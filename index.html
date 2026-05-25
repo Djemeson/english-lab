@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>English Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== VARIABLES ===== */
+:root {
+  --bg: #0F172A;
+  --surface: #1E293B;
+  --surface2: #2D3F55;
+  --surface3: #334155;
+  --border: #3E4F68;
+  --primary: #3B82F6;
+  --primary-d: #2563EB;
+  --primary-glow: rgba(59,130,246,0.15);
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --purple: #A78BFA;
+  --text: #F1F5F9;
+  --text2: #94A3B8;
+  --text3: #64748B;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+input,textarea,select,button{font-family:inherit;font-size:inherit}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ===== NAVBAR ===== */
+.navbar{
+  position:sticky;top:0;z-index:100;
+  display:flex;align-items:center;gap:24px;
+  padding:0 24px;height:60px;
+  background:rgba(15,23,42,0.96);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.nav-brand{
+  font-weight:700;font-size:1.1rem;
+  background:linear-gradient(135deg,#60A5FA,#818CF8);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;
+}
+.nav-tabs{display:flex;gap:4px;flex:1}
+.nav-tab{
+  padding:6px 16px;border:none;border-radius:var(--radius-sm);
+  background:transparent;color:var(--text2);cursor:pointer;
+  font-weight:500;font-size:0.9rem;transition:all .15s;
+}
+.nav-tab:hover{background:var(--surface2);color:var(--text)}
+.nav-tab.active{background:var(--primary-glow);color:var(--primary)}
+.badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;height:18px;padding:0 5px;
+  background:var(--primary);color:#fff;border-radius:9px;
+  font-size:0.7rem;font-weight:700;margin-left:6px;vertical-align:middle;
+}
+.badge.red{background:var(--error)}
+.badge.hidden{display:none}
+.anki-indicator{
+  display:flex;align-items:center;gap:6px;
+  font-size:0.8rem;color:var(--text3);margin-left:auto;
+}
+.anki-dot{width:8px;height:8px;border-radius:50%;background:var(--error);flex-shrink:0}
+.anki-dot.on{background:var(--success)}
+
+/* ===== LAYOUT ===== */
+.main{max-width:1000px;margin:0 auto;padding:32px 24px}
+.section{display:none}
+.section.active{display:block}
+.page-header{margin-bottom:28px}
+.page-header h1{font-size:1.5rem;font-weight:700}
+.page-header p{color:var(--text2);margin-top:4px;font-size:0.95rem}
+
+/* ===== STATS ===== */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.stat-label{font-size:0.78rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.stat-value{font-size:2rem;font-weight:700;margin-top:4px;line-height:1}
+.stat-sub{font-size:0.8rem;color:var(--text2);margin-top:6px}
+.stat-card.blue .stat-value{color:var(--primary)}
+.stat-card.green .stat-value{color:var(--success)}
+.stat-card.yellow .stat-value{color:var(--warning)}
+.stat-card.purple .stat-value{color:var(--purple)}
+
+/* ===== RECENT LIST ===== */
+.card-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
+.card-box-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-box-header h3{font-size:0.92rem;font-weight:600}
+.recent-list{max-height:260px;overflow-y:auto}
+.recent-item{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 20px;border-bottom:1px solid var(--border);
+  transition:background .15s;
+}
+.recent-item:last-child{border-bottom:none}
+.recent-item:hover{background:var(--surface2)}
+.ri-word{font-weight:600;font-size:0.9rem;min-width:130px}
+.ri-ctx{flex:1;font-size:0.82rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status-chip{
+  font-size:0.72rem;padding:2px 8px;border-radius:4px;font-weight:600;white-space:nowrap;
+}
+.status-chip.pending_ai{background:rgba(245,158,11,.15);color:var(--warning)}
+.status-chip.pending_review{background:rgba(59,130,246,.15);color:var(--primary)}
+.status-chip.in_anki{background:rgba(16,185,129,.15);color:var(--success)}
+.status-chip.skipped{background:rgba(100,116,139,.15);color:var(--text3)}
+.empty-state{padding:48px;text-align:center;color:var(--text3)}
+.empty-state .icon{font-size:2.5rem;margin-bottom:10px}
+
+/* ===== QUICK ADD ===== */
+.quick-add{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px}
+.quick-add h3{font-size:0.85rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+.quick-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+
+/* ===== TABS ===== */
+.tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:0}
+.tab{
+  padding:8px 18px;border:none;background:transparent;
+  color:var(--text2);cursor:pointer;font-weight:500;font-size:0.9rem;
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;
+}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ===== FORMS ===== */
+.form-group{margin-bottom:14px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+label{display:block;font-size:0.83rem;font-weight:500;color:var(--text2);margin-bottom:5px}
+.label-note{font-size:0.75rem;color:var(--text3);font-weight:400}
+input[type=text],input[type=url],input[type=password],textarea,select{
+  width:100%;padding:9px 13px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text);transition:border-color .15s;outline:none;
+}
+input:focus,textarea:focus,select:focus{border-color:var(--primary)}
+textarea{resize:vertical;min-height:76px}
+select option{background:var(--surface)}
+
+/* ===== BUTTONS ===== */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 18px;border:none;border-radius:var(--radius-sm);
+  font-weight:600;font-size:0.9rem;cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--primary-d)}
+.btn-success{background:var(--success);color:#fff}
+.btn-success:hover:not(:disabled){background:#059669}
+.btn-danger{background:var(--error);color:#fff}
+.btn-danger:hover:not(:disabled){background:#DC2626}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover:not(:disabled){background:var(--surface3)}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover:not(:disabled){background:var(--surface2);color:var(--text)}
+.btn-sm{padding:5px 12px;font-size:0.82rem}
+.btn-full{width:100%;justify-content:center}
+.btn-group{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+
+/* ===== UPLOAD AREA ===== */
+.upload-area{
+  border:2px dashed var(--border);border-radius:var(--radius);
+  padding:36px;text-align:center;cursor:pointer;transition:all .2s;
+}
+.upload-area:hover,.upload-area.drag{border-color:var(--primary);background:var(--primary-glow)}
+.upload-area input[type=file]{display:none}
+.upload-icon{font-size:2rem;margin-bottom:8px}
+.upload-area p{color:var(--text2);font-size:0.88rem;margin-top:4px}
+
+/* ===== PARSED LIST ===== */
+.parsed-header{display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px}
+.parsed-header h3{font-size:0.95rem;font-weight:600}
+.parsed-list{display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;padding-right:2px}
+.parsed-item{
+  display:flex;align-items:flex-start;gap:12px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:12px 14px;
+}
+.parsed-item input[type=checkbox]{margin-top:3px;accent-color:var(--primary);width:16px;height:16px;cursor:pointer;flex-shrink:0}
+.parsed-item-body{flex:1;min-width:0}
+.parsed-word{font-weight:600;margin-bottom:3px}
+.parsed-context{font-size:0.83rem;color:var(--text2);line-height:1.5}
+.parsed-meta{font-size:0.75rem;color:var(--text3);margin-top:4px}
+/* Kindle word picker */
+.word-picker{line-height:1.9;font-size:0.85rem;color:var(--text2)}
+.wp-tok{cursor:pointer;padding:1px 3px;border-radius:3px;transition:background .1s}
+.wp-tok:hover{background:rgba(59,130,246,.25)}
+.wp-tok.sel{background:var(--primary);color:#fff;border-radius:3px}
+/* word target input inside parsed item */
+.word-target-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.word-target-row input{flex:1;padding:5px 10px;font-size:0.82rem}
+.word-target-row label{margin:0;white-space:nowrap;font-size:0.78rem}
+
+/* ===== DIVIDER ===== */
+.divider{height:1px;background:var(--border);margin:18px 0}
+.info-box{background:var(--surface2);border-radius:var(--radius-sm);padding:12px 16px;font-size:0.85rem;color:var(--text2);margin-bottom:16px}
+.info-box strong{color:var(--text)}
+
+/* ===== REVIEW SECTION REDESIGN ===== */
+.review-layout{display:grid;grid-template-columns:260px 1fr;gap:20px;align-items:start}
+
+/* Sidebar */
+.review-sidebar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;position:sticky;top:76px}
+.review-sidebar-header{
+  padding:12px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.review-sidebar-header h3{font-size:0.88rem;font-weight:600}
+.review-search{padding:10px 12px;border-bottom:1px solid var(--border)}
+.review-search input{padding:7px 12px;font-size:0.85rem}
+.review-word-list{max-height:calc(100vh - 220px);overflow-y:auto}
+.rw-item{
+  padding:11px 16px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .15s;
+}
+.rw-item:last-child{border-bottom:none}
+.rw-item:hover{background:var(--surface2)}
+.rw-item.active{background:var(--primary-glow);border-left:3px solid var(--primary)}
+.rw-word{font-weight:600;font-size:0.88rem;margin-bottom:3px}
+.rw-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.rw-count{font-size:0.73rem;color:var(--text3)}
+
+/* Main card area */
+.review-main{}
+.review-empty-main{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:80px 40px;text-align:center;color:var(--text3);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+}
+.review-empty-main .icon{font-size:3rem;margin-bottom:12px}
+
+/* Word card */
+.word-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.wc-header{padding:20px 24px;border-bottom:1px solid var(--border)}
+.wc-word{font-size:1.8rem;font-weight:700;margin-bottom:8px}
+.wc-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.wc-ipa{font-size:0.95rem;color:var(--text2);font-style:italic}
+.wc-source{font-size:0.8rem;color:var(--text3)}
+.wc-context{
+  margin-top:12px;padding:12px 14px;
+  background:var(--bg);border-radius:var(--radius-sm);
+  border-left:3px solid var(--primary);
+  font-size:0.88rem;color:var(--text2);line-height:1.7;
+  font-style:italic;
+}
+.wc-context .ctx-word{color:var(--primary);font-weight:600;font-style:normal}
+
+/* Pending AI state */
+.wc-pending-ai{padding:32px 24px;text-align:center}
+.wc-pending-ai p{color:var(--text2);margin-bottom:20px;font-size:0.95rem}
+.wc-pending-ai .big-btn{font-size:1rem;padding:12px 28px}
+
+/* Meanings list */
+.wc-meanings{padding:0 24px 20px}
+.meanings-toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 0 12px;border-bottom:1px solid var(--border);margin-bottom:12px;
+}
+.meanings-toolbar-left{display:flex;align-items:center;gap:10px;font-size:0.85rem;color:var(--text2)}
+.meanings-count{font-weight:600;color:var(--text)}
+
+/* Single meaning item */
+.meaning-item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px 14px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);margin-bottom:8px;
+  cursor:pointer;transition:all .15s;
+  background:var(--bg);
+}
+.meaning-item:hover{border-color:var(--surface3);background:var(--surface2)}
+.meaning-item.selected{
+  border-color:var(--primary);
+  background:rgba(59,130,246,.07);
+}
+.meaning-item.context-match{
+  border-color:rgba(16,185,129,.5);
+}
+.meaning-item.context-match.selected{
+  border-color:var(--success);
+  background:rgba(16,185,129,.07);
+}
+.mi-checkbox{
+  width:18px;height:18px;border-radius:4px;flex-shrink:0;margin-top:2px;
+  border:2px solid var(--border);background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.meaning-item.selected .mi-checkbox{background:var(--primary);border-color:var(--primary)}
+.meaning-item.context-match.selected .mi-checkbox{background:var(--success);border-color:var(--success)}
+.mi-checkbox::after{
+  content:'✓';color:#fff;font-size:0.7rem;font-weight:700;
+  display:none;
+}
+.meaning-item.selected .mi-checkbox::after{display:block}
+.mi-body{flex:1;min-width:0}
+.mi-top{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.mi-meaning{font-size:0.92rem;font-weight:600;color:var(--text);line-height:1.4;flex:1}
+.mi-chips{display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;align-items:flex-start}
+.chip{
+  font-size:0.7rem;font-weight:600;padding:2px 7px;border-radius:3px;
+  background:var(--surface3);color:var(--text2);white-space:nowrap;
+}
+.chip.register-informal{background:rgba(245,158,11,.15);color:var(--warning)}
+.chip.register-slang{background:rgba(239,68,68,.12);color:#FCA5A5}
+.chip.register-formal{background:rgba(167,139,250,.15);color:var(--purple)}
+.chip.register-technical{background:rgba(16,185,129,.12);color:var(--success)}
+.chip.level-a1,.chip.level-a2{background:rgba(16,185,129,.15);color:var(--success)}
+.chip.level-b1,.chip.level-b2{background:rgba(59,130,246,.15);color:var(--primary)}
+.chip.level-c1,.chip.level-c2{background:rgba(167,139,250,.15);color:var(--purple)}
+.mi-note{font-size:0.8rem;color:var(--text3);margin-bottom:7px;line-height:1.5}
+.mi-example{
+  font-size:0.83rem;line-height:1.6;
+  border-left:2px solid var(--border);padding-left:10px;
+}
+.mi-example .en{color:var(--text2);font-style:italic}
+.mi-example .pt{color:var(--text3);font-size:0.78rem;margin-top:2px}
+.context-match-badge{
+  font-size:0.68rem;font-weight:700;padding:2px 6px;border-radius:3px;
+  background:rgba(16,185,129,.2);color:var(--success);white-space:nowrap;
+}
+
+/* Actions bar */
+.wc-actions{
+  padding:16px 24px;border-top:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--surface2);
+}
+
+/* ===== SETTINGS ===== */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.settings-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px}
+.settings-card.full{grid-column:1/-1}
+.settings-card h3{font-size:0.95rem;font-weight:600;margin-bottom:4px}
+.settings-card .desc{font-size:0.82rem;color:var(--text2);margin-bottom:16px}
+.test-result{display:flex;align-items:center;gap:8px;font-size:0.83rem;padding:9px 12px;border-radius:var(--radius-sm);background:var(--surface2);margin-top:10px}
+.test-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0}
+.test-dot.ok{background:var(--success)}
+.test-dot.err{background:var(--error)}
+.model-row{display:flex;gap:10px;align-items:end}
+.model-row select{flex:1}
+
+/* ===== TOAST ===== */
+#toasts{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 18px;border-radius:var(--radius);
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);font-size:0.87rem;font-weight:500;
+  box-shadow:var(--shadow);min-width:260px;max-width:380px;
+  animation:tin .2s ease;
+}
+.toast.success{border-color:var(--success)}
+.toast.error{border-color:var(--error)}
+.toast.warning{border-color:var(--warning)}
+@keyframes tin{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+.spinner{
+  display:inline-block;width:15px;height:15px;
+  border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
+  border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+.mt-2{margin-top:8px}.mt-4{margin-top:16px}.mb-4{margin-bottom:16px}
+.text-muted{color:var(--text2)}.text-sm{font-size:0.85rem}
+@media(max-width:700px){
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .review-layout{grid-template-columns:1fr}
+  .settings-grid{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .quick-row{grid-template-columns:1fr}
+  .review-sidebar{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="nav-brand">🔤 English Lab</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showSection('dashboard')">Dashboard</button>
+    <button class="nav-tab" onclick="showSection('adicionar')">Adicionar</button>
+    <button class="nav-tab" onclick="showSection('revisar')">
+      Revisar <span class="badge hidden" id="badge-review">0</span>
+    </button>
+    <button class="nav-tab" onclick="showSection('configuracoes')">Configurações</button>
+  </div>
+  <div class="anki-indicator">
+    <div class="anki-dot" id="anki-dot"></div>
+    <span id="anki-label">Anki</span>
+  </div>
+</nav>
+
+<main class="main">
+
+<!-- =========== DASHBOARD =========== -->
+<section id="section-dashboard" class="section active">
+  <div class="page-header">
+    <h1>Dashboard</h1>
+    <p>Seu progresso de vocabulário em inglês</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card blue">
+      <div class="stat-label">Total</div>
+      <div class="stat-value" id="st-total">0</div>
+      <div class="stat-sub">palavras capturadas</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">No Anki</div>
+      <div class="stat-value" id="st-anki">0</div>
+      <div class="stat-sub">cards criados</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-label">Para Revisar</div>
+      <div class="stat-value" id="st-review">0</div>
+      <div class="stat-sub">aguardando você</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-label">Esta Semana</div>
+      <div class="stat-value" id="st-week">0</div>
+      <div class="stat-sub">adicionadas</div>
+    </div>
+  </div>
+
+  <div class="quick-add card-box">
+    <div class="card-box-header"><h3>⚡ Adição rápida</h3></div>
+    <div style="padding:18px">
+      <div class="quick-row">
+        <div>
+          <label>Palavra ou expressão</label>
+          <input type="text" id="q-word" placeholder="ex: give up / serendipity / kick the bucket">
+        </div>
+        <div>
+          <label>Contexto <span class="label-note">(opcional)</span></label>
+          <input type="text" id="q-ctx" placeholder="Frase onde encontrou">
+        </div>
+        <button class="btn btn-primary" onclick="quickAdd()" style="align-self:end">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-box">
+    <div class="card-box-header">
+      <h3>Adicionadas recentemente</h3>
+      <button class="btn btn-ghost btn-sm" onclick="showSection('adicionar')">+ Mais</button>
+    </div>
+    <div class="recent-list" id="recent-list">
+      <div class="empty-state"><div class="icon">📖</div><p>Nenhuma palavra ainda.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- =========== ADICIONAR =========== -->
+<section id="section-adicionar" class="section">
+  <div class="page-header">
+    <h1>Adicionar vocabulário</h1>
+    <p>Escolha a fonte do input</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('manual')">✍️ Manual</button>
+    <button class="tab" onclick="showTab('kindle')">📖 Kindle</button>
+    <button class="tab" onclick="showTab('midia')">🎬 Mídia</button>
+    <button class="tab" onclick="showTab('site')">🌐 Website</button>
+  </div>
+
+  <!-- TAB MANUAL -->
+  <div class="tab-panel active" id="panel-manual">
+    <div class="info-box">
+      Os campos são <strong>independentes</strong> — você pode adicionar só a palavra, só a frase, ou ambos.
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="margin:0">
+        <label>Palavra / Phrasal verb / Idiom <span class="label-note">(opcional)</span></label>
+        <input type="text" id="m-word" placeholder="ex: give up · kick the bucket · serendipity">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Frase ou expressão completa <span class="label-note">(opcional)</span></label>
+        <input type="text" id="m-ctx" placeholder="ex: She decided to give up on her dream.">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="margin:0">
+        <label>Fonte</label>
+        <select id="m-source">
+          <option value="manual">Manual</option>
+          <option value="kindle">Kindle</option>
+          <option value="series">Série</option>
+          <option value="movie">Filme</option>
+          <option value="youtube">YouTube</option>
+          <option value="podcast">Podcast</option>
+          <option value="website">Website</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Título / Origem <span class="label-note">(opcional)</span></label>
+        <input type="text" id="m-title" placeholder="ex: Harry Potter, Breaking Bad...">
+      </div>
+    </div>
+    <div class="btn-group" style="margin-top:4px">
+      <button class="btn btn-primary" onclick="addManual()">➕ Adicionar para revisão</button>
+    </div>
+  </div>
+
+  <!-- TAB KINDLE -->
+  <div class="tab-panel" id="panel-kindle">
+    <div class="info-box">
+      Importe o arquivo HTML exportado pelo Kindle (<strong>Notas e Destaques</strong>). Cada destaque aparece com seu texto — clique na palavra alvo dentro de cada frase para identificá-la, ou digite no campo de texto.
+    </div>
+    <div class="upload-area" id="kindle-drop" onclick="document.getElementById('kindle-file').click()">
+      <input type="file" id="kindle-file" accept=".html,.htm,.txt,.csv" onchange="handleKindleFile(this)">
+      <div class="upload-icon">📖</div>
+      <p><strong>Clique</strong> ou arraste o arquivo aqui</p>
+      <p>.html (Notas e Destaques) · .txt (My Clippings) · .csv (Vocabulary Builder)</p>
+    </div>
+
+    <div id="kindle-result" class="hidden">
+      <div class="parsed-header">
+        <h3 id="kindle-count">0 destaques</h3>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('kindle-check',true)">Todos</button>
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('kindle-check',false)">Nenhum</button>
+          <button class="btn btn-primary btn-sm" onclick="addKindleSelected()">➕ Adicionar selecionados</button>
+        </div>
+      </div>
+      <div class="parsed-list" id="kindle-list"></div>
+    </div>
+  </div>
+
+  <!-- TAB MÍDIA -->
+  <div class="tab-panel" id="panel-midia">
+    <div class="info-box">
+      Palavras anotadas enquanto assiste séries, filmes ou YouTube — com ou sem a extensão Language Reactor. Cole o texto ou carregue um arquivo .txt.
+    </div>
+    <div class="form-group">
+      <label>Fonte de mídia</label>
+      <div style="display:flex;gap:10px">
+        <label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--text);cursor:pointer;margin:0">
+          <input type="radio" name="midia-type" value="series" checked style="accent-color:var(--primary)"> Série
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--text);cursor:pointer;margin:0">
+          <input type="radio" name="midia-type" value="movie" style="accent-color:var(--primary)"> Filme
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--text);cursor:pointer;margin:0">
+          <input type="radio" name="midia-type" value="youtube" style="accent-color:var(--primary)"> YouTube
+        </label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Título / URL <span class="label-note">(opcional)</span></label>
+      <input type="text" id="midia-title" placeholder="ex: Breaking Bad S01E01 / https://youtube.com/watch?v=...">
+    </div>
+    <div class="form-group">
+      <label>Cole o conteúdo do arquivo ou suas anotações</label>
+      <textarea id="midia-text" rows="7" placeholder="Formatos aceitos:&#10;&#10;serendipity&#10;give up :: She decided to give up.&#10;palavra  contexto (separado por TAB)&#10;&#10;Um item por linha."></textarea>
+    </div>
+    <div style="margin-bottom:12px">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('midia-file').click()">📂 Ou carregar arquivo .txt</button>
+      <input type="file" id="midia-file" accept=".txt,.tsv,.csv" class="hidden" onchange="handleMidiaFile(this)">
+    </div>
+    <div id="midia-result" class="hidden">
+      <div class="parsed-header">
+        <h3 id="midia-count">0 itens</h3>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('midia-check',true)">Todos</button>
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('midia-check',false)">Nenhum</button>
+          <button class="btn btn-primary btn-sm" onclick="addMidiaSelected()">➕ Adicionar selecionados</button>
+        </div>
+      </div>
+      <div class="parsed-list" id="midia-list"></div>
+    </div>
+    <div class="btn-group" style="margin-top:4px">
+      <button class="btn btn-secondary" onclick="parseMidiaText()">🔍 Analisar texto</button>
+    </div>
+  </div>
+
+  <!-- TAB SITE -->
+  <div class="tab-panel" id="panel-site">
+    <div class="info-box">
+      Cole uma URL — a plataforma busca o conteúdo e a IA identifica vocabulário acima de B1 para você selecionar.
+      <strong>Requer n8n configurado.</strong>
+    </div>
+    <div class="form-group">
+      <label>URL do artigo / página</label>
+      <input type="url" id="site-url" placeholder="https://www.bbc.com/news/...">
+    </div>
+    <button class="btn btn-primary" id="site-btn" onclick="extractSite()">🌐 Extrair vocabulário</button>
+
+    <div id="site-result" class="hidden">
+      <div class="parsed-header">
+        <h3 id="site-count">0 palavras</h3>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('site-check',true)">Todos</button>
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('site-check',false)">Nenhum</button>
+          <button class="btn btn-primary btn-sm" onclick="addSiteSelected()">➕ Adicionar selecionados</button>
+        </div>
+      </div>
+      <div class="parsed-list" id="site-list"></div>
+    </div>
+  </div>
+</section>
+
+<!-- =========== REVISAR =========== -->
+<section id="section-revisar" class="section">
+  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <h1>Revisar</h1>
+      <p>A IA gera todos os significados — você seleciona os que quer estudar e envia pro Anki</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-secondary btn-sm" onclick="analyzeAll()">⚡ Analisar todas com IA</button>
+      <button class="btn btn-ghost btn-sm" onclick="showSection('adicionar')">+ Adicionar</button>
+    </div>
+  </div>
+
+  <div id="review-empty" class="empty-state" style="margin-top:40px">
+    <div class="icon">✅</div>
+    <p>Nada na fila de revisão ainda.</p>
+    <button class="btn btn-primary mt-4" onclick="showSection('adicionar')" style="margin-top:16px">+ Adicionar palavras</button>
+  </div>
+
+  <div id="review-content" class="hidden">
+    <div class="review-layout">
+
+      <!-- Sidebar -->
+      <div class="review-sidebar">
+        <div class="review-sidebar-header">
+          <h3>Palavras</h3>
+          <span class="badge" id="sidebar-count">0</span>
+        </div>
+        <div class="review-search">
+          <input type="text" id="sidebar-search" placeholder="🔍 Buscar..." oninput="filterSidebar(this.value)">
+        </div>
+        <div class="review-word-list" id="review-word-list"></div>
+      </div>
+
+      <!-- Main area -->
+      <div id="review-main">
+        <div class="review-empty-main">
+          <div class="icon">👈</div>
+          <p>Selecione uma palavra na lista para ver seus significados</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- =========== CONFIGURAÇÕES =========== -->
+<section id="section-configuracoes" class="section">
+  <div class="page-header">
+    <h1>Configurações</h1>
+    <p>Configure IA, Anki e integrações</p>
+  </div>
+
+  <div class="settings-grid">
+
+    <!-- OpenAI -->
+    <div class="settings-card full">
+      <h3>🤖 OpenAI (IA principal)</h3>
+      <p class="desc">Usada para analisar vocabulário e gerar todos os significados automaticamente.</p>
+      <div class="form-row">
+        <div class="form-group" style="margin:0">
+          <label>API Key</label>
+          <input type="password" id="cfg-oai-key" placeholder="sk-...">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Modelo</label>
+          <select id="cfg-oai-model">
+            <option value="gpt-4o-mini">gpt-4o-mini (rápido, barato)</option>
+            <option value="gpt-4o">gpt-4o (mais capaz)</option>
+            <option value="gpt-4-turbo">gpt-4-turbo</option>
+          </select>
+        </div>
+      </div>
+      <div id="oai-test-result" class="test-result hidden">
+        <div class="test-dot" id="oai-dot"></div>
+        <span id="oai-msg"></span>
+      </div>
+      <div class="btn-group" style="margin-top:12px">
+        <button class="btn btn-secondary btn-sm" onclick="testOpenAI()">Testar conexão</button>
+      </div>
+    </div>
+
+    <!-- AnkiConnect -->
+    <div class="settings-card">
+      <h3>🃏 AnkiConnect</h3>
+      <p class="desc">Anki deve estar aberto com o plugin AnkiConnect instalado (código 2055492159).</p>
+      <div class="form-group">
+        <label>URL do AnkiConnect</label>
+        <input type="url" id="cfg-anki-url" placeholder="http://localhost:8765">
+      </div>
+      <div class="form-group">
+        <label>Deck padrão</label>
+        <input type="text" id="cfg-anki-deck" placeholder="Inglês">
+      </div>
+      <div class="form-group">
+        <label>Modelo de nota</label>
+        <input type="text" id="cfg-anki-model" placeholder="Inglês Básico">
+      </div>
+      <div id="anki-test-result" class="test-result hidden">
+        <div class="test-dot" id="anki-tdot"></div>
+        <span id="anki-tmsg"></span>
+      </div>
+      <div class="btn-group" style="margin-top:12px">
+        <button class="btn btn-secondary btn-sm" onclick="testAnki()">Testar conexão</button>
+      </div>
+    </div>
+
+    <!-- Campos Anki -->
+    <div class="settings-card">
+      <h3>📋 Campos do modelo Anki</h3>
+      <p class="desc">Nome exato dos campos no seu tipo de nota.</p>
+      <div class="form-group"><label>Frente (palavra)</label><input type="text" id="cfg-f-word" placeholder="Frente"></div>
+      <div class="form-group"><label>Verso (significado)</label><input type="text" id="cfg-f-meaning" placeholder="Verso"></div>
+      <div class="form-group"><label>Contexto</label><input type="text" id="cfg-f-context" placeholder="Contexto"></div>
+      <div class="form-group"><label>IPA</label><input type="text" id="cfg-f-ipa" placeholder="IPA"></div>
+      <div class="form-group"><label>Exemplos</label><input type="text" id="cfg-f-examples" placeholder="Exemplos"></div>
+      <div class="form-group"><label>Áudio</label><input type="text" id="cfg-f-audio" placeholder="Áudio"></div>
+    </div>
+
+    <!-- n8n (opcional) -->
+    <div class="settings-card">
+      <h3>🔧 n8n <span style="font-weight:400;color:var(--text3);font-size:0.85rem">(opcional)</span></h3>
+      <p class="desc">Usado para extração de websites e sincronização com Google Sheets. A IA principal é o OpenAI acima.</p>
+      <div class="form-group">
+        <label>URL base do n8n (Hostinger)</label>
+        <input type="url" id="cfg-n8n" placeholder="https://seu-n8n.hostinger.com">
+      </div>
+    </div>
+
+    <!-- Dados -->
+    <div class="settings-card full">
+      <h3>💾 Dados locais</h3>
+      <p class="desc">Os dados ficam no localStorage do navegador. Faça backups regulares.</p>
+      <div class="btn-group" style="margin-top:4px">
+        <button class="btn btn-secondary btn-sm" onclick="exportData()">📥 Exportar JSON</button>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click()">📤 Importar JSON</button>
+        <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(this)">
+        <button class="btn btn-danger btn-sm" onclick="clearAllData()">🗑 Limpar tudo</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top:24px">
+    <button class="btn btn-primary" onclick="saveSettings()">💾 Salvar configurações</button>
+  </div>
+</section>
+
+</main>
+<div id="toasts"></div>
+
+<script>
+// ================================================================
+// STATE & STORAGE
+// ================================================================
+const SK = { settings: 'englab_cfg', words: 'englab_words' }
+
+const DEF_CFG = {
+  openaiKey: '', openaiModel: 'gpt-4o-mini',
+  ankiUrl: 'http://localhost:8765', ankiDeck: 'Inglês', ankiModel: 'Inglês Básico',
+  n8nBase: '',
+  fields: { word: 'Frente', meaning: 'Verso', context: 'Contexto', ipa: 'IPA', examples: 'Exemplos', audio: 'Áudio' }
+}
+
+let cfg = {}
+let words = []
+let activeWordId = null
+let kindleItems = [], midiaItems = [], siteItems = []
+
+function loadCfg() {
+  try { cfg = { ...DEF_CFG, ...JSON.parse(localStorage.getItem(SK.settings) || '{}') }
+        if (!cfg.fields) cfg.fields = DEF_CFG.fields
+  } catch { cfg = { ...DEF_CFG } }
+}
+function saveCfg() { localStorage.setItem(SK.settings, JSON.stringify(cfg)) }
+function loadWords() {
+  try { words = JSON.parse(localStorage.getItem(SK.words) || '[]') } catch { words = [] }
+}
+function saveWords() { localStorage.setItem(SK.words, JSON.stringify(words)) }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7) }
+
+// ================================================================
+// NAVIGATION
+// ================================================================
+const SECTIONS = ['dashboard','adicionar','revisar','configuracoes']
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', SECTIONS[i] === name))
+  document.getElementById(`section-${name}`).classList.add('active')
+  if (name === 'dashboard') renderDashboard()
+  if (name === 'revisar') renderReview()
+  if (name === 'configuracoes') fillSettings()
+}
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'))
+  document.getElementById(`panel-${name}`).classList.add('active')
+  event.currentTarget.classList.add('active')
+}
+
+// ================================================================
+// DASHBOARD
+// ================================================================
+function renderDashboard() {
+  const total = words.length
+  const inAnki = words.filter(w => w.status === 'in_anki').length
+  const review = words.filter(w => ['pending_ai','pending_review'].includes(w.status)).length
+  const week = words.filter(w => Date.now() - new Date(w.created_at) < 7*864e5).length
+
+  el('st-total').textContent = total
+  el('st-anki').textContent = inAnki
+  el('st-review').textContent = review
+  el('st-week').textContent = week
+
+  const badge = el('badge-review')
+  badge.textContent = review
+  badge.classList.toggle('hidden', review === 0)
+
+  const list = el('recent-list')
+  if (!words.length) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">📖</div><p>Nenhuma palavra ainda.</p></div>`
+    return
+  }
+  list.innerHTML = [...words]
+    .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 20).map(w => `
+    <div class="recent-item">
+      <div class="ri-word">${esc(w.word || '(frase)')}</div>
+      <div class="ri-ctx">${w.context ? esc(w.context) : '<em style="color:var(--text3)">sem contexto</em>'}</div>
+      <span class="status-chip ${w.status}">${statusLabel(w.status)}</span>
+    </div>`).join('')
+}
+
+function statusLabel(s) {
+  return { pending_ai:'⏳ Pendente IA', pending_review:'👁 Revisar', in_anki:'✓ Anki', skipped:'– Pulada' }[s] || s
+}
+
+// ================================================================
+// WORD CREATION
+// ================================================================
+function createWord(data) {
+  const w = {
+    id: uid(),
+    word: (data.word || '').trim(),
+    context: (data.context || '').trim(),
+    source_type: data.source_type || 'manual',
+    source_title: data.source_title || '',
+    status: 'pending_ai',
+    meanings: [],
+    ai_processed: false,
+    created_at: new Date().toISOString()
+  }
+  words.unshift(w)
+  saveWords()
+  return w
+}
+
+// ================================================================
+// QUICK ADD
+// ================================================================
+function quickAdd() {
+  const word = el('q-word').value.trim()
+  const ctx = el('q-ctx').value.trim()
+  if (!word && !ctx) { toast('Digite ao menos uma palavra ou frase', 'warning'); return }
+  createWord({ word, context: ctx, source_type: 'manual' })
+  el('q-word').value = ''
+  el('q-ctx').value = ''
+  renderDashboard()
+  toast(`Adicionado! Vá em Revisar para analisar com IA.`, 'success')
+}
+
+// ================================================================
+// MANUAL ADD
+// ================================================================
+function addManual() {
+  const word = el('m-word').value.trim()
+  const ctx = el('m-ctx').value.trim()
+  if (!word && !ctx) { toast('Preencha a palavra ou a frase', 'warning'); return }
+  createWord({ word, context: ctx,
+    source_type: el('m-source').value,
+    source_title: el('m-title').value.trim()
+  })
+  el('m-word').value = ''; el('m-ctx').value = ''; el('m-title').value = ''
+  renderDashboard()
+  toast(`Adicionado à fila de revisão!`, 'success')
+}
+
+// ================================================================
+// KINDLE PARSER — HTML/TXT/CSV
+// ================================================================
+function handleKindleFile(input) {
+  const file = input.files[0]; if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => {
+    const text = e.target.result
+    const name = file.name.toLowerCase()
+    if (name.endsWith('.html') || name.endsWith('.htm')) {
+      kindleItems = parseKindleHTML(text)
+    } else if (name.endsWith('.csv')) {
+      kindleItems = parseKindleCSV(text)
+    } else {
+      kindleItems = parseKindleClippings(text)
+    }
+    renderKindleList()
+  }
+  reader.readAsText(file, 'utf-8')
+  input.value = ''
+}
+
+function parseKindleHTML(html) {
+  // Extrai book title
+  const titleMatch = html.match(/class='bookTitle'>([^<]+)/)
+  const bookTitle = titleMatch ? titleMatch[1].replace(/\n/g,' ').trim() : 'Kindle'
+
+  // Extrai chapters e highlights em ordem de posição no documento
+  const events = []
+  const chapRe = /class='sectionHeading'>([^<]+)<\/h2>/g
+  const noteRe = /class='noteText'>([^<]+)/g
+  let m
+  while ((m = chapRe.exec(html)) !== null) events.push({ t: 'ch', text: m[1].trim(), pos: m.index })
+  while ((m = noteRe.exec(html)) !== null) {
+    const text = m[1].trim()
+    if (text && text.length >= 2) events.push({ t: 'note', text, pos: m.index })
+  }
+  events.sort((a,b) => a.pos - b.pos)
+
+  const items = []
+  let chapter = ''
+  events.forEach(ev => {
+    if (ev.t === 'ch') { chapter = ev.text }
+    else { items.push({ word:'', context: ev.text, source_type:'kindle', source_title: bookTitle, chapter }) }
+  })
+  return items
+}
+
+function parseKindleClippings(text) {
+  const bookTitle = 'My Clippings'
+  return text.split(/={10,}/).map(s => s.trim()).filter(Boolean).reduce((acc, entry) => {
+    const lines = entry.split('\n').map(l => l.trim()).filter(Boolean)
+    if (lines.length < 2) return acc
+    const meta = lines[1]
+    if (!meta.startsWith('-')) return acc
+    if (/bookmark|note/i.test(meta)) return acc
+    const content = lines.slice(2).join(' ').trim()
+    if (content.length >= 2)
+      acc.push({ word:'', context: content, source_type:'kindle', source_title: lines[0].replace(/\(.*?\)$/, '').trim() })
+    return acc
+  }, [])
+}
+
+function parseKindleCSV(text) {
+  const lines = text.split('\n')
+  const hasHeader = /word|usage/i.test(lines[0])
+  return lines.slice(hasHeader ? 1 : 0).reduce((acc, line) => {
+    const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim())
+    const word = cols[0] || ''; const context = cols.find((c,i) => i>0 && c.length>10) || ''
+    if (word || context) acc.push({ word, context, source_type:'kindle', source_title: cols[4] || 'Kindle' })
+    return acc
+  }, [])
+}
+
+function renderKindleList() {
+  const list = el('kindle-list')
+  el('kindle-count').textContent = `${kindleItems.length} destaques`
+  el('kindle-result').classList.remove('hidden')
+  list.innerHTML = kindleItems.map((item, i) => {
+    const hasPicker = !item.word && item.context
+    return `
+    <div class="parsed-item" id="ki-${i}">
+      <input type="checkbox" class="kindle-check" data-i="${i}" checked>
+      <div class="parsed-item-body">
+        <div class="parsed-word" id="kw-${i}" style="${item.word ? '' : 'color:var(--text3);font-style:italic'}">${item.word || 'Clique na palavra alvo abaixo'}</div>
+        ${hasPicker ? `<div class="word-picker" id="kp-${i}">${buildPicker(item.context, i)}</div>` : `<div class="parsed-context">${esc(item.context)}</div>`}
+        <div class="word-target-row">
+          <label style="color:var(--text3);font-size:0.77rem">ou digite:</label>
+          <input type="text" placeholder="palavra alvo" value="${esc(item.word)}" oninput="setKindleWord(${i},this.value)" style="max-width:200px">
+        </div>
+        <div class="parsed-meta">📖 ${esc(item.source_title)}${item.chapter ? ' · ' + esc(item.chapter) : ''}</div>
+      </div>
+    </div>`
+  }).join('')
+  kindleItems.forEach((_,i) => attachPicker(i))
+}
+
+function buildPicker(text, idx) {
+  return text.split(/(\s+)/).map(tok => {
+    if (/^\s+$/.test(tok)) return tok
+    const w = tok.replace(/[.,!?;:"""''()[\]]/g, '')
+    return `<span class="wp-tok" data-i="${idx}" data-w="${escA(w)}">${esc(tok)}</span>`
+  }).join('')
+}
+
+function attachPicker(idx) {
+  const c = el(`kp-${idx}`); if (!c) return
+  c.querySelectorAll('.wp-tok').forEach(tok => tok.addEventListener('click', function() {
+    c.querySelectorAll('.wp-tok').forEach(t => t.classList.remove('sel'))
+    this.classList.add('sel')
+    setKindleWord(parseInt(this.dataset.i), this.dataset.w)
+  }))
+}
+
+function setKindleWord(i, word) {
+  kindleItems[i].word = word
+  const wEl = el(`kw-${i}`)
+  if (wEl) { wEl.textContent = word || 'Clique na palavra alvo'; wEl.style.color = word ? '' : 'var(--text3)' }
+  // Also sync input
+  const ki = el(`ki-${i}`)
+  if (ki) { const inp = ki.querySelector('.word-target-row input'); if (inp && inp.value !== word) inp.value = word }
+}
+
+function addKindleSelected() {
+  const sel = [...document.querySelectorAll('.kindle-check')].filter(c => c.checked).map(c => kindleItems[+c.dataset.i])
+  if (!sel.length) { toast('Selecione pelo menos um item', 'warning'); return }
+  sel.forEach(item => createWord(item))
+  saveWords(); renderDashboard()
+  toast(`${sel.length} itens adicionados à fila!`, 'success')
+  el('kindle-result').classList.add('hidden')
+  kindleItems = []
+}
+
+// ================================================================
+// MÍDIA PARSER
+// ================================================================
+function handleMidiaFile(input) {
+  const file = input.files[0]; if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => { el('midia-text').value = e.target.result; parseMidiaText() }
+  reader.readAsText(file, 'utf-8')
+  input.value = ''
+}
+
+function parseMidiaText() {
+  const text = el('midia-text').value.trim()
+  if (!text) { toast('Nenhum texto para analisar', 'warning'); return }
+  const srcType = document.querySelector('input[name="midia-type"]:checked')?.value || 'series'
+  const srcTitle = el('midia-title').value.trim()
+
+  midiaItems = text.split('\n').map(l => l.trim()).filter(Boolean)
+    .filter(l => !l.startsWith('#') && !l.startsWith('//'))
+    .map(line => {
+      if (line.includes('\t')) {
+        const [w, ctx] = line.split('\t')
+        return { word: w.trim(), context: ctx?.trim() || '', source_type: srcType, source_title: srcTitle }
+      }
+      if (line.includes(' :: ')) {
+        const [w, ctx] = line.split(' :: ')
+        return { word: w.trim(), context: ctx?.trim() || '', source_type: srcType, source_title: srcTitle }
+      }
+      return { word: line, context: '', source_type: srcType, source_title: srcTitle }
+    })
+
+  renderMidiaList()
+}
+
+function renderMidiaList() {
+  const list = el('midia-list')
+  el('midia-count').textContent = `${midiaItems.length} itens`
+  el('midia-result').classList.remove('hidden')
+  list.innerHTML = midiaItems.map((item, i) => `
+    <div class="parsed-item">
+      <input type="checkbox" class="midia-check" data-i="${i}" checked>
+      <div class="parsed-item-body">
+        <div class="parsed-word">${esc(item.word)}</div>
+        ${item.context ? `<div class="parsed-context">${esc(item.context)}</div>` : '<div class="parsed-context" style="color:var(--text3)">sem contexto</div>'}
+        <div class="parsed-meta">${srcIcon(item.source_type)} ${item.source_title || item.source_type}</div>
+      </div>
+    </div>`).join('')
+}
+
+function addMidiaSelected() {
+  const sel = [...document.querySelectorAll('.midia-check')].filter(c => c.checked).map(c => midiaItems[+c.dataset.i])
+  if (!sel.length) { toast('Selecione ao menos um item', 'warning'); return }
+  sel.forEach(item => createWord(item))
+  saveWords(); renderDashboard()
+  toast(`${sel.length} itens adicionados!`, 'success')
+  el('midia-result').classList.add('hidden')
+}
+
+function srcIcon(t) {
+  return { series:'📺', movie:'🎬', youtube:'▶️', kindle:'📖', podcast:'🎙', website:'🌐', manual:'✍️' }[t] || '📌'
+}
+
+// ================================================================
+// SITE EXTRACTOR
+// ================================================================
+async function extractSite() {
+  const url = el('site-url').value.trim()
+  if (!url) { toast('Digite uma URL', 'error'); return }
+  if (!cfg.n8nBase) { toast('Configure o n8n nas Configurações para usar esta função', 'warning'); return }
+  const btn = el('site-btn')
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Extraindo...'
+  try {
+    const res = await fetch(`${cfg.n8nBase}/webhook/en-site`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url })
+    })
+    siteItems = await res.json()
+    if (!Array.isArray(siteItems)) siteItems = siteItems.words || []
+    renderSiteList()
+  } catch(e) { toast(`Erro: ${e.message}`, 'error') }
+  finally { btn.disabled = false; btn.textContent = '🌐 Extrair vocabulário' }
+}
+
+function renderSiteList() {
+  const list = el('site-list')
+  el('site-count').textContent = `${siteItems.length} palavras`
+  el('site-result').classList.remove('hidden')
+  list.innerHTML = siteItems.map((item, i) => {
+    const w = typeof item === 'string' ? item : (item.word || item)
+    const ctx = item.context || ''
+    return `<div class="parsed-item">
+      <input type="checkbox" class="site-check" data-i="${i}" checked>
+      <div class="parsed-item-body">
+        <div class="parsed-word">${esc(w)}</div>
+        ${ctx ? `<div class="parsed-context">${esc(ctx)}</div>` : ''}
+        ${item.level ? `<span class="chip level-${(item.level||'').toLowerCase()}">${item.level}</span>` : ''}
+      </div>
+    </div>`
+  }).join('')
+}
+
+function addSiteSelected() {
+  const src = el('site-url').value.trim()
+  const sel = [...document.querySelectorAll('.site-check')].filter(c => c.checked).map(c => {
+    const item = siteItems[+c.dataset.i]
+    return typeof item === 'string'
+      ? { word: item, context: '', source_type:'website', source_title: src }
+      : { ...item, word: item.word||item, source_type:'website', source_title: src }
+  })
+  if (!sel.length) { toast('Selecione ao menos um item', 'warning'); return }
+  sel.forEach(i => createWord(i))
+  saveWords(); renderDashboard()
+  toast(`${sel.length} itens adicionados!`, 'success')
+  el('site-result').classList.add('hidden')
+}
+
+// ================================================================
+// OPENAI INTEGRATION
+// ================================================================
+async function analyzeWord(wordId) {
+  const w = words.find(x => x.id === wordId)
+  if (!w) return
+  if (!cfg.openaiKey) { toast('Configure a API Key da OpenAI nas Configurações', 'error'); return }
+
+  // Update UI to show loading
+  const main = el('review-main')
+  if (activeWordId === wordId) {
+    main.innerHTML = `<div class="review-empty-main"><span class="spinner" style="width:32px;height:32px;border-width:3px"></span><p style="margin-top:16px">Analisando com IA...</p></div>`
+  }
+
+  try {
+    const result = await callOpenAI(w.word || w.context, w.context)
+    w.word = result.word || w.word
+    w.type = result.type || 'word'
+    w.ipa = result.ipa || ''
+    w.meanings = (result.meanings || []).map((m, i) => ({ ...m, id: uid(), selected: true, idx: i }))
+    w.status = 'pending_review'
+    w.ai_processed = true
+    saveWords()
+    renderSidebar()
+    if (activeWordId === wordId) renderWordCard(wordId)
+    renderDashboard()
+    toast(`"${w.word}" analisada — ${w.meanings.length} significados encontrados`, 'success')
+  } catch(e) {
+    toast(`Erro na IA: ${e.message}`, 'error')
+    if (activeWordId === wordId) renderWordCard(wordId)
+  }
+}
+
+async function analyzeAll() {
+  if (!cfg.openaiKey) { toast('Configure a API Key da OpenAI primeiro', 'error'); showSection('configuracoes'); return }
+  const pending = words.filter(w => w.status === 'pending_ai')
+  if (!pending.length) { toast('Nenhuma palavra pendente de análise', 'info'); return }
+  toast(`Analisando ${pending.length} palavras...`)
+  for (const w of pending) {
+    await analyzeWord(w.id)
+    await sleep(300) // small delay to avoid rate limit
+  }
+  toast('Análise concluída!', 'success')
+}
+
+async function callOpenAI(word, context) {
+  const prompt = buildPrompt(word, context)
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: cfg.openaiModel || 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2500, temperature: 0.3
+    })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error?.message || `OpenAI ${res.status}`)
+  }
+  const data = await res.json()
+  const text = data.choices[0].message.content
+  const match = text.match(/\{[\s\S]*\}/)
+  if (!match) throw new Error('Resposta da IA sem JSON válido')
+  return JSON.parse(match[0])
+}
+
+function buildPrompt(word, context) {
+  return `You are an expert English vocabulary teacher for Brazilian Portuguese (PT-BR) speakers.
+
+Analyze the following and return ONLY a valid JSON object — no other text.
+
+${word ? `Word / Expression: "${word}"` : ''}
+${context ? `Context sentence: "${context}"` : ''}
+
+Return ALL relevant meanings. For polysemous words (hot, run, get, break, etc.) include 3–7 meanings. For specific/technical terms, 1–2 is fine.
+
+IMPORTANT for meaning_pt: be precise and non-superficial. Instead of just "quente", write "quente; que possui ou emite temperatura elevada — descreve clima, objetos, alimentos ou temperatura corporal". Add nuance and usage context.
+
+{
+  "word": "exact word or expression to study (extract from context if needed)",
+  "type": "word|phrasal_verb|idiom|collocation",
+  "ipa": "/IPA American English/",
+  "meanings": [
+    {
+      "meaning_pt": "precise Portuguese translation with nuance and usage note (2–3 clauses minimum)",
+      "register": "neutral|formal|informal|slang|technical|literary",
+      "level": "A1|A2|B1|B2|C1|C2",
+      "example_en": "a natural, varied example sentence (not a cliché)",
+      "example_pt": "accurate Portuguese translation of the example",
+      "context_note": "one sentence: when and where this meaning is typically used",
+      "tags": ["category"],
+      "context_match": ${context ? 'true if this meaning matches the provided context sentence, otherwise false' : 'false'}
+    }
+  ]
+}`
+}
+
+// ================================================================
+// REVIEW SECTION
+// ================================================================
+function renderReview() {
+  const reviewable = words.filter(w => ['pending_ai','pending_review'].includes(w.status))
+  el('review-empty').classList.toggle('hidden', reviewable.length > 0)
+  el('review-content').classList.toggle('hidden', reviewable.length === 0)
+  if (!reviewable.length) return
+  renderSidebar()
+  if (!activeWordId || !words.find(w => w.id === activeWordId)) {
+    activeWordId = reviewable[0].id
+  }
+  renderWordCard(activeWordId)
+}
+
+function renderSidebar(filter = '') {
+  const reviewable = words.filter(w => ['pending_ai','pending_review'].includes(w.status))
+  const filtered = filter
+    ? reviewable.filter(w => (w.word + w.context).toLowerCase().includes(filter.toLowerCase()))
+    : reviewable
+
+  el('sidebar-count').textContent = reviewable.length
+
+  el('review-word-list').innerHTML = filtered.map(w => {
+    const isActive = w.id === activeWordId
+    const statusHtml = w.status === 'pending_ai'
+      ? `<span class="status-chip pending_ai">⏳ Pendente IA</span>`
+      : `<span class="status-chip pending_review">● ${w.meanings.length} significado${w.meanings.length !== 1 ? 's' : ''}</span>`
+    return `
+    <div class="rw-item ${isActive ? 'active' : ''}" onclick="selectWord('${w.id}')">
+      <div class="rw-word">${esc(w.word || '(frase)')}</div>
+      <div class="rw-meta">
+        ${statusHtml}
+        <span class="rw-count">${srcIcon(w.source_type)}</span>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function filterSidebar(val) { renderSidebar(val) }
+
+function selectWord(id) {
+  activeWordId = id
+  renderSidebar(el('sidebar-search').value)
+  renderWordCard(id)
+}
+
+function renderWordCard(wordId) {
+  const w = words.find(x => x.id === wordId)
+  if (!w) return
+  const main = el('review-main')
+
+  // Context with word highlighted
+  const ctxHtml = w.context ? (() => {
+    const safeWord = w.word ? escR(w.word) : null
+    const ctxEsc = esc(w.context)
+    if (!safeWord) return ctxEsc
+    return ctxEsc.replace(new RegExp(`(${safeWord})`, 'gi'), '<span class="ctx-word">$1</span>')
+  })() : ''
+
+  const typeMap = { word:'word', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' }
+
+  let bodyHtml
+
+  if (w.status === 'pending_ai') {
+    bodyHtml = `
+    <div class="wc-pending-ai">
+      <p>Esta palavra ainda não foi analisada pela IA.</p>
+      <button class="btn btn-primary big-btn" onclick="analyzeWord('${w.id}')">
+        ⚡ Analisar com IA agora
+      </button>
+      <p style="margin-top:12px;font-size:0.82rem;color:var(--text3)">
+        A IA vai identificar todos os significados, exemplos, nível e registro automaticamente.
+      </p>
+    </div>`
+  } else {
+    const selCount = w.meanings.filter(m => m.selected !== false).length
+    bodyHtml = `
+    <div class="wc-meanings">
+      <div class="meanings-toolbar">
+        <div class="meanings-toolbar-left">
+          <span class="meanings-count">${w.meanings.length} significado${w.meanings.length !== 1 ? 's'  : ''}</span>
+          <span>·</span>
+          <span>${selCount} selecionado${selCount !== 1 ? 's' : ''}</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="selectAllMeanings('${w.id}',true)">Todos</button>
+          <button class="btn btn-ghost btn-sm" onclick="selectAllMeanings('${w.id}',false)">Nenhum</button>
+        </div>
+      </div>
+      ${w.meanings.map((m, mi) => renderMeaningItem(w.id, m, mi)).join('')}
+    </div>`
+  }
+
+  main.innerHTML = `
+  <div class="word-card">
+    <div class="wc-header">
+      <div class="wc-word">${esc(w.word || '(frase)')}</div>
+      <div class="wc-meta">
+        ${w.type ? `<span class="chip">${typeMap[w.type] || w.type}</span>` : ''}
+        ${w.ipa ? `<span class="wc-ipa">${esc(w.ipa)}</span>` : ''}
+        <span class="wc-source">${srcIcon(w.source_type)} ${esc(w.source_title || w.source_type)}</span>
+      </div>
+      ${ctxHtml ? `<div class="wc-context">"${ctxHtml}"</div>` : ''}
+    </div>
+    ${bodyHtml}
+    <div class="wc-actions">
+      ${w.status === 'pending_review' && w.meanings.length > 0 ? `
+        <button class="btn btn-success" onclick="sendToAnki('${w.id}')">
+          ✓ Criar ${selCount} card${selCount !== 1 ? 's' : ''} no Anki
+        </button>
+      ` : ''}
+      ${w.status === 'pending_ai' ? '' : `
+        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')">
+          🔄 Re-analisar com IA
+        </button>
+      `}
+      <button class="btn btn-ghost btn-sm" onclick="speakWord('${escA(w.word || w.context)}')">🔊</button>
+      <button class="btn btn-ghost btn-sm" onclick="skipWord('${w.id}')">⟶ Pular</button>
+      <button class="btn btn-ghost btn-sm" onclick="deleteWord('${w.id}')">🗑</button>
+    </div>
+  </div>`
+}
+
+function renderMeaningItem(wordId, m, mi) {
+  const sel = m.selected !== false
+  const isMatch = m.context_match === true
+  return `
+  <div class="meaning-item ${sel ? 'selected' : ''} ${isMatch ? 'context-match' : ''}"
+       onclick="toggleMeaning('${wordId}',${mi})" id="mi-${wordId}-${mi}">
+    <div class="mi-checkbox"></div>
+    <div class="mi-body">
+      <div class="mi-top">
+        <div class="mi-meaning">${esc(m.meaning_pt)}</div>
+        <div class="mi-chips">
+          ${isMatch ? `<span class="context-match-badge">✓ contexto</span>` : ''}
+          ${m.register ? `<span class="chip register-${m.register}">${m.register}</span>` : ''}
+          ${m.level ? `<span class="chip level-${m.level.toLowerCase()}">${m.level}</span>` : ''}
+        </div>
+      </div>
+      ${m.context_note ? `<div class="mi-note">${esc(m.context_note)}</div>` : ''}
+      ${m.example_en ? `
+      <div class="mi-example">
+        <div class="en">"${esc(m.example_en)}"</div>
+        ${m.example_pt ? `<div class="pt">"${esc(m.example_pt)}"</div>` : ''}
+      </div>` : ''}
+    </div>
+  </div>`
+}
+
+function toggleMeaning(wordId, mi) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  w.meanings[mi].selected = !(w.meanings[mi].selected !== false)
+  saveWords()
+  // Update just this item and actions bar
+  const item = el(`mi-${wordId}-${mi}`)
+  if (item) {
+    const sel = w.meanings[mi].selected !== false
+    item.classList.toggle('selected', sel)
+    item.querySelector('.mi-checkbox').style.cssText = ''
+  }
+  // Update send button
+  const selCount = w.meanings.filter(m => m.selected !== false).length
+  const actions = document.querySelector('.wc-actions')
+  if (actions) {
+    const btn = actions.querySelector('.btn-success')
+    if (btn) btn.textContent = `✓ Criar ${selCount} card${selCount !== 1 ? 's' : ''} no Anki`
+  }
+  // Update toolbar count
+  const toolbar = document.querySelector('.meanings-count')?.parentElement?.querySelector('span:nth-child(3)')
+  if (toolbar) toolbar.textContent = `${selCount} selecionado${selCount !== 1 ? 's' : ''}`
+}
+
+function selectAllMeanings(wordId, val) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  w.meanings.forEach(m => m.selected = val)
+  saveWords()
+  renderWordCard(wordId)
+}
+
+// ================================================================
+// ANKICONNECT
+// ================================================================
+async function callAnki(action, params = {}) {
+  const res = await fetch(cfg.ankiUrl || 'http://localhost:8765', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ action, version: 6, params })
+  })
+  const d = await res.json()
+  if (d.error) throw new Error(d.error)
+  return d.result
+}
+
+async function sendToAnki(wordId) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const selected = w.meanings.filter(m => m.selected !== false)
+  if (!selected.length) { toast('Selecione ao menos um significado', 'warning'); return }
+
+  const btn = document.querySelector('.wc-actions .btn-success')
+  if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
+
+  let ok = 0, fail = 0
+  for (const m of selected) {
+    try {
+      const noteId = await callAnki('addNote', {
+        note: {
+          deckName: cfg.ankiDeck || 'Inglês',
+          modelName: cfg.ankiModel || 'Inglês Básico',
+          fields: {
+            [cfg.fields.word || 'Frente']: w.word || '',
+            [cfg.fields.meaning || 'Verso']: m.meaning_pt || '',
+            [cfg.fields.context || 'Contexto']: `${w.context || ''}${m.example_en ? '\n\n' + m.example_en : ''}`,
+            [cfg.fields.ipa || 'IPA']: w.ipa || '',
+            [cfg.fields.examples || 'Exemplos']: [m.example_en, m.example_pt].filter(Boolean).join('\n'),
+            [cfg.fields.audio || 'Áudio']: ''
+          },
+          tags: ['english-lab', w.source_type, m.register, m.level, w.type].filter(Boolean)
+        }
+      })
+      m.anki_id = noteId
+      ok++
+    } catch(e) {
+      console.warn('Anki error for meaning:', m.meaning_pt, e.message)
+      fail++
+    }
+  }
+
+  if (ok > 0) {
+    w.status = 'in_anki'
+    saveWords()
+    toast(`✅ ${ok} card${ok !== 1 ? 's' : ''} criado${ok !== 1 ? 's' : ''} no Anki!${fail ? ` (${fail} falhou)` : ''}`, 'success')
+    renderSidebar()
+    // Move to next word
+    const next = words.find(x => ['pending_ai','pending_review'].includes(x.status))
+    if (next) { activeWordId = next.id; renderWordCard(next.id) }
+    else { activeWordId = null; el('review-main').innerHTML = `<div class="review-empty-main"><div class="icon">🎉</div><p>Fila zerada! Adicione mais palavras.</p></div>` }
+    renderDashboard()
+  } else {
+    toast(`Erro ao criar cards: verifique se o Anki está aberto`, 'error')
+    if (btn) { btn.disabled = false; btn.textContent = `✓ Criar ${selected.length} cards no Anki` }
+  }
+}
+
+function skipWord(id) {
+  const w = words.find(x => x.id === id); if (!w) return
+  w.status = 'skipped'; saveWords()
+  toast(`"${w.word || '(frase)'}" pulada`, 'info')
+  renderSidebar()
+  const next = words.find(x => ['pending_ai','pending_review'].includes(x.status) && x.id !== id)
+  if (next) { activeWordId = next.id; renderWordCard(next.id) }
+  else renderReview()
+  renderDashboard()
+}
+
+function deleteWord(id) {
+  const w = words.find(x => x.id === id)
+  if (!confirm(`Remover "${w?.word || '(frase)'}" permanentemente?`)) return
+  words = words.filter(x => x.id !== id); saveWords()
+  toast('Removida', 'info')
+  renderReview()
+  renderDashboard()
+}
+
+// ================================================================
+// SETTINGS
+// ================================================================
+function fillSettings() {
+  el('cfg-oai-key').value = cfg.openaiKey || ''
+  el('cfg-oai-model').value = cfg.openaiModel || 'gpt-4o-mini'
+  el('cfg-anki-url').value = cfg.ankiUrl || 'http://localhost:8765'
+  el('cfg-anki-deck').value = cfg.ankiDeck || 'Inglês'
+  el('cfg-anki-model').value = cfg.ankiModel || 'Inglês Básico'
+  el('cfg-n8n').value = cfg.n8nBase || ''
+  el('cfg-f-word').value = cfg.fields?.word || 'Frente'
+  el('cfg-f-meaning').value = cfg.fields?.meaning || 'Verso'
+  el('cfg-f-context').value = cfg.fields?.context || 'Contexto'
+  el('cfg-f-ipa').value = cfg.fields?.ipa || 'IPA'
+  el('cfg-f-examples').value = cfg.fields?.examples || 'Exemplos'
+  el('cfg-f-audio').value = cfg.fields?.audio || 'Áudio'
+}
+
+function saveSettings() {
+  cfg.openaiKey = el('cfg-oai-key').value.trim()
+  cfg.openaiModel = el('cfg-oai-model').value
+  cfg.ankiUrl = el('cfg-anki-url').value.trim()
+  cfg.ankiDeck = el('cfg-anki-deck').value.trim()
+  cfg.ankiModel = el('cfg-anki-model').value.trim()
+  cfg.n8nBase = el('cfg-n8n').value.trim().replace(/\/$/, '')
+  cfg.fields = {
+    word: el('cfg-f-word').value.trim() || 'Frente',
+    meaning: el('cfg-f-meaning').value.trim() || 'Verso',
+    context: el('cfg-f-context').value.trim() || 'Contexto',
+    ipa: el('cfg-f-ipa').value.trim() || 'IPA',
+    examples: el('cfg-f-examples').value.trim() || 'Exemplos',
+    audio: el('cfg-f-audio').value.trim() || 'Áudio'
+  }
+  saveCfg()
+  toast('Configurações salvas!', 'success')
+}
+
+async function testOpenAI() {
+  const key = el('cfg-oai-key').value.trim()
+  if (!key) { toast('Digite a API Key primeiro', 'error'); return }
+  showTestResult('oai', null, 'Testando...')
+  try {
+    const res = await fetch('https://api.openai.com/v1/models', { headers: { 'Authorization': `Bearer ${key}` } })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    showTestResult('oai', true, 'Conectado! Chave válida.')
+  } catch(e) { showTestResult('oai', false, `Erro: ${e.message}`) }
+}
+
+async function testAnki() {
+  showTestResult('anki', null, 'Testando...')
+  try {
+    const v = await callAnki('version')
+    showTestResult('anki', true, `AnkiConnect v${v} — conectado!`)
+    updateAnkiNav(true)
+  } catch(e) { showTestResult('anki', false, 'Anki não encontrado. Abra o Anki e verifique o plugin AnkiConnect.'); updateAnkiNav(false) }
+}
+
+function showTestResult(which, ok, msg) {
+  const resultEl = el(which === 'oai' ? 'oai-test-result' : 'anki-test-result')
+  const dotEl = el(which === 'oai' ? 'oai-dot' : 'anki-tdot')
+  const msgEl = el(which === 'oai' ? 'oai-msg' : 'anki-tmsg')
+  resultEl.classList.remove('hidden')
+  dotEl.className = 'test-dot' + (ok === true ? ' ok' : ok === false ? ' err' : '')
+  msgEl.textContent = msg
+}
+
+function updateAnkiNav(on) {
+  el('anki-dot').className = 'anki-dot' + (on ? ' on' : '')
+  el('anki-label').textContent = on ? 'Anki ✓' : 'Anki'
+}
+
+// ================================================================
+// DATA MANAGEMENT
+// ================================================================
+function exportData() {
+  const blob = new Blob([JSON.stringify({ words, cfg, exported_at: new Date().toISOString() }, null, 2)], { type:'application/json' })
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+  a.download = `english-lab-${new Date().toISOString().slice(0,10)}.json`
+  a.click(); toast('Backup exportado!', 'success')
+}
+
+function importData(input) {
+  const file = input.files[0]; if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => {
+    try {
+      const d = JSON.parse(e.target.result)
+      if (d.words) {
+        if (!confirm(`Importar ${d.words.length} palavras (mescla com dados existentes)?`)) return
+        const ids = new Set(words.map(w => w.id))
+        words = [...words, ...d.words.filter(w => !ids.has(w.id))]
+        saveWords(); renderDashboard()
+        toast(`${d.words.length} palavras importadas!`, 'success')
+      }
+    } catch { toast('Arquivo JSON inválido', 'error') }
+  }
+  reader.readAsText(file); input.value = ''
+}
+
+function clearAllData() {
+  if (!confirm('Apagar todos os dados locais? Faça um backup antes.')) return
+  if (!confirm('Tem certeza? Esta ação é irreversível.')) return
+  words = []; saveWords(); renderDashboard()
+  toast('Dados apagados.', 'info')
+}
+
+// ================================================================
+// HELPERS
+// ================================================================
+function el(id) { return document.getElementById(id) }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function escA(s) { return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;') }
+function escR(s) { return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+
+function selectAll(cls, val) {
+  document.querySelectorAll(`.${cls}`).forEach(c => c.checked = val)
+}
+
+function speakWord(word) {
+  if (!window.speechSynthesis) return
+  const u = new SpeechSynthesisUtterance(word); u.lang = 'en-US'; u.rate = 0.85
+  speechSynthesis.speak(u)
+}
+
+function toast(msg, type = 'info') {
+  const icons = { success:'✅', error:'❌', warning:'⚠️', info:'ℹ️' }
+  const t = document.createElement('div')
+  t.className = `toast ${type}`
+  t.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${esc(msg)}</span>`
+  el('toasts').appendChild(t)
+  setTimeout(() => t.remove(), 4500)
+}
+
+// Drag & drop upload
+function setupDrop(areaId, handler) {
+  const area = el(areaId); if (!area) return
+  area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('drag') })
+  area.addEventListener('dragleave', () => area.classList.remove('drag'))
+  area.addEventListener('drop', e => {
+    e.preventDefault(); area.classList.remove('drag')
+    const file = e.dataTransfer.files[0]
+    if (file) { const dt = new DataTransfer(); dt.items.add(file); handler({ files: dt.files }) }
+  })
+}
+
+// ================================================================
+// INIT
+// ================================================================
+async function checkAnkiOnLoad() {
+  try { await callAnki('version'); updateAnkiNav(true) } catch { updateAnkiNav(false) }
+}
+
+function init() {
+  loadCfg(); loadWords()
+  renderDashboard()
+  fillSettings()
+  setupDrop('kindle-drop', handleKindleFile)
+  checkAnkiOnLoad()
+  if (!cfg.openaiKey) {
+    setTimeout(() => toast('Configure sua API Key da OpenAI em Configurações para usar a IA', 'info'), 1000)
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init)
+</script>
+</body>
+</html>

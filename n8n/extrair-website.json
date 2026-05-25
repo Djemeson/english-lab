@@ -1,0 +1,133 @@
+{
+  "name": "English Lab — Extrair Vocabulário de Website",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "en-site",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b1c2d3e4-0001-0001-0001-b1c2d3e40001",
+      "name": "Webhook URL",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "en-site"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.body.url || $json.url }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 3
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "User-Agent", "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+            { "name": "Accept", "value": "text/html,application/xhtml+xml" }
+          ]
+        }
+      },
+      "id": "b1c2d3e4-0002-0002-0002-b1c2d3e40002",
+      "name": "Buscar Página",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Remove tags HTML e extrai texto limpo\nconst html = $input.first().json.data || $input.first().json || '';\nconst webhookData = $('Webhook URL').first().json;\nconst sourceUrl = webhookData.body?.url || webhookData.url || '';\n\n// Remove scripts, styles e tags\nlet text = String(html)\n  .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;/g, ' ')\n  .replace(/&amp;/g, '&')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/&quot;/g, '\"')\n  .replace(/\\s{2,}/g, ' ')\n  .trim();\n\n// Limita a 4000 chars para o prompt da IA\nif (text.length > 4000) text = text.slice(0, 4000) + '...';\n\nreturn [{ json: { text, source_url: sourceUrl } }];"
+      },
+      "id": "b1c2d3e4-0003-0003-0003-b1c2d3e40003",
+      "name": "Extrair Texto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "x-api-key", "value": "COLE_SUA_CHAVE_ANTHROPIC_AQUI" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1500,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Analise este texto em inglês e identifique palavras, phrasal verbs e idioms de nível B2 ou acima que um estudante brasileiro intermediário provavelmente não conhece.\\n\\nRetorne SOMENTE um array JSON com até 20 itens, cada um com: word, context (a frase do texto onde aparece), type (word/phrasal_verb/idiom), level (B2/C1/C2).\\n\\nTexto:\\n{{ $json.text }}\\n\\nResposta (APENAS o array JSON):\"\n    }\n  ]\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "b1c2d3e4-0004-0004-0004-b1c2d3e40004",
+      "name": "Claude — Identificar Vocabulário",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parseia resposta do Claude e formata para o frontend\nconst response = $input.first().json;\nconst pageData = $('Extrair Texto').first().json;\n\nlet words = [];\ntry {\n  const text = response.content?.[0]?.text || '[]';\n  const match = text.match(/\\[[\\s\\S]*\\]/);\n  if (match) words = JSON.parse(match[0]);\n} catch { words = []; }\n\n// Adiciona source_url em cada item\nwords = words.map(w => ({\n  ...w,\n  source_type: 'website',\n  source_title: pageData.source_url\n}));\n\nreturn [{ json: { words, count: words.length, source_url: pageData.source_url } }];"
+      },
+      "id": "b1c2d3e4-0005-0005-0005-b1c2d3e40005",
+      "name": "Parsear Vocabulário",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.words) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" }
+            ]
+          }
+        }
+      },
+      "id": "b1c2d3e4-0006-0006-0006-b1c2d3e40006",
+      "name": "Responder com Lista",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Webhook URL": {
+      "main": [[{ "node": "Buscar Página", "type": "main", "index": 0 }]]
+    },
+    "Buscar Página": {
+      "main": [[{ "node": "Extrair Texto", "type": "main", "index": 0 }]]
+    },
+    "Extrair Texto": {
+      "main": [[{ "node": "Claude — Identificar Vocabulário", "type": "main", "index": 0 }]]
+    },
+    "Claude — Identificar Vocabulário": {
+      "main": [[{ "node": "Parsear Vocabulário", "type": "main", "index": 0 }]]
+    },
+    "Parsear Vocabulário": {
+      "main": [[{ "node": "Responder com Lista", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "id": "english-lab-site-002",
+  "tags": [{ "name": "english-lab" }]
+}

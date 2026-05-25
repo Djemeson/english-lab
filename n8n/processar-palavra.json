@@ -1,0 +1,228 @@
+{
+  "name": "English Lab — Processar Palavra",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "en-processar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-a1b2c3d40001",
+      "name": "Webhook Receber",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "en-processar"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Valida e normaliza o input\nconst body = $input.first().json;\n\nconst word = (body.word || '').trim();\nconst context = (body.context || '').trim();\nconst sourceType = body.source_type || 'manual';\nconst sourceTitle = body.source_title || '';\n\nif (!word && !context) {\n  throw new Error('Nenhuma palavra ou contexto fornecido');\n}\n\nreturn [{\n  json: {\n    word,\n    context,\n    source_type: sourceType,\n    source_title: sourceTitle,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0002-0002-0002-a1b2c3d40002",
+      "name": "Validar Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "x-api-key", "value": "={{$credentials.httpHeaderAuth.value}}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Analise este item de vocabulário em inglês e retorne APENAS um JSON válido, sem texto extra.\\n\\nPalavra/Expressão: {{ $json.word }}\\nFrase de contexto: {{ $json.context }}\\n\\nResponda SOMENTE com este JSON:\\n{\\n  \\\"word\\\": \\\"a palavra ou expressão exata a estudar (extraia do contexto se necessário)\\\",\\n  \\\"type\\\": \\\"word|phrasal_verb|idiom|collocation\\\",\\n  \\\"ipa\\\": \\\"transcrição IPA em inglês americano\\\",\\n  \\\"meaning_pt\\\": \\\"significado em português neste contexto específico (conciso, 1-2 linhas)\\\",\\n  \\\"examples\\\": [\\\"frase exemplo 1 em inglês\\\", \\\"frase exemplo 2 em inglês\\\"],\\n  \\\"level\\\": \\\"A2|B1|B2|C1|C2\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\"]\\n}\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "a1b2c3d4-0003-0003-0003-a1b2c3d40003",
+      "name": "Claude AI — Analisar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_ANTHROPIC_CRED",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrai e parseia a resposta do Claude\nconst response = $input.first().json;\nconst inputData = $('Validar Input').first().json;\n\nlet aiData = {};\ntry {\n  const content = response.content?.[0]?.text || '{}';\n  // Tenta extrair JSON mesmo se houver texto extra\n  const match = content.match(/\\{[\\s\\S]*\\}/);\n  if (match) aiData = JSON.parse(match[0]);\n} catch (e) {\n  aiData = {};\n}\n\n// Merge com input original\nconst result = {\n  word: aiData.word || inputData.word,\n  type: aiData.type || 'word',\n  ipa: aiData.ipa || '',\n  meaning_pt: aiData.meaning_pt || '',\n  examples: aiData.examples || [],\n  level: aiData.level || '',\n  tags: aiData.tags || [],\n  context: inputData.context,\n  source_type: inputData.source_type,\n  source_title: inputData.source_title,\n  processed: true,\n  processed_at: new Date().toISOString()\n};\n\nreturn [{ json: result }];"
+      },
+      "id": "a1b2c3d4-0004-0004-0004-a1b2c3d40004",
+      "name": "Parsear Resposta IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/speech",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$credentials.httpHeaderAuth.value}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"tts-1\",\n  \"input\": \"{{ $json.word }}\",\n  \"voice\": \"nova\",\n  \"speed\": 0.85\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "base64"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "a1b2c3d4-0005-0005-0005-a1b2c3d40005",
+      "name": "OpenAI TTS — Áudio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_OPENAI_CRED",
+          "name": "OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combina dados processados com áudio base64\nconst aiResult = $('Parsear Resposta IA').first().json;\nconst ttsResponse = $input.first();\n\nlet audioBase64 = null;\ntry {\n  // n8n retorna binary data — pega o base64\n  audioBase64 = ttsResponse.binary?.data?.data || null;\n} catch { audioBase64 = null; }\n\nreturn [{\n  json: {\n    ...aiResult,\n    audio_base64: audioBase64\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0006-0006-0006-a1b2c3d40006",
+      "name": "Combinar Resultado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "COLE_AQUI_O_ID_DA_PLANILHA"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Vocabulário"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id || Date.now().toString(36) }}",
+            "word": "={{ $json.word }}",
+            "type": "={{ $json.type }}",
+            "ipa": "={{ $json.ipa }}",
+            "meaning_pt": "={{ $json.meaning_pt }}",
+            "examples": "={{ ($json.examples || []).join(' | ') }}",
+            "level": "={{ $json.level }}",
+            "context": "={{ $json.context }}",
+            "source_type": "={{ $json.source_type }}",
+            "source_title": "={{ $json.source_title }}",
+            "status": "=pending",
+            "tags": "={{ ($json.tags || []).join(', ') }}",
+            "has_audio": "={{ $json.audio_base64 ? 'sim' : 'não' }}",
+            "created_at": "={{ $json.processed_at || new Date().toISOString() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0007-0007-0007-a1b2c3d40007",
+      "name": "Salvar Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1340, 460],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_GSHEETS_CRED",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Combinar Resultado').first().json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" },
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          }
+        }
+      },
+      "id": "a1b2c3d4-0008-0008-0008-a1b2c3d40008",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Receber": {
+      "main": [[{ "node": "Validar Input", "type": "main", "index": 0 }]]
+    },
+    "Validar Input": {
+      "main": [[{ "node": "Claude AI — Analisar", "type": "main", "index": 0 }]]
+    },
+    "Claude AI — Analisar": {
+      "main": [[{ "node": "Parsear Resposta IA", "type": "main", "index": 0 }]]
+    },
+    "Parsear Resposta IA": {
+      "main": [[
+        { "node": "OpenAI TTS — Áudio", "type": "main", "index": 0 },
+        { "node": "Salvar Google Sheets", "type": "main", "index": 0 }
+      ]]
+    },
+    "OpenAI TTS — Áudio": {
+      "main": [[{ "node": "Combinar Resultado", "type": "main", "index": 0 }]]
+    },
+    "Combinar Resultado": {
+      "main": [[{ "node": "Responder Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  },
+  "id": "english-lab-processar-001",
+  "tags": [{ "name": "english-lab" }],
+  "_comments": {
+    "credenciais": [
+      "1. Crie uma credencial 'HTTP Header Auth' com Name='x-api-key' e Value=SUA_CHAVE_ANTHROPIC para o node 'Claude AI'",
+      "2. Crie uma credencial 'HTTP Header Auth' com Name='Authorization' e Value=SUA_CHAVE_OPENAI para 'OpenAI TTS'",
+      "3. Configure OAuth2 do Google Sheets e substitua o ID da planilha no node 'Salvar Google Sheets'",
+      "4. Crie a planilha com aba 'Vocabulário' e colunas: id, word, type, ipa, meaning_pt, examples, level, context, source_type, source_title, status, tags, has_audio, created_at"
+    ]
+  }
+}

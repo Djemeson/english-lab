@@ -1,0 +1,138 @@
+{
+  "name": "English Lab — Gerenciar Fila (Status)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "en-status",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c1d2e3f4-0001-0001-0001-c1d2e3f40001",
+      "name": "Webhook Status",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "en-status"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Valida o payload de atualização de status\nconst body = $input.first().json.body || $input.first().json;\nconst id = body.id || '';\nconst status = body.status || 'pending'; // pending|in_anki|skipped\nconst ankiId = body.anki_id || null;\n\nif (!id) throw new Error('id é obrigatório');\nconst validStatuses = ['pending','in_anki','skipped'];\nif (!validStatuses.includes(status)) throw new Error('status inválido');\n\nreturn [{ json: { id, status, anki_id: ankiId, updated_at: new Date().toISOString() } }];"
+      },
+      "id": "c1d2e3f4-0002-0002-0002-c1d2e3f40002",
+      "name": "Validar Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "mode": "id",
+          "value": "COLE_AQUI_O_ID_DA_PLANILHA"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Vocabulário"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.status }}",
+            "anki_id": "={{ $json.anki_id || '' }}",
+            "updated_at": "={{ $json.updated_at }}"
+          }
+        },
+        "where": {
+          "values": [
+            {
+              "column": "id",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c1d2e3f4-0003-0003-0003-c1d2e3f40003",
+      "name": "Atualizar Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [680, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_GSHEETS_CRED",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"ok\": true, \"id\": \"{{ $('Validar Payload').first().json.id }}\", \"status\": \"{{ $('Validar Payload').first().json.status }}\"}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" }
+            ]
+          }
+        }
+      },
+      "id": "c1d2e3f4-0004-0004-0004-c1d2e3f40004",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "en-ping",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c1d2e3f4-0005-0005-0005-c1d2e3f40005",
+      "name": "Webhook Ping",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 520],
+      "webhookId": "en-ping"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"pong\": true, \"version\": \"1.0\", \"timestamp\": \"{{ new Date().toISOString() }}\"}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" }
+            ]
+          }
+        }
+      },
+      "id": "c1d2e3f4-0006-0006-0006-c1d2e3f40006",
+      "name": "Responder Ping",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [460, 520]
+    }
+  ],
+  "connections": {
+    "Webhook Status": {
+      "main": [[{ "node": "Validar Payload", "type": "main", "index": 0 }]]
+    },
+    "Validar Payload": {
+      "main": [[{ "node": "Atualizar Sheets", "type": "main", "index": 0 }]]
+    },
+    "Atualizar Sheets": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
+    },
+    "Webhook Ping": {
+      "main": [[{ "node": "Responder Ping", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "id": "english-lab-status-003",
+  "tags": [{ "name": "english-lab" }]
+}
