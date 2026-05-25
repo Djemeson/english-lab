@@ -665,30 +665,35 @@ select option{background:var(--surface)}
 
   <div class="settings-grid">
 
-    <!-- OpenAI -->
+    <!-- IA via n8n -->
     <div class="settings-card full">
-      <h3>🤖 OpenAI (IA principal)</h3>
-      <p class="desc">Usada para analisar vocabulário e gerar todos os significados automaticamente.</p>
+      <h3>🤖 Inteligência Artificial (via n8n)</h3>
+      <p class="desc">Toda análise de vocabulário é processada pelo n8n. Escolha o provider de IA e de áudio — as chaves ficam configuradas diretamente no n8n, não aqui.</p>
       <div class="form-row">
         <div class="form-group" style="margin:0">
-          <label>API Key</label>
-          <input type="password" id="cfg-oai-key" placeholder="sk-...">
+          <label>Provider de IA</label>
+          <select id="cfg-ai-provider">
+            <option value="anthropic">Anthropic Claude Haiku (padrão)</option>
+            <option value="openai">OpenAI GPT-4o-mini</option>
+            <option value="google">Google Gemini Flash</option>
+          </select>
         </div>
         <div class="form-group" style="margin:0">
-          <label>Modelo</label>
-          <select id="cfg-oai-model">
-            <option value="gpt-4o-mini">gpt-4o-mini (rápido, barato)</option>
-            <option value="gpt-4o">gpt-4o (mais capaz)</option>
-            <option value="gpt-4-turbo">gpt-4-turbo</option>
+          <label>Provider de Áudio (TTS)</label>
+          <select id="cfg-tts-provider">
+            <option value="openai">OpenAI TTS (padrão)</option>
+            <option value="elevenlabs">ElevenLabs</option>
+            <option value="google">Google Cloud TTS</option>
+            <option value="none">Sem áudio</option>
           </select>
         </div>
       </div>
-      <div id="oai-test-result" class="test-result hidden">
-        <div class="test-dot" id="oai-dot"></div>
-        <span id="oai-msg"></span>
+      <div id="n8n-ai-test-result" class="test-result hidden">
+        <div class="test-dot" id="n8n-ai-dot"></div>
+        <span id="n8n-ai-msg"></span>
       </div>
       <div class="btn-group" style="margin-top:12px">
-        <button class="btn btn-secondary btn-sm" onclick="testOpenAI()">Testar conexão</button>
+        <button class="btn btn-secondary btn-sm" onclick="testN8nAI()">Testar conexão n8n</button>
       </div>
     </div>
 
@@ -729,10 +734,10 @@ select option{background:var(--surface)}
       <div class="form-group"><label>Áudio</label><input type="text" id="cfg-f-audio" placeholder="Áudio"></div>
     </div>
 
-    <!-- n8n (opcional) -->
+    <!-- n8n -->
     <div class="settings-card">
-      <h3>🔧 n8n <span style="font-weight:400;color:var(--text3);font-size:0.85rem">(opcional)</span></h3>
-      <p class="desc">Usado para extração de websites e sincronização com Google Sheets. A IA principal é o OpenAI acima.</p>
+      <h3>🔧 n8n</h3>
+      <p class="desc">URL base do seu n8n (Hostinger). Usado para análise de IA, extração de websites e sincronização com Google Sheets.</p>
       <div class="form-group">
         <label>URL base do n8n (Hostinger)</label>
         <input type="url" id="cfg-n8n" placeholder="https://seu-n8n.hostinger.com">
@@ -768,7 +773,7 @@ select option{background:var(--surface)}
 const SK = { settings: 'englab_cfg', words: 'englab_words' }
 
 const DEF_CFG = {
-  openaiKey: '', openaiModel: 'gpt-4o-mini',
+  aiProvider: 'anthropic', ttsProvider: 'openai',
   ankiUrl: 'http://localhost:8765', ankiDeck: 'Inglês', ankiModel: 'Inglês Básico',
   n8nBase: '',
   fields: { word: 'Frente', meaning: 'Verso', context: 'Contexto', ipa: 'IPA', examples: 'Exemplos', audio: 'Áudio' }
@@ -1146,32 +1151,44 @@ function addSiteSelected() {
 }
 
 // ================================================================
-// OPENAI INTEGRATION
+// IA VIA N8N
 // ================================================================
 async function analyzeWord(wordId) {
   const w = words.find(x => x.id === wordId)
   if (!w) return
-  if (!cfg.openaiKey) { toast('Configure a API Key da OpenAI nas Configurações', 'error'); return }
+  if (!cfg.n8nBase) { toast('Configure a URL do n8n nas Configurações', 'error'); showSection('configuracoes'); return }
 
-  // Update UI to show loading
   const main = el('review-main')
   if (activeWordId === wordId) {
-    main.innerHTML = `<div class="review-empty-main"><span class="spinner" style="width:32px;height:32px;border-width:3px"></span><p style="margin-top:16px">Analisando com IA...</p></div>`
+    main.innerHTML = `<div class="review-empty-main"><span class="spinner" style="width:32px;height:32px;border-width:3px"></span><p style="margin-top:16px">Analisando com IA (${cfg.aiProvider || 'anthropic'})...</p></div>`
   }
 
   try {
-    const result = await callOpenAI(w.word || w.context, w.context)
+    const result = await callN8n(w.word || w.context, w.context, w.source_type, w.source_title)
     w.word = result.word || w.word
     w.type = result.type || 'word'
     w.ipa = result.ipa || ''
-    w.meanings = (result.meanings || []).map((m, i) => ({ ...m, id: uid(), selected: true, idx: i }))
+    w.audio_base64 = result.audio_base64 || null
+    // Mapeia o retorno do n8n para o formato de meanings usado na UI
+    w.meanings = [{
+      id: uid(), selected: true, idx: 0,
+      meaning_pt: result.meaning_pt || '',
+      register: 'neutral',
+      level: result.level || '',
+      example_en: (result.examples || [])[0] || '',
+      example_pt: (result.examples || [])[1] || '',
+      context_note: '',
+      tags: result.tags || [],
+      context_match: true
+    }]
     w.status = 'pending_review'
     w.ai_processed = true
+    w.ai_provider = result.ai_provider || cfg.aiProvider
     saveWords()
     renderSidebar()
     if (activeWordId === wordId) renderWordCard(wordId)
     renderDashboard()
-    toast(`"${w.word}" analisada — ${w.meanings.length} significados encontrados`, 'success')
+    toast(`"${w.word}" analisada via ${w.ai_provider}`, 'success')
   } catch(e) {
     toast(`Erro na IA: ${e.message}`, 'error')
     if (activeWordId === wordId) renderWordCard(wordId)
@@ -1179,68 +1196,35 @@ async function analyzeWord(wordId) {
 }
 
 async function analyzeAll() {
-  if (!cfg.openaiKey) { toast('Configure a API Key da OpenAI primeiro', 'error'); showSection('configuracoes'); return }
+  if (!cfg.n8nBase) { toast('Configure a URL do n8n nas Configurações', 'error'); showSection('configuracoes'); return }
   const pending = words.filter(w => w.status === 'pending_ai')
   if (!pending.length) { toast('Nenhuma palavra pendente de análise', 'info'); return }
   toast(`Analisando ${pending.length} palavras...`)
   for (const w of pending) {
     await analyzeWord(w.id)
-    await sleep(300) // small delay to avoid rate limit
+    await sleep(400)
   }
   toast('Análise concluída!', 'success')
 }
 
-async function callOpenAI(word, context) {
-  const prompt = buildPrompt(word, context)
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+async function callN8n(word, context, sourceType, sourceTitle) {
+  const url = `${cfg.n8nBase}/webhook/en-processar`
+  const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: cfg.openaiModel || 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 2500, temperature: 0.3
+      word, context,
+      source_type: sourceType || 'manual',
+      source_title: sourceTitle || '',
+      ai_provider: cfg.aiProvider || 'anthropic',
+      tts_provider: cfg.ttsProvider || 'openai'
     })
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err.error?.message || `OpenAI ${res.status}`)
+    throw new Error(err.message || `n8n retornou ${res.status}`)
   }
-  const data = await res.json()
-  const text = data.choices[0].message.content
-  const match = text.match(/\{[\s\S]*\}/)
-  if (!match) throw new Error('Resposta da IA sem JSON válido')
-  return JSON.parse(match[0])
-}
-
-function buildPrompt(word, context) {
-  return `You are an expert English vocabulary teacher for Brazilian Portuguese (PT-BR) speakers.
-
-Analyze the following and return ONLY a valid JSON object — no other text.
-
-${word ? `Word / Expression: "${word}"` : ''}
-${context ? `Context sentence: "${context}"` : ''}
-
-Return ALL relevant meanings. For polysemous words (hot, run, get, break, etc.) include 3–7 meanings. For specific/technical terms, 1–2 is fine.
-
-IMPORTANT for meaning_pt: be precise and non-superficial. Instead of just "quente", write "quente; que possui ou emite temperatura elevada — descreve clima, objetos, alimentos ou temperatura corporal". Add nuance and usage context.
-
-{
-  "word": "exact word or expression to study (extract from context if needed)",
-  "type": "word|phrasal_verb|idiom|collocation",
-  "ipa": "/IPA American English/",
-  "meanings": [
-    {
-      "meaning_pt": "precise Portuguese translation with nuance and usage note (2–3 clauses minimum)",
-      "register": "neutral|formal|informal|slang|technical|literary",
-      "level": "A1|A2|B1|B2|C1|C2",
-      "example_en": "a natural, varied example sentence (not a cliché)",
-      "example_pt": "accurate Portuguese translation of the example",
-      "context_note": "one sentence: when and where this meaning is typically used",
-      "tags": ["category"],
-      "context_match": ${context ? 'true if this meaning matches the provided context sentence, otherwise false' : 'false'}
-    }
-  ]
-}`
+  return res.json()
 }
 
 // ================================================================
@@ -1510,8 +1494,8 @@ function deleteWord(id) {
 // SETTINGS
 // ================================================================
 function fillSettings() {
-  el('cfg-oai-key').value = cfg.openaiKey || ''
-  el('cfg-oai-model').value = cfg.openaiModel || 'gpt-4o-mini'
+  el('cfg-ai-provider').value = cfg.aiProvider || 'anthropic'
+  el('cfg-tts-provider').value = cfg.ttsProvider || 'openai'
   el('cfg-anki-url').value = cfg.ankiUrl || 'http://localhost:8765'
   el('cfg-anki-deck').value = cfg.ankiDeck || 'Inglês'
   el('cfg-anki-model').value = cfg.ankiModel || 'Inglês Básico'
@@ -1525,8 +1509,8 @@ function fillSettings() {
 }
 
 function saveSettings() {
-  cfg.openaiKey = el('cfg-oai-key').value.trim()
-  cfg.openaiModel = el('cfg-oai-model').value
+  cfg.aiProvider = el('cfg-ai-provider').value
+  cfg.ttsProvider = el('cfg-tts-provider').value
   cfg.ankiUrl = el('cfg-anki-url').value.trim()
   cfg.ankiDeck = el('cfg-anki-deck').value.trim()
   cfg.ankiModel = el('cfg-anki-model').value.trim()
@@ -1543,15 +1527,20 @@ function saveSettings() {
   toast('Configurações salvas!', 'success')
 }
 
-async function testOpenAI() {
-  const key = el('cfg-oai-key').value.trim()
-  if (!key) { toast('Digite a API Key primeiro', 'error'); return }
-  showTestResult('oai', null, 'Testando...')
+async function testN8nAI() {
+  const base = el('cfg-n8n').value.trim()
+  if (!base) { toast('Configure a URL do n8n primeiro', 'error'); return }
+  showTestResult('n8n-ai', null, 'Testando...')
   try {
-    const res = await fetch('https://api.openai.com/v1/models', { headers: { 'Authorization': `Bearer ${key}` } })
+    const res = await fetch(`${base}/webhook/en-processar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word: 'test', context: 'This is a test.', ai_provider: el('cfg-ai-provider').value, tts_provider: 'none' })
+    })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    showTestResult('oai', true, 'Conectado! Chave válida.')
-  } catch(e) { showTestResult('oai', false, `Erro: ${e.message}`) }
+    const data = await res.json()
+    showTestResult('n8n-ai', true, `Conectado! Provider: ${data.ai_provider || el('cfg-ai-provider').value}`)
+  } catch(e) { showTestResult('n8n-ai', false, `Erro: ${e.message}`) }
 }
 
 async function testAnki() {
@@ -1564,9 +1553,12 @@ async function testAnki() {
 }
 
 function showTestResult(which, ok, msg) {
-  const resultEl = el(which === 'oai' ? 'oai-test-result' : 'anki-test-result')
-  const dotEl = el(which === 'oai' ? 'oai-dot' : 'anki-tdot')
-  const msgEl = el(which === 'oai' ? 'oai-msg' : 'anki-tmsg')
+  const map = {
+    'n8n-ai': ['n8n-ai-test-result', 'n8n-ai-dot', 'n8n-ai-msg'],
+    'anki':   ['anki-test-result',   'anki-tdot',   'anki-tmsg']
+  }
+  const [resId, dotId, msgId] = map[which] || map['anki']
+  const resultEl = el(resId), dotEl = el(dotId), msgEl = el(msgId)
   resultEl.classList.remove('hidden')
   dotEl.className = 'test-dot' + (ok === true ? ' ok' : ok === false ? ' err' : '')
   msgEl.textContent = msg
@@ -1665,8 +1657,8 @@ function init() {
   fillSettings()
   setupDrop('kindle-drop', handleKindleFile)
   checkAnkiOnLoad()
-  if (!cfg.openaiKey) {
-    setTimeout(() => toast('Configure sua API Key da OpenAI em Configurações para usar a IA', 'info'), 1000)
+  if (!cfg.n8nBase) {
+    setTimeout(() => toast('Configure a URL do n8n em Configurações para usar a IA', 'info'), 1000)
   }
 }
 
