@@ -1,5 +1,5 @@
 {
-  "name": "English Lab — Processar Palavra",
+  "name": "English Lab — Processar Palavra v2",
   "nodes": [
     {
       "parameters": {
@@ -8,22 +8,116 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "a1b2c3d4-0001-0001-0001-a1b2c3d40001",
+      "id": "b0010000-0000-0000-0000-000000000001",
       "name": "Webhook Receber",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300],
+      "position": [
+        240,
+        400
+      ],
       "webhookId": "en-processar"
     },
     {
       "parameters": {
-        "jsCode": "// Valida e normaliza o input\nconst body = $input.first().json;\n\nconst word = (body.word || '').trim();\nconst context = (body.context || '').trim();\nconst sourceType = body.source_type || 'manual';\nconst sourceTitle = body.source_title || '';\n\nif (!word && !context) {\n  throw new Error('Nenhuma palavra ou contexto fornecido');\n}\n\nreturn [{\n  json: {\n    word,\n    context,\n    source_type: sourceType,\n    source_title: sourceTitle,\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const body = $input.first().json;\nconst word = (body.word || '').trim();\nconst context = (body.context || '').trim();\nconst sourceType = body.source_type || 'manual';\nconst sourceTitle = body.source_title || '';\nconst rawAI = (body.ai_provider || 'anthropic').toLowerCase();\nconst rawTTS = (body.tts_provider || 'openai').toLowerCase();\nif (!word && !context) throw new Error('Nenhuma palavra ou contexto fornecido');\nconst validAI = ['anthropic', 'openai', 'google'];\nconst validTTS = ['openai', 'elevenlabs', 'google', 'none'];\nreturn [{ json: {\n  word, context,\n  source_type: sourceType, source_title: sourceTitle,\n  ai_provider: validAI.includes(rawAI) ? rawAI : 'anthropic',\n  tts_provider: validTTS.includes(rawTTS) ? rawTTS : 'openai',\n  timestamp: new Date().toISOString()\n} }];"
       },
-      "id": "a1b2c3d4-0002-0002-0002-a1b2c3d40002",
+      "id": "b0020000-0000-0000-0000-000000000002",
       "name": "Validar Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [460, 300]
+      "position": [
+        460,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "rules": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "ai-1",
+                    "leftValue": "={{ $json.ai_provider }}",
+                    "rightValue": "anthropic",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "anthropic"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "ai-2",
+                    "leftValue": "={{ $json.ai_provider }}",
+                    "rightValue": "openai",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "openai"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "ai-3",
+                    "leftValue": "={{ $json.ai_provider }}",
+                    "rightValue": "google",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "google"
+            }
+          ]
+        },
+        "fallbackOutput": 0,
+        "options": {}
+      },
+      "id": "b0030000-0000-0000-0000-000000000003",
+      "name": "Switch — Provedor IA",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        700,
+        400
+      ]
     },
     {
       "parameters": {
@@ -34,23 +128,35 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "x-api-key", "value": "={{$credentials.httpHeaderAuth.value}}" },
-            { "name": "content-type", "value": "application/json" }
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{$credentials.httpHeaderAuth.value}}"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Analise este item de vocabulário em inglês e retorne APENAS um JSON válido, sem texto extra.\\n\\nPalavra/Expressão: {{ $json.word }}\\nFrase de contexto: {{ $json.context }}\\n\\nResponda SOMENTE com este JSON:\\n{\\n  \\\"word\\\": \\\"a palavra ou expressão exata a estudar (extraia do contexto se necessário)\\\",\\n  \\\"type\\\": \\\"word|phrasal_verb|idiom|collocation\\\",\\n  \\\"ipa\\\": \\\"transcrição IPA em inglês americano\\\",\\n  \\\"meaning_pt\\\": \\\"significado em português neste contexto específico (conciso, 1-2 linhas)\\\",\\n  \\\"examples\\\": [\\\"frase exemplo 1 em inglês\\\", \\\"frase exemplo 2 em inglês\\\"],\\n  \\\"level\\\": \\\"A2|B1|B2|C1|C2\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\"]\\n}\"\n    }\n  ]\n}",
+        "jsonBody": "={\"model\":\"claude-haiku-4-5-20251001\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Analise este item de vocabulário em inglês e retorne APENAS um JSON válido, sem texto extra.\\n\\nPalavra/Expressão: {{ $json.word }}\\nFrase de contexto: {{ $json.context }}\\n\\nResponda SOMENTE com este JSON:\\n{\\n  \\\"word\\\": \\\"a palavra ou expressão exata a estudar (extraia do contexto se necessário)\\\",\\n  \\\"type\\\": \\\"word|phrasal_verb|idiom|collocation\\\",\\n  \\\"ipa\\\": \\\"transcrição IPA em inglês americano\\\",\\n  \\\"meaning_pt\\\": \\\"significado em português neste contexto específico (conciso, 1-2 linhas)\\\",\\n  \\\"examples\\\": [\\\"frase exemplo 1 em inglês\\\", \\\"frase exemplo 2 em inglês\\\"],\\n  \\\"level\\\": \\\"A2|B1|B2|C1|C2\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\"]\\n}\"}]}",
         "options": {
           "timeout": 30000
         }
       },
-      "id": "a1b2c3d4-0003-0003-0003-a1b2c3d40003",
-      "name": "Claude AI — Analisar",
+      "id": "b0040000-0000-0000-0000-000000000004",
+      "name": "Anthropic — Analisar",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 300],
+      "position": [
+        960,
+        160
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "CONFIGURE_ANTHROPIC_CRED",
@@ -60,13 +166,236 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extrai e parseia a resposta do Claude\nconst response = $input.first().json;\nconst inputData = $('Validar Input').first().json;\n\nlet aiData = {};\ntry {\n  const content = response.content?.[0]?.text || '{}';\n  // Tenta extrair JSON mesmo se houver texto extra\n  const match = content.match(/\\{[\\s\\S]*\\}/);\n  if (match) aiData = JSON.parse(match[0]);\n} catch (e) {\n  aiData = {};\n}\n\n// Merge com input original\nconst result = {\n  word: aiData.word || inputData.word,\n  type: aiData.type || 'word',\n  ipa: aiData.ipa || '',\n  meaning_pt: aiData.meaning_pt || '',\n  examples: aiData.examples || [],\n  level: aiData.level || '',\n  tags: aiData.tags || [],\n  context: inputData.context,\n  source_type: inputData.source_type,\n  source_title: inputData.source_title,\n  processed: true,\n  processed_at: new Date().toISOString()\n};\n\nreturn [{ json: result }];"
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.httpHeaderAuth.value}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"gpt-4o-mini\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Analise este item de vocabulário em inglês e retorne APENAS um JSON válido, sem texto extra.\\n\\nPalavra/Expressão: {{ $json.word }}\\nFrase de contexto: {{ $json.context }}\\n\\nResponda SOMENTE com este JSON:\\n{\\n  \\\"word\\\": \\\"a palavra ou expressão exata a estudar (extraia do contexto se necessário)\\\",\\n  \\\"type\\\": \\\"word|phrasal_verb|idiom|collocation\\\",\\n  \\\"ipa\\\": \\\"transcrição IPA em inglês americano\\\",\\n  \\\"meaning_pt\\\": \\\"significado em português neste contexto específico (conciso, 1-2 linhas)\\\",\\n  \\\"examples\\\": [\\\"frase exemplo 1 em inglês\\\", \\\"frase exemplo 2 em inglês\\\"],\\n  \\\"level\\\": \\\"A2|B1|B2|C1|C2\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\"]\\n}\"}]}",
+        "options": {
+          "timeout": 30000
+        }
       },
-      "id": "a1b2c3d4-0004-0004-0004-a1b2c3d40004",
-      "name": "Parsear Resposta IA",
+      "id": "b0050000-0000-0000-0000-000000000005",
+      "name": "OpenAI GPT — Analisar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_OPENAI_CRED",
+          "name": "OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.httpHeaderAuth.value}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"contents\":[{\"parts\":[{\"text\":\"Analise este item de vocabulário em inglês e retorne APENAS um JSON válido, sem texto extra.\\n\\nPalavra/Expressão: {{ $json.word }}\\nFrase de contexto: {{ $json.context }}\\n\\nResponda SOMENTE com este JSON:\\n{\\n  \\\"word\\\": \\\"a palavra ou expressão exata a estudar (extraia do contexto se necessário)\\\",\\n  \\\"type\\\": \\\"word|phrasal_verb|idiom|collocation\\\",\\n  \\\"ipa\\\": \\\"transcrição IPA em inglês americano\\\",\\n  \\\"meaning_pt\\\": \\\"significado em português neste contexto específico (conciso, 1-2 linhas)\\\",\\n  \\\"examples\\\": [\\\"frase exemplo 1 em inglês\\\", \\\"frase exemplo 2 em inglês\\\"],\\n  \\\"level\\\": \\\"A2|B1|B2|C1|C2\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\"]\\n}\"}]}],\"generationConfig\":{\"maxOutputTokens\":1024}}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "b0060000-0000-0000-0000-000000000006",
+      "name": "Google Gemini — Analisar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        640
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_GOOGLE_AI_CRED",
+          "name": "Google AI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "passThrough",
+        "output": "empty"
+      },
+      "id": "b0070000-0000-0000-0000-000000000007",
+      "name": "Merge — Resposta IA",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1220,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst provider = $('Validar Input').first().json.ai_provider || 'anthropic';\nlet rawText = '';\nif (provider === 'anthropic') rawText = response.content?.[0]?.text || '';\nelse if (provider === 'openai') rawText = response.choices?.[0]?.message?.content || '';\nelse if (provider === 'google') rawText = response.candidates?.[0]?.content?.parts?.[0]?.text || '';\nif (!rawText) throw new Error('Provider ' + provider + ' retornou resposta vazia.');\nreturn [{ json: { raw_ai_text: rawText } }];"
+      },
+      "id": "b0080000-0000-0000-0000-000000000008",
+      "name": "Normalizar — Resposta IA",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [900, 300]
+      "position": [
+        1440,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst orig = $('Validar Input').first().json;\nlet ai = {};\ntry { const m = (input.raw_ai_text||'').match(/\\{[\\s\\S]*\\}/); if(m) ai=JSON.parse(m[0]); } catch(e){}\nreturn [{ json: {\n  word: ai.word||orig.word, type: ai.type||'word',\n  ipa: ai.ipa||'', meaning_pt: ai.meaning_pt||'',\n  examples: ai.examples||[], level: ai.level||'', tags: ai.tags||[],\n  context: orig.context, source_type: orig.source_type, source_title: orig.source_title,\n  ai_provider: orig.ai_provider, tts_provider: orig.tts_provider,\n  processed: true, processed_at: new Date().toISOString()\n} }];"
+      },
+      "id": "b0090000-0000-0000-0000-000000000009",
+      "name": "Parsear — JSON da IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1660,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "rules": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "tts-1",
+                    "leftValue": "={{ $json.tts_provider }}",
+                    "rightValue": "openai",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "openai"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "tts-2",
+                    "leftValue": "={{ $json.tts_provider }}",
+                    "rightValue": "elevenlabs",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "elevenlabs"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "tts-3",
+                    "leftValue": "={{ $json.tts_provider }}",
+                    "rightValue": "google",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "google"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "tts-4",
+                    "leftValue": "={{ $json.tts_provider }}",
+                    "rightValue": "none",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "none"
+            }
+          ]
+        },
+        "fallbackOutput": 0,
+        "options": {}
+      },
+      "id": "b0100000-0000-0000-0000-000000000010",
+      "name": "Switch — Provedor TTS",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1900,
+        400
+      ]
     },
     {
       "parameters": {
@@ -77,13 +406,19 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{$credentials.httpHeaderAuth.value}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.httpHeaderAuth.value}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"tts-1\",\n  \"input\": \"{{ $json.word }}\",\n  \"voice\": \"nova\",\n  \"speed\": 0.85\n}",
+        "jsonBody": "={\"model\":\"tts-1\",\"input\":\"{{ $json.word }}\",\"voice\":\"nova\",\"speed\":0.85}",
         "options": {
           "response": {
             "response": {
@@ -93,11 +428,14 @@
           "timeout": 15000
         }
       },
-      "id": "a1b2c3d4-0005-0005-0005-a1b2c3d40005",
-      "name": "OpenAI TTS — Áudio",
+      "id": "b0110000-0000-0000-0000-000000000011",
+      "name": "OpenAI TTS — Audio",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1120, 200],
+      "position": [
+        2160,
+        160
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "CONFIGURE_OPENAI_CRED",
@@ -107,13 +445,134 @@
     },
     {
       "parameters": {
-        "jsCode": "// Combina dados processados com áudio base64\nconst aiResult = $('Parsear Resposta IA').first().json;\nconst ttsResponse = $input.first();\n\nlet audioBase64 = null;\ntry {\n  // n8n retorna binary data — pega o base64\n  audioBase64 = ttsResponse.binary?.data?.data || null;\n} catch { audioBase64 = null; }\n\nreturn [{\n  json: {\n    ...aiResult,\n    audio_base64: audioBase64\n  }\n}];"
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $json.elevenlabs_voice_id || '21m00Tcm4TlvDq8ikWAM' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xi-api-key",
+              "value": "={{$credentials.httpHeaderAuth.value}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "audio/mpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"text\":\"{{ $json.word }}\",\"model_id\":\"eleven_monolingual_v1\",\"voice_settings\":{\"stability\":0.5,\"similarity_boost\":0.75}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "base64"
+            }
+          },
+          "timeout": 20000
+        }
       },
-      "id": "a1b2c3d4-0006-0006-0006-a1b2c3d40006",
-      "name": "Combinar Resultado",
+      "id": "b0120000-0000-0000-0000-000000000012",
+      "name": "ElevenLabs TTS — Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_ELEVENLABS_CRED",
+          "name": "ElevenLabs API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://texttospeech.googleapis.com/v1/text:synthesize",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$credentials.httpHeaderAuth.value}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"input\":{\"text\":\"{{ $json.word }}\"},\"voice\":{\"languageCode\":\"en-US\",\"name\":\"en-US-Neural2-F\",\"ssmlGender\":\"FEMALE\"},\"audioConfig\":{\"audioEncoding\":\"MP3\",\"speakingRate\":0.85}}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "b0130000-0000-0000-0000-000000000013",
+      "name": "Google TTS — Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        640
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_GOOGLE_TTS_CRED",
+          "name": "Google TTS API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { audio_base64: null, tts_skipped: true } }];"
+      },
+      "id": "b0140000-0000-0000-0000-000000000014",
+      "name": "Sem Audio — Passthrough",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1340, 300]
+      "position": [
+        2160,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough",
+        "output": "empty"
+      },
+      "id": "b0150000-0000-0000-0000-000000000015",
+      "name": "Merge — Audio",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2420,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ai = $('Parsear — JSON da IA').first().json;\nconst audioInput = $input.first();\nlet audioBase64 = null;\nif (audioInput.binary?.data?.data) audioBase64 = audioInput.binary.data.data;\nelse if (audioInput.json?.audioContent) audioBase64 = audioInput.json.audioContent;\nelse if (audioInput.json?.audio_base64 !== undefined) audioBase64 = audioInput.json.audio_base64;\nreturn [{ json: { ...ai, audio_base64: audioBase64 } }];"
+      },
+      "id": "b0160000-0000-0000-0000-000000000016",
+      "name": "Combinar — Resultado Final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        400
+      ]
     },
     {
       "parameters": {
@@ -124,34 +583,37 @@
         },
         "sheetName": {
           "mode": "name",
-          "value": "Vocabulário"
+          "value": "Vocabulario"
         },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "id": "={{ $json.id || Date.now().toString(36) }}",
             "word": "={{ $json.word }}",
             "type": "={{ $json.type }}",
             "ipa": "={{ $json.ipa }}",
             "meaning_pt": "={{ $json.meaning_pt }}",
-            "examples": "={{ ($json.examples || []).join(' | ') }}",
+            "examples": "={{ ($json.examples||[]).join(' | ') }}",
             "level": "={{ $json.level }}",
             "context": "={{ $json.context }}",
             "source_type": "={{ $json.source_type }}",
             "source_title": "={{ $json.source_title }}",
             "status": "=pending",
-            "tags": "={{ ($json.tags || []).join(', ') }}",
-            "has_audio": "={{ $json.audio_base64 ? 'sim' : 'não' }}",
+            "tags": "={{ ($json.tags||[]).join(', ') }}",
+            "ai_provider": "={{ $json.ai_provider }}",
+            "has_audio": "={{ $json.audio_base64 ? 'sim' : 'nao' }}",
             "created_at": "={{ $json.processed_at || new Date().toISOString() }}"
           }
         },
         "options": {}
       },
-      "id": "a1b2c3d4-0007-0007-0007-a1b2c3d40007",
-      "name": "Salvar Google Sheets",
+      "id": "b0170000-0000-0000-0000-000000000017",
+      "name": "Salvar — Google Sheets",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [1340, 460],
+      "position": [
+        1900,
+        660
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "CONFIGURE_GSHEETS_CRED",
@@ -162,44 +624,248 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($('Combinar Resultado').first().json) }}",
+        "responseBody": "={{ JSON.stringify($('Combinar — Resultado Final').first().json) }}",
         "options": {
           "responseHeaders": {
             "entries": [
-              { "name": "Access-Control-Allow-Origin", "value": "*" },
-              { "name": "Content-Type", "value": "application/json" }
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
             ]
           }
         }
       },
-      "id": "a1b2c3d4-0008-0008-0008-a1b2c3d40008",
-      "name": "Responder Webhook",
+      "id": "b0180000-0000-0000-0000-000000000018",
+      "name": "Responder — Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1560, 300]
+      "position": [
+        2900,
+        400
+      ]
     }
   ],
   "connections": {
     "Webhook Receber": {
-      "main": [[{ "node": "Validar Input", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Validar Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Validar Input": {
-      "main": [[{ "node": "Claude AI — Analisar", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Switch — Provedor IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Claude AI — Analisar": {
-      "main": [[{ "node": "Parsear Resposta IA", "type": "main", "index": 0 }]]
+    "Switch — Provedor IA": {
+      "main": [
+        [
+          {
+            "node": "Anthropic — Analisar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI GPT — Analisar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Gemini — Analisar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Parsear Resposta IA": {
-      "main": [[
-        { "node": "OpenAI TTS — Áudio", "type": "main", "index": 0 },
-        { "node": "Salvar Google Sheets", "type": "main", "index": 0 }
-      ]]
+    "Anthropic — Analisar": {
+      "main": [
+        [
+          {
+            "node": "Merge — Resposta IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "OpenAI TTS — Áudio": {
-      "main": [[{ "node": "Combinar Resultado", "type": "main", "index": 0 }]]
+    "OpenAI GPT — Analisar": {
+      "main": [
+        [
+          {
+            "node": "Merge — Resposta IA",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
     },
-    "Combinar Resultado": {
-      "main": [[{ "node": "Responder Webhook", "type": "main", "index": 0 }]]
+    "Google Gemini — Analisar": {
+      "main": [
+        [
+          {
+            "node": "Merge — Resposta IA",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge — Resposta IA": {
+      "main": [
+        [
+          {
+            "node": "Normalizar — Resposta IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar — Resposta IA": {
+      "main": [
+        [
+          {
+            "node": "Parsear — JSON da IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear — JSON da IA": {
+      "main": [
+        [
+          {
+            "node": "Switch — Provedor TTS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Salvar — Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch — Provedor TTS": {
+      "main": [
+        [
+          {
+            "node": "OpenAI TTS — Audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ElevenLabs TTS — Audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google TTS — Audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sem Audio — Passthrough",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI TTS — Audio": {
+      "main": [
+        [
+          {
+            "node": "Merge — Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs TTS — Audio": {
+      "main": [
+        [
+          {
+            "node": "Merge — Audio",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Google TTS — Audio": {
+      "main": [
+        [
+          {
+            "node": "Merge — Audio",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Sem Audio — Passthrough": {
+      "main": [
+        [
+          {
+            "node": "Merge — Audio",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Merge — Audio": {
+      "main": [
+        [
+          {
+            "node": "Combinar — Resultado Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combinar — Resultado Final": {
+      "main": [
+        [
+          {
+            "node": "Responder — Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -208,21 +874,38 @@
     "saveDataErrorExecution": "all",
     "saveDataSuccessExecution": "none",
     "saveManualExecutions": true,
-    "callerPolicy": "workflowsFromSameOwner",
-    "errorWorkflow": ""
+    "callerPolicy": "workflowsFromSameOwner"
   },
   "meta": {
     "templateCredsSetupCompleted": false,
     "instanceId": ""
   },
-  "id": "english-lab-processar-001",
-  "tags": [{ "name": "english-lab" }],
+  "id": "english-lab-processar-002",
+  "tags": [
+    {
+      "name": "english-lab"
+    }
+  ],
   "_comments": {
-    "credenciais": [
-      "1. Crie uma credencial 'HTTP Header Auth' com Name='x-api-key' e Value=SUA_CHAVE_ANTHROPIC para o node 'Claude AI'",
-      "2. Crie uma credencial 'HTTP Header Auth' com Name='Authorization' e Value=SUA_CHAVE_OPENAI para 'OpenAI TTS'",
-      "3. Configure OAuth2 do Google Sheets e substitua o ID da planilha no node 'Salvar Google Sheets'",
-      "4. Crie a planilha com aba 'Vocabulário' e colunas: id, word, type, ipa, meaning_pt, examples, level, context, source_type, source_title, status, tags, has_audio, created_at"
-    ]
+    "versao": "v2 — suporte multi-provider para analise IA e TTS",
+    "payload_opcoes": {
+      "ai_provider": "anthropic (padrao) | openai | google",
+      "tts_provider": "openai (padrao) | elevenlabs | google | none",
+      "elevenlabs_voice_id": "ID da voz ElevenLabs (opcional, padrao=Rachel 21m00Tcm4TlvDq8ikWAM)"
+    },
+    "credenciais": {
+      "Anthropic API Key": "HTTP Header Auth — Name: x-api-key",
+      "OpenAI API Key": "HTTP Header Auth — Name: Authorization  (node adiciona Bearer)",
+      "Google AI API Key": "HTTP Header Auth — Name: Authorization  (Gemini, node adiciona Bearer)",
+      "ElevenLabs API Key": "HTTP Header Auth — Name: xi-api-key",
+      "Google TTS API Key": "HTTP Header Auth — Name: Authorization  (Cloud TTS, node adiciona Bearer)",
+      "Google Sheets OAuth2": "OAuth2 padrao do Google Sheets"
+    },
+    "vozes_elevenlabs": {
+      "21m00Tcm4TlvDq8ikWAM": "Rachel — feminina americana (PADRAO)",
+      "EXAVITQu4vr4xnSDxMaL": "Bella — feminina americana",
+      "VR6AewLTigWG4xSOukaG": "Arnold — masculino americano",
+      "pNInz6obpgDQGcFmaJgB": "Adam — masculino americano"
+    }
   }
 }
