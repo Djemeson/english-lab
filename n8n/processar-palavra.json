@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json;\nconst word = (body.word || '').trim();\nconst context = (body.context || '').trim();\nconst sourceType = body.source_type || 'manual';\nconst sourceTitle = body.source_title || '';\nconst rawAI = (body.ai_provider || 'anthropic').toLowerCase();\nconst rawTTS = (body.tts_provider || 'openai').toLowerCase();\nif (!word && !context) throw new Error('Nenhuma palavra ou contexto fornecido');\nconst validAI = ['anthropic', 'openai', 'google'];\nconst validTTS = ['openai', 'elevenlabs', 'google', 'none'];\nreturn [{ json: {\n  word, context,\n  source_type: sourceType, source_title: sourceTitle,\n  ai_provider: validAI.includes(rawAI) ? rawAI : 'anthropic',\n  tts_provider: validTTS.includes(rawTTS) ? rawTTS : 'openai',\n  timestamp: new Date().toISOString()\n} }];"
+        "jsCode": "const body = $input.first().json;\nconst word = (body.word || '').trim();\nconst context = (body.context || '').trim();\nconst sourceType = body.source_type || 'manual';\nconst sourceTitle = body.source_title || '';\nconst rawAI = (body.ai_provider || 'anthropic').toLowerCase();\nconst rawTTS = (body.tts_provider || 'openai').toLowerCase();\nif (!word && !context) throw new Error('Nenhuma palavra ou contexto fornecido');\nconst validAI = ['anthropic', 'openai', 'google'];\nconst validTTS = ['openai', 'elevenlabs', 'google', 'none'];\nreturn [{ json: {\n  word, context,\n  source_type: sourceType, source_title: sourceTitle,\n  ai_provider: validAI.includes(rawAI) ? rawAI : 'anthropic',\n  ai_model: (body.ai_model || '').trim(),\n  tts_provider: validTTS.includes(rawTTS) ? rawTTS : 'openai',\n  tts_voice: (body.tts_voice || 'nova').trim(),\n  timestamp: new Date().toISOString()\n} }];"
       },
       "id": "b0020000-0000-0000-0000-000000000002",
       "name": "Validar Input",
@@ -144,7 +144,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-haiku-4-5-20251001\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Analise este item de vocabulário em inglês e retorne APENAS um JSON válido, sem texto extra.\\n\\nPalavra/Expressão: {{ $json.word }}\\nFrase de contexto: {{ $json.context }}\\n\\nResponda SOMENTE com este JSON:\\n{\\n  \\\"word\\\": \\\"a palavra ou expressão exata a estudar (extraia do contexto se necessário)\\\",\\n  \\\"type\\\": \\\"word|phrasal_verb|idiom|collocation\\\",\\n  \\\"ipa\\\": \\\"transcrição IPA em inglês americano\\\",\\n  \\\"meaning_pt\\\": \\\"significado em português neste contexto específico (conciso, 1-2 linhas)\\\",\\n  \\\"examples\\\": [\\\"frase exemplo 1 em inglês\\\", \\\"frase exemplo 2 em inglês\\\"],\\n  \\\"level\\\": \\\"A2|B1|B2|C1|C2\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\"]\\n}\"}]}",
+        "jsonBody": "={\"model\":\"{{ $json.ai_model || 'claude-haiku-4-5-20251001' }}\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Analise este item de vocabulário em inglês e retorne APENAS um JSON válido, sem texto extra.\\n\\nPalavra/Expressão: {{ $json.word }}\\nFrase de contexto: {{ $json.context }}\\n\\nResponda SOMENTE com este JSON:\\n{\\n  \\\"word\\\": \\\"a palavra ou expressão exata a estudar (extraia do contexto se necessário)\\\",\\n  \\\"type\\\": \\\"word|phrasal_verb|idiom|collocation\\\",\\n  \\\"ipa\\\": \\\"transcrição IPA em inglês americano\\\",\\n  \\\"meaning_pt\\\": \\\"significado em português neste contexto específico (conciso, 1-2 linhas)\\\",\\n  \\\"examples\\\": [\\\"frase exemplo 1 em inglês\\\", \\\"frase exemplo 2 em inglês\\\"],\\n  \\\"level\\\": \\\"A2|B1|B2|C1|C2\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\"]\\n}\"}]}",
         "options": {
           "timeout": 30000
         }
@@ -185,7 +185,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"gpt-4o-mini\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Analise este item de vocabulário em inglês e retorne APENAS um JSON válido, sem texto extra.\\n\\nPalavra/Expressão: {{ $json.word }}\\nFrase de contexto: {{ $json.context }}\\n\\nResponda SOMENTE com este JSON:\\n{\\n  \\\"word\\\": \\\"a palavra ou expressão exata a estudar (extraia do contexto se necessário)\\\",\\n  \\\"type\\\": \\\"word|phrasal_verb|idiom|collocation\\\",\\n  \\\"ipa\\\": \\\"transcrição IPA em inglês americano\\\",\\n  \\\"meaning_pt\\\": \\\"significado em português neste contexto específico (conciso, 1-2 linhas)\\\",\\n  \\\"examples\\\": [\\\"frase exemplo 1 em inglês\\\", \\\"frase exemplo 2 em inglês\\\"],\\n  \\\"level\\\": \\\"A2|B1|B2|C1|C2\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\"]\\n}\"}]}",
+        "jsonBody": "={\"model\":\"{{ $json.ai_model || 'gpt-4o-mini' }}\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Analise este item de vocabulário em inglês e retorne APENAS um JSON válido, sem texto extra.\\n\\nPalavra/Expressão: {{ $json.word }}\\nFrase de contexto: {{ $json.context }}\\n\\nResponda SOMENTE com este JSON:\\n{\\n  \\\"word\\\": \\\"a palavra ou expressão exata a estudar (extraia do contexto se necessário)\\\",\\n  \\\"type\\\": \\\"word|phrasal_verb|idiom|collocation\\\",\\n  \\\"ipa\\\": \\\"transcrição IPA em inglês americano\\\",\\n  \\\"meaning_pt\\\": \\\"significado em português neste contexto específico (conciso, 1-2 linhas)\\\",\\n  \\\"examples\\\": [\\\"frase exemplo 1 em inglês\\\", \\\"frase exemplo 2 em inglês\\\"],\\n  \\\"level\\\": \\\"A2|B1|B2|C1|C2\\\",\\n  \\\"tags\\\": [\\\"tag1\\\", \\\"tag2\\\"]\\n}\"}]}",
         "options": {
           "timeout": 30000
         }
@@ -208,7 +208,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $json.ai_model || 'gemini-1.5-flash' }}:generateContent",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -418,7 +418,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"tts-1\",\"input\":\"{{ $json.word }}\",\"voice\":\"nova\",\"speed\":0.85}",
+        "jsonBody": "={\"model\":\"tts-1\",\"input\":\"{{ $json.word }}\",\"voice\":\"{{ $json.tts_voice || 'nova' }}\",\"speed\":0.85}",
         "options": {
           "response": {
             "response": {

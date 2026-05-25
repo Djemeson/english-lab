@@ -672,16 +672,20 @@ select option{background:var(--surface)}
       <div class="form-row">
         <div class="form-group" style="margin:0">
           <label>Provider de IA</label>
-          <select id="cfg-ai-provider">
-            <option value="anthropic">Anthropic Claude Haiku (padrão)</option>
-            <option value="openai">OpenAI GPT-4o-mini</option>
-            <option value="google">Google Gemini Flash</option>
+          <select id="cfg-ai-provider" onchange="updateModelOptions()">
+            <option value="anthropic">Anthropic Claude</option>
+            <option value="openai">OpenAI GPT</option>
+            <option value="google">Google Gemini</option>
           </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Modelo</label>
+          <select id="cfg-ai-model"></select>
         </div>
         <div class="form-group" style="margin:0">
           <label>Provider de Áudio (TTS)</label>
           <select id="cfg-tts-provider">
-            <option value="openai">OpenAI TTS (padrão)</option>
+            <option value="openai">OpenAI TTS (voz aleatória)</option>
             <option value="elevenlabs">ElevenLabs</option>
             <option value="google">Google Cloud TTS</option>
             <option value="none">Sem áudio</option>
@@ -773,7 +777,7 @@ select option{background:var(--surface)}
 const SK = { settings: 'englab_cfg', words: 'englab_words' }
 
 const DEF_CFG = {
-  aiProvider: 'anthropic', ttsProvider: 'openai',
+  aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai',
   ankiUrl: 'http://localhost:8765', ankiDeck: 'Inglês', ankiModel: 'Inglês Básico',
   n8nBase: '',
   fields: { word: 'Frente', meaning: 'Verso', context: 'Contexto', ipa: 'IPA', examples: 'Exemplos', audio: 'Áudio' }
@@ -1151,6 +1155,45 @@ function addSiteSelected() {
 }
 
 // ================================================================
+// MODELOS E VOZES
+// ================================================================
+const AI_MODELS = {
+  anthropic: [
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — rápido, barato (padrão)' },
+    { value: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6 — equilibrado' },
+    { value: 'claude-opus-4-6',           label: 'Claude Opus 4.6 — mais capaz' }
+  ],
+  openai: [
+    { value: 'gpt-4o-mini',   label: 'GPT-4o-mini — rápido, barato (padrão)' },
+    { value: 'gpt-4o',        label: 'GPT-4o — equilibrado' },
+    { value: 'gpt-5',         label: 'GPT-5 — mais capaz (verifique disponibilidade)' }
+  ],
+  google: [
+    { value: 'gemini-1.5-flash',   label: 'Gemini 1.5 Flash — rápido, barato (padrão)' },
+    { value: 'gemini-1.5-pro',     label: 'Gemini 1.5 Pro — equilibrado' },
+    { value: 'gemini-2.0-flash',   label: 'Gemini 2.0 Flash — mais recente' }
+  ]
+}
+
+const OPENAI_VOICES = ['alloy', 'ash', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer']
+
+function updateModelOptions(keepCurrent = false) {
+  const provider = el('cfg-ai-provider').value
+  const models = AI_MODELS[provider] || []
+  const current = keepCurrent ? el('cfg-ai-model').value : null
+  el('cfg-ai-model').innerHTML = models.map(m =>
+    `<option value="${m.value}" ${m.value === current ? 'selected' : ''}>${m.label}</option>`
+  ).join('')
+  if (!keepCurrent) {
+    el('cfg-ai-model').value = models[0]?.value || ''
+  }
+}
+
+function randomVoice() {
+  return OPENAI_VOICES[Math.floor(Math.random() * OPENAI_VOICES.length)]
+}
+
+// ================================================================
 // IA VIA N8N
 // ================================================================
 async function analyzeWord(wordId) {
@@ -1209,16 +1252,22 @@ async function analyzeAll() {
 
 async function callN8n(word, context, sourceType, sourceTitle) {
   const url = `${cfg.n8nBase}/webhook/en-processar`
+  const ttsProvider = cfg.ttsProvider || 'openai'
+  const payload = {
+    word, context,
+    source_type: sourceType || 'manual',
+    source_title: sourceTitle || '',
+    ai_provider: cfg.aiProvider || 'anthropic',
+    ai_model: cfg.aiModel || '',
+    tts_provider: ttsProvider
+  }
+  // Voz aleatória do OpenAI TTS a cada card
+  if (ttsProvider === 'openai') payload.tts_voice = randomVoice()
+
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      word, context,
-      source_type: sourceType || 'manual',
-      source_title: sourceTitle || '',
-      ai_provider: cfg.aiProvider || 'anthropic',
-      tts_provider: cfg.ttsProvider || 'openai'
-    })
+    body: JSON.stringify(payload)
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -1495,6 +1544,8 @@ function deleteWord(id) {
 // ================================================================
 function fillSettings() {
   el('cfg-ai-provider').value = cfg.aiProvider || 'anthropic'
+  updateModelOptions(false)
+  el('cfg-ai-model').value = cfg.aiModel || AI_MODELS[cfg.aiProvider || 'anthropic'][0]?.value || ''
   el('cfg-tts-provider').value = cfg.ttsProvider || 'openai'
   el('cfg-anki-url').value = cfg.ankiUrl || 'http://localhost:8765'
   el('cfg-anki-deck').value = cfg.ankiDeck || 'Inglês'
@@ -1510,6 +1561,7 @@ function fillSettings() {
 
 function saveSettings() {
   cfg.aiProvider = el('cfg-ai-provider').value
+  cfg.aiModel = el('cfg-ai-model').value
   cfg.ttsProvider = el('cfg-tts-provider').value
   cfg.ankiUrl = el('cfg-anki-url').value.trim()
   cfg.ankiDeck = el('cfg-anki-deck').value.trim()
@@ -1549,7 +1601,27 @@ async function testAnki() {
     const v = await callAnki('version')
     showTestResult('anki', true, `AnkiConnect v${v} — conectado!`)
     updateAnkiNav(true)
-  } catch(e) { showTestResult('anki', false, 'Anki não encontrado. Abra o Anki e verifique o plugin AnkiConnect.'); updateAnkiNav(false) }
+    // Verifica se o deck existe
+    const decks = await callAnki('deckNames').catch(() => [])
+    const deck = cfg.ankiDeck || 'Inglês'
+    if (decks.length && !decks.includes(deck)) {
+      showTestResult('anki', false, `Conectado, mas o deck "${deck}" não existe. Decks disponíveis: ${decks.slice(0,5).join(', ')}`)
+    }
+  } catch(e) {
+    updateAnkiNav(false)
+    const msg = e.message || ''
+    let dica = ''
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('ERR_CONNECTION_REFUSED')) {
+      dica = '❌ Não foi possível conectar. Verifique: (1) O Anki está aberto? (2) O plugin AnkiConnect está instalado? (instale pelo código 2055492159 em Ferramentas → Complementos → Instalar). (3) A URL está correta (padrão: http://localhost:8765)?'
+    } else if (msg.includes('CORS') || msg.includes('cross-origin')) {
+      dica = '❌ Erro de CORS. Nas configurações do AnkiConnect, adicione seu domínio à lista webCorsOriginList (ou use "*").'
+    } else if (msg.toLowerCase().includes('not allowed') || msg.includes('403')) {
+      dica = `❌ Acesso negado pelo AnkiConnect. Vá em Ferramentas → Complementos → AnkiConnect → Configuração e adicione "${location.origin}" em webCorsOriginList.`
+    } else {
+      dica = `❌ Erro: ${msg}. Verifique se o Anki está aberto e o AnkiConnect está ativo.`
+    }
+    showTestResult('anki', false, dica)
+  }
 }
 
 function showTestResult(which, ok, msg) {
