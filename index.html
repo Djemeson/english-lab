@@ -777,7 +777,7 @@ select option{background:var(--surface)}
 const SK = { settings: 'englab_cfg', words: 'englab_words' }
 
 const DEF_CFG = {
-  aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai',
+  aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
   ankiUrl: 'http://localhost:8765', ankiDeck: 'Inglês', ankiModel: 'Inglês Básico',
   n8nBase: '',
   fields: { word: 'Frente', meaning: 'Verso', context: 'Contexto', ipa: 'IPA', examples: 'Exemplos', audio: 'Áudio' }
@@ -1112,10 +1112,15 @@ async function extractSite() {
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Extraindo...'
   try {
     const res = await fetch(`${cfg.n8nBase}/webhook/en-site`, {
-      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url })
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ url, ai_provider: cfg.aiProvider, ai_model: cfg.aiModel })
     })
-    siteItems = await res.json()
-    if (!Array.isArray(siteItems)) siteItems = siteItems.words || []
+    if (!res.ok && res.status !== 200) throw new Error(`n8n retornou status ${res.status}`)
+    const data = await res.json()
+    if (data && data.error) { toast(data.error, 'error'); return }
+    siteItems = Array.isArray(data) ? data : (data.words || [])
+    if (!siteItems.length) { toast('Nenhuma palavra encontrada nesta página', 'warning'); return }
     renderSiteList()
   } catch(e) { toast(`Erro: ${e.message}`, 'error') }
   finally { btn.disabled = false; btn.textContent = '🌐 Extrair vocabulário' }
@@ -1203,7 +1208,7 @@ async function analyzeWord(wordId) {
 
   const main = el('review-main')
   if (activeWordId === wordId) {
-    main.innerHTML = `<div class="review-empty-main"><span class="spinner" style="width:32px;height:32px;border-width:3px"></span><p style="margin-top:16px">Analisando com IA (${cfg.aiProvider || 'anthropic'})...</p></div>`
+    main.innerHTML = `<div class="review-empty-main"><span class="spinner" style="width:32px;height:32px;border-width:3px"></span><p style="margin-top:16px">Analisando com IA (${cfg.aiProvider || 'openai'})...</p></div>`
   }
 
   try {
@@ -1257,7 +1262,7 @@ async function callN8n(word, context, sourceType, sourceTitle) {
     word, context,
     source_type: sourceType || 'manual',
     source_title: sourceTitle || '',
-    ai_provider: cfg.aiProvider || 'anthropic',
+    ai_provider: cfg.aiProvider || 'openai',
     ai_model: cfg.aiModel || '',
     tts_provider: ttsProvider
   }
@@ -1543,9 +1548,9 @@ function deleteWord(id) {
 // SETTINGS
 // ================================================================
 function fillSettings() {
-  el('cfg-ai-provider').value = cfg.aiProvider || 'anthropic'
+  el('cfg-ai-provider').value = cfg.aiProvider || 'openai'
   updateModelOptions(false)
-  el('cfg-ai-model').value = cfg.aiModel || AI_MODELS[cfg.aiProvider || 'anthropic'][0]?.value || ''
+  el('cfg-ai-model').value = cfg.aiModel || AI_MODELS[cfg.aiProvider || 'openai'][0]?.value || ''
   el('cfg-tts-provider').value = cfg.ttsProvider || 'openai'
   el('cfg-anki-url').value = cfg.ankiUrl || 'http://localhost:8765'
   el('cfg-anki-deck').value = cfg.ankiDeck || 'Inglês'
