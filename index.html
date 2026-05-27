@@ -1011,7 +1011,8 @@ function renderKindleList() {
         ${hasPicker ? `<div class="word-picker" id="kp-${i}">${buildPicker(item.context, i)}</div>` : `<div class="parsed-context">${esc(item.context)}</div>`}
         <div class="word-target-row">
           <label style="color:var(--text3);font-size:0.77rem">ou digite:</label>
-          <input type="text" placeholder="palavra alvo" value="${esc(item.word)}" oninput="setKindleWord(${i},this.value)" style="max-width:200px">
+          <input type="text" id="kt-${i}" placeholder="palavra alvo" value="${esc(item.word)}" oninput="setKindleWord(${i},this.value)" style="max-width:200px">
+          <button class="btn btn-sm" id="kb-${i}" onclick="detectKindleWord(${i})" title="IA detecta phrasal verbs, idioms e expressões" style="padding:4px 8px;font-size:0.75rem">🤖</button>
         </div>
         <div class="parsed-meta">📖 ${esc(item.source_title)}${item.chapter ? ' · ' + esc(item.chapter) : ''}</div>
       </div>
@@ -1041,9 +1042,48 @@ function setKindleWord(i, word) {
   kindleItems[i].word = word
   const wEl = el(`kw-${i}`)
   if (wEl) { wEl.textContent = word || 'Clique na palavra alvo'; wEl.style.color = word ? '' : 'var(--text3)' }
-  // Also sync input
-  const ki = el(`ki-${i}`)
-  if (ki) { const inp = ki.querySelector('.word-target-row input'); if (inp && inp.value !== word) inp.value = word }
+  const inp = el(`kt-${i}`)
+  if (inp && inp.value !== word) inp.value = word
+}
+
+async function detectKindleWord(i) {
+  if (!cfg.openaiKey) { toast('Configure a OpenAI API Key nas configurações para usar a detecção automática', 'warning'); return }
+  const item = kindleItems[i]
+  if (!item.context) { toast('Sem contexto para analisar', 'warning'); return }
+  const btn = el(`kb-${i}`)
+  if (btn) { btn.disabled = true; btn.textContent = '⏳' }
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 30,
+        messages: [{
+          role: 'user',
+          content: `Context: "${item.context}"\n\nIdentify the single most interesting vocabulary item to study from this sentence. It can be a word, phrasal verb, idiom, or multi-word expression. Return ONLY the vocabulary item itself, nothing else, no punctuation, no explanation.`
+        }]
+      })
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    const detected = (data.choices?.[0]?.message?.content || '').trim().toLowerCase().replace(/[.,!?;:"""''()]/g, '')
+    if (detected) {
+      setKindleWord(i, detected)
+      // Tenta selecionar o token correspondente no picker
+      const picker = el(`kp-${i}`)
+      if (picker) {
+        picker.querySelectorAll('.wp-tok').forEach(tok => {
+          tok.classList.toggle('sel', tok.dataset.w?.toLowerCase() === detected)
+        })
+      }
+      toast(`Detectado: "${detected}"`, 'success')
+    }
+  } catch(e) {
+    toast(`Erro na detecção: ${e.message}`, 'error')
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖' }
+  }
 }
 
 function addKindleSelected() {
@@ -1395,7 +1435,7 @@ function renderSidebar(filter = '') {
     const count = group.words.length
 
     if (showGroups) {
-      html += `<div class="rw-group-header" onclick="toggleGroup(${JSON.stringify(key)})">
+      html += `<div class="rw-group-header" data-key="${escA(key)}" onclick="toggleGroup(this.dataset.key)">
         <span>${icon} ${esc(label)} <span class="rw-group-count">${count}</span></span>
         <span class="rw-group-toggle">${isCollapsed ? '▶' : '▼'}</span>
       </div>`
