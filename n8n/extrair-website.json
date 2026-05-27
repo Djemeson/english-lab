@@ -224,7 +224,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"{{ $json.ai_model || 'gpt-4o-mini' }}\",\n  \"max_tokens\": 1500,\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Analise este texto em inglês e identifique palavras, phrasal verbs e idioms de nível B2 ou acima que um estudante brasileiro intermediário provavelmente não conhece.\\n\\nRetorne SOMENTE um array JSON com até 20 itens, cada um com: word, context (a frase do texto onde aparece), type (word/phrasal_verb/idiom), level (B2/C1/C2).\\n\\nTexto:\\n{{ $json.text }}\\n\\nResposta (APENAS o array JSON):\"}\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"{{ $json.ai_model || 'gpt-4o-mini' }}\",\n  \"max_tokens\": 1500,\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Analise este texto em inglês e identifique palavras, phrasal verbs e idioms de nível B2 ou acima que um estudante brasileiro intermediário provavelmente não conhece.\\n\\nRetorne SOMENTE um array JSON com até 20 itens, cada um com: word, context (a frase do texto onde aparece), type (word/phrasal_verb/idiom), level (B2/C1/C2).\\n\\nTexto:\\n{{ $json.text.replace(/\"/g, \"'\").replace(/[\\n\\r\\t]/g, ' ').replace(/\\\\+/g, ' ') }}\\n\\nResposta (APENAS o array JSON):\"}\n  ]\n}",
         "options": {
           "timeout": 30000
         }
@@ -266,7 +266,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"{{ $json.ai_model || 'claude-haiku-4-5-20251001' }}\",\n  \"max_tokens\": 1500,\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Analise este texto em inglês e identifique palavras, phrasal verbs e idioms de nível B2 ou acima que um estudante brasileiro intermediário provavelmente não conhece.\\n\\nRetorne SOMENTE um array JSON com até 20 itens, cada um com: word, context (a frase do texto onde aparece), type (word/phrasal_verb/idiom), level (B2/C1/C2).\\n\\nTexto:\\n{{ $json.text }}\\n\\nResposta (APENAS o array JSON):\"}\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"{{ $json.ai_model || 'claude-haiku-4-5-20251001' }}\",\n  \"max_tokens\": 1500,\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Analise este texto em inglês e identifique palavras, phrasal verbs e idioms de nível B2 ou acima que um estudante brasileiro intermediário provavelmente não conhece.\\n\\nRetorne SOMENTE um array JSON com até 20 itens, cada um com: word, context (a frase do texto onde aparece), type (word/phrasal_verb/idiom), level (B2/C1/C2).\\n\\nTexto:\\n{{ $json.text.replace(/\"/g, \"'\").replace(/[\\n\\r\\t]/g, ' ').replace(/\\\\+/g, ' ') }}\\n\\nResposta (APENAS o array JSON):\"}\n  ]\n}",
         "options": {
           "timeout": 30000
         }
@@ -295,7 +295,7 @@
         "nodeCredentialType": "httpQueryAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"contents\": [\n    {\"parts\": [{\"text\": \"Analise este texto em inglês e identifique palavras, phrasal verbs e idioms de nível B2 ou acima que um estudante brasileiro intermediário provavelmente não conhece.\\n\\nRetorne SOMENTE um array JSON com até 20 itens, cada um com: word, context (a frase do texto onde aparece), type (word/phrasal_verb/idiom), level (B2/C1/C2).\\n\\nTexto:\\n{{ $json.text }}\\n\\nResposta (APENAS o array JSON):\"}]}\n  ]\n}",
+        "jsonBody": "={\n  \"contents\": [\n    {\"parts\": [{\"text\": \"Analise este texto em inglês e identifique palavras, phrasal verbs e idioms de nível B2 ou acima que um estudante brasileiro intermediário provavelmente não conhece.\\n\\nRetorne SOMENTE um array JSON com até 20 itens, cada um com: word, context (a frase do texto onde aparece), type (word/phrasal_verb/idiom), level (B2/C1/C2).\\n\\nTexto:\\n{{ $json.text.replace(/\"/g, \"'\").replace(/[\\n\\r\\t]/g, ' ').replace(/\\\\+/g, ' ') }}\\n\\nResposta (APENAS o array JSON):\"}]}\n  ]\n}",
         "options": {
           "timeout": 30000
         }

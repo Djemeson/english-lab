@@ -1020,6 +1020,57 @@ function renderKindleList() {
     </div>`
   }).join('')
   kindleItems.forEach((_,i) => attachPicker(i))
+  analyzeKindleItems()
+}
+
+async function analyzeKindleItems() {
+  if (!cfg.openaiKey || !kindleItems.length) return
+  // Mostra loading em todos os itens
+  kindleItems.forEach((_, i) => {
+    const kw = el(`kw-${i}`)
+    if (kw) { kw.textContent = '⏳ analisando...'; kw.style.color = 'var(--text3)'; kw.style.fontStyle = 'italic' }
+  })
+  try {
+    const lines = kindleItems.map((item, i) =>
+      `${i + 1}. Context: "${(item.context || '').replace(/"/g, "'")}"${item.word ? ` | Highlighted word: "${item.word}"` : ''}`
+    ).join('\n')
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 300,
+        response_format: { type: 'json_object' },
+        messages: [{
+          role: 'system',
+          content: 'You are a vocabulary extraction assistant. For each sentence, identify the most valuable vocabulary item to study — it could be a single word, phrasal verb, idiom, collocation, or fixed multi-word expression. Prioritize multi-word expressions when the highlighted word is part of one.'
+        }, {
+          role: 'user',
+          content: `For each item below, return the complete vocabulary item as it appears in the sentence (lowercase, no punctuation).\n\n${lines}\n\nReturn only: {"items": [{"i": 0, "item": "..."}, ...]}`
+        }]
+      })
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    const result = JSON.parse(data.choices?.[0]?.message?.content || '{}')
+    if (Array.isArray(result.items)) {
+      result.items.forEach(({ i, item }) => {
+        const idx = Number(i)
+        if (isNaN(idx) || idx < 0 || idx >= kindleItems.length || !item) return
+        const clean = item.toLowerCase().replace(/[.,!?;:"""''()\n]/g, '').trim()
+        setKindleWord(idx, clean)
+        const picker = el(`kp-${idx}`)
+        if (picker) highlightExpression(picker, clean)
+      })
+    }
+  } catch(e) {
+    console.warn('Análise Kindle em lote falhou:', e.message)
+    // Restaura estado
+    kindleItems.forEach((item, i) => {
+      const kw = el(`kw-${i}`)
+      if (kw) { kw.textContent = item.word || 'Clique na palavra alvo'; kw.style.color = item.word ? '' : 'var(--text3)'; kw.style.fontStyle = '' }
+    })
+  }
 }
 
 function buildPicker(text, idx) {
