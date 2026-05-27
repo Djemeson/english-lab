@@ -1641,6 +1641,18 @@ async function sendToAnki(wordId) {
     const filename = `el-${safeWord}-${Date.now()}.mp3`
     try {
       const audioData = String(w.audio_base64).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '')
+      // === DIAGNÓSTICO — remover após confirmar funcionamento ===
+      console.log('[Audio] Primeiros 60 chars:', audioData.substring(0, 60))
+      console.log('[Audio] Tamanho total (chars):', audioData.length)
+      try {
+        const firstBytes = atob(audioData.substring(0, 12))
+        const hex = Array.from(firstBytes, c => c.charCodeAt(0).toString(16).padStart(2,'0')).join(' ')
+        console.log('[Audio] Primeiros bytes (hex):', hex)
+        // MP3 válido começa com: 49 44 33 (ID3) ou ff fb / ff f3 (frame MPEG)
+        const isMP3 = hex.startsWith('49 44 33') || hex.startsWith('ff fb') || hex.startsWith('ff f3') || hex.startsWith('ff f2')
+        console.log('[Audio] Parece MP3 válido?', isMP3)
+      } catch(diagErr) { console.warn('[Audio] Erro ao inspecionar bytes:', diagErr.message) }
+      // === FIM DIAGNÓSTICO ===
       await callAnki('storeMediaFile', { filename, data: audioData })
       audioTag = `[sound:${filename}]`
     } catch(e) {
