@@ -1520,10 +1520,16 @@ function buildFrente(w, m, ex) {
   // Frente = frase exemplo em inglês com a palavra-alvo em negrito
   const sentence = (ex && ex.en) || m.example_en || w.context || ''
   if (!sentence) return esc(w.word || '')
+  // Se o AI já forneceu <b> na frase EN, usa direto
+  if (/<b>/i.test(sentence)) return allowBold(sentence)
+  // Fallback: tenta boldar a palavra e variações comuns
   const wordPattern = (w.word || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   if (!wordPattern) return esc(sentence)
   try {
-    return sentence.replace(new RegExp(`\\b(${wordPattern}(?:s|ed|ing|er|est|ly|'s)?)\\b`, 'gi'), '<b>$1</b>')
+    return sentence.replace(
+      new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi'),
+      '<b>$1</b>'
+    )
   } catch { return esc(sentence) }
 }
 
@@ -1576,13 +1582,15 @@ async function sendToAnki(wordId) {
   if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
 
   // Armazena o áudio uma vez (mesma pronúncia para todos os significados)
-  let audioField = ''
+  let audioTag = ''
   if (w.audio_base64) {
     const safeWord = (w.word || 'word').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
     const filename = `el-${safeWord}-${Date.now()}.mp3`
     try {
-      await callAnki('storeMediaFile', { filename, data: w.audio_base64 })
-      audioField = `[sound:${filename}]`
+      // Remove prefixo data URI se presente (AnkiConnect espera base64 puro)
+      const audioData = String(w.audio_base64).replace(/^data:[^;]+;base64,/, '')
+      await callAnki('storeMediaFile', { filename, data: audioData })
+      audioTag = `[sound:${filename}]`
     } catch(e) { console.warn('Anki audio store failed:', e.message) }
   }
 
@@ -1600,12 +1608,13 @@ async function sendToAnki(wordId) {
             deckName: cfg.ankiDeck || 'Inglês',
             modelName: cfg.ankiModel || 'Inglês Básico',
             fields: {
-              [cfg.fields.word    || 'Frente'  ]: buildFrente(w, m, ex),
+              // Áudio embutido na Frente — toca automaticamente em qualquer modelo Anki
+              [cfg.fields.word    || 'Frente'  ]: buildFrente(w, m, ex) + (audioTag ? ' ' + audioTag : ''),
               [cfg.fields.meaning || 'Verso'   ]: buildVerso(w, m, ex),
               [cfg.fields.context || 'Contexto']: w.context || '',
               [cfg.fields.ipa     || 'IPA'     ]: w.ipa || '',
               [cfg.fields.examples|| 'Exemplos']: [ex.en, ex.pt].filter(Boolean).join('\n'),
-              [cfg.fields.audio   || 'Áudio'   ]: audioField
+              [cfg.fields.audio   || 'Áudio'   ]: audioTag
             },
             tags: ['english-lab', w.source_type, m.register, m.level, w.type].filter(Boolean)
           }
