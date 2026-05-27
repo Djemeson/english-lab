@@ -195,6 +195,8 @@ select option{background:var(--surface)}
 .wp-tok{cursor:pointer;padding:1px 3px;border-radius:3px;transition:background .1s}
 .wp-tok:hover{background:rgba(59,130,246,.25)}
 .wp-tok.sel{background:var(--primary);color:#fff;border-radius:3px}
+.wp-tok.sel-multi{background:var(--purple);color:#fff;border-radius:3px}
+.wp-tok.wp-loading{opacity:.6;cursor:wait}
 /* word target input inside parsed item */
 .word-target-row{display:flex;align-items:center;gap:8px;margin-top:8px}
 .word-target-row input{flex:1;padding:5px 10px;font-size:0.82rem}
@@ -1012,7 +1014,6 @@ function renderKindleList() {
         <div class="word-target-row">
           <label style="color:var(--text3);font-size:0.77rem">ou digite:</label>
           <input type="text" id="kt-${i}" placeholder="palavra alvo" value="${esc(item.word)}" oninput="setKindleWord(${i},this.value)" style="max-width:200px">
-          <button class="btn btn-sm" id="kb-${i}" onclick="detectKindleWord(${i})" title="IA detecta phrasal verbs, idioms e expressões" style="padding:4px 8px;font-size:0.75rem">🤖</button>
         </div>
         <div class="parsed-meta">📖 ${esc(item.source_title)}${item.chapter ? ' · ' + esc(item.chapter) : ''}</div>
       </div>
@@ -1029,12 +1030,68 @@ function buildPicker(text, idx) {
   }).join('')
 }
 
+function highlightExpression(container, expression) {
+  const tokens = [...container.querySelectorAll('.wp-tok')]
+  tokens.forEach(t => t.classList.remove('sel', 'sel-multi'))
+  const words = expression.toLowerCase().split(/\s+/).filter(Boolean)
+  if (words.length === 1) {
+    const tok = tokens.find(t => t.dataset.w?.toLowerCase() === words[0])
+    if (tok) tok.classList.add('sel')
+    return
+  }
+  // Tenta encontrar a sequência exata no texto
+  for (let i = 0; i <= tokens.length - words.length; i++) {
+    if (words.every((w, j) => tokens[i + j]?.dataset.w?.toLowerCase() === w)) {
+      words.forEach((_, j) => tokens[i + j].classList.add('sel-multi'))
+      return
+    }
+  }
+  // Fallback: destaca tokens individuais que fazem parte da expressão
+  tokens.forEach(t => { if (words.includes(t.dataset.w?.toLowerCase())) t.classList.add('sel-multi') })
+}
+
 function attachPicker(idx) {
   const c = el(`kp-${idx}`); if (!c) return
-  c.querySelectorAll('.wp-tok').forEach(tok => tok.addEventListener('click', function() {
-    c.querySelectorAll('.wp-tok').forEach(t => t.classList.remove('sel'))
+  c.querySelectorAll('.wp-tok').forEach(tok => tok.addEventListener('click', async function() {
+    const clickedWord = this.dataset.w
+    const i = parseInt(this.dataset.i)
+
+    // Feedback imediato: seleciona a palavra clicada
+    c.querySelectorAll('.wp-tok').forEach(t => t.classList.remove('sel', 'sel-multi'))
     this.classList.add('sel')
-    setKindleWord(parseInt(this.dataset.i), this.dataset.w)
+    setKindleWord(i, clickedWord)
+
+    // Sem API key: usa apenas a palavra clicada
+    if (!cfg.openaiKey) return
+
+    // Detecta se é phrasal verb / idiom / expressão multi-palavra
+    this.classList.add('wp-loading')
+    try {
+      const context = kindleItems[i]?.context || ''
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          max_tokens: 15,
+          messages: [{
+            role: 'user',
+            content: `Sentence: "${context}"\nThe user clicked on the word: "${clickedWord}"\n\nIs "${clickedWord}" part of a phrasal verb, idiom, or fixed multi-word expression in this sentence? If yes, return the complete expression as it appears in the sentence. If no, return just "${clickedWord}". Return ONLY the word or expression, lowercase, no punctuation, no explanation.`
+          }]
+        })
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      const detected = (data.choices?.[0]?.message?.content || '').trim().toLowerCase().replace(/[.,!?;:"""''()\n]/g, '').trim()
+      if (detected && detected !== clickedWord) {
+        setKindleWord(i, detected)
+        highlightExpression(c, detected)
+      }
+    } catch(e) {
+      console.warn('Detecção de expressão falhou:', e.message)
+    } finally {
+      this.classList.remove('wp-loading')
+    }
   }))
 }
 
