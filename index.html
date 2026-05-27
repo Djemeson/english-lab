@@ -1238,8 +1238,11 @@ async function analyzeWord(wordId) {
       usage:         m.usage         || '',
       status:        m.status        || '',
       tone:          m.tone          || '',
-      example_en:    m.example_en    || '',
-      example_pt:    m.example_pt    || '',
+      examples:      Array.isArray(m.examples) && m.examples.length > 0
+                       ? m.examples
+                       : (m.example_en ? [{ en: m.example_en, pt: m.example_pt || '' }] : []),
+      example_en:    m.example_en    || (Array.isArray(m.examples) && m.examples[0] ? m.examples[0].en : '') || '',
+      example_pt:    m.example_pt    || (Array.isArray(m.examples) && m.examples[0] ? m.examples[0].pt : '') || '',
       notes:         m.notes         || [],
       word_family:   m.word_family   || [],
       synonyms:      m.synonyms      || [],
@@ -1365,7 +1368,9 @@ function renderWordCard(wordId) {
 
   const typeMap = { word:'word', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' }
 
-  const selCount = (w.meanings || []).filter(m => m.selected !== false).length
+  const selMeanings = (w.meanings || []).filter(m => m.selected !== false)
+  const selCount = selMeanings.length
+  const totalCards = selMeanings.reduce((sum, m) => sum + ((m.examples && m.examples.length) || 1), 0)
   let bodyHtml
 
   if (w.status === 'pending_ai') {
@@ -1386,7 +1391,7 @@ function renderWordCard(wordId) {
         <div class="meanings-toolbar-left">
           <span class="meanings-count">${w.meanings.length} significado${w.meanings.length !== 1 ? 's'  : ''}</span>
           <span>·</span>
-          <span>${selCount} selecionado${selCount !== 1 ? 's' : ''}</span>
+          <span>${selCount} selecionado${selCount !== 1 ? 's' : ''} · ${totalCards} card${totalCards !== 1 ? 's' : ''}</span>
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" onclick="selectAllMeanings('${w.id}',true)">Todos</button>
@@ -1412,7 +1417,7 @@ function renderWordCard(wordId) {
     <div class="wc-actions">
       ${w.status === 'pending_review' && w.meanings.length > 0 ? `
         <button class="btn btn-success" onclick="sendToAnki('${w.id}')">
-          ✓ Criar ${selCount} card${selCount !== 1 ? 's' : ''} no Anki
+          ✓ Criar ${totalCards} card${totalCards !== 1 ? 's' : ''} no Anki
         </button>
       ` : ''}
       ${w.status === 'pending_ai' ? '' : `
@@ -1446,11 +1451,16 @@ function renderMeaningItem(wordId, m, mi) {
       ${m.definition_pt ? `<div class="mi-note" style="font-style:italic;opacity:0.8;margin-top:4px">${esc(m.definition_pt)}</div>` : ''}
       ${m.context_note ? `<div class="mi-note">${esc(m.context_note)}</div>` : ''}
       ${m.synonyms && m.synonyms.length ? `<div class="mi-note" style="font-size:0.78rem;color:var(--text3)">↔ ${m.synonyms.slice(0,4).map(esc).join(', ')}</div>` : ''}
-      ${m.example_en ? `
+      ${(m.examples && m.examples.length ? m.examples : (m.example_en ? [{en:m.example_en, pt:m.example_pt||''}] : [])).map((ex, ei) => ex.en ? `
       <div class="mi-example">
-        <div class="en">"${esc(m.example_en)}"</div>
-        ${m.example_pt ? `<div class="pt">"${esc(m.example_pt)}"</div>` : ''}
-      </div>` : ''}
+        <div style="display:flex;gap:8px;align-items:baseline">
+          <span style="font-size:0.7rem;color:var(--text3);flex-shrink:0;font-weight:600">#${ei+1}</span>
+          <div style="flex:1">
+            <div class="en">"${esc(ex.en)}"</div>
+            ${ex.pt ? `<div class="pt">"${allowBold(ex.pt)}"</div>` : ''}
+          </div>
+        </div>
+      </div>` : '').join('')}
     </div>
   </div>`
 }
@@ -1466,16 +1476,17 @@ function toggleMeaning(wordId, mi) {
     item.classList.toggle('selected', sel)
     item.querySelector('.mi-checkbox').style.cssText = ''
   }
-  // Update send button
-  const selCount = w.meanings.filter(m => m.selected !== false).length
+  // Update send button and toolbar
+  const selM = w.meanings.filter(m => m.selected !== false)
+  const selCount = selM.length
+  const totalCards = selM.reduce((sum, m) => sum + ((m.examples && m.examples.length) || 1), 0)
   const actions = document.querySelector('.wc-actions')
   if (actions) {
     const btn = actions.querySelector('.btn-success')
-    if (btn) btn.textContent = `✓ Criar ${selCount} card${selCount !== 1 ? 's' : ''} no Anki`
+    if (btn) btn.textContent = `✓ Criar ${totalCards} card${totalCards !== 1 ? 's' : ''} no Anki`
   }
-  // Update toolbar count
   const toolbar = document.querySelector('.meanings-count')?.parentElement?.querySelector('span:nth-child(3)')
-  if (toolbar) toolbar.textContent = `${selCount} selecionado${selCount !== 1 ? 's' : ''}`
+  if (toolbar) toolbar.textContent = `${selCount} selecionado${selCount !== 1 ? 's' : ''} · ${totalCards} card${totalCards !== 1 ? 's' : ''}`
 }
 
 function selectAllMeanings(wordId, val) {
@@ -1498,22 +1509,30 @@ async function callAnki(action, params = {}) {
   return d.result
 }
 
-function buildFrente(w, m) {
-  // Frente = frase exemplo em inglês com a palavra em negrito
-  const sentence = m.example_en || w.context || ''
+// Permite apenas <b> e </b> no texto do AI (seguro para Anki)
+function allowBold(s) {
+  return String(s || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/&lt;b&gt;/gi,'<b>').replace(/&lt;\/b&gt;/gi,'</b>')
+}
+
+function buildFrente(w, m, ex) {
+  // Frente = frase exemplo em inglês com a palavra-alvo em negrito
+  const sentence = (ex && ex.en) || m.example_en || w.context || ''
   if (!sentence) return esc(w.word || '')
   const wordPattern = (w.word || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   if (!wordPattern) return esc(sentence)
   try {
-    return sentence.replace(new RegExp(`\\b(${wordPattern}(?:s|ed|ing|er|est|ly)?)\\b`, 'gi'), '<b>$1</b>')
+    return sentence.replace(new RegExp(`\\b(${wordPattern}(?:s|ed|ing|er|est|ly|'s)?)\\b`, 'gi'), '<b>$1</b>')
   } catch { return esc(sentence) }
 }
 
-function buildVerso(w, m) {
+function buildVerso(w, m, ex) {
   const SRC = { series:'série de TV', movie:'filme', youtube:'YouTube', kindle:'e-book/Kindle', podcast:'podcast', website:'site', manual:'input manual' }
   let v = ''
-  // 1. Frase exemplo em PT
-  if (m.example_pt) v += `${esc(m.example_pt)}<br><br>`
+  // 1. Frase exemplo em PT (AI já inclui <b>palavra_pt</b>)
+  const ptSentence = (ex && ex.pt) || m.example_pt || ''
+  if (ptSentence) v += `${allowBold(ptSentence)}<br><br>`
   // 2. Palavra + IPA + Definição
   v += `${esc(w.word || '')}${w.ipa ? ' ' + esc(w.ipa) : ''} <br>`
   if (m.definition_pt) v += ` <b>Definição:</b> ${esc(m.definition_pt)} <br>`
@@ -1569,27 +1588,35 @@ async function sendToAnki(wordId) {
 
   let ok = 0, fail = 0
   for (const m of selected) {
-    try {
-      const noteId = await callAnki('addNote', {
-        note: {
-          deckName: cfg.ankiDeck || 'Inglês',
-          modelName: cfg.ankiModel || 'Inglês Básico',
-          fields: {
-            [cfg.fields.word    || 'Frente'  ]: buildFrente(w, m),
-            [cfg.fields.meaning || 'Verso'   ]: buildVerso(w, m),
-            [cfg.fields.context || 'Contexto']: w.context || '',
-            [cfg.fields.ipa     || 'IPA'     ]: w.ipa || '',
-            [cfg.fields.examples|| 'Exemplos']: [m.example_en, m.example_pt].filter(Boolean).join('\n'),
-            [cfg.fields.audio   || 'Áudio'   ]: audioField
-          },
-          tags: ['english-lab', w.source_type, m.register, m.level, w.type].filter(Boolean)
-        }
-      })
-      m.anki_id = noteId
-      ok++
-    } catch(e) {
-      console.warn('Anki error for meaning:', m.meaning_pt, e.message)
-      fail++
+    // Um card por exemplo (3 exemplos = 3 cards por significado)
+    const exArr = m.examples && m.examples.length > 0
+      ? m.examples
+      : [{ en: m.example_en || '', pt: m.example_pt || '' }]
+
+    for (const ex of exArr) {
+      try {
+        const noteId = await callAnki('addNote', {
+          note: {
+            deckName: cfg.ankiDeck || 'Inglês',
+            modelName: cfg.ankiModel || 'Inglês Básico',
+            fields: {
+              [cfg.fields.word    || 'Frente'  ]: buildFrente(w, m, ex),
+              [cfg.fields.meaning || 'Verso'   ]: buildVerso(w, m, ex),
+              [cfg.fields.context || 'Contexto']: w.context || '',
+              [cfg.fields.ipa     || 'IPA'     ]: w.ipa || '',
+              [cfg.fields.examples|| 'Exemplos']: [ex.en, ex.pt].filter(Boolean).join('\n'),
+              [cfg.fields.audio   || 'Áudio'   ]: audioField
+            },
+            tags: ['english-lab', w.source_type, m.register, m.level, w.type].filter(Boolean)
+          }
+        })
+        if (!m.anki_ids) m.anki_ids = []
+        m.anki_ids.push(noteId)
+        ok++
+      } catch(e) {
+        console.warn('Anki error:', m.meaning_pt, ex.en, e.message)
+        fail++
+      }
     }
   }
 
