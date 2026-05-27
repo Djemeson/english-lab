@@ -1713,6 +1713,15 @@ function renderWordCard(wordId) {
 
   const typeMap = { word:'word', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' }
 
+function getAnkiDeck(w) {
+  const base = cfg.ankiDeck || 'Inglês'
+  const type = (w?.type || '').toLowerCase()
+  if (type === 'idiom')        return `${base}::Idioms`
+  if (type === 'phrasal_verb') return `${base}::Phrasal Verbs`
+  if (type === 'collocation')  return `${base}::Collocations`
+  return `${base}::Vocabulary`
+}
+
   const selMeanings = (w.meanings || []).filter(m => m.selected !== false)
   const selCount = selMeanings.length
   const totalCards = selMeanings.reduce((sum, m) => sum + ((m.examples && m.examples.length) || 1), 0)
@@ -1985,7 +1994,7 @@ async function sendToAnki(wordId) {
       try {
         const noteId = await callAnki('addNote', {
           note: {
-            deckName: cfg.ankiDeck || 'Inglês',
+            deckName: getAnkiDeck(w),
             modelName: cfg.ankiModel || 'Inglês Básico',
             fields: {
               [cfg.fields.word    || 'Frente'  ]: buildFrente(w, m, ex) + (audioTag ? ' ' + audioTag : ''),
