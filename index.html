@@ -702,6 +702,10 @@ select option{background:var(--surface)}
             <option value="none">Sem áudio</option>
           </select>
         </div>
+        <div class="form-group" style="margin:0">
+          <label>OpenAI API Key <span style="color:var(--text3);font-weight:400;font-size:0.8rem">(para TTS direto no site — fallback se n8n não enviar áudio)</span></label>
+          <input type="password" id="cfg-openai-key" placeholder="sk-..." autocomplete="off">
+        </div>
       </div>
       <div id="n8n-ai-test-result" class="test-result hidden">
         <div class="test-dot" id="n8n-ai-dot"></div>
@@ -789,6 +793,7 @@ const SK = { settings: 'englab_cfg', words: 'englab_words' }
 
 const DEF_CFG = {
   aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
+  openaiKey: '',
   ankiUrl: 'http://localhost:8765', ankiDeck: 'Inglês', ankiModel: 'Inglês Básico',
   n8nBase: '',
   fields: { word: 'Frente', meaning: 'Verso', context: 'Contexto', ipa: 'IPA', examples: 'Exemplos', audio: 'Áudio' }
@@ -1208,6 +1213,30 @@ function updateModelOptions(keepCurrent = false) {
 
 function randomVoice() {
   return OPENAI_VOICES[Math.floor(Math.random() * OPENAI_VOICES.length)]
+}
+
+// Busca áudio diretamente da OpenAI TTS (fallback quando n8n não entrega base64)
+async function fetchAudioBase64(word) {
+  const key = cfg.openaiKey || ''
+  if (!key || !word) return null
+  try {
+    const voice = randomVoice()
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'tts-1', input: word, voice })
+    })
+    if (!res.ok) { console.warn('[TTS Direto] Erro HTTP', res.status); return null }
+    const buffer = await res.arrayBuffer()
+    // Converte ArrayBuffer para base64
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
+    return btoa(binary)
+  } catch(e) {
+    console.warn('[TTS Direto] Falha:', e.message)
+    return null
+  }
 }
 
 // ================================================================
@@ -1635,24 +1664,19 @@ async function sendToAnki(wordId) {
   if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
 
   // Armazena o áudio uma vez (mesma pronúncia para todos os significados)
+  // Se n8n não entregou base64 (problema filesystem-v2), tenta buscar direto da OpenAI
+  let audioBase64Raw = w.audio_base64 || null
+  if (!audioBase64Raw && cfg.openaiKey) {
+    toast('Buscando áudio direto da OpenAI...', 'info')
+    audioBase64Raw = await fetchAudioBase64(w.word)
+  }
+
   let audioTag = ''
-  if (w.audio_base64) {
+  if (audioBase64Raw) {
     const safeWord = (w.word || 'word').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
     const filename = `el-${safeWord}-${Date.now()}.mp3`
     try {
-      const audioData = String(w.audio_base64).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '')
-      // === DIAGNÓSTICO — remover após confirmar funcionamento ===
-      console.log('[Audio] Primeiros 60 chars:', audioData.substring(0, 60))
-      console.log('[Audio] Tamanho total (chars):', audioData.length)
-      try {
-        const firstBytes = atob(audioData.substring(0, 12))
-        const hex = Array.from(firstBytes, c => c.charCodeAt(0).toString(16).padStart(2,'0')).join(' ')
-        console.log('[Audio] Primeiros bytes (hex):', hex)
-        // MP3 válido começa com: 49 44 33 (ID3) ou ff fb / ff f3 (frame MPEG)
-        const isMP3 = hex.startsWith('49 44 33') || hex.startsWith('ff fb') || hex.startsWith('ff f3') || hex.startsWith('ff f2')
-        console.log('[Audio] Parece MP3 válido?', isMP3)
-      } catch(diagErr) { console.warn('[Audio] Erro ao inspecionar bytes:', diagErr.message) }
-      // === FIM DIAGNÓSTICO ===
+      const audioData = String(audioBase64Raw).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '')
       await callAnki('storeMediaFile', { filename, data: audioData })
       audioTag = `[sound:${filename}]`
     } catch(e) {
@@ -1660,8 +1684,9 @@ async function sendToAnki(wordId) {
       toast(`Áudio não adicionado: ${e.message}`, 'warning')
     }
   } else {
+    const motivo = cfg.openaiKey ? 'Falha ao buscar áudio da OpenAI' : 'Configure a OpenAI API Key nas configurações para áudio'
     console.warn('audio_base64 ausente para a palavra:', w.word)
-    toast('Áudio indisponível — verifique o nó Combinar no n8n', 'warning')
+    toast(motivo, 'warning')
   }
 
   let ok = 0, fail = 0
@@ -1743,6 +1768,7 @@ function fillSettings() {
   updateModelOptions(false)
   el('cfg-ai-model').value = cfg.aiModel || AI_MODELS[cfg.aiProvider || 'openai'][0]?.value || ''
   el('cfg-tts-provider').value = cfg.ttsProvider || 'openai'
+  el('cfg-openai-key').value = cfg.openaiKey || ''
   el('cfg-anki-url').value = cfg.ankiUrl || 'http://localhost:8765'
   el('cfg-anki-deck').value = cfg.ankiDeck || 'Inglês'
   el('cfg-anki-model').value = cfg.ankiModel || 'Inglês Básico'
@@ -1759,6 +1785,7 @@ function saveSettings() {
   cfg.aiProvider = el('cfg-ai-provider').value
   cfg.aiModel = el('cfg-ai-model').value
   cfg.ttsProvider = el('cfg-tts-provider').value
+  cfg.openaiKey = el('cfg-openai-key').value.trim()
   cfg.ankiUrl = el('cfg-anki-url').value.trim()
   cfg.ankiDeck = el('cfg-anki-deck').value.trim()
   cfg.ankiModel = el('cfg-anki-model').value.trim()
