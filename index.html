@@ -180,6 +180,7 @@ select option{background:var(--surface)}
 .parsed-header{display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px}
 .parsed-header h3{font-size:0.95rem;font-weight:600}
 .parsed-list{display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;padding-right:2px}
+.parsed-list.kindle-list-expanded{max-height:600px}
 .parsed-item{
   display:flex;align-items:flex-start;gap:12px;
   background:var(--surface);border:1px solid var(--border);
@@ -539,7 +540,7 @@ select option{background:var(--surface)}
     <div class="info-box">
       Importe o arquivo HTML exportado pelo Kindle (<strong>Notas e Destaques</strong>). Cada destaque aparece com seu texto — clique na palavra alvo dentro de cada frase para identificá-la, ou digite no campo de texto.
     </div>
-    <div class="upload-area" id="kindle-drop" onclick="document.getElementById('kindle-file').click()">
+    <div class="upload-area" id="kindle-drop" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="this.classList.remove('drag');handleKindleFile({files:event.dataTransfer.files})" onclick="document.getElementById('kindle-file').click()">
       <input type="file" id="kindle-file" accept=".html,.htm,.txt,.csv" onchange="handleKindleFile(this)">
       <div class="upload-icon">📖</div>
       <p><strong>Clique</strong> ou arraste o arquivo aqui</p>
@@ -549,13 +550,14 @@ select option{background:var(--surface)}
     <div id="kindle-result" class="hidden">
       <div class="parsed-header">
         <h3 id="kindle-count">0 destaques</h3>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-ghost btn-sm" onclick="selectAll('kindle-check',true)">Todos</button>
           <button class="btn btn-ghost btn-sm" onclick="selectAll('kindle-check',false)">Nenhum</button>
+          <button class="btn btn-ghost btn-sm" onclick="resetKindleUpload()" title="Carregar outro arquivo" style="padding:4px 10px">🔄</button>
           <button class="btn btn-primary btn-sm" onclick="addKindleSelected()">➕ Adicionar selecionados</button>
         </div>
       </div>
-      <div class="parsed-list" id="kindle-list"></div>
+      <div class="parsed-list kindle-list-expanded" id="kindle-list"></div>
     </div>
   </div>
 
@@ -639,8 +641,9 @@ select option{background:var(--surface)}
       <h1>Revisar</h1>
       <p>A IA gera todos os significados — você seleciona os que quer estudar e envia pro Anki</p>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-secondary btn-sm" onclick="analyzeAll()">⚡ Analisar todas com IA</button>
+      <button class="btn btn-success btn-sm" id="btn-send-all-anki" onclick="sendAllToAnki()" disabled style="opacity:.45;cursor:not-allowed">📤 Enviar todos pro Anki</button>
       <button class="btn btn-ghost btn-sm" onclick="showSection('adicionar')">+ Adicionar</button>
     </div>
   </div>
@@ -1008,9 +1011,17 @@ function parseKindleCSV(text) {
   }, [])
 }
 
+function resetKindleUpload() {
+  kindleItems = []
+  el('kindle-result').classList.add('hidden')
+  el('kindle-drop').classList.remove('hidden')
+  el('kindle-file').value = ''
+}
+
 function renderKindleList() {
   const list = el('kindle-list')
   el('kindle-count').textContent = `${kindleItems.length} destaques`
+  el('kindle-drop').classList.add('hidden')
   el('kindle-result').classList.remove('hidden')
   list.innerHTML = kindleItems.map((item, i) => {
     const hasContext = !!item.context
@@ -1063,10 +1074,10 @@ async function analyzeKindleItems() {
         response_format: { type: 'json_object' },
         messages: [{
           role: 'system',
-          content: 'You are a vocabulary extraction assistant. For each sentence, identify the most valuable vocabulary item to study — a single word, phrasal verb, idiom, collocation, or fixed multi-word expression. Prioritize multi-word expressions when relevant.'
+          content: `You are a vocabulary extraction assistant for English learners. For each sentence, identify the single most valuable vocabulary item to study.\n\nRULES:\n1. Use MULTI-WORD only for: true phrasal verbs (give up, hold on, take off), fixed idioms (have a hard time, make up your mind), or permanent collocations that must be learned as a unit (break the ice, small talk, take part in).\n2. NEVER combine a regular transitive verb with its direct object (e.g. "munched pretzels" → use "munch"; "opened the door" → use "open"). They are not collocations.\n3. NEVER combine two separate verbs just because they appear together (e.g. "leaned and pushed" → pick the more interesting one).\n4. Return BASE FORM when possible: "munch" not "munched", "lean" not "leaned".\n5. Pick vocabulary with real study value: unusual/vivid words, phrasal verbs, idioms. Skip generic verbs (went, said, got) unless they're part of a phrasal verb or idiom.`
         }, {
           role: 'user',
-          content: `Each item below uses [0-based index]. Return the best vocabulary item for each, lowercase, no punctuation.\n\n${lines}\n\nRespond ONLY with valid JSON: {"items": [{"i": 0, "item": "expression"}, {"i": 1, "item": "expression"}, ...]}`
+          content: `Each item below uses [0-based index]. Return the best vocabulary item for each, lowercase, base form, no punctuation.\n\n${lines}\n\nRespond ONLY with valid JSON: {"items": [{"i": 0, "item": "expression"}, {"i": 1, "item": "expression"}, ...]}`
         }]
       })
     })
@@ -1268,8 +1279,7 @@ function addKindleSelected() {
   sel.forEach(item => createWord(item))
   saveWords(); renderDashboard()
   toast(`${sel.length} itens adicionados à fila!`, 'success')
-  el('kindle-result').classList.add('hidden')
-  kindleItems = []
+  resetKindleUpload()
 }
 
 // ================================================================
@@ -1533,6 +1543,39 @@ async function analyzeAll() {
     await sleep(400)
   }
   toast('Análise concluída!', 'success')
+  updateSendAllBtn()
+}
+
+function updateSendAllBtn() {
+  const btn = el('btn-send-all-anki')
+  if (!btn) return
+  const ready = words.filter(w => w.status === 'pending_review' && w.meanings?.some(m => m.selected !== false))
+  const hasReady = ready.length > 0
+  btn.disabled = !hasReady
+  btn.style.opacity = hasReady ? '1' : '.45'
+  btn.style.cursor = hasReady ? 'pointer' : 'not-allowed'
+}
+
+async function sendAllToAnki() {
+  const ready = words.filter(w => w.status === 'pending_review' && w.meanings?.some(m => m.selected !== false))
+  if (!ready.length) { toast('Nenhuma palavra analisada pronta para enviar', 'warning'); return }
+  const btn = el('btn-send-all-anki')
+  if (btn) { btn.disabled = true; btn.style.opacity = '.45'; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
+  toast(`Enviando ${ready.length} palavras pro Anki...`)
+  let ok = 0, fail = 0
+  for (const w of ready) {
+    try {
+      await sendToAnki(w.id)
+      ok++
+    } catch(e) {
+      fail++
+      console.warn(`sendAllToAnki: falhou para "${w.word}":`, e.message)
+    }
+    await sleep(300)
+  }
+  if (btn) { btn.innerHTML = '📤 Enviar todos pro Anki'; updateSendAllBtn() }
+  toast(`${ok} enviadas${fail ? `, ${fail} com erro` : ''}`, ok > 0 ? 'success' : 'error')
+  renderReview(); renderDashboard()
 }
 
 async function callN8n(word, context, sourceType, sourceTitle) {
@@ -1570,6 +1613,7 @@ function renderReview() {
   const reviewable = words.filter(w => ['pending_ai','pending_review'].includes(w.status))
   el('review-empty').classList.toggle('hidden', reviewable.length > 0)
   el('review-content').classList.toggle('hidden', reviewable.length === 0)
+  updateSendAllBtn()
   if (!reviewable.length) return
   renderSidebar()
   if (!activeWordId || !words.find(w => w.id === activeWordId)) {
@@ -1818,17 +1862,23 @@ function buildFrente(w, m, ex) {
   // Frente = frase exemplo em inglês com a palavra-alvo em negrito
   const sentence = (ex && ex.en) || m.example_en || w.context || ''
   if (!sentence) return esc(w.word || '')
-  // Se o AI já forneceu <b> na frase EN, usa direto
-  if (/<b>/i.test(sentence)) return capFirst(allowBold(sentence))
-  // Fallback: tenta boldar a palavra e variações comuns
-  const wordPattern = (w.word || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  if (!wordPattern) return capFirst(esc(sentence))
+  const wordRaw = (w.word || '').trim()
+  const isMultiWord = wordRaw.includes(' ')
+  // Single word e AI já forneceu <b>: confia no bold do AI
+  if (/<b>/i.test(sentence) && !isMultiWord) return capFirst(allowBold(sentence))
+  // Remove <b> parciais do AI (pode ter boldado apenas a 1ª palavra da expressão)
+  const cleanSentence = sentence.replace(/<\/?b>/gi, '')
+  const wordPattern = wordRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (!wordPattern) return capFirst(esc(cleanSentence))
   try {
-    return capFirst(sentence.replace(
-      new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi'),
-      '<b>$1</b>'
-    ))
-  } catch { return capFirst(esc(sentence)) }
+    // Multi-word: match exato; single word: aceita inflexões comuns
+    const regex = isMultiWord
+      ? new RegExp(`\\b(${wordPattern})\\b`, 'gi')
+      : new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi')
+    const bolded = cleanSentence.replace(regex, '<b>$1</b>')
+    // Se não encontrou a expressão na frase gerada pela IA, retorna sem bold
+    return capFirst(bolded.includes('<b>') ? bolded : esc(cleanSentence))
+  } catch { return capFirst(esc(cleanSentence)) }
 }
 
 function buildVerso(w, m, ex) {
