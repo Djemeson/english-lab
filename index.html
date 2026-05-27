@@ -1698,6 +1698,15 @@ function selectWord(id) {
   renderWordCard(id)
 }
 
+function getAnkiDeck(w) {
+  const base = cfg.ankiDeck || 'Inglês'
+  const type = (w?.type || '').toLowerCase()
+  if (type === 'idiom')        return `${base}::Idioms`
+  if (type === 'phrasal_verb') return `${base}::Phrasal Verbs`
+  if (type === 'collocation')  return `${base}::Collocations`
+  return `${base}::Vocabulary`
+}
+
 function renderWordCard(wordId) {
   const w = words.find(x => x.id === wordId)
   if (!w) return
@@ -1712,15 +1721,6 @@ function renderWordCard(wordId) {
   })() : ''
 
   const typeMap = { word:'word', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' }
-
-function getAnkiDeck(w) {
-  const base = cfg.ankiDeck || 'Inglês'
-  const type = (w?.type || '').toLowerCase()
-  if (type === 'idiom')        return `${base}::Idioms`
-  if (type === 'phrasal_verb') return `${base}::Phrasal Verbs`
-  if (type === 'collocation')  return `${base}::Collocations`
-  return `${base}::Vocabulary`
-}
 
   const selMeanings = (w.meanings || []).filter(m => m.selected !== false)
   const selCount = selMeanings.length
@@ -1902,9 +1902,9 @@ function buildFrente(w, m, ex) {
 function buildVerso(w, m, ex) {
   const SRC = { series:'série de TV', movie:'filme', youtube:'YouTube', kindle:'e-book/Kindle', podcast:'podcast', website:'site', manual:'input manual' }
   let v = ''
-  // 1. Frase exemplo em PT (AI já inclui <b>palavra_pt</b>)
+  // 1. Frase exemplo em PT — remove <b> do AI (posição errada em PT) e deixa só texto
   const ptSentence = (ex && ex.pt) || m.example_pt || ''
-  if (ptSentence) v += `${capFirst(allowBold(ptSentence))}<br><br>`
+  if (ptSentence) v += `${capFirst(esc(ptSentence.replace(/<\/?b>/gi, '')))}<br><br>`
   // 2. Palavra + IPA + Definição
   v += `${esc(w.word || '')}${w.ipa ? ' ' + esc(w.ipa) : ''} <br>`
   if (m.definition_pt) v += ` <b>Definição:</b> ${esc(m.definition_pt)} <br>`
