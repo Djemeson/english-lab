@@ -218,16 +218,27 @@ select option{background:var(--surface)}
 .review-search{padding:10px 12px;border-bottom:1px solid var(--border)}
 .review-search input{padding:7px 12px;font-size:0.85rem}
 .review-word-list{max-height:calc(100vh - 220px);overflow-y:auto}
-.rw-item{
-  padding:11px 16px;border-bottom:1px solid var(--border);
-  cursor:pointer;transition:background .15s;
-}
 .rw-item:last-child{border-bottom:none}
 .rw-item:hover{background:var(--surface2)}
 .rw-item.active{background:var(--primary-glow);border-left:3px solid var(--primary)}
 .rw-word{font-weight:600;font-size:0.88rem;margin-bottom:3px}
 .rw-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .rw-count{font-size:0.73rem;color:var(--text3)}
+.rw-group-header{
+  padding:7px 16px;background:var(--surface3);border-bottom:1px solid var(--border);
+  font-size:0.75rem;font-weight:600;color:var(--text2);cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;user-select:none;
+  position:sticky;top:0;z-index:1;
+}
+.rw-group-header:hover{background:var(--surface2);color:var(--text)}
+.rw-group-count{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:16px;height:16px;padding:0 4px;
+  background:var(--border);color:var(--text2);border-radius:8px;
+  font-size:0.68rem;font-weight:700;margin-left:5px;
+}
+.rw-group-toggle{font-size:0.65rem;color:var(--text3);flex-shrink:0}
+.rw-item{padding:9px 16px 9px 24px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
 
 /* Main card area */
 .review-main{}
@@ -786,6 +797,7 @@ const DEF_CFG = {
 let cfg = {}
 let words = []
 let activeWordId = null
+const collapsedGroups = new Set()
 let kindleItems = [], midiaItems = [], siteItems = []
 
 function loadCfg() {
@@ -1321,28 +1333,63 @@ function renderReview() {
   renderWordCard(activeWordId)
 }
 
+function toggleGroup(key) {
+  if (collapsedGroups.has(key)) collapsedGroups.delete(key)
+  else collapsedGroups.add(key)
+  renderSidebar(el('sidebar-search').value)
+}
+
 function renderSidebar(filter = '') {
   const reviewable = words.filter(w => ['pending_ai','pending_review'].includes(w.status))
   const filtered = filter
-    ? reviewable.filter(w => (w.word + w.context).toLowerCase().includes(filter.toLowerCase()))
+    ? reviewable.filter(w => (w.word + (w.context||'')).toLowerCase().includes(filter.toLowerCase()))
     : reviewable
 
   el('sidebar-count').textContent = reviewable.length
 
-  el('review-word-list').innerHTML = filtered.map(w => {
-    const isActive = w.id === activeWordId
-    const statusHtml = w.status === 'pending_ai'
-      ? `<span class="status-chip pending_ai">⏳ Pendente IA</span>`
-      : `<span class="status-chip pending_review">● ${w.meanings.length} significado${w.meanings.length !== 1 ? 's' : ''}</span>`
-    return `
-    <div class="rw-item ${isActive ? 'active' : ''}" onclick="selectWord('${w.id}')">
-      <div class="rw-word">${esc(w.word || '(frase)')}</div>
-      <div class="rw-meta">
-        ${statusHtml}
-        <span class="rw-count">${srcIcon(w.source_type)}</span>
-      </div>
-    </div>`
-  }).join('')
+  // Agrupar por fonte (source_title ou source_type)
+  const groups = new Map()
+  for (const w of filtered) {
+    const key = w.source_title || w.source_type || 'desconhecido'
+    if (!groups.has(key)) groups.set(key, { words: [], source_type: w.source_type, source_title: w.source_title })
+    groups.get(key).words.push(w)
+  }
+
+  // Se só há um grupo (ou nenhum), não mostra cabeçalhos de grupo
+  const showGroups = groups.size > 1
+
+  let html = ''
+  for (const [key, group] of groups) {
+    const isCollapsed = collapsedGroups.has(key)
+    const icon = srcIcon(group.source_type)
+    const label = group.source_title || key
+    const count = group.words.length
+
+    if (showGroups) {
+      html += `<div class="rw-group-header" onclick="toggleGroup(${JSON.stringify(key)})">
+        <span>${icon} ${esc(label)} <span class="rw-group-count">${count}</span></span>
+        <span class="rw-group-toggle">${isCollapsed ? '▶' : '▼'}</span>
+      </div>`
+    }
+
+    if (!isCollapsed) {
+      for (const w of group.words) {
+        const isActive = w.id === activeWordId
+        const statusHtml = w.status === 'pending_ai'
+          ? `<span class="status-chip pending_ai">⏳ Pendente IA</span>`
+          : `<span class="status-chip pending_review">● ${(w.meanings||[]).length} significado${(w.meanings||[]).length !== 1 ? 's' : ''}</span>`
+        html += `<div class="rw-item ${isActive ? 'active' : ''}" onclick="selectWord('${w.id}')">
+          <div class="rw-word">${esc(w.word || '(frase)')}</div>
+          <div class="rw-meta">
+            ${statusHtml}
+            ${!showGroups ? `<span class="rw-count">${icon}</span>` : ''}
+          </div>
+        </div>`
+      }
+    }
+  }
+
+  el('review-word-list').innerHTML = html
 }
 
 function filterSidebar(val) { renderSidebar(val) }
@@ -1587,11 +1634,16 @@ async function sendToAnki(wordId) {
     const safeWord = (w.word || 'word').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
     const filename = `el-${safeWord}-${Date.now()}.mp3`
     try {
-      // Remove prefixo data URI se presente (AnkiConnect espera base64 puro)
       const audioData = String(w.audio_base64).replace(/^data:[^;]+;base64,/, '')
       await callAnki('storeMediaFile', { filename, data: audioData })
       audioTag = `[sound:${filename}]`
-    } catch(e) { console.warn('Anki audio store failed:', e.message) }
+    } catch(e) {
+      console.warn('Anki storeMediaFile falhou:', e.message)
+      toast(`Áudio não adicionado: ${e.message}`, 'warning')
+    }
+  } else {
+    console.warn('audio_base64 ausente para a palavra:', w.word)
+    toast('Áudio indisponível — verifique o nó Combinar no n8n', 'warning')
   }
 
   let ok = 0, fail = 0
