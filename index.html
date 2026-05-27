@@ -1563,21 +1563,27 @@ function allowBold(s) {
     .replace(/&lt;b&gt;/gi,'<b>').replace(/&lt;\/b&gt;/gi,'</b>')
 }
 
+// Capitaliza o primeiro caractere alfabético, mesmo se estiver dentro de <b>
+function capFirst(s) {
+  if (!s) return s
+  return s.replace(/^(<b>)?([a-záàãâéêíóôõúüç])/i, (_, tag, ch) => (tag || '') + ch.toUpperCase())
+}
+
 function buildFrente(w, m, ex) {
   // Frente = frase exemplo em inglês com a palavra-alvo em negrito
   const sentence = (ex && ex.en) || m.example_en || w.context || ''
   if (!sentence) return esc(w.word || '')
   // Se o AI já forneceu <b> na frase EN, usa direto
-  if (/<b>/i.test(sentence)) return allowBold(sentence)
+  if (/<b>/i.test(sentence)) return capFirst(allowBold(sentence))
   // Fallback: tenta boldar a palavra e variações comuns
   const wordPattern = (w.word || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  if (!wordPattern) return esc(sentence)
+  if (!wordPattern) return capFirst(esc(sentence))
   try {
-    return sentence.replace(
+    return capFirst(sentence.replace(
       new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi'),
       '<b>$1</b>'
-    )
-  } catch { return esc(sentence) }
+    ))
+  } catch { return capFirst(esc(sentence)) }
 }
 
 function buildVerso(w, m, ex) {
@@ -1585,7 +1591,7 @@ function buildVerso(w, m, ex) {
   let v = ''
   // 1. Frase exemplo em PT (AI já inclui <b>palavra_pt</b>)
   const ptSentence = (ex && ex.pt) || m.example_pt || ''
-  if (ptSentence) v += `${allowBold(ptSentence)}<br><br>`
+  if (ptSentence) v += `${capFirst(allowBold(ptSentence))}<br><br>`
   // 2. Palavra + IPA + Definição
   v += `${esc(w.word || '')}${w.ipa ? ' ' + esc(w.ipa) : ''} <br>`
   if (m.definition_pt) v += ` <b>Definição:</b> ${esc(m.definition_pt)} <br>`
@@ -1634,7 +1640,7 @@ async function sendToAnki(wordId) {
     const safeWord = (w.word || 'word').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
     const filename = `el-${safeWord}-${Date.now()}.mp3`
     try {
-      const audioData = String(w.audio_base64).replace(/^data:[^;]+;base64,/, '')
+      const audioData = String(w.audio_base64).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '')
       await callAnki('storeMediaFile', { filename, data: audioData })
       audioTag = `[sound:${filename}]`
     } catch(e) {
