@@ -1278,7 +1278,9 @@ async function callN8n(word, context, sourceType, sourceTitle) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.message || `n8n retornou ${res.status}`)
   }
-  return res.json()
+  const data = await res.json()
+  // n8n pode retornar array de itens — extrair o primeiro
+  return Array.isArray(data) ? data[0] : data
 }
 
 // ================================================================
@@ -1343,6 +1345,7 @@ function renderWordCard(wordId) {
 
   const typeMap = { word:'word', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' }
 
+  const selCount = (w.meanings || []).filter(m => m.selected !== false).length
   let bodyHtml
 
   if (w.status === 'pending_ai') {
@@ -1357,7 +1360,6 @@ function renderWordCard(wordId) {
       </p>
     </div>`
   } else {
-    const selCount = w.meanings.filter(m => m.selected !== false).length
     bodyHtml = `
     <div class="wc-meanings">
       <div class="meanings-toolbar">
