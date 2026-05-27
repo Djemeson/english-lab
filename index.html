@@ -203,7 +203,8 @@ select option{background:var(--surface)}
 .word-target-row input{flex:1;padding:5px 10px;font-size:0.82rem}
 .word-target-row label{margin:0;white-space:nowrap;font-size:0.78rem}
 /* Kindle AI-first redesign */
-.kindle-sentence{font-size:0.87rem;color:var(--text2);line-height:1.65;margin-bottom:7px}
+.kindle-sentence{font-size:0.87rem;color:var(--text2);line-height:1.65;margin-bottom:3px}
+.kindle-sentence-pt{font-size:0.8rem;color:var(--text3);font-style:italic;margin-bottom:7px;min-height:0}
 .expr-highlight{background:rgba(59,130,246,0.22);color:var(--text);border-radius:4px;padding:1px 4px;font-weight:600;font-style:normal}
 .kindle-expr-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap}
 .kindle-expr-chip{display:inline-flex;align-items:center;background:var(--primary-glow);border:1px solid rgba(59,130,246,0.35);color:var(--primary);border-radius:20px;padding:3px 12px;font-size:0.82rem;font-weight:600;letter-spacing:.01em}
@@ -1038,6 +1039,7 @@ function renderKindleList() {
       <input type="checkbox" class="kindle-check" data-i="${i}" checked>
       <div class="parsed-item-body">
         <div class="kindle-sentence" id="ks-${i}">${sentenceHTML}</div>
+        <div class="kindle-sentence-pt" id="ks-pt-${i}">${esc(item.context_pt || '')}</div>
         <div class="kindle-expr-row">
           ${chipContent}
           ${hasContext ? `<button class="btn btn-ghost btn-xs" onclick="toggleKindlePicker(${i})">✏️ alterar</button>` : ''}
@@ -1070,14 +1072,14 @@ async function analyzeKindleItems() {
       headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        max_tokens: 400,
+        max_tokens: 800,
         response_format: { type: 'json_object' },
         messages: [{
           role: 'system',
-          content: `You are a vocabulary extraction assistant for English learners. For each sentence, identify the single most valuable vocabulary item to study.\n\nRULES:\n1. Use MULTI-WORD only for: true phrasal verbs (give up, hold on, take off), fixed idioms (have a hard time, make up your mind), or permanent collocations that must be learned as a unit (break the ice, small talk, take part in).\n2. NEVER combine a regular transitive verb with its direct object (e.g. "munched pretzels" → use "munch"; "opened the door" → use "open"). They are not collocations.\n3. NEVER combine two separate verbs just because they appear together (e.g. "leaned and pushed" → pick the more interesting one).\n4. Return BASE FORM when possible: "munch" not "munched", "lean" not "leaned".\n5. Pick vocabulary with real study value: unusual/vivid words, phrasal verbs, idioms. Skip generic verbs (went, said, got) unless they're part of a phrasal verb or idiom.`
+          content: `You are a vocabulary extraction assistant for English learners. For each sentence, identify the single most valuable vocabulary item to study AND provide a natural Portuguese translation of the full sentence.\n\nVOCABULARY RULES:\n1. Use MULTI-WORD only for: true phrasal verbs (give up, hold on, take off), fixed idioms (have a hard time, make up your mind), or permanent collocations that must be learned as a unit (break the ice, small talk, take part in).\n2. NEVER combine a regular transitive verb with its direct object (e.g. "munched pretzels" → use "munch"; "opened the door" → use "open"). They are not collocations.\n3. NEVER combine two separate verbs just because they appear together (e.g. "leaned and pushed" → pick the more interesting one).\n4. Return BASE FORM when possible: "munch" not "munched", "lean" not "leaned".\n5. Pick vocabulary with real study value: unusual/vivid words, phrasal verbs, idioms. Skip generic verbs (went, said, got) unless they're part of a phrasal verb or idiom.`
         }, {
           role: 'user',
-          content: `Each item below uses [0-based index]. Return the best vocabulary item for each, lowercase, base form, no punctuation.\n\n${lines}\n\nRespond ONLY with valid JSON: {"items": [{"i": 0, "item": "expression"}, {"i": 1, "item": "expression"}, ...]}`
+          content: `Each item below uses [0-based index]. Return the best vocabulary item AND a natural Portuguese translation of the full sentence.\n\n${lines}\n\nRespond ONLY with valid JSON: {"items": [{"i": 0, "item": "expression", "pt": "tradução natural em português"}, ...]}`
         }]
       })
     })
@@ -1087,9 +1089,16 @@ async function analyzeKindleItems() {
     let rawContent = (data.choices?.[0]?.message?.content || '{}').replace(/```(?:json)?\n?|\n?```/g, '').trim()
     const result = JSON.parse(rawContent)
     if (Array.isArray(result.items)) {
-      result.items.forEach(({ i, item }) => {
+      result.items.forEach(({ i, item, pt }) => {
         const idx = Number(i)
-        if (isNaN(idx) || idx < 0 || idx >= kindleItems.length || !item) return
+        if (isNaN(idx) || idx < 0 || idx >= kindleItems.length) return
+        // Armazena tradução PT
+        if (pt) {
+          kindleItems[idx].context_pt = String(pt).trim()
+          const ptEl = el(`ks-pt-${idx}`)
+          if (ptEl) ptEl.textContent = kindleItems[idx].context_pt
+        }
+        if (!item) return
         const clean = String(item).toLowerCase().replace(/[.,!?;:"""''()\n]/g, '').trim()
         if (!clean) return
         setKindleWord(idx, clean)
