@@ -1663,30 +1663,25 @@ async function sendToAnki(wordId) {
   const btn = document.querySelector('.wc-actions .btn-success')
   if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
 
-  // Armazena o áudio uma vez (mesma pronúncia para todos os significados)
-  // Se n8n não entregou base64 (problema filesystem-v2), tenta buscar direto da OpenAI
-  let audioBase64Raw = w.audio_base64 || null
-  if (!audioBase64Raw && cfg.openaiKey) {
-    toast('Buscando áudio direto da OpenAI...', 'info')
-    audioBase64Raw = await fetchAudioBase64(w.word)
-  }
+  // Áudio do n8n (caso filesystem-v2 seja resolvido futuramente)
+  const n8nAudioRaw = w.audio_base64 || null
+  const canFetchTTS = !!cfg.openaiKey
+  const totalCards = selected.reduce((s, m) => s + ((m.examples?.length) || 1), 0)
+  if (!n8nAudioRaw && canFetchTTS) toast(`Buscando áudio para ${totalCards} card${totalCards !== 1 ? 's' : ''}...`, 'info')
 
-  let audioTag = ''
-  if (audioBase64Raw) {
-    const safeWord = (w.word || 'word').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
-    const filename = `el-${safeWord}-${Date.now()}.mp3`
-    try {
-      const audioData = String(audioBase64Raw).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '')
-      await callAnki('storeMediaFile', { filename, data: audioData })
-      audioTag = `[sound:${filename}]`
-    } catch(e) {
-      console.warn('Anki storeMediaFile falhou:', e.message)
-      toast(`Áudio não adicionado: ${e.message}`, 'warning')
+  // Helper: obtém base64 de áudio para um texto (n8n ou OpenAI direto)
+  async function resolveAudio(text) {
+    if (n8nAudioRaw) {
+      // n8n entregou áudio — usa ele (mesmo audio para todos os cards)
+      return String(n8nAudioRaw).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '')
     }
-  } else {
-    const motivo = cfg.openaiKey ? 'Falha ao buscar áudio da OpenAI' : 'Configure a OpenAI API Key nas configurações para áudio'
-    console.warn('audio_base64 ausente para a palavra:', w.word)
-    toast(motivo, 'warning')
+    if (canFetchTTS && text) {
+      // Frase limpa: remove tags HTML para o TTS
+      const cleanText = text.replace(/<[^>]+>/g, '')
+      const b64 = await fetchAudioBase64(cleanText)
+      return b64 || null
+    }
+    return null
   }
 
   let ok = 0, fail = 0
@@ -1697,13 +1692,27 @@ async function sendToAnki(wordId) {
       : [{ en: m.example_en || '', pt: m.example_pt || '' }]
 
     for (const ex of exArr) {
+      // Áudio da frase EN deste card específico
+      const sentenceEN = ex.en || m.example_en || w.word || ''
+      let audioTag = ''
+      try {
+        const audioData = await resolveAudio(sentenceEN)
+        if (audioData) {
+          const safeWord = (w.word || 'word').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+          const filename = `el-${safeWord}-${Date.now()}.mp3`
+          await callAnki('storeMediaFile', { filename, data: audioData })
+          audioTag = `[sound:${filename}]`
+        }
+      } catch(e) {
+        console.warn('Anki storeMediaFile falhou:', e.message)
+      }
+
       try {
         const noteId = await callAnki('addNote', {
           note: {
             deckName: cfg.ankiDeck || 'Inglês',
             modelName: cfg.ankiModel || 'Inglês Básico',
             fields: {
-              // Áudio embutido na Frente — toca automaticamente em qualquer modelo Anki
               [cfg.fields.word    || 'Frente'  ]: buildFrente(w, m, ex) + (audioTag ? ' ' + audioTag : ''),
               [cfg.fields.meaning || 'Verso'   ]: buildVerso(w, m, ex),
               [cfg.fields.context || 'Contexto']: w.context || '',
