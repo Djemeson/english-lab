@@ -201,6 +201,15 @@ select option{background:var(--surface)}
 .word-target-row{display:flex;align-items:center;gap:8px;margin-top:8px}
 .word-target-row input{flex:1;padding:5px 10px;font-size:0.82rem}
 .word-target-row label{margin:0;white-space:nowrap;font-size:0.78rem}
+/* Kindle AI-first redesign */
+.kindle-sentence{font-size:0.87rem;color:var(--text2);line-height:1.65;margin-bottom:7px}
+.expr-highlight{background:rgba(59,130,246,0.22);color:var(--text);border-radius:4px;padding:1px 4px;font-weight:600;font-style:normal}
+.kindle-expr-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap}
+.kindle-expr-chip{display:inline-flex;align-items:center;background:var(--primary-glow);border:1px solid rgba(59,130,246,0.35);color:var(--primary);border-radius:20px;padding:3px 12px;font-size:0.82rem;font-weight:600;letter-spacing:.01em}
+.kindle-expr-chip.loading{color:var(--text3);border-color:var(--border);background:transparent;font-style:italic;font-weight:400}
+.kindle-override{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.kindle-override.hidden{display:none}
+.btn-xs{padding:2px 8px!important;font-size:0.75rem!important;min-width:0}
 
 /* ===== DIVIDER ===== */
 .divider{height:1px;background:var(--border);margin:18px 0}
@@ -1004,17 +1013,30 @@ function renderKindleList() {
   el('kindle-count').textContent = `${kindleItems.length} destaques`
   el('kindle-result').classList.remove('hidden')
   list.innerHTML = kindleItems.map((item, i) => {
-    const hasPicker = !item.word && item.context
+    const hasContext = !!item.context
+    const chipContent = item.word
+      ? `<span class="kindle-expr-chip" id="ke-${i}">${esc(item.word)}</span>`
+      : `<span class="kindle-expr-chip loading" id="ke-${i}">⏳ analisando...</span>`
+    const sentenceHTML = hasContext
+      ? (item.word ? highlightExprInSentence(item.context, item.word) : esc(item.context))
+      : esc(item.word || '')
     return `
     <div class="parsed-item" id="ki-${i}">
       <input type="checkbox" class="kindle-check" data-i="${i}" checked>
       <div class="parsed-item-body">
-        <div class="parsed-word" id="kw-${i}" style="${item.word ? '' : 'color:var(--text3);font-style:italic'}">${item.word || 'Clique na palavra alvo abaixo'}</div>
-        ${hasPicker ? `<div class="word-picker" id="kp-${i}">${buildPicker(item.context, i)}</div>` : `<div class="parsed-context">${esc(item.context)}</div>`}
-        <div class="word-target-row">
-          <label style="color:var(--text3);font-size:0.77rem">ou digite:</label>
-          <input type="text" id="kt-${i}" placeholder="palavra alvo" value="${esc(item.word)}" oninput="setKindleWord(${i},this.value)" style="max-width:200px">
+        <div class="kindle-sentence" id="ks-${i}">${sentenceHTML}</div>
+        <div class="kindle-expr-row">
+          ${chipContent}
+          ${hasContext ? `<button class="btn btn-ghost btn-xs" onclick="toggleKindlePicker(${i})">✏️ alterar</button>` : ''}
         </div>
+        ${hasContext ? `
+        <div class="kindle-override hidden" id="ko-${i}">
+          <div class="word-picker" id="kp-${i}">${buildPicker(item.context, i)}</div>
+          <div class="word-target-row">
+            <label style="color:var(--text3);font-size:0.77rem">ou digite:</label>
+            <input type="text" id="kt-${i}" placeholder="palavra alvo" value="${esc(item.word)}" oninput="setKindleWord(${i},this.value)" style="max-width:200px">
+          </div>
+        </div>` : ''}
         <div class="parsed-meta">📖 ${esc(item.source_title)}${item.chapter ? ' · ' + esc(item.chapter) : ''}</div>
       </div>
     </div>`
@@ -1025,11 +1047,7 @@ function renderKindleList() {
 
 async function analyzeKindleItems() {
   if (!cfg.openaiKey || !kindleItems.length) return
-  // Mostra loading em todos os itens
-  kindleItems.forEach((_, i) => {
-    const kw = el(`kw-${i}`)
-    if (kw) { kw.textContent = '⏳ analisando...'; kw.style.color = 'var(--text3)'; kw.style.fontStyle = 'italic' }
-  })
+  // Já inicia com chip "⏳ analisando..." em todos sem palavra
   try {
     const lines = kindleItems.map((item, i) =>
       `${i + 1}. Context: "${(item.context || '').replace(/"/g, "'")}"${item.word ? ` | Highlighted word: "${item.word}"` : ''}`
@@ -1039,7 +1057,7 @@ async function analyzeKindleItems() {
       headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        max_tokens: 300,
+        max_tokens: 400,
         response_format: { type: 'json_object' },
         messages: [{
           role: 'system',
@@ -1059,16 +1077,17 @@ async function analyzeKindleItems() {
         if (isNaN(idx) || idx < 0 || idx >= kindleItems.length || !item) return
         const clean = item.toLowerCase().replace(/[.,!?;:"""''()\n]/g, '').trim()
         setKindleWord(idx, clean)
-        const picker = el(`kp-${idx}`)
-        if (picker) highlightExpression(picker, clean)
       })
     }
   } catch(e) {
     console.warn('Análise Kindle em lote falhou:', e.message)
-    // Restaura estado
+    // Restaura chip com palavra original ou placeholder
     kindleItems.forEach((item, i) => {
-      const kw = el(`kw-${i}`)
-      if (kw) { kw.textContent = item.word || 'Clique na palavra alvo'; kw.style.color = item.word ? '' : 'var(--text3)'; kw.style.fontStyle = '' }
+      const chip = el(`ke-${i}`)
+      if (chip) {
+        chip.textContent = item.word || '—'
+        chip.classList.toggle('loading', !item.word)
+      }
     })
   }
 }
@@ -1101,13 +1120,55 @@ function highlightExpression(container, expression) {
   tokens.forEach(t => { if (words.includes(t.dataset.w?.toLowerCase())) t.classList.add('sel-multi') })
 }
 
+function highlightExprInSentence(sentence, expression) {
+  if (!expression || !sentence) return esc(sentence || '')
+  try {
+    const exprPattern = expression.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const parts = sentence.split(new RegExp(`(${exprPattern})`, 'gi'))
+    return parts.map(p =>
+      p.toLowerCase() === expression.toLowerCase()
+        ? `<mark class="expr-highlight">${esc(p)}</mark>`
+        : esc(p)
+    ).join('')
+  } catch { return esc(sentence) }
+}
+
+function updateKindleDisplay(i, expression) {
+  const item = kindleItems[i]
+  if (!item) return
+  // Atualiza frase com highlight inline
+  const sentEl = el(`ks-${i}`)
+  if (sentEl) {
+    sentEl.innerHTML = item.context
+      ? highlightExprInSentence(item.context, expression)
+      : esc(expression || '')
+  }
+  // Atualiza chip
+  const chipEl = el(`ke-${i}`)
+  if (chipEl) {
+    chipEl.textContent = expression || '—'
+    chipEl.classList.remove('loading')
+  }
+  // Atualiza input de texto oculto
+  const inp = el(`kt-${i}`)
+  if (inp && inp.value !== expression) inp.value = expression || ''
+  // Atualiza destaque no picker (se visível)
+  const picker = el(`kp-${i}`)
+  if (picker) highlightExpression(picker, expression || '')
+}
+
+function toggleKindlePicker(i) {
+  const ko = el(`ko-${i}`)
+  if (ko) ko.classList.toggle('hidden')
+}
+
 function attachPicker(idx) {
   const c = el(`kp-${idx}`); if (!c) return
   c.querySelectorAll('.wp-tok').forEach(tok => tok.addEventListener('click', async function() {
     const clickedWord = this.dataset.w
     const i = parseInt(this.dataset.i)
 
-    // Feedback imediato: seleciona a palavra clicada
+    // Feedback imediato: seleciona token e atualiza chip/frase
     c.querySelectorAll('.wp-tok').forEach(t => t.classList.remove('sel', 'sel-multi'))
     this.classList.add('sel')
     setKindleWord(i, clickedWord)
@@ -1136,7 +1197,6 @@ function attachPicker(idx) {
       const detected = (data.choices?.[0]?.message?.content || '').trim().toLowerCase().replace(/[.,!?;:"""''()\n]/g, '').trim()
       if (detected && detected !== clickedWord) {
         setKindleWord(i, detected)
-        highlightExpression(c, detected)
       }
     } catch(e) {
       console.warn('Detecção de expressão falhou:', e.message)
@@ -1148,10 +1208,7 @@ function attachPicker(idx) {
 
 function setKindleWord(i, word) {
   kindleItems[i].word = word
-  const wEl = el(`kw-${i}`)
-  if (wEl) { wEl.textContent = word || 'Clique na palavra alvo'; wEl.style.color = word ? '' : 'var(--text3)' }
-  const inp = el(`kt-${i}`)
-  if (inp && inp.value !== word) inp.value = word
+  updateKindleDisplay(i, word)
 }
 
 async function detectKindleWord(i) {
