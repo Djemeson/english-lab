@@ -1217,18 +1217,38 @@ async function analyzeWord(wordId) {
     w.type = result.type || 'word'
     w.ipa = result.ipa || ''
     w.audio_base64 = result.audio_base64 || null
-    // Mapeia o retorno do n8n para o formato de meanings usado na UI
-    w.meanings = [{
-      id: uid(), selected: true, idx: 0,
-      meaning_pt: result.meaning_pt || '',
-      register: 'neutral',
-      level: result.level || '',
-      example_en: (result.examples || [])[0] || '',
-      example_pt: (result.examples || [])[1] || '',
-      context_note: '',
-      tags: result.tags || [],
-      context_match: true
-    }]
+    // Suporta novo formato (meanings[]) e legado (meaning_pt flat)
+    const rawMeanings = Array.isArray(result.meanings) && result.meanings.length > 0
+      ? result.meanings
+      : [{
+          meaning_pt: result.meaning_pt || '', definition_pt: '', register: 'neutral',
+          level: result.level || '', origin: '', diffusion: '', usage: '', status: '', tone: '',
+          example_en: (result.examples || [])[0] || '', example_pt: (result.examples || [])[1] || '',
+          notes: [], word_family: [], synonyms: [], antonyms: [],
+          grammar: '', context_match: true, tags: result.tags || []
+        }]
+    w.meanings = rawMeanings.map((m, i) => ({
+      id: uid(), selected: true, idx: i,
+      meaning_pt:    m.meaning_pt    || '',
+      definition_pt: m.definition_pt || '',
+      register:      m.register      || 'neutral',
+      level:         m.level         || '',
+      origin:        m.origin        || '',
+      diffusion:     m.diffusion     || '',
+      usage:         m.usage         || '',
+      status:        m.status        || '',
+      tone:          m.tone          || '',
+      example_en:    m.example_en    || '',
+      example_pt:    m.example_pt    || '',
+      notes:         m.notes         || [],
+      word_family:   m.word_family   || [],
+      synonyms:      m.synonyms      || [],
+      antonyms:      m.antonyms      || [],
+      grammar:       m.grammar       || '',
+      context_note:  m.context_note  || '',
+      tags:          m.tags          || [],
+      context_match: m.context_match !== false
+    }))
     w.status = 'pending_review'
     w.ai_processed = true
     w.ai_provider = result.ai_provider || cfg.aiProvider
@@ -1423,7 +1443,9 @@ function renderMeaningItem(wordId, m, mi) {
           ${m.level ? `<span class="chip level-${m.level.toLowerCase()}">${m.level}</span>` : ''}
         </div>
       </div>
+      ${m.definition_pt ? `<div class="mi-note" style="font-style:italic;opacity:0.8;margin-top:4px">${esc(m.definition_pt)}</div>` : ''}
       ${m.context_note ? `<div class="mi-note">${esc(m.context_note)}</div>` : ''}
+      ${m.synonyms && m.synonyms.length ? `<div class="mi-note" style="font-size:0.78rem;color:var(--text3)">↔ ${m.synonyms.slice(0,4).map(esc).join(', ')}</div>` : ''}
       ${m.example_en ? `
       <div class="mi-example">
         <div class="en">"${esc(m.example_en)}"</div>
@@ -1476,6 +1498,56 @@ async function callAnki(action, params = {}) {
   return d.result
 }
 
+function buildFrente(w, m) {
+  // Frente = frase exemplo em inglês com a palavra em negrito
+  const sentence = m.example_en || w.context || ''
+  if (!sentence) return esc(w.word || '')
+  const wordPattern = (w.word || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (!wordPattern) return esc(sentence)
+  try {
+    return sentence.replace(new RegExp(`\\b(${wordPattern}(?:s|ed|ing|er|est|ly)?)\\b`, 'gi'), '<b>$1</b>')
+  } catch { return esc(sentence) }
+}
+
+function buildVerso(w, m) {
+  const SRC = { series:'série de TV', movie:'filme', youtube:'YouTube', kindle:'e-book/Kindle', podcast:'podcast', website:'site', manual:'input manual' }
+  let v = ''
+  // 1. Frase exemplo em PT
+  if (m.example_pt) v += `${esc(m.example_pt)}<br><br>`
+  // 2. Palavra + IPA + Definição
+  v += `${esc(w.word || '')}${w.ipa ? ' ' + esc(w.ipa) : ''} <br>`
+  if (m.definition_pt) v += ` <b>Definição:</b> ${esc(m.definition_pt)} <br>`
+  v += '<br>'
+  // 3. Tradução principal
+  if (m.meaning_pt) v += ` <b>Possíveis traduções:</b> ${esc(m.meaning_pt)} <br><br>`
+  // 4. Origem / Difusão / Uso / Status / Tom
+  if (m.origin)    v += ` <b>Origem:</b> ${esc(m.origin)} <br>`
+  if (m.diffusion) v += ` <b>Difusão:</b> ${esc(m.diffusion)} <br>`
+  if (m.usage)     v += ` <b>Uso:</b> ${esc(m.usage)} <br>`
+  if (m.status)    v += ` <b>Status:</b> ${esc(m.status)} <br>`
+  if (m.tone)      v += ` <b>Tom:</b> ${esc(m.tone)} <br>`
+  if (m.origin || m.diffusion || m.usage || m.status || m.tone) v += '<br>'
+  // 5. Notas culturais/de uso
+  if (m.notes && m.notes.length) { m.notes.forEach(n => { v += `${esc(n)}<br>` }); v += '<br>' }
+  // 6. Família de palavras
+  if (m.word_family && m.word_family.length) {
+    v += `<b>Família de palavras</b><br>`
+    m.word_family.forEach(wf => { v += `${esc(wf)}<br>` })
+    v += '<br>'
+  }
+  // 7. Sinônimos / Antônimos
+  if (m.synonyms && m.synonyms.length) v += `<b>Sinônimos:</b> ${m.synonyms.map(esc).join(', ')}<br>`
+  if (m.antonyms && m.antonyms.length) v += `<b>Antônimos:</b> ${m.antonyms.map(esc).join(', ')}<br>`
+  if ((m.synonyms && m.synonyms.length) || (m.antonyms && m.antonyms.length)) v += '<br>'
+  // 8. Gramática
+  if (m.grammar) { v += `<b>Informações gramaticais</b><br>Classe gramatical: ${esc(m.grammar)}<br><br>` }
+  // 9. Fonte
+  v += `<b>Fonte do objeto de estudo</b><br>`
+  v += `Mídia: ${esc(SRC[w.source_type] || w.source_type || 'desconhecido')}<br>`
+  if (w.source_title) v += `Título: <i>${esc(w.source_title)}</i>`
+  return v
+}
+
 async function sendToAnki(wordId) {
   const w = words.find(x => x.id === wordId); if (!w) return
   const selected = w.meanings.filter(m => m.selected !== false)
@@ -1483,6 +1555,17 @@ async function sendToAnki(wordId) {
 
   const btn = document.querySelector('.wc-actions .btn-success')
   if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
+
+  // Armazena o áudio uma vez (mesma pronúncia para todos os significados)
+  let audioField = ''
+  if (w.audio_base64) {
+    const safeWord = (w.word || 'word').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+    const filename = `el-${safeWord}-${Date.now()}.mp3`
+    try {
+      await callAnki('storeMediaFile', { filename, data: w.audio_base64 })
+      audioField = `[sound:${filename}]`
+    } catch(e) { console.warn('Anki audio store failed:', e.message) }
+  }
 
   let ok = 0, fail = 0
   for (const m of selected) {
@@ -1492,12 +1575,12 @@ async function sendToAnki(wordId) {
           deckName: cfg.ankiDeck || 'Inglês',
           modelName: cfg.ankiModel || 'Inglês Básico',
           fields: {
-            [cfg.fields.word || 'Frente']: w.word || '',
-            [cfg.fields.meaning || 'Verso']: m.meaning_pt || '',
-            [cfg.fields.context || 'Contexto']: `${w.context || ''}${m.example_en ? '\n\n' + m.example_en : ''}`,
-            [cfg.fields.ipa || 'IPA']: w.ipa || '',
-            [cfg.fields.examples || 'Exemplos']: [m.example_en, m.example_pt].filter(Boolean).join('\n'),
-            [cfg.fields.audio || 'Áudio']: ''
+            [cfg.fields.word    || 'Frente'  ]: buildFrente(w, m),
+            [cfg.fields.meaning || 'Verso'   ]: buildVerso(w, m),
+            [cfg.fields.context || 'Contexto']: w.context || '',
+            [cfg.fields.ipa     || 'IPA'     ]: w.ipa || '',
+            [cfg.fields.examples|| 'Exemplos']: [m.example_en, m.example_pt].filter(Boolean).join('\n'),
+            [cfg.fields.audio   || 'Áudio'   ]: audioField
           },
           tags: ['english-lab', w.source_type, m.register, m.level, w.type].filter(Boolean)
         }
