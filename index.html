@@ -1016,7 +1016,9 @@ function renderKindleList() {
     const hasContext = !!item.context
     const chipContent = item.word
       ? `<span class="kindle-expr-chip" id="ke-${i}">${esc(item.word)}</span>`
-      : `<span class="kindle-expr-chip loading" id="ke-${i}">⏳ analisando...</span>`
+      : (cfg.openaiKey
+          ? `<span class="kindle-expr-chip loading" id="ke-${i}">⏳ analisando...</span>`
+          : `<span class="kindle-expr-chip loading" id="ke-${i}">✏️ selecione abaixo</span>`)
     const sentenceHTML = hasContext
       ? (item.word ? highlightExprInSentence(item.context, item.word) : esc(item.context))
       : esc(item.word || '')
@@ -1047,10 +1049,10 @@ function renderKindleList() {
 
 async function analyzeKindleItems() {
   if (!cfg.openaiKey || !kindleItems.length) return
-  // Já inicia com chip "⏳ analisando..." em todos sem palavra
   try {
+    // Usa índice 0-based explicitamente no prompt para evitar confusão
     const lines = kindleItems.map((item, i) =>
-      `${i + 1}. Context: "${(item.context || '').replace(/"/g, "'")}"${item.word ? ` | Highlighted word: "${item.word}"` : ''}`
+      `[${i}] "${(item.context || '').replace(/"/g, "'")}"${item.word ? ` (word: "${item.word}")` : ''}`
     ).join('\n')
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -1061,32 +1063,40 @@ async function analyzeKindleItems() {
         response_format: { type: 'json_object' },
         messages: [{
           role: 'system',
-          content: 'You are a vocabulary extraction assistant. For each sentence, identify the most valuable vocabulary item to study — it could be a single word, phrasal verb, idiom, collocation, or fixed multi-word expression. Prioritize multi-word expressions when the highlighted word is part of one.'
+          content: 'You are a vocabulary extraction assistant. For each sentence, identify the most valuable vocabulary item to study — a single word, phrasal verb, idiom, collocation, or fixed multi-word expression. Prioritize multi-word expressions when relevant.'
         }, {
           role: 'user',
-          content: `For each item below, return the complete vocabulary item as it appears in the sentence (lowercase, no punctuation).\n\n${lines}\n\nReturn only: {"items": [{"i": 0, "item": "..."}, ...]}`
+          content: `Each item below uses [0-based index]. Return the best vocabulary item for each, lowercase, no punctuation.\n\n${lines}\n\nRespond ONLY with valid JSON: {"items": [{"i": 0, "item": "expression"}, {"i": 1, "item": "expression"}, ...]}`
         }]
       })
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
-    const result = JSON.parse(data.choices?.[0]?.message?.content || '{}')
+    // Remove possíveis blocos de código markdown antes do parse
+    let rawContent = (data.choices?.[0]?.message?.content || '{}').replace(/```(?:json)?\n?|\n?```/g, '').trim()
+    const result = JSON.parse(rawContent)
     if (Array.isArray(result.items)) {
       result.items.forEach(({ i, item }) => {
         const idx = Number(i)
         if (isNaN(idx) || idx < 0 || idx >= kindleItems.length || !item) return
-        const clean = item.toLowerCase().replace(/[.,!?;:"""''()\n]/g, '').trim()
+        const clean = String(item).toLowerCase().replace(/[.,!?;:"""''()\n]/g, '').trim()
+        if (!clean) return
         setKindleWord(idx, clean)
       })
     }
   } catch(e) {
     console.warn('Análise Kindle em lote falhou:', e.message)
-    // Restaura chip com palavra original ou placeholder
+    // Se falhou: mostra palavra original do Kindle (se existir) ou sinaliza erro visualmente
     kindleItems.forEach((item, i) => {
       const chip = el(`ke-${i}`)
-      if (chip) {
-        chip.textContent = item.word || '—'
-        chip.classList.toggle('loading', !item.word)
+      if (!chip) return
+      if (item.word) {
+        chip.textContent = item.word
+        chip.classList.remove('loading')
+        const sentEl = el(`ks-${i}`)
+        if (sentEl && item.context) sentEl.innerHTML = highlightExprInSentence(item.context, item.word)
+      } else if (chip.classList.contains('loading')) {
+        chip.textContent = '✏️ selecione abaixo'
       }
     })
   }
@@ -1207,8 +1217,9 @@ function attachPicker(idx) {
 }
 
 function setKindleWord(i, word) {
+  if (!kindleItems[i]) return
   kindleItems[i].word = word
-  updateKindleDisplay(i, word)
+  if (word) updateKindleDisplay(i, word)
 }
 
 async function detectKindleWord(i) {
