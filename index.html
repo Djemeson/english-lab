@@ -1970,14 +1970,9 @@ async function sendToAnki(wordId) {
 
   let ok = 0, fail = 0
 
-  // Garante que o sub-deck existe antes de enviar os cards
   const targetDeck = getAnkiDeck(w)
-  try {
-    await callAnki('createDeck', { deck: targetDeck })
-  } catch(e) {
-    console.warn('createDeck aviso (pode ser normal):', e.message)
-  }
-  console.log(`[English Lab] Enviando para deck: "${targetDeck}" (tipo: ${w.type || 'word'})`)
+  console.log(`[English Lab] Deck alvo: "${targetDeck}" | tipo: ${w.type || '?'} | base cfg: "${cfg.ankiDeck}"`)
+  toast(`📤 Enviando para: ${targetDeck}`, 'info')
 
   for (const m of selected) {
     // Um card por exemplo (3 exemplos = 3 cards por significado)
@@ -2030,7 +2025,7 @@ async function sendToAnki(wordId) {
   if (ok > 0) {
     w.status = 'in_anki'
     saveWords()
-    toast(`✅ ${ok} card${ok !== 1 ? 's' : ''} criado${ok !== 1 ? 's' : ''} no Anki!${fail ? ` (${fail} falhou)` : ''}`, 'success')
+    toast(`✅ ${ok} card${ok !== 1 ? 's' : ''} → ${targetDeck}${fail ? ` (${fail} falhou)` : ''}`, 'success')
     renderSidebar()
     // Move to next word
     const next = words.find(x => ['pending_ai','pending_review'].includes(x.status))
