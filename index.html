@@ -1908,41 +1908,61 @@ function buildFrente(w, m, ex) {
 
 function buildVerso(w, m, ex) {
   const SRC = { series:'série de TV', movie:'filme', youtube:'YouTube', kindle:'e-book/Kindle', podcast:'podcast', website:'site', manual:'input manual' }
+  const TYPE = { word:'vocabulário', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' }
+  const hr = '<hr style="border:none;border-top:1px solid #e0e0e0;margin:8px 0">'
   let v = ''
-  // 1. Frase exemplo em PT — remove <b> do AI (posição errada em PT) e deixa só texto
+
+  // 1. Frase PT — italico, menor, separada visualmente
   const ptSentence = (ex && ex.pt) || m.example_pt || ''
-  if (ptSentence) v += `${capFirst(esc(ptSentence.replace(/<\/?b>/gi, '')))}<br><br>`
-  // 2. Palavra + IPA + Definição
-  v += `${esc(w.word || '')}${w.ipa ? ' ' + esc(w.ipa) : ''} <br>`
-  if (m.definition_pt) v += ` <b>Definição:</b> ${esc(m.definition_pt)} <br>`
-  v += '<br>'
-  // 3. Tradução principal
-  if (m.meaning_pt) v += ` <b>Possíveis traduções:</b> ${esc(m.meaning_pt)} <br><br>`
-  // 4. Origem / Difusão / Uso / Status / Tom
-  if (m.origin)    v += ` <b>Origem:</b> ${esc(m.origin)} <br>`
-  if (m.diffusion) v += ` <b>Difusão:</b> ${esc(m.diffusion)} <br>`
-  if (m.usage)     v += ` <b>Uso:</b> ${esc(m.usage)} <br>`
-  if (m.status)    v += ` <b>Status:</b> ${esc(m.status)} <br>`
-  if (m.tone)      v += ` <b>Tom:</b> ${esc(m.tone)} <br>`
-  if (m.origin || m.diffusion || m.usage || m.status || m.tone) v += '<br>'
-  // 5. Notas culturais/de uso
-  if (m.notes && m.notes.length) { m.notes.forEach(n => { v += `${esc(n)}<br>` }); v += '<br>' }
-  // 6. Família de palavras
-  if (m.word_family && m.word_family.length) {
-    v += `<b>Família de palavras</b><br>`
-    m.word_family.forEach(wf => { v += `${esc(wf)}<br>` })
-    v += '<br>'
+  if (ptSentence) {
+    v += `<i style="font-size:0.82em;color:#555">${capFirst(esc(ptSentence.replace(/<\/?b>/gi, '')))}</i>`
+    v += hr
   }
-  // 7. Sinônimos / Antônimos
-  if (m.synonyms && m.synonyms.length) v += `<b>Sinônimos:</b> ${m.synonyms.map(esc).join(', ')}<br>`
-  if (m.antonyms && m.antonyms.length) v += `<b>Antônimos:</b> ${m.antonyms.map(esc).join(', ')}<br>`
-  if ((m.synonyms && m.synonyms.length) || (m.antonyms && m.antonyms.length)) v += '<br>'
-  // 8. Gramática
-  if (m.grammar) { v += `<b>Informações gramaticais</b><br>Classe gramatical: ${esc(m.grammar)}<br><br>` }
-  // 9. Fonte
-  v += `<b>Fonte do objeto de estudo</b><br>`
-  v += `Mídia: ${esc(SRC[w.source_type] || w.source_type || 'desconhecido')}<br>`
-  if (w.source_title) v += `Título: <i>${esc(w.source_title)}</i>`
+
+  // 2. Expressão + IPA + tipo (badge)
+  v += `<b style="font-size:1.05em;color:#1a5276">${esc(w.word || '')}</b>`
+  if (w.ipa) v += `&nbsp;<span style="font-family:monospace;font-size:0.8em;color:#777">${esc(w.ipa)}</span>`
+  if (w.type && TYPE[w.type]) v += `&nbsp;<span style="font-size:0.6em;background:#e8f0fe;color:#1a5fa8;padding:2px 9px;border-radius:10px;vertical-align:middle">${TYPE[w.type]}</span>`
+  v += '<br>'
+
+  // 3. Definição
+  if (m.definition_pt) v += `<span style="font-size:0.85em;color:#333">${esc(m.definition_pt)}</span><br>`
+
+  // 4. Tradução principal — destaque
+  if (m.meaning_pt) v += `<br><b style="color:#117a65">${esc(m.meaning_pt)}</b><br>`
+
+  // 5. Metadados compactos em uma linha
+  const metas = []
+  if (m.origin)    metas.push(`<b>Origem:</b> ${esc(m.origin)}`)
+  if (m.diffusion) metas.push(`<b>Difusão:</b> ${esc(m.diffusion)}`)
+  if (m.tone)      metas.push(`<b>Tom:</b> ${esc(m.tone)}`)
+  if (m.status)    metas.push(`<b>Status:</b> ${esc(m.status)}`)
+  if (m.usage)     metas.push(`<b>Uso:</b> ${esc(m.usage)}`)
+  if (metas.length) {
+    v += hr
+    v += `<span style="font-size:0.78em;color:#555">${metas.join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</span><br>`
+  }
+
+  // 6. Notas de uso — itálico pequeno
+  if (m.notes && m.notes.length) {
+    v += `<span style="font-size:0.78em;color:#666;font-style:italic">${m.notes.map(esc).join('<br>')}</span><br>`
+  }
+
+  // 7. Família / Sinônimos / Antônimos — seção compacta
+  const hasRelated = (m.word_family?.length) || (m.synonyms?.length) || (m.antonyms?.length)
+  if (hasRelated) {
+    v += hr
+    if (m.word_family?.length) v += `<span style="font-size:0.8em"><b>Família:</b> ${m.word_family.map(esc).join(', ')}</span><br>`
+    if (m.synonyms?.length)    v += `<span style="font-size:0.8em"><b>Sinônimos:</b> ${m.synonyms.map(esc).join(', ')}</span><br>`
+    if (m.antonyms?.length)    v += `<span style="font-size:0.8em"><b>Antônimos:</b> ${m.antonyms.map(esc).join(', ')}</span><br>`
+  }
+
+  // 8. Rodapé — gramática + fonte, bem discreto
+  v += hr
+  const srcLabel = SRC[w.source_type] || w.source_type || '?'
+  const gramStr = m.grammar ? `${esc(m.grammar)}&nbsp;&nbsp;·&nbsp;&nbsp;` : ''
+  v += `<span style="font-size:0.72em;color:#999">${gramStr}${esc(srcLabel)}${w.source_title ? ': <i>' + esc(w.source_title) + '</i>' : ''}</span>`
+
   return v
 }
 
