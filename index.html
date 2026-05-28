@@ -403,6 +403,127 @@ select option{background:var(--surface)}
   .quick-row{grid-template-columns:1fr}
   .review-sidebar{display:none}
 }
+
+/* ===== SRS STATUS CHIPS ===== */
+.status-chip.in_srs{background:rgba(167,139,250,.15);color:var(--purple)}
+
+/* ===== SRS STUDY SECTION ===== */
+.srs-dashboard{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}
+.srs-dash-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;text-align:center;
+}
+.srs-dash-card .sdc-value{font-size:2.2rem;font-weight:700;line-height:1;margin-bottom:4px}
+.srs-dash-card .sdc-label{font-size:0.78rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.srs-dash-card.due .sdc-value{color:var(--primary)}
+.srs-dash-card.new .sdc-value{color:var(--success)}
+.srs-dash-card.streak .sdc-value{color:var(--warning)}
+
+/* Study session */
+.srs-session-wrap{max-width:640px;margin:0 auto}
+.srs-progress-bar-wrap{height:4px;background:var(--surface3);border-radius:2px;margin-bottom:28px;overflow:hidden}
+.srs-progress-bar{height:100%;background:var(--primary);border-radius:2px;transition:width .4s ease}
+
+/* Flip card */
+.srs-flip-card{
+  perspective:1000px;margin-bottom:20px;cursor:pointer;
+}
+.srs-flip-inner{
+  position:relative;min-height:260px;
+  transform-style:preserve-3d;transition:transform .45s cubic-bezier(.4,0,.2,1);
+  border-radius:var(--radius);
+}
+.srs-flip-card.flipped .srs-flip-inner{transform:rotateY(180deg)}
+.srs-card-face{
+  position:absolute;width:100%;min-height:260px;
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  border-radius:var(--radius);border:1px solid var(--border);
+  background:var(--surface);padding:28px 32px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.srs-card-back{transform:rotateY(180deg)}
+.srs-card-front-word{
+  font-size:2rem;font-weight:700;color:var(--text);text-align:center;margin-bottom:10px;
+}
+.srs-card-front-sentence{
+  font-size:0.92rem;color:var(--text2);font-style:italic;text-align:center;line-height:1.7;
+  max-width:500px;
+}
+.srs-card-front-sentence b{color:var(--text);font-style:normal}
+.srs-card-front-hint{
+  margin-top:20px;font-size:0.78rem;color:var(--text3);
+}
+.srs-card-back-body{width:100%;text-align:left}
+.srs-back-translation{
+  font-size:0.85rem;color:var(--text3);font-style:italic;margin-bottom:14px;
+  padding-bottom:12px;border-bottom:1px solid var(--border);
+}
+.srs-back-word{font-size:1.3rem;font-weight:700;color:var(--primary);margin-bottom:4px}
+.srs-back-ipa{font-size:0.85rem;color:var(--text3);font-family:monospace;margin-bottom:4px}
+.srs-back-type-chip{
+  display:inline-block;font-size:0.65rem;background:var(--primary-glow);color:var(--primary);
+  border-radius:20px;padding:2px 9px;font-weight:600;margin-bottom:12px;
+}
+.srs-back-meaning{font-size:1rem;font-weight:600;color:var(--success);margin-bottom:8px}
+.srs-back-def{font-size:0.83rem;color:var(--text2);margin-bottom:10px;line-height:1.5}
+.srs-back-example{
+  font-size:0.82rem;color:var(--text2);font-style:italic;
+  border-left:2px solid var(--border);padding-left:10px;margin-bottom:4px;line-height:1.6;
+}
+.srs-back-example b{color:var(--text);font-style:normal}
+.srs-back-example-pt{font-size:0.76rem;color:var(--text3);padding-left:10px;margin-bottom:8px}
+.srs-back-footer{font-size:0.72rem;color:var(--text3);margin-top:10px}
+
+/* Rating buttons */
+.srs-rate-buttons{display:flex;gap:10px;justify-content:center}
+.srs-rate-btn{
+  flex:1;max-width:140px;display:flex;flex-direction:column;align-items:center;
+  padding:12px 8px;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--surface);cursor:pointer;transition:all .15s;font-family:inherit;
+}
+.srs-rate-btn:hover{transform:translateY(-2px);border-color:var(--text3)}
+.srs-rate-btn.again:hover{border-color:var(--error);background:rgba(239,68,68,.08)}
+.srs-rate-btn.hard:hover{border-color:var(--warning);background:rgba(245,158,11,.08)}
+.srs-rate-btn.good:hover{border-color:var(--success);background:rgba(16,185,129,.08)}
+.srs-rate-btn.easy:hover{border-color:var(--primary);background:var(--primary-glow)}
+.srb-label{font-size:0.88rem;font-weight:600;color:var(--text);margin-bottom:3px}
+.srb-interval{font-size:0.72rem;color:var(--text3)}
+.srs-rate-btn.again .srb-label{color:#F87171}
+.srs-rate-btn.hard  .srb-label{color:var(--warning)}
+.srs-rate-btn.good  .srb-label{color:var(--success)}
+.srs-rate-btn.easy  .srb-label{color:var(--primary)}
+
+/* Session end screen */
+.srs-session-end{text-align:center;padding:60px 20px}
+.srs-end-icon{font-size:3.5rem;margin-bottom:16px}
+.srs-end-title{font-size:1.4rem;font-weight:700;margin-bottom:8px}
+.srs-end-sub{color:var(--text2);font-size:0.95rem;margin-bottom:28px}
+.srs-end-stats{display:flex;justify-content:center;gap:32px;margin-bottom:28px}
+.ses-stat{text-align:center}
+.ses-stat-val{font-size:1.6rem;font-weight:700}
+.ses-stat-lbl{font-size:0.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+
+/* Empty / no-cards state */
+.srs-empty{text-align:center;padding:80px 20px;color:var(--text3)}
+.srs-empty .icon{font-size:3rem;margin-bottom:12px}
+
+/* Action bar in Revisar */
+.btn-srs{background:rgba(167,139,250,.15);color:var(--purple);border:1px solid rgba(167,139,250,.35)}
+.btn-srs:hover:not(:disabled){background:rgba(167,139,250,.25)}
+
+/* ===== CLOUD SYNC INDICATOR ===== */
+.sync-indicator{
+  display:flex;align-items:center;gap:6px;
+  font-size:0.8rem;color:var(--text3);margin-left:8px;cursor:pointer;
+}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
+.sync-dot.ok{background:var(--success)}
+.sync-dot.err{background:var(--error)}
+.sync-dot.syncing{background:var(--warning);animation:pulse .8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Gist settings card */
+.sync-status-row{display:flex;align-items:center;gap:8px;font-size:0.83rem;padding:9px 12px;border-radius:var(--radius-sm);background:var(--surface2);margin-top:10px}
 </style>
 </head>
 <body>
@@ -416,11 +537,18 @@ select option{background:var(--surface)}
     <button class="nav-tab" onclick="showSection('revisar')">
       Revisar <span class="badge hidden" id="badge-review">0</span>
     </button>
+    <button class="nav-tab" onclick="showSection('estudar')">
+      Estudar <span class="badge hidden" id="badge-srs">0</span>
+    </button>
     <button class="nav-tab" onclick="showSection('configuracoes')">Configurações</button>
   </div>
   <div class="anki-indicator">
     <div class="anki-dot" id="anki-dot"></div>
     <span id="anki-label">Anki</span>
+  </div>
+  <div class="sync-indicator hidden" id="sync-indicator" onclick="showSection('configuracoes')" title="Sincronização em nuvem">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span id="sync-label">Nuvem</span>
   </div>
 </nav>
 
@@ -442,7 +570,7 @@ select option{background:var(--surface)}
     <div class="stat-card green">
       <div class="stat-label">No Anki</div>
       <div class="stat-value" id="st-anki">0</div>
-      <div class="stat-sub">cards criados</div>
+      <div class="stat-sub" id="st-anki-sub">cards criados</div>
     </div>
     <div class="stat-card yellow">
       <div class="stat-label">Para Revisar</div>
@@ -778,6 +906,31 @@ select option{background:var(--surface)}
       </div>
     </div>
 
+    <!-- GitHub Gist Sync -->
+    <div class="settings-card full">
+      <h3>☁️ Sincronização em nuvem (GitHub Gist)</h3>
+      <p class="desc">Seus dados do SRS ficam num Gist privado do GitHub — acessível de qualquer dispositivo. Crie um <a href="https://github.com/settings/tokens/new?scopes=gist&description=EnglishLab+SRS" target="_blank" style="color:var(--primary)">Personal Access Token</a> com escopo <code style="background:var(--surface3);padding:1px 5px;border-radius:3px">gist</code> e cole abaixo.</p>
+      <div class="form-row">
+        <div class="form-group" style="margin:0">
+          <label>GitHub Personal Access Token <span class="label-note">(escopo: gist)</span></label>
+          <input type="password" id="cfg-gist-token" placeholder="ghp_..." autocomplete="off">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Gist ID <span class="label-note">(preenchido automaticamente na 1ª sincronização)</span></label>
+          <input type="text" id="cfg-gist-id" placeholder="Deixe vazio para criar automaticamente" autocomplete="off">
+        </div>
+      </div>
+      <div id="gist-sync-result" class="sync-status-row hidden">
+        <div class="sync-dot" id="gist-tdot"></div>
+        <span id="gist-tmsg"></span>
+      </div>
+      <div class="btn-group" style="margin-top:12px">
+        <button class="btn btn-secondary btn-sm" onclick="testGistSync()">🔗 Testar e sincronizar agora</button>
+        <button class="btn btn-ghost btn-sm" onclick="forcePullGist()">⬇ Forçar download da nuvem</button>
+        <button class="btn btn-ghost btn-sm" onclick="forcePushGist()">⬆ Forçar envio para nuvem</button>
+      </div>
+    </div>
+
     <!-- Dados -->
     <div class="settings-card full">
       <h3>💾 Dados locais</h3>
@@ -797,6 +950,87 @@ select option{background:var(--surface)}
   </div>
 </section>
 
+<!-- =========== ESTUDAR (SRS) =========== -->
+<section id="section-estudar" class="section">
+  <div id="srs-view-dashboard">
+    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <h1>Estudar</h1>
+        <p>Revisão espaçada nativa — sem precisar do Anki</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost btn-sm" onclick="showSrsCfgModal()">⚙️ Configurar SRS</button>
+      </div>
+    </div>
+    <div class="srs-dashboard">
+      <div class="srs-dash-card due">
+        <div class="sdc-value" id="srs-due-count">0</div>
+        <div class="sdc-label">Para revisar hoje</div>
+      </div>
+      <div class="srs-dash-card new">
+        <div class="sdc-value" id="srs-new-count">0</div>
+        <div class="sdc-label">Novos disponíveis</div>
+      </div>
+      <div class="srs-dash-card streak">
+        <div class="sdc-value" id="srs-streak">0</div>
+        <div class="sdc-label">Dias de sequência 🔥</div>
+      </div>
+    </div>
+    <div id="srs-start-area"></div>
+    <div style="margin-top:32px" id="srs-all-cards-area"></div>
+  </div>
+
+  <!-- Study session view -->
+  <div id="srs-view-session" class="hidden">
+    <div class="srs-session-wrap">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <span id="srs-session-counter" style="font-size:0.85rem;color:var(--text3)">0 / 0</span>
+        <button class="btn btn-ghost btn-sm" onclick="endSrsSession()">✕ Encerrar</button>
+      </div>
+      <div class="srs-progress-bar-wrap">
+        <div class="srs-progress-bar" id="srs-progress-bar" style="width:0%"></div>
+      </div>
+      <div id="srs-card-area"></div>
+    </div>
+  </div>
+</section>
+
+<!-- SRS Config Modal -->
+<div id="srs-cfg-modal" class="hidden" style="position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:100%;max-width:440px;box-shadow:var(--shadow)">
+    <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px">⚙️ Configurações do SRS</h3>
+    <p style="font-size:0.82rem;color:var(--text2);margin-bottom:20px">Ajuste os parâmetros do algoritmo SM-2</p>
+    <div class="form-row">
+      <div class="form-group" style="margin:0">
+        <label>Novos por dia <span class="label-note">(máx)</span></label>
+        <input type="number" id="srs-cfg-new-day" min="1" max="200" value="20" style="width:100%">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Revisões por dia <span class="label-note">(máx)</span></label>
+        <input type="number" id="srs-cfg-rev-day" min="1" max="9999" value="200" style="width:100%">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Learning steps <span class="label-note">(minutos, separados por espaço)</span></label>
+      <input type="text" id="srs-cfg-steps" placeholder="1 10" value="1 10">
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="margin:0">
+        <label>Ease inicial <span class="label-note">(2.5 = padrão)</span></label>
+        <input type="number" id="srs-cfg-ease" min="1.3" max="4.0" step="0.1" value="2.5">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Intervalo graduação <span class="label-note">(dias)</span></label>
+        <input type="number" id="srs-cfg-grad-int" min="1" max="10" value="1" style="width:100%">
+      </div>
+    </div>
+    <div class="btn-group" style="margin-top:4px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="hideSrsCfgModal()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSrsCfg()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
 </main>
 <div id="toasts"></div>
 
@@ -804,13 +1038,14 @@ select option{background:var(--surface)}
 // ================================================================
 // STATE & STORAGE
 // ================================================================
-const SK = { settings: 'englab_cfg', words: 'englab_words' }
+const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log' }
 
 const DEF_CFG = {
   aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
   openaiKey: '',
   ankiUrl: 'http://localhost:8765', ankiDeck: 'Inglês', ankiModel: 'Inglês Básico',
   n8nBase: '',
+  gistToken: '', gistId: '',
   fields: { word: 'Frente', meaning: 'Verso', context: 'Contexto', ipa: 'IPA', examples: 'Exemplos', audio: 'Áudio' }
 }
 
@@ -835,7 +1070,7 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 // ================================================================
 // NAVIGATION
 // ================================================================
-const SECTIONS = ['dashboard','adicionar','revisar','configuracoes']
+const SECTIONS = ['dashboard','adicionar','revisar','estudar','configuracoes']
 function showSection(name) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
   document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', SECTIONS[i] === name))
@@ -843,6 +1078,7 @@ function showSection(name) {
   if (name === 'dashboard') renderDashboard()
   if (name === 'revisar') renderReview()
   if (name === 'configuracoes') fillSettings()
+  if (name === 'estudar') renderSrsSection()
 }
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
@@ -1773,6 +2009,9 @@ function renderWordCard(wordId) {
         <button class="btn btn-success" onclick="sendToAnki('${w.id}')">
           ✓ Criar ${totalCards} card${totalCards !== 1 ? 's' : ''} no Anki
         </button>
+        <button class="btn btn-srs" onclick="saveToSrs('${w.id}')">
+          📚 Salvar no site
+        </button>
       ` : ''}
       ${w.status === 'pending_ai' ? '' : `
         <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')">
@@ -2087,7 +2326,9 @@ function saveSettings() {
   cfg.ankiUrl = el('cfg-anki-url').value.trim()
   cfg.ankiDeck = el('cfg-anki-deck').value.trim()
   cfg.ankiModel = el('cfg-anki-model').value.trim()
-  cfg.n8nBase = el('cfg-n8n').value.trim().replace(/\/$/, '')
+  cfg.n8nBase = el('cfg-n8n').value.trim()
+  cfg.gistToken = el('cfg-gist-token').value.trim()
+  cfg.gistId = el('cfg-gist-id').value.trim().replace(/\/$/, '')
   cfg.fields = {
     word: el('cfg-f-word').value.trim() || 'Frente',
     meaning: el('cfg-f-meaning').value.trim() || 'Verso',
@@ -2237,6 +2478,731 @@ function setupDrop(areaId, handler) {
   })
 }
 
+
+
+// ================================================================
+// CLOUD SYNC — GITHUB GIST
+// ================================================================
+const GIST_FILENAME = 'english-lab-srs.json'
+
+function updateSyncNav(state) {
+  // state: 'off' | 'ok' | 'err' | 'syncing'
+  const ind = el('sync-indicator')
+  const dot = el('sync-dot')
+  const lbl = el('sync-label')
+  if (!ind) return
+  if (state === 'off') { ind.classList.add('hidden'); return }
+  ind.classList.remove('hidden')
+  dot.className = 'sync-dot' + (state === 'ok' ? ' ok' : state === 'err' ? ' err' : state === 'syncing' ? ' syncing' : '')
+  lbl.textContent = state === 'ok' ? 'Nuvem' : state === 'err' ? 'Sync erro' : 'Sincronizando...'
+}
+
+function gistHeaders() {
+  return {
+    'Authorization': `Bearer ${cfg.gistToken}`,
+    'Accept': 'application/vnd.github+json',
+    'Content-Type': 'application/json',
+    'X-GitHub-Api-Version': '2022-11-28'
+  }
+}
+
+async function gistPush() {
+  if (!cfg.gistToken) return false
+  loadSrs()
+  const payload = { srsCards, srsCfg, srsLog, words, exportedAt: new Date().toISOString() }
+  const body = JSON.stringify({ description: 'English Lab SRS data', public: false,
+    files: { [GIST_FILENAME]: { content: JSON.stringify(payload) } }
+  })
+  let res
+  if (cfg.gistId) {
+    res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, { method: 'PATCH', headers: gistHeaders(), body })
+  } else {
+    res = await fetch('https://api.github.com/gists', { method: 'POST', headers: gistHeaders(), body })
+    if (res.ok) {
+      const data = await res.json()
+      cfg.gistId = data.id
+      saveCfg()
+      // Update input field if visible
+      const inp = el('cfg-gist-id')
+      if (inp) inp.value = cfg.gistId
+    }
+  }
+  return res.ok
+}
+
+async function gistPull() {
+  if (!cfg.gistToken || !cfg.gistId) return false
+  const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, { headers: gistHeaders() })
+  if (!res.ok) return false
+  const data = await res.json()
+  const fileContent = data.files?.[GIST_FILENAME]?.content
+  if (!fileContent) return false
+  const payload = JSON.parse(fileContent)
+  // Merge strategy: cloud wins for SRS data, local wins for words (words managed locally)
+  if (payload.srsCards) { srsCards = payload.srsCards; localStorage.setItem(SK.srsCards, JSON.stringify(srsCards)) }
+  if (payload.srsCfg)   { srsCfg   = { ...SRS_DEF_CFG, ...payload.srsCfg }; persistSrsCfg() }
+  if (payload.srsLog)   { srsLog   = payload.srsLog; saveSrsLog() }
+  if (payload.words && payload.words.length > words.length) { words = payload.words; saveWords() }
+  return true
+}
+
+async function syncGist(direction = 'push') {
+  if (!cfg.gistToken) return
+  updateSyncNav('syncing')
+  try {
+    if (direction === 'pull') { await gistPull() }
+    else { await gistPush() }
+    updateSyncNav('ok')
+    return true
+  } catch(e) {
+    console.warn('[SRS Sync] Error:', e.message)
+    updateSyncNav('err')
+    return false
+  }
+}
+
+async function autoSyncAfterChange() {
+  if (!cfg.gistToken) return
+  // Debounce: wait 2s after last change before pushing
+  clearTimeout(window._syncTimer)
+  window._syncTimer = setTimeout(() => syncGist('push'), 2000)
+}
+
+// Buttons in settings
+async function testGistSync() {
+  const dot = el('gist-tdot'), msg = el('gist-tmsg'), box = el('gist-sync-result')
+  box.classList.remove('hidden')
+  dot.className = 'sync-dot syncing'; msg.textContent = 'Conectando...'
+  // Save token/id from form first
+  cfg.gistToken = el('cfg-gist-token').value.trim()
+  cfg.gistId = el('cfg-gist-id').value.trim()
+  saveCfg()
+  try {
+    updateSyncNav('syncing')
+    const ok = await gistPush()
+    if (ok) {
+      dot.className = 'sync-dot ok'
+      msg.textContent = `✅ Sincronizado! Gist ID: ${cfg.gistId}`
+      el('cfg-gist-id').value = cfg.gistId
+      updateSyncNav('ok')
+      toast('Dados enviados para o GitHub Gist com sucesso!', 'success')
+    } else {
+      dot.className = 'sync-dot err'
+      msg.textContent = '❌ Falha. Verifique o token e tente novamente.'
+      updateSyncNav('err')
+    }
+  } catch(e) {
+    dot.className = 'sync-dot err'
+    msg.textContent = `❌ Erro: ${e.message}`
+    updateSyncNav('err')
+  }
+}
+
+async function forcePullGist() {
+  cfg.gistToken = el('cfg-gist-token').value.trim()
+  cfg.gistId = el('cfg-gist-id').value.trim()
+  saveCfg()
+  updateSyncNav('syncing')
+  try {
+    const ok = await gistPull()
+    if (ok) { updateSyncNav('ok'); toast('⬇ Dados importados da nuvem com sucesso!', 'success'); renderSrsSection() }
+    else { updateSyncNav('err'); toast('Falha ao importar. Verifique token e Gist ID.', 'error') }
+  } catch(e) { updateSyncNav('err'); toast('Erro: ' + e.message, 'error') }
+}
+
+async function forcePushGist() {
+  cfg.gistToken = el('cfg-gist-token').value.trim()
+  cfg.gistId = el('cfg-gist-id').value.trim()
+  saveCfg()
+  updateSyncNav('syncing')
+  try {
+    const ok = await gistPush()
+    if (ok) { updateSyncNav('ok'); toast('⬆ Dados enviados para a nuvem!', 'success') }
+    else { updateSyncNav('err'); toast('Falha ao enviar. Verifique o token.', 'error') }
+  } catch(e) { updateSyncNav('err'); toast('Erro: ' + e.message, 'error') }
+}
+
+async function initCloudSync() {
+  if (!cfg.gistToken) { updateSyncNav('off'); return }
+  updateSyncNav('syncing')
+  try {
+    const pulled = await gistPull()
+    updateSyncNav(pulled ? 'ok' : 'err')
+    if (pulled) { updateSrsBadge(); renderDashboard() }
+  } catch { updateSyncNav('err') }
+}
+
+// ================================================================
+// SRS ENGINE — SM-2 ALGORITHM
+// ================================================================
+
+// ---- Storage ----
+let srsCards = []  // array of card objects
+let srsCfg = {}
+let srsLog = []    // [{date:'YYYY-MM-DD', reviewed:N, correct:N}]
+
+const SRS_DEF_CFG = {
+  newPerDay: 20,
+  revPerDay: 200,
+  steps: [1, 10],        // learning steps in minutes
+  graduateInterval: 1,   // days after learning → review
+  easeStart: 2.5,
+  easeMin: 1.3,
+  easyBonus: 1.3,
+  intervalModifier: 1.0
+}
+
+function loadSrs() {
+  try { srsCards = JSON.parse(localStorage.getItem(SK.srsCards) || '[]') } catch { srsCards = [] }
+  try { srsCfg = { ...SRS_DEF_CFG, ...JSON.parse(localStorage.getItem(SK.srsCfg) || '{}') } } catch { srsCfg = { ...SRS_DEF_CFG } }
+  try { srsLog = JSON.parse(localStorage.getItem(SK.srsLog) || '[]') } catch { srsLog = [] }
+}
+
+function saveSrsCards() { localStorage.setItem(SK.srsCards, JSON.stringify(srsCards)) }
+function persistSrsCfg(){ localStorage.setItem(SK.srsCfg, JSON.stringify(srsCfg)) }
+function saveSrsLog()   { localStorage.setItem(SK.srsLog, JSON.stringify(srsLog)) }
+
+function todayStr() { return new Date().toISOString().slice(0,10) }
+function nowTs()    { return Date.now() }
+
+// ---- SM-2 Core ----
+// Card schema:
+// { id, wordId, meaningIdx, exampleIdx, state:'new'|'learning'|'review'|'relearning',
+//   due: timestamp_ms, interval: days, ease: float, lapses: int,
+//   stepIdx: int (for learning/relearning), addedDate: 'YYYY-MM-DD',
+//   frente: str, verso: str, word: str, meaning_pt: str, ipa: str, type: str }
+
+function createSrsCard(wordId, meaningIdx, exampleIdx) {
+  const w = words.find(x => x.id === wordId)
+  if (!w) return null
+  const m = w.meanings[meaningIdx]
+  if (!m) return null
+  const ex = m.examples && m.examples[exampleIdx] ? m.examples[exampleIdx] : null
+
+  return {
+    id: uid(),
+    wordId, meaningIdx, exampleIdx,
+    state: 'new',
+    due: nowTs(),
+    interval: 0,
+    ease: srsCfg.easeStart,
+    lapses: 0,
+    stepIdx: 0,
+    addedDate: todayStr(),
+    // Snapshot data (so card works even if word is deleted)
+    word: w.word || '',
+    ipa: w.ipa || '',
+    type: w.type || '',
+    source_type: w.source_type || '',
+    meaning_pt: m.meaning_pt || '',
+    definition_pt: m.definition_pt || '',
+    example_en: ex ? ex.en : (m.example_en || ''),
+    example_pt: ex ? ex.pt : (m.example_pt || '')
+  }
+}
+
+// Rating: 1=again, 2=hard, 3=good, 4=easy
+function rateSrsCard(cardId, rating) {
+  const card = srsCards.find(c => c.id === cardId)
+  if (!card) return
+
+  const steps = srsCfg.steps || [1, 10]
+  const now = nowTs()
+
+  if (card.state === 'new' || card.state === 'learning') {
+    if (rating === 1) {
+      // Errei — restart learning
+      card.stepIdx = 0
+      card.state = 'learning'
+      card.due = now + steps[0] * 60000
+    } else if (rating === 4) {
+      // Fácil — skip learning, graduate now
+      card.state = 'review'
+      card.interval = srsCfg.graduateInterval
+      card.ease = Math.max(srsCfg.easeMin, card.ease + 0.15)
+      card.due = now + card.interval * 86400000
+    } else {
+      // Difícil ou Bom — advance step
+      card.stepIdx = Math.min(card.stepIdx + 1, steps.length - 1)
+      if (card.stepIdx >= steps.length - 1 && rating >= 3) {
+        // Graduated
+        card.state = 'review'
+        card.interval = srsCfg.graduateInterval
+        card.due = now + card.interval * 86400000
+      } else {
+        card.state = 'learning'
+        card.due = now + steps[card.stepIdx] * 60000
+      }
+    }
+  } else if (card.state === 'review' || card.state === 'relearning') {
+    if (rating === 1) {
+      // Errei (lapse)
+      card.lapses++
+      card.ease = Math.max(srsCfg.easeMin, card.ease - 0.20)
+      card.interval = Math.max(1, Math.round(card.interval * 0.2))
+      card.stepIdx = 0
+      card.state = 'relearning'
+      card.due = now + steps[0] * 60000
+    } else {
+      card.state = 'review'
+      let newInterval
+      if (rating === 2) {
+        // Difícil
+        newInterval = Math.round(card.interval * 1.2 * srsCfg.intervalModifier)
+        card.ease = Math.max(srsCfg.easeMin, card.ease - 0.15)
+      } else if (rating === 3) {
+        // Bom
+        newInterval = Math.round(card.interval * card.ease * srsCfg.intervalModifier)
+      } else {
+        // Fácil
+        newInterval = Math.round(card.interval * card.ease * srsCfg.easyBonus * srsCfg.intervalModifier)
+        card.ease = card.ease + 0.15
+      }
+      card.interval = Math.max(1, newInterval)
+      card.due = now + card.interval * 86400000
+    }
+  }
+
+  saveSrsCards()
+  autoSyncAfterChange()
+}
+
+// ---- Preview next interval (without modifying card) ----
+function previewInterval(card, rating) {
+  const steps = srsCfg.steps || [1, 10]
+  if (card.state === 'new' || card.state === 'learning') {
+    if (rating === 1) return fmtDur(steps[0] * 60000)
+    if (rating === 4) return fmtDays(srsCfg.graduateInterval)
+    const nextStep = Math.min(card.stepIdx + 1, steps.length - 1)
+    if (nextStep >= steps.length - 1 && rating >= 3) return fmtDays(srsCfg.graduateInterval)
+    return fmtDur(steps[nextStep] * 60000)
+  } else {
+    if (rating === 1) return fmtDur(steps[0] * 60000)
+    let ni
+    if (rating === 2) ni = Math.round(card.interval * 1.2 * srsCfg.intervalModifier)
+    else if (rating === 3) ni = Math.round(card.interval * card.ease * srsCfg.intervalModifier)
+    else ni = Math.round(card.interval * card.ease * srsCfg.easyBonus * srsCfg.intervalModifier)
+    return fmtDays(Math.max(1, ni))
+  }
+}
+
+function fmtDur(ms) {
+  if (ms < 3600000) return Math.round(ms/60000) + 'min'
+  return Math.round(ms/3600000) + 'h'
+}
+function fmtDays(d) {
+  if (d < 1)   return '<1d'
+  if (d === 1) return '1d'
+  if (d < 31)  return d + 'd'
+  if (d < 365) return Math.round(d/30) + 'm'
+  return Math.round(d/365) + 'a'
+}
+
+// ---- Counts ----
+function srsDueCount() {
+  const now = nowTs()
+  return srsCards.filter(c => c.due <= now && (c.state === 'review' || c.state === 'relearning')).length
+}
+function srsNewTodayRemaining() {
+  const today = todayStr()
+  const newAdded = srsCards.filter(c => c.addedDate === today && c.state === 'new').length
+  // How many NEW cards already seen today? Count from log
+  const todayLog = srsLog.find(l => l.date === today)
+  const newSeen = todayLog ? (todayLog.newSeen || 0) : 0
+  const newAvail = srsCards.filter(c => c.state === 'new').length
+  return Math.max(0, Math.min(srsCfg.newPerDay - newSeen, newAvail))
+}
+function srsStreak() {
+  if (!srsLog.length) return 0
+  let streak = 0
+  const today = todayStr()
+  let d = new Date()
+  while (true) {
+    const ds = d.toISOString().slice(0,10)
+    if (ds === today && !srsLog.find(l => l.date === ds)) { d.setDate(d.getDate()-1); continue }
+    if (srsLog.find(l => l.date === ds && l.reviewed > 0)) { streak++; d.setDate(d.getDate()-1) }
+    else break
+  }
+  return streak
+}
+
+// ---- Save word to SRS ----
+function saveToSrs(wordId) {
+  loadSrs()
+  const w = words.find(x => x.id === wordId)
+  if (!w || !w.meanings || !w.meanings.length) { toast('Sem significados para salvar', 'warning'); return }
+  const selected = w.meanings.filter(m => m.selected !== false)
+  if (!selected.length) { toast('Selecione ao menos um significado', 'warning'); return }
+
+  let added = 0, skipped = 0
+  selected.forEach((m, _) => {
+    const mi = w.meanings.indexOf(m)
+    const examples = m.examples && m.examples.length ? m.examples : [null]
+    examples.forEach((ex, ei) => {
+      const exIdx = ex ? ei : -1
+      // Check duplicate
+      const exists = srsCards.find(c => c.wordId === wordId && c.meaningIdx === mi && c.exampleIdx === exIdx)
+      if (exists) { skipped++; return }
+      const card = createSrsCard(wordId, mi, exIdx < 0 ? 0 : exIdx)
+      if (card) { srsCards.push(card); added++ }
+    })
+  })
+
+  saveSrsCards()
+  autoSyncAfterChange()
+
+  // Mark word status
+  if (added > 0) {
+    w.status = 'in_srs'
+    saveWords()
+    renderSidebar()
+    renderDashboard()
+    updateSrsBadge()
+    toast(`📚 ${added} card${added !== 1 ? 's' : ''} salvos no site SRS${skipped ? ` (${skipped} já existiam)` : ''}`, 'success')
+  } else {
+    toast(`Todos os cards já existem no SRS (${skipped} duplicados)`, 'info')
+  }
+}
+
+// ---- Update SRS badge in nav ----
+function updateSrsBadge() {
+  loadSrs()
+  const due = srsDueCount() + srsNewTodayRemaining()
+  const badge = el('badge-srs')
+  if (badge) {
+    badge.textContent = due
+    badge.classList.toggle('hidden', due === 0)
+  }
+}
+
+// ================================================================
+// SRS SECTION RENDERING
+// ================================================================
+let srsSession = null  // current session state
+
+function renderSrsSection() {
+  loadSrs()
+  updateSrsBadge()
+
+  const due = srsDueCount()
+  const newRem = srsNewTodayRemaining()
+  const streak = srsStreak()
+
+  el('srs-due-count').textContent = due
+  el('srs-new-count').textContent = newRem
+  el('srs-streak').textContent = streak
+
+  const startArea = el('srs-start-area')
+  const total = due + newRem
+
+  if (srsCards.length === 0) {
+    startArea.innerHTML = `
+    <div class="srs-empty">
+      <div class="icon">📚</div>
+      <p style="font-size:1rem;font-weight:600;margin-bottom:8px">Nenhum card ainda</p>
+      <p style="font-size:0.88rem;margin-bottom:20px">Revise suas palavras e clique em <strong>"Salvar no site"</strong></p>
+      <button class="btn btn-primary" onclick="showSection('revisar')">➡ Ir para Revisar</button>
+    </div>`
+  } else if (total === 0) {
+    startArea.innerHTML = `
+    <div class="srs-empty">
+      <div class="icon">🎉</div>
+      <p style="font-size:1rem;font-weight:600;margin-bottom:8px">Fila zerada!</p>
+      <p style="font-size:0.88rem;color:var(--text2)">Volte amanhã — o algoritmo já agendou a próxima revisão.</p>
+    </div>`
+  } else {
+    startArea.innerHTML = `
+    <div style="text-align:center;padding:24px 0">
+      <p style="color:var(--text2);margin-bottom:16px;font-size:0.95rem">
+        ${due > 0 ? `<strong style="color:var(--primary)">${due}</strong> para revisar` : ''}
+        ${due > 0 && newRem > 0 ? ' · ' : ''}
+        ${newRem > 0 ? `<strong style="color:var(--success)">${newRem}</strong> novos` : ''}
+      </p>
+      <button class="btn btn-primary" style="padding:12px 36px;font-size:1rem" onclick="startSrsSession()">
+        ▶ Começar sessão
+      </button>
+    </div>`
+  }
+
+  renderSrsAllCards()
+}
+
+function renderSrsAllCards() {
+  const area = el('srs-all-cards-area')
+  if (!area || !srsCards.length) return
+
+  const now = nowTs()
+  const stateOrder = {review:0, relearning:1, learning:2, new:3}
+  const sorted = [...srsCards].sort((a,b) => stateOrder[a.state] - stateOrder[b.state] || a.due - b.due)
+
+  area.innerHTML = `
+  <div class="card-box">
+    <div class="card-box-header">
+      <h3>Todos os cards (${srsCards.length})</h3>
+    </div>
+    <div style="max-height:280px;overflow-y:auto">
+      ${sorted.map(c => {
+        const stateColors = {new:'var(--success)', learning:'var(--warning)', review:'var(--primary)', relearning:'var(--error)'}
+        const stateLabel = {new:'Novo', learning:'Aprendendo', review:'Revisão', relearning:'Reaprendendo'}
+        const dueTxt = c.due <= now ? 'Agora' : fmtDays(Math.round((c.due - now)/86400000))
+        return `<div class="recent-item">
+          <div class="ri-word">${esc(c.word)}</div>
+          <div class="ri-ctx">${esc(c.meaning_pt)}</div>
+          <span style="font-size:0.72rem;color:${stateColors[c.state]||'var(--text3)'};font-weight:600;white-space:nowrap">${stateLabel[c.state]||c.state}</span>
+          <span style="font-size:0.72rem;color:var(--text3);margin-left:8px;white-space:nowrap">⏱ ${dueTxt}</span>
+        </div>`
+      }).join('')}
+    </div>
+  </div>`
+}
+
+// ================================================================
+// SRS SESSION
+// ================================================================
+function buildSessionQueue() {
+  loadSrs()
+  const now = nowTs()
+  const steps = srsCfg.steps || [1, 10]
+  const today = todayStr()
+
+  // 1. Due reviews (review + relearning)
+  let reviews = srsCards.filter(c => c.due <= now && (c.state === 'review' || c.state === 'relearning'))
+  reviews = reviews.slice(0, srsCfg.revPerDay)
+
+  // 2. Due learning steps
+  const learning = srsCards.filter(c => c.due <= now && c.state === 'learning')
+
+  // 3. New cards (respecting daily limit)
+  const todayLog = srsLog.find(l => l.date === today)
+  const newSeen = todayLog ? (todayLog.newSeen || 0) : 0
+  const newLimit = Math.max(0, srsCfg.newPerDay - newSeen)
+  const newCards = srsCards.filter(c => c.state === 'new').slice(0, newLimit)
+
+  return [...reviews, ...learning, ...newCards]
+}
+
+function startSrsSession() {
+  loadSrs()
+  const queue = buildSessionQueue()
+  if (!queue.length) { toast('Nada para estudar agora!', 'info'); return }
+
+  srsSession = {
+    queue: queue.map(c => c.id),
+    current: 0,
+    total: queue.length,
+    done: 0,
+    correct: 0,
+    newSeen: 0,
+    startTime: Date.now()
+  }
+
+  el('srs-view-dashboard').classList.add('hidden')
+  el('srs-view-session').classList.remove('hidden')
+
+  renderSrsCard()
+}
+
+function renderSrsCard() {
+  if (!srsSession) return
+  const { queue, current, done, total } = srsSession
+  if (current >= queue.length) { finishSrsSession(); return }
+
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  el('srs-progress-bar').style.width = pct + '%'
+  el('srs-session-counter').textContent = `${done} / ${total}`
+
+  const cardId = queue[current]
+  const card = srsCards.find(c => c.id === cardId)
+  if (!card) { srsSession.current++; renderSrsCard(); return }
+
+  const frente = buildSrsFrente(card)
+  const verso = buildSrsVerso(card)
+
+  const ratingBtns = [
+    { cls: 'again', label: 'Errei',   r: 1 },
+    { cls: 'hard',  label: 'Difícil', r: 2 },
+    { cls: 'good',  label: 'Bom',     r: 3 },
+    { cls: 'easy',  label: 'Fácil',   r: 4 }
+  ].map(b => `
+    <button class="srs-rate-btn ${b.cls}" onclick="rateSrsCardAndNext('${card.id}',${b.r})">
+      <span class="srb-label">${b.label}</span>
+      <span class="srb-interval">${previewInterval(card, b.r)}</span>
+    </button>`).join('')
+
+  el('srs-card-area').innerHTML = `
+  <div class="srs-flip-card" id="srs-flip" onclick="flipSrsCard()">
+    <div class="srs-flip-inner">
+      <div class="srs-card-face srs-card-front">
+        <div class="srs-card-front-word">${esc(card.word)}</div>
+        ${frente ? `<div class="srs-card-front-sentence">${frente}</div>` : ''}
+        <div class="srs-card-front-hint">Clique para revelar</div>
+      </div>
+      <div class="srs-card-face srs-card-back">
+        <div class="srs-card-back-body">${verso}</div>
+      </div>
+    </div>
+  </div>
+  <div class="srs-rate-buttons hidden" id="srs-rating-area">
+    ${ratingBtns}
+  </div>
+  <div style="text-align:center;margin-top:12px">
+    <button class="btn btn-ghost btn-sm" onclick="flipSrsCard()">
+      <span id="srs-flip-hint">👁 Revelar resposta</span>
+    </button>
+  </div>`
+}
+
+function flipSrsCard() {
+  const flip = el('srs-flip')
+  const rating = el('srs-rating-area')
+  const hint = el('srs-flip-hint')
+  if (!flip) return
+  const isFlipped = flip.classList.toggle('flipped')
+  if (rating) rating.classList.toggle('hidden', !isFlipped)
+  if (hint) hint.textContent = isFlipped ? '↩ Voltar' : '👁 Revelar resposta'
+}
+
+function rateSrsCardAndNext(cardId, rating) {
+  const card = srsCards.find(c => c.id === cardId)
+  if (!card) return
+  const wasNew = card.state === 'new'
+
+  rateSrsCard(cardId, rating)
+
+  if (srsSession) {
+    srsSession.done++
+    if (wasNew) srsSession.newSeen++
+    if (rating >= 3) srsSession.correct++
+    srsSession.current++
+
+    // Re-queue if learning card not yet graduated
+    const updated = srsCards.find(c => c.id === cardId)
+    if (updated && (updated.state === 'learning' || updated.state === 'relearning')) {
+      // Will come back naturally when due (within session requeue logic)
+    }
+  }
+
+  updateSrsBadge()
+  renderSrsCard()
+}
+
+function finishSrsSession() {
+  const today = todayStr()
+  let log = srsLog.find(l => l.date === today)
+  if (!log) { log = {date: today, reviewed: 0, correct: 0, newSeen: 0}; srsLog.push(log) }
+  if (srsSession) {
+    log.reviewed += srsSession.done
+    log.correct  += srsSession.correct
+    log.newSeen  = (log.newSeen || 0) + srsSession.newSeen
+  }
+  saveSrsLog()
+  autoSyncAfterChange()
+
+  const done = srsSession ? srsSession.done : 0
+  const correct = srsSession ? srsSession.correct : 0
+  const pct = done > 0 ? Math.round((correct/done)*100) : 0
+
+  el('srs-card-area').innerHTML = `
+  <div class="srs-session-end">
+    <div class="srs-end-icon">${pct >= 80 ? '🏆' : pct >= 50 ? '✅' : '💪'}</div>
+    <div class="srs-end-title">${pct >= 80 ? 'Excelente!' : pct >= 50 ? 'Bom trabalho!' : 'Continue praticando!'}</div>
+    <div class="srs-end-sub">Sessão concluída</div>
+    <div class="srs-end-stats">
+      <div class="ses-stat">
+        <div class="ses-stat-val" style="color:var(--primary)">${done}</div>
+        <div class="ses-stat-lbl">Revisados</div>
+      </div>
+      <div class="ses-stat">
+        <div class="ses-stat-val" style="color:var(--success)">${correct}</div>
+        <div class="ses-stat-lbl">Corretos</div>
+      </div>
+      <div class="ses-stat">
+        <div class="ses-stat-val" style="color:var(--warning)">${pct}%</div>
+        <div class="ses-stat-lbl">Acerto</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="endSrsSession()">Ver dashboard</button>
+  </div>`
+
+  el('srs-progress-bar').style.width = '100%'
+  el('srs-session-counter').textContent = `${done} / ${done}`
+}
+
+function endSrsSession() {
+  srsSession = null
+  el('srs-view-session').classList.add('hidden')
+  el('srs-view-dashboard').classList.remove('hidden')
+  renderSrsSection()
+}
+
+// ---- Card content builders (for study session) ----
+function buildSrsFrente(card) {
+  const sentence = card.example_en || ''
+  if (!sentence) return ''
+  const wordRaw = (card.word || '').trim()
+  if (!wordRaw) return esc(sentence)
+  const isMultiWord = wordRaw.includes(' ')
+  const cleanSentence = sentence.replace(/<\/?b>/gi, '')
+  const wordPattern = wordRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  try {
+    let regex
+    if (isMultiWord) {
+      const parts = wordRaw.split(/\s+/)
+      const particle = parts.slice(1).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
+      regex = new RegExp(`\\b(\\w+(?:'\\w+)?\\s+${particle})\\b`, 'gi')
+    } else {
+      regex = new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi')
+    }
+    return cleanSentence.replace(regex, '<b>$1</b>')
+  } catch { return esc(cleanSentence) }
+}
+
+function buildSrsVerso(card) {
+  const TYPE = {word:'vocabulário', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation'}
+  let v = ''
+  if (card.example_pt) v += `<div class="srs-back-translation">"${esc(card.example_pt)}"</div>`
+  v += `<div class="srs-back-word">${esc(card.word)}</div>`
+  if (card.ipa) v += `<div class="srs-back-ipa">${esc(card.ipa)}</div>`
+  if (card.type && TYPE[card.type]) v += `<span class="srs-back-type-chip">${TYPE[card.type]}</span>`
+  v += `<div class="srs-back-meaning">${esc(card.meaning_pt)}</div>`
+  if (card.definition_pt) v += `<div class="srs-back-def">${esc(card.definition_pt)}</div>`
+  if (card.example_en) {
+    const bolded = buildSrsFrente(card)
+    v += `<div class="srs-back-example">"${bolded}"</div>`
+  }
+  if (card.example_pt) v += `<div class="srs-back-example-pt">"${esc(card.example_pt)}"</div>`
+  v += `<div class="srs-back-footer">${esc(card.source_type || '')}</div>`
+  return v
+}
+
+// ---- SRS Config Modal ----
+function showSrsCfgModal() {
+  loadSrs()
+  el('srs-cfg-new-day').value = srsCfg.newPerDay
+  el('srs-cfg-rev-day').value = srsCfg.revPerDay
+  el('srs-cfg-steps').value = (srsCfg.steps || [1,10]).join(' ')
+  el('srs-cfg-ease').value = srsCfg.easeStart
+  el('srs-cfg-grad-int').value = srsCfg.graduateInterval
+  el('srs-cfg-modal').classList.remove('hidden')
+  el('srs-cfg-modal').style.display = 'flex'
+}
+function hideSrsCfgModal() {
+  el('srs-cfg-modal').classList.add('hidden')
+  el('srs-cfg-modal').style.display = ''
+}
+function saveSrsCfg() {
+  loadSrs()
+  srsCfg.newPerDay = parseInt(el('srs-cfg-new-day').value) || 20
+  srsCfg.revPerDay = parseInt(el('srs-cfg-rev-day').value) || 200
+  srsCfg.steps = (el('srs-cfg-steps').value || '1 10').split(/\s+/).map(Number).filter(Boolean)
+  if (!srsCfg.steps.length) srsCfg.steps = [1, 10]
+  srsCfg.easeStart = parseFloat(el('srs-cfg-ease').value) || 2.5
+  srsCfg.graduateInterval = parseInt(el('srs-cfg-grad-int').value) || 1
+  persistSrsCfg()
+  hideSrsCfgModal()
+  toast('Configurações do SRS salvas', 'success')
+}
+
 // ================================================================
 // INIT
 // ================================================================
@@ -2245,8 +3211,10 @@ async function checkAnkiOnLoad() {
 }
 
 function init() {
-  loadCfg(); loadWords()
+  loadCfg(); loadWords(); loadSrs()
   renderDashboard()
+  updateSrsBadge()
+  initCloudSync()
   fillSettings()
   setupDrop('kindle-drop', handleKindleFile)
   checkAnkiOnLoad()
