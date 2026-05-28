@@ -1889,10 +1889,17 @@ function buildFrente(w, m, ex) {
   const wordPattern = wordRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   if (!wordPattern) return capFirst(esc(cleanSentence))
   try {
-    // Multi-word: match exato; single word: aceita inflexões comuns
-    const regex = isMultiWord
-      ? new RegExp(`\\b(${wordPattern})\\b`, 'gi')
-      : new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi')
+    // Multi-word: ancora no particle (2ª palavra em diante) e aceita qualquer verbo antes
+    // Ex: "give up" → bola "gave up", "giving up", "gives up" etc.
+    // Single word: aceita inflexões comuns
+    let regex
+    if (isMultiWord) {
+      const parts = wordRaw.split(/\s+/)
+      const particle = parts.slice(1).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
+      regex = new RegExp(`\\b(\\w+(?:'\\w+)?\\s+${particle})\\b`, 'gi')
+    } else {
+      regex = new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi')
+    }
     const bolded = cleanSentence.replace(regex, '<b>$1</b>')
     // Se não encontrou a expressão na frase gerada pela IA, retorna sem bold
     return capFirst(bolded.includes('<b>') ? bolded : esc(cleanSentence))
@@ -1947,6 +1954,15 @@ async function sendToAnki(wordId) {
   const btn = document.querySelector('.wc-actions .btn-success')
   if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
 
+  // Verifica conexão com AnkiConnect antes de tentar enviar
+  try {
+    await callAnki('version')
+  } catch(e) {
+    toast(`❌ Anki inacessível: ${e.message}`, 'error')
+    if (btn) { btn.disabled = false; btn.textContent = `✓ Criar cards no Anki` }
+    return
+  }
+
   // Áudio do n8n (caso filesystem-v2 seja resolvido futuramente)
   const n8nAudioRaw = w.audio_base64 || null
   const canFetchTTS = !!cfg.openaiKey
@@ -1968,7 +1984,7 @@ async function sendToAnki(wordId) {
     return null
   }
 
-  let ok = 0, fail = 0
+  let ok = 0, fail = 0, lastError = ''
 
   const targetDeck = getAnkiDeck(w)
   console.log(`[English Lab] Deck alvo: "${targetDeck}" | tipo: ${w.type || '?'} | base cfg: "${cfg.ankiDeck}"`)
@@ -2016,8 +2032,14 @@ async function sendToAnki(wordId) {
         m.anki_ids.push(noteId)
         ok++
       } catch(e) {
-        console.warn('Anki error:', m.meaning_pt, ex.en, e.message)
-        fail++
+        const msg = (e.message || '').toLowerCase()
+        if (msg.includes('duplicate')) {
+          ok++ // trata duplicata como sucesso — card já existe no Anki
+        } else {
+          console.warn('Anki addNote erro:', e.message)
+          lastError = e.message
+          fail++
+        }
       }
     }
   }
@@ -2033,7 +2055,8 @@ async function sendToAnki(wordId) {
     else { activeWordId = null; el('review-main').innerHTML = `<div class="review-empty-main"><div class="icon">🎉</div><p>Fila zerada! Adicione mais palavras.</p></div>` }
     renderDashboard()
   } else {
-    toast(`Erro ao criar cards: verifique se o Anki está aberto`, 'error')
+    const errMsg = lastError ? `Erro Anki: ${lastError}` : 'Verifique se o Anki está aberto'
+    toast(errMsg, 'error')
     if (btn) { btn.disabled = false; btn.textContent = `✓ Criar ${selected.length} cards no Anki` }
   }
 }
