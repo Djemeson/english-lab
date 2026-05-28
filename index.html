@@ -1969,6 +1969,16 @@ async function sendToAnki(wordId) {
   }
 
   let ok = 0, fail = 0
+
+  // Garante que o sub-deck existe antes de enviar os cards
+  const targetDeck = getAnkiDeck(w)
+  try {
+    await callAnki('createDeck', { deck: targetDeck })
+  } catch(e) {
+    console.warn('createDeck aviso (pode ser normal):', e.message)
+  }
+  console.log(`[English Lab] Enviando para deck: "${targetDeck}" (tipo: ${w.type || 'word'})`)
+
   for (const m of selected) {
     // Um card por exemplo (3 exemplos = 3 cards por significado)
     const exArr = m.examples && m.examples.length > 0
@@ -1994,7 +2004,7 @@ async function sendToAnki(wordId) {
       try {
         const noteId = await callAnki('addNote', {
           note: {
-            deckName: getAnkiDeck(w),
+            deckName: targetDeck,
             modelName: cfg.ankiModel || 'Inglês Básico',
             fields: {
               [cfg.fields.word    || 'Frente'  ]: buildFrente(w, m, ex) + (audioTag ? ' ' + audioTag : ''),
