@@ -3600,7 +3600,7 @@ async function generateCardImage(cardId, callerEl) {
   const word   = card.word || ''
   const meaning = card.meaning_pt || card.definition_pt || ''
   const context = card.example_en  || ''
-  const prompt  = `Simple, clear educational illustration for English vocabulary learning. Word: "${word}". Meaning: "${meaning}". ${context ? 'Example: "'+context+'".' : ''} Minimal style, no text, clean background, vivid colors.`
+  const prompt  = `Digital illustration, editorial style. English vocabulary flashcard image for the word "${word}". Meaning: "${meaning}". ${context ? 'Example sentence: "'+context+'".' : ''} No text in the image. Detailed, artistic, vivid colors, clean composition.`
 
   try {
     const res = await fetch('https://api.openai.com/v1/images/generations', {
@@ -3807,11 +3807,13 @@ async function browserGenerateAudioSelected() {
   const cards = srsCards.filter(c => ids.includes(c.id))
   toast(`🎵 Gerando áudio para ${cards.length} card(s)...`, 'info')
   let generated = 0
+  const textsToGenerate = new Set()
   for (const card of cards) {
-    const text = card.example_en || card.word
-    if (!text) continue
-    const key = audioKey(text)
-    const exists = await AudioDB.get(key)
+    if (card.example_en) textsToGenerate.add(card.example_en)  // frase
+    if (card.word)       textsToGenerate.add(card.word)         // palavra isolada
+  }
+  for (const text of textsToGenerate) {
+    const exists = await AudioDB.get(audioKey(text))
     if (exists) continue
     const result = await ensureSrsAudio(text)
     if (result) generated++
