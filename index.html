@@ -447,7 +447,35 @@ select option{background:var(--surface)}
 .srs-dash-card.streak .sdc-value{color:var(--warning)}
 
 /* Study session */
-.srs-session-wrap{max-width:640px;margin:0 auto}
+.srs-session-wrap{max-width:700px;margin:0 auto}
+/* Histórico de cards revisados */
+.srs-history-strip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;min-height:28px;align-items:center}
+.srs-hist-chip{
+  font-size:0.72rem;padding:3px 9px;border-radius:20px;
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text3);opacity:0.55;cursor:default;user-select:none;
+  white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis
+}
+.srs-hist-chip.again{border-color:#F87171;color:#F87171}
+.srs-hist-chip.hard {border-color:var(--warning);color:var(--warning)}
+.srs-hist-chip.good {border-color:var(--success);color:var(--success)}
+.srs-hist-chip.easy {border-color:var(--primary);color:var(--primary)}
+/* Layout verso com imagem ao lado */
+.srs-back-with-image{display:grid;grid-template-columns:1fr 200px;gap:20px;align-items:start}
+.srs-back-image-col img{
+  width:200px;height:200px;border-radius:12px;object-fit:cover;
+  border:1px solid var(--border);display:block
+}
+/* Remove margem do card-image quando está no layout side-by-side */
+.srs-back-image-col .srs-card-image{max-width:100%;max-height:200px;margin:0;width:100%}
+/* Undo button */
+.srs-undo-btn{
+  font-size:0.78rem;color:var(--text3);background:none;border:none;
+  cursor:pointer;padding:4px 8px;border-radius:var(--radius-sm);
+  transition:color .15s;display:flex;align-items:center;gap:4px
+}
+.srs-undo-btn:hover{color:var(--text);background:var(--surface2)}
+.srs-undo-btn:disabled{opacity:0.3;cursor:default}
 .srs-progress-bar-wrap{height:4px;background:var(--surface3);border-radius:2px;margin-bottom:28px;overflow:hidden}
 .srs-progress-bar{height:100%;background:var(--primary);border-radius:2px;transition:width .4s ease}
 
@@ -1076,13 +1104,17 @@ select option{background:var(--surface)}
   <!-- Study session view -->
   <div id="srs-view-session" class="hidden">
     <div class="srs-session-wrap">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <span id="srs-session-counter" style="font-size:0.85rem;color:var(--text3)">0 / 0</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="srs-session-counter" style="font-size:0.85rem;color:var(--text3)">0 / 0</span>
+          <button class="srs-undo-btn" id="srs-undo-btn" onclick="undoLastCard()" disabled title="Desfazer última avaliação">↩ Desfazer</button>
+        </div>
         <button class="btn btn-ghost btn-sm" onclick="endSrsSession()">✕ Encerrar</button>
       </div>
       <div class="srs-progress-bar-wrap">
         <div class="srs-progress-bar" id="srs-progress-bar" style="width:0%"></div>
       </div>
+      <div class="srs-history-strip" id="srs-history-strip"></div>
       <div id="srs-card-area"></div>
     </div>
   </div>
@@ -3600,7 +3632,7 @@ async function generateCardImage(cardId, callerEl) {
   const word   = card.word || ''
   const meaning = card.meaning_pt || card.definition_pt || ''
   const context = card.example_en  || ''
-  const prompt  = `Digital illustration, editorial style. English vocabulary flashcard image for the word "${word}". Meaning: "${meaning}". ${context ? 'Example sentence: "'+context+'".' : ''} No text in the image. Detailed, artistic, vivid colors, clean composition.`
+  const prompt  = `Digital illustration, editorial style. English vocabulary flashcard image for the word "${word}". Meaning: "${meaning}". ${context ? 'Example sentence: "'+context+'".' : ''} No text in the image. Detailed, artistic, vivid colors, clean composition. IMPORTANT: Before finalizing, verify anatomical accuracy — all humans and animals must have the correct number of limbs, fingers, and facial features. Reject and redo if any body part appears duplicated, missing, or malformed.`
 
   try {
     const res = await fetch('https://api.openai.com/v1/images/generations', {
@@ -4046,12 +4078,14 @@ function startSrsSession(filterDeckId = null) {
     done: 0,
     correct: 0,
     newSeen: 0,
-    startTime: Date.now()
+    startTime: Date.now(),
+    history: []  // [{cardId, rating, ratingLabel, prevState}]
   }
 
   el('srs-view-dashboard').classList.add('hidden')
   el('srs-view-session').classList.remove('hidden')
 
+  renderHistoryStrip()
   renderSrsCard()
 }
 
@@ -4126,6 +4160,25 @@ function flipSrsCard() {
   if (hint) hint.textContent = isFlipped ? '↩ Ver frente' : '👁 Revelar resposta'
 }
 
+// Atalho de teclado: Espaço = revelar / Bom
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Space') return
+  if (!srsSession) return
+  // Evita acionar quando está digitando em inputs
+  if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return
+  e.preventDefault()
+  const flip = el('srs-flip')
+  if (!flip) return
+  if (!flip.classList.contains('flipped')) {
+    // 1ª vez: revelar verso
+    flipSrsCard()
+  } else {
+    // 2ª vez: avaliar como "Bom"
+    const card = window._srsCurrentCard
+    if (card) rateSrsCardAndNext(card.id, 3)
+  }
+})
+
 // Re-renderiza apenas o back do card em revisão (sem resetar o flip)
 async function renderSrsCardBack() {
   const card = window._srsCurrentCard; if (!card) return
@@ -4138,23 +4191,62 @@ function rateSrsCardAndNext(cardId, rating) {
   if (!card) return
   const wasNew = card.state === 'new'
 
+  // Snapshot do estado ANTES de avaliar (para undo)
+  const prevState = JSON.parse(JSON.stringify(card))
+  const ratingLabels = {1:'again',2:'hard',3:'good',4:'easy'}
+
   rateSrsCard(cardId, rating)
 
   if (srsSession) {
+    srsSession.history.push({ cardId, rating, ratingLabel: ratingLabels[rating], prevState, wasNew })
     srsSession.done++
     if (wasNew) srsSession.newSeen++
     if (rating >= 3) srsSession.correct++
     srsSession.current++
-
-    // Re-queue if learning card not yet graduated
-    const updated = srsCards.find(c => c.id === cardId)
-    if (updated && (updated.state === 'learning' || updated.state === 'relearning')) {
-      // Will come back naturally when due (within session requeue logic)
-    }
   }
 
   updateSrsBadge()
+  renderHistoryStrip()
   renderSrsCard()
+}
+
+function renderHistoryStrip() {
+  const strip = el('srs-history-strip'); if (!strip || !srsSession) return
+  const undoBtn = el('srs-undo-btn')
+  if (undoBtn) undoBtn.disabled = srsSession.history.length === 0
+  // Últimos 8 cards avaliados (mais recente à direita)
+  const recent = srsSession.history.slice(-8)
+  strip.innerHTML = recent.map(h => {
+    const card = srsCards.find(c => c.id === h.cardId)
+    return `<span class="srs-hist-chip ${h.ratingLabel}" title="${card?.word || ''}">${card?.word || '?'}</span>`
+  }).join('')
+}
+
+async function undoLastCard() {
+  if (!srsSession || !srsSession.history.length) return
+  const last = srsSession.history.pop()
+
+  // Restaurar estado do card
+  const idx = srsCards.findIndex(c => c.id === last.cardId)
+  if (idx !== -1) srsCards[idx] = last.prevState
+
+  // Reverter contadores da sessão
+  srsSession.done = Math.max(0, srsSession.done - 1)
+  if (last.wasNew) srsSession.newSeen = Math.max(0, srsSession.newSeen - 1)
+  if (last.rating >= 3) srsSession.correct = Math.max(0, srsSession.correct - 1)
+  srsSession.current = Math.max(0, srsSession.current - 1)
+
+  saveSrsCards()
+  updateSrsBadge()
+  renderHistoryStrip()
+  await renderSrsCard()
+  // Revelar verso automaticamente para o card restaurado
+  const flip = el('srs-flip')
+  if (flip) {
+    flip.classList.add('flipped')
+    const rating = el('srs-rating-area'); if (rating) rating.classList.remove('hidden')
+    const hint = el('srs-flip-hint'); if (hint) hint.textContent = '↩ Ver frente'
+  }
 }
 
 function finishSrsSession() {
@@ -4236,26 +4328,29 @@ async function buildSrsVersoAsync(card) {
 function buildSrsVerso(card, imgData) {
   const TYPE = {word:'vocabulário', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation'}
   const strip = s => String(s||'').replace(/<[^>]*>/g,'')
-  let v = ''
-  if (card.example_pt) v += `<div class="srs-back-translation">"${esc(strip(card.example_pt))}"</div>`
-  v += `<div class="srs-back-word">${esc(card.word)}</div>`
-  if (card.ipa) v += `<div class="srs-back-ipa">${esc(card.ipa)}</div>`
-  v += `<button class="btn btn-ghost btn-sm" style="margin:4px 0 10px" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.word||'')">🔊 ${esc(card.word)}</button>`
-  if (card.type && TYPE[card.type]) v += `<span class="srs-back-type-chip">${TYPE[card.type]}</span>`
-  v += `<div class="srs-back-meaning">${esc(strip(card.meaning_pt))}</div>`
-  if (card.definition_pt) v += `<div class="srs-back-def">${esc(strip(card.definition_pt))}</div>`
+
+  // Coluna de texto (sempre presente)
+  let text = ''
+  // 1. Frase EN no topo
   if (card.example_en) {
-    const exText = strip(card.example_en)
-    v += `<div class="srs-back-example">"${buildSrsFrente(card)}"</div>`
-    v += `<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">🔊 Repetir frase</button>`
+    text += `<div class="srs-back-example">"${buildSrsFrente(card)}"</div>`
+    text += `<button class="btn btn-ghost btn-sm" style="margin:4px 0 10px" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">🔊 Repetir frase</button>`
   }
-  // Imagem (se já gerada)
-  if (imgData) v += `<img src="${imgData}" class="srs-card-image" alt="${esc(card.word)}">`
+  // 2. Tradução PT da frase logo abaixo
+  if (card.example_pt) text += `<div class="srs-back-translation">"${esc(strip(card.example_pt))}"</div>`
+  // 3. Palavra + IPA + áudio + tipo
+  text += `<div class="srs-back-word" style="margin-top:${card.example_en||card.example_pt?'14px':'0'}">${esc(card.word)}</div>`
+  if (card.ipa) text += `<div class="srs-back-ipa">${esc(card.ipa)}</div>`
+  text += `<button class="btn btn-ghost btn-sm" style="margin:4px 0 10px" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.word||'')">🔊 ${esc(card.word)}</button>`
+  if (card.type && TYPE[card.type]) text += `<span class="srs-back-type-chip">${TYPE[card.type]}</span>`
+  // 4. Significado + definição
+  text += `<div class="srs-back-meaning">${esc(strip(card.meaning_pt))}</div>`
+  if (card.definition_pt) text += `<div class="srs-back-def">${esc(strip(card.definition_pt))}</div>`
+  // Footer + configurações (sempre na coluna de texto)
   const SRC = {series:'série', movie:'filme', youtube:'YouTube', kindle:'Kindle', podcast:'podcast', website:'site', manual:'manual'}
   const deckLabel = card.deckId ? getSrsDeckPath(card.deckId) : ''
-  v += `<div class="srs-back-footer">${esc(SRC[card.source_type]||card.source_type||'')}${deckLabel ? ' · ' + esc(deckLabel) : ''}</div>`
-  // Botão Configurações (collapsível, quase imperceptível)
-  v += `<details class="srs-card-settings" onclick="event.stopPropagation()">
+  text += `<div class="srs-back-footer">${esc(SRC[card.source_type]||card.source_type||'')}${deckLabel ? ' · ' + esc(deckLabel) : ''}</div>`
+  text += `<details class="srs-card-settings" onclick="event.stopPropagation()">
     <summary>configurações</summary>
     <div class="srs-card-settings-body">
       <button class="btn btn-ghost btn-sm" style="font-size:0.8rem"
@@ -4265,7 +4360,17 @@ function buildSrsVerso(card, imgData) {
       </button>
     </div>
   </details>`
-  return v
+
+  // Layout: se tem imagem → duas colunas (texto | imagem)
+  if (imgData) {
+    return `<div class="srs-back-with-image">
+      <div class="srs-back-text-col">${text}</div>
+      <div class="srs-back-image-col">
+        <img src="${imgData}" alt="${esc(card.word)}" style="width:200px;height:200px;border-radius:12px;object-fit:cover;border:1px solid var(--border)">
+      </div>
+    </div>`
+  }
+  return text
 }
 
 // ---- SRS Config Modal ----
