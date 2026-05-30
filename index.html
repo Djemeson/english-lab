@@ -447,7 +447,7 @@ select option{background:var(--surface)}
 .srs-dash-card.streak .sdc-value{color:var(--warning)}
 
 /* Study session */
-.srs-session-wrap{max-width:980px;margin:0 auto}
+.srs-session-wrap{max-width:800px;margin:0 auto}
 /* Navegação de histórico */
 .srs-history-nav{display:flex;align-items:center;gap:8px;margin-bottom:12px;min-height:24px}
 .srs-hist-nav-btn{
@@ -466,21 +466,18 @@ select option{background:var(--surface)}
 /* Rating buttons desabilitados no modo histórico */
 .srs-rate-buttons.history-mode .srs-rate-btn{opacity:0.35;cursor:default;pointer-events:none}
 /* Layout verso com imagem ao lado */
-/* Layout estudo: card de texto + painel de imagem lado a lado */
-.srs-study-layout{display:flex;gap:16px;align-items:flex-start;margin-bottom:0}
-.srs-study-card-col{flex:1;min-width:0}
-.srs-study-image-panel{
-  width:280px;flex-shrink:0;
-  border-radius:var(--radius);border:1px solid var(--border);
-  overflow:hidden;background:var(--surface2);
-  display:flex;flex-direction:column
+/* Layout verso com imagem dentro do card */
+.srs-card-face.has-image{padding:0!important;overflow:hidden}
+.srs-back-with-image{display:grid;grid-template-columns:1fr 220px;align-items:stretch;width:100%;min-height:260px}
+.srs-back-text-col{padding:24px 28px;overflow-y:auto;min-width:0}
+.srs-back-image-col{
+  border-left:1px solid var(--border);
+  padding:16px;display:flex;align-items:center;justify-content:center;
+  background:var(--surface2)
 }
-.srs-study-image-panel img{
-  width:100%;aspect-ratio:1/1;object-fit:cover;display:block
-}
-.srs-study-image-label{
-  font-size:0.7rem;color:var(--text3);text-align:center;padding:6px;
-  border-top:1px solid var(--border)
+.srs-back-image-col img{
+  width:100%;aspect-ratio:1/1;object-fit:cover;
+  border-radius:10px;display:block
 }
 /* Biblioteca preview — imagem abaixo do texto */
 .bpp-card-image{
@@ -4202,37 +4199,24 @@ async function renderSrsCard() {
       <span class="srb-interval">${previewInterval(card, b.r)}</span>
     </button>`).join('')
 
-  // Obtém imagem separadamente do verso
-  const imgData = await ImageDB.get(imageKey(card))
-  const imagePanelHtml = imgData ? `
-    <div class="srs-study-image-panel" id="srs-image-panel">
-      <img src="${imgData}" alt="${esc(card.word)}">
-      <div class="srs-study-image-label">${esc(card.word)}</div>
-    </div>` : ''
-
   el('srs-card-area').innerHTML = `
-  <div class="srs-study-layout">
-    <div class="srs-study-card-col">
-      <div class="srs-flip-card" id="srs-flip" onclick="flipSrsCard()">
-        <div class="srs-flip-inner">
-          <div class="srs-card-face srs-card-front">
-            <div class="srs-card-front-word">${esc(card.word)}</div>
-            ${frente ? `<div class="srs-card-front-sentence">${frente}</div>` : ''}
-            <div style="display:flex;align-items:center;gap:12px;margin-top:18px">
-              <div class="srs-card-front-hint">Clique para revelar</div>
-              <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:0.8rem"
-                onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">
-                🔊 Repetir
-              </button>
-            </div>
-          </div>
-          <div class="srs-card-face srs-card-back">
-            <div class="srs-card-back-body">${verso}</div>
-          </div>
+  <div class="srs-flip-card" id="srs-flip" onclick="flipSrsCard()">
+    <div class="srs-flip-inner">
+      <div class="srs-card-face srs-card-front">
+        <div class="srs-card-front-word">${esc(card.word)}</div>
+        ${frente ? `<div class="srs-card-front-sentence">${frente}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:12px;margin-top:18px">
+          <div class="srs-card-front-hint">Clique para revelar</div>
+          <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:0.8rem"
+            onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">
+            🔊 Repetir
+          </button>
         </div>
       </div>
+      <div class="srs-card-face srs-card-back${verso.includes('data-has-image') ? ' has-image' : ''}">
+        <div class="srs-card-back-body">${verso}</div>
+      </div>
     </div>
-    ${imagePanelHtml}
   </div>
   <div class="srs-rate-buttons hidden" id="srs-rating-area">
     ${ratingBtns}
@@ -4276,24 +4260,12 @@ document.addEventListener('keydown', e => {
 // Re-renderiza apenas o back do card em revisão (sem resetar o flip)
 async function renderSrsCardBack() {
   const card = window._srsCurrentCard; if (!card) return
+  const verso = await buildSrsVersoAsync(card)
   const body = document.querySelector('.srs-card-back-body'); if (!body) return
-  body.innerHTML = await buildSrsVersoAsync(card)
-  // Atualiza também o painel de imagem externo se existir
-  const imgData = await ImageDB.get(imageKey(card))
-  let panel = el('srs-image-panel')
-  if (imgData && !panel) {
-    // Cria painel se não existe
-    const layout = document.querySelector('.srs-study-layout')
-    if (layout) {
-      layout.insertAdjacentHTML('beforeend', `
-        <div class="srs-study-image-panel" id="srs-image-panel">
-          <img src="${imgData}" alt="${esc(card.word)}">
-          <div class="srs-study-image-label">${esc(card.word)}</div>
-        </div>`)
-    }
-  } else if (imgData && panel) {
-    panel.querySelector('img').src = imgData
-  }
+  body.innerHTML = verso
+  // Atualiza classe has-image no face do card
+  const backFace = body.closest('.srs-card-back')
+  if (backFace) backFace.classList.toggle('has-image', verso.includes('data-has-image'))
 }
 
 function rateSrsCardAndNext(cardId, rating) {
@@ -4388,26 +4360,14 @@ async function renderHistoryOrCurrent() {
   ].map(b => `<button class="srs-rate-btn ${b.cls}" disabled style="opacity:.35;cursor:default">
     <span class="srb-label">${b.label}</span></button>`).join('')
 
-  const histImgData = await ImageDB.get(imageKey(card))
-  const histImgPanel = histImgData ? `
-    <div class="srs-study-image-panel">
-      <img src="${histImgData}" alt="${esc(card.word)}">
-      <div class="srs-study-image-label">${esc(card.word)}</div>
-    </div>` : ''
-
   el('srs-card-area').innerHTML = `
-  <div class="srs-study-layout">
-    <div class="srs-study-card-col">
-      <div class="srs-flip-card flipped" id="srs-flip" style="cursor:default">
-        <div class="srs-flip-inner">
-          <div class="srs-card-face srs-card-front" style="display:none">${frente}</div>
-          <div class="srs-card-face srs-card-back" style="display:flex;animation:none">
-            <div class="srs-card-back-body">${verso}</div>
-          </div>
-        </div>
+  <div class="srs-flip-card flipped" id="srs-flip" style="cursor:default">
+    <div class="srs-flip-inner">
+      <div class="srs-card-face srs-card-front" style="display:none">${frente}</div>
+      <div class="srs-card-face srs-card-back${verso.includes('data-has-image') ? ' has-image' : ''}" style="display:flex;animation:none">
+        <div class="srs-card-back-body">${verso}</div>
       </div>
     </div>
-    ${histImgPanel}
   </div>
   <div class="srs-rate-buttons history-mode" id="srs-rating-area" style="display:flex">
     ${ratingBtns}
@@ -4560,10 +4520,15 @@ function buildSrsVerso(card, imgData) {
     </div>
   </details>`
 
-  // Imagem não é mais renderizada dentro do verso — é painel externo em renderSrsCard
-  // Em contextos sem painel externo (biblioteca preview), imgData ainda pode ser passado
+  // Imagem dentro do card: grid texto|imagem. Sem imagem: só texto.
+  // Em contextos de preview de biblioteca: imgData como faixa abaixo do texto
   if (imgData) {
-    text += `<img src="${imgData}" class="bpp-card-image" alt="${esc(card.word)}">`
+    return `<div class="srs-back-with-image" data-has-image="1">
+      <div class="srs-back-text-col">${text}</div>
+      <div class="srs-back-image-col">
+        <img src="${imgData}" alt="${esc(card.word)}">
+      </div>
+    </div>`
   }
   return text
 }
