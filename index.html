@@ -1156,6 +1156,7 @@ select option{background:var(--surface)}
         <button class="btn btn-secondary btn-sm" onclick="exportData()">📥 Exportar JSON</button>
         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click()">📤 Importar JSON</button>
         <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(this)">
+        <button class="btn btn-secondary btn-sm" onclick="clearKindleSeen()">📖 Resetar histórico Kindle</button>
         <button class="btn btn-danger btn-sm" onclick="clearAllData()">🗑 Limpar tudo</button>
       </div>
     </div>
@@ -1266,7 +1267,7 @@ select option{background:var(--surface)}
 // ================================================================
 // STATE & STORAGE
 // ================================================================
-const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks' }
+const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen' }
 
 const DEF_CFG = {
   aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
@@ -1451,20 +1452,53 @@ function addManual() {
 // ================================================================
 // KINDLE PARSER — HTML/TXT/CSV
 // ================================================================
+// Hash simples para identificar um highlight (baseado no texto)
+function kindleHighlightHash(text) {
+  let h = 0
+  for (let i = 0; i < Math.min(text.length, 200); i++)
+    h = (Math.imul(31, h) + text.charCodeAt(i)) | 0
+  return Math.abs(h).toString(36)
+}
+
+function loadKindleSeen() {
+  try { return new Set(JSON.parse(localStorage.getItem(SK.kindleSeen) || '[]')) } catch { return new Set() }
+}
+
+function saveKindleSeen(seen) {
+  localStorage.setItem(SK.kindleSeen, JSON.stringify([...seen]))
+}
+
+function markKindleItemsAsSeen(items) {
+  const seen = loadKindleSeen()
+  items.forEach(item => seen.add(kindleHighlightHash(item.context || item.word)))
+  saveKindleSeen(seen)
+}
+
 function handleKindleFile(input) {
   const file = input.files[0]; if (!file) return
   const reader = new FileReader()
   reader.onload = e => {
     const text = e.target.result
     const name = file.name.toLowerCase()
+    let allItems
     if (name.endsWith('.html') || name.endsWith('.htm')) {
-      kindleItems = parseKindleHTML(text)
+      allItems = parseKindleHTML(text)
     } else if (name.endsWith('.csv')) {
-      kindleItems = parseKindleCSV(text)
+      allItems = parseKindleCSV(text)
     } else {
-      kindleItems = parseKindleClippings(text)
+      allItems = parseKindleClippings(text)
     }
-    renderKindleList()
+
+    // Filtrar highlights já processados
+    const seen = loadKindleSeen()
+    const newItems = allItems.filter(item => {
+      const hash = kindleHighlightHash(item.context || item.word)
+      return !seen.has(hash)
+    })
+    const skipped = allItems.length - newItems.length
+
+    kindleItems = newItems
+    renderKindleList(skipped, allItems.length)
   }
   reader.readAsText(file, 'utf-8')
   input.value = ''
@@ -1529,9 +1563,11 @@ function resetKindleUpload() {
   el('kindle-file').value = ''
 }
 
-function renderKindleList() {
+function renderKindleList(skipped, total) {
   const list = el('kindle-list')
-  el('kindle-count').textContent = `${kindleItems.length} destaques`
+  const skipInfo = skipped > 0 ? ` · ${skipped} já processados ignorados` : ''
+  const totalInfo = total && total !== kindleItems.length ? ` (${total} no arquivo)` : ''
+  el('kindle-count').textContent = `${kindleItems.length} novos destaques${skipInfo}${totalInfo}`
   el('kindle-drop').classList.add('hidden')
   el('kindle-result').classList.remove('hidden')
   list.innerHTML = kindleItems.map((item, i) => {
@@ -1797,6 +1833,8 @@ function addKindleSelected() {
   if (!sel.length) { toast('Selecione pelo menos um item', 'warning'); return }
   sel.forEach(item => createWord(item))
   saveWords(); renderDashboard()
+  // Marca os itens adicionados como processados para futuras importações
+  markKindleItemsAsSeen(sel)
   toast(`${sel.length} itens adicionados à fila!`, 'success')
   resetKindleUpload()
 }
@@ -2937,12 +2975,19 @@ function importData(input) {
   reader.readAsText(file); input.value = ''
 }
 
+function clearKindleSeen() {
+  if (!confirm('Resetar histórico do Kindle?\nOs destaques já adicionados voltarão a aparecer na próxima importação.')) return
+  localStorage.removeItem(SK.kindleSeen)
+  toast('Histórico Kindle resetado. Próxima importação mostrará todos os destaques.', 'info')
+}
+
 async function clearAllData() {
   if (!confirm('⚠️ Apagar TODOS os dados?\n\nIsso inclui:\n• Palavras e revisões\n• Cards SRS e progresso\n• Áudios gerados\n• Imagens geradas\n• Configurações\n\nFaça um backup antes.')) return
   if (!confirm('Confirma? Esta ação é IRREVERSÍVEL.')) return
 
   // localStorage
   Object.values(SK).forEach(k => localStorage.removeItem(k))
+  localStorage.removeItem('el-kindle-seen')
   localStorage.removeItem('englab_cfg')
 
   // IndexedDB — áudio e imagens
