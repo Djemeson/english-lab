@@ -447,7 +447,7 @@ select option{background:var(--surface)}
 .srs-dash-card.streak .sdc-value{color:var(--warning)}
 
 /* Study session */
-.srs-session-wrap{max-width:700px;margin:0 auto}
+.srs-session-wrap{max-width:980px;margin:0 auto}
 /* Navegação de histórico */
 .srs-history-nav{display:flex;align-items:center;gap:8px;margin-bottom:12px;min-height:24px}
 .srs-hist-nav-btn{
@@ -466,18 +466,59 @@ select option{background:var(--surface)}
 /* Rating buttons desabilitados no modo histórico */
 .srs-rate-buttons.history-mode .srs-rate-btn{opacity:0.35;cursor:default;pointer-events:none}
 /* Layout verso com imagem ao lado */
-/* Layout lado-a-lado: card sem padding, imagem ocupa altura total */
-.srs-card-face.srs-card-back.has-image{padding:0;overflow:hidden}
-.srs-back-with-image{display:grid;grid-template-columns:1fr 260px;align-items:stretch;width:100%;min-height:280px}
-.srs-back-text-col{padding:24px 28px;overflow-y:auto;min-width:0}
-.srs-back-image-col{
-  border-left:1px solid var(--border);
-  border-radius:0 var(--radius) var(--radius) 0;
-  overflow:hidden;background:var(--surface2)
+/* Layout estudo: card de texto + painel de imagem lado a lado */
+.srs-study-layout{display:flex;gap:16px;align-items:flex-start;margin-bottom:0}
+.srs-study-card-col{flex:1;min-width:0}
+.srs-study-image-panel{
+  width:280px;flex-shrink:0;
+  border-radius:var(--radius);border:1px solid var(--border);
+  overflow:hidden;background:var(--surface2);
+  display:flex;flex-direction:column
 }
-.srs-back-image-col img{
-  width:100%;height:100%;object-fit:cover;display:block;border-radius:0
+.srs-study-image-panel img{
+  width:100%;aspect-ratio:1/1;object-fit:cover;display:block
 }
+.srs-study-image-label{
+  font-size:0.7rem;color:var(--text3);text-align:center;padding:6px;
+  border-top:1px solid var(--border)
+}
+/* Biblioteca preview — imagem abaixo do texto */
+.bpp-card-image{
+  width:100%;aspect-ratio:16/9;object-fit:cover;
+  border-radius:var(--radius-sm);margin-top:10px;display:block
+}
+/* Chat consulta */
+.consulta-wrap{display:flex;flex-direction:column;height:calc(100vh - 280px);min-height:400px}
+.consulta-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.consulta-msg{max-width:90%;line-height:1.6;font-size:0.9rem}
+.consulta-msg.user{
+  align-self:flex-end;background:var(--primary);color:#fff;
+  padding:10px 14px;border-radius:16px 16px 4px 16px
+}
+.consulta-msg.ai{
+  align-self:flex-start;background:var(--surface2);border:1px solid var(--border);
+  padding:12px 16px;border-radius:4px 16px 16px 16px;color:var(--text)
+}
+.consulta-msg.ai .consulta-add-btn{
+  display:inline-block;margin-top:10px;font-size:0.78rem;
+  padding:4px 12px;border-radius:20px;cursor:pointer;
+  background:var(--success);color:#fff;border:none
+}
+.consulta-input-row{
+  display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);
+  background:var(--surface)
+}
+.consulta-input-row input{
+  flex:1;padding:10px 14px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text);font-size:0.9rem;outline:none
+}
+.consulta-input-row input:focus{border-color:var(--primary)}
+.consulta-empty{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;color:var(--text3);text-align:center;padding:32px
+}
+.consulta-empty .icon{font-size:2.5rem}
 /* Undo button */
 .srs-undo-btn{
   font-size:0.78rem;color:var(--text3);background:none;border:none;
@@ -747,6 +788,7 @@ select option{background:var(--surface)}
     <button class="tab" onclick="showTab('kindle')">📖 Kindle</button>
     <button class="tab" onclick="showTab('midia')">🎬 Mídia</button>
     <button class="tab" onclick="showTab('site')">🌐 Website</button>
+    <button class="tab" onclick="showTab('consulta')">💬 Consulta</button>
   </div>
 
   <!-- TAB MANUAL -->
@@ -882,6 +924,29 @@ select option{background:var(--surface)}
         </div>
       </div>
       <div class="parsed-list" id="site-list"></div>
+    </div>
+  </div>
+
+  <!-- TAB CONSULTA -->
+  <div class="tab-panel" id="panel-consulta">
+    <div class="info-box">
+      Tire dúvidas pontuais de inglês — significados, uso, contexto. Se gostar, adicione ao SRS com um clique.
+    </div>
+    <div class="consulta-wrap" id="consulta-wrap">
+      <div class="consulta-messages" id="consulta-messages">
+        <div class="consulta-empty" id="consulta-empty">
+          <div class="icon">💬</div>
+          <p style="font-weight:600">Pergunte qualquer coisa em inglês</p>
+          <p style="font-size:0.85rem">Ex: "O que significa breaking bad?", "Como usar nevertheless?", "Diferença entre speak e talk"</p>
+        </div>
+      </div>
+      <div class="consulta-input-row">
+        <input type="text" id="consulta-input"
+          placeholder="O que significa... / Como usar... / Diferença entre..."
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendConsulta()}">
+        <button class="btn btn-primary" onclick="sendConsulta()" id="consulta-send-btn">Perguntar</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearConsulta()" title="Limpar conversa">🗑</button>
+      </div>
     </div>
   </div>
 </section>
@@ -4137,24 +4202,37 @@ async function renderSrsCard() {
       <span class="srb-interval">${previewInterval(card, b.r)}</span>
     </button>`).join('')
 
+  // Obtém imagem separadamente do verso
+  const imgData = await ImageDB.get(imageKey(card))
+  const imagePanelHtml = imgData ? `
+    <div class="srs-study-image-panel" id="srs-image-panel">
+      <img src="${imgData}" alt="${esc(card.word)}">
+      <div class="srs-study-image-label">${esc(card.word)}</div>
+    </div>` : ''
+
   el('srs-card-area').innerHTML = `
-  <div class="srs-flip-card" id="srs-flip" onclick="flipSrsCard()">
-    <div class="srs-flip-inner">
-      <div class="srs-card-face srs-card-front">
-        <div class="srs-card-front-word">${esc(card.word)}</div>
-        ${frente ? `<div class="srs-card-front-sentence">${frente}</div>` : ''}
-        <div style="display:flex;align-items:center;gap:12px;margin-top:18px">
-          <div class="srs-card-front-hint">Clique para revelar</div>
-          <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:0.8rem"
-            onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">
-            🔊 Repetir
-          </button>
+  <div class="srs-study-layout">
+    <div class="srs-study-card-col">
+      <div class="srs-flip-card" id="srs-flip" onclick="flipSrsCard()">
+        <div class="srs-flip-inner">
+          <div class="srs-card-face srs-card-front">
+            <div class="srs-card-front-word">${esc(card.word)}</div>
+            ${frente ? `<div class="srs-card-front-sentence">${frente}</div>` : ''}
+            <div style="display:flex;align-items:center;gap:12px;margin-top:18px">
+              <div class="srs-card-front-hint">Clique para revelar</div>
+              <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:0.8rem"
+                onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">
+                🔊 Repetir
+              </button>
+            </div>
+          </div>
+          <div class="srs-card-face srs-card-back">
+            <div class="srs-card-back-body">${verso}</div>
+          </div>
         </div>
       </div>
-      <div class="srs-card-face srs-card-back${verso.includes('data-has-image') ? ' has-image' : ''}">
-        <div class="srs-card-back-body">${verso}</div>
-      </div>
     </div>
+    ${imagePanelHtml}
   </div>
   <div class="srs-rate-buttons hidden" id="srs-rating-area">
     ${ratingBtns}
@@ -4200,6 +4278,22 @@ async function renderSrsCardBack() {
   const card = window._srsCurrentCard; if (!card) return
   const body = document.querySelector('.srs-card-back-body'); if (!body) return
   body.innerHTML = await buildSrsVersoAsync(card)
+  // Atualiza também o painel de imagem externo se existir
+  const imgData = await ImageDB.get(imageKey(card))
+  let panel = el('srs-image-panel')
+  if (imgData && !panel) {
+    // Cria painel se não existe
+    const layout = document.querySelector('.srs-study-layout')
+    if (layout) {
+      layout.insertAdjacentHTML('beforeend', `
+        <div class="srs-study-image-panel" id="srs-image-panel">
+          <img src="${imgData}" alt="${esc(card.word)}">
+          <div class="srs-study-image-label">${esc(card.word)}</div>
+        </div>`)
+    }
+  } else if (imgData && panel) {
+    panel.querySelector('img').src = imgData
+  }
 }
 
 function rateSrsCardAndNext(cardId, rating) {
@@ -4294,14 +4388,26 @@ async function renderHistoryOrCurrent() {
   ].map(b => `<button class="srs-rate-btn ${b.cls}" disabled style="opacity:.35;cursor:default">
     <span class="srb-label">${b.label}</span></button>`).join('')
 
+  const histImgData = await ImageDB.get(imageKey(card))
+  const histImgPanel = histImgData ? `
+    <div class="srs-study-image-panel">
+      <img src="${histImgData}" alt="${esc(card.word)}">
+      <div class="srs-study-image-label">${esc(card.word)}</div>
+    </div>` : ''
+
   el('srs-card-area').innerHTML = `
-  <div class="srs-flip-card flipped" id="srs-flip" style="cursor:default">
-    <div class="srs-flip-inner">
-      <div class="srs-card-face srs-card-front" style="display:none">${frente}</div>
-      <div class="srs-card-face srs-card-back${verso.includes('data-has-image') ? ' has-image' : ''}" style="display:flex;animation:none">
-        <div class="srs-card-back-body">${verso}</div>
+  <div class="srs-study-layout">
+    <div class="srs-study-card-col">
+      <div class="srs-flip-card flipped" id="srs-flip" style="cursor:default">
+        <div class="srs-flip-inner">
+          <div class="srs-card-face srs-card-front" style="display:none">${frente}</div>
+          <div class="srs-card-face srs-card-back" style="display:flex;animation:none">
+            <div class="srs-card-back-body">${verso}</div>
+          </div>
+        </div>
       </div>
     </div>
+    ${histImgPanel}
   </div>
   <div class="srs-rate-buttons history-mode" id="srs-rating-area" style="display:flex">
     ${ratingBtns}
@@ -4454,16 +4560,10 @@ function buildSrsVerso(card, imgData) {
     </div>
   </details>`
 
-  // Layout: se tem imagem → duas colunas (texto | imagem)
-  // Marca o card-back com has-image para CSS remover padding
+  // Imagem não é mais renderizada dentro do verso — é painel externo em renderSrsCard
+  // Em contextos sem painel externo (biblioteca preview), imgData ainda pode ser passado
   if (imgData) {
-    // Adiciona classe ao container pai via flag no HTML
-    return `<div class="srs-back-with-image" data-has-image="1">
-      <div class="srs-back-text-col">${text}</div>
-      <div class="srs-back-image-col">
-        <img src="${imgData}" alt="${esc(card.word)}">
-      </div>
-    </div>`
+    text += `<img src="${imgData}" class="bpp-card-image" alt="${esc(card.word)}">`
   }
   return text
 }
@@ -4513,6 +4613,154 @@ async function checkAnkiOnLoad() {
       }
     }
   }
+}
+
+// ================================================================
+// CONSULTA AI — chat de dúvidas pontuais de inglês
+// ================================================================
+let _consultaHistory = []  // {role, content}
+
+async function sendConsulta() {
+  const input = el('consulta-input')
+  const question = input?.value.trim()
+  if (!question) return
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+
+  input.value = ''
+  input.disabled = true
+  el('consulta-send-btn').disabled = true
+
+  // Esconde empty state
+  const empty = el('consulta-empty')
+  if (empty) empty.style.display = 'none'
+
+  // Adiciona mensagem do usuário
+  appendConsultaMsg('user', esc(question))
+
+  // Adiciona à conversa
+  _consultaHistory.push({ role: 'user', content: question })
+
+  // Loading indicator
+  const loadId = 'cload-' + Date.now()
+  const msgs = el('consulta-messages')
+  msgs.insertAdjacentHTML('beforeend',
+    `<div class="consulta-msg ai" id="${loadId}" style="opacity:.5;font-style:italic">Analisando...</div>`)
+  msgs.scrollTop = msgs.scrollHeight
+
+  try {
+    const systemPrompt = `Você é um especialista em inglês ajudando um brasileiro a aprender. 
+Quando o usuário perguntar sobre uma palavra ou expressão em inglês:
+1. Explique o significado em português de forma clara
+2. Mostre a pronúncia (IPA entre barras: //)
+3. Dê 2-3 exemplos de uso em inglês com tradução
+4. Adicione contexto útil (origem, registros formal/informal, diferenças de uso)
+5. No FINAL da resposta, sempre inclua um bloco JSON assim (mesmo que o usuário pergunte sobre múltiplas coisas, escolha a mais relevante):
+<srs_item>
+{"word":"...","type":"word|phrasal_verb|idiom|collocation","meaning_pt":"...","ipa":"...","example_en":"...","example_pt":"...","definition_pt":"..."}
+</srs_item>
+Responda sempre em português (exceto os exemplos em inglês). Seja claro e didático.`
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: cfg.aiModel || 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ..._consultaHistory
+        ],
+        temperature: 0.7
+      })
+    })
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || res.status) }
+    const data = await res.json()
+    const reply = data.choices[0].message.content
+
+    _consultaHistory.push({ role: 'assistant', content: reply })
+
+    // Remove loading
+    el(loadId)?.remove()
+
+    // Extrai bloco SRS se existir
+    const srsMatch = reply.match(/<srs_item>\s*([\s\S]*?)\s*<\/srs_item>/)
+    let srsItem = null
+    if (srsMatch) {
+      try { srsItem = JSON.parse(srsMatch[1]) } catch {}
+    }
+    // Exibe resposta sem o bloco JSON
+    const cleanReply = reply.replace(/<srs_item>[\s\S]*?<\/srs_item>/g, '').trim()
+    appendConsultaMsg('ai', formatConsultaReply(cleanReply), srsItem)
+
+  } catch(e) {
+    el(loadId)?.remove()
+    appendConsultaMsg('ai', `❌ Erro: ${esc(e.message)}`, null)
+    _consultaHistory.pop()
+  } finally {
+    if (input) { input.disabled = false; input.focus() }
+    const btn = el('consulta-send-btn'); if (btn) btn.disabled = false
+  }
+}
+
+function formatConsultaReply(text) {
+  // Markdown básico: **bold**, *italic*, listas
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code style="background:var(--surface3);padding:1px 4px;border-radius:3px">$1</code>')
+    .replace(/^[-•] (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/s,'<ul style="padding-left:16px;margin:6px 0">$1</ul>')
+    .replace(/\n/g,'<br>')
+}
+
+function appendConsultaMsg(role, html, srsItem) {
+  const msgs = el('consulta-messages')
+  const addBtn = srsItem
+    ? `<br><button class="consulta-add-btn" onclick='addConsultaItemToSrs(${JSON.stringify(JSON.stringify(srsItem))})'>➕ Adicionar ao SRS</button>`
+    : ''
+  msgs.insertAdjacentHTML('beforeend',
+    `<div class="consulta-msg ${role}">${html}${addBtn}</div>`)
+  msgs.scrollTop = msgs.scrollHeight
+}
+
+function addConsultaItemToSrs(jsonStr) {
+  try {
+    const item = JSON.parse(jsonStr)
+    if (!item.word) { toast('Sem palavra para adicionar', 'warning'); return }
+    // Cria palavra na lista
+    const w = createWord({
+      word: item.word,
+      context: item.example_en || '',
+      source_type: 'manual'
+    })
+    // Adiciona significado pré-processado
+    w.meanings = [{
+      meaning_pt: item.meaning_pt || '',
+      definition_pt: item.definition_pt || '',
+      examples: item.example_en ? [{ en: item.example_en, pt: item.example_pt || '' }] : [],
+      selected: true
+    }]
+    w.ipa = item.ipa || ''
+    w.type = item.type || 'word'
+    w.status = 'pending_review'
+    w.ai_processed = true
+    saveWords()
+    renderDashboard()
+    updateSrsBadge()
+    // Salvar direto no SRS
+    saveToSrs(w.id)
+    toast(`"${item.word}" adicionado ao SRS!`, 'success')
+  } catch(e) { toast('Erro ao adicionar: ' + e.message, 'error') }
+}
+
+function clearConsulta() {
+  _consultaHistory = []
+  const msgs = el('consulta-messages')
+  if (msgs) msgs.innerHTML = `<div class="consulta-empty" id="consulta-empty">
+    <div class="icon">💬</div>
+    <p style="font-weight:600">Pergunte qualquer coisa em inglês</p>
+    <p style="font-size:0.85rem">Ex: "O que significa breaking bad?", "Como usar nevertheless?", "Diferença entre speak e talk"</p>
+  </div>`
 }
 
 function init() {
