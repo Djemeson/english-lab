@@ -72,9 +72,15 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .anki-dot.on{background:var(--success)}
 
 /* ===== LAYOUT ===== */
-.main{max-width:1000px;margin:0 auto;padding:32px 24px}
+.main{max-width:1200px;margin:0 auto;padding:32px 24px}
 .section{display:none}
 .section.active{display:block}
+/* Estudar usa full width para a biblioteca */
+#section-estudar.active{display:block}
+#section-estudar .srs-library-wrap{
+  margin: 0 calc(-24px + max(0px, (100vw - 1200px)/2 * -1));
+  width: 100%;
+}
 .page-header{margin-bottom:28px}
 .page-header h1{font-size:1.5rem;font-weight:700}
 .page-header p{color:var(--text2);margin-top:4px;font-size:0.95rem}
@@ -89,6 +95,23 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .stat-card.green .stat-value{color:var(--success)}
 .stat-card.yellow .stat-value{color:var(--warning)}
 .stat-card.purple .stat-value{color:var(--purple)}
+.stat-card.orange .stat-value{color:#e67e22}
+.stat-card.teal .stat-value{color:#1abc9c}
+.stat-card.red .stat-value{color:#e74c3c}
+.stat-card.gray .stat-value{color:var(--text2)}
+.stats-section-label{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--text3);margin:20px 0 10px}
+/* Deck focus panel */
+.deck-focus-panel{background:var(--surface2);border:1px solid var(--primary);border-radius:var(--radius);
+  padding:20px 24px;margin:12px 0 8px;animation:srsReveal .2s ease}
+.deck-focus-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:14px}
+.deck-focus-stats{display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap}
+.dfs-item{display:flex;flex-direction:column;align-items:center;min-width:60px}
+.dfs-value{font-size:1.6rem;font-weight:700;line-height:1}
+.dfs-label{font-size:0.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+.srs-deck-table tr.deck-row-clickable{cursor:pointer}
+.srs-deck-table tr.deck-row-clickable:hover td{background:rgba(var(--primary-rgb),.08)}
+.srs-deck-table tr.deck-row-selected td{background:rgba(var(--primary-rgb),.12)}
 
 /* ===== RECENT LIST ===== */
 .card-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
@@ -395,6 +418,10 @@ select option{background:var(--surface)}
 .hidden{display:none!important}
 .mt-2{margin-top:8px}.mt-4{margin-top:16px}.mb-4{margin-bottom:16px}
 .text-muted{color:var(--text2)}.text-sm{font-size:0.85rem}
+@media(max-width:900px){
+  #section-estudar .srs-library-grid{grid-template-columns:180px 1fr !important}
+  .browser-preview-panel{display:none}
+}
 @media(max-width:700px){
   .stats-grid{grid-template-columns:1fr 1fr}
   .review-layout{grid-template-columns:1fr}
@@ -425,23 +452,18 @@ select option{background:var(--surface)}
 .srs-progress-bar{height:100%;background:var(--primary);border-radius:2px;transition:width .4s ease}
 
 /* Flip card */
-.srs-flip-card{
-  perspective:1000px;margin-bottom:20px;cursor:pointer;
-}
-.srs-flip-inner{
-  position:relative;min-height:260px;
-  transform-style:preserve-3d;transition:transform .45s cubic-bezier(.4,0,.2,1);
-  border-radius:var(--radius);
-}
-.srs-flip-card.flipped .srs-flip-inner{transform:rotateY(180deg)}
+.srs-flip-card{margin-bottom:20px;cursor:pointer;}
+/* Front: visible by default; Back: hidden until flipped */
 .srs-card-face{
-  position:absolute;width:100%;min-height:260px;
-  backface-visibility:hidden;-webkit-backface-visibility:hidden;
   border-radius:var(--radius);border:1px solid var(--border);
   background:var(--surface);padding:28px 32px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:200px;
 }
-.srs-card-back{transform:rotateY(180deg)}
+.srs-card-back{display:none}
+.srs-flip-card.flipped .srs-card-front{display:none}
+.srs-flip-card.flipped .srs-card-back{display:flex;animation:srsReveal .25s ease}
+@keyframes srsReveal{from{opacity:0;transform:scaleX(.97)}to{opacity:1;transform:scaleX(1)}}
 .srs-card-front-word{
   font-size:2rem;font-weight:700;color:var(--text);text-align:center;margin-bottom:10px;
 }
@@ -473,6 +495,60 @@ select option{background:var(--surface)}
 .srs-back-example b{color:var(--text);font-style:normal}
 .srs-back-example-pt{font-size:0.76rem;color:var(--text3);padding-left:10px;margin-bottom:8px}
 .srs-back-footer{font-size:0.72rem;color:var(--text3);margin-top:10px}
+/* Card image */
+.srs-card-image{max-width:100%;max-height:180px;border-radius:8px;margin:10px auto 0;display:block;object-fit:cover}
+/* Card settings collapsible */
+.srs-card-settings{margin-top:14px;border-top:1px solid var(--border);padding-top:10px}
+.srs-card-settings summary{
+  font-size:0.72rem;color:var(--text3);cursor:pointer;user-select:none;
+  list-style:none;display:flex;align-items:center;gap:4px;outline:none
+}
+.srs-card-settings summary::-webkit-details-marker{display:none}
+.srs-card-settings summary::before{content:'⚙';font-size:0.7rem}
+.srs-card-settings-body{padding-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+/* Browser preview panel */
+.browser-preview-panel{
+  border-left:1px solid var(--border);padding:16px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:12px;background:var(--surface);
+  min-width:0;max-height:calc(100vh - 280px)
+}
+.bpp-empty{display:flex;align-items:center;justify-content:center;
+  height:100%;color:var(--text3);font-size:0.85rem;text-align:center}
+.bpp-card-front{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px;text-align:center
+}
+.bpp-card-back{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px
+}
+.bpp-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--text3);margin-bottom:8px}
+.image-badge-ok{font-size:0.78rem;color:#9b59b6}
+.image-badge-no{font-size:0.78rem;color:var(--text3)}
+/* Generating spinner */
+.gen-spinner{display:inline-block;width:14px;height:14px;
+  border:2px solid var(--border);border-top-color:var(--primary);
+  border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.srs-deck-table{width:100%;border-collapse:collapse;margin:20px 0 8px;font-size:0.9rem}
+.srs-deck-table th{text-align:right;color:var(--text3);font-size:0.75rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;padding:0 12px 8px;border-bottom:1px solid var(--border)}
+.srs-deck-table th:first-child{text-align:left;padding-left:0}
+.srs-deck-table td{padding:7px 12px;border-bottom:1px solid var(--border)}
+.srs-deck-table td:first-child{padding-left:0}
+.srs-deck-table tr:last-child td{border-bottom:none}
+.srs-deck-table tr:hover td{background:var(--surface2)}
+.sdt-name{font-weight:500;cursor:default}
+.sdt-name.root{font-weight:700}
+.sdt-new{color:var(--primary);text-align:right;font-weight:600}
+.sdt-learn{color:#e67e22;text-align:right;font-weight:600}
+.sdt-review{color:var(--success);text-align:right;font-weight:600}
+.sdt-zero{color:var(--text3);text-align:right}
+.srs-deck-table-wrap{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px 20px;margin-bottom:20px}
+.srs-deck-table-wrap h3{font-size:0.8rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--text3);margin:0 0 4px}
 
 /* Rating buttons */
 .srs-rate-buttons{display:flex;gap:10px;justify-content:center}
@@ -524,6 +600,36 @@ select option{background:var(--surface)}
 
 /* Gist settings card */
 .sync-status-row{display:flex;align-items:center;gap:8px;font-size:0.83rem;padding:9px 12px;border-radius:var(--radius-sm);background:var(--surface2);margin-top:10px}
+
+/* ===== SRS CARD BROWSER ===== */
+.srs-browser-deck{
+  display:flex;align-items:center;gap:6px;padding:8px 16px;
+  border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;
+  font-size:0.85rem;
+}
+.srs-browser-deck:hover,.srs-browser-deck.active{background:var(--primary-glow)}
+.srs-browser-deck.active{color:var(--primary)}
+.srs-deck-toggle{font-size:0.7rem;color:var(--text3);flex-shrink:0;width:10px}
+.srs-deck-name{flex:1;font-weight:500}
+.srs-deck-count{font-size:0.7rem;background:var(--surface3);color:var(--text2);border-radius:8px;padding:1px 6px;font-weight:600;}
+.srs-deck-actions{display:none;gap:2px;align-items:center}
+.srs-browser-deck:hover .srs-deck-actions{display:flex}
+.srs-browser-row{display:flex;align-items:center;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);transition:background .1s;}
+.srs-browser-row:hover{background:var(--surface2)}
+.srs-browser-row.selected{background:rgba(var(--primary-rgb),.1)}
+.btn-xs{padding:2px 7px!important;font-size:0.72rem!important;min-width:0}
+.browser-cb{width:15px;height:15px;cursor:pointer;accent-color:var(--primary);flex-shrink:0}
+.browser-toolbar{display:flex;align-items:center;gap:8px;padding:8px 14px;
+  border-bottom:2px solid var(--border);background:var(--surface2);flex-wrap:wrap}
+.browser-toolbar.hidden{display:none}
+.browser-col-hdr{display:flex;align-items:center;gap:6px;padding:6px 14px;
+  border-bottom:1px solid var(--border);background:var(--surface2);
+  font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)}
+.browser-col-hdr span{cursor:pointer;user-select:none;white-space:nowrap}
+.browser-col-hdr span:hover{color:var(--text)}
+.browser-col-hdr .sort-active{color:var(--primary)}
+.audio-badge-ok{font-size:0.78rem;color:var(--success)}
+.audio-badge-no{font-size:0.78rem;color:var(--warning)}
 </style>
 </head>
 <body>
@@ -561,28 +667,7 @@ select option{background:var(--surface)}
     <p>Seu progresso de vocabulário em inglês</p>
   </div>
 
-  <div class="stats-grid">
-    <div class="stat-card blue">
-      <div class="stat-label">Total</div>
-      <div class="stat-value" id="st-total">0</div>
-      <div class="stat-sub">palavras capturadas</div>
-    </div>
-    <div class="stat-card green">
-      <div class="stat-label">No Anki</div>
-      <div class="stat-value" id="st-anki">0</div>
-      <div class="stat-sub" id="st-anki-sub">cards criados</div>
-    </div>
-    <div class="stat-card yellow">
-      <div class="stat-label">Para Revisar</div>
-      <div class="stat-value" id="st-review">0</div>
-      <div class="stat-sub">aguardando você</div>
-    </div>
-    <div class="stat-card purple">
-      <div class="stat-label">Esta Semana</div>
-      <div class="stat-value" id="st-week">0</div>
-      <div class="stat-sub">adicionadas</div>
-    </div>
-  </div>
+  <div id="dash-stats-area"></div>
 
   <div class="quick-add card-box">
     <div class="card-box-header"><h3>⚡ Adição rápida</h3></div>
@@ -869,11 +954,17 @@ select option{background:var(--surface)}
       </div>
       <div class="form-group">
         <label>Deck padrão</label>
-        <input type="text" id="cfg-anki-deck" placeholder="Inglês">
+        <div class="model-row">
+          <select id="cfg-anki-deck-sel" style="flex:1"><option value="">— conecte ao Anki para listar —</option></select>
+          <input type="text" id="cfg-anki-deck" placeholder="Inglês" style="flex:1;display:none">
+        </div>
       </div>
       <div class="form-group">
         <label>Modelo de nota</label>
-        <input type="text" id="cfg-anki-model" placeholder="Inglês Básico">
+        <div class="model-row">
+          <select id="cfg-anki-model-sel" style="flex:1"><option value="">— conecte ao Anki para listar —</option></select>
+          <input type="text" id="cfg-anki-model" placeholder="Inglês Básico" style="flex:1;display:none">
+        </div>
       </div>
       <div id="anki-test-result" class="test-result hidden">
         <div class="test-dot" id="anki-tdot"></div>
@@ -881,6 +972,7 @@ select option{background:var(--surface)}
       </div>
       <div class="btn-group" style="margin-top:12px">
         <button class="btn btn-secondary btn-sm" onclick="testAnki()">Testar conexão</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadAnkiDropdowns()">↻ Atualizar listas</button>
       </div>
     </div>
 
@@ -976,6 +1068,7 @@ select option{background:var(--surface)}
         <div class="sdc-label">Dias de sequência 🔥</div>
       </div>
     </div>
+    <div id="srs-deck-stats"></div>
     <div id="srs-start-area"></div>
     <div style="margin-top:32px" id="srs-all-cards-area"></div>
   </div>
@@ -1038,7 +1131,7 @@ select option{background:var(--surface)}
 // ================================================================
 // STATE & STORAGE
 // ================================================================
-const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log' }
+const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks' }
 
 const DEF_CFG = {
   aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
@@ -1091,21 +1184,67 @@ function showTab(name) {
 // DASHBOARD
 // ================================================================
 function renderDashboard() {
-  const total = words.length
-  const inAnki = words.filter(w => w.status === 'in_anki').length
-  const review = words.filter(w => ['pending_ai','pending_review'].includes(w.status)).length
-  const week = words.filter(w => Date.now() - new Date(w.created_at) < 7*864e5).length
+  loadSrs()
 
-  el('st-total').textContent = total
-  el('st-anki').textContent = inAnki
-  el('st-review').textContent = review
-  el('st-week').textContent = week
+  // --- Vocabulary metrics ---
+  const total   = words.length
+  const inSrs   = words.filter(w => w.status === 'in_srs').length
+  const inAnki  = words.filter(w => w.status === 'in_anki').length
+  const pending = words.filter(w => ['pending_ai','pending_review'].includes(w.status)).length
+  const week    = words.filter(w => Date.now() - new Date(w.created_at) < 7*864e5).length
 
+  // --- SRS metrics ---
+  const dueToday  = srsDueCount()
+  const newToday  = srsNewTodayRemaining()
+  const paraHoje  = dueToday + newToday
+  const streak    = srsStreak()
+
+  const now = nowTs()
+  const tomorrow = now + 864e5
+  const amanha = srsCards.filter(c =>
+    (c.state === 'review' || c.state === 'relearning' || c.state === 'learning') &&
+    c.due > now && c.due <= tomorrow
+  ).length
+
+  const totalReviewed = srsLog.reduce((s,l) => s + (l.reviewed||0), 0)
+  const totalCorrect  = srsLog.reduce((s,l) => s + (l.correct||0), 0)
+  const acerto = totalReviewed > 0 ? Math.round((totalCorrect / totalReviewed) * 100) : 0
+
+  // Render stats
+  const area = el('dash-stats-area')
+  if (area) {
+    function card(color, label, value, sub) {
+      return `<div class="stat-card ${color}">
+        <div class="stat-label">${label}</div>
+        <div class="stat-value">${value}</div>
+        <div class="stat-sub">${sub}</div>
+      </div>`
+    }
+    area.innerHTML = `
+      <div class="stats-section-label">📖 Vocabulário</div>
+      <div class="stats-grid">
+        ${card('blue',   'Total capturado', total,  'palavras e expressões')}
+        ${card('purple', 'No SRS',          inSrs,  'em revisão espaçada')}
+        ${card('green',  'No Anki',         inAnki, 'cards exportados')}
+        ${card('yellow', 'Para processar',  pending,'aguardando revisão')}
+      </div>
+      <div class="stats-section-label">🎴 Revisão Espaçada</div>
+      <div class="stats-grid">
+        ${card('blue',   'Para hoje',   paraHoje,       dueToday + ' revisões · ' + newToday + ' novos')}
+        ${card('orange', 'Amanhã',      amanha,         'cards programados')}
+        ${card('teal',   'Taxa de acerto', acerto + '%', totalReviewed + ' revisões no total')}
+        ${card('yellow', 'Sequência 🔥', streak,        streak === 1 ? 'dia seguido' : 'dias seguidos')}
+      </div>`
+  }
+
+  // Badge
   const badge = el('badge-review')
-  badge.textContent = review
-  badge.classList.toggle('hidden', review === 0)
+  badge.textContent = pending
+  badge.classList.toggle('hidden', pending === 0)
 
+  // Recent list
   const list = el('recent-list')
+  if (!list) return
   if (!words.length) {
     list.innerHTML = `<div class="empty-state"><div class="icon">📖</div><p>Nenhuma palavra ainda.</p></div>`
     return
@@ -1684,6 +1823,169 @@ function updateModelOptions(keepCurrent = false) {
 
 function randomVoice() {
   return OPENAI_VOICES[Math.floor(Math.random() * OPENAI_VOICES.length)]
+}
+
+// ================================================================
+// AUDIO SYSTEM — IndexedDB cache + OpenAI TTS pre-generation
+// ================================================================
+
+// IndexedDB wrapper — sem limite de tamanho, persiste localmente
+const AudioDB = {
+  _db: null,
+  async open() {
+    if (this._db) return this._db
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('english-lab-audio', 1)
+      req.onupgradeneeded = e => e.target.result.createObjectStore('audio')
+      req.onsuccess = e => { this._db = e.target.result; resolve(this._db) }
+      req.onerror = () => reject(req.error)
+    })
+  },
+  async get(key) {
+    const db = await this.open()
+    return new Promise((resolve, reject) => {
+      const req = db.transaction('audio', 'readonly').objectStore('audio').get(key)
+      req.onsuccess = () => resolve(req.result || null)
+      req.onerror = () => resolve(null)
+    })
+  },
+  async set(key, value) {
+    const db = await this.open()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('audio', 'readwrite')
+      tx.objectStore('audio').put(value, key)
+      tx.oncomplete = resolve
+      tx.onerror = () => resolve()
+    })
+  },
+  async getAll() {
+    const db = await this.open()
+    return new Promise((resolve) => {
+      const result = {}
+      const req = db.transaction('audio', 'readonly').objectStore('audio').openCursor()
+      req.onsuccess = e => {
+        const cursor = e.target.result
+        if (cursor) { result[cursor.key] = cursor.value; cursor.continue() }
+        else resolve(result)
+      }
+      req.onerror = () => resolve({})
+    })
+  },
+  async setAll(data) {
+    if (!data || typeof data !== 'object') return
+    const db = await this.open()
+    return new Promise((resolve) => {
+      const tx = db.transaction('audio', 'readwrite')
+      const store = tx.objectStore('audio')
+      store.clear()
+      for (const [k, v] of Object.entries(data)) store.put(v, k)
+      tx.oncomplete = resolve
+      tx.onerror = resolve
+    })
+  },
+  async count() {
+    const db = await this.open()
+    return new Promise(resolve => {
+      const req = db.transaction('audio', 'readonly').objectStore('audio').count()
+      req.onsuccess = () => resolve(req.result)
+      req.onerror = () => resolve(0)
+    })
+  }
+}
+
+// Gera chave de cache baseada no texto (hash simples)
+function audioKey(text) {
+  let h = 0
+  for (let i = 0; i < text.length; i++) h = (Math.imul(31, h) + text.charCodeAt(i)) | 0
+  return 'a' + Math.abs(h).toString(36)
+}
+
+// Converte Blob para data URL base64
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+// Gera áudio via OpenAI TTS e armazena no IndexedDB
+// Retorna data URL base64 ou null se falhar
+async function ensureSrsAudio(text) {
+  if (!text || !cfg.openaiKey) return null
+  const key = audioKey(text)
+  // Verifica cache local
+  const cached = await AudioDB.get(key)
+  if (cached) return cached
+  // Gera via OpenAI TTS
+  try {
+    const voice = randomVoice()
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'tts-1', input: text, voice, speed: 0.9 })
+    })
+    if (!res.ok) throw new Error(`TTS ${res.status}`)
+    const blob = await res.blob()
+    const b64 = await blobToBase64(blob)
+    await AudioDB.set(key, b64)
+    return b64
+  } catch(e) {
+    console.warn('[SRS Audio]', e.message)
+    return null
+  }
+}
+
+// Pré-gera áudio para uma lista de cards recém-criados (chamado ao salvar no SRS)
+async function preGenerateAudio(cards) {
+  if (!cfg.openaiKey || !cards || !cards.length) return
+  const toGenerate = cards.map(c => c.example_en || c.word).filter(Boolean)
+  const unique = [...new Set(toGenerate)]
+  if (!unique.length) return
+  toast(`🎵 Gerando áudio para ${unique.length} card${unique.length !== 1 ? 's' : ''}...`, 'info')
+  let generated = 0
+  for (const text of unique) {
+    const result = await ensureSrsAudio(text)
+    if (result) generated++
+  }
+  if (generated > 0) {
+    autoSyncAfterChange() // Sincroniza áudio com a nuvem
+    toast(`✅ Áudio gerado para ${generated} card${generated !== 1 ? 's' : ''}`, 'success')
+  }
+}
+
+// Reproduz áudio do card — usa cache IndexedDB, fallback Web Speech
+let _srsAudio = null
+async function playSrsTTS(text) {
+  if (!text) return
+  if (_srsAudio) { try { _srsAudio.pause() } catch{} ; _srsAudio = null }
+
+  // Tenta cache local (IndexedDB)
+  const key = audioKey(text)
+  const cached = await AudioDB.get(key)
+  if (cached) {
+    _srsAudio = new Audio(cached)
+    _srsAudio.play()
+    return
+  }
+
+  // Não tem cache — gera agora (caso card antigo sem áudio pré-gerado)
+  if (cfg.openaiKey) {
+    const b64 = await ensureSrsAudio(text)
+    if (b64) {
+      _srsAudio = new Audio(b64)
+      _srsAudio.play()
+      autoSyncAfterChange()
+      return
+    }
+  }
+
+  // Fallback: Web Speech API (sem chave OpenAI ou erro)
+  if (window.speechSynthesis) {
+    const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = 0.82
+    speechSynthesis.cancel(); speechSynthesis.speak(u)
+  }
 }
 
 // Busca áudio diretamente da OpenAI TTS (fallback quando n8n não entrega base64)
@@ -2309,6 +2611,7 @@ function fillSettings() {
   el('cfg-anki-url').value = cfg.ankiUrl || 'http://localhost:8765'
   el('cfg-anki-deck').value = cfg.ankiDeck || 'Inglês'
   el('cfg-anki-model').value = cfg.ankiModel || 'Inglês Básico'
+  loadAnkiDropdowns()
   el('cfg-n8n').value = cfg.n8nBase || ''
   el('cfg-f-word').value = cfg.fields?.word || 'Frente'
   el('cfg-f-meaning').value = cfg.fields?.meaning || 'Verso'
@@ -2324,8 +2627,9 @@ function saveSettings() {
   cfg.ttsProvider = el('cfg-tts-provider').value
   cfg.openaiKey = el('cfg-openai-key').value.trim()
   cfg.ankiUrl = el('cfg-anki-url').value.trim()
-  cfg.ankiDeck = el('cfg-anki-deck').value.trim()
-  cfg.ankiModel = el('cfg-anki-model').value.trim()
+  const _ds = el('cfg-anki-deck-sel'), _ms = el('cfg-anki-model-sel')
+  cfg.ankiDeck  = (_ds && _ds.style.display !== 'none' ? _ds.value  : el('cfg-anki-deck').value).trim()
+  cfg.ankiModel = (_ms && _ms.style.display !== 'none' ? _ms.value : el('cfg-anki-model').value).trim()
   cfg.n8nBase = el('cfg-n8n').value.trim()
   cfg.gistToken = el('cfg-gist-token').value.trim()
   cfg.gistId = el('cfg-gist-id').value.trim().replace(/\/$/, '')
@@ -2355,6 +2659,30 @@ async function testN8nAI() {
     const data = await res.json()
     showTestResult('n8n-ai', true, `Conectado! Provider: ${data.ai_provider || el('cfg-ai-provider').value}`)
   } catch(e) { showTestResult('n8n-ai', false, `Erro: ${e.message}`) }
+}
+
+async function loadAnkiDropdowns() {
+  try {
+    const [decks, models] = await Promise.all([ callAnki('deckNames'), callAnki('modelNames') ])
+    const ds = el('cfg-anki-deck-sel'), di = el('cfg-anki-deck')
+    const ms = el('cfg-anki-model-sel'), mi = el('cfg-anki-model')
+    if (ds && decks) {
+      const cur = cfg.ankiDeck || ''
+      ds.innerHTML = decks.sort().map(d => `<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`).join('')
+      ds.style.display = ''; di.style.display = 'none'
+    }
+    if (ms && models) {
+      const cur = cfg.ankiModel || ''
+      ms.innerHTML = models.sort().map(m => `<option value="${esc(m)}"${m===cur?' selected':''}>${esc(m)}</option>`).join('')
+      ms.style.display = ''; mi.style.display = 'none'
+    }
+  } catch {
+    // Anki offline — show text inputs
+    const ds = el('cfg-anki-deck-sel'), di = el('cfg-anki-deck')
+    const ms = el('cfg-anki-model-sel'), mi = el('cfg-anki-model')
+    if (ds) ds.style.display = 'none'; if (di) di.style.display = ''
+    if (ms) ms.style.display = 'none'; if (mi) mi.style.display = ''
+  }
 }
 
 async function testAnki() {
@@ -2481,9 +2809,79 @@ function setupDrop(areaId, handler) {
 
 
 // ================================================================
+// SRS DECK SYSTEM
+// ================================================================
+let srsDecks = []
+
+const DEFAULT_DECKS = [
+  { id: 'dk-root',    name: 'Inglês', parentId: null },
+  { id: 'dk-vocab',   name: 'Vocabulary',    parentId: 'dk-root' },
+  { id: 'dk-phrasal', name: 'Phrasal Verbs', parentId: 'dk-root' },
+  { id: 'dk-idioms',  name: 'Idioms',        parentId: 'dk-root' },
+  { id: 'dk-colloc',  name: 'Collocations',  parentId: 'dk-root' },
+]
+
+function loadSrsDecks() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SK.srsDecks) || '[]')
+    srsDecks = stored.length ? stored : JSON.parse(JSON.stringify(DEFAULT_DECKS))
+  } catch { srsDecks = JSON.parse(JSON.stringify(DEFAULT_DECKS)) }
+  if (!srsDecks.length) srsDecks = JSON.parse(JSON.stringify(DEFAULT_DECKS))
+  saveSrsDecks()
+}
+function saveSrsDecks() { localStorage.setItem(SK.srsDecks, JSON.stringify(srsDecks)) }
+function getDeckById(id) { return srsDecks.find(d => d.id === id) }
+function getSrsDeckPath(id) {
+  const deck = getDeckById(id); if (!deck) return ''
+  if (!deck.parentId) return deck.name
+  return getSrsDeckPath(deck.parentId) + '::' + deck.name
+}
+function getDeckChildren(parentId) { return srsDecks.filter(d => d.parentId === parentId) }
+function getRootDecks() { return srsDecks.filter(d => !d.parentId) }
+function getAllDescendantIds(deckId) {
+  const children = getDeckChildren(deckId)
+  let ids = children.map(c => c.id)
+  children.forEach(c => { ids = ids.concat(getAllDescendantIds(c.id)) })
+  return ids
+}
+function getDeckCardCount(deckId) {
+  const allIds = [deckId, ...getAllDescendantIds(deckId)]
+  return srsCards.filter(c => allIds.includes(c.deckId)).length
+}
+function getWordDeckId(wordType) {
+  const m = { phrasal_verb:'dk-phrasal', idiom:'dk-idioms', collocation:'dk-colloc' }
+  return m[(wordType||'').toLowerCase()] || 'dk-vocab'
+}
+function addDeck(name, parentId) {
+  const id = 'dk-' + uid(); srsDecks.push({ id, name: name.trim(), parentId: parentId||null }); saveSrsDecks(); return id
+}
+function renameDeck(id, newName) { const d = getDeckById(id); if (d) { d.name = newName.trim(); saveSrsDecks() } }
+function deleteDeck(id) {
+  const deck = getDeckById(id); const fallback = deck?.parentId || 'dk-vocab'
+  srsCards.forEach(c => { if (c.deckId === id) c.deckId = fallback })
+  const toRemove = [id, ...getAllDescendantIds(id)]
+  srsDecks = srsDecks.filter(d => !toRemove.includes(d.id))
+  saveSrsDecks(); saveSrsCards()
+}
+function populateDeckSelect(selectEl, selectedId) {
+  if (!selectEl) return; selectEl.innerHTML = ''
+  function addOpts(parentId, depth) {
+    srsDecks.filter(d => d.parentId === parentId).forEach(d => {
+      const opt = document.createElement('option')
+      opt.value = d.id; opt.textContent = '  '.repeat(depth) + (depth > 0 ? '› ' : '') + d.name
+      if (d.id === selectedId) opt.selected = true
+      selectEl.appendChild(opt); addOpts(d.id, depth + 1)
+    })
+  }
+  addOpts(null, 0)
+}
+
+// ================================================================
 // CLOUD SYNC — GITHUB GIST
 // ================================================================
-const GIST_FILENAME = 'english-lab-srs.json'
+const GIST_FILENAME       = 'english-lab-srs.json'
+const GIST_AUDIO_FILENAME = 'english-lab-audio.json'
+const GIST_IMAGE_FILENAME = 'english-lab-images.json'
 
 function updateSyncNav(state) {
   // state: 'off' | 'ok' | 'err' | 'syncing'
@@ -2510,9 +2908,19 @@ async function gistPush() {
   if (!cfg.gistToken) return false
   loadSrs()
   const payload = { srsCards, srsCfg, srsLog, words, exportedAt: new Date().toISOString() }
-  const body = JSON.stringify({ description: 'English Lab SRS data', public: false,
-    files: { [GIST_FILENAME]: { content: JSON.stringify(payload) } }
-  })
+  // Carrega áudio do IndexedDB para incluir no push
+  const audioData = await AudioDB.getAll()
+  const imageData = await ImageDB.getAll()
+  const files = {
+    [GIST_FILENAME]: { content: JSON.stringify(payload) },
+  }
+  if (Object.keys(audioData).length > 0) {
+    files[GIST_AUDIO_FILENAME] = { content: JSON.stringify(audioData) }
+  }
+  if (Object.keys(imageData).length > 0) {
+    files[GIST_IMAGE_FILENAME] = { content: JSON.stringify(imageData) }
+  }
+  const body = JSON.stringify({ description: 'English Lab SRS data', public: false, files })
   let res
   if (cfg.gistId) {
     res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, { method: 'PATCH', headers: gistHeaders(), body })
@@ -2543,6 +2951,23 @@ async function gistPull() {
   if (payload.srsCfg)   { srsCfg   = { ...SRS_DEF_CFG, ...payload.srsCfg }; persistSrsCfg() }
   if (payload.srsLog)   { srsLog   = payload.srsLog; saveSrsLog() }
   if (payload.words && payload.words.length > words.length) { words = payload.words; saveWords() }
+  // Restaura áudio do Gist para IndexedDB local
+  const audioContent = data.files?.[GIST_AUDIO_FILENAME]?.content
+  if (audioContent) {
+    try {
+      const audioData = JSON.parse(audioContent)
+      await AudioDB.setAll(audioData)
+      console.log(`[SRS Audio] ${Object.keys(audioData).length} áudios restaurados da nuvem`)
+    } catch(e) { console.warn('[SRS Audio] Falha ao restaurar áudio:', e.message) }
+  }
+  const imageContent = data.files?.[GIST_IMAGE_FILENAME]?.content
+  if (imageContent) {
+    try {
+      const imgData = JSON.parse(imageContent)
+      await ImageDB.setAll(imgData)
+      console.log(`[SRS Image] ${Object.keys(imgData).length} imagens restauradas da nuvem`)
+    } catch(e) { console.warn('[SRS Image] Falha ao restaurar imagens:', e.message) }
+  }
   return true
 }
 
@@ -2656,6 +3081,7 @@ function loadSrs() {
   try { srsCards = JSON.parse(localStorage.getItem(SK.srsCards) || '[]') } catch { srsCards = [] }
   try { srsCfg = { ...SRS_DEF_CFG, ...JSON.parse(localStorage.getItem(SK.srsCfg) || '{}') } } catch { srsCfg = { ...SRS_DEF_CFG } }
   try { srsLog = JSON.parse(localStorage.getItem(SK.srsLog) || '[]') } catch { srsLog = [] }
+  loadSrsDecks()
 }
 
 function saveSrsCards() { localStorage.setItem(SK.srsCards, JSON.stringify(srsCards)) }
@@ -2679,9 +3105,11 @@ function createSrsCard(wordId, meaningIdx, exampleIdx) {
   if (!m) return null
   const ex = m.examples && m.examples[exampleIdx] ? m.examples[exampleIdx] : null
 
+  const deckId = getWordDeckId(w.type)
   return {
     id: uid(),
     wordId, meaningIdx, exampleIdx,
+    deckId,
     state: 'new',
     due: nowTs(),
     interval: 0,
@@ -2859,6 +3287,9 @@ function saveToSrs(wordId) {
     renderDashboard()
     updateSrsBadge()
     toast(`📚 ${added} card${added !== 1 ? 's' : ''} salvos no site SRS${skipped ? ` (${skipped} já existiam)` : ''}`, 'success')
+    // Pré-gera áudio para os novos cards (igual ao Anki)
+    const newCards = srsCards.slice(-added)
+    preGenerateAudio(newCards)
   } else {
     toast(`Todos os cards já existem no SRS (${skipped} duplicados)`, 'info')
   }
@@ -2891,6 +3322,8 @@ function renderSrsSection() {
   el('srs-due-count').textContent = due
   el('srs-new-count').textContent = newRem
   el('srs-streak').textContent = streak
+
+  renderDeckStatsTable()
 
   const startArea = el('srs-start-area')
   const total = due + newRem
@@ -2927,63 +3360,638 @@ function renderSrsSection() {
   renderSrsAllCards()
 }
 
-function renderSrsAllCards() {
-  const area = el('srs-all-cards-area')
-  if (!area || !srsCards.length) return
+let _focusDeckId = null
+
+function showDeckFocus(deckId) {
+  // Toggle: clicar no mesmo deck fecha o painel
+  if (_focusDeckId === deckId) {
+    _focusDeckId = null
+    renderDeckStatsTable()
+    return
+  }
+  _focusDeckId = deckId
+  renderDeckStatsTable()
+}
+
+function renderDeckStatsTable() {
+  const area = el('srs-deck-stats'); if (!area) return
+  if (!srsCards.length) { area.innerHTML = ''; return }
 
   const now = nowTs()
-  const stateOrder = {review:0, relearning:1, learning:2, new:3}
-  const sorted = [...srsCards].sort((a,b) => stateOrder[a.state] - stateOrder[b.state] || a.due - b.due)
+  const tomorrow = now + 864e5
+
+  function countForDeck(deckId) {
+    const ids = [deckId, ...getAllDescendantIds(deckId)]
+    const cards = srsCards.filter(c => ids.includes(c.deckId))
+    const novo     = cards.filter(c => c.state === 'new').length
+    const aprender = cards.filter(c => c.state === 'learning' || c.state === 'relearning').length
+    const revisar  = cards.filter(c => c.state === 'review' && c.due <= now).length
+    const amanha   = cards.filter(c =>
+      (c.state === 'review' || c.state === 'relearning' || c.state === 'learning') &&
+      c.due > now && c.due <= tomorrow
+    ).length
+    return { novo, aprender, revisar, amanha, total: cards.length }
+  }
+
+  function numCell(n, cls) {
+    return n > 0 ? `<td class="${cls}">${n}</td>` : `<td class="sdt-zero">0</td>`
+  }
+
+  function deckRows(deckId, depth) {
+    const deck = getDeckById(deckId); if (!deck) return ''
+    const counts = countForDeck(deckId)
+    if (counts.total === 0 && depth > 0) return ''
+    const indent = depth * 18
+    const isSelected = _focusDeckId === deckId
+    let rows = `<tr class="deck-row-clickable${isSelected ? ' deck-row-selected' : ''}"
+      onclick="showDeckFocus('${deckId}')">
+      <td class="sdt-name${depth===0?' root':''}" style="padding-left:${indent}px">${esc(deck.name)}</td>
+      ${numCell(counts.novo,     'sdt-new')}
+      ${numCell(counts.aprender, 'sdt-learn')}
+      ${numCell(counts.revisar,  'sdt-review')}
+      ${numCell(counts.amanha,   'sdt-zero')}
+    </tr>`
+    for (const child of getDeckChildren(deckId)) rows += deckRows(child.id, depth + 1)
+    return rows
+  }
+
+  const roots = getRootDecks()
+  if (!roots.length) { area.innerHTML = ''; return }
+
+  const tableRows = roots.map(d => deckRows(d.id, 0)).join('')
+
+  // Painel de foco (se houver deck selecionado)
+  let focusPanel = ''
+  if (_focusDeckId) {
+    const deck = getDeckById(_focusDeckId)
+    if (deck) {
+      const counts = countForDeck(_focusDeckId)
+      const path = getSrsDeckPath(_focusDeckId)
+      const queueSize = buildSessionQueue(_focusDeckId).length
+      const hasCards = queueSize > 0
+      focusPanel = `
+      <div class="deck-focus-panel">
+        <div class="deck-focus-title">📚 ${esc(path)}</div>
+        <div class="deck-focus-stats">
+          <div class="dfs-item"><span class="dfs-value sdt-new">${counts.novo}</span><span class="dfs-label">Novo</span></div>
+          <div class="dfs-item"><span class="dfs-value sdt-learn">${counts.aprender}</span><span class="dfs-label">Aprender</span></div>
+          <div class="dfs-item"><span class="dfs-value sdt-review">${counts.revisar}</span><span class="dfs-label">Revisar</span></div>
+          <div class="dfs-item"><span class="dfs-value" style="color:var(--text2)">${counts.amanha}</span><span class="dfs-label">Amanhã</span></div>
+        </div>
+        ${hasCards
+          ? `<button class="btn btn-primary btn-sm" onclick="startSrsSession('${_focusDeckId}')">▶ Estudar agora (${queueSize} cards)</button>`
+          : `<p style="color:var(--text3);font-size:0.88rem;margin:0">Nenhum card para estudar agora neste baralho.</p>`
+        }
+      </div>`
+    }
+  }
 
   area.innerHTML = `
-  <div class="card-box">
+  <div class="srs-deck-table-wrap">
+    <h3>Baralhos</h3>
+    <table class="srs-deck-table">
+      <thead>
+        <tr>
+          <th>Baralho</th>
+          <th>Novo</th>
+          <th>Aprender</th>
+          <th>Revisar</th>
+          <th>Amanhã</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+    ${focusPanel}
+  </div>`
+}
+
+// ---- Browser state ----
+let _activeBrowserDeck = null
+let _browserSort = { col: 'state', dir: 1 }
+let _browserSelected = new Set()
+let _browserCurrentCards = []
+// Cache de quais chaves de áudio existem no IndexedDB
+let _audioKeyCache = null
+async function refreshAudioKeyCache() {
+  const all = await AudioDB.getAll()
+  _audioKeyCache = new Set(Object.keys(all))
+}
+
+// ================================================================
+// IMAGE SYSTEM — IndexedDB cache + DALL-E 3 + Gist cloud sync
+// Key: wordId_meaningIdx (uma imagem por significado, compartilhada)
+// ================================================================
+const ImageDB = {
+  _db: null,
+  async open() {
+    if (this._db) return this._db
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('english-lab-images', 1)
+      req.onupgradeneeded = e => e.target.result.createObjectStore('images')
+      req.onsuccess = e => { this._db = e.target.result; resolve(this._db) }
+      req.onerror = () => reject(req.error)
+    })
+  },
+  async get(key) {
+    const db = await this.open()
+    return new Promise(resolve => {
+      const req = db.transaction('images','readonly').objectStore('images').get(key)
+      req.onsuccess = () => resolve(req.result || null)
+      req.onerror = () => resolve(null)
+    })
+  },
+  async set(key, value) {
+    const db = await this.open()
+    return new Promise(resolve => {
+      const tx = db.transaction('images','readwrite')
+      tx.objectStore('images').put(value, key)
+      tx.oncomplete = resolve; tx.onerror = resolve
+    })
+  },
+  async getAll() {
+    const db = await this.open()
+    return new Promise(resolve => {
+      const result = {}
+      const req = db.transaction('images','readonly').objectStore('images').openCursor()
+      req.onsuccess = e => {
+        const c = e.target.result
+        if (c) { result[c.key] = c.value; c.continue() } else resolve(result)
+      }
+      req.onerror = () => resolve({})
+    })
+  },
+  async setAll(data) {
+    if (!data || typeof data !== 'object') return
+    const db = await this.open()
+    return new Promise(resolve => {
+      const tx = db.transaction('images','readwrite')
+      const store = tx.objectStore('images')
+      store.clear()
+      for (const [k,v] of Object.entries(data)) store.put(v, k)
+      tx.oncomplete = resolve; tx.onerror = resolve
+    })
+  }
+}
+
+// Chave da imagem: por significado, compartilhada entre todos os cards com mesmo wordId+meaningIdx
+function imageKey(card) { return `img_${card.wordId}_${card.meaningIdx}` }
+
+let _imageKeyCache = null
+async function refreshImageKeyCache() {
+  const all = await ImageDB.getAll()
+  _imageKeyCache = new Set(Object.keys(all))
+}
+
+// Gera imagem via DALL-E 3 para o significado do card
+// Propaga automaticamente para todos os cards que compartilham o mesmo significado
+async function generateCardImage(cardId, callerEl) {
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  const card = srsCards.find(c => c.id === cardId)
+  if (!card) return
+
+  const key = imageKey(card)
+
+  // Spinner no botão chamador
+  if (callerEl) { callerEl.disabled = true; callerEl.innerHTML = '<span class="gen-spinner"></span> Gerando...' }
+
+  const word   = card.word || ''
+  const meaning = card.meaning_pt || card.definition_pt || ''
+  const context = card.example_en  || ''
+  const prompt  = `Simple, clear educational illustration for English vocabulary learning. Word: "${word}". Meaning: "${meaning}". ${context ? 'Example: "'+context+'".' : ''} Minimal style, no text, clean background, vivid colors.`
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-image-1', prompt, n: 1, size: '1024x1024', quality: 'medium' })
+    })
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || res.status) }
+    const data = await res.json()
+    // gpt-image-1 retorna b64_json diretamente; fallback para URL em modelos legados
+    let b64
+    if (data.data[0].b64_json) {
+      b64 = 'data:image/png;base64,' + data.data[0].b64_json
+    } else {
+      const imgRes = await fetch(data.data[0].url)
+      const blob = await imgRes.blob()
+      b64 = await blobToBase64(blob)
+    }
+
+    await ImageDB.set(key, b64)
+    if (!_imageKeyCache) _imageKeyCache = new Set()
+    _imageKeyCache.add(key)
+    autoSyncAfterChange()
+
+    // Conta cards irmãos (mesmo significado)
+    const siblings = srsCards.filter(c => c.wordId === card.wordId && c.meaningIdx === card.meaningIdx).length
+    toast(`🖼️ Imagem gerada${siblings > 1 ? ` · aplicada a ${siblings} cards` : ''}`, 'success')
+
+    // Atualiza visualizações ativas
+    if (window._srsCurrentCard?.id === cardId) renderSrsCardBack()
+    if (_browserPreviewCardId === cardId || srsCards.find(c=>c.id===_browserPreviewCardId && imageKey(c)===key)) {
+      showBrowserCardPreview(_browserPreviewCardId)
+    }
+    if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value||'')
+  } catch(e) {
+    toast('Erro ao gerar imagem: ' + e.message, 'error')
+  } finally {
+    if (callerEl) { callerEl.disabled = false; callerEl.innerHTML = '🖼️ Gerar imagem' }
+  }
+}
+
+// Gera imagens para os cards selecionados na biblioteca (respeita a regra de significado compartilhado)
+async function browserGenerateImagesSelected() {
+  if (!_browserSelected.size) return
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  const ids = [..._browserSelected]
+  const cards = srsCards.filter(c => ids.includes(c.id))
+  // Deduplica por chave de imagem (evita gerar a mesma imagem duas vezes)
+  const seen = new Set()
+  const toGenerate = cards.filter(c => { const k = imageKey(c); if (seen.has(k)) return false; seen.add(k); return true })
+  toast(`🖼️ Gerando imagens para ${toGenerate.length} significado(s)...`, 'info')
+  for (const card of toGenerate) await generateCardImage(card.id, null)
+  await refreshImageKeyCache()
+  if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value||'')
+}
+
+function renderSrsAllCards() {
+  const area = el('srs-all-cards-area'); if (!area) return
+  if (!srsCards.length) { area.innerHTML = ''; return }
+  function deckNodeHtml(deckId, depth) {
+    const deck = getDeckById(deckId); if (!deck) return ''
+    const count = getDeckCardCount(deckId)
+    const children = getDeckChildren(deckId)
+    const indent = depth * 16
+    let h = `<div class="srs-browser-deck" style="padding-left:${16+indent}px"
+      onclick="toggleBrowserDeck('${deckId}')" id="bdk-${deckId}">
+      <span class="srs-deck-toggle">${children.length ? '▾' : '·'}</span>
+      <span class="srs-deck-name">${esc(deck.name)}</span>
+      <span class="srs-deck-count">${count}</span>
+      <span class="srs-deck-actions">
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();editDeckName('${deckId}')" title="Renomear">✏️</button>
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();addChildDeck('${deckId}')" title="Subdeck">+</button>
+        ${deckId !== 'dk-root' ? `<button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteDeckUI('${deckId}')">✕</button>` : ''}
+      </span></div>
+    <div id="bdk-cards-${deckId}"></div>`
+    children.forEach(ch => { h += deckNodeHtml(ch.id, depth + 1) }); return h
+  }
+  const treeHtml = getRootDecks().map(d => deckNodeHtml(d.id, 0)).join('')
+  area.innerHTML = `
+  <div class="card-box" style="margin-bottom:0">
     <div class="card-box-header">
-      <h3>Todos os cards (${srsCards.length})</h3>
+      <h3>📚 Biblioteca (${srsCards.length})</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="srs-browser-search" placeholder="🔍 Buscar..."
+          oninput="filterBrowser(this.value)"
+          style="padding:5px 10px;font-size:0.82rem;width:170px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);outline:none">
+        <button class="btn btn-ghost btn-sm" onclick="addRootDeck()">+ Deck</button>
+      </div>
     </div>
-    <div style="max-height:280px;overflow-y:auto">
-      ${sorted.map(c => {
-        const stateColors = {new:'var(--success)', learning:'var(--warning)', review:'var(--primary)', relearning:'var(--error)'}
-        const stateLabel = {new:'Novo', learning:'Aprendendo', review:'Revisão', relearning:'Reaprendendo'}
-        const dueTxt = c.due <= now ? 'Agora' : fmtDays(Math.round((c.due - now)/86400000))
-        return `<div class="recent-item">
-          <div class="ri-word">${esc(c.word)}</div>
-          <div class="ri-ctx">${esc(c.meaning_pt)}</div>
-          <span style="font-size:0.72rem;color:${stateColors[c.state]||'var(--text3)'};font-weight:600;white-space:nowrap">${stateLabel[c.state]||c.state}</span>
-          <span style="font-size:0.72rem;color:var(--text3);margin-left:8px;white-space:nowrap">⏱ ${dueTxt}</span>
-        </div>`
-      }).join('')}
+    <div style="display:grid;grid-template-columns:220px 1fr 340px;min-height:400px">
+      <div style="border-right:1px solid var(--border);overflow-y:auto;max-height:420px">
+        <div id="srs-deck-tree">${treeHtml}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;overflow:hidden;max-height:420px">
+        <!-- Toolbar de seleção (aparece quando há selecionados) -->
+        <div class="browser-toolbar hidden" id="browser-sel-toolbar">
+          <span id="browser-sel-count" style="font-size:0.82rem;font-weight:600;color:var(--primary)"></span>
+          <button class="btn btn-ghost btn-sm" onclick="browserSelectAll()">Selecionar tudo</button>
+          <button class="btn btn-ghost btn-sm" onclick="browserDeselectAll()">Desmarcar tudo</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--error)" onclick="browserDeleteSelected()">🗑 Excluir</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--primary)" onclick="browserGenerateAudioSelected()">🔊 Gerar áudio</button>
+          <button class="btn btn-ghost btn-sm" style="color:#9b59b6" onclick="browserGenerateImagesSelected()">🖼️ Gerar imagens</button>
+        </div>
+        <!-- Header de colunas clicável -->
+        <div class="browser-col-hdr" id="browser-col-hdr" style="display:none">
+          <input type="checkbox" class="browser-cb" id="browser-cb-all" onchange="browserToggleAll(this.checked)" title="Selecionar tudo">
+          <span style="flex:1" onclick="setBrowserSort('word')">Palavra <span id="bsort-word"></span></span>
+          <span style="width:75px;text-align:center" onclick="setBrowserSort('state')">Estado <span id="bsort-state"></span></span>
+          <span style="width:60px;text-align:center" onclick="setBrowserSort('due')">Prazo <span id="bsort-due"></span></span>
+          <span style="width:50px;text-align:center" onclick="setBrowserSort('ease')">Ease <span id="bsort-ease"></span></span>
+          <span style="width:32px;text-align:center" onclick="setBrowserSort('audio')">🔊 <span id="bsort-audio"></span></span>
+          <span style="width:32px;text-align:center" onclick="setBrowserSort('image')">🖼️ <span id="bsort-image"></span></span>
+          <span style="width:52px"></span>
+        </div>
+        <div id="srs-browser-cards" style="overflow-y:auto;flex:1;min-height:0">
+          <div style="padding:32px;text-align:center;color:var(--text3);font-size:0.88rem">Clique em um deck para ver os cards</div>
+        </div>
+      </div>
+      <!-- Preview panel (3ª coluna) -->
+      <div class="browser-preview-panel" id="browser-preview-panel">
+        <div class="bpp-empty">Clique em um card<br>para ver o preview</div>
+      </div>
     </div>
   </div>`
+  // Carrega caches de áudio e imagem assim que a biblioteca abre
+  refreshAudioKeyCache()
+  refreshImageKeyCache()
+}
+
+function toggleBrowserDeck(deckId) {
+  _activeBrowserDeck = deckId
+  _browserSelected.clear()
+  document.querySelectorAll('.srs-browser-deck').forEach(d => d.classList.remove('active'))
+  const bd = el('bdk-' + deckId); if (bd) bd.classList.add('active')
+  const hdr = el('browser-col-hdr'); if (hdr) hdr.style.display = 'flex'
+  renderBrowserCardList(deckId)
+}
+
+function setBrowserSort(col) {
+  if (_browserSort.col === col) _browserSort.dir *= -1
+  else { _browserSort.col = col; _browserSort.dir = 1 }
+  // Update sort indicators
+  ['word','state','due','ease','audio','image'].forEach(c => {
+    const s = el('bsort-' + c)
+    if (!s) return
+    s.textContent = _browserSort.col === c ? (_browserSort.dir === 1 ? ' ▲' : ' ▼') : ''
+    s.className = _browserSort.col === c ? 'sort-active' : ''
+  })
+  if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value || '')
+}
+
+function browserToggleAll(checked) {
+  _browserCurrentCards.forEach(c => {
+    if (checked) _browserSelected.add(c.id)
+    else _browserSelected.delete(c.id)
+  })
+  updateBrowserToolbar()
+  // Re-render to update row highlights
+  document.querySelectorAll('.srs-browser-row').forEach(row => {
+    const id = row.dataset.id
+    if (id) row.classList.toggle('selected', _browserSelected.has(id))
+    const cb = row.querySelector('.browser-cb')
+    if (cb) cb.checked = _browserSelected.has(id)
+  })
+}
+
+function browserToggleCard(cardId, checked) {
+  if (checked) _browserSelected.add(cardId)
+  else _browserSelected.delete(cardId)
+  updateBrowserToolbar()
+  const cbAll = el('browser-cb-all')
+  if (cbAll) cbAll.checked = _browserCurrentCards.length > 0 && _browserSelected.size === _browserCurrentCards.length
+  const row = document.querySelector(`.srs-browser-row[data-id="${cardId}"]`)
+  if (row) row.classList.toggle('selected', checked)
+}
+
+function browserSelectAll()   { browserToggleAll(true)  }
+function browserDeselectAll() { browserToggleAll(false) }
+
+function updateBrowserToolbar() {
+  const toolbar = el('browser-sel-toolbar'); if (!toolbar) return
+  const n = _browserSelected.size
+  toolbar.classList.toggle('hidden', n === 0)
+  const countEl = el('browser-sel-count')
+  if (countEl) countEl.textContent = n + ' selecionado' + (n !== 1 ? 's' : '')
+}
+
+async function browserDeleteSelected() {
+  if (!_browserSelected.size) return
+  if (!confirm(`Excluir ${_browserSelected.size} card(s)?`)) return
+  srsCards = srsCards.filter(c => !_browserSelected.has(c.id))
+  _browserSelected.clear()
+  saveSrsCards(); autoSyncAfterChange()
+  updateBrowserToolbar()
+  if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck)
+  renderSrsSection()
+  toast('Cards excluídos', 'info')
+}
+
+async function browserGenerateAudioSelected() {
+  if (!_browserSelected.size) return
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  const ids = [..._browserSelected]
+  const cards = srsCards.filter(c => ids.includes(c.id))
+  toast(`🎵 Gerando áudio para ${cards.length} card(s)...`, 'info')
+  let generated = 0
+  for (const card of cards) {
+    const text = card.example_en || card.word
+    if (!text) continue
+    const key = audioKey(text)
+    const exists = await AudioDB.get(key)
+    if (exists) continue
+    const result = await ensureSrsAudio(text)
+    if (result) generated++
+  }
+  await refreshAudioKeyCache()
+  if (generated > 0) {
+    autoSyncAfterChange()
+    toast(`✅ Áudio gerado para ${generated} card(s)`, 'success')
+    if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck)
+  } else {
+    toast('Todos os cards selecionados já têm áudio', 'info')
+  }
+}
+
+async function renderBrowserCardList(deckId, query) {
+  const panel = el('srs-browser-cards'); if (!panel) return
+  const now = nowTs()
+  const SC = {new:'var(--success)', learning:'var(--warning)', review:'var(--primary)', relearning:'var(--error)'}
+  const SL = {new:'Novo', learning:'Aprendendo', review:'Revisão', relearning:'Reaprendendo'}
+  const allIds = [deckId, ...getAllDescendantIds(deckId)]
+  let cards = srsCards.filter(c => allIds.includes(c.deckId))
+  if (query) { const q = query.toLowerCase(); cards = cards.filter(c => (c.word||'').toLowerCase().includes(q) || (c.meaning_pt||'').toLowerCase().includes(q)) }
+  if (!cards.length) { panel.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)">Nenhum card neste deck</div>`; return }
+
+  // Garante cache de áudio
+  if (!_audioKeyCache) await refreshAudioKeyCache()
+
+  // Sortação
+  const sortFns = {
+    word:  (a,b) => (a.word||'').localeCompare(b.word||'') * _browserSort.dir,
+    state: (a,b) => { const so={review:0,relearning:1,learning:2,new:3}; return ((so[a.state]??9)-(so[b.state]??9)) * _browserSort.dir },
+    due:   (a,b) => (a.due - b.due) * _browserSort.dir,
+    ease:  (a,b) => (a.ease - b.ease) * _browserSort.dir,
+    audio: (a,b) => {
+      const ha = _audioKeyCache?.has(audioKey(a.example_en||a.word||''))
+      const hb = _audioKeyCache?.has(audioKey(b.example_en||b.word||''))
+      return (Number(ha) - Number(hb)) * _browserSort.dir
+    },
+    image: (a,b) => {
+      const ha = _imageKeyCache?.has(imageKey(a))
+      const hb = _imageKeyCache?.has(imageKey(b))
+      return (Number(ha) - Number(hb)) * _browserSort.dir
+    }
+  }
+  cards.sort(sortFns[_browserSort.col] || sortFns.state)
+  _browserCurrentCards = cards
+
+  // Render sort headers
+  setBrowserSort(_browserSort.col)  // refresh indicators without changing
+
+  panel.innerHTML = cards.map(c => {
+    const dueTxt = c.due <= now ? '<span style="color:var(--primary)">Agora</span>' : fmtDays(Math.round((c.due-now)/86400000))
+    const hasAudio = _audioKeyCache?.has(audioKey(c.example_en || c.word || ''))
+    const hasImage = _imageKeyCache?.has(imageKey(c))
+    const audioCell = hasAudio
+      ? `<span class="audio-badge-ok" title="Tem áudio">🔊</span>`
+      : `<span class="audio-badge-no" title="Sem áudio">⚠️</span>`
+    const imageCell = hasImage
+      ? `<span class="image-badge-ok" title="Tem imagem">🖼️</span>`
+      : `<span class="image-badge-no" title="Sem imagem">·</span>`
+    const isSel = _browserSelected.has(c.id)
+    return `<div class="srs-browser-row${isSel?' selected':''}" data-id="${c.id}"
+      onclick="showBrowserCardPreview('${c.id}')">
+      <input type="checkbox" class="browser-cb" ${isSel?'checked':''} onchange="event.stopPropagation();browserToggleCard('${c.id}',this.checked)">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:0.88rem">${esc(c.word)}</div>
+        <div style="font-size:0.78rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.meaning_pt||'')}</div>
+      </div>
+      <span style="font-size:0.72rem;color:${SC[c.state]};font-weight:600;white-space:nowrap;width:75px;text-align:center">${SL[c.state]}</span>
+      <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:60px;text-align:center">⏱ ${dueTxt}</span>
+      <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:50px;text-align:center">ease ${c.ease.toFixed(1)}</span>
+      <span style="width:32px;text-align:center">${audioCell}</span>
+      <span style="width:32px;text-align:center">${imageCell}</span>
+      <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();moveSrsCardDeck('${c.id}')" title="Mover">↗</button>
+      <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">✕</button>
+    </div>`
+  }).join('')
+
+  // Sync "select all" checkbox state
+  const cbAll = el('browser-cb-all')
+  if (cbAll) cbAll.checked = cards.length > 0 && _browserSelected.size === cards.length
+  updateBrowserToolbar()
+}
+
+async function filterBrowser(query) {
+  const hdr = el('browser-col-hdr')
+  if (_activeBrowserDeck) { await renderBrowserCardList(_activeBrowserDeck, query); return }
+  if (hdr) hdr.style.display = query ? 'flex' : 'none'
+  const panel = el('srs-browser-cards'); if (!panel) return
+  if (!query) {
+    panel.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)">Clique num deck ou busque acima</div>`
+    return
+  }
+  if (!_audioKeyCache) await refreshAudioKeyCache()
+  const q = query.toLowerCase()
+  const SC = {new:'var(--success)', learning:'var(--warning)', review:'var(--primary)', relearning:'var(--error)'}
+  const SL = {new:'Novo', learning:'Aprendendo', review:'Revisão', relearning:'Reaprendendo'}
+  const cards = srsCards.filter(c => (c.word||'').toLowerCase().includes(q) || (c.meaning_pt||'').toLowerCase().includes(q))
+  _browserCurrentCards = cards
+  if (!cards.length) { panel.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text3)">Nenhum resultado</div>`; return }
+  panel.innerHTML = cards.map(c => {
+    const hasAudio = _audioKeyCache.has(audioKey(c.example_en || c.word || ''))
+    const isSel = _browserSelected.has(c.id)
+    return `<div class="srs-browser-row${isSel?' selected':''}" data-id="${c.id}">
+      <input type="checkbox" class="browser-cb" ${isSel?'checked':''} onchange="browserToggleCard('${c.id}',this.checked)">
+      <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:0.88rem">${esc(c.word)}</div>
+      <div style="font-size:0.78rem;color:var(--text2)">${esc(c.meaning_pt||'')}</div></div>
+      <span style="font-size:0.72rem;color:${SC[c.state]};font-weight:600;margin-right:8px">${SL[c.state]}</span>
+      <span style="margin-right:4px">${hasAudio?'<span class="audio-badge-ok">🔊</span>':'<span class="audio-badge-no">⚠️</span>'}</span>
+      <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">✕</button>
+    </div>`
+  }).join('')
+  updateBrowserToolbar()
+}
+function deleteSrsCard(cardId) {
+  if (!confirm('Excluir este card?')) return
+  srsCards = srsCards.filter(c => c.id !== cardId)
+  _browserSelected.delete(cardId)
+  saveSrsCards(); autoSyncAfterChange()
+  if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck)
+  renderSrsSection(); toast('Card excluído','info')
+}
+function moveSrsCardDeck(cardId) {
+  const card = srsCards.find(c => c.id === cardId); if (!card) return
+  const modal = document.createElement('div')
+  modal.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)'
+  modal.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:320px;box-shadow:var(--shadow)">
+    <h4 style="margin-bottom:12px">Mover card para deck</h4>
+    <select id="move-deck-sel" style="width:100%;margin-bottom:16px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"></select>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="this.closest('[style]').remove()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmMoveDeck('${cardId}',document.getElementById('move-deck-sel').value);this.closest('[style]').remove()">Mover</button>
+    </div></div>`
+  document.body.appendChild(modal)
+  populateDeckSelect(document.getElementById('move-deck-sel'), card.deckId)
+}
+function confirmMoveDeck(cardId, newDeckId) {
+  const card = srsCards.find(c => c.id === cardId)
+  if (card && newDeckId) { card.deckId = newDeckId; saveSrsCards(); autoSyncAfterChange() }
+  if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck); renderSrsSection()
+}
+let _browserPreviewCardId = null
+async function showBrowserCardPreview(cardId) {
+  _browserPreviewCardId = cardId
+  const panel = el('browser-preview-panel'); if (!panel) return
+  const card = srsCards.find(c => c.id === cardId)
+  if (!card) { panel.innerHTML = '<div class="bpp-empty">Card não encontrado</div>'; return }
+
+  // Highlight selected row
+  document.querySelectorAll('.srs-browser-row').forEach(r => r.classList.toggle('selected', r.dataset.id === cardId && !_browserSelected.has(cardId)))
+
+  const imgData = await ImageDB.get(imageKey(card))
+  const frente  = buildSrsFrente(card)
+  const verso   = buildSrsVerso(card, imgData)
+
+  const SC = {new:'var(--success)', learning:'var(--warning)', review:'var(--primary)', relearning:'var(--error)'}
+  const SL = {new:'Novo', learning:'Aprendendo', review:'Revisão', relearning:'Reaprendendo'}
+
+  panel.innerHTML = `
+    <div>
+      <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">
+        <span style="color:${SC[card.state]}">${SL[card.state]}</span>
+        · ease ${card.ease.toFixed(1)}
+      </div>
+      <div class="bpp-card-front">
+        <div class="bpp-label">Frente</div>
+        <div style="font-size:1.1rem;font-weight:700;margin-bottom:6px">${esc(card.word)}</div>
+        ${frente ? `<div style="font-size:0.85rem;color:var(--text2)">${frente}</div>` : ''}
+        <button class="btn btn-ghost btn-xs" style="margin-top:8px"
+          onclick="playSrsTTS('${(card.example_en||card.word||'').replace(/'/g,"\'")}')">🔊</button>
+      </div>
+      <div class="bpp-card-back" style="margin-top:10px">
+        <div class="bpp-label">Verso</div>
+        <div class="srs-card-back-body" style="font-size:0.88rem">${verso}</div>
+      </div>
+    </div>`
+}
+
+function addRootDeck()        { const n = prompt('Nome do novo deck:'); if (n) { addDeck(n, null); renderSrsAllCards() } }
+function addChildDeck(pid)    { const n = prompt('Nome do subdeck:');   if (n) { addDeck(n, pid);  renderSrsAllCards() } }
+function editDeckName(deckId) {
+  const d = getDeckById(deckId); if (!d) return
+  const n = prompt('Novo nome:', d.name); if (n && n.trim()) { renameDeck(deckId, n); renderSrsAllCards() }
+}
+function deleteDeckUI(deckId) {
+  const d = getDeckById(deckId); if (!d) return
+  const cnt = getDeckCardCount(deckId)
+  const msg = cnt > 0 ? `Excluir "${d.name}"? Os ${cnt} cards serão movidos para o deck pai.` : `Excluir "${d.name}"?`
+  if (!confirm(msg)) return
+  deleteDeck(deckId); renderSrsAllCards(); renderSrsSection()
 }
 
 // ================================================================
 // SRS SESSION
 // ================================================================
-function buildSessionQueue() {
+function buildSessionQueue(filterDeckId = null) {
   loadSrs()
   const now = nowTs()
-  const steps = srsCfg.steps || [1, 10]
   const today = todayStr()
 
+  // Filtro por deck: inclui descendentes
+  const deckIds = filterDeckId ? [filterDeckId, ...getAllDescendantIds(filterDeckId)] : null
+  const inDeck = c => !deckIds || deckIds.includes(c.deckId)
+
   // 1. Due reviews (review + relearning)
-  let reviews = srsCards.filter(c => c.due <= now && (c.state === 'review' || c.state === 'relearning'))
+  let reviews = srsCards.filter(c => inDeck(c) && c.due <= now && (c.state === 'review' || c.state === 'relearning'))
   reviews = reviews.slice(0, srsCfg.revPerDay)
 
   // 2. Due learning steps
-  const learning = srsCards.filter(c => c.due <= now && c.state === 'learning')
+  const learning = srsCards.filter(c => inDeck(c) && c.due <= now && c.state === 'learning')
 
   // 3. New cards (respecting daily limit)
   const todayLog = srsLog.find(l => l.date === today)
   const newSeen = todayLog ? (todayLog.newSeen || 0) : 0
   const newLimit = Math.max(0, srsCfg.newPerDay - newSeen)
-  const newCards = srsCards.filter(c => c.state === 'new').slice(0, newLimit)
+  const newCards = srsCards.filter(c => inDeck(c) && c.state === 'new').slice(0, newLimit)
 
   return [...reviews, ...learning, ...newCards]
 }
 
-function startSrsSession() {
+function startSrsSession(filterDeckId = null) {
   loadSrs()
-  const queue = buildSessionQueue()
+  const queue = buildSessionQueue(filterDeckId)
   if (!queue.length) { toast('Nada para estudar agora!', 'info'); return }
 
   srsSession = {
@@ -3002,7 +4010,7 @@ function startSrsSession() {
   renderSrsCard()
 }
 
-function renderSrsCard() {
+async function renderSrsCard() {
   if (!srsSession) return
   const { queue, current, done, total } = srsSession
   if (current >= queue.length) { finishSrsSession(); return }
@@ -3015,8 +4023,13 @@ function renderSrsCard() {
   const card = srsCards.find(c => c.id === cardId)
   if (!card) { srsSession.current++; renderSrsCard(); return }
 
+  window._srsCurrentCard = card
   const frente = buildSrsFrente(card)
-  const verso = buildSrsVerso(card)
+  // Use async verso to load image from IndexedDB
+  const verso = await buildSrsVersoAsync(card)
+  // Play full EN sentence via OpenAI TTS when card front is shown
+  const audioText = card.example_en || card.word || ''
+  if (audioText) playSrsTTS(audioText)
 
   const ratingBtns = [
     { cls: 'again', label: 'Errei',   r: 1 },
@@ -3035,7 +4048,13 @@ function renderSrsCard() {
       <div class="srs-card-face srs-card-front">
         <div class="srs-card-front-word">${esc(card.word)}</div>
         ${frente ? `<div class="srs-card-front-sentence">${frente}</div>` : ''}
-        <div class="srs-card-front-hint">Clique para revelar</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:18px">
+          <div class="srs-card-front-hint">Clique para revelar</div>
+          <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:0.8rem"
+            onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">
+            🔊 Repetir
+          </button>
+        </div>
       </div>
       <div class="srs-card-face srs-card-back">
         <div class="srs-card-back-body">${verso}</div>
@@ -3059,7 +4078,14 @@ function flipSrsCard() {
   if (!flip) return
   const isFlipped = flip.classList.toggle('flipped')
   if (rating) rating.classList.toggle('hidden', !isFlipped)
-  if (hint) hint.textContent = isFlipped ? '↩ Voltar' : '👁 Revelar resposta'
+  if (hint) hint.textContent = isFlipped ? '↩ Ver frente' : '👁 Revelar resposta'
+}
+
+// Re-renderiza apenas o back do card em revisão (sem resetar o flip)
+async function renderSrsCardBack() {
+  const card = window._srsCurrentCard; if (!card) return
+  const body = document.querySelector('.srs-card-back-body'); if (!body) return
+  body.innerHTML = await buildSrsVersoAsync(card)
 }
 
 function rateSrsCardAndNext(cardId, rating) {
@@ -3157,21 +4183,43 @@ function buildSrsFrente(card) {
   } catch { return esc(cleanSentence) }
 }
 
-function buildSrsVerso(card) {
+// Async version checks ImageDB; sync version used for browser preview (no image check)
+async function buildSrsVersoAsync(card) {
+  const img = await ImageDB.get(imageKey(card))
+  return buildSrsVerso(card, img)
+}
+function buildSrsVerso(card, imgData) {
   const TYPE = {word:'vocabulário', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation'}
+  const strip = s => String(s||'').replace(/<[^>]*>/g,'')
   let v = ''
-  if (card.example_pt) v += `<div class="srs-back-translation">"${esc(card.example_pt)}"</div>`
+  if (card.example_pt) v += `<div class="srs-back-translation">"${esc(strip(card.example_pt))}"</div>`
   v += `<div class="srs-back-word">${esc(card.word)}</div>`
   if (card.ipa) v += `<div class="srs-back-ipa">${esc(card.ipa)}</div>`
+  v += `<button class="btn btn-ghost btn-sm" style="margin:4px 0 10px" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.word||'')">🔊 ${esc(card.word)}</button>`
   if (card.type && TYPE[card.type]) v += `<span class="srs-back-type-chip">${TYPE[card.type]}</span>`
-  v += `<div class="srs-back-meaning">${esc(card.meaning_pt)}</div>`
-  if (card.definition_pt) v += `<div class="srs-back-def">${esc(card.definition_pt)}</div>`
+  v += `<div class="srs-back-meaning">${esc(strip(card.meaning_pt))}</div>`
+  if (card.definition_pt) v += `<div class="srs-back-def">${esc(strip(card.definition_pt))}</div>`
   if (card.example_en) {
-    const bolded = buildSrsFrente(card)
-    v += `<div class="srs-back-example">"${bolded}"</div>`
+    const exText = strip(card.example_en)
+    v += `<div class="srs-back-example">"${buildSrsFrente(card)}"</div>`
+    v += `<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">🔊 Repetir frase</button>`
   }
-  if (card.example_pt) v += `<div class="srs-back-example-pt">"${esc(card.example_pt)}"</div>`
-  v += `<div class="srs-back-footer">${esc(card.source_type || '')}</div>`
+  // Imagem (se já gerada)
+  if (imgData) v += `<img src="${imgData}" class="srs-card-image" alt="${esc(card.word)}">`
+  const SRC = {series:'série', movie:'filme', youtube:'YouTube', kindle:'Kindle', podcast:'podcast', website:'site', manual:'manual'}
+  const deckLabel = card.deckId ? getSrsDeckPath(card.deckId) : ''
+  v += `<div class="srs-back-footer">${esc(SRC[card.source_type]||card.source_type||'')}${deckLabel ? ' · ' + esc(deckLabel) : ''}</div>`
+  // Botão Configurações (collapsível, quase imperceptível)
+  v += `<details class="srs-card-settings" onclick="event.stopPropagation()">
+    <summary>configurações</summary>
+    <div class="srs-card-settings-body">
+      <button class="btn btn-ghost btn-sm" style="font-size:0.8rem"
+        id="img-gen-btn-${card.id}"
+        onclick="event.stopPropagation();generateCardImage('${card.id}',this)">
+        🖼️ ${imgData ? 'Regenerar imagem' : 'Gerar imagem'}
+      </button>
+    </div>
+  </details>`
   return v
 }
 
@@ -3211,7 +4259,7 @@ async function checkAnkiOnLoad() {
 }
 
 function init() {
-  loadCfg(); loadWords(); loadSrs()
+  loadCfg(); loadWords(); loadSrs(); loadSrsDecks()
   renderDashboard()
   updateSrsBadge()
   initCloudSync()
