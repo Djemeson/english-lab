@@ -448,26 +448,36 @@ select option{background:var(--surface)}
 
 /* Study session */
 .srs-session-wrap{max-width:700px;margin:0 auto}
-/* Histórico de cards revisados */
-.srs-history-strip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;min-height:28px;align-items:center}
-.srs-hist-chip{
-  font-size:0.72rem;padding:3px 9px;border-radius:20px;
-  background:var(--surface2);border:1px solid var(--border);
-  color:var(--text3);opacity:0.55;cursor:default;user-select:none;
-  white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis
+/* Navegação de histórico */
+.srs-history-nav{display:flex;align-items:center;gap:8px;margin-bottom:12px;min-height:24px}
+.srs-hist-nav-btn{
+  font-size:0.78rem;padding:3px 10px;border-radius:20px;cursor:pointer;
+  background:var(--surface2);border:1px solid var(--border);color:var(--text3);
+  transition:all .15s;user-select:none
 }
-.srs-hist-chip.again{border-color:#F87171;color:#F87171}
-.srs-hist-chip.hard {border-color:var(--warning);color:var(--warning)}
-.srs-hist-chip.good {border-color:var(--success);color:var(--success)}
-.srs-hist-chip.easy {border-color:var(--primary);color:var(--primary)}
+.srs-hist-nav-btn:hover:not(:disabled){background:var(--surface3);color:var(--text);border-color:var(--text3)}
+.srs-hist-nav-btn:disabled{opacity:0.35;cursor:default}
+.srs-hist-nav-info{font-size:0.75rem;color:var(--text3);flex:1;text-align:center}
+.srs-hist-viewing-banner{
+  font-size:0.75rem;color:var(--text3);text-align:center;
+  padding:4px 12px;background:var(--surface2);border-radius:20px;
+  border:1px solid var(--border);margin-bottom:8px;display:none
+}
+/* Rating buttons desabilitados no modo histórico */
+.srs-rate-buttons.history-mode .srs-rate-btn{opacity:0.35;cursor:default;pointer-events:none}
 /* Layout verso com imagem ao lado */
-.srs-back-with-image{display:grid;grid-template-columns:1fr 200px;gap:20px;align-items:start}
-.srs-back-image-col img{
-  width:200px;height:200px;border-radius:12px;object-fit:cover;
-  border:1px solid var(--border);display:block
+/* Layout lado-a-lado: card sem padding, imagem ocupa altura total */
+.srs-card-face.srs-card-back.has-image{padding:0;overflow:hidden}
+.srs-back-with-image{display:grid;grid-template-columns:1fr 260px;align-items:stretch;width:100%;min-height:280px}
+.srs-back-text-col{padding:24px 28px;overflow-y:auto;min-width:0}
+.srs-back-image-col{
+  border-left:1px solid var(--border);
+  border-radius:0 var(--radius) var(--radius) 0;
+  overflow:hidden;background:var(--surface2)
 }
-/* Remove margem do card-image quando está no layout side-by-side */
-.srs-back-image-col .srs-card-image{max-width:100%;max-height:200px;margin:0;width:100%}
+.srs-back-image-col img{
+  width:100%;height:100%;object-fit:cover;display:block;border-radius:0
+}
 /* Undo button */
 .srs-undo-btn{
   font-size:0.78rem;color:var(--text3);background:none;border:none;
@@ -1114,7 +1124,12 @@ select option{background:var(--surface)}
       <div class="srs-progress-bar-wrap">
         <div class="srs-progress-bar" id="srs-progress-bar" style="width:0%"></div>
       </div>
-      <div class="srs-history-strip" id="srs-history-strip"></div>
+      <div class="srs-history-nav" id="srs-history-nav" style="display:none">
+        <button class="srs-hist-nav-btn" id="srs-hist-prev" onclick="navigateHistory(-1)" disabled>← Anterior</button>
+        <span class="srs-hist-nav-info" id="srs-hist-info"></span>
+        <button class="srs-hist-nav-btn" id="srs-hist-next" onclick="navigateHistory(1)" disabled>Atual →</button>
+      </div>
+      <div class="srs-hist-viewing-banner" id="srs-hist-banner">👁 Visualizando histórico — avaliação bloqueada</div>
       <div id="srs-card-area"></div>
     </div>
   </div>
@@ -4085,7 +4100,8 @@ function startSrsSession(filterDeckId = null) {
   el('srs-view-dashboard').classList.add('hidden')
   el('srs-view-session').classList.remove('hidden')
 
-  renderHistoryStrip()
+  _histNavIdx = null
+  renderHistoryNav()
   renderSrsCard()
 }
 
@@ -4135,7 +4151,7 @@ async function renderSrsCard() {
           </button>
         </div>
       </div>
-      <div class="srs-card-face srs-card-back">
+      <div class="srs-card-face srs-card-back${verso.includes('data-has-image') ? ' has-image' : ''}">
         <div class="srs-card-back-body">${verso}</div>
       </div>
     </div>
@@ -4206,20 +4222,97 @@ function rateSrsCardAndNext(cardId, rating) {
   }
 
   updateSrsBadge()
-  renderHistoryStrip()
+  _histNavIdx = null
+  renderHistoryNav()
   renderSrsCard()
 }
 
-function renderHistoryStrip() {
-  const strip = el('srs-history-strip'); if (!strip || !srsSession) return
+let _histNavIdx = null  // null = current card; number = index in history
+
+function renderHistoryNav() {
+  const nav  = el('srs-history-nav'); if (!srsSession) return
+  const prev = el('srs-hist-prev')
+  const next = el('srs-hist-next')
+  const info = el('srs-hist-info')
+  const banner = el('srs-hist-banner')
   const undoBtn = el('srs-undo-btn')
   if (undoBtn) undoBtn.disabled = srsSession.history.length === 0
-  // Últimos 8 cards avaliados (mais recente à direita)
-  const recent = srsSession.history.slice(-8)
-  strip.innerHTML = recent.map(h => {
-    const card = srsCards.find(c => c.id === h.cardId)
-    return `<span class="srs-hist-chip ${h.ratingLabel}" title="${card?.word || ''}">${card?.word || '?'}</span>`
-  }).join('')
+
+  const hasHistory = srsSession.history.length > 0
+  if (nav) nav.style.display = hasHistory ? 'flex' : 'none'
+  if (!hasHistory) { _histNavIdx = null; return }
+
+  const isViewing = _histNavIdx !== null
+  const idx = isViewing ? _histNavIdx : srsSession.history.length  // virtual "current" position
+  if (prev) prev.disabled = idx <= 0
+  if (next) next.disabled = !isViewing  // no "next" when already at current
+  if (info) info.textContent = isViewing
+    ? `${idx + 1} de ${srsSession.history.length} revisados`
+    : `${srsSession.history.length} revisado${srsSession.history.length !== 1 ? 's' : ''}`
+  if (banner) banner.style.display = isViewing ? 'block' : 'none'
+
+  // Bloquear rating buttons no modo histórico
+  const ratingArea = el('srs-rating-area')
+  if (ratingArea) ratingArea.classList.toggle('history-mode', isViewing)
+}
+
+async function navigateHistory(dir) {
+  if (!srsSession) return
+  const maxIdx = srsSession.history.length - 1
+  if (dir < 0) {
+    // Ir para anterior
+    if (_histNavIdx === null) _histNavIdx = maxIdx
+    else _histNavIdx = Math.max(0, _histNavIdx - 1)
+  } else {
+    // Ir para próximo / voltar ao atual
+    if (_histNavIdx === null) return
+    if (_histNavIdx >= maxIdx) { _histNavIdx = null }
+    else _histNavIdx++
+  }
+  await renderHistoryOrCurrent()
+}
+
+async function renderHistoryOrCurrent() {
+  if (_histNavIdx === null) {
+    // Mostrar card atual normalmente
+    await renderSrsCard()
+    return
+  }
+  // Mostrar card histórico (direto no verso, bloqueado)
+  const entry = srsSession.history[_histNavIdx]
+  if (!entry) return
+  const card = srsCards.find(c => c.id === entry.cardId) || entry.prevState
+  if (!card) return
+  window._srsCurrentCard = card
+  const frente = buildSrsFrente(card)
+  const verso = await buildSrsVersoAsync(card)
+  const ratingBtns = [
+    { cls: 'again', label: 'Errei',   r: 1 },
+    { cls: 'hard',  label: 'Difícil', r: 2 },
+    { cls: 'good',  label: 'Bom',     r: 3 },
+    { cls: 'easy',  label: 'Fácil',   r: 4 }
+  ].map(b => `<button class="srs-rate-btn ${b.cls}" disabled style="opacity:.35;cursor:default">
+    <span class="srb-label">${b.label}</span></button>`).join('')
+
+  el('srs-card-area').innerHTML = `
+  <div class="srs-flip-card flipped" id="srs-flip" style="cursor:default">
+    <div class="srs-flip-inner">
+      <div class="srs-card-face srs-card-front" style="display:none">${frente}</div>
+      <div class="srs-card-face srs-card-back${verso.includes('data-has-image') ? ' has-image' : ''}" style="display:flex;animation:none">
+        <div class="srs-card-back-body">${verso}</div>
+      </div>
+    </div>
+  </div>
+  <div class="srs-rate-buttons history-mode" id="srs-rating-area" style="display:flex">
+    ${ratingBtns}
+  </div>
+  <div style="text-align:center;margin-top:12px">
+    <span style="font-size:0.78rem;color:var(--text3)">avaliado como
+      <strong style="color:${{1:'#F87171',2:'var(--warning)',3:'var(--success)',4:'var(--primary)'}[entry.rating]}">${{1:'Errei',2:'Difícil',3:'Bom',4:'Fácil'}[entry.rating]}</strong>
+    </span>
+  </div>`
+
+  renderHistoryNav()
 }
 
 async function undoLastCard() {
@@ -4238,7 +4331,7 @@ async function undoLastCard() {
 
   saveSrsCards()
   updateSrsBadge()
-  renderHistoryStrip()
+  renderHistoryNav()
   await renderSrsCard()
   // Revelar verso automaticamente para o card restaurado
   const flip = el('srs-flip')
@@ -4362,11 +4455,13 @@ function buildSrsVerso(card, imgData) {
   </details>`
 
   // Layout: se tem imagem → duas colunas (texto | imagem)
+  // Marca o card-back com has-image para CSS remover padding
   if (imgData) {
-    return `<div class="srs-back-with-image">
+    // Adiciona classe ao container pai via flag no HTML
+    return `<div class="srs-back-with-image" data-has-image="1">
       <div class="srs-back-text-col">${text}</div>
       <div class="srs-back-image-col">
-        <img src="${imgData}" alt="${esc(card.word)}" style="width:200px;height:200px;border-radius:12px;object-fit:cover;border:1px solid var(--border)">
+        <img src="${imgData}" alt="${esc(card.word)}">
       </div>
     </div>`
   }
