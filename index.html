@@ -694,6 +694,31 @@ select option{background:var(--surface)}
 .srs-browser-row:hover{background:var(--surface2)}
 .srs-browser-row.selected{background:rgba(var(--primary-rgb),.1)}
 .btn-xs{padding:2px 7px!important;font-size:0.72rem!important;min-width:0}
+/* Lightbox de imagem */
+.img-lightbox{
+  position:fixed;inset:0;z-index:900;
+  background:rgba(0,0,0,.85);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;cursor:zoom-out;
+  animation:fadeIn .15s ease
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.img-lightbox img{
+  max-width:90vw;max-height:90vh;border-radius:12px;
+  box-shadow:0 24px 80px rgba(0,0,0,.6);cursor:default;
+  animation:scaleIn .2s ease
+}
+@keyframes scaleIn{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+/* Imagem clicável no card */
+.srs-back-image-col img{cursor:zoom-in}
+.srs-card-image{cursor:zoom-in}
+.bpp-card-image{cursor:zoom-in}
+/* Botão reset invisível */
+.reset-all-btn{
+  display:block;margin:32px auto 0;font-size:0.72rem;
+  color:var(--text3);background:none;border:none;cursor:pointer;
+  opacity:0.4;transition:opacity .2s;text-decoration:underline dotted
+}
+.reset-all-btn:hover{opacity:1;color:var(--error)}
 .browser-cb{width:15px;height:15px;cursor:pointer;accent-color:var(--primary);flex-shrink:0}
 .browser-toolbar{display:flex;align-items:center;gap:8px;padding:8px 14px;
   border-bottom:2px solid var(--border);background:var(--surface2);flex-wrap:wrap}
@@ -1140,6 +1165,7 @@ select option{background:var(--surface)}
   <div style="margin-top:24px">
     <button class="btn btn-primary" onclick="saveSettings()">💾 Salvar configurações</button>
   </div>
+  <button class="reset-all-btn" onclick="clearAllData()">apagar todos os dados e começar do zero</button>
 </section>
 
 <!-- =========== ESTUDAR (SRS) =========== -->
@@ -2911,11 +2937,29 @@ function importData(input) {
   reader.readAsText(file); input.value = ''
 }
 
-function clearAllData() {
-  if (!confirm('Apagar todos os dados locais? Faça um backup antes.')) return
-  if (!confirm('Tem certeza? Esta ação é irreversível.')) return
-  words = []; saveWords(); renderDashboard()
-  toast('Dados apagados.', 'info')
+async function clearAllData() {
+  if (!confirm('⚠️ Apagar TODOS os dados?\n\nIsso inclui:\n• Palavras e revisões\n• Cards SRS e progresso\n• Áudios gerados\n• Imagens geradas\n• Configurações\n\nFaça um backup antes.')) return
+  if (!confirm('Confirma? Esta ação é IRREVERSÍVEL.')) return
+
+  // localStorage
+  Object.values(SK).forEach(k => localStorage.removeItem(k))
+  localStorage.removeItem('englab_cfg')
+
+  // IndexedDB — áudio e imagens
+  try { await AudioDB.setAll({}) } catch {}
+  try { await ImageDB.setAll({}) } catch {}
+
+  // Reset state
+  words = []; srsCards = []; srsLog = []; srsDecks = []
+  cfg = { ...DEF_CFG }
+  srsCfg = { ...SRS_DEF_CFG }
+  _audioKeyCache = null; _imageKeyCache = null
+
+  renderDashboard()
+  fillSettings()
+  updateSrsBadge()
+  toast('✅ Todos os dados apagados. Começando do zero.', 'success')
+  setTimeout(() => showSection('dashboard'), 800)
 }
 
 // ================================================================
@@ -4727,6 +4771,28 @@ function clearConsulta() {
     <p style="font-size:0.85rem">Ex: "O que significa breaking bad?", "Como usar nevertheless?", "Diferença entre speak e talk"</p>
   </div>`
 }
+
+// ================================================================
+// LIGHTBOX — zoom de imagem ao clicar
+// ================================================================
+function openImageLightbox(src, alt) {
+  if (document.getElementById('img-lightbox')) return  // já aberto
+  const lb = document.createElement('div')
+  lb.className = 'img-lightbox'
+  lb.id = 'img-lightbox'
+  lb.onclick = () => lb.remove()
+  lb.innerHTML = `<img src="${src}" alt="${alt || ''}" onclick="event.stopPropagation()">`
+  document.body.appendChild(lb)
+}
+
+// Delegar clique em imagens do card (usando event delegation no body)
+document.addEventListener('click', e => {
+  const img = e.target.closest('.srs-back-image-col img, .bpp-card-image, .srs-card-image')
+  if (img) { e.stopPropagation(); openImageLightbox(img.src, img.alt) }
+})
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { document.getElementById('img-lightbox')?.remove() }
+})
 
 function init() {
   loadCfg(); loadWords(); loadSrs(); loadSrsDecks()
