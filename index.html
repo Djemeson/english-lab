@@ -2430,10 +2430,17 @@ function buildFrente(w, m, ex) {
   const wordPattern = wordRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   if (!wordPattern) return capFirst(esc(cleanSentence))
   try {
-    // Multi-word: match exato; single word: aceita inflexões comuns
-    const regex = isMultiWord
-      ? new RegExp(`\\b(${wordPattern})\\b`, 'gi')
-      : new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi')
+    // Multi-word: ancora no particle (2ª palavra em diante) e aceita qualquer verbo antes
+    // Ex: "give up" → bola "gave up", "giving up", "gives up" etc.
+    // Single word: aceita inflexões comuns
+    let regex
+    if (isMultiWord) {
+      const parts = wordRaw.split(/\s+/)
+      const particle = parts.slice(1).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
+      regex = new RegExp(`\\b(\\w+(?:'\\w+)?\\s+${particle})\\b`, 'gi')
+    } else {
+      regex = new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi')
+    }
     const bolded = cleanSentence.replace(regex, '<b>$1</b>')
     // Se não encontrou a expressão na frase gerada pela IA, retorna sem bold
     return capFirst(bolded.includes('<b>') ? bolded : esc(cleanSentence))
@@ -2442,41 +2449,61 @@ function buildFrente(w, m, ex) {
 
 function buildVerso(w, m, ex) {
   const SRC = { series:'série de TV', movie:'filme', youtube:'YouTube', kindle:'e-book/Kindle', podcast:'podcast', website:'site', manual:'input manual' }
+  const TYPE = { word:'vocabulário', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' }
+  const hr = '<hr class="el-hr">'
   let v = ''
-  // 1. Frase exemplo em PT — remove <b> do AI (posição errada em PT) e deixa só texto
+
+  // 1. Frase PT
   const ptSentence = (ex && ex.pt) || m.example_pt || ''
-  if (ptSentence) v += `${capFirst(esc(ptSentence.replace(/<\/?b>/gi, '')))}<br><br>`
-  // 2. Palavra + IPA + Definição
-  v += `${esc(w.word || '')}${w.ipa ? ' ' + esc(w.ipa) : ''} <br>`
-  if (m.definition_pt) v += ` <b>Definição:</b> ${esc(m.definition_pt)} <br>`
-  v += '<br>'
-  // 3. Tradução principal
-  if (m.meaning_pt) v += ` <b>Possíveis traduções:</b> ${esc(m.meaning_pt)} <br><br>`
-  // 4. Origem / Difusão / Uso / Status / Tom
-  if (m.origin)    v += ` <b>Origem:</b> ${esc(m.origin)} <br>`
-  if (m.diffusion) v += ` <b>Difusão:</b> ${esc(m.diffusion)} <br>`
-  if (m.usage)     v += ` <b>Uso:</b> ${esc(m.usage)} <br>`
-  if (m.status)    v += ` <b>Status:</b> ${esc(m.status)} <br>`
-  if (m.tone)      v += ` <b>Tom:</b> ${esc(m.tone)} <br>`
-  if (m.origin || m.diffusion || m.usage || m.status || m.tone) v += '<br>'
-  // 5. Notas culturais/de uso
-  if (m.notes && m.notes.length) { m.notes.forEach(n => { v += `${esc(n)}<br>` }); v += '<br>' }
-  // 6. Família de palavras
-  if (m.word_family && m.word_family.length) {
-    v += `<b>Família de palavras</b><br>`
-    m.word_family.forEach(wf => { v += `${esc(wf)}<br>` })
-    v += '<br>'
+  if (ptSentence) {
+    v += `<span class="el-pt">${capFirst(esc(ptSentence.replace(/<\/?b>/gi, '')))}</span>`
+    v += hr
   }
-  // 7. Sinônimos / Antônimos
-  if (m.synonyms && m.synonyms.length) v += `<b>Sinônimos:</b> ${m.synonyms.map(esc).join(', ')}<br>`
-  if (m.antonyms && m.antonyms.length) v += `<b>Antônimos:</b> ${m.antonyms.map(esc).join(', ')}<br>`
-  if ((m.synonyms && m.synonyms.length) || (m.antonyms && m.antonyms.length)) v += '<br>'
-  // 8. Gramática
-  if (m.grammar) { v += `<b>Informações gramaticais</b><br>Classe gramatical: ${esc(m.grammar)}<br><br>` }
-  // 9. Fonte
-  v += `<b>Fonte do objeto de estudo</b><br>`
-  v += `Mídia: ${esc(SRC[w.source_type] || w.source_type || 'desconhecido')}<br>`
-  if (w.source_title) v += `Título: <i>${esc(w.source_title)}</i>`
+
+  // 2. Expressão + IPA + tipo (badge)
+  v += `<span class="el-word">${esc(w.word || '')}</span>`
+  if (w.ipa) v += `&nbsp;<span class="el-ipa">${esc(w.ipa)}</span>`
+  if (w.type && TYPE[w.type]) v += `&nbsp;<span class="el-type">${TYPE[w.type]}</span>`
+  v += '<br>'
+
+  // 3. Definição
+  if (m.definition_pt) v += `<span class="el-def">${esc(m.definition_pt)}</span><br>`
+
+  // 4. Tradução principal — destaque
+  if (m.meaning_pt) v += `<br><span class="el-meaning">${esc(m.meaning_pt)}</span><br>`
+
+  // 5. Metadados compactos em uma linha
+  const metas = []
+  if (m.origin)    metas.push(`<b>Origem:</b> ${esc(m.origin)}`)
+  if (m.diffusion) metas.push(`<b>Difusão:</b> ${esc(m.diffusion)}`)
+  if (m.tone)      metas.push(`<b>Tom:</b> ${esc(m.tone)}`)
+  if (m.status)    metas.push(`<b>Status:</b> ${esc(m.status)}`)
+  if (m.usage)     metas.push(`<b>Uso:</b> ${esc(m.usage)}`)
+  if (metas.length) {
+    v += hr
+    v += `<span class="el-meta">${metas.join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</span><br>`
+  }
+
+  // 6. Notas de uso
+  if (m.notes && m.notes.length) {
+    v += `<span class="el-meta" style="font-style:italic">${m.notes.map(esc).join('<br>')}</span><br>`
+  }
+
+  // 7. Família / Sinônimos / Antônimos
+  const hasRelated = (m.word_family?.length) || (m.synonyms?.length) || (m.antonyms?.length)
+  if (hasRelated) {
+    v += hr
+    if (m.word_family?.length) v += `<span class="el-related"><b>Família:</b> ${m.word_family.map(esc).join(', ')}</span><br>`
+    if (m.synonyms?.length)    v += `<span class="el-related"><b>Sinônimos:</b> ${m.synonyms.map(esc).join(', ')}</span><br>`
+    if (m.antonyms?.length)    v += `<span class="el-related"><b>Antônimos:</b> ${m.antonyms.map(esc).join(', ')}</span><br>`
+  }
+
+  // 8. Rodapé — gramática + fonte
+  v += hr
+  const srcLabel = SRC[w.source_type] || w.source_type || '?'
+  const gramStr = m.grammar ? `${esc(m.grammar)}&nbsp;&nbsp;·&nbsp;&nbsp;` : ''
+  v += `<span class="el-footer">${gramStr}${esc(srcLabel)}${w.source_title ? ': <i>' + esc(w.source_title) + '</i>' : ''}</span>`
+
   return v
 }
 
@@ -2487,6 +2514,15 @@ async function sendToAnki(wordId) {
 
   const btn = document.querySelector('.wc-actions .btn-success')
   if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
+
+  // Verifica conexão com AnkiConnect antes de tentar enviar
+  try {
+    await callAnki('version')
+  } catch(e) {
+    toast(`❌ Anki inacessível: ${e.message}`, 'error')
+    if (btn) { btn.disabled = false; btn.textContent = `✓ Criar cards no Anki` }
+    return
+  }
 
   // Áudio do n8n (caso filesystem-v2 seja resolvido futuramente)
   const n8nAudioRaw = w.audio_base64 || null
@@ -2509,7 +2545,7 @@ async function sendToAnki(wordId) {
     return null
   }
 
-  let ok = 0, fail = 0
+  let ok = 0, fail = 0, lastError = ''
 
   const targetDeck = getAnkiDeck(w)
   console.log(`[English Lab] Deck alvo: "${targetDeck}" | tipo: ${w.type || '?'} | base cfg: "${cfg.ankiDeck}"`)
@@ -2557,8 +2593,14 @@ async function sendToAnki(wordId) {
         m.anki_ids.push(noteId)
         ok++
       } catch(e) {
-        console.warn('Anki error:', m.meaning_pt, ex.en, e.message)
-        fail++
+        const msg = (e.message || '').toLowerCase()
+        if (msg.includes('duplicate')) {
+          ok++ // trata duplicata como sucesso — card já existe no Anki
+        } else {
+          console.warn('Anki addNote erro:', e.message)
+          lastError = e.message
+          fail++
+        }
       }
     }
   }
@@ -2574,7 +2616,8 @@ async function sendToAnki(wordId) {
     else { activeWordId = null; el('review-main').innerHTML = `<div class="review-empty-main"><div class="icon">🎉</div><p>Fila zerada! Adicione mais palavras.</p></div>` }
     renderDashboard()
   } else {
-    toast(`Erro ao criar cards: verifique se o Anki está aberto`, 'error')
+    const errMsg = lastError ? `Erro Anki: ${lastError}` : 'Verifique se o Anki está aberto'
+    toast(errMsg, 'error')
     if (btn) { btn.disabled = false; btn.textContent = `✓ Criar ${selected.length} cards no Anki` }
   }
 }
@@ -4255,7 +4298,19 @@ function saveSrsCfg() {
 // INIT
 // ================================================================
 async function checkAnkiOnLoad() {
-  try { await callAnki('version'); updateAnkiNav(true) } catch { updateAnkiNav(false) }
+  try {
+    await callAnki('version')
+    updateAnkiNav(true)
+  } catch(e) {
+    updateAnkiNav(false)
+    // Se estiver em HTTPS e Anki não conectar, avisa sobre Private Network Access
+    if (location.protocol === 'https:') {
+      const msg = (e.message || '').toLowerCase()
+      if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load')) {
+        setTimeout(() => toast('⚠️ Anki não conecta via HTTPS. Abra o site como arquivo local (file://) ou atualize o AnkiConnect.', 'warning'), 1200)
+      }
+    }
+  }
 }
 
 function init() {
