@@ -1892,6 +1892,8 @@ TRANSLATION RULES:
           const isInstructionLeak = /global.?index|cada item|utiliza|return|json|vocabulary/i.test(ptStr)
           if (ptStr && !isInstructionLeak) {
             kindleItems[idx].context_pt = ptStr
+            const ptEl = document.getElementById(`ks-pt-${idx}`)
+            if (ptEl) ptEl.textContent = ptStr
           }
           if (!item) return
           const clean = String(item).toLowerCase()
