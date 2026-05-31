@@ -457,9 +457,23 @@ select option{background:var(--surface)}
   .srs-history-nav{gap:4px}
   .srs-hist-nav-btn{font-size:0.72rem;padding:3px 8px}
 
-  /* Navbar — scroll horizontal nas tabs */
-  .nav-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap}
-  .nav-tab{white-space:nowrap;font-size:0.78rem;padding:6px 10px}
+  /* Navbar mobile: 2 linhas */
+  .navbar{
+    flex-wrap:wrap;height:auto;padding:8px 12px;gap:6px;
+  }
+  .nav-brand{font-size:0.95rem}
+  .nav-tabs{
+    order:3;width:100%;overflow-x:auto;
+    -webkit-overflow-scrolling:touch;flex-wrap:nowrap;
+    padding-bottom:2px;gap:2px;
+  }
+  .nav-tab{white-space:nowrap;font-size:0.78rem;padding:5px 10px}
+  /* Indicadores e chip do user: ficam no topo direito */
+  .sync-indicator{font-size:0.72rem}
+  #fb-user-chip{order:2}
+  #fb-login-btn{order:2}
+  /* Esconder nome no chip, só mostrar foto */
+  #fb-user-name{display:none}
 
   /* Biblioteca */
   .srs-deck-table-wrap{padding:10px 12px}
