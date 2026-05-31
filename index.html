@@ -1395,7 +1395,7 @@ select option{background:var(--surface)}
 // ================================================================
 // STATE & STORAGE
 // ================================================================
-const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen' }
+const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue' }
 
 const DEF_CFG = {
   aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
@@ -1433,6 +1433,7 @@ function showSection(name) {
   document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', SECTIONS[i] === name))
   document.getElementById(`section-${name}`).classList.add('active')
   if (name === 'dashboard') renderDashboard()
+  if (name === 'adicionar') { if (loadKindleQueue()) renderKindleList() }
   if (name === 'revisar') renderReview()
   if (name === 'configuracoes') fillSettings()
   if (name === 'estudar') renderSrsSection()
@@ -1605,16 +1606,23 @@ function markKindleItemsAsSeen(items) {
 function handleKindleFile(input) {
   const file = input.files[0]; if (!file) return
   const reader = new FileReader()
-  reader.onload = e => {
+  reader.onload = async e => {
     const text = e.target.result
     const name = file.name.toLowerCase()
     let allItems
-    if (name.endsWith('.html') || name.endsWith('.htm')) {
+    // Detecta formato por conteúdo (mais confiável que extensão)
+    if (name.endsWith('.html') || name.endsWith('.htm') || text.includes("class='noteText'") || text.includes('class="noteText"')) {
       allItems = parseKindleHTML(text)
-    } else if (name.endsWith('.csv')) {
+    } else if (name.endsWith('.csv') && text.split('\n')[0]?.match(/word|usage|stem/i)) {
       allItems = parseKindleCSV(text)
-    } else {
+    } else if (/PÁGINA\s+\d+\s*[•·]\s*(DESTAQUE|MARCAÇÃO)/i.test(text) || /PAGE\s+\d+\s*[•·]\s*HIGHLIGHT/i.test(text)) {
+      allItems = parseKindleAndroidExport(text)
+    } else if (/={5,}/.test(text)) {
       allItems = parseKindleClippings(text)
+    } else {
+      // Tenta Android export como fallback para .txt não reconhecido
+      allItems = parseKindleAndroidExport(text)
+      if (!allItems.length) allItems = parseKindleClippings(text)
     }
 
     // Filtrar highlights já processados
@@ -1626,10 +1634,45 @@ function handleKindleFile(input) {
     const skipped = allItems.length - newItems.length
 
     kindleItems = newItems
+    // Mostra loading enquanto processa em lote
+    el('kindle-drop').classList.add('hidden')
+    el('kindle-result').classList.remove('hidden')
+    el('kindle-count').textContent = `⏳ Traduzindo ${kindleItems.length} destaques...`
+    el('kindle-list').innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)">
+      <div style="font-size:1.5rem;margin-bottom:12px">🔄</div>
+      <div>Processando todos os destaques com IA...</div>
+      <div style="font-size:0.82rem;margin-top:8px;color:var(--text3)">Isso pode levar alguns segundos</div>
+    </div>`
+    // Processa em lote e depois salva + renderiza
+    await analyzeKindleItems()
+    saveKindleQueue()
     renderKindleList(skipped, allItems.length)
   }
   reader.readAsText(file, 'utf-8')
   input.value = ''
+}
+
+// Persistência da fila Kindle
+function saveKindleQueue() {
+  localStorage.setItem(SK.kindleQueue, JSON.stringify(kindleItems))
+  autoSyncAfterChange()
+}
+
+function loadKindleQueue() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SK.kindleQueue) || '[]')
+    if (saved.length > 0) {
+      kindleItems = saved
+      return true
+    }
+  } catch {}
+  return false
+}
+
+function clearKindleQueue() {
+  kindleItems = []
+  localStorage.removeItem(SK.kindleQueue)
+  autoSyncAfterChange()
 }
 
 function parseKindleHTML(html) {
@@ -1673,6 +1716,54 @@ function parseKindleClippings(text) {
   }, [])
 }
 
+function parseKindleAndroidExport(text) {
+  // Formato do Kindle Android: "PÁGINA X • DESTAQUE (COR)" + texto
+  // Também suporta versão em inglês: "PAGE X • HIGHLIGHT (COLOR)"
+  const lines = text.split('\n').map(l => l.trim())
+
+  // Tenta extrair título (primeiras linhas não-vazias antes do primeiro PÁGINA/PAGE)
+  let bookTitle = 'Kindle'
+  for (let i = 0; i < Math.min(6, lines.length); i++) {
+    if (lines[i] && !/^(PÁGINA|PAGE|LOCATION|\d)/i.test(lines[i])) {
+      bookTitle = lines[i]
+      break
+    }
+  }
+
+  const items = []
+  const headerRe = /^(PÁGINA|PAGE)\s+\d+\s*[•·•]\s*(DESTAQUE|HIGHLIGHT|MARCAÇÃO)/i
+  const noteRe   = /^(NOTA|NOTE)\s*[:\-]/i
+  const citationRe = /["""]\s*\(([^)]+,\s*\d{4}[^)]*|[^)]+,\s*p\.\s*\d+[^)]*)\)\s*$/ // remove APA/MLA/Chicago
+
+  let i = 0
+  while (i < lines.length) {
+    if (headerRe.test(lines[i])) {
+      i++
+      // Coleta linhas de texto até o próximo header ou nota
+      const textParts = []
+      while (i < lines.length && !headerRe.test(lines[i]) && !noteRe.test(lines[i])) {
+        if (lines[i]) textParts.push(lines[i])
+        i++
+      }
+      let ctx = textParts.join(' ')
+        .replace(/^["""']+|["""']+$/g, '')           // remove aspas envolventes
+        .replace(citationRe, '')                      // remove citação APA/MLA/Chicago
+        .replace(/\s*\([A-Z][^)]+,\s*\d{4}[^)]*\)\s*$/, '') // mais padrões de citação
+        .trim()
+      if (ctx && ctx.length > 2) {
+        items.push({ word: '', context: ctx, source_type: 'kindle', source_title: bookTitle })
+      }
+    } else if (noteRe.test(lines[i])) {
+      // Pula notas do usuário
+      i++
+      while (i < lines.length && !headerRe.test(lines[i])) i++
+    } else {
+      i++
+    }
+  }
+  return items
+}
+
 function parseKindleCSV(text) {
   const lines = text.split('\n')
   const hasHeader = /word|usage/i.test(lines[0])
@@ -1684,8 +1775,9 @@ function parseKindleCSV(text) {
   }, [])
 }
 
-function resetKindleUpload() {
+function resetKindleUpload(clearQueue = true) {
   kindleItems = []
+  if (clearQueue) clearKindleQueue()
   el('kindle-result').classList.add('hidden')
   el('kindle-drop').classList.remove('hidden')
   el('kindle-file').value = ''
@@ -1736,63 +1828,58 @@ function renderKindleList(skipped, total) {
 
 async function analyzeKindleItems() {
   if (!cfg.openaiKey || !kindleItems.length) return
-  try {
-    // Usa índice 0-based explicitamente no prompt para evitar confusão
-    const lines = kindleItems.map((item, i) =>
-      `[${i}] "${(item.context || '').replace(/"/g, "'")}"${item.word ? ` (word: "${item.word}")` : ''}`
-    ).join('\n')
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 800,
-        response_format: { type: 'json_object' },
-        messages: [{
-          role: 'system',
-          content: `You are a vocabulary extraction assistant for English learners. For each sentence, identify the single most valuable vocabulary item to study AND provide a natural Portuguese translation of the full sentence.\n\nVOCABULARY RULES:\n1. Use MULTI-WORD only for: true phrasal verbs (give up, hold on, take off), fixed idioms (have a hard time, make up your mind), or permanent collocations that must be learned as a unit (break the ice, small talk, take part in).\n2. NEVER combine a regular transitive verb with its direct object (e.g. "munched pretzels" → use "munch"; "opened the door" → use "open"). They are not collocations.\n3. NEVER combine two separate verbs just because they appear together (e.g. "leaned and pushed" → pick the more interesting one).\n4. Return BASE FORM when possible: "munch" not "munched", "lean" not "leaned".\n5. Pick vocabulary with real study value: unusual/vivid words, phrasal verbs, idioms. Skip generic verbs (went, said, got) unless they're part of a phrasal verb or idiom.`
-        }, {
-          role: 'user',
-          content: `Each item below uses [0-based index]. Return the best vocabulary item AND a natural Portuguese translation of the full sentence.\n\n${lines}\n\nRespond ONLY with valid JSON: {"items": [{"i": 0, "item": "expression", "pt": "tradução natural em português"}, ...]}`
-        }]
+
+  const BATCH = 25  // itens por chamada à API
+  const SYSTEM_PROMPT = `You are a vocabulary extraction assistant for English learners. For each sentence, identify the single most valuable vocabulary item to study AND provide a natural Portuguese translation of the full sentence.
+
+VOCABULARY RULES:
+1. Use MULTI-WORD only for: true phrasal verbs (give up, hold on, take off), fixed idioms (have a hard time, make up your mind), or permanent collocations (break the ice, small talk, take part in).
+2. NEVER combine a regular transitive verb with its direct object ("munched pretzels" → "munch").
+3. Return BASE FORM: "munch" not "munched", "lean" not "leaned".
+4. Pick vocabulary with real study value: unusual/vivid words, phrasal verbs, idioms. Skip generic verbs (went, said, got) unless part of a phrasal/idiom.`
+
+  // Processa em lotes para cobrir todos os itens
+  for (let start = 0; start < kindleItems.length; start += BATCH) {
+    const batch = kindleItems.slice(start, start + BATCH)
+    const lines = batch.map((item, j) => {
+      const globalIdx = start + j
+      return `[${globalIdx}] "${(item.context || '').replace(/"/g, "'")}"${item.word ? ` (word: "${item.word}")` : ''}`
+    }).join('\n')
+
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          max_tokens: Math.max(600, batch.length * 30),
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: `Each item uses [global-index]. Return vocabulary item AND Portuguese translation.\n\n${lines}\n\nRespond ONLY with valid JSON: {"items": [{"i": 0, "item": "expression", "pt": "tradução natural em português"}, ...]}` }
+          ]
+        })
       })
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    // Remove possíveis blocos de código markdown antes do parse
-    let rawContent = (data.choices?.[0]?.message?.content || '{}').replace(/```(?:json)?\n?|\n?```/g, '').trim()
-    const result = JSON.parse(rawContent)
-    if (Array.isArray(result.items)) {
-      result.items.forEach(({ i, item, pt }) => {
-        const idx = Number(i)
-        if (isNaN(idx) || idx < 0 || idx >= kindleItems.length) return
-        // Armazena tradução PT
-        if (pt) {
-          kindleItems[idx].context_pt = String(pt).trim()
-          const ptEl = el(`ks-pt-${idx}`)
-          if (ptEl) ptEl.textContent = kindleItems[idx].context_pt
-        }
-        if (!item) return
-        const clean = String(item).toLowerCase().replace(/[.,!?;:"""''()\n]/g, '').trim()
-        if (!clean) return
-        setKindleWord(idx, clean)
-      })
-    }
-  } catch(e) {
-    console.warn('Análise Kindle em lote falhou:', e.message)
-    // Se falhou: mostra palavra original do Kindle (se existir) ou sinaliza erro visualmente
-    kindleItems.forEach((item, i) => {
-      const chip = el(`ke-${i}`)
-      if (!chip) return
-      if (item.word) {
-        chip.textContent = item.word
-        chip.classList.remove('loading')
-        const sentEl = el(`ks-${i}`)
-        if (sentEl && item.context) sentEl.innerHTML = highlightExprInSentence(item.context, item.word)
-      } else if (chip.classList.contains('loading')) {
-        chip.textContent = '✏️ selecione abaixo'
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      let raw = (data.choices?.[0]?.message?.content || '{}').replace(/```(?:json)?\n?|\n?```/g, '').trim()
+      const result = JSON.parse(raw)
+      if (Array.isArray(result.items)) {
+        result.items.forEach(({ i, item, pt }) => {
+          const idx = Number(i)
+          if (isNaN(idx) || idx < 0 || idx >= kindleItems.length) return
+          if (pt) kindleItems[idx].context_pt = String(pt).trim()
+          if (!item) return
+          const clean = String(item).toLowerCase().replace(/[.,!?;:"""\''()\n]/g, '').trim()
+          if (clean) {
+            kindleItems[idx].word = clean
+          }
+        })
       }
-    })
+    } catch(e) {
+      console.warn(`[Kindle] Lote ${start}-${start+BATCH} falhou:`, e.message)
+      // Mantém palavra original do Kindle se existir
+    }
   }
 }
 
@@ -1964,7 +2051,16 @@ function addKindleSelected() {
   // Marca os itens adicionados como processados para futuras importações
   markKindleItemsAsSeen(sel)
   toast(`${sel.length} itens adicionados à fila!`, 'success')
-  resetKindleUpload()
+  // Remove itens adicionados da queue e salva o restante
+  const addedHashes = new Set(sel.map(item => kindleHighlightHash(item.context || item.word)))
+  kindleItems = kindleItems.filter(item => !addedHashes.has(kindleHighlightHash(item.context || item.word)))
+  if (kindleItems.length > 0) {
+    saveKindleQueue()
+    renderKindleList()
+    toast(`${kindleItems.length} destaques restantes na fila`, 'info')
+  } else {
+    resetKindleUpload(true)
+  }
 }
 
 // ================================================================
@@ -3117,6 +3213,7 @@ async function clearAllData() {
   // localStorage
   Object.values(SK).forEach(k => localStorage.removeItem(k))
   localStorage.removeItem('el-kindle-seen')
+  localStorage.removeItem(SK.kindleQueue)
   localStorage.removeItem('englab_cfg')
 
   // IndexedDB — áudio e imagens
@@ -3362,6 +3459,9 @@ async function fbPush() {
     batch.set(base.collection('data').doc('srsCfg'),   { ...srsCfg, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsLog'),   { list: srsLog, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsDecks'), { list: srsDecks, updatedAt: Date.now() })
+    if (kindleItems.length > 0) {
+      batch.set(base.collection('data').doc('kindleQueue'), { list: kindleItems, updatedAt: Date.now() })
+    }
     await batch.commit()
 
     // Áudios (cada um como documento separado)
@@ -3406,6 +3506,11 @@ async function fbPull() {
     if (cfgDoc.exists)    { srsCfg    = { ...SRS_DEF_CFG, ...cfgDoc.data() }; persistSrsCfg() }
     if (logDoc.exists)    { srsLog    = logDoc.data().list || [];       saveSrsLog() }
     if (decksDoc.exists)  { srsDecks  = decksDoc.data().list || [];    saveSrsDecks() }
+    const kindleDoc = await base.collection('data').doc('kindleQueue').get()
+    if (kindleDoc.exists && kindleDoc.data().list?.length > 0) {
+      kindleItems = kindleDoc.data().list
+      localStorage.setItem(SK.kindleQueue, JSON.stringify(kindleItems))
+    }
 
     // Áudios — restaurar no IndexedDB
     const audioDocs = await base.collection('audio').get()
