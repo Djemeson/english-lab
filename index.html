@@ -989,6 +989,7 @@ select option{background:var(--surface)}
           <button class="btn btn-ghost btn-sm" onclick="selectAll('kindle-check',true)">Todos</button>
           <button class="btn btn-ghost btn-sm" onclick="selectAll('kindle-check',false)">Nenhum</button>
           <button class="btn btn-ghost btn-sm" onclick="resetKindleUpload()" title="Carregar outro arquivo" style="padding:4px 10px">🔄</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--error)" onclick="discardKindleSelected()">🗑 Descartar selecionados</button>
           <button class="btn btn-primary btn-sm" onclick="addKindleSelected()">➕ Adicionar selecionados</button>
         </div>
       </div>
@@ -2063,6 +2064,24 @@ async function detectKindleWord(i) {
     toast(`Erro na detecção: ${e.message}`, 'error')
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🤖' }
+  }
+}
+
+function discardKindleSelected() {
+  const sel = [...document.querySelectorAll('.kindle-check')].filter(c => c.checked).map(c => kindleItems[+c.dataset.i])
+  if (!sel.length) { toast('Selecione ao menos um item', 'warning'); return }
+  // Marca como vistos (não aparecerão em importações futuras)
+  markKindleItemsAsSeen(sel)
+  // Remove da fila atual
+  const discardedHashes = new Set(sel.map(item => kindleHighlightHash(item.context || item.word)))
+  kindleItems = kindleItems.filter(item => !discardedHashes.has(kindleHighlightHash(item.context || item.word)))
+  if (kindleItems.length > 0) {
+    saveKindleQueue()
+    renderKindleList()
+    toast(`${sel.length} descartado${sel.length !== 1 ? 's' : ''} · ${kindleItems.length} restante${kindleItems.length !== 1 ? 's' : ''}`, 'info')
+  } else {
+    resetKindleUpload(true)
+    toast(`${sel.length} descartado${sel.length !== 1 ? 's' : ''}. Fila vazia.`, 'info')
   }
 }
 
