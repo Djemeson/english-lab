@@ -758,6 +758,13 @@ select option{background:var(--surface)}
 .audio-badge-ok{font-size:0.78rem;color:var(--success)}
 .audio-badge-no{font-size:0.78rem;color:var(--warning)}
 </style>
+<!-- Firebase SDK -->
+<script type="module">
+  // Importado inline para evitar problemas de module scope
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -779,9 +786,17 @@ select option{background:var(--surface)}
     <div class="anki-dot" id="anki-dot"></div>
     <span id="anki-label">Anki</span>
   </div>
-  <div class="sync-indicator hidden" id="sync-indicator" onclick="showSection('configuracoes')" title="Sincronização em nuvem">
+  <div class="sync-indicator hidden" id="sync-indicator" title="Sincronização Firebase" onclick="showSection('configuracoes')" style="cursor:pointer">
     <div class="sync-dot" id="sync-dot"></div>
     <span id="sync-label">Nuvem</span>
+  </div>
+  <button id="fb-login-btn" class="btn btn-ghost btn-sm" onclick="firebaseSignIn()" style="display:none;font-size:0.78rem;padding:4px 10px">
+    🔑 Entrar com Google
+  </button>
+  <div id="fb-user-chip" style="display:none;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:6px">
+    <img id="fb-user-photo" src="" style="width:22px;height:22px;border-radius:50%;display:none">
+    <span id="fb-user-name"></span>
+    <button class="btn btn-ghost" style="font-size:0.7rem;padding:2px 6px" onclick="firebaseSignOut()">sair</button>
   </div>
 </nav>
 
@@ -1149,28 +1164,37 @@ select option{background:var(--surface)}
       </div>
     </div>
 
-    <!-- GitHub Gist Sync -->
+    <!-- Firebase Sync -->
     <div class="settings-card full">
-      <h3>☁️ Sincronização em nuvem (GitHub Gist)</h3>
-      <p class="desc">Seus dados do SRS ficam num Gist privado do GitHub — acessível de qualquer dispositivo. Crie um <a href="https://github.com/settings/tokens/new?scopes=gist&description=EnglishLab+SRS" target="_blank" style="color:var(--primary)">Personal Access Token</a> com escopo <code style="background:var(--surface3);padding:1px 5px;border-radius:3px">gist</code> e cole abaixo.</p>
-      <div class="form-row">
-        <div class="form-group" style="margin:0">
-          <label>GitHub Personal Access Token <span class="label-note">(escopo: gist)</span></label>
-          <input type="password" id="cfg-gist-token" placeholder="ghp_..." autocomplete="off">
-        </div>
-        <div class="form-group" style="margin:0">
-          <label>Gist ID <span class="label-note">(preenchido automaticamente na 1ª sincronização)</span></label>
-          <input type="text" id="cfg-gist-id" placeholder="Deixe vazio para criar automaticamente" autocomplete="off">
-        </div>
+      <h3>☁️ Sincronização em nuvem (Firebase)</h3>
+      <p class="desc">Faça login com sua conta Google para sincronizar todos os dados — palavras, cards, áudios e imagens — entre qualquer dispositivo automaticamente.</p>
+
+      <!-- Estado: não logado -->
+      <div id="fb-settings-logged-out">
+        <button class="btn btn-primary" onclick="firebaseSignIn()" style="margin-top:8px">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:16px;height:16px;vertical-align:middle;margin-right:6px">
+          Entrar com Google
+        </button>
       </div>
-      <div id="gist-sync-result" class="sync-status-row hidden">
-        <div class="sync-dot" id="gist-tdot"></div>
-        <span id="gist-tmsg"></span>
-      </div>
-      <div class="btn-group" style="margin-top:12px">
-        <button class="btn btn-secondary btn-sm" onclick="testGistSync()">🔗 Testar e sincronizar agora</button>
-        <button class="btn btn-ghost btn-sm" onclick="forcePullGist()">⬇ Forçar download da nuvem</button>
-        <button class="btn btn-ghost btn-sm" onclick="forcePushGist()">⬆ Forçar envio para nuvem</button>
+
+      <!-- Estado: logado -->
+      <div id="fb-settings-logged-in" style="display:none">
+        <div class="sync-status-row" style="margin-top:8px">
+          <div class="sync-dot ok"></div>
+          <div>
+            <span id="fb-settings-email" style="font-weight:600"></span>
+            <span style="color:var(--text3);margin-left:8px;font-size:0.8rem">conectado</span>
+          </div>
+        </div>
+        <div id="fb-sync-status" class="sync-status-row hidden" style="margin-top:8px">
+          <div class="sync-dot" id="fb-status-dot"></div>
+          <span id="fb-status-msg"></span>
+        </div>
+        <div class="btn-group" style="margin-top:12px">
+          <button class="btn btn-secondary btn-sm" onclick="fbForcePush()">⬆ Enviar dados para nuvem</button>
+          <button class="btn btn-secondary btn-sm" onclick="fbForcePull()">⬇ Baixar dados da nuvem</button>
+          <button class="btn btn-ghost btn-sm" onclick="firebaseSignOut()" style="color:var(--error)">Sair da conta</button>
+        </div>
       </div>
     </div>
 
@@ -2861,6 +2885,8 @@ function fillSettings() {
   el('cfg-f-ipa').value = cfg.fields?.ipa || 'IPA'
   el('cfg-f-examples').value = cfg.fields?.examples || 'Exemplos'
   el('cfg-f-audio').value = cfg.fields?.audio || 'Áudio'
+  // Atualiza UI Firebase com estado atual
+  if (_fbUser !== undefined) updateFirebaseUI(_fbUser)
 }
 
 function saveSettings() {
@@ -2873,8 +2899,7 @@ function saveSettings() {
   cfg.ankiDeck  = (_ds && _ds.style.display !== 'none' ? _ds.value  : el('cfg-anki-deck').value).trim()
   cfg.ankiModel = (_ms && _ms.style.display !== 'none' ? _ms.value : el('cfg-anki-model').value).trim()
   cfg.n8nBase = el('cfg-n8n').value.trim()
-  cfg.gistToken = el('cfg-gist-token').value.trim()
-  cfg.gistId = el('cfg-gist-id').value.trim().replace(/\/$/, '')
+  // Firebase — sem campos de token para salvar
   cfg.fields = {
     word: el('cfg-f-word').value.trim() || 'Frente',
     meaning: el('cfg-f-meaning').value.trim() || 'Verso',
@@ -3031,6 +3056,8 @@ async function clearAllData() {
   updateSrsBadge()
   toast('✅ Todos os dados apagados. Começando do zero.', 'success')
   setTimeout(() => showSection('dashboard'), 800)
+  // Sign out Firebase se estiver logado
+  if (_fbAuth && _fbUser) _fbAuth.signOut().catch(() => {})
 }
 
 // ================================================================
@@ -3151,7 +3178,6 @@ const GIST_AUDIO_FILENAME = 'english-lab-audio.json'
 const GIST_IMAGE_FILENAME = 'english-lab-images.json'
 
 function updateSyncNav(state) {
-  // state: 'off' | 'ok' | 'err' | 'syncing'
   const ind = el('sync-indicator')
   const dot = el('sync-dot')
   const lbl = el('sync-label')
@@ -3162,167 +3188,213 @@ function updateSyncNav(state) {
   lbl.textContent = state === 'ok' ? 'Nuvem' : state === 'err' ? 'Sync erro' : 'Sincronizando...'
 }
 
-function gistHeaders() {
-  return {
-    'Authorization': `Bearer ${cfg.gistToken}`,
-    'Accept': 'application/vnd.github+json',
-    'Content-Type': 'application/json',
-    'X-GitHub-Api-Version': '2022-11-28'
-  }
+// ================================================================
+// FIREBASE SYNC — Firestore + Google Auth
+// ================================================================
+const FB_CONFIG = {
+  apiKey: "AIzaSyCwMSwO27_UKQiOhnvhxvTQ7-ykD31mLEw",
+  authDomain: "english-lab-726e7.firebaseapp.com",
+  projectId: "english-lab-726e7",
+  storageBucket: "english-lab-726e7.firebasestorage.app",
+  messagingSenderId: "181422619156",
+  appId: "1:181422619156:web:7bb0bedbe6dd106dfe4501"
 }
 
-async function gistPush() {
-  if (!cfg.gistToken) return false
-  loadSrs()
-  const payload = { srsCards, srsCfg, srsLog, words, exportedAt: new Date().toISOString() }
-  // Carrega áudio do IndexedDB para incluir no push
-  const audioData = await AudioDB.getAll()
-  const imageData = await ImageDB.getAll()
-  const files = {
-    [GIST_FILENAME]: { content: JSON.stringify(payload) },
-  }
-  if (Object.keys(audioData).length > 0) {
-    files[GIST_AUDIO_FILENAME] = { content: JSON.stringify(audioData) }
-  }
-  if (Object.keys(imageData).length > 0) {
-    files[GIST_IMAGE_FILENAME] = { content: JSON.stringify(imageData) }
-  }
-  const body = JSON.stringify({ description: 'English Lab SRS data', public: false, files })
-  let res
-  if (cfg.gistId) {
-    res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, { method: 'PATCH', headers: gistHeaders(), body })
+let _fbApp = null, _fbDb = null, _fbAuth = null, _fbUser = null
+let _fbSyncTimer = null
+
+function initFirebase() {
+  if (_fbApp) return
+  try {
+    _fbApp  = firebase.initializeApp(FB_CONFIG)
+    _fbAuth = firebase.auth()
+    _fbDb   = firebase.firestore()
+    _fbAuth.onAuthStateChanged(user => {
+      _fbUser = user
+      updateFirebaseUI(user)
+      if (user) {
+        updateSyncNav('syncing')
+        fbPull().then(() => { updateSyncNav('ok'); renderDashboard(); updateSrsBadge() })
+               .catch(() => updateSyncNav('err'))
+      } else {
+        updateSyncNav('off')
+      }
+    })
+  } catch(e) { console.warn('[Firebase] init error:', e.message) }
+}
+
+function updateFirebaseUI(user) {
+  const loginBtn   = el('fb-login-btn')
+  const userChip   = el('fb-user-chip')
+  const loggedOut  = el('fb-settings-logged-out')
+  const loggedIn   = el('fb-settings-logged-in')
+
+  if (user) {
+    if (loginBtn)  loginBtn.style.display  = 'none'
+    if (userChip)  userChip.style.display  = 'flex'
+    const photo = el('fb-user-photo')
+    const name  = el('fb-user-name')
+    if (photo && user.photoURL) { photo.src = user.photoURL; photo.style.display = 'block' }
+    if (name) name.textContent = user.displayName || user.email
+    if (loggedOut) loggedOut.style.display = 'none'
+    if (loggedIn)  loggedIn.style.display  = 'block'
+    const emailEl = el('fb-settings-email')
+    if (emailEl) emailEl.textContent = user.displayName || user.email
   } else {
-    res = await fetch('https://api.github.com/gists', { method: 'POST', headers: gistHeaders(), body })
-    if (res.ok) {
-      const data = await res.json()
-      cfg.gistId = data.id
-      saveCfg()
-      // Update input field if visible
-      const inp = el('cfg-gist-id')
-      if (inp) inp.value = cfg.gistId
-    }
+    if (loginBtn)  loginBtn.style.display  = 'block'
+    if (userChip)  { userChip.style.display = 'none'; userChip.style.cssText += ';display:none' }
+    if (loggedOut) loggedOut.style.display = 'block'
+    if (loggedIn)  loggedIn.style.display  = 'none'
   }
-  return res.ok
 }
 
-async function gistPull() {
-  if (!cfg.gistToken || !cfg.gistId) return false
-  const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, { headers: gistHeaders() })
-  if (!res.ok) return false
-  const data = await res.json()
-  const fileContent = data.files?.[GIST_FILENAME]?.content
-  if (!fileContent) return false
-  const payload = JSON.parse(fileContent)
-  // Merge strategy: cloud wins for SRS data, local wins for words (words managed locally)
-  if (payload.srsCards) { srsCards = payload.srsCards; localStorage.setItem(SK.srsCards, JSON.stringify(srsCards)) }
-  if (payload.srsCfg)   { srsCfg   = { ...SRS_DEF_CFG, ...payload.srsCfg }; persistSrsCfg() }
-  if (payload.srsLog)   { srsLog   = payload.srsLog; saveSrsLog() }
-  if (payload.words && payload.words.length > words.length) { words = payload.words; saveWords() }
-  // Restaura áudio do Gist para IndexedDB local
-  const audioContent = data.files?.[GIST_AUDIO_FILENAME]?.content
-  if (audioContent) {
-    try {
-      const audioData = JSON.parse(audioContent)
-      await AudioDB.setAll(audioData)
-      console.log(`[SRS Audio] ${Object.keys(audioData).length} áudios restaurados da nuvem`)
-    } catch(e) { console.warn('[SRS Audio] Falha ao restaurar áudio:', e.message) }
-  }
-  const imageContent = data.files?.[GIST_IMAGE_FILENAME]?.content
-  if (imageContent) {
-    try {
-      const imgData = JSON.parse(imageContent)
-      await ImageDB.setAll(imgData)
-      console.log(`[SRS Image] ${Object.keys(imgData).length} imagens restauradas da nuvem`)
-    } catch(e) { console.warn('[SRS Image] Falha ao restaurar imagens:', e.message) }
-  }
-  return true
+async function firebaseSignIn() {
+  if (!_fbAuth) { initFirebase(); await new Promise(r => setTimeout(r, 500)) }
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider()
+    await _fbAuth.signInWithPopup(provider)
+  } catch(e) { toast('Erro ao entrar: ' + e.message, 'error') }
 }
 
-async function syncGist(direction = 'push') {
-  if (!cfg.gistToken) return
+async function firebaseSignOut() {
+  if (!confirm('Sair da conta Google? Os dados locais são mantidos.')) return
+  await _fbAuth?.signOut()
+  updateSyncNav('off')
+  toast('Saiu da conta.', 'info')
+}
+
+function userRef(path) {
+  if (!_fbDb || !_fbUser) return null
+  return _fbDb.collection('users').doc(_fbUser.uid).collection(path)
+}
+
+// ---- PUSH: local → Firestore ----
+async function fbPush() {
+  if (!_fbUser || !_fbDb) return false
   updateSyncNav('syncing')
   try {
-    if (direction === 'pull') { await gistPull() }
-    else { await gistPush() }
+    loadSrs()
+    const uid = _fbUser.uid
+    const base = _fbDb.collection('users').doc(uid)
+
+    // Dados principais em batch
+    const batch = _fbDb.batch()
+    batch.set(base.collection('data').doc('words'),    { list: words, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('srsCards'), { list: srsCards, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('srsCfg'),   { ...srsCfg, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('srsLog'),   { list: srsLog, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('srsDecks'), { list: srsDecks, updatedAt: Date.now() })
+    await batch.commit()
+
+    // Áudios (cada um como documento separado)
+    const audioData = await AudioDB.getAll()
+    for (const [key, val] of Object.entries(audioData)) {
+      await base.collection('audio').doc(key).set({ data: val, updatedAt: Date.now() })
+    }
+
+    // Imagens
+    const imageData = await ImageDB.getAll()
+    for (const [key, val] of Object.entries(imageData)) {
+      await base.collection('images').doc(key).set({ data: val, updatedAt: Date.now() })
+    }
+
     updateSyncNav('ok')
     return true
   } catch(e) {
-    console.warn('[SRS Sync] Error:', e.message)
+    console.warn('[Firebase] push error:', e)
     updateSyncNav('err')
     return false
   }
 }
 
-async function autoSyncAfterChange() {
-  if (!cfg.gistToken) return
-  // Debounce: wait 2s after last change before pushing
-  clearTimeout(window._syncTimer)
-  window._syncTimer = setTimeout(() => syncGist('push'), 2000)
-}
-
-// Buttons in settings
-async function testGistSync() {
-  const dot = el('gist-tdot'), msg = el('gist-tmsg'), box = el('gist-sync-result')
-  box.classList.remove('hidden')
-  dot.className = 'sync-dot syncing'; msg.textContent = 'Conectando...'
-  // Save token/id from form first
-  cfg.gistToken = el('cfg-gist-token').value.trim()
-  cfg.gistId = el('cfg-gist-id').value.trim()
-  saveCfg()
+// ---- PULL: Firestore → local ----
+async function fbPull() {
+  if (!_fbUser || !_fbDb) return false
+  updateSyncNav('syncing')
   try {
-    updateSyncNav('syncing')
-    const ok = await gistPush()
-    if (ok) {
-      dot.className = 'sync-dot ok'
-      msg.textContent = `✅ Sincronizado! Gist ID: ${cfg.gistId}`
-      el('cfg-gist-id').value = cfg.gistId
-      updateSyncNav('ok')
-      toast('Dados enviados para o GitHub Gist com sucesso!', 'success')
-    } else {
-      dot.className = 'sync-dot err'
-      msg.textContent = '❌ Falha. Verifique o token e tente novamente.'
-      updateSyncNav('err')
+    const base = _fbDb.collection('users').doc(_fbUser.uid)
+
+    // Dados principais
+    const [wordsDoc, cardsDoc, cfgDoc, logDoc, decksDoc] = await Promise.all([
+      base.collection('data').doc('words').get(),
+      base.collection('data').doc('srsCards').get(),
+      base.collection('data').doc('srsCfg').get(),
+      base.collection('data').doc('srsLog').get(),
+      base.collection('data').doc('srsDecks').get(),
+    ])
+
+    if (wordsDoc.exists)  { words     = wordsDoc.data().list || [];    saveWords() }
+    if (cardsDoc.exists)  { srsCards  = cardsDoc.data().list || [];    saveSrsCards() }
+    if (cfgDoc.exists)    { srsCfg    = { ...SRS_DEF_CFG, ...cfgDoc.data() }; persistSrsCfg() }
+    if (logDoc.exists)    { srsLog    = logDoc.data().list || [];       saveSrsLog() }
+    if (decksDoc.exists)  { srsDecks  = decksDoc.data().list || [];    saveSrsDecks() }
+
+    // Áudios — restaurar no IndexedDB
+    const audioDocs = await base.collection('audio').get()
+    const audioMap = {}
+    audioDocs.forEach(d => { audioMap[d.id] = d.data().data })
+    if (Object.keys(audioMap).length > 0) {
+      await AudioDB.setAll(audioMap)
+      _audioKeyCache = new Set(Object.keys(audioMap))
     }
+
+    // Imagens
+    const imageDocs = await base.collection('images').get()
+    const imageMap = {}
+    imageDocs.forEach(d => { imageMap[d.id] = d.data().data })
+    if (Object.keys(imageMap).length > 0) {
+      await ImageDB.setAll(imageMap)
+      _imageKeyCache = new Set(Object.keys(imageMap))
+    }
+
+    updateSyncNav('ok')
+    return true
   } catch(e) {
-    dot.className = 'sync-dot err'
-    msg.textContent = `❌ Erro: ${e.message}`
+    console.warn('[Firebase] pull error:', e)
     updateSyncNav('err')
+    return false
   }
 }
 
-async function forcePullGist() {
-  cfg.gistToken = el('cfg-gist-token').value.trim()
-  cfg.gistId = el('cfg-gist-id').value.trim()
-  saveCfg()
-  updateSyncNav('syncing')
-  try {
-    const ok = await gistPull()
-    if (ok) { updateSyncNav('ok'); toast('⬇ Dados importados da nuvem com sucesso!', 'success'); renderSrsSection() }
-    else { updateSyncNav('err'); toast('Falha ao importar. Verifique token e Gist ID.', 'error') }
-  } catch(e) { updateSyncNav('err'); toast('Erro: ' + e.message, 'error') }
+// ---- Auto-sync com debounce ----
+async function autoSyncAfterChange() {
+  if (!_fbUser) return
+  clearTimeout(_fbSyncTimer)
+  _fbSyncTimer = setTimeout(async () => {
+    await fbPush()
+  }, 2000)
 }
 
-async function forcePushGist() {
-  cfg.gistToken = el('cfg-gist-token').value.trim()
-  cfg.gistId = el('cfg-gist-id').value.trim()
-  saveCfg()
-  updateSyncNav('syncing')
-  try {
-    const ok = await gistPush()
-    if (ok) { updateSyncNav('ok'); toast('⬆ Dados enviados para a nuvem!', 'success') }
-    else { updateSyncNav('err'); toast('Falha ao enviar. Verifique o token.', 'error') }
-  } catch(e) { updateSyncNav('err'); toast('Erro: ' + e.message, 'error') }
+async function fbForcePush() {
+  const statusBox = el('fb-sync-status')
+  const dot = el('fb-status-dot')
+  const msg = el('fb-status-msg')
+  if (statusBox) statusBox.classList.remove('hidden')
+  if (dot) dot.className = 'sync-dot syncing'
+  if (msg) msg.textContent = 'Enviando dados...'
+  const ok = await fbPush()
+  if (dot) dot.className = 'sync-dot ' + (ok ? 'ok' : 'err')
+  if (msg) msg.textContent = ok ? '✅ Dados enviados com sucesso!' : '❌ Erro ao enviar.'
+  if (ok) toast('⬆ Dados enviados para o Firebase!', 'success')
 }
 
-async function initCloudSync() {
-  if (!cfg.gistToken) { updateSyncNav('off'); return }
-  updateSyncNav('syncing')
-  try {
-    const pulled = await gistPull()
-    updateSyncNav(pulled ? 'ok' : 'err')
-    if (pulled) { updateSrsBadge(); renderDashboard() }
-  } catch { updateSyncNav('err') }
+async function fbForcePull() {
+  const statusBox = el('fb-sync-status')
+  const dot = el('fb-status-dot')
+  const msg = el('fb-status-msg')
+  if (statusBox) statusBox.classList.remove('hidden')
+  if (dot) dot.className = 'sync-dot syncing'
+  if (msg) msg.textContent = 'Baixando dados...'
+  const ok = await fbPull()
+  if (dot) dot.className = 'sync-dot ' + (ok ? 'ok' : 'err')
+  if (msg) msg.textContent = ok ? '✅ Dados baixados com sucesso!' : '❌ Erro ao baixar.'
+  if (ok) { renderDashboard(); renderSrsSection(); updateSrsBadge(); toast('⬇ Dados sincronizados!', 'success') }
 }
+
+// Mantém compatibilidade com chamadas legadas do Gist
+async function initCloudSync() { initFirebase() }
+
+function gistHeaders() { return {} } // legacy stub
 
 // ================================================================
 // SRS ENGINE — SM-2 ALGORITHM
@@ -4955,7 +5027,7 @@ function init() {
   loadCfg(); loadWords(); loadSrs(); loadSrsDecks()
   renderDashboard()
   updateSrsBadge()
-  initCloudSync()
+  initFirebase()
   fillSettings()
   setupDrop('kindle-drop', handleKindleFile)
   checkAnkiOnLoad()
