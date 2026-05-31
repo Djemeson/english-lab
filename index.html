@@ -1749,6 +1749,7 @@ function parseKindleAndroidExport(text) {
         .replace(/^["""']+|["""']+$/g, '')           // remove aspas envolventes
         .replace(citationRe, '')                      // remove citação APA/MLA/Chicago
         .replace(/\s*\([A-Z][^)]+,\s*\d{4}[^)]*\)\s*$/, '') // mais padrões de citação
+        .replace(/[,;.]+$/, '')                       // remove pontuação final
         .trim()
       if (ctx && ctx.length > 2) {
         items.push({ word: '', context: ctx, source_type: 'kindle', source_title: bookTitle })
@@ -1829,21 +1830,37 @@ function renderKindleList(skipped, total) {
 async function analyzeKindleItems() {
   if (!cfg.openaiKey || !kindleItems.length) return
 
-  const BATCH = 25  // itens por chamada à API
-  const SYSTEM_PROMPT = `You are a vocabulary extraction assistant for English learners. For each sentence, identify the single most valuable vocabulary item to study AND provide a natural Portuguese translation of the full sentence.
+  const BATCH = 20  // menor para mais precisão e menos falhas
+
+  const SYSTEM_PROMPT = `You are a vocabulary extraction assistant for English learners.
+For each numbered sentence, do TWO things:
+1. ITEM: identify the single best vocabulary item to study (base form, no punctuation)
+2. PT: translate the full English sentence naturally to Brazilian Portuguese
 
 VOCABULARY RULES:
-1. Use MULTI-WORD only for: true phrasal verbs (give up, hold on, take off), fixed idioms (have a hard time, make up your mind), or permanent collocations (break the ice, small talk, take part in).
-2. NEVER combine a regular transitive verb with its direct object ("munched pretzels" → "munch").
-3. Return BASE FORM: "munch" not "munched", "lean" not "leaned".
-4. Pick vocabulary with real study value: unusual/vivid words, phrasal verbs, idioms. Skip generic verbs (went, said, got) unless part of a phrasal/idiom.`
+- Use multi-word ONLY for real phrasal verbs (give up, take off) or fixed idioms (break the ice)
+- NEVER combine verb + object ("munched pretzels" → "munch")
+- Base form only: "munch" not "munched"
+- Pick unusual/vivid/advanced words. Skip: went, said, got, came, looked (unless part of idiom)
 
-  // Processa em lotes para cobrir todos os itens
+TRANSLATION RULES:
+- PT must be a natural Brazilian Portuguese translation of the English sentence
+- If the entry is a single word with no sentence context, PT should be its meaning in Portuguese
+- NEVER put instruction text or index numbers in PT field`
+
   for (let start = 0; start < kindleItems.length; start += BATCH) {
     const batch = kindleItems.slice(start, start + BATCH)
+
+    // Separa itens com frase de itens com só palavra
     const lines = batch.map((item, j) => {
-      const globalIdx = start + j
-      return `[${globalIdx}] "${(item.context || '').replace(/"/g, "'")}"${item.word ? ` (word: "${item.word}")` : ''}`
+      const idx = start + j
+      const ctx = (item.context || '').replace(/"/g, "'").trim()
+      const hasWord = item.word && item.word !== ctx
+      if (ctx.split(/\s+/).length <= 2) {
+        // Highlight de palavra única ou dupla — não tem frase
+        return `${idx}. WORD: "${ctx}"`
+      }
+      return `${idx}. "${ctx}"${hasWord ? ` [known: ${item.word}]` : ''}`
     }).join('\n')
 
     try {
@@ -1852,33 +1869,39 @@ VOCABULARY RULES:
         headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
-          max_tokens: Math.max(600, batch.length * 30),
+          max_tokens: Math.max(800, batch.length * 40),
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: `Each item uses [global-index]. Return vocabulary item AND Portuguese translation.\n\n${lines}\n\nRespond ONLY with valid JSON: {"items": [{"i": 0, "item": "expression", "pt": "tradução natural em português"}, ...]}` }
+            { role: 'user', content: `Process these ${batch.length} highlights. For each number, return the vocabulary item and Portuguese translation/meaning.\n\n${lines}\n\nReturn ONLY this JSON format:\n{"items": [{"i": <number>, "item": "<vocabulary>", "pt": "<portuguese translation or meaning>"}, ...]}\n\nInclude ALL ${batch.length} items in your response.` }
           ]
         })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      let raw = (data.choices?.[0]?.message?.content || '{}').replace(/```(?:json)?\n?|\n?```/g, '').trim()
+      let raw = (data.choices?.[0]?.message?.content || '{}')
+        .replace(/```(?:json)?\n?|\n?```/g, '').trim()
       const result = JSON.parse(raw)
       if (Array.isArray(result.items)) {
         result.items.forEach(({ i, item, pt }) => {
           const idx = Number(i)
           if (isNaN(idx) || idx < 0 || idx >= kindleItems.length) return
-          if (pt) kindleItems[idx].context_pt = String(pt).trim()
+          // Valida que pt não é texto de instrução
+          const ptStr = String(pt || '').trim()
+          const isInstructionLeak = /global.?index|cada item|utiliza|return|json|vocabulary/i.test(ptStr)
+          if (ptStr && !isInstructionLeak) {
+            kindleItems[idx].context_pt = ptStr
+          }
           if (!item) return
-          const clean = String(item).toLowerCase().replace(/[.,!?;:"""\''()\n]/g, '').trim()
-          if (clean) {
+          const clean = String(item).toLowerCase()
+            .replace(/[.,!?;:"""\''()\n\[\]]/g, '').trim()
+          if (clean && clean.length > 0) {
             kindleItems[idx].word = clean
           }
         })
       }
     } catch(e) {
       console.warn(`[Kindle] Lote ${start}-${start+BATCH} falhou:`, e.message)
-      // Mantém palavra original do Kindle se existir
     }
   }
 }
