@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>English Lab</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -421,6 +422,64 @@ select option{background:var(--surface)}
 @media(max-width:900px){
   #section-estudar .srs-library-grid{grid-template-columns:180px 1fr !important}
   .browser-preview-panel{display:none}
+}
+/* ===== MOBILE SRS ===== */
+@media(max-width:640px){
+  /* Sessão de estudo */
+  .srs-session-wrap{padding:0 8px}
+  .srs-card-face{padding:18px 16px;min-height:160px}
+  .srs-card-front-word{font-size:1.5rem}
+  .srs-card-front-sentence{font-size:0.85rem}
+
+  /* Imagem: empilhar verticalmente no mobile */
+  .srs-back-with-image{
+    display:block!important;
+  }
+  .srs-back-text-col{padding:16px}
+  .srs-back-image-col{
+    border-left:none!important;
+    border-top:1px solid var(--border);
+    padding:12px 16px;
+    display:flex;justify-content:center;
+  }
+  .srs-back-image-col img{
+    width:100%;max-width:280px;
+    aspect-ratio:1/1;border-radius:10px;
+  }
+
+  /* Rating buttons */
+  .srs-rate-buttons{gap:6px}
+  .srs-rate-btn{padding:10px 6px;min-width:0;flex:1}
+  .srb-label{font-size:0.85rem}
+  .srb-interval{font-size:0.68rem}
+
+  /* Navegação histórico */
+  .srs-history-nav{gap:4px}
+  .srs-hist-nav-btn{font-size:0.72rem;padding:3px 8px}
+
+  /* Navbar — scroll horizontal nas tabs */
+  .nav-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap}
+  .nav-tab{white-space:nowrap;font-size:0.78rem;padding:6px 10px}
+
+  /* Biblioteca */
+  .srs-deck-table-wrap{padding:10px 12px}
+  .srs-deck-table{font-size:0.78rem}
+
+  /* Dashboard */
+  .stats-grid{grid-template-columns:1fr 1fr!important}
+  .srs-dashboard{grid-template-columns:1fr 1fr}
+
+  /* Biblioteca browser — ocultar painel preview */
+  .browser-preview-panel{display:none!important}
+  /* Grid biblioteca: só 2 colunas no mobile */
+  div[style*="grid-template-columns:210px"]{
+    grid-template-columns:160px 1fr!important;
+  }
+
+  /* Geral */
+  .main{padding:16px 12px}
+  .card-box-header{padding:10px 14px}
+  .page-header h1{font-size:1.3rem}
 }
 @media(max-width:700px){
   .stats-grid{grid-template-columns:1fr 1fr}
