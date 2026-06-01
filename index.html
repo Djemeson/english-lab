@@ -1791,20 +1791,22 @@ function renderKindleList(skipped, total) {
     const hasContext = !!item.context
     const iwords = getItemWords(item)
     const chipContent = iwords.length
-      ? `<div id="ke-wrap-${i}" style="display:flex;gap:5px;flex-wrap:wrap">${iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeKindleWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1" title="remover">×</span></span>`).join('')}</div>`
+      ? `<div id="ke-wrap-${i}" style="display:flex;gap:5px;flex-wrap:wrap">${iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeKindleWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1">×</span></span>`).join('')}</div>`
       : (cfg.openaiKey
-          ? `<div id="ke-wrap-${i}"><span class="kindle-expr-chip loading">⏳ analisando...</span></div>`
-          : `<div id="ke-wrap-${i}"><span class="kindle-expr-chip loading" style="color:var(--text3);font-size:0.75rem">Selecione com o mouse</span></div>`)
-    const sentenceHTML = hasContext
-      ? (iwords.length ? highlightMultipleExprs(item.context, iwords) : esc(item.context))
-      : esc(iwords[0] || '')
+          ? `<div id="ke-wrap-${i}"><span style="font-size:0.75rem;color:var(--text3);font-style:italic">⏳ analisando...</span></div>`
+          : `<div id="ke-wrap-${i}"><span style="font-size:0.75rem;color:var(--text3);font-style:italic">selecione com o mouse</span></div>`)
+    const sentenceHTML = hasContext ? esc(item.context) : esc(item.word || '')
+    const vocabRefHTML = item.vocab_ref?.length
+      ? `<div style="font-size:0.75rem;color:var(--text3);margin-top:3px">📌 ${item.vocab_ref.map(v=>esc(v)).join(' · ')}</div>`
+      : ''
     return `
     <div class="parsed-item" id="ki-${i}">
       <input type="checkbox" class="kindle-check" data-i="${i}" checked>
       <div class="parsed-item-body">
-        <div class="kindle-sentence selectable-sentence" id="ks-${i}" onmouseup="handleSentenceMouseUp(event,${i},'kindle')" title="Selecione com o mouse para adicionar objeto de estudo">${sentenceHTML}</div>
+        <div class="kindle-sentence selectable-sentence" id="ks-${i}" onmouseup="handleSentenceMouseUp(event,${i},'kindle')" title="Selecione com o mouse para adicionar ao estudo">${sentenceHTML}</div>
         <div class="kindle-sentence-pt" id="ks-pt-${i}">${esc(item.context_pt || '')}</div>
-        <div class="kindle-expr-row" style="flex-wrap:wrap;gap:5px">
+        ${vocabRefHTML}
+        <div class="kindle-expr-row" style="flex-wrap:wrap;gap:5px;margin-top:6px">
           ${chipContent}
         </div>
         <div class="parsed-meta">📖 ${esc(item.source_title)}${item.chapter ? ' · ' + esc(item.chapter) : ''}</div>
@@ -1819,12 +1821,14 @@ async function analyzeKindleItems() {
 
   const BATCH = 20  // menor para mais precisão e menos falhas
 
-  const SYSTEM_PROMPT = `For each numbered English text, return a JSON with:
-- i: the number
-- item: the best vocabulary word/expression to study (base form, no punctuation; for WORD: entries use that word)
-- trans: translate the full text to Brazilian Portuguese exactly as written (if WORD: entry, give the word meaning instead)
+  const SYSTEM_PROMPT = `For each numbered English sentence:
+1. Find ONLY phrasal verbs, idioms, collocations, and slang — NOT individual difficult words.
+2. Translate the full sentence to Brazilian Portuguese.
 
-Return ONLY: {"items":[{"i":<n>,"item":"<word>","trans":"<portuguese>"}]}`
+For WORD: entries (single isolated words), return empty vocab [] and the word meaning as trans.
+
+Return ONLY valid JSON:
+{"items":[{"i":<n>,"vocab":["phrasal verb","idiom","collocation","slang"],"trans":"<full Portuguese translation>"}]}`
 
   for (let start = 0; start < kindleItems.length; start += BATCH) {
     const batch = kindleItems.slice(start, start + BATCH)
@@ -2044,7 +2048,7 @@ function updateKindleWordsDisplay(i) {
   const iwords = getItemWords(item)
   // Sentence highlight
   const sentEl = el(`ks-${i}`)
-  if (sentEl) sentEl.innerHTML = item.context ? highlightMultipleExprs(item.context, iwords) : esc(iwords[0]||'')
+  if (sentEl) sentEl.innerHTML = item.context ? esc(item.context) : esc(iwords[0]||'')
   // Chips
   const wrap = el(`ke-wrap-${i}`)
   if (wrap) {
@@ -2164,12 +2168,13 @@ async function analyzeMidiaText() {
   el('midia-proc-results')?.classList.add('hidden')
   midiaProcessed = []
 
-  const SYSTEM = `For each numbered English text, return:
-- i: the number
-- item: best vocabulary word/expression to study (base form; for 1-3 word inputs use the input itself)
-- trans: translate the full text to Brazilian Portuguese exactly as written (for single words, give the meaning in Portuguese)
+  const SYSTEM = `For each numbered English sentence, find ALL interesting vocabulary a Brazilian learner should study: unusual/advanced words, phrasal verbs, idioms, collocations, slang. Return base forms, no punctuation.
+Also translate the full sentence to Brazilian Portuguese.
 
-Return ONLY: {"items":[{"i":<n>,"item":"<word>","trans":"<portuguese>"}]}`
+For short inputs (1-3 words), return that input in vocab and its meaning as trans.
+
+Return ONLY valid JSON:
+{"items":[{"i":<n>,"vocab":["word1","phrasal verb","idiom"],"trans":"<full Portuguese translation>"}]}`
 
   const numbered = lines.map((l, i) => `${i}. ${l}`).join('\n')
   try {
@@ -2256,7 +2261,7 @@ function updateMidiaWordsDisplay(idx) {
   const item = midiaProcessed[idx]; if (!item) return
   const iwords = getItemWords(item)
   const sentEl = el(`ms-${idx}`)
-  if (sentEl) sentEl.innerHTML = item.context ? highlightMultipleExprs(item.context, iwords) : esc(iwords[0]||'')
+  if (sentEl) sentEl.innerHTML = item.context ? esc(item.context) : esc(iwords[0]||'')
   const wrap = el(`me-wrap-${idx}`)
   if (wrap) {
     wrap.innerHTML = iwords.length
