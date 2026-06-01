@@ -5084,16 +5084,19 @@ function toggleBrowserDeck(deckId) {
   renderBrowserCardList(deckId)
 }
 
-function setBrowserSort(col) {
-  if (_browserSort.col === col) _browserSort.dir *= -1
-  else { _browserSort.col = col; _browserSort.dir = 1 }
-  // Update sort indicators
-  ['word','state','due','ease','audio','image'].forEach(c => {
+function refreshSortIndicators() {
+  ;['word','state','due','ease'].forEach(c => {
     const s = el('bsort-' + c)
     if (!s) return
     s.textContent = _browserSort.col === c ? (_browserSort.dir === 1 ? ' ▲' : ' ▼') : ''
-    s.className = _browserSort.col === c ? 'sort-active' : ''
+    s.className   = _browserSort.col === c ? 'sort-active' : ''
   })
+}
+
+function setBrowserSort(col) {
+  if (_browserSort.col === col) _browserSort.dir *= -1
+  else { _browserSort.col = col; _browserSort.dir = 1 }
+  refreshSortIndicators()
   if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value || '')
 }
 
@@ -5214,7 +5217,7 @@ async function renderBrowserCardList(deckId, query) {
   cards.sort(sortFns[_browserSort.col] || sortFns.state)
   _browserCurrentCards = cards
   _browserRenderedCount = Math.min(BROWSER_PAGE_SIZE, cards.length)
-  setBrowserSort(_browserSort.col)
+  refreshSortIndicators()
 
   const now = nowTs()
   const visible = cards.slice(0, _browserRenderedCount)
