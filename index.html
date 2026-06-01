@@ -2659,10 +2659,12 @@ let _audioGenAbort = false
 function cancelAudioGen() {
   _audioGenAbort = true
   el('audio-gen-banner')?.classList.add('hidden')
-  toast('Geração de áudio cancelada', 'info')
+  // Áudios já gerados estão salvos no IndexedDB — sincroniza o que foi feito
+  autoSyncAfterChange()
+  toast('Geração cancelada — áudios gerados até aqui foram salvos', 'info')
 }
 
-function _updateAudioBanner(done, total) {
+function _updateAudioBanner(done, total, saved) {
   const banner = el('audio-gen-banner')
   const bar    = el('audio-gen-bar')
   const label  = el('audio-gen-label')
@@ -2671,7 +2673,7 @@ function _updateAudioBanner(done, total) {
   banner.classList.remove('hidden')
   const pct = Math.round((done / total) * 100)
   if (bar)   bar.style.width = pct + '%'
-  if (label) label.textContent = `${done} / ${total}`
+  if (label) label.textContent = `${done} / ${total}${saved ? ` · ✓ ${saved} salvos` : ''}`
 }
 
 async function preGenerateAudio(cards) {
@@ -2683,23 +2685,33 @@ async function preGenerateAudio(cards) {
   _audioGenAbort = false
   const total = unique.length
   let done = 0, generated = 0
-  _updateAudioBanner(0, total)
+  _updateAudioBanner(0, total, 0)
+
+  const SYNC_EVERY = 5 // sincroniza Firebase a cada N áudios gerados
 
   for (const text of unique) {
     if (_audioGenAbort) break
-    const result = await ensureSrsAudio(text)
-    if (result) generated++
+    const result = await ensureSrsAudio(text) // salva no IndexedDB imediatamente
+    if (result) {
+      generated++
+      // Sincroniza Firebase a cada SYNC_EVERY — debounced, não sobrecarrega
+      if (generated % SYNC_EVERY === 0) autoSyncAfterChange()
+    }
     done++
-    _updateAudioBanner(done, total)
-    // Pequena pausa para não travar a UI e respeitar rate limits
-    await new Promise(r => setTimeout(r, 120))
+    _updateAudioBanner(done, total, generated)
+    await new Promise(r => setTimeout(r, 100))
   }
 
+  // Sync final para garantir que tudo chegou ao Firebase
+  if (generated > 0) autoSyncAfterChange()
+
   el('audio-gen-banner')?.classList.add('hidden')
-  if (generated > 0) {
-    autoSyncAfterChange()
-    toast(`✅ Áudio gerado: ${generated}/${total}`, 'success')
-  }
+  toast(
+    _audioGenAbort
+      ? `Cancelado — ${generated} áudio${generated!==1?'s':''} salvos`
+      : `✅ ${generated}/${total} áudio${generated!==1?'s':''} gerados e salvos`,
+    generated > 0 ? 'success' : 'info'
+  )
 }
 
 // ================================================================
