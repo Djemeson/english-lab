@@ -2235,15 +2235,18 @@ function renderMidiaProcessed() {
       : esc(iwords[0] || '')
     const chipsHTML = iwords.length
       ? iwords.map((w,wi) => `<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeMidiaWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1" title="remover">×</span></span>`).join('')
-      : `<span class="kindle-expr-chip loading" style="color:var(--text3);font-size:0.75rem">Selecione com o mouse</span>`
+      : `<span style="font-size:0.75rem;color:var(--text3);font-style:italic">selecione com o mouse</span>`
+    const vocabRefHTML = item.vocab_ref?.length
+      ? `<div style="font-size:0.75rem;color:var(--text3);margin-top:3px">📌 ${item.vocab_ref.map(esc).join(' · ')}</div>`
+      : ''
     return `
     <div class="parsed-item" id="mi-proc-${i}">
       <input type="checkbox" class="midia-proc-check" data-i="${i}" checked>
       <div class="parsed-item-body">
-        <div class="kindle-sentence selectable-sentence" id="ms-${i}" onmouseup="handleSentenceMouseUp(event,${i},'midia')" title="Selecione com o mouse para adicionar objeto de estudo">${sentHTML}</div>
+        <div class="kindle-sentence selectable-sentence" id="ms-${i}" onmouseup="handleSentenceMouseUp(event,${i},'midia')" title="Selecione com o mouse para adicionar ao estudo">${sentHTML}</div>
         ${item.context_pt ? `<div class="kindle-sentence-pt">${esc(item.context_pt)}</div>` : ''}
-        <div class="kindle-expr-row" id="me-wrap-${i}" style="flex-wrap:wrap;gap:5px">${chipsHTML}</div>
-
+        ${vocabRefHTML}
+        <div class="kindle-expr-row" id="me-wrap-${i}" style="flex-wrap:wrap;gap:5px;margin-top:4px">${chipsHTML}</div>
         <div class="parsed-meta">${srcIcon(item.source_type)} ${esc(item.source_title || item.source_type)}</div>
       </div>
     </div>`
