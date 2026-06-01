@@ -2511,6 +2511,7 @@ async function analyzeWord(wordId) {
     w.status = 'pending_review'
     w.ai_processed = true
     w.ai_provider = result.ai_provider || cfg.aiProvider
+    w.updated_at = new Date().toISOString()
     saveWords()
     renderSidebar()
     if (activeWordId === wordId) renderWordCard(wordId)
@@ -3623,7 +3624,28 @@ async function fbPull() {
       base.collection('data').doc('srsDecks').get(),
     ])
 
-    if (wordsDoc.exists)  { words     = wordsDoc.data().list || [];    saveWords() }
+    if (wordsDoc.exists) {
+      const cloudWords = wordsDoc.data().list || []
+      const localWords = (() => { try { return JSON.parse(localStorage.getItem(SK.words) || '[]') } catch { return [] } })()
+      // Merge: para cada palavra, mantém a versão mais "avançada"
+      // (analisada > pendente; ou mais recente se ambas analisadas)
+      const byId = {}
+      cloudWords.forEach(w => { byId[w.id] = w })
+      localWords.forEach(w => {
+        if (!byId[w.id]) { byId[w.id] = w; return }
+        const cloud = byId[w.id]
+        const localAnalyzed = w.status !== 'pending_ai' && w.ai_processed
+        const cloudAnalyzed = cloud.status !== 'pending_ai' && cloud.ai_processed
+        if (localAnalyzed && !cloudAnalyzed) { byId[w.id] = w; return }
+        if (!localAnalyzed && cloudAnalyzed) { return } // mantém cloud
+        // Ambos analisados: usa o mais recente
+        const localTs = w.updated_at || w.created_at || 0
+        const cloudTs = cloud.updated_at || cloud.created_at || 0
+        if (localTs > cloudTs) byId[w.id] = w
+      })
+      words = Object.values(byId)
+      saveWords()
+    }
     if (cardsDoc.exists)  { srsCards  = cardsDoc.data().list || [];    saveSrsCards() }
     if (cfgDoc.exists)    { srsCfg    = { ...SRS_DEF_CFG, ...cfgDoc.data() }; persistSrsCfg() }
     if (logDoc.exists)    { srsLog    = logDoc.data().list || [];       saveSrsLog() }
@@ -5201,147 +5223,3 @@ Preencha variety e register com precisão — são informações pedagógicas im
 Responda sempre em português (exceto os exemplos em inglês). Seja claro e didático.`
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: cfg.aiModel || 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ..._consultaHistory
-        ],
-        temperature: 0.7
-      })
-    })
-    if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || res.status) }
-    const data = await res.json()
-    const reply = data.choices[0].message.content
-
-    _consultaHistory.push({ role: 'assistant', content: reply })
-
-    // Remove loading
-    el(loadId)?.remove()
-
-    // Extrai bloco SRS se existir
-    const srsMatch = reply.match(/<srs_item>\s*([\s\S]*?)\s*<\/srs_item>/)
-    let srsItem = null
-    if (srsMatch) {
-      try { srsItem = JSON.parse(srsMatch[1]) } catch {}
-    }
-    // Exibe resposta sem o bloco JSON
-    const cleanReply = reply.replace(/<srs_item>[\s\S]*?<\/srs_item>/g, '').trim()
-    appendConsultaMsg('ai', formatConsultaReply(cleanReply), srsItem)
-
-  } catch(e) {
-    el(loadId)?.remove()
-    appendConsultaMsg('ai', `❌ Erro: ${esc(e.message)}`, null)
-    _consultaHistory.pop()
-  } finally {
-    if (input) { input.disabled = false; input.focus() }
-    const btn = el('consulta-send-btn'); if (btn) btn.disabled = false
-  }
-}
-
-function formatConsultaReply(text) {
-  // Markdown básico: **bold**, *italic*, listas
-  return text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/`(.+?)`/g,'<code style="background:var(--surface3);padding:1px 4px;border-radius:3px">$1</code>')
-    .replace(/^[-•] (.+)$/gm,'<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/s,'<ul style="padding-left:16px;margin:6px 0">$1</ul>')
-    .replace(/\n/g,'<br>')
-}
-
-function appendConsultaMsg(role, html, srsItem) {
-  const msgs = el('consulta-messages')
-  const addBtn = srsItem
-    ? `<br><button class="consulta-add-btn" onclick='addConsultaItemToSrs(${JSON.stringify(JSON.stringify(srsItem))})'>➕ Adicionar ao SRS</button>`
-    : ''
-  msgs.insertAdjacentHTML('beforeend',
-    `<div class="consulta-msg ${role}">${html}${addBtn}</div>`)
-  msgs.scrollTop = msgs.scrollHeight
-}
-
-function addConsultaItemToSrs(jsonStr) {
-  try {
-    const item = JSON.parse(jsonStr)
-    if (!item.word) { toast('Sem palavra para adicionar', 'warning'); return }
-    // Cria palavra na lista
-    const w = createWord({
-      word: item.word,
-      context: item.example_en || '',
-      source_type: 'manual'
-    })
-    // Adiciona significado pré-processado
-    w.meanings = [{
-      meaning_pt: item.meaning_pt || '',
-      definition_pt: item.definition_pt || '',
-      examples: item.example_en ? [{ en: item.example_en, pt: item.example_pt || '' }] : [],
-      selected: true
-    }]
-    w.ipa = item.ipa || ''
-    w.type = item.type || 'word'
-    // variety e register vão para o significado (meanings[0])
-    if (item.variety) w.meanings[0].variety = item.variety
-    if (item.register && item.register !== 'standard') w.meanings[0].register = item.register
-    w.status = 'pending_review'
-    w.ai_processed = true
-    saveWords()
-    renderDashboard()
-    updateSrsBadge()
-    // Salvar direto no SRS
-    saveToSrs(w.id)
-    toast(`"${item.word}" adicionado ao SRS!`, 'success')
-  } catch(e) { toast('Erro ao adicionar: ' + e.message, 'error') }
-}
-
-function clearConsulta() {
-  _consultaHistory = []
-  const msgs = el('consulta-messages')
-  if (msgs) msgs.innerHTML = `<div class="consulta-empty" id="consulta-empty">
-    <div class="icon">💬</div>
-    <p style="font-weight:600">Pergunte qualquer coisa em inglês</p>
-    <p style="font-size:0.85rem">Ex: "O que significa breaking bad?", "Como usar nevertheless?", "Diferença entre speak e talk"</p>
-  </div>`
-}
-
-// ================================================================
-// LIGHTBOX — zoom de imagem ao clicar
-// ================================================================
-function openImageLightbox(src, alt) {
-  if (document.getElementById('img-lightbox')) return  // já aberto
-  const lb = document.createElement('div')
-  lb.className = 'img-lightbox'
-  lb.id = 'img-lightbox'
-  lb.onclick = () => lb.remove()
-  lb.innerHTML = `<img src="${src}" alt="${alt || ''}" onclick="event.stopPropagation()">`
-  document.body.appendChild(lb)
-}
-
-// Delegar clique em imagens do card (usando event delegation no body)
-document.addEventListener('click', e => {
-  const img = e.target.closest('.srs-back-image-col img, .bpp-card-image, .srs-card-image')
-  if (img) { e.stopPropagation(); openImageLightbox(img.src, img.alt) }
-})
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { document.getElementById('img-lightbox')?.remove() }
-})
-
-function init() {
-  loadCfg(); loadWords(); loadSrs(); loadSrsDecks()
-  renderDashboard()
-  updateSrsBadge()
-  initFirebase()
-  fillSettings()
-  setupDrop('kindle-drop', handleKindleFile)
-  checkAnkiOnLoad()
-  if (!cfg.n8nBase) {
-    setTimeout(() => toast('Configure a URL do n8n em Configurações para usar a IA', 'info'), 1000)
-  }
-}
-
-document.addEventListener('DOMContentLoaded', init)
-</script>
-</body>
-</html>
