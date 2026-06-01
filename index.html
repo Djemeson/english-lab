@@ -1483,10 +1483,30 @@ function showTab(name) {
 }
 
 // ================================================================
+// ================================================================
+// BOOTSTRAP
+// ================================================================
+async function initApp() {
+  loadCfg()
+  loadWords()
+  loadSrs()          // loads srsCfg, srsLog, decks
+  await loadSrsAsync() // loads srsCards from IDB (migrates if needed)
+  renderDashboard()
+  updateSrsBadge()
+  initFirebase()
+}
+// Kick off when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp)
+} else {
+  initApp()
+}
+
+// ================================================================
 // DASHBOARD
 // ================================================================
 function renderDashboard() {
-  loadSrs()
+  // srsCards already in memory via initApp — no loadSrs() needed here
   const total   = words.length
   const inSrs   = words.filter(w => w.status === 'in_srs').length
   const inAnki  = words.filter(w => w.status === 'in_anki').length
@@ -2682,6 +2702,79 @@ async function preGenerateAudio(cards) {
   }
 }
 
+// ================================================================
+// CARDS DB — IndexedDB para srsCards (substitui localStorage)
+// Índices: deckId, state, due — queries sem carregar tudo na memória
+// ================================================================
+const CardsDB = {
+  _db: null,
+  async open() {
+    if (this._db) return this._db
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('english-lab-cards', 1)
+      req.onupgradeneeded = e => {
+        const db = e.target.result
+        if (!db.objectStoreNames.contains('cards')) {
+          const store = db.createObjectStore('cards', { keyPath: 'id' })
+          store.createIndex('deckId', 'deckId', { unique: false })
+          store.createIndex('state',  'state',  { unique: false })
+          store.createIndex('due',    'due',    { unique: false })
+          store.createIndex('wordId', 'wordId', { unique: false })
+        }
+      }
+      req.onsuccess = e => { this._db = e.target.result; resolve(this._db) }
+      req.onerror = () => reject(req.error)
+    })
+  },
+  async getAll() {
+    const db = await this.open()
+    return new Promise(resolve => {
+      const req = db.transaction('cards','readonly').objectStore('cards').getAll()
+      req.onsuccess = () => resolve(req.result || [])
+      req.onerror  = () => resolve([])
+    })
+  },
+  async getByDecks(deckIds) {
+    const db = await this.open()
+    const index = db.transaction('cards','readonly').objectStore('cards').index('deckId')
+    const results = await Promise.all([...new Set(deckIds)].map(id =>
+      new Promise(resolve => {
+        const req = index.getAll(id)
+        req.onsuccess = () => resolve(req.result || [])
+        req.onerror  = () => resolve([])
+      })
+    ))
+    return results.flat()
+  },
+  // Fire-and-forget — não bloqueia a UI
+  save(cards) {
+    this.open().then(db => {
+      const tx = db.transaction('cards','readwrite')
+      const store = tx.objectStore('cards')
+      store.clear()
+      for (const c of cards) store.put(c)
+    }).catch(console.warn)
+  },
+  saveOne(card) {
+    this.open().then(db => {
+      db.transaction('cards','readwrite').objectStore('cards').put(card)
+    }).catch(console.warn)
+  },
+  deleteCard(id) {
+    this.open().then(db => {
+      db.transaction('cards','readwrite').objectStore('cards').delete(id)
+    }).catch(console.warn)
+  },
+  async clear() {
+    const db = await this.open()
+    return new Promise(resolve => {
+      const req = db.transaction('cards','readwrite').objectStore('cards').clear()
+      req.onsuccess = resolve
+      req.onerror  = () => resolve()
+    })
+  }
+}
+
 // Reproduz áudio do card — usa cache IndexedDB, fallback Web Speech
 let _srsAudio = null
 async function playSrsTTS(text) {
@@ -2949,7 +3042,6 @@ async function saveAllToSrs() {
   // Suprime toasts individuais durante o batch
   const _toast = window._batchMode = true
   let ok = 0, totalCards = 0
-  loadSrs()
   for (const w of ready) {
     if (!w.meanings?.length) continue
     const selected = w.meanings.filter(m => m.selected !== false)
@@ -3287,7 +3379,6 @@ async function saveSelectedToSrs() {
     return w?.status === 'pending_review' && w.meanings?.some(m => m.selected !== false)
   })
   if (!ids.length) { toast('Nenhuma das selecionadas está pronta', 'warning'); return }
-  loadSrs()
   let ok = 0, totalCards = 0
   for (const id of ids) {
     const w = words.find(x => x.id === id)
@@ -3936,6 +4027,7 @@ async function clearAllData() {
   // IndexedDB — áudio e imagens
   try { await AudioDB.setAll({}) } catch {}
   try { await ImageDB.setAll({}) } catch {}
+  try { await CardsDB.clear() } catch {}
 
   // Reset state
   words = []; srsCards = []; srsLog = []; srsDecks = []
@@ -4165,7 +4257,6 @@ async function fbPush() {
   if (!_fbUser || !_fbDb) return false
   updateSyncNav('syncing')
   try {
-    loadSrs()
     const uid = _fbUser.uid
     const base = _fbDb.collection('users').doc(uid)
 
@@ -4340,14 +4431,39 @@ const SRS_DEF_CFG = {
   intervalModifier: 1.0
 }
 
+// loadSrs — carrega srsCfg, srsLog e decks (srsCards vem do IDB via initApp)
+// Mantido para compatibilidade mas NÃO recarrega srsCards do storage
 function loadSrs() {
-  try { srsCards = JSON.parse(localStorage.getItem(SK.srsCards) || '[]') } catch { srsCards = [] }
   try { srsCfg = { ...SRS_DEF_CFG, ...JSON.parse(localStorage.getItem(SK.srsCfg) || '{}') } } catch { srsCfg = { ...SRS_DEF_CFG } }
   try { srsLog = JSON.parse(localStorage.getItem(SK.srsLog) || '[]') } catch { srsLog = [] }
   loadSrsDecks()
 }
 
-function saveSrsCards() { localStorage.setItem(SK.srsCards, JSON.stringify(srsCards)) }
+// Carrega srsCards do IDB na inicialização; migra do localStorage se necessário
+async function loadSrsAsync() {
+  try {
+    let cards = await CardsDB.getAll()
+    if (!cards.length) {
+      // Migração única: dados antigos no localStorage
+      try {
+        const old = JSON.parse(localStorage.getItem(SK.srsCards) || '[]')
+        if (old.length) {
+          cards = old
+          CardsDB.save(cards) // persiste no IDB
+          localStorage.removeItem(SK.srsCards) // limpa localStorage
+          console.log(`[CardsDB] Migrated ${cards.length} cards from localStorage to IndexedDB`)
+        }
+      } catch {}
+    }
+    srsCards = cards
+  } catch(e) {
+    console.warn('[CardsDB] loadSrsAsync failed, falling back to localStorage', e)
+    try { srsCards = JSON.parse(localStorage.getItem(SK.srsCards) || '[]') } catch { srsCards = [] }
+  }
+}
+
+// saveSrsCards — grava no IDB (fire-and-forget, não bloqueia UI)
+function saveSrsCards() { CardsDB.save(srsCards) }
 function persistSrsCfg(){ localStorage.setItem(SK.srsCfg, JSON.stringify(srsCfg)) }
 function saveSrsLog()   { localStorage.setItem(SK.srsLog, JSON.stringify(srsLog)) }
 
@@ -4521,7 +4637,6 @@ function srsStreak() {
 
 // ---- Save word to SRS ----
 function saveToSrs(wordId) {
-  loadSrs()
   const w = words.find(x => x.id === wordId)
   if (!w || !w.meanings || !w.meanings.length) { toast('Sem significados para salvar', 'warning'); return }
   const selected = w.meanings.filter(m => m.selected !== false)
@@ -5071,8 +5186,10 @@ let _browserRenderedCount = 0
 
 async function renderBrowserCardList(deckId, query) {
   const panel = el('srs-browser-cards'); if (!panel) return
+  panel.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text3);font-size:0.85rem">Carregando...</div>`
   const allIds = [deckId, ...getAllDescendantIds(deckId)]
-  let cards = srsCards.filter(c => allIds.includes(c.deckId))
+  // Query indexada por deckId — não filtra o array inteiro em memória
+  let cards = await CardsDB.getByDecks(allIds)
   if (query) { const q = query.toLowerCase(); cards = cards.filter(c => (c.word||'').toLowerCase().includes(q) || (c.meaning_pt||'').toLowerCase().includes(q)) }
   if (!cards.length) { panel.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)">Nenhum card neste deck</div>`; return }
 
@@ -5943,20 +6060,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { document.getElementById('img-lightbox')?.remove() }
 })
 
-function init() {
-  loadCfg(); loadWords(); loadSrs(); loadSrsDecks()
-  renderDashboard()
-  updateSrsBadge()
-  initFirebase()
-  fillSettings()
-  setupDrop('kindle-drop', handleKindleFile)
-  checkAnkiOnLoad()
-  if (!cfg.n8nBase) {
-    setTimeout(() => toast('Configure a URL do n8n em Configurações para usar a IA', 'info'), 1000)
-  }
-}
-
-document.addEventListener('DOMContentLoaded', init)
+// Bootstrap is handled by initApp() defined above
 </script>
 </body>
 </html>
