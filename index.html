@@ -327,6 +327,12 @@ select option{background:var(--surface)}
 }
 .review-empty-main .icon{font-size:3rem;margin-bottom:12px}
 
+/* Word card toolbar (above card) */
+.wc-toolbar{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:8px 0 10px;flex-wrap:wrap;
+}
+
 /* Word card */
 .word-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
 .wc-header{padding:20px 24px;border-bottom:1px solid var(--border)}
@@ -1402,7 +1408,11 @@ select option{background:var(--surface)}
 // ================================================================
 // STATE & STORAGE
 // ================================================================
-const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue' }
+const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue', deletedWords: 'el-deleted-words' }
+
+function loadDeletedIds() { try { return new Set(JSON.parse(localStorage.getItem(SK.deletedWords) || '[]')) } catch { return new Set() } }
+function saveDeletedIds(ids) { localStorage.setItem(SK.deletedWords, JSON.stringify([...ids])) }
+function markDeleted(id) { const ids = loadDeletedIds(); ids.add(id); saveDeletedIds(ids) }
 
 const DEF_CFG = {
   aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
@@ -2739,12 +2749,15 @@ async function analyzeWordDirect(wordId) {
 Item: "${target}"
 ${ctx ? `Context sentence: "${ctx}"` : ''}
 
-Rules for examples:
-- Use EXACTLY 3 examples per meaning, each in a DIFFERENT tense or construction (e.g., present simple, past simple, present continuous, future, conditional, imperative, passive, etc.)
-- Use different subjects (he, she, they, I, we, you, names)
-- Use varied, natural real-world contexts — not formulaic repetitions of the same pattern
-- Wrap the target word/expression in <b></b> tags as it appears in each sentence (including conjugated/inflected forms)
-- Each example must feel like it could come from a novel, article, or conversation
+Rules for examples — CRITICAL, follow exactly:
+- Write EXACTLY 3 examples per meaning
+- Each example MUST use a completely different grammatical tense or construction. Do NOT repeat the same tense. Good variety: #1 present simple, #2 past simple or past perfect, #3 present continuous or future or conditional or imperative or passive
+- Each example MUST have a different subject (mix: he/she/they/I/we/you/a proper name/a noun phrase)
+- Each example MUST describe a genuinely different real-world situation or context (work, relationships, sports, travel, news, etc.)
+- NEVER use formulaic sentence patterns — sentences should feel natural, like they come from a novel, news article, or real conversation
+- Wrap the target word/expression in <b></b> tags exactly as it appears conjugated/inflected in that sentence
+- BAD (avoid): "#1 He backs down. #2 She backed down. #3 They are backing down." — same pattern, different pronouns
+- GOOD: "#1 The senator backed down after facing criticism from his own party. #2 Don't back down just because the situation gets uncomfortable. #3 She never backs down from a challenge, even when the odds are against her."
 
 Return ONLY this JSON (no markdown, no explanation):
 {
@@ -2775,8 +2788,8 @@ Return ONLY this JSON (no markdown, no explanation):
       method: 'POST',
       headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: cfg.aiModel || 'gpt-4o-mini',
-        max_tokens: 1200,
+        model: cfg.aiModel || 'gpt-4o',
+        max_tokens: 1400,
         response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: PROMPT }]
       })
@@ -3197,6 +3210,7 @@ function deleteSelected() {
   if (!ids.length) return
   if (!confirm(`Excluir ${ids.length} item${ids.length!==1?'s':''}?`)) return
   ids.forEach(id => {
+    markDeleted(id)
     const idx = words.findIndex(w => w.id === id)
     if (idx !== -1) words.splice(idx, 1)
   })
@@ -3265,11 +3279,33 @@ function renderWordCard(wordId) {
   }
 
   main.innerHTML = `
+  <div class="wc-toolbar">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      ${w.status === 'pending_review' && w.meanings.length > 0 ? `
+        <button class="btn btn-success btn-sm" onclick="sendToAnki('${w.id}')">
+          ✓ Criar ${totalCards} card${totalCards !== 1 ? 's' : ''} no Anki
+        </button>
+        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')">
+          📚 Salvar no site
+        </button>
+      ` : ''}
+      ${w.status === 'pending_ai' ? '' : `
+        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')">
+          🔄 Re-analisar
+        </button>
+      `}
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="btn btn-ghost btn-sm" onclick="speakWord('${escA(w.word || w.context)}')" title="Ouvir">🔊</button>
+      <button class="btn btn-ghost btn-sm" onclick="skipWord('${w.id}')" title="Pular">⟶</button>
+      <button class="btn btn-ghost btn-sm" onclick="deleteWord('${w.id}')" title="Excluir">🗑</button>
+    </div>
+  </div>
   <div class="word-card">
     <div class="wc-header">
       <div class="wc-word" style="display:flex;align-items:center;gap:8px">
         <span id="wc-word-text-${w.id}">${esc(w.word || '(frase)')}</span>
-        <button class="btn btn-ghost btn-xs" title="Editar item de estudo" onclick="startEditWord('${w.id}')" id="wc-edit-btn-${w.id}" style="font-size:0.75rem;padding:2px 6px">✏️</button>
+        <button class="btn btn-ghost btn-xs" title="Editar" onclick="startEditWord('${w.id}')" id="wc-edit-btn-${w.id}" style="font-size:0.75rem;padding:2px 6px">✏️</button>
         <input type="text" id="wc-word-input-${w.id}" value="${escA(w.word || '')}" style="display:none;font-size:1.2rem;font-weight:700;background:var(--surface2);border:1px solid var(--primary);border-radius:6px;padding:2px 8px;color:var(--text);width:200px" onkeydown="handleEditWordKey(event,'${w.id}')" onblur="confirmEditWord('${w.id}')">
       </div>
       <div class="wc-meta">
@@ -3280,24 +3316,6 @@ function renderWordCard(wordId) {
       ${ctxHtml ? `<div class="wc-context">"${ctxHtml}"</div>` : ''}
     </div>
     ${bodyHtml}
-    <div class="wc-actions">
-      ${w.status === 'pending_review' && w.meanings.length > 0 ? `
-        <button class="btn btn-success" onclick="sendToAnki('${w.id}')">
-          ✓ Criar ${totalCards} card${totalCards !== 1 ? 's' : ''} no Anki
-        </button>
-        <button class="btn btn-srs" onclick="saveToSrs('${w.id}')">
-          📚 Salvar no site
-        </button>
-      ` : ''}
-      ${w.status === 'pending_ai' ? '' : `
-        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')">
-          🔄 Re-analisar com IA
-        </button>
-      `}
-      <button class="btn btn-ghost btn-sm" onclick="speakWord('${escA(w.word || w.context)}')">🔊</button>
-      <button class="btn btn-ghost btn-sm" onclick="skipWord('${w.id}')">⟶ Pular</button>
-      <button class="btn btn-ghost btn-sm" onclick="deleteWord('${w.id}')">🗑</button>
-    </div>
   </div>`
 }
 
@@ -3325,8 +3343,8 @@ function renderMeaningItem(wordId, m, mi) {
         <div style="display:flex;gap:8px;align-items:baseline">
           <span style="font-size:0.7rem;color:var(--text3);flex-shrink:0;font-weight:600">#${ei+1}</span>
           <div style="flex:1">
-            <div class="en">"${esc(ex.en)}"</div>
-            ${ex.pt ? `<div class="pt">"${allowBold(ex.pt)}"</div>` : ''}
+            <div class="en">"${allowBold(ex.en)}"</div>
+            ${ex.pt ? `<div class="pt">"${esc(ex.pt)}"</div>` : ''}
           </div>
         </div>
       </div>` : '').join('')}
@@ -3610,8 +3628,12 @@ function skipWord(id) {
 function deleteWord(id) {
   const w = words.find(x => x.id === id)
   if (!confirm(`Remover "${w?.word || '(frase)'}" permanentemente?`)) return
+  markDeleted(id)
   words = words.filter(x => x.id !== id); saveWords()
   toast('Removida', 'info')
+  const next = words.find(x => ['pending_ai','pending_review'].includes(x.status) && x.id !== id)
+  if (next) { activeWordId = next.id }
+  else activeWordId = null
   renderReview()
   renderDashboard()
 }
@@ -4081,11 +4103,13 @@ async function fbPull() {
     if (wordsDoc.exists) {
       const cloudWords = wordsDoc.data().list || []
       const localWords = (() => { try { return JSON.parse(localStorage.getItem(SK.words) || '[]') } catch { return [] } })()
+      const deletedIds = loadDeletedIds()
       // Merge: para cada palavra, mantém a versão mais "avançada"
       // (analisada > pendente; ou mais recente se ambas analisadas)
       const byId = {}
-      cloudWords.forEach(w => { byId[w.id] = w })
+      cloudWords.forEach(w => { if (!deletedIds.has(w.id)) byId[w.id] = w })
       localWords.forEach(w => {
+        if (deletedIds.has(w.id)) return // ignorar deletadas
         if (!byId[w.id]) { byId[w.id] = w; return }
         const cloud = byId[w.id]
         const localAnalyzed = w.status !== "pending_ai"
