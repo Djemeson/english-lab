@@ -2748,18 +2748,20 @@ For Portuguese translations of examples:
 - Each Portuguese translation should read like natural Brazilian Portuguese, not like a translation
 
 Rules for meanings — CRITICAL:
-- If the word/expression has MORE THAN ONE distinct sense, return EACH as a SEPARATE object in the meanings array
-- NEVER merge two different senses into one meaning using semicolons (e.g. "decolar; ter sucesso" is WRONG — those must be two separate meaning objects)
-- Each meaning MUST have its own 3 examples showing that specific sense in use
-- Set "context_match": true ONLY for the meaning that matches the context sentence (if provided); others get false
-- If context is provided, put the matching meaning FIRST in the array
-- A word/expression typically has 1-3 distinct meanings; capture all relevant ones
+- The context sentence is ONLY used to identify the word correctly and to mark which sense appeared there. It does NOT limit which meanings you return.
+- ALWAYS return ALL distinct senses the word has in common English usage — not just the one from the context.
+- Think of yourself as a dictionary: if the word has 3 senses, return 3 meaning objects. If it has 2, return 2. Never collapse them into one.
+- NEVER merge two different senses into one meaning using semicolons (e.g. "decolar; ter sucesso" is WRONG — those must be two separate objects)
+- NEVER omit a common sense just because it doesn't appear in the context sentence
+- Each meaning MUST have its own 3 examples that illustrate that specific sense
+- Set "context_match": true ONLY for the meaning that matches the context sentence; all others get false
+- Put the context-matching meaning FIRST in the array (so the learner sees their original context first)
 
-Example of CORRECT behavior for "take off":
+Example of CORRECT behavior for "take off" with context "his startup took off overnight":
 meanings: [
-  { meaning_pt: "decolar", definition_pt: "Quando um avião ou foguete deixa o solo.", context_match: false, examples: [...] },
-  { meaning_pt: "ter sucesso repentino", definition_pt: "Quando algo começa a crescer ou se tornar popular rapidamente.", context_match: true, examples: [...] },
-  { meaning_pt: "tirar, remover", definition_pt: "Remover algo do corpo, como roupas ou acessórios.", context_match: false, examples: [...] }
+  { meaning_pt: "ter sucesso repentino", ..., context_match: true,  examples: [...] },  ← matches context, comes first
+  { meaning_pt: "decolar",              ..., context_match: false, examples: [...] },  ← different sense, still included
+  { meaning_pt: "tirar, remover",       ..., context_match: false, examples: [...] }   ← different sense, still included
 ]
 
 Return ONLY this JSON (no markdown, no explanation):
