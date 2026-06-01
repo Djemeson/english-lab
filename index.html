@@ -2057,7 +2057,7 @@ function updateKindleWordsDisplay(i) {
   const iwords = getItemWords(item)
   // Sentence highlight
   const sentEl = el(`ks-${i}`)
-  if (sentEl) sentEl.innerHTML = item.context ? esc(item.context) : esc(iwords[0]||'')
+  if (sentEl) sentEl.innerHTML = item.context ? (iwords.length ? highlightMultipleExprs(item.context, iwords) : esc(item.context)) : esc(iwords[0]||'')
   // Chips
   const wrap = el(`ke-wrap-${i}`)
   if (wrap) {
@@ -2203,10 +2203,12 @@ Return ONLY valid JSON:
     midiaProcessed = lines.map((line, i) => {
       const ai = result.items?.find(x => Number(x.i) === i)
       const isShort = line.trim().split(/\s+/).length <= 3
-      const w = ai?.item || (isShort ? line.trim() : '')
+      const vocabArr = Array.isArray(ai?.vocab) ? ai.vocab : []
+      const vocab_ref = vocabArr.map(v => String(v).toLowerCase().replace(/[.,!?;:"""\'()\[\]]/g,'').trim()).filter(Boolean)
       return {
-        words: w ? [w] : [],
-        word: w,
+        words: [],
+        word: '',
+        vocab_ref,
         context: isShort ? '' : line.trim(),
         context_pt: ai?.trans || '',
         source_type: srcType,
@@ -2270,7 +2272,7 @@ function updateMidiaWordsDisplay(idx) {
   const item = midiaProcessed[idx]; if (!item) return
   const iwords = getItemWords(item)
   const sentEl = el(`ms-${idx}`)
-  if (sentEl) sentEl.innerHTML = item.context ? esc(item.context) : esc(iwords[0]||'')
+  if (sentEl) sentEl.innerHTML = item.context ? (iwords.length ? highlightMultipleExprs(item.context, iwords) : esc(item.context)) : esc(iwords[0]||'')
   const wrap = el(`me-wrap-${idx}`)
   if (wrap) {
     wrap.innerHTML = iwords.length
