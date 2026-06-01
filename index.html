@@ -2792,8 +2792,8 @@ Return ONLY this JSON (no markdown, no explanation):
     if (activeWordId === wordId) renderWordCard(wordId)
     renderDashboard()
     toast(`"${w.word}" analisada`, 'success')
-    // TTS assíncrono (não bloqueia)
-    fetchAndCacheAudio(w.word).catch(() => {})
+    // TTS assíncrono — gera e cacheia no IndexedDB (não bloqueia)
+    ensureSrsAudio(w.word).catch(() => {})
     return true
   } catch(e) {
     toast(`Erro na análise: ${e.message}`, 'error')
