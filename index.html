@@ -2759,6 +2759,11 @@ Rules for examples — CRITICAL, follow exactly:
 - BAD (avoid): "#1 He backs down. #2 She backed down. #3 They are backing down." — same pattern, different pronouns
 - GOOD: "#1 The senator backed down after facing criticism from his own party. #2 Don't back down just because the situation gets uncomfortable. #3 She never backs down from a challenge, even when the odds are against her."
 
+For Portuguese translations of examples:
+- Translate naturally — don't translate word-for-word
+- Use DIFFERENT Portuguese words/synonyms across the 3 examples when the target word has synonyms (e.g. for "thunderstruck": use "atordoado", "estarrecido", "pasmado" — not "atordoado" × 3)
+- Each Portuguese translation should read like natural Brazilian Portuguese, not like a translation
+
 Return ONLY this JSON (no markdown, no explanation):
 {
   "word": "exact word or expression to study",
@@ -3363,17 +3368,17 @@ function toggleMeaning(wordId, mi) {
     item.classList.toggle('selected', sel)
     item.querySelector('.mi-checkbox').style.cssText = ''
   }
-  // Update send button and toolbar
+  // Update toolbar above card
   const selM = w.meanings.filter(m => m.selected !== false)
   const selCount = selM.length
   const totalCards = selM.reduce((sum, m) => sum + ((m.examples && m.examples.length) || 1), 0)
-  const actions = document.querySelector('.wc-actions')
-  if (actions) {
-    const btn = actions.querySelector('.btn-success')
-    if (btn) btn.textContent = `✓ Criar ${totalCards} card${totalCards !== 1 ? 's' : ''} no Anki`
+  const wcToolbar = document.querySelector('.wc-toolbar')
+  if (wcToolbar) {
+    const ankiBtn = wcToolbar.querySelector('.btn-success')
+    if (ankiBtn) ankiBtn.textContent = `✓ Criar ${totalCards} card${totalCards !== 1 ? 's' : ''} no Anki`
   }
-  const toolbar = document.querySelector('.meanings-count')?.parentElement?.querySelector('span:nth-child(3)')
-  if (toolbar) toolbar.textContent = `${selCount} selecionado${selCount !== 1 ? 's' : ''} · ${totalCards} card${totalCards !== 1 ? 's' : ''}`
+  const countEl = document.querySelector('.meanings-count')?.parentElement?.querySelector('span:nth-child(3)')
+  if (countEl) countEl.textContent = `${selCount} selecionado${selCount !== 1 ? 's' : ''} · ${totalCards} card${totalCards !== 1 ? 's' : ''}`
 }
 
 function selectAllMeanings(wordId, val) {
