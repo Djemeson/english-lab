@@ -144,14 +144,14 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .quick-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
 
 /* ===== TABS ===== */
-.tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:0}
+.tabs{display:flex;gap:4px;background:var(--surface);padding:4px;border-radius:10px;margin-bottom:24px;width:fit-content;border-bottom:none}
 .tab{
   padding:8px 18px;border:none;background:transparent;
   color:var(--text2);cursor:pointer;font-weight:500;font-size:0.9rem;
   border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;
 }
 .tab:hover{color:var(--text)}
-.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tab.active{color:var(--text);background:var(--surface2);border:1px solid var(--border)}
 .tab-panel{display:none}
 .tab-panel.active{display:block}
 
@@ -233,6 +233,8 @@ select option{background:var(--surface)}
 .selectable-sentence:hover{background:rgba(59,130,246,.04)}
 .midia-type-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;font-size:0.82rem;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);transition:all .12s}
 .midia-type-chip.active{background:var(--primary-glow);border-color:rgba(59,130,246,.4);color:var(--primary)}
+.src-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:7px;font-size:0.82rem;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);transition:all .12s}
+.src-chip.active{background:var(--primary-glow);border-color:rgba(59,130,246,.4);color:var(--primary)}
 /* Dashboard home */
 .dash-action-card{background:var(--primary-glow);border:1px solid rgba(59,130,246,.35);border-radius:var(--radius);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .dash-action-left .dash-num{font-size:2.2rem;font-weight:700;color:var(--primary);line-height:1}
@@ -906,52 +908,48 @@ select option{background:var(--surface)}
 <section id="section-adicionar" class="section">
   <div class="page-header">
     <h1>Adicionar vocabulário</h1>
-    <p>Escolha a fonte do input</p>
   </div>
 
   <div class="tabs">
-    <button class="tab active" onclick="showTab('manual')">✍️ Manual</button>
-    <button class="tab" onclick="showTab('kindle')">📖 Kindle</button>
-    <button class="tab" onclick="showTab('midia')">🎬 Mídia</button>
-    <button class="tab" onclick="showTab('site')">🌐 Website</button>
-    <button class="tab" onclick="showTab('consulta')">💬 Consulta</button>
+    <button class="tab active" onclick="showTab('manual')">Manual</button>
+    <button class="tab" onclick="showTab('kindle')">Kindle</button>
+    <button class="tab" onclick="showTab('midia')">Mídia</button>
+    <button class="tab" onclick="showTab('site')">Website</button>
+    <button class="tab" onclick="showTab('consulta')">Consulta</button>
   </div>
 
   <!-- TAB MANUAL -->
   <div class="tab-panel active" id="panel-manual">
-    <div class="info-box">
-      Os campos são <strong>independentes</strong> — você pode adicionar só a palavra, só a frase, ou ambos.
-    </div>
-    <div class="form-row">
+    <div class="form-row" style="margin-bottom:12px">
       <div class="form-group" style="margin:0">
         <label>Palavra / Phrasal verb / Idiom <span class="label-note">(opcional)</span></label>
-        <input type="text" id="m-word" placeholder="ex: give up · kick the bucket · serendipity">
+        <input type="text" id="m-word" placeholder="ex: give up · kick the bucket · serendipity" onkeydown="if(event.key==='Enter')addManual()" oninput="checkManualDup(this.value)">
       </div>
       <div class="form-group" style="margin:0">
-        <label>Frase ou expressão completa <span class="label-note">(opcional)</span></label>
-        <input type="text" id="m-ctx" placeholder="ex: She decided to give up on her dream.">
+        <label>Frase de contexto <span class="label-note">(opcional)</span></label>
+        <input type="text" id="m-ctx" placeholder="ex: She decided to give up on her dream." onkeydown="if(event.key==='Enter')addManual()">
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-group" style="margin:0">
-        <label>Fonte</label>
-        <select id="m-source">
-          <option value="manual">Manual</option>
-          <option value="kindle">Kindle</option>
-          <option value="series">Série</option>
-          <option value="movie">Filme</option>
-          <option value="youtube">YouTube</option>
-          <option value="podcast">Podcast</option>
-          <option value="website">Website</option>
-        </select>
-      </div>
-      <div class="form-group" style="margin:0">
-        <label>Título / Origem <span class="label-note">(opcional)</span></label>
-        <input type="text" id="m-title" placeholder="ex: Harry Potter, Breaking Bad...">
+    <div id="m-dup-warn" style="display:none;background:var(--warning-bg,rgba(234,179,8,.12));border:1px solid rgba(234,179,8,.35);border-radius:6px;padding:8px 12px;font-size:0.8rem;color:#ca8a04;margin-bottom:12px;display:none;align-items:center;gap:8px">
+      ⚠ "<strong id="m-dup-word"></strong>" já está na sua fila.
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:0.75rem;color:var(--text3);margin-bottom:7px">Fonte</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="m-source-chips">
+        <span class="src-chip active" data-val="manual" onclick="setManualSource(this)">Manual</span>
+        <span class="src-chip" data-val="series" onclick="setManualSource(this)">📺 Série</span>
+        <span class="src-chip" data-val="movie" onclick="setManualSource(this)">🎬 Filme</span>
+        <span class="src-chip" data-val="youtube" onclick="setManualSource(this)">▶️ YouTube</span>
+        <span class="src-chip" data-val="podcast" onclick="setManualSource(this)">🎙 Podcast</span>
+        <span class="src-chip" data-val="website" onclick="setManualSource(this)">🌐 Website</span>
       </div>
     </div>
-    <div class="btn-group" style="margin-top:4px">
-      <button class="btn btn-primary" onclick="addManual()">➕ Adicionar para revisão</button>
+    <div id="m-title-wrap" style="display:none;margin-bottom:14px">
+      <input type="text" id="m-title" placeholder="Título / origem (ex: Breaking Bad, Harry Potter...)" style="max-width:360px" onkeydown="if(event.key==='Enter')addManual()">
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="btn btn-primary" onclick="addManual()">Adicionar para revisão</button>
+      <span style="font-size:0.75rem;color:var(--text3)">ou Enter</span>
     </div>
   </div>
 
@@ -1042,9 +1040,7 @@ select option{background:var(--surface)}
 
   <!-- TAB CONSULTA -->
   <div class="tab-panel" id="panel-consulta">
-    <div class="info-box">
-      Tire dúvidas pontuais de inglês — significados, uso, contexto. Se gostar, adicione ao SRS com um clique.
-    </div>
+
     <div class="consulta-wrap" id="consulta-wrap">
       <div class="consulta-messages" id="consulta-messages">
         <div class="consulta-empty" id="consulta-empty">
@@ -1538,17 +1534,42 @@ function quickAdd() {
 // ================================================================
 // MANUAL ADD
 // ================================================================
+function setManualSource(el_) {
+  document.querySelectorAll('#m-source-chips .src-chip').forEach(c => c.classList.remove('active'))
+  el_.classList.add('active')
+  const isManual = el_.dataset.val === 'manual'
+  const wrap = el('m-title-wrap')
+  if (wrap) { wrap.style.display = isManual ? 'none' : 'block' }
+  if (!isManual) el('m-title')?.focus()
+}
+
+function checkManualDup(val) {
+  const w = val.trim().toLowerCase()
+  const warn = el('m-dup-warn')
+  if (!warn) return
+  if (w.length < 2) { warn.style.display = 'none'; return }
+  const match = words.find(x => (x.word || '').toLowerCase() === w)
+  if (match) {
+    warn.style.display = 'flex'
+    const wd = el('m-dup-word'); if (wd) wd.textContent = val.trim()
+  } else {
+    warn.style.display = 'none'
+  }
+}
+
 function addManual() {
   const word = el('m-word').value.trim()
   const ctx = el('m-ctx').value.trim()
   if (!word && !ctx) { toast('Preencha a palavra ou a frase', 'warning'); return }
-  createWord({ word, context: ctx,
-    source_type: el('m-source').value,
-    source_title: el('m-title').value.trim()
-  })
-  el('m-word').value = ''; el('m-ctx').value = ''; el('m-title').value = ''
+  const srcType = document.querySelector('#m-source-chips .src-chip.active')?.dataset.val || 'manual'
+  const srcTitle = (el('m-title')?.value || '').trim()
+  createWord({ word, context: ctx, source_type: srcType, source_title: srcTitle })
+  el('m-word').value = ''; el('m-ctx').value = ''
+  if (el('m-title')) el('m-title').value = ''
+  el('m-word')?.focus()
+  const warn = el('m-dup-warn'); if (warn) warn.style.display = 'none'
   renderDashboard()
-  toast(`Adicionado à fila de revisão!`, 'success')
+  toast('Adicionado à fila de revisão!', 'success')
 }
 
 // ================================================================
