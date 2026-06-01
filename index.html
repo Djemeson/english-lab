@@ -1820,20 +1820,12 @@ async function analyzeKindleItems() {
   const BATCH = 20  // menor para mais precisão e menos falhas
 
   const SYSTEM_PROMPT = `You are a vocabulary extraction assistant for English learners.
-For each numbered sentence, do TWO things:
-1. ITEM: identify the single best vocabulary item to study (base form, no punctuation)
-2. PT: translate the full English sentence naturally to Brazilian Portuguese
+For each numbered sentence return:
+1. ITEM: best vocabulary item to study (base form, no punctuation). Pick unusual/vivid/advanced words or real phrasal verbs/idioms. Skip: went, said, got, came, looked (unless idiom). Never combine verb + object.
+2. SENTENCE_PT: natural Brazilian Portuguese TRANSLATION of the full sentence exactly as written. For single isolated words (marked WORD:), set to "".
+3. MEANING: brief Portuguese meaning of ITEM only — concise, 1 line.
 
-VOCABULARY RULES:
-- Use multi-word ONLY for real phrasal verbs (give up, take off) or fixed idioms (break the ice)
-- NEVER combine verb + object ("munched pretzels" → "munch")
-- Base form only: "munch" not "munched"
-- Pick unusual/vivid/advanced words. Skip: went, said, got, came, looked (unless part of idiom)
-
-TRANSLATION RULES:
-- PT must be a natural Brazilian Portuguese translation of the English sentence
-- If the entry is a single word with no sentence context, PT should be its meaning in Portuguese
-- NEVER put instruction text or index numbers in PT field`
+Return ONLY valid JSON: {"items":[{"i":<number>,"item":"<vocab>","sentence_pt":"<full translation>","meaning":"<word meaning>"}]}`
 
   for (let start = 0; start < kindleItems.length; start += BATCH) {
     const batch = kindleItems.slice(start, start + BATCH)
@@ -1860,7 +1852,7 @@ TRANSLATION RULES:
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: `Process these ${batch.length} highlights. For each number, return the vocabulary item and Portuguese translation/meaning.\n\n${lines}\n\nReturn ONLY this JSON format:\n{"items": [{"i": <number>, "item": "<vocabulary>", "pt": "<portuguese translation or meaning>"}, ...]}\n\nInclude ALL ${batch.length} items in your response.` }
+            { role: 'user', content: `Process these ${batch.length} highlights.\n\n${lines}\n\nReturn ONLY this JSON (ALL ${batch.length} items):\n{"items":[{"i":<number>,"item":"<vocab>","sentence_pt":"<full sentence translation>","meaning":"<word meaning>"}]}` }
           ]
         })
       })
@@ -1870,11 +1862,10 @@ TRANSLATION RULES:
         .replace(/```(?:json)?\n?|\n?```/g, '').trim()
       const result = JSON.parse(raw)
       if (Array.isArray(result.items)) {
-        result.items.forEach(({ i, item, pt }) => {
+        result.items.forEach(({ i, item, sentence_pt, meaning }) => {
           const idx = Number(i)
           if (isNaN(idx) || idx < 0 || idx >= kindleItems.length) return
-          // Valida que pt não é texto de instrução
-          const ptStr = String(pt || '').trim()
+          const ptStr = String(sentence_pt || '').trim()
           const isInstructionLeak = /global.?index|cada item|utiliza|return|json|vocabulary/i.test(ptStr)
           if (ptStr && !isInstructionLeak) {
             kindleItems[idx].context_pt = ptStr
@@ -2175,12 +2166,12 @@ async function analyzeMidiaText() {
   midiaProcessed = []
 
   const SYSTEM = `You are a vocabulary extraction assistant for English learners.
-For each numbered item, return THREE things:
-1. ITEM: the best vocabulary item to study (base form, no punctuation). For 1-3 word inputs use the input itself. For sentences pick the most advanced/vivid word or phrasal verb.
-2. PT: if input is a sentence (4+ words) → natural Brazilian Portuguese TRANSLATION of the full sentence. If input is a word/short phrase → its meaning in Portuguese.
-3. MEANING: brief Portuguese meaning of ITEM specifically (always required, 1 short line, e.g. "passageiro, que dura pouco").
+For each numbered item return:
+1. ITEM: best vocabulary item to study (base form, no punctuation). 1-3 word inputs → use the input itself. Sentences → pick the most advanced/vivid word or phrasal verb.
+2. SENTENCE_PT: Brazilian Portuguese translation of the FULL sentence/phrase as written. If the input is a single isolated word with no sentence context, set to "".
+3. MEANING: brief Portuguese meaning of ITEM only — concise, 1 line (e.g. "passageiro, efêmero" or "desistir de algo").
 
-Return ONLY this JSON: {"items":[{"i":<number>,"item":"<vocabulary>","pt":"<translation or meaning>","meaning":"<word meaning>"}]}`
+Return ONLY valid JSON: {"items":[{"i":<number>,"item":"<vocab>","sentence_pt":"<full sentence translation>","meaning":"<word meaning>"}]}`
 
   const numbered = lines.map((l, i) => `${i}. ${l}`).join('\n')
   try {
@@ -2236,6 +2227,7 @@ function renderMidiaProcessed() {
         <div class="kindle-sentence selectable-sentence" id="ms-${i}" onmouseup="handleSentenceMouseUp(event,${i},'midia')" title="Selecione com o mouse para adicionar objeto de estudo">${sentHTML}</div>
         ${item.context_pt ? `<div class="kindle-sentence-pt">${esc(item.context_pt)}</div>` : ''}
         <div class="kindle-expr-row" id="me-wrap-${i}" style="flex-wrap:wrap;gap:5px">${chipsHTML}</div>
+        ${item.word_meaning ? `<div style="font-size:0.75rem;color:var(--text3);margin-top:3px">${esc(iwords[0]||'')} — ${esc(item.word_meaning)}</div>` : ''}
         <div class="parsed-meta">${srcIcon(item.source_type)} ${esc(item.source_title || item.source_type)}</div>
       </div>
     </div>`
