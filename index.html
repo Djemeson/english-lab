@@ -229,6 +229,21 @@ select option{background:var(--surface)}
 /* Kindle AI-first redesign */
 .kindle-sentence{font-size:0.87rem;color:var(--text2);line-height:1.65;margin-bottom:3px}
 .kindle-sentence-pt{font-size:0.8rem;color:var(--text3);font-style:italic;margin-bottom:7px;min-height:0}
+.selectable-sentence{cursor:text;border-radius:4px;transition:background .1s}
+.selectable-sentence:hover{background:rgba(59,130,246,.04)}
+.midia-type-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;font-size:0.82rem;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);transition:all .12s}
+.midia-type-chip.active{background:var(--primary-glow);border-color:rgba(59,130,246,.4);color:var(--primary)}
+/* Dashboard home */
+.dash-action-card{background:var(--primary-glow);border:1px solid rgba(59,130,246,.35);border-radius:var(--radius);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.dash-action-left .dash-num{font-size:2.2rem;font-weight:700;color:var(--primary);line-height:1}
+.dash-action-left .dash-sub{font-size:0.85rem;color:var(--text2);margin-top:4px}
+.dash-secondary{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;font-size:0.88rem;color:var(--text2)}
+.dash-mini-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.dash-mini-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px}
+.dash-mini-card .lbl{font-size:0.72rem;color:var(--text3);margin-bottom:3px}
+.dash-mini-card .val{font-size:1.25rem;font-weight:600;color:var(--text)}
+.dash-recent-chips{display:flex;flex-wrap:wrap;gap:6px}
+.dash-recent-chip{padding:4px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:0.8rem;color:var(--text2)}
 .expr-highlight{background:rgba(59,130,246,0.22);color:var(--text);border-radius:4px;padding:1px 4px;font-weight:600;font-style:normal}
 .kindle-expr-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap}
 .kindle-expr-chip{display:inline-flex;align-items:center;background:var(--primary-glow);border:1px solid rgba(59,130,246,0.35);color:var(--primary);border-radius:20px;padding:3px 12px;font-size:0.82rem;font-weight:600;letter-spacing:.01em}
@@ -882,39 +897,9 @@ select option{background:var(--surface)}
 
 <!-- =========== DASHBOARD =========== -->
 <section id="section-dashboard" class="section active">
-  <div class="page-header">
-    <h1>Dashboard</h1>
-    <p>Seu progresso de vocabulário em inglês</p>
-  </div>
-
+  <div id="dash-main-action"></div>
   <div id="dash-stats-area"></div>
-
-  <div class="quick-add card-box">
-    <div class="card-box-header"><h3>⚡ Adição rápida</h3></div>
-    <div style="padding:18px">
-      <div class="quick-row">
-        <div>
-          <label>Palavra ou expressão</label>
-          <input type="text" id="q-word" placeholder="ex: give up / serendipity / kick the bucket">
-        </div>
-        <div>
-          <label>Contexto <span class="label-note">(opcional)</span></label>
-          <input type="text" id="q-ctx" placeholder="Frase onde encontrou">
-        </div>
-        <button class="btn btn-primary" onclick="quickAdd()" style="align-self:end">Adicionar</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="card-box">
-    <div class="card-box-header">
-      <h3>Adicionadas recentemente</h3>
-      <button class="btn btn-ghost btn-sm" onclick="showSection('adicionar')">+ Mais</button>
-    </div>
-    <div class="recent-list" id="recent-list">
-      <div class="empty-state"><div class="icon">📖</div><p>Nenhuma palavra ainda.</p></div>
-    </div>
-  </div>
+  <div id="dash-recent-area"></div>
 </section>
 
 <!-- =========== ADICIONAR =========== -->
@@ -999,48 +984,34 @@ select option{background:var(--surface)}
 
   <!-- TAB MÍDIA -->
   <div class="tab-panel" id="panel-midia">
-    <div class="info-box">
-      Palavras anotadas enquanto assiste séries, filmes ou YouTube — com ou sem a extensão Language Reactor. Cole o texto ou carregue um arquivo .txt.
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <span class="midia-type-chip active" data-val="series" onclick="setMidiaType(this)">📺 Série</span>
+      <span class="midia-type-chip" data-val="movie" onclick="setMidiaType(this)">🎬 Filme</span>
+      <span class="midia-type-chip" data-val="youtube" onclick="setMidiaType(this)">▶️ YouTube</span>
+      <span class="midia-type-chip" data-val="podcast" onclick="setMidiaType(this)">🎙 Podcast</span>
     </div>
     <div class="form-group">
-      <label>Fonte de mídia</label>
-      <div style="display:flex;gap:10px">
-        <label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--text);cursor:pointer;margin:0">
-          <input type="radio" name="midia-type" value="series" checked style="accent-color:var(--primary)"> Série
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--text);cursor:pointer;margin:0">
-          <input type="radio" name="midia-type" value="movie" style="accent-color:var(--primary)"> Filme
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--text);cursor:pointer;margin:0">
-          <input type="radio" name="midia-type" value="youtube" style="accent-color:var(--primary)"> YouTube
-        </label>
-      </div>
+      <input type="text" id="midia-title-new" placeholder="Título (ex: Breaking Bad S01E03)" style="max-width:340px">
     </div>
     <div class="form-group">
-      <label>Título / URL <span class="label-note">(opcional)</span></label>
-      <input type="text" id="midia-title" placeholder="ex: Breaking Bad S01E01 / https://youtube.com/watch?v=...">
-    </div>
-    <div class="form-group">
-      <label>Cole o conteúdo do arquivo ou suas anotações</label>
-      <textarea id="midia-text" rows="7" placeholder="Formatos aceitos:&#10;&#10;serendipity&#10;give up :: She decided to give up.&#10;palavra  contexto (separado por TAB)&#10;&#10;Um item por linha."></textarea>
-    </div>
-    <div style="margin-bottom:12px">
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('midia-file').click()">📂 Ou carregar arquivo .txt</button>
-      <input type="file" id="midia-file" accept=".txt,.tsv,.csv" class="hidden" onchange="handleMidiaFile(this)">
-    </div>
-    <div id="midia-result" class="hidden">
-      <div class="parsed-header">
-        <h3 id="midia-count">0 itens</h3>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-ghost btn-sm" onclick="selectAll('midia-check',true)">Todos</button>
-          <button class="btn btn-ghost btn-sm" onclick="selectAll('midia-check',false)">Nenhum</button>
-          <button class="btn btn-primary btn-sm" onclick="addMidiaSelected()">➕ Adicionar selecionados</button>
-        </div>
-      </div>
-      <div class="parsed-list" id="midia-list"></div>
+      <label>Cole ou digite — uma palavra ou frase por linha</label>
+      <textarea id="midia-text-new" rows="5" placeholder="ephemeral&#10;The beauty of youth is ephemeral.&#10;give up&#10;She decided to give up on her dream."></textarea>
     </div>
     <div class="btn-group" style="margin-top:4px">
-      <button class="btn btn-secondary" onclick="parseMidiaText()">🔍 Analisar texto</button>
+      <button class="btn btn-primary" id="midia-analyze-btn" onclick="analyzeMidiaText()">⚡ Analisar com IA</button>
+    </div>
+    <div id="midia-proc-results" class="hidden" style="margin-top:20px">
+      <div class="parsed-header">
+        <h3 id="midia-proc-count">0 itens</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('midia-proc-check',true)">Todos</button>
+          <button class="btn btn-ghost btn-sm" onclick="selectAll('midia-proc-check',false)">Nenhum</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--error)" onclick="discardMidiaSelected()">🗑 Descartar</button>
+          <button class="btn btn-primary btn-sm" onclick="addMidiaProcessed()">➕ Adicionar selecionados</button>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text3);margin-bottom:10px">Selecione com o mouse o objeto de estudo para ajustar a sugestão da IA</div>
+      <div id="midia-proc-list"></div>
     </div>
   </div>
 
@@ -1452,78 +1423,78 @@ function showTab(name) {
 // ================================================================
 function renderDashboard() {
   loadSrs()
-
-  // --- Vocabulary metrics ---
   const total   = words.length
   const inSrs   = words.filter(w => w.status === 'in_srs').length
   const inAnki  = words.filter(w => w.status === 'in_anki').length
-  const pending = words.filter(w => ['pending_ai','pending_review'].includes(w.status)).length
-  const week    = words.filter(w => Date.now() - new Date(w.created_at) < 7*864e5).length
-
-  // --- SRS metrics ---
+  const pendingAI = words.filter(w => w.status === 'pending_ai').length
+  const pendingRev = words.filter(w => w.status === 'pending_review').length
+  const pending = pendingAI + pendingRev
   const dueToday  = srsDueCount()
   const newToday  = srsNewTodayRemaining()
   const paraHoje  = dueToday + newToday
   const streak    = srsStreak()
-
-  const now = nowTs()
-  const tomorrow = now + 864e5
-  const amanha = srsCards.filter(c =>
-    (c.state === 'review' || c.state === 'relearning' || c.state === 'learning') &&
-    c.due > now && c.due <= tomorrow
-  ).length
-
   const totalReviewed = srsLog.reduce((s,l) => s + (l.reviewed||0), 0)
   const totalCorrect  = srsLog.reduce((s,l) => s + (l.correct||0), 0)
   const acerto = totalReviewed > 0 ? Math.round((totalCorrect / totalReviewed) * 100) : 0
 
-  // Render stats
-  const area = el('dash-stats-area')
-  if (area) {
-    function card(color, label, value, sub) {
-      return `<div class="stat-card ${color}">
-        <div class="stat-label">${label}</div>
-        <div class="stat-value">${value}</div>
-        <div class="stat-sub">${sub}</div>
-      </div>`
-    }
-    area.innerHTML = `
-      <div class="stats-section-label">📖 Vocabulário</div>
-      <div class="stats-grid">
-        ${card('blue',   'Total capturado', total,  'palavras e expressões')}
-        ${card('purple', 'No SRS',          inSrs,  'em revisão espaçada')}
-        ${card('green',  'No Anki',         inAnki, 'cards exportados')}
-        ${card('yellow', 'Para processar',  pending,'aguardando revisão')}
-      </div>
-      <div class="stats-section-label">🎴 Revisão Espaçada</div>
-      <div class="stats-grid">
-        ${card('blue',   'Para hoje',   paraHoje,       dueToday + ' revisões · ' + newToday + ' novos')}
-        ${card('orange', 'Amanhã',      amanha,         'cards programados')}
-        ${card('teal',   'Taxa de acerto', acerto + '%', totalReviewed + ' revisões no total')}
-        ${card('yellow', 'Sequência 🔥', streak,        streak === 1 ? 'dia seguido' : 'dias seguidos')}
-      </div>`
-  }
-
-  // Badge
+  // Badge nav
   const badge = el('badge-review')
-  badge.textContent = pending
-  badge.classList.toggle('hidden', pending === 0)
+  if (badge) { badge.textContent = pending; badge.classList.toggle('hidden', pending === 0) }
 
-  // Recent list
-  const list = el('recent-list')
-  if (!list) return
-  if (!words.length) {
-    list.innerHTML = `<div class="empty-state"><div class="icon">📖</div><p>Nenhuma palavra ainda.</p></div>`
-    return
+  // ── Ação principal ──
+  const mainArea = el('dash-main-action')
+  if (mainArea) {
+    if (paraHoje > 0) {
+      mainArea.innerHTML = `
+        <div class="dash-action-card">
+          <div class="dash-action-left">
+            <div class="dash-num">${paraHoje}</div>
+            <div class="dash-sub">${dueToday} revisão${dueToday!==1?'ões':''} · ${newToday} novo${newToday!==1?'s':''} disponív${newToday!==1?'eis':'el'} hoje</div>
+          </div>
+          <button class="btn btn-primary" onclick="showSection('estudar')">Estudar agora →</button>
+        </div>`
+    } else {
+      mainArea.innerHTML = `
+        <div class="dash-action-card" style="background:var(--surface);border-color:var(--border)">
+          <div class="dash-action-left">
+            <div class="dash-num" style="color:var(--success)">✓</div>
+            <div class="dash-sub">Nada para revisar hoje. Volte amanhã!</div>
+          </div>
+          <button class="btn btn-ghost" onclick="showSection('adicionar')">+ Adicionar palavras</button>
+        </div>`
+    }
   }
-  list.innerHTML = [...words]
-    .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
-    .slice(0, 20).map(w => `
-    <div class="recent-item">
-      <div class="ri-word">${esc(w.word || '(frase)')}</div>
-      <div class="ri-ctx">${w.context ? esc(w.context) : '<em style="color:var(--text3)">sem contexto</em>'}</div>
-      <span class="status-chip ${w.status}">${statusLabel(w.status)}</span>
-    </div>`).join('')
+
+  // ── Ação secundária: pendentes de IA ──
+  const statsArea = el('dash-stats-area')
+  if (statsArea) {
+    const secondaryHTML = pending > 0 ? `
+      <div class="dash-secondary">
+        <span>${pendingAI > 0 ? pendingAI + ' palavra' + (pendingAI!==1?'s':'') + ' aguardando IA' : ''}${pendingAI>0&&pendingRev>0?' · ':''}${pendingRev > 0 ? pendingRev + ' pronta' + (pendingRev!==1?'s':'') + ' para revisar' : ''}</span>
+        <button class="btn btn-ghost btn-sm" onclick="showSection('revisar')">${pendingAI > 0 ? '⚡ Ir para revisão' : '👁 Revisar agora'}</button>
+      </div>` : ''
+    statsArea.innerHTML = secondaryHTML + `
+      <div class="dash-mini-grid">
+        <div class="dash-mini-card"><div class="lbl">Capturadas</div><div class="val">${total}</div></div>
+        <div class="dash-mini-card"><div class="lbl">No SRS</div><div class="val">${inSrs}</div></div>
+        <div class="dash-mini-card"><div class="lbl">Taxa de acerto</div><div class="val">${acerto}%</div></div>
+        <div class="dash-mini-card"><div class="lbl">Sequência</div><div class="val">${streak} 🔥</div></div>
+      </div>`
+  }
+
+  // ── Recentes (chips) ──
+  const recentArea = el('dash-recent-area')
+  if (recentArea && words.length > 0) {
+    const recent = [...words].sort((a,b) => new Date(b.created_at)-new Date(a.created_at)).slice(0,20)
+    recentArea.innerHTML = `
+      <div style="font-size:0.78rem;color:var(--text3);margin-bottom:8px">Adicionadas recentemente</div>
+      <div class="dash-recent-chips">
+        ${recent.map(w => `<span class="dash-recent-chip" onclick="showSection('revisar')" style="cursor:pointer" title="${esc(w.context||'')}">${esc(w.word||'(frase)')}</span>`).join('')}
+        <span class="dash-recent-chip" style="color:var(--text3);cursor:pointer" onclick="showSection('adicionar')">+ adicionar</span>
+      </div>`
+  } else if (recentArea) {
+    recentArea.innerHTML = `<div class="empty-state" style="margin-top:20px"><div class="icon">📖</div><p>Nenhuma palavra ainda.</p><button class="btn btn-primary mt-4" onclick="showSection('adicionar')" style="margin-top:12px">+ Adicionar palavras</button></div>`
+  }
 }
 
 function statusLabel(s) {
@@ -1801,7 +1772,7 @@ function renderKindleList(skipped, total) {
       ? `<span class="kindle-expr-chip" id="ke-${i}">${esc(item.word)}</span>`
       : (cfg.openaiKey
           ? `<span class="kindle-expr-chip loading" id="ke-${i}">⏳ analisando...</span>`
-          : `<span class="kindle-expr-chip loading" id="ke-${i}">✏️ selecione abaixo</span>`)
+          : `<span class="kindle-expr-chip loading" id="ke-${i}">⏳ aguardando IA</span>`)
     const sentenceHTML = hasContext
       ? (item.word ? highlightExprInSentence(item.context, item.word) : esc(item.context))
       : esc(item.word || '')
@@ -1809,25 +1780,15 @@ function renderKindleList(skipped, total) {
     <div class="parsed-item" id="ki-${i}">
       <input type="checkbox" class="kindle-check" data-i="${i}" checked>
       <div class="parsed-item-body">
-        <div class="kindle-sentence" id="ks-${i}">${sentenceHTML}</div>
+        <div class="kindle-sentence selectable-sentence" id="ks-${i}" onmouseup="handleSentenceMouseUp(event,${i},'kindle')">${sentenceHTML}</div>
         <div class="kindle-sentence-pt" id="ks-pt-${i}">${esc(item.context_pt || '')}</div>
         <div class="kindle-expr-row">
           ${chipContent}
-          ${hasContext ? `<button class="btn btn-ghost btn-xs" onclick="toggleKindlePicker(${i})">✏️ alterar</button>` : ''}
         </div>
-        ${hasContext ? `
-        <div class="kindle-override hidden" id="ko-${i}">
-          <div class="word-picker" id="kp-${i}">${buildPicker(item.context, i)}</div>
-          <div class="word-target-row">
-            <label style="color:var(--text3);font-size:0.77rem">ou digite:</label>
-            <input type="text" id="kt-${i}" placeholder="palavra alvo" value="${esc(item.word)}" oninput="setKindleWord(${i},this.value)" style="max-width:200px">
-          </div>
-        </div>` : ''}
         <div class="parsed-meta">📖 ${esc(item.source_title)}${item.chapter ? ' · ' + esc(item.chapter) : ''}</div>
       </div>
     </div>`
   }).join('')
-  kindleItems.forEach((_,i) => attachPicker(i))
   analyzeKindleItems()
 }
 
@@ -2111,61 +2072,133 @@ function addKindleSelected() {
 }
 
 // ================================================================
-// MÍDIA PARSER
+// MÍDIA — novo fluxo com análise IA
 // ================================================================
-function handleMidiaFile(input) {
-  const file = input.files[0]; if (!file) return
-  const reader = new FileReader()
-  reader.onload = e => { el('midia-text').value = e.target.result; parseMidiaText() }
-  reader.readAsText(file, 'utf-8')
-  input.value = ''
+let midiaProcessed = []
+
+function setMidiaType(el_) {
+  document.querySelectorAll('.midia-type-chip').forEach(c => c.classList.remove('active'))
+  el_.classList.add('active')
 }
 
-function parseMidiaText() {
-  const text = el('midia-text').value.trim()
-  if (!text) { toast('Nenhum texto para analisar', 'warning'); return }
-  const srcType = document.querySelector('input[name="midia-type"]:checked')?.value || 'series'
-  const srcTitle = el('midia-title').value.trim()
+async function analyzeMidiaText() {
+  const text = (el('midia-text-new')?.value || '').trim()
+  if (!text) { toast('Digite ao menos uma palavra ou frase', 'warning'); return }
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); showSection('configuracoes'); return }
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+  if (!lines.length) return
+  const srcType = document.querySelector('.midia-type-chip.active')?.dataset.val || 'series'
+  const srcTitle = (el('midia-title-new')?.value || '').trim()
+  const btn = el('midia-analyze-btn')
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Analisando...' }
+  el('midia-proc-results')?.classList.add('hidden')
+  midiaProcessed = []
 
-  midiaItems = text.split('\n').map(l => l.trim()).filter(Boolean)
-    .filter(l => !l.startsWith('#') && !l.startsWith('//'))
-    .map(line => {
-      if (line.includes('\t')) {
-        const [w, ctx] = line.split('\t')
-        return { word: w.trim(), context: ctx?.trim() || '', source_type: srcType, source_title: srcTitle }
-      }
-      if (line.includes(' :: ')) {
-        const [w, ctx] = line.split(' :: ')
-        return { word: w.trim(), context: ctx?.trim() || '', source_type: srcType, source_title: srcTitle }
-      }
-      return { word: line, context: '', source_type: srcType, source_title: srcTitle }
+  const SYSTEM = `You are a vocabulary extraction assistant for English learners.
+For each numbered item, do TWO things:
+1. ITEM: identify the best vocabulary item to study (base form, no punctuation). For 1-3 word inputs use the input itself. For sentences pick the most advanced/interesting word or phrasal verb.
+2. PT: for a full sentence, give a natural Brazilian Portuguese translation. For a word/short phrase, give its meaning in Portuguese.
+Return ONLY this JSON: {"items":[{"i":<number>,"item":"<vocabulary>","pt":"<portuguese>"}]}`
+
+  const numbered = lines.map((l, i) => `${i}. ${l}`).join('\n')
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: cfg.aiModel || 'gpt-4o-mini',
+        max_tokens: Math.max(600, lines.length * 60),
+        response_format: { type: 'json_object' },
+        messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `Process these ${lines.length} items:\n\n${numbered}\n\nReturn ALL ${lines.length} items.` }]
+      })
     })
-
-  renderMidiaList()
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    const result = JSON.parse((data.choices?.[0]?.message?.content || '{}').trim())
+    midiaProcessed = lines.map((line, i) => {
+      const ai = result.items?.find(x => Number(x.i) === i)
+      const isShort = line.trim().split(/\s+/).length <= 3
+      return {
+        word: ai?.item || (isShort ? line.trim() : ''),
+        context: isShort ? '' : line.trim(),
+        context_pt: ai?.pt || '',
+        source_type: srcType,
+        source_title: srcTitle
+      }
+    })
+    renderMidiaProcessed()
+    el('midia-proc-results')?.classList.remove('hidden')
+  } catch(e) {
+    toast(`Erro na análise: ${e.message}`, 'error')
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '⚡ Analisar com IA' }
+  }
 }
 
-function renderMidiaList() {
-  const list = el('midia-list')
-  el('midia-count').textContent = `${midiaItems.length} itens`
-  el('midia-result').classList.remove('hidden')
-  list.innerHTML = midiaItems.map((item, i) => `
-    <div class="parsed-item">
-      <input type="checkbox" class="midia-check" data-i="${i}" checked>
+function renderMidiaProcessed() {
+  const list = el('midia-proc-list'); if (!list) return
+  el('midia-proc-count').textContent = `${midiaProcessed.length} item${midiaProcessed.length !== 1 ? 's' : ''}`
+  list.innerHTML = midiaProcessed.map((item, i) => {
+    const hasCtx = !!item.context
+    const sentHTML = hasCtx && item.word ? highlightExprInSentence(item.context, item.word) : esc(item.context || item.word || '')
+    return `
+    <div class="parsed-item" id="mi-proc-${i}">
+      <input type="checkbox" class="midia-proc-check" data-i="${i}" checked>
       <div class="parsed-item-body">
-        <div class="parsed-word">${esc(item.word)}</div>
-        ${item.context ? `<div class="parsed-context">${esc(item.context)}</div>` : '<div class="parsed-context" style="color:var(--text3)">sem contexto</div>'}
-        <div class="parsed-meta">${srcIcon(item.source_type)} ${item.source_title || item.source_type}</div>
+        <div class="kindle-sentence selectable-sentence" id="ms-${i}" onmouseup="handleSentenceMouseUp(event,${i},'midia')">${sentHTML}</div>
+        ${item.context_pt ? `<div class="kindle-sentence-pt">${esc(item.context_pt)}</div>` : ''}
+        <div class="kindle-expr-row">
+          <span class="kindle-expr-chip" id="me-${i}">${esc(item.word || '?')}</span>
+        </div>
+        <div class="parsed-meta">${srcIcon(item.source_type)} ${esc(item.source_title || item.source_type)}</div>
       </div>
-    </div>`).join('')
+    </div>`
+  }).join('')
 }
 
-function addMidiaSelected() {
-  const sel = [...document.querySelectorAll('.midia-check')].filter(c => c.checked).map(c => midiaItems[+c.dataset.i])
+function setMidiaProcessedWord(idx, word) {
+  if (!midiaProcessed[idx]) return
+  midiaProcessed[idx].word = word
+  const sentEl = el(`ms-${idx}`)
+  if (sentEl && midiaProcessed[idx].context) sentEl.innerHTML = highlightExprInSentence(midiaProcessed[idx].context, word)
+  const chipEl = el(`me-${idx}`)
+  if (chipEl) chipEl.textContent = word
+}
+
+function discardMidiaSelected() {
+  const checked = [...document.querySelectorAll('.midia-proc-check')].filter(c => c.checked).map(c => +c.dataset.i)
+  if (!checked.length) { toast('Selecione ao menos um item', 'warning'); return }
+  checked.sort((a,b) => b-a).forEach(i => midiaProcessed.splice(i, 1))
+  if (!midiaProcessed.length) { el('midia-proc-results')?.classList.add('hidden'); return }
+  renderMidiaProcessed()
+  toast(`${checked.length} item${checked.length!==1?'s':''} descartado${checked.length!==1?'s':''}`, 'info')
+}
+
+function addMidiaProcessed() {
+  const sel = [...document.querySelectorAll('.midia-proc-check')].filter(c => c.checked).map(c => midiaProcessed[+c.dataset.i]).filter(Boolean)
   if (!sel.length) { toast('Selecione ao menos um item', 'warning'); return }
-  sel.forEach(item => createWord(item))
+  sel.forEach(item => createWord({ word: item.word, context: item.context, source_type: item.source_type, source_title: item.source_title }))
   saveWords(); renderDashboard()
-  toast(`${sel.length} itens adicionados!`, 'success')
-  el('midia-result').classList.add('hidden')
+  const selSet = new Set(sel)
+  midiaProcessed = midiaProcessed.filter(x => !selSet.has(x))
+  toast(`${sel.length} item${sel.length!==1?'s':''} adicionado${sel.length!==1?'s':''}!`, 'success')
+  if (!midiaProcessed.length) {
+    el('midia-proc-results')?.classList.add('hidden')
+    if (el('midia-text-new')) el('midia-text-new').value = ''
+  } else { renderMidiaProcessed() }
+}
+
+// ── Mouse selection — Kindle + Mídia ──────────────────────────────────────────
+function handleSentenceMouseUp(event, idx, type) {
+  const sel = window.getSelection()
+  if (!sel || sel.isCollapsed) return
+  const container = event.currentTarget
+  if (!container.contains(sel.anchorNode) || !container.contains(sel.focusNode)) return
+  const txt = sel.toString().trim().replace(/[.,!?;:"""\u2018\u2019()\[\]]/g, '').trim()
+  if (!txt || txt.length < 1) { sel.removeAllRanges(); return }
+  sel.removeAllRanges()
+  if (type === 'kindle') setKindleWord(idx, txt)
+  else if (type === 'midia') setMidiaProcessedWord(idx, txt)
 }
 
 function srcIcon(t) {
