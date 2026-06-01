@@ -452,6 +452,16 @@ select option{background:var(--surface)}
   border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
+/* Audio generation progress banner */
+#audio-gen-banner{
+  position:fixed;bottom:16px;right:16px;z-index:9999;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px 16px;min-width:260px;max-width:320px;
+  box-shadow:0 4px 20px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:8px;
+}
+#audio-gen-banner.hidden{display:none!important}
+#audio-gen-bar-wrap{background:var(--surface2);border-radius:4px;height:6px;overflow:hidden}
+#audio-gen-bar{height:6px;background:var(--primary);border-radius:4px;transition:width .3s}
 .hidden{display:none!important}
 .mt-2{margin-top:8px}.mt-4{margin-top:16px}.mb-4{margin-bottom:16px}
 .text-muted{color:var(--text2)}.text-sm{font-size:0.85rem}
@@ -833,6 +843,7 @@ select option{background:var(--surface)}
 .srs-browser-row{display:flex;align-items:center;gap:6px;padding:7px 14px;border-bottom:1px solid var(--border);transition:background .1s;}
 .srs-browser-row:hover{background:var(--surface2)}
 .srs-browser-row.selected{background:rgba(var(--primary-rgb),.1)}
+.srs-browser-row.preview-active{background:var(--primary-glow);border-left:2px solid var(--primary)}
 .btn-xs{padding:2px 7px!important;font-size:0.72rem!important;min-width:0}
 /* Lightbox de imagem */
 .img-lightbox{
@@ -917,6 +928,19 @@ select option{background:var(--surface)}
 <main class="main">
 
 <!-- =========== DASHBOARD =========== -->
+<!-- Audio generation progress banner -->
+<div id="audio-gen-banner" class="hidden">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+    <span style="font-size:0.82rem;font-weight:600;color:var(--text)">🎵 Gerando áudio</span>
+    <button onclick="cancelAudioGen()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:1rem;line-height:1;padding:0" title="Cancelar">✕</button>
+  </div>
+  <div id="audio-gen-bar-wrap"><div id="audio-gen-bar" style="width:0%"></div></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span id="audio-gen-label" style="font-size:0.75rem;color:var(--text3)">0 / 0</span>
+    <span style="font-size:0.72rem;color:var(--text3)">Fechar aba cancela</span>
+  </div>
+</div>
+
 <section id="section-dashboard" class="section active">
   <div id="dash-main-action"></div>
   <div id="dash-stats-area"></div>
@@ -2596,20 +2620,51 @@ async function ensureSrsAudio(text) {
 }
 
 // Pré-gera áudio para uma lista de cards recém-criados (chamado ao salvar no SRS)
+let _audioGenAbort = false
+
+function cancelAudioGen() {
+  _audioGenAbort = true
+  el('audio-gen-banner')?.classList.add('hidden')
+  toast('Geração de áudio cancelada', 'info')
+}
+
+function _updateAudioBanner(done, total) {
+  const banner = el('audio-gen-banner')
+  const bar    = el('audio-gen-bar')
+  const label  = el('audio-gen-label')
+  if (!banner) return
+  if (total === 0) { banner.classList.add('hidden'); return }
+  banner.classList.remove('hidden')
+  const pct = Math.round((done / total) * 100)
+  if (bar)   bar.style.width = pct + '%'
+  if (label) label.textContent = `${done} / ${total}`
+}
+
 async function preGenerateAudio(cards) {
   if (!cfg.openaiKey || !cards || !cards.length) return
   const toGenerate = cards.map(c => c.example_en || c.word).filter(Boolean)
   const unique = [...new Set(toGenerate)]
   if (!unique.length) return
-  toast(`🎵 Gerando áudio para ${unique.length} card${unique.length !== 1 ? 's' : ''}...`, 'info')
-  let generated = 0
+
+  _audioGenAbort = false
+  const total = unique.length
+  let done = 0, generated = 0
+  _updateAudioBanner(0, total)
+
   for (const text of unique) {
+    if (_audioGenAbort) break
     const result = await ensureSrsAudio(text)
     if (result) generated++
+    done++
+    _updateAudioBanner(done, total)
+    // Pequena pausa para não travar a UI e respeitar rate limits
+    await new Promise(r => setTimeout(r, 120))
   }
+
+  el('audio-gen-banner')?.classList.add('hidden')
   if (generated > 0) {
-    autoSyncAfterChange() // Sincroniza áudio com a nuvem
-    toast(`✅ Áudio gerado para ${generated} card${generated !== 1 ? 's' : ''}`, 'success')
+    autoSyncAfterChange()
+    toast(`✅ Áudio gerado: ${generated}/${total}`, 'success')
   }
 }
 
@@ -4951,74 +5006,81 @@ async function browserGenerateAudioSelected() {
   }
 }
 
-async function renderBrowserCardList(deckId, query) {
-  const panel = el('srs-browser-cards'); if (!panel) return
-  const now = nowTs()
+const BROWSER_PAGE_SIZE = 80
+
+function buildBrowserRow(c, now) {
   const SC = {new:'var(--success)', learning:'var(--warning)', review:'var(--primary)', relearning:'var(--error)'}
   const SL = {new:'Novo', learning:'Aprendendo', review:'Revisão', relearning:'Reaprendendo'}
+  const dueTxt  = c.due <= now ? `<span style="color:var(--primary)">Agora</span>` : fmtDays(Math.round((c.due-now)/86400000))
+  const hasAudio = _audioKeyCache?.has(audioKey(c.example_en || c.word || ''))
+  const hasImage = _imageKeyCache?.has(imageKey(c))
+  const isSel    = _browserSelected.has(c.id)
+  return `<div class="srs-browser-row${isSel?' selected':''}" data-id="${c.id}" onclick="showBrowserCardPreview('${c.id}')">
+    <input type="checkbox" class="browser-cb" ${isSel?'checked':''} onchange="event.stopPropagation();browserToggleCard('${c.id}',this.checked)">
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:600;font-size:0.88rem">${esc(c.word)}</div>
+      <div style="font-size:0.78rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.meaning_pt||'')}</div>
+    </div>
+    <span style="font-size:0.72rem;color:${SC[c.state]};font-weight:600;white-space:nowrap;width:75px;text-align:center">${SL[c.state]}</span>
+    <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:60px;text-align:center">⏱ ${dueTxt}</span>
+    <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:50px;text-align:center">ease ${c.ease.toFixed(1)}</span>
+    <span style="width:32px;text-align:center">${hasAudio ? '<span class="audio-badge-ok" title="Tem áudio">🔊</span>' : '<span class="audio-badge-no" title="Sem áudio">⚠️</span>'}</span>
+    <span style="width:32px;text-align:center">${hasImage ? '<span class="image-badge-ok" title="Tem imagem">🖼️</span>' : '<span class="image-badge-no" title="Sem imagem">·</span>'}</span>
+    <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();moveSrsCardDeck('${c.id}')" title="Mover">↗</button>
+    <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">✕</button>
+  </div>`
+}
+
+let _browserRenderedCount = 0
+
+async function renderBrowserCardList(deckId, query) {
+  const panel = el('srs-browser-cards'); if (!panel) return
   const allIds = [deckId, ...getAllDescendantIds(deckId)]
   let cards = srsCards.filter(c => allIds.includes(c.deckId))
   if (query) { const q = query.toLowerCase(); cards = cards.filter(c => (c.word||'').toLowerCase().includes(q) || (c.meaning_pt||'').toLowerCase().includes(q)) }
   if (!cards.length) { panel.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)">Nenhum card neste deck</div>`; return }
 
-  // Garante cache de áudio
   if (!_audioKeyCache) await refreshAudioKeyCache()
 
-  // Sortação
   const sortFns = {
     word:  (a,b) => (a.word||'').localeCompare(b.word||'') * _browserSort.dir,
     state: (a,b) => { const so={review:0,relearning:1,learning:2,new:3}; return ((so[a.state]??9)-(so[b.state]??9)) * _browserSort.dir },
     due:   (a,b) => (a.due - b.due) * _browserSort.dir,
     ease:  (a,b) => (a.ease - b.ease) * _browserSort.dir,
-    audio: (a,b) => {
-      const ha = _audioKeyCache?.has(audioKey(a.example_en||a.word||''))
-      const hb = _audioKeyCache?.has(audioKey(b.example_en||b.word||''))
-      return (Number(ha) - Number(hb)) * _browserSort.dir
-    },
-    image: (a,b) => {
-      const ha = _imageKeyCache?.has(imageKey(a))
-      const hb = _imageKeyCache?.has(imageKey(b))
-      return (Number(ha) - Number(hb)) * _browserSort.dir
-    }
+    audio: (a,b) => (Number(_audioKeyCache?.has(audioKey(a.example_en||a.word||''))) - Number(_audioKeyCache?.has(audioKey(b.example_en||b.word||'')))) * _browserSort.dir,
+    image: (a,b) => (Number(_imageKeyCache?.has(imageKey(a))) - Number(_imageKeyCache?.has(imageKey(b)))) * _browserSort.dir
   }
   cards.sort(sortFns[_browserSort.col] || sortFns.state)
   _browserCurrentCards = cards
+  _browserRenderedCount = Math.min(BROWSER_PAGE_SIZE, cards.length)
+  setBrowserSort(_browserSort.col)
 
-  // Render sort headers
-  setBrowserSort(_browserSort.col)  // refresh indicators without changing
+  const now = nowTs()
+  const visible = cards.slice(0, _browserRenderedCount)
+  const hasMore = cards.length > _browserRenderedCount
 
-  panel.innerHTML = cards.map(c => {
-    const dueTxt = c.due <= now ? '<span style="color:var(--primary)">Agora</span>' : fmtDays(Math.round((c.due-now)/86400000))
-    const hasAudio = _audioKeyCache?.has(audioKey(c.example_en || c.word || ''))
-    const hasImage = _imageKeyCache?.has(imageKey(c))
-    const audioCell = hasAudio
-      ? `<span class="audio-badge-ok" title="Tem áudio">🔊</span>`
-      : `<span class="audio-badge-no" title="Sem áudio">⚠️</span>`
-    const imageCell = hasImage
-      ? `<span class="image-badge-ok" title="Tem imagem">🖼️</span>`
-      : `<span class="image-badge-no" title="Sem imagem">·</span>`
-    const isSel = _browserSelected.has(c.id)
-    return `<div class="srs-browser-row${isSel?' selected':''}" data-id="${c.id}"
-      onclick="showBrowserCardPreview('${c.id}')">
-      <input type="checkbox" class="browser-cb" ${isSel?'checked':''} onchange="event.stopPropagation();browserToggleCard('${c.id}',this.checked)">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:0.88rem">${esc(c.word)}</div>
-        <div style="font-size:0.78rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.meaning_pt||'')}</div>
-      </div>
-      <span style="font-size:0.72rem;color:${SC[c.state]};font-weight:600;white-space:nowrap;width:75px;text-align:center">${SL[c.state]}</span>
-      <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:60px;text-align:center">⏱ ${dueTxt}</span>
-      <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:50px;text-align:center">ease ${c.ease.toFixed(1)}</span>
-      <span style="width:32px;text-align:center">${audioCell}</span>
-      <span style="width:32px;text-align:center">${imageCell}</span>
-      <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();moveSrsCardDeck('${c.id}')" title="Mover">↗</button>
-      <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">✕</button>
-    </div>`
-  }).join('')
+  panel.innerHTML = visible.map(c => buildBrowserRow(c, now)).join('') +
+    (hasMore ? `<div id="browser-load-more" style="padding:12px;text-align:center">
+      <button class="btn btn-ghost btn-sm" onclick="browserLoadMore()">Carregar mais (${cards.length - _browserRenderedCount} restantes)</button>
+    </div>` : '')
 
-  // Sync "select all" checkbox state
   const cbAll = el('browser-cb-all')
   if (cbAll) cbAll.checked = cards.length > 0 && _browserSelected.size === cards.length
   updateBrowserToolbar()
+}
+
+function browserLoadMore() {
+  const panel = el('srs-browser-cards'); if (!panel) return
+  const cards = _browserCurrentCards; if (!cards) return
+  const now = nowTs()
+  const next = Math.min(_browserRenderedCount + BROWSER_PAGE_SIZE, cards.length)
+  const newRows = cards.slice(_browserRenderedCount, next).map(c => buildBrowserRow(c, now)).join('')
+  const btn = el('browser-load-more')
+  if (btn) btn.outerHTML = newRows + (next < cards.length
+    ? `<div id="browser-load-more" style="padding:12px;text-align:center">
+        <button class="btn btn-ghost btn-sm" onclick="browserLoadMore()">Carregar mais (${cards.length - next} restantes)</button>
+      </div>` : '')
+  _browserRenderedCount = next
 }
 
 async function filterBrowser(query) {
@@ -5085,8 +5147,9 @@ async function showBrowserCardPreview(cardId) {
   const card = srsCards.find(c => c.id === cardId)
   if (!card) { panel.innerHTML = '<div class="bpp-empty">Card não encontrado</div>'; return }
 
-  // Highlight selected row
-  document.querySelectorAll('.srs-browser-row').forEach(r => r.classList.toggle('selected', r.dataset.id === cardId && !_browserSelected.has(cardId)))
+  // Highlight selected row — sem tocar todos os elementos
+  document.querySelector(`.srs-browser-row.preview-active`)?.classList.remove('preview-active')
+  document.querySelector(`.srs-browser-row[data-id="${cardId}"]`)?.classList.add('preview-active')
 
   const imgData = await ImageDB.get(imageKey(card))
   const frente  = buildSrsFrente(card)
