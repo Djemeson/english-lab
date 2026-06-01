@@ -1819,13 +1819,12 @@ async function analyzeKindleItems() {
 
   const BATCH = 20  // menor para mais precisão e menos falhas
 
-  const SYSTEM_PROMPT = `You are a vocabulary extraction assistant for English learners.
-For each numbered sentence return:
-1. ITEM: best vocabulary item to study (base form, no punctuation). Pick unusual/vivid/advanced words or real phrasal verbs/idioms. Skip: went, said, got, came, looked (unless idiom). Never combine verb + object.
-2. SENTENCE_PT: natural Brazilian Portuguese TRANSLATION of the full sentence exactly as written. For single isolated words (marked WORD:), set to "".
-3. MEANING: brief Portuguese meaning of ITEM only — concise, 1 line.
+  const SYSTEM_PROMPT = `For each numbered English text, return a JSON with:
+- i: the number
+- item: the best vocabulary word/expression to study (base form, no punctuation; for WORD: entries use that word)
+- trans: translate the full text to Brazilian Portuguese exactly as written (if WORD: entry, give the word meaning instead)
 
-Return ONLY valid JSON: {"items":[{"i":<number>,"item":"<vocab>","sentence_pt":"<full translation>","meaning":"<word meaning>"}]}`
+Return ONLY: {"items":[{"i":<n>,"item":"<word>","trans":"<portuguese>"}]}`
 
   for (let start = 0; start < kindleItems.length; start += BATCH) {
     const batch = kindleItems.slice(start, start + BATCH)
@@ -1852,7 +1851,7 @@ Return ONLY valid JSON: {"items":[{"i":<number>,"item":"<vocab>","sentence_pt":"
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: `Process these ${batch.length} highlights.\n\n${lines}\n\nReturn ONLY this JSON (ALL ${batch.length} items):\n{"items":[{"i":<number>,"item":"<vocab>","sentence_pt":"<full sentence translation>","meaning":"<word meaning>"}]}` }
+            { role: 'user', content: `${lines}\n\nReturn JSON for ALL ${batch.length} items.` }
           ]
         })
       })
@@ -1862,10 +1861,10 @@ Return ONLY valid JSON: {"items":[{"i":<number>,"item":"<vocab>","sentence_pt":"
         .replace(/```(?:json)?\n?|\n?```/g, '').trim()
       const result = JSON.parse(raw)
       if (Array.isArray(result.items)) {
-        result.items.forEach(({ i, item, sentence_pt, meaning }) => {
+        result.items.forEach(({ i, item, trans }) => {
           const idx = Number(i)
           if (isNaN(idx) || idx < 0 || idx >= kindleItems.length) return
-          const ptStr = String(sentence_pt || '').trim()
+          const ptStr = String(trans || '').trim()
           const isInstructionLeak = /global.?index|cada item|utiliza|return|json|vocabulary/i.test(ptStr)
           if (ptStr && !isInstructionLeak) {
             kindleItems[idx].context_pt = ptStr
@@ -2165,13 +2164,12 @@ async function analyzeMidiaText() {
   el('midia-proc-results')?.classList.add('hidden')
   midiaProcessed = []
 
-  const SYSTEM = `You are a vocabulary extraction assistant for English learners.
-For each numbered item return:
-1. ITEM: best vocabulary item to study (base form, no punctuation). 1-3 word inputs → use the input itself. Sentences → pick the most advanced/vivid word or phrasal verb.
-2. SENTENCE_PT: Brazilian Portuguese translation of the FULL sentence/phrase as written. If the input is a single isolated word with no sentence context, set to "".
-3. MEANING: brief Portuguese meaning of ITEM only — concise, 1 line (e.g. "passageiro, efêmero" or "desistir de algo").
+  const SYSTEM = `For each numbered English text, return:
+- i: the number
+- item: best vocabulary word/expression to study (base form; for 1-3 word inputs use the input itself)
+- trans: translate the full text to Brazilian Portuguese exactly as written (for single words, give the meaning in Portuguese)
 
-Return ONLY valid JSON: {"items":[{"i":<number>,"item":"<vocab>","sentence_pt":"<full sentence translation>","meaning":"<word meaning>"}]}`
+Return ONLY: {"items":[{"i":<n>,"item":"<word>","trans":"<portuguese>"}]}\`
 
   const numbered = lines.map((l, i) => `${i}. ${l}`).join('\n')
   try {
@@ -2182,7 +2180,7 @@ Return ONLY valid JSON: {"items":[{"i":<number>,"item":"<vocab>","sentence_pt":"
         model: cfg.aiModel || 'gpt-4o-mini',
         max_tokens: Math.max(600, lines.length * 60),
         response_format: { type: 'json_object' },
-        messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `Process these ${lines.length} items:\n\n${numbered}\n\nReturn ALL ${lines.length} items.` }]
+        messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `${numbered}\n\nReturn JSON for ALL ${lines.length} items.` }]
       })
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -2191,10 +2189,12 @@ Return ONLY valid JSON: {"items":[{"i":<number>,"item":"<vocab>","sentence_pt":"
     midiaProcessed = lines.map((line, i) => {
       const ai = result.items?.find(x => Number(x.i) === i)
       const isShort = line.trim().split(/\s+/).length <= 3
+      const w = ai?.item || (isShort ? line.trim() : '')
       return {
-        word: ai?.item || (isShort ? line.trim() : ''),
+        words: w ? [w] : [],
+        word: w,
         context: isShort ? '' : line.trim(),
-        context_pt: ai?.pt || '',
+        context_pt: ai?.trans || '',
         source_type: srcType,
         source_title: srcTitle
       }
@@ -2227,7 +2227,7 @@ function renderMidiaProcessed() {
         <div class="kindle-sentence selectable-sentence" id="ms-${i}" onmouseup="handleSentenceMouseUp(event,${i},'midia')" title="Selecione com o mouse para adicionar objeto de estudo">${sentHTML}</div>
         ${item.context_pt ? `<div class="kindle-sentence-pt">${esc(item.context_pt)}</div>` : ''}
         <div class="kindle-expr-row" id="me-wrap-${i}" style="flex-wrap:wrap;gap:5px">${chipsHTML}</div>
-        ${item.word_meaning ? `<div style="font-size:0.75rem;color:var(--text3);margin-top:3px">${esc(iwords[0]||'')} — ${esc(item.word_meaning)}</div>` : ''}
+
         <div class="parsed-meta">${srcIcon(item.source_type)} ${esc(item.source_title || item.source_type)}</div>
       </div>
     </div>`
