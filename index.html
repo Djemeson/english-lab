@@ -280,17 +280,6 @@ select option{background:var(--surface)}
 /* Search */
 .review-search{padding:8px 12px;border-bottom:1px solid var(--border)}
 .review-search input{padding:6px 11px;font-size:0.83rem}
-/* Action bar */
-.rsb-action-bar{
-  padding:8px 12px;border-bottom:1px solid var(--border);
-  background:rgba(59,130,246,.07);
-  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
-}
-.rsb-action-bar.hidden{display:none}
-.rsb-sel-count{font-size:0.78rem;font-weight:600;color:var(--primary);flex:1;white-space:nowrap}
-.rsb-act-btn{padding:4px 10px;font-size:0.75rem;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-weight:500;white-space:nowrap}
-.rsb-act-btn:hover{background:var(--primary-glow);border-color:rgba(59,130,246,.4);color:var(--primary)}
-.rsb-act-btn.danger:hover{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.4);color:#F87171}
 /* Word list */
 .review-word-list{max-height:calc(100vh - 280px);overflow-y:auto}
 .rw-item:last-child{border-bottom:none}
@@ -1129,14 +1118,7 @@ select option{background:var(--surface)}
         <div class="review-search">
           <input type="text" id="sidebar-search" placeholder="🔍 Buscar..." oninput="filterSidebar(this.value)">
         </div>
-        <!-- Batch action bar (visible when items selected) -->
-        <div class="rsb-action-bar hidden" id="rsb-action-bar">
-          <span class="rsb-sel-count" id="rsb-sel-count">0 selecionadas</span>
-          <button class="rsb-act-btn" onclick="analyzeSelected()">⚡ Analisar</button>
-          <button class="rsb-act-btn" onclick="sendSelectedToAnki()">📤 Anki</button>
-          <button class="rsb-act-btn" onclick="saveSelectedToSrs()">📚 Site</button>
-          <button class="rsb-act-btn danger" onclick="deleteSelected()">🗑</button>
-        </div>
+        <!-- batch actions moved to wc-toolbar above card -->
         <div class="review-word-list" id="review-word-list"></div>
       </div>
 
@@ -3072,11 +3054,6 @@ function updateActionBar() {
   const reviewableIds = new Set(words.filter(w => ['pending_ai','pending_review'].includes(w.status)).map(w => w.id))
   for (const id of selectedWordIds) if (!reviewableIds.has(id)) selectedWordIds.delete(id)
 
-  const count = selectedWordIds.size
-  const bar = el('rsb-action-bar')
-  const cnt = el('rsb-sel-count')
-  if (bar) bar.classList.toggle('hidden', count === 0)
-  if (cnt) cnt.textContent = `${count} selecionada${count !== 1 ? 's' : ''}`
   // Update "Todas" button label
   const selAllBtn = document.querySelector('.rsb-select-all')
   if (selAllBtn) {
@@ -3084,6 +3061,43 @@ function updateActionBar() {
     const visible = reviewable.flatMap(g => g.words)
     const allSel = visible.length > 0 && visible.every(w => selectedWordIds.has(w.id))
     selAllBtn.textContent = allSel ? '☑ Todas' : '☐ Todas'
+  }
+  // Update toolbar above word card
+  renderWcToolbarLeft()
+}
+
+// Renders the left side of the wc-toolbar contextually:
+// — batch actions when items are selected
+// — individual actions for the active word otherwise
+function renderWcToolbarLeft() {
+  const leftEl = document.querySelector('.wct-left')
+  if (!leftEl) return
+  const w = words.find(x => x.id === activeWordId)
+  const selCount = selectedWordIds.size
+
+  if (selCount > 0) {
+    leftEl.innerHTML = `
+      <span style="font-size:0.82rem;font-weight:600;color:var(--primary);white-space:nowrap">${selCount} selecionada${selCount!==1?'s':''}</span>
+      <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()">⚡ Analisar</button>
+      <button class="btn btn-success btn-sm" onclick="sendSelectedToAnki()">📤 Anki</button>
+      <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()">📚 Site</button>
+      <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()">🗑 Excluir</button>`
+  } else if (w) {
+    if (w.status === 'pending_review' && w.meanings?.length > 0) {
+      const selM = w.meanings.filter(m => m.selected !== false)
+      const totalCards = selM.reduce((sum, m) => sum + ((m.examples?.length) || 1), 0)
+      leftEl.innerHTML = `
+        <button class="btn btn-success btn-sm" onclick="sendToAnki('${w.id}')">✓ Criar ${totalCards} card${totalCards!==1?'s':''} no Anki</button>
+        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')">📚 Salvar no site</button>
+        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')">🔄 Re-analisar</button>`
+    } else if (w.status === 'pending_ai') {
+      leftEl.innerHTML = `
+        <button class="btn btn-primary btn-sm" onclick="analyzeWord('${w.id}')">⚡ Analisar com IA</button>`
+    } else {
+      leftEl.innerHTML = ''
+    }
+  } else {
+    leftEl.innerHTML = ''
   }
 }
 
@@ -3155,7 +3169,6 @@ async function analyzeSelected() {
   const ids = [...selectedWordIds]
   if (!ids.length) return
   if (!cfg.openaiKey && !cfg.n8nBase) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
-  const btn = document.querySelector('.rsb-act-btn')
   toast(`Analisando ${ids.length} palavra${ids.length!==1?'s':''}...`)
   for (const id of ids) {
     await analyzeWord(id)
@@ -3285,22 +3298,8 @@ function renderWordCard(wordId) {
 
   main.innerHTML = `
   <div class="wc-toolbar">
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      ${w.status === 'pending_review' && w.meanings.length > 0 ? `
-        <button class="btn btn-success btn-sm" onclick="sendToAnki('${w.id}')">
-          ✓ Criar ${totalCards} card${totalCards !== 1 ? 's' : ''} no Anki
-        </button>
-        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')">
-          📚 Salvar no site
-        </button>
-      ` : ''}
-      ${w.status === 'pending_ai' ? '' : `
-        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')">
-          🔄 Re-analisar
-        </button>
-      `}
-    </div>
-    <div style="display:flex;gap:6px;align-items:center">
+    <div class="wct-left" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"></div>
+    <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
       <button class="btn btn-ghost btn-sm" onclick="speakWord('${escA(w.word || w.context)}')" title="Ouvir">🔊</button>
       <button class="btn btn-ghost btn-sm" onclick="skipWord('${w.id}')" title="Pular">⟶</button>
       <button class="btn btn-ghost btn-sm" onclick="deleteWord('${w.id}')" title="Excluir">🗑</button>
@@ -3322,6 +3321,7 @@ function renderWordCard(wordId) {
     </div>
     ${bodyHtml}
   </div>`
+  renderWcToolbarLeft()
 }
 
 function renderMeaningItem(wordId, m, mi) {
@@ -3368,17 +3368,13 @@ function toggleMeaning(wordId, mi) {
     item.classList.toggle('selected', sel)
     item.querySelector('.mi-checkbox').style.cssText = ''
   }
-  // Update toolbar above card
+  // Update toolbar + meanings count
   const selM = w.meanings.filter(m => m.selected !== false)
-  const selCount = selM.length
+  const selCount2 = selM.length
   const totalCards = selM.reduce((sum, m) => sum + ((m.examples && m.examples.length) || 1), 0)
-  const wcToolbar = document.querySelector('.wc-toolbar')
-  if (wcToolbar) {
-    const ankiBtn = wcToolbar.querySelector('.btn-success')
-    if (ankiBtn) ankiBtn.textContent = `✓ Criar ${totalCards} card${totalCards !== 1 ? 's' : ''} no Anki`
-  }
+  renderWcToolbarLeft()
   const countEl = document.querySelector('.meanings-count')?.parentElement?.querySelector('span:nth-child(3)')
-  if (countEl) countEl.textContent = `${selCount} selecionado${selCount !== 1 ? 's' : ''} · ${totalCards} card${totalCards !== 1 ? 's' : ''}`
+  if (countEl) countEl.textContent = `${selCount2} selecionado${selCount2 !== 1 ? 's' : ''} · ${totalCards} card${totalCards !== 1 ? 's' : ''}`
 }
 
 function selectAllMeanings(wordId, val) {
