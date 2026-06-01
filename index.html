@@ -1313,6 +1313,20 @@ select option{background:var(--surface)}
   <div style="margin-top:24px">
     <button class="btn btn-primary" onclick="saveSettings()">💾 Salvar configurações</button>
   </div>
+
+  <!-- Manutenção de Áudio -->
+  <div style="margin-top:32px;padding:20px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--border)">
+    <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px">🔊 Manutenção de Áudio</h3>
+    <p style="font-size:0.83rem;color:var(--text3);margin-bottom:16px">Gera áudio para cards que ainda não têm. Requer chave OpenAI configurada acima.</p>
+    <div id="audio-maint-status" style="font-size:0.85rem;color:var(--text2);margin-bottom:12px">
+      Clique em "Verificar" para contar cards sem áudio.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm" onclick="checkMissingAudio()">🔍 Verificar</button>
+      <button class="btn btn-primary btn-sm" id="btn-gen-missing-audio" style="display:none" onclick="generateMissingAudio()">⚡ Gerar áudio ausente</button>
+    </div>
+  </div>
+
   <button class="reset-all-btn" onclick="clearAllData()">apagar todos os dados e começar do zero</button>
 </section>
 
@@ -3879,6 +3893,36 @@ function clearKindleSeen() {
   toast('Histórico Kindle resetado. Próxima importação mostrará todos os destaques.', 'info')
 }
 
+async function checkMissingAudio() {
+  const statusEl = el('audio-maint-status')
+  const btn = el('btn-gen-missing-audio')
+  if (statusEl) statusEl.textContent = 'Verificando...'
+  await refreshAudioKeyCache()
+  const texts = [...new Set(srsCards.map(c => c.example_en || c.word).filter(Boolean))]
+  const missing = texts.filter(t => !_audioKeyCache?.has(audioKey(t)))
+  if (statusEl) {
+    if (missing.length === 0) {
+      statusEl.innerHTML = `<span style="color:var(--success)">✅ Todos os ${texts.length} cards têm áudio.</span>`
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--warning)">⚠️ ${missing.length} de ${texts.length} cards sem áudio.</span>`
+    }
+  }
+  if (btn) btn.style.display = missing.length > 0 ? 'inline-flex' : 'none'
+}
+
+async function generateMissingAudio() {
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI primeiro', 'error'); return }
+  const btn = el('btn-gen-missing-audio')
+  if (btn) btn.disabled = true
+  await refreshAudioKeyCache()
+  const texts = [...new Set(srsCards.map(c => c.example_en || c.word).filter(Boolean))]
+  const missing = texts.filter(t => !_audioKeyCache?.has(audioKey(t)))
+  if (!missing.length) { toast('Todos os cards já têm áudio', 'info'); if (btn) btn.disabled = false; return }
+  await preGenerateAudio(missing.map(t => ({ example_en: t })))
+  if (btn) btn.disabled = false
+  checkMissingAudio()
+}
+
 async function clearAllData() {
   if (!confirm('⚠️ Apagar TODOS os dados?\n\nIsso inclui:\n• Palavras e revisões\n• Cards SRS e progresso\n• Áudios gerados\n• Imagens geradas\n• Configurações\n\nFaça um backup antes.')) return
   if (!confirm('Confirma? Esta ação é IRREVERSÍVEL.')) return
@@ -4889,8 +4933,6 @@ function renderSrsAllCards() {
           <span style="width:75px;text-align:center" onclick="setBrowserSort('state')">Estado <span id="bsort-state"></span></span>
           <span style="width:60px;text-align:center" onclick="setBrowserSort('due')">Prazo <span id="bsort-due"></span></span>
           <span style="width:50px;text-align:center" onclick="setBrowserSort('ease')">Ease <span id="bsort-ease"></span></span>
-          <span style="width:32px;text-align:center" onclick="setBrowserSort('audio')">🔊 <span id="bsort-audio"></span></span>
-          <span style="width:32px;text-align:center" onclick="setBrowserSort('image')">🖼️ <span id="bsort-image"></span></span>
           <span style="width:52px"></span>
         </div>
         <div id="srs-browser-cards" style="overflow-y:auto;flex:1;min-height:0">
@@ -4903,10 +4945,8 @@ function renderSrsAllCards() {
       </div>
     </div>
   </div>`
-  // Carrega caches de áudio e imagem assim que a biblioteca abre
-  refreshAudioKeyCache()
-  refreshImageKeyCache()
 }
+
 
 function toggleBrowserDeck(deckId) {
   _activeBrowserDeck = deckId
@@ -5011,10 +5051,8 @@ const BROWSER_PAGE_SIZE = 80
 function buildBrowserRow(c, now) {
   const SC = {new:'var(--success)', learning:'var(--warning)', review:'var(--primary)', relearning:'var(--error)'}
   const SL = {new:'Novo', learning:'Aprendendo', review:'Revisão', relearning:'Reaprendendo'}
-  const dueTxt  = c.due <= now ? `<span style="color:var(--primary)">Agora</span>` : fmtDays(Math.round((c.due-now)/86400000))
-  const hasAudio = _audioKeyCache?.has(audioKey(c.example_en || c.word || ''))
-  const hasImage = _imageKeyCache?.has(imageKey(c))
-  const isSel    = _browserSelected.has(c.id)
+  const dueTxt = c.due <= now ? `<span style="color:var(--primary)">Agora</span>` : fmtDays(Math.round((c.due-now)/86400000))
+  const isSel  = _browserSelected.has(c.id)
   return `<div class="srs-browser-row${isSel?' selected':''}" data-id="${c.id}" onclick="showBrowserCardPreview('${c.id}')">
     <input type="checkbox" class="browser-cb" ${isSel?'checked':''} onchange="event.stopPropagation();browserToggleCard('${c.id}',this.checked)">
     <div style="flex:1;min-width:0">
@@ -5024,8 +5062,6 @@ function buildBrowserRow(c, now) {
     <span style="font-size:0.72rem;color:${SC[c.state]};font-weight:600;white-space:nowrap;width:75px;text-align:center">${SL[c.state]}</span>
     <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:60px;text-align:center">⏱ ${dueTxt}</span>
     <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:50px;text-align:center">ease ${c.ease.toFixed(1)}</span>
-    <span style="width:32px;text-align:center">${hasAudio ? '<span class="audio-badge-ok" title="Tem áudio">🔊</span>' : '<span class="audio-badge-no" title="Sem áudio">⚠️</span>'}</span>
-    <span style="width:32px;text-align:center">${hasImage ? '<span class="image-badge-ok" title="Tem imagem">🖼️</span>' : '<span class="image-badge-no" title="Sem imagem">·</span>'}</span>
     <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();moveSrsCardDeck('${c.id}')" title="Mover">↗</button>
     <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">✕</button>
   </div>`
@@ -5040,15 +5076,11 @@ async function renderBrowserCardList(deckId, query) {
   if (query) { const q = query.toLowerCase(); cards = cards.filter(c => (c.word||'').toLowerCase().includes(q) || (c.meaning_pt||'').toLowerCase().includes(q)) }
   if (!cards.length) { panel.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)">Nenhum card neste deck</div>`; return }
 
-  if (!_audioKeyCache) await refreshAudioKeyCache()
-
   const sortFns = {
     word:  (a,b) => (a.word||'').localeCompare(b.word||'') * _browserSort.dir,
     state: (a,b) => { const so={review:0,relearning:1,learning:2,new:3}; return ((so[a.state]??9)-(so[b.state]??9)) * _browserSort.dir },
     due:   (a,b) => (a.due - b.due) * _browserSort.dir,
-    ease:  (a,b) => (a.ease - b.ease) * _browserSort.dir,
-    audio: (a,b) => (Number(_audioKeyCache?.has(audioKey(a.example_en||a.word||''))) - Number(_audioKeyCache?.has(audioKey(b.example_en||b.word||'')))) * _browserSort.dir,
-    image: (a,b) => (Number(_imageKeyCache?.has(imageKey(a))) - Number(_imageKeyCache?.has(imageKey(b)))) * _browserSort.dir
+    ease:  (a,b) => (a.ease - b.ease) * _browserSort.dir
   }
   cards.sort(sortFns[_browserSort.col] || sortFns.state)
   _browserCurrentCards = cards
