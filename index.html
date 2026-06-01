@@ -1103,6 +1103,7 @@ select option{background:var(--surface)}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-secondary btn-sm" onclick="analyzeAll()">⚡ Analisar todas com IA</button>
       <button class="btn btn-success btn-sm" id="btn-send-all-anki" onclick="sendAllToAnki()" disabled style="opacity:.45;cursor:not-allowed">📤 Enviar todos pro Anki</button>
+      <button class="btn btn-srs btn-sm" id="btn-save-all-srs" onclick="saveAllToSrs()" disabled style="opacity:.45;cursor:not-allowed">📚 Salvar todos no site</button>
       <button class="btn btn-ghost btn-sm" onclick="showSection('adicionar')">+ Adicionar</button>
     </div>
   </div>
@@ -2535,13 +2536,86 @@ async function analyzeAll() {
 }
 
 function updateSendAllBtn() {
-  const btn = el('btn-send-all-anki')
-  if (!btn) return
   const ready = words.filter(w => w.status === 'pending_review' && w.meanings?.some(m => m.selected !== false))
   const hasReady = ready.length > 0
-  btn.disabled = !hasReady
-  btn.style.opacity = hasReady ? '1' : '.45'
-  btn.style.cursor = hasReady ? 'pointer' : 'not-allowed'
+  const btn = el('btn-send-all-anki')
+  if (btn) { btn.disabled = !hasReady; btn.style.opacity = hasReady ? '1' : '.45'; btn.style.cursor = hasReady ? 'pointer' : 'not-allowed' }
+  const btnSrs = el('btn-save-all-srs')
+  if (btnSrs) { btnSrs.disabled = !hasReady; btnSrs.style.opacity = hasReady ? '1' : '.45'; btnSrs.style.cursor = hasReady ? 'pointer' : 'not-allowed' }
+}
+
+async function saveAllToSrs() {
+  const ready = words.filter(w => w.status === 'pending_review' && w.meanings?.some(m => m.selected !== false))
+  if (!ready.length) { toast('Nenhuma palavra analisada pronta para salvar', 'warning'); return }
+  const btn = el('btn-save-all-srs')
+  if (btn) { btn.disabled = true; btn.style.opacity = '.45'; btn.innerHTML = `<span class="spinner"></span> Salvando...` }
+  // Suprime toasts individuais durante o batch
+  const _toast = window._batchMode = true
+  let ok = 0, totalCards = 0
+  loadSrs()
+  for (const w of ready) {
+    if (!w.meanings?.length) continue
+    const selected = w.meanings.filter(m => m.selected !== false)
+    if (!selected.length) continue
+    let added = 0
+    selected.forEach(m => {
+      const mi = w.meanings.indexOf(m)
+      const examples = m.examples?.length ? m.examples : [null]
+      examples.forEach((ex, ei) => {
+        const exIdx = ex ? ei : -1
+        const exists = srsCards.find(c => c.wordId === w.id && c.meaningIdx === mi && c.exampleIdx === exIdx)
+        if (exists) return
+        const card = createSrsCard(w.id, mi, exIdx < 0 ? 0 : exIdx)
+        if (card) { srsCards.push(card); added++; totalCards++ }
+      })
+    })
+    if (added > 0) { w.status = 'in_srs'; ok++ }
+  }
+  window._batchMode = false
+  saveSrsCards(); saveWords(); autoSyncAfterChange()
+  if (btn) { btn.innerHTML = '📚 Salvar todos no site'; updateSendAllBtn() }
+  toast(`📚 ${ok} palavra${ok !== 1 ? 's' : ''} (${totalCards} cards) salvas no site`, ok > 0 ? 'success' : 'info')
+  renderReview(); renderDashboard(); renderSidebar(); updateSrsBadge()
+}
+
+function startEditWord(wordId) {
+  const textEl = document.getElementById(`wc-word-text-${wordId}`)
+  const inputEl = document.getElementById(`wc-word-input-${wordId}`)
+  const btnEl = document.getElementById(`wc-edit-btn-${wordId}`)
+  if (!textEl || !inputEl) return
+  textEl.style.display = 'none'
+  btnEl.style.display = 'none'
+  inputEl.style.display = 'inline-block'
+  inputEl.focus()
+  inputEl.select()
+}
+
+function confirmEditWord(wordId) {
+  const textEl = document.getElementById(`wc-word-text-${wordId}`)
+  const inputEl = document.getElementById(`wc-word-input-${wordId}`)
+  const btnEl = document.getElementById(`wc-edit-btn-${wordId}`)
+  if (!textEl || !inputEl) return
+  const newVal = inputEl.value.trim()
+  if (newVal) {
+    const w = words.find(x => x.id === wordId)
+    if (w) { w.word = newVal; saveWords() }
+    textEl.textContent = newVal
+  }
+  textEl.style.display = ''
+  btnEl.style.display = ''
+  inputEl.style.display = 'none'
+}
+
+function handleEditWordKey(e, wordId) {
+  if (e.key === 'Enter') { e.preventDefault(); confirmEditWord(wordId) }
+  if (e.key === 'Escape') {
+    const textEl = document.getElementById(`wc-word-text-${wordId}`)
+    const inputEl = document.getElementById(`wc-word-input-${wordId}`)
+    const btnEl = document.getElementById(`wc-edit-btn-${wordId}`)
+    if (textEl) textEl.style.display = ''
+    if (btnEl) btnEl.style.display = ''
+    if (inputEl) inputEl.style.display = 'none'
+  }
 }
 
 async function sendAllToAnki() {
@@ -2738,7 +2812,11 @@ function renderWordCard(wordId) {
   main.innerHTML = `
   <div class="word-card">
     <div class="wc-header">
-      <div class="wc-word">${esc(w.word || '(frase)')}</div>
+      <div class="wc-word" style="display:flex;align-items:center;gap:8px">
+        <span id="wc-word-text-${w.id}">${esc(w.word || '(frase)')}</span>
+        <button class="btn btn-ghost btn-xs" title="Editar item de estudo" onclick="startEditWord('${w.id}')" id="wc-edit-btn-${w.id}" style="font-size:0.75rem;padding:2px 6px">✏️</button>
+        <input type="text" id="wc-word-input-${w.id}" value="${escA(w.word || '')}" style="display:none;font-size:1.2rem;font-weight:700;background:var(--surface2);border:1px solid var(--primary);border-radius:6px;padding:2px 8px;color:var(--text);width:200px" onkeydown="handleEditWordKey(event,'${w.id}')" onblur="confirmEditWord('${w.id}')">
+      </div>
       <div class="wc-meta">
         ${w.type ? `<span class="chip">${typeMap[w.type] || w.type}</span>` : ''}
         ${w.ipa ? `<span class="wc-ipa">${esc(w.ipa)}</span>` : ''}
@@ -5154,116 +5232,4 @@ Responda sempre em português (exceto os exemplos em inglês). Seja claro e did�
     appendConsultaMsg('ai', formatConsultaReply(cleanReply), srsItem)
 
   } catch(e) {
-    el(loadId)?.remove()
-    appendConsultaMsg('ai', `❌ Erro: ${esc(e.message)}`, null)
-    _consultaHistory.pop()
-  } finally {
-    if (input) { input.disabled = false; input.focus() }
-    const btn = el('consulta-send-btn'); if (btn) btn.disabled = false
-  }
-}
-
-function formatConsultaReply(text) {
-  // Markdown básico: **bold**, *italic*, listas
-  return text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/`(.+?)`/g,'<code style="background:var(--surface3);padding:1px 4px;border-radius:3px">$1</code>')
-    .replace(/^[-•] (.+)$/gm,'<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/s,'<ul style="padding-left:16px;margin:6px 0">$1</ul>')
-    .replace(/\n/g,'<br>')
-}
-
-function appendConsultaMsg(role, html, srsItem) {
-  const msgs = el('consulta-messages')
-  const addBtn = srsItem
-    ? `<br><button class="consulta-add-btn" onclick='addConsultaItemToSrs(${JSON.stringify(JSON.stringify(srsItem))})'>➕ Adicionar ao SRS</button>`
-    : ''
-  msgs.insertAdjacentHTML('beforeend',
-    `<div class="consulta-msg ${role}">${html}${addBtn}</div>`)
-  msgs.scrollTop = msgs.scrollHeight
-}
-
-function addConsultaItemToSrs(jsonStr) {
-  try {
-    const item = JSON.parse(jsonStr)
-    if (!item.word) { toast('Sem palavra para adicionar', 'warning'); return }
-    // Cria palavra na lista
-    const w = createWord({
-      word: item.word,
-      context: item.example_en || '',
-      source_type: 'manual'
-    })
-    // Adiciona significado pré-processado
-    w.meanings = [{
-      meaning_pt: item.meaning_pt || '',
-      definition_pt: item.definition_pt || '',
-      examples: item.example_en ? [{ en: item.example_en, pt: item.example_pt || '' }] : [],
-      selected: true
-    }]
-    w.ipa = item.ipa || ''
-    w.type = item.type || 'word'
-    // variety e register vão para o significado (meanings[0])
-    if (item.variety) w.meanings[0].variety = item.variety
-    if (item.register && item.register !== 'standard') w.meanings[0].register = item.register
-    w.status = 'pending_review'
-    w.ai_processed = true
-    saveWords()
-    renderDashboard()
-    updateSrsBadge()
-    // Salvar direto no SRS
-    saveToSrs(w.id)
-    toast(`"${item.word}" adicionado ao SRS!`, 'success')
-  } catch(e) { toast('Erro ao adicionar: ' + e.message, 'error') }
-}
-
-function clearConsulta() {
-  _consultaHistory = []
-  const msgs = el('consulta-messages')
-  if (msgs) msgs.innerHTML = `<div class="consulta-empty" id="consulta-empty">
-    <div class="icon">💬</div>
-    <p style="font-weight:600">Pergunte qualquer coisa em inglês</p>
-    <p style="font-size:0.85rem">Ex: "O que significa breaking bad?", "Como usar nevertheless?", "Diferença entre speak e talk"</p>
-  </div>`
-}
-
-// ================================================================
-// LIGHTBOX — zoom de imagem ao clicar
-// ================================================================
-function openImageLightbox(src, alt) {
-  if (document.getElementById('img-lightbox')) return  // já aberto
-  const lb = document.createElement('div')
-  lb.className = 'img-lightbox'
-  lb.id = 'img-lightbox'
-  lb.onclick = () => lb.remove()
-  lb.innerHTML = `<img src="${src}" alt="${alt || ''}" onclick="event.stopPropagation()">`
-  document.body.appendChild(lb)
-}
-
-// Delegar clique em imagens do card (usando event delegation no body)
-document.addEventListener('click', e => {
-  const img = e.target.closest('.srs-back-image-col img, .bpp-card-image, .srs-card-image')
-  if (img) { e.stopPropagation(); openImageLightbox(img.src, img.alt) }
-})
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { document.getElementById('img-lightbox')?.remove() }
-})
-
-function init() {
-  loadCfg(); loadWords(); loadSrs(); loadSrsDecks()
-  renderDashboard()
-  updateSrsBadge()
-  initFirebase()
-  fillSettings()
-  setupDrop('kindle-drop', handleKindleFile)
-  checkAnkiOnLoad()
-  if (!cfg.n8nBase) {
-    setTimeout(() => toast('Configure a URL do n8n em Configurações para usar a IA', 'info'), 1000)
-  }
-}
-
-document.addEventListener('DOMContentLoaded', init)
-</script>
-</body>
-</html>
+    el(
