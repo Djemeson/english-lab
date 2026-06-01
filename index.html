@@ -1796,13 +1796,18 @@ function renderKindleList(skipped, total) {
           ? `<div id="ke-wrap-${i}"><span style="font-size:0.75rem;color:var(--text3);font-style:italic">⏳ analisando...</span></div>`
           : `<div id="ke-wrap-${i}"><span style="font-size:0.75rem;color:var(--text3);font-style:italic">selecione com o mouse</span></div>`)
     const sentenceHTML = hasContext ? esc(item.context) : esc(item.word || '')
-    const vocabRefHTML = item.vocab_ref?.length
-      ? '<div style="font-size:0.75rem;color:var(--text3);margin-top:4px;display:flex;flex-wrap:wrap;gap:6px">' +
-        item.vocab_ref.map(v => {
-          const lbl = v.type ? '<span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px;margin-left:3px">' + esc(v.type) + '</span>' : ''
-          return '<span style="display:inline-flex;align-items:center;gap:2px">📌 ' + esc(v.expr) + lbl + '</span>'
-        }).join('<span style="color:var(--border);margin:0 2px">&middot;</span>') + '</div>'
-      : ''
+    const vocabRefHTML = (()=>{
+      if (!item.vocab_ref?.length) return ''
+      const parts = item.vocab_ref.map(v => {
+        const expr = typeof v === 'object' ? (v.expr||v.expression||v.phrase||v.text||'') : String(v||'')
+        const type = typeof v === 'object' ? (v.type||v.category||'') : ''
+        if (!expr || expr.trim().length < 2) return ''
+        const lbl = type ? `<span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 5px;margin-left:4px">${esc(type)}</span>` : ''
+        return `<span style="display:inline-flex;align-items:center">📌 ${esc(expr)}${lbl}</span>`
+      }).filter(Boolean)
+      if (!parts.length) return ''
+      return `<div style="font-size:0.78rem;color:var(--text2);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px">${parts.join('')}</div>`
+    })()
     return `
     <div class="parsed-item" id="ki-${i}">
       <input type="checkbox" class="kindle-check" data-i="${i}" checked>
@@ -2240,13 +2245,18 @@ function renderMidiaProcessed() {
     const chipsHTML = iwords.length
       ? iwords.map((w,wi) => `<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeMidiaWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1" title="remover">×</span></span>`).join('')
       : `<span style="font-size:0.75rem;color:var(--text3);font-style:italic">selecione com o mouse</span>`
-    const vocabRefHTML = item.vocab_ref?.length
-      ? '<div style="font-size:0.75rem;color:var(--text3);margin-top:4px;display:flex;flex-wrap:wrap;gap:6px">' +
-        item.vocab_ref.map(v => {
-          const lbl = v.type ? '<span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px;margin-left:3px">' + esc(v.type) + '</span>' : ''
-          return '<span style="display:inline-flex;align-items:center;gap:2px">📌 ' + esc(v.expr) + lbl + '</span>'
-        }).join('<span style="color:var(--border);margin:0 2px">&middot;</span>') + '</div>'
-      : ''
+    const vocabRefHTML = (()=>{
+      if (!item.vocab_ref?.length) return ''
+      const parts = item.vocab_ref.map(v => {
+        const expr = typeof v === 'object' ? (v.expr||v.expression||v.phrase||v.text||'') : String(v||'')
+        const type = typeof v === 'object' ? (v.type||v.category||'') : ''
+        if (!expr || expr.trim().length < 2) return ''
+        const lbl = type ? `<span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 5px;margin-left:4px">${esc(type)}</span>` : ''
+        return `<span style="display:inline-flex;align-items:center">📌 ${esc(expr)}${lbl}</span>`
+      }).filter(Boolean)
+      if (!parts.length) return ''
+      return `<div style="font-size:0.78rem;color:var(--text2);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px">${parts.join('')}</div>`
+    })()
     return `
     <div class="parsed-item" id="mi-proc-${i}">
       <input type="checkbox" class="midia-proc-check" data-i="${i}" checked>
