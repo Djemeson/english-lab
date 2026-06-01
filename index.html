@@ -1821,14 +1821,23 @@ async function analyzeKindleItems() {
 
   const BATCH = 20  // menor para mais precisão e menos falhas
 
-  const SYSTEM_PROMPT = `For each numbered English sentence:
-1. Find ONLY phrasal verbs, idioms, collocations, and slang — NOT individual difficult words.
-2. Translate the full sentence to Brazilian Portuguese.
+  const SYSTEM_PROMPT = `Analyze each numbered English sentence. Your job:
+1. Find ALL phrasal verbs, idioms, collocations, and slang present. Be exhaustive — do not skip subtle ones.
 
-For WORD: entries (single isolated words), return empty vocab [] and the word meaning as trans.
+Examples of what to catch:
+- Phrasal verbs: "give up", "trailed off", "lifted it off", "take off", "put up with"
+- Idioms: "grit his teeth", "break the ice", "take the black", "blood ran cold"
+- Collocations: "lick his lips", "blood matted", "raise an eyebrow", "heart sank"
+- Slang: "freaked out", "bail", "crash"
+
+Do NOT include plain difficult words (e.g. "ephemeral", "gorget"). Only multi-word expressions or set phrases.
+If none found, return empty vocab [].
+
+2. Translate the full sentence naturally to Brazilian Portuguese.
+For short inputs (1-3 words), return vocab [] and word meaning as trans.
 
 Return ONLY valid JSON:
-{"items":[{"i":<n>,"vocab":["phrasal verb","idiom","collocation","slang"],"trans":"<full Portuguese translation>"}]}`
+{"items":[{"i":<n>,"vocab":["expression1","expression2"],"trans":"<full Portuguese translation>"}]}`
 
   for (let start = 0; start < kindleItems.length; start += BATCH) {
     const batch = kindleItems.slice(start, start + BATCH)
@@ -1850,8 +1859,8 @@ Return ONLY valid JSON:
         method: 'POST',
         headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          max_tokens: Math.max(800, batch.length * 40),
+          model: 'gpt-4o',
+          max_tokens: Math.max(800, batch.length * 60),
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
@@ -2182,8 +2191,8 @@ Return ONLY valid JSON:
       method: 'POST',
       headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: cfg.aiModel || 'gpt-4o-mini',
-        max_tokens: Math.max(600, lines.length * 60),
+        model: 'gpt-4o',
+        max_tokens: Math.max(800, lines.length * 80),
         response_format: { type: 'json_object' },
         messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `${numbered}\n\nReturn JSON for ALL ${lines.length} items.` }]
       })
