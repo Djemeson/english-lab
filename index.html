@@ -1797,7 +1797,11 @@ function renderKindleList(skipped, total) {
           : `<div id="ke-wrap-${i}"><span style="font-size:0.75rem;color:var(--text3);font-style:italic">selecione com o mouse</span></div>`)
     const sentenceHTML = hasContext ? esc(item.context) : esc(item.word || '')
     const vocabRefHTML = item.vocab_ref?.length
-      ? `<div style="font-size:0.75rem;color:var(--text3);margin-top:3px">📌 ${item.vocab_ref.map(v=>esc(v)).join(' · ')}</div>`
+      ? '<div style="font-size:0.75rem;color:var(--text3);margin-top:4px;display:flex;flex-wrap:wrap;gap:6px">' +
+        item.vocab_ref.map(v => {
+          const lbl = v.type ? '<span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px;margin-left:3px">' + esc(v.type) + '</span>' : ''
+          return '<span style="display:inline-flex;align-items:center;gap:2px">📌 ' + esc(v.expr) + lbl + '</span>'
+        }).join('<span style="color:var(--border);margin:0 2px">&middot;</span>') + '</div>'
       : ''
     return `
     <div class="parsed-item" id="ki-${i}">
@@ -2237,7 +2241,11 @@ function renderMidiaProcessed() {
       ? iwords.map((w,wi) => `<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeMidiaWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1" title="remover">×</span></span>`).join('')
       : `<span style="font-size:0.75rem;color:var(--text3);font-style:italic">selecione com o mouse</span>`
     const vocabRefHTML = item.vocab_ref?.length
-      ? `<div style="font-size:0.75rem;color:var(--text3);margin-top:3px">📌 ${item.vocab_ref.map(esc).join(' · ')}</div>`
+      ? '<div style="font-size:0.75rem;color:var(--text3);margin-top:4px;display:flex;flex-wrap:wrap;gap:6px">' +
+        item.vocab_ref.map(v => {
+          const lbl = v.type ? '<span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px;margin-left:3px">' + esc(v.type) + '</span>' : ''
+          return '<span style="display:inline-flex;align-items:center;gap:2px">📌 ' + esc(v.expr) + lbl + '</span>'
+        }).join('<span style="color:var(--border);margin:0 2px">&middot;</span>') + '</div>'
       : ''
     return `
     <div class="parsed-item" id="mi-proc-${i}">
