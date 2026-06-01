@@ -1789,21 +1789,22 @@ function renderKindleList(skipped, total) {
   el('kindle-result').classList.remove('hidden')
   list.innerHTML = kindleItems.map((item, i) => {
     const hasContext = !!item.context
-    const chipContent = item.word
-      ? `<span class="kindle-expr-chip" id="ke-${i}">${esc(item.word)}</span>`
+    const iwords = getItemWords(item)
+    const chipContent = iwords.length
+      ? `<div id="ke-wrap-${i}" style="display:flex;gap:5px;flex-wrap:wrap">${iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeKindleWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1" title="remover">×</span></span>`).join('')}</div>`
       : (cfg.openaiKey
-          ? `<span class="kindle-expr-chip loading" id="ke-${i}">⏳ analisando...</span>`
-          : `<span class="kindle-expr-chip loading" id="ke-${i}">⏳ aguardando IA</span>`)
+          ? `<div id="ke-wrap-${i}"><span class="kindle-expr-chip loading">⏳ analisando...</span></div>`
+          : `<div id="ke-wrap-${i}"><span class="kindle-expr-chip loading" style="color:var(--text3);font-size:0.75rem">Selecione com o mouse</span></div>`)
     const sentenceHTML = hasContext
-      ? (item.word ? highlightExprInSentence(item.context, item.word) : esc(item.context))
-      : esc(item.word || '')
+      ? (iwords.length ? highlightMultipleExprs(item.context, iwords) : esc(item.context))
+      : esc(iwords[0] || '')
     return `
     <div class="parsed-item" id="ki-${i}">
       <input type="checkbox" class="kindle-check" data-i="${i}" checked>
       <div class="parsed-item-body">
-        <div class="kindle-sentence selectable-sentence" id="ks-${i}" onmouseup="handleSentenceMouseUp(event,${i},'kindle')">${sentenceHTML}</div>
+        <div class="kindle-sentence selectable-sentence" id="ks-${i}" onmouseup="handleSentenceMouseUp(event,${i},'kindle')" title="Selecione com o mouse para adicionar objeto de estudo">${sentenceHTML}</div>
         <div class="kindle-sentence-pt" id="ks-pt-${i}">${esc(item.context_pt || '')}</div>
-        <div class="kindle-expr-row">
+        <div class="kindle-expr-row" style="flex-wrap:wrap;gap:5px">
           ${chipContent}
         </div>
         <div class="parsed-meta">📖 ${esc(item.source_title)}${item.chapter ? ' · ' + esc(item.chapter) : ''}</div>
@@ -1884,7 +1885,9 @@ TRANSLATION RULES:
           const clean = String(item).toLowerCase()
             .replace(/[.,!?;:"""\''()\n\[\]]/g, '').trim()
           if (clean && clean.length > 0) {
-            kindleItems[idx].word = clean
+            if (!Array.isArray(kindleItems[idx].words)) kindleItems[idx].words = []
+            if (!kindleItems[idx].words.includes(clean)) kindleItems[idx].words = [clean]
+            kindleItems[idx].word = clean // compat
           }
         })
       }
@@ -1933,6 +1936,24 @@ function highlightExprInSentence(sentence, expression) {
         : esc(p)
     ).join('')
   } catch { return esc(sentence) }
+}
+
+function highlightMultipleExprs(sentence, words) {
+  if (!words?.length || !sentence) return esc(sentence || '')
+  let result = esc(sentence)
+  words.filter(Boolean).forEach(w => {
+    try {
+      const pat = esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      result = result.replace(new RegExp('(' + pat + ')', 'gi'), '<mark class="expr-highlight">$1</mark>')
+    } catch {}
+  })
+  return result
+}
+
+function getItemWords(item) {
+  if (Array.isArray(item.words) && item.words.length) return item.words
+  if (item.word) return [item.word]
+  return []
 }
 
 function updateKindleDisplay(i, expression) {
@@ -2008,10 +2029,41 @@ function attachPicker(idx) {
   }))
 }
 
-function setKindleWord(i, word) {
+function setKindleWord(i, word) { addKindleWord(i, word) } // compat
+
+function addKindleWord(i, word) {
+  if (!kindleItems[i] || !word) return
+  if (!Array.isArray(kindleItems[i].words)) kindleItems[i].words = kindleItems[i].word ? [kindleItems[i].word] : []
+  if (!kindleItems[i].words.map(w=>w.toLowerCase()).includes(word.toLowerCase())) {
+    kindleItems[i].words.push(word)
+  }
+  kindleItems[i].word = kindleItems[i].words[0] // compat
+  updateKindleWordsDisplay(i)
+}
+
+function removeKindleWord(i, wi) {
   if (!kindleItems[i]) return
-  kindleItems[i].word = word
-  if (word) updateKindleDisplay(i, word)
+  if (!Array.isArray(kindleItems[i].words)) return
+  kindleItems[i].words.splice(wi, 1)
+  kindleItems[i].word = kindleItems[i].words[0] || ''
+  updateKindleWordsDisplay(i)
+}
+
+function updateKindleWordsDisplay(i) {
+  const item = kindleItems[i]; if (!item) return
+  const iwords = getItemWords(item)
+  // Sentence highlight
+  const sentEl = el(`ks-${i}`)
+  if (sentEl) sentEl.innerHTML = item.context ? highlightMultipleExprs(item.context, iwords) : esc(iwords[0]||'')
+  // Chips
+  const wrap = el(`ke-wrap-${i}`)
+  if (wrap) {
+    if (iwords.length) {
+      wrap.innerHTML = iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeKindleWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1">×</span></span>`).join('')
+    } else {
+      wrap.innerHTML = `<span class="kindle-expr-chip loading" style="color:var(--text3);font-size:0.75rem">Selecione com o mouse</span>`
+    }
+  }
 }
 
 async function detectKindleWord(i) {
@@ -2075,7 +2127,14 @@ function discardKindleSelected() {
 function addKindleSelected() {
   const sel = [...document.querySelectorAll('.kindle-check')].filter(c => c.checked).map(c => kindleItems[+c.dataset.i])
   if (!sel.length) { toast('Selecione pelo menos um item', 'warning'); return }
-  sel.forEach(item => createWord(item))
+  sel.forEach(item => {
+    const iwords = getItemWords(item)
+    if (iwords.length <= 1) {
+      createWord({ ...item, word: iwords[0] || item.word || item.context })
+    } else {
+      iwords.forEach(w => createWord({ word: w, context: item.context, context_pt: item.context_pt, source_type: item.source_type, source_title: item.source_title }))
+    }
+  })
   saveWords(); renderDashboard()
   // Marca os itens adicionados como processados para futuras importações
   markKindleItemsAsSeen(sel)
@@ -2116,10 +2175,12 @@ async function analyzeMidiaText() {
   midiaProcessed = []
 
   const SYSTEM = `You are a vocabulary extraction assistant for English learners.
-For each numbered item, do TWO things:
-1. ITEM: identify the best vocabulary item to study (base form, no punctuation). For 1-3 word inputs use the input itself. For sentences pick the most advanced/interesting word or phrasal verb.
-2. PT: for a full sentence, give a natural Brazilian Portuguese translation. For a word/short phrase, give its meaning in Portuguese.
-Return ONLY this JSON: {"items":[{"i":<number>,"item":"<vocabulary>","pt":"<portuguese>"}]}`
+For each numbered item, return THREE things:
+1. ITEM: the best vocabulary item to study (base form, no punctuation). For 1-3 word inputs use the input itself. For sentences pick the most advanced/vivid word or phrasal verb.
+2. PT: if input is a sentence (4+ words) → natural Brazilian Portuguese TRANSLATION of the full sentence. If input is a word/short phrase → its meaning in Portuguese.
+3. MEANING: brief Portuguese meaning of ITEM specifically (always required, 1 short line, e.g. "passageiro, que dura pouco").
+
+Return ONLY this JSON: {"items":[{"i":<number>,"item":"<vocabulary>","pt":"<translation or meaning>","meaning":"<word meaning>"}]}`
 
   const numbered = lines.map((l, i) => `${i}. ${l}`).join('\n')
   try {
@@ -2161,30 +2222,58 @@ function renderMidiaProcessed() {
   el('midia-proc-count').textContent = `${midiaProcessed.length} item${midiaProcessed.length !== 1 ? 's' : ''}`
   list.innerHTML = midiaProcessed.map((item, i) => {
     const hasCtx = !!item.context
-    const sentHTML = hasCtx && item.word ? highlightExprInSentence(item.context, item.word) : esc(item.context || item.word || '')
+    const iwords = getItemWords(item)
+    const sentHTML = hasCtx
+      ? (iwords.length ? highlightMultipleExprs(item.context, iwords) : esc(item.context))
+      : esc(iwords[0] || '')
+    const chipsHTML = iwords.length
+      ? iwords.map((w,wi) => `<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeMidiaWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1" title="remover">×</span></span>`).join('')
+      : `<span class="kindle-expr-chip loading" style="color:var(--text3);font-size:0.75rem">Selecione com o mouse</span>`
     return `
     <div class="parsed-item" id="mi-proc-${i}">
       <input type="checkbox" class="midia-proc-check" data-i="${i}" checked>
       <div class="parsed-item-body">
-        <div class="kindle-sentence selectable-sentence" id="ms-${i}" onmouseup="handleSentenceMouseUp(event,${i},'midia')">${sentHTML}</div>
+        <div class="kindle-sentence selectable-sentence" id="ms-${i}" onmouseup="handleSentenceMouseUp(event,${i},'midia')" title="Selecione com o mouse para adicionar objeto de estudo">${sentHTML}</div>
         ${item.context_pt ? `<div class="kindle-sentence-pt">${esc(item.context_pt)}</div>` : ''}
-        <div class="kindle-expr-row">
-          <span class="kindle-expr-chip" id="me-${i}">${esc(item.word || '?')}</span>
-        </div>
+        <div class="kindle-expr-row" id="me-wrap-${i}" style="flex-wrap:wrap;gap:5px">${chipsHTML}</div>
         <div class="parsed-meta">${srcIcon(item.source_type)} ${esc(item.source_title || item.source_type)}</div>
       </div>
     </div>`
   }).join('')
 }
 
-function setMidiaProcessedWord(idx, word) {
-  if (!midiaProcessed[idx]) return
-  midiaProcessed[idx].word = word
-  const sentEl = el(`ms-${idx}`)
-  if (sentEl && midiaProcessed[idx].context) sentEl.innerHTML = highlightExprInSentence(midiaProcessed[idx].context, word)
-  const chipEl = el(`me-${idx}`)
-  if (chipEl) chipEl.textContent = word
+function addMidiaWord(idx, word) {
+  if (!midiaProcessed[idx] || !word) return
+  if (!Array.isArray(midiaProcessed[idx].words)) midiaProcessed[idx].words = midiaProcessed[idx].word ? [midiaProcessed[idx].word] : []
+  if (!midiaProcessed[idx].words.map(w=>w.toLowerCase()).includes(word.toLowerCase())) {
+    midiaProcessed[idx].words.push(word)
+  }
+  midiaProcessed[idx].word = midiaProcessed[idx].words[0]
+  updateMidiaWordsDisplay(idx)
 }
+
+function removeMidiaWord(idx, wi) {
+  if (!midiaProcessed[idx]) return
+  if (!Array.isArray(midiaProcessed[idx].words)) return
+  midiaProcessed[idx].words.splice(wi, 1)
+  midiaProcessed[idx].word = midiaProcessed[idx].words[0] || ''
+  updateMidiaWordsDisplay(idx)
+}
+
+function updateMidiaWordsDisplay(idx) {
+  const item = midiaProcessed[idx]; if (!item) return
+  const iwords = getItemWords(item)
+  const sentEl = el(`ms-${idx}`)
+  if (sentEl) sentEl.innerHTML = item.context ? highlightMultipleExprs(item.context, iwords) : esc(iwords[0]||'')
+  const wrap = el(`me-wrap-${idx}`)
+  if (wrap) {
+    wrap.innerHTML = iwords.length
+      ? iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeMidiaWord(${idx},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1">×</span></span>`).join('')
+      : `<span class="kindle-expr-chip loading" style="color:var(--text3);font-size:0.75rem">Selecione com o mouse</span>`
+  }
+}
+
+function setMidiaProcessedWord(idx, word) { addMidiaWord(idx, word) } // compat
 
 function discardMidiaSelected() {
   const checked = [...document.querySelectorAll('.midia-proc-check')].filter(c => c.checked).map(c => +c.dataset.i)
@@ -2198,7 +2287,14 @@ function discardMidiaSelected() {
 function addMidiaProcessed() {
   const sel = [...document.querySelectorAll('.midia-proc-check')].filter(c => c.checked).map(c => midiaProcessed[+c.dataset.i]).filter(Boolean)
   if (!sel.length) { toast('Selecione ao menos um item', 'warning'); return }
-  sel.forEach(item => createWord({ word: item.word, context: item.context, source_type: item.source_type, source_title: item.source_title }))
+  sel.forEach(item => {
+    const iwords = getItemWords(item)
+    if (iwords.length <= 1) {
+      createWord({ word: iwords[0]||item.word, context: item.context, source_type: item.source_type, source_title: item.source_title })
+    } else {
+      iwords.forEach(w => createWord({ word: w, context: item.context, source_type: item.source_type, source_title: item.source_title }))
+    }
+  })
   saveWords(); renderDashboard()
   const selSet = new Set(sel)
   midiaProcessed = midiaProcessed.filter(x => !selSet.has(x))
@@ -2218,8 +2314,8 @@ function handleSentenceMouseUp(event, idx, type) {
   const txt = sel.toString().trim().replace(/[.,!?;:"""\u2018\u2019()\[\]]/g, '').trim()
   if (!txt || txt.length < 1) { sel.removeAllRanges(); return }
   sel.removeAllRanges()
-  if (type === 'kindle') setKindleWord(idx, txt)
-  else if (type === 'midia') setMidiaProcessedWord(idx, txt)
+  if (type === 'kindle') addKindleWord(idx, txt)
+  else if (type === 'midia') addMidiaWord(idx, txt)
 }
 
 function srcIcon(t) {
