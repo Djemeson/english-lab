@@ -2747,6 +2747,21 @@ For Portuguese translations of examples:
 - Use DIFFERENT Portuguese words/synonyms across the 3 examples when the target word has synonyms (e.g. for "thunderstruck": use "atordoado", "estarrecido", "pasmado" — not "atordoado" × 3)
 - Each Portuguese translation should read like natural Brazilian Portuguese, not like a translation
 
+Rules for meanings — CRITICAL:
+- If the word/expression has MORE THAN ONE distinct sense, return EACH as a SEPARATE object in the meanings array
+- NEVER merge two different senses into one meaning using semicolons (e.g. "decolar; ter sucesso" is WRONG — those must be two separate meaning objects)
+- Each meaning MUST have its own 3 examples showing that specific sense in use
+- Set "context_match": true ONLY for the meaning that matches the context sentence (if provided); others get false
+- If context is provided, put the matching meaning FIRST in the array
+- A word/expression typically has 1-3 distinct meanings; capture all relevant ones
+
+Example of CORRECT behavior for "take off":
+meanings: [
+  { meaning_pt: "decolar", definition_pt: "Quando um avião ou foguete deixa o solo.", context_match: false, examples: [...] },
+  { meaning_pt: "ter sucesso repentino", definition_pt: "Quando algo começa a crescer ou se tornar popular rapidamente.", context_match: true, examples: [...] },
+  { meaning_pt: "tirar, remover", definition_pt: "Remover algo do corpo, como roupas ou acessórios.", context_match: false, examples: [...] }
+]
+
 Return ONLY this JSON (no markdown, no explanation):
 {
   "word": "exact word or expression to study",
@@ -2755,8 +2770,8 @@ Return ONLY this JSON (no markdown, no explanation):
   "level": "A2|B1|B2|C1|C2",
   "meanings": [
     {
-      "meaning_pt": "concise Portuguese translation (1-4 words)",
-      "definition_pt": "Full definition in Portuguese (1-2 sentences explaining meaning and typical use)",
+      "meaning_pt": "concise Portuguese translation (1-4 words, ONE sense only — no semicolons)",
+      "definition_pt": "Full definition in Portuguese for THIS specific sense (1-2 sentences)",
       "register": "neutral|formal|informal|slang",
       "level": "A2|B1|B2|C1|C2",
       "context_match": true,
@@ -2777,7 +2792,7 @@ Return ONLY this JSON (no markdown, no explanation):
       headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: cfg.aiModel || 'gpt-4o',
-        max_tokens: 1400,
+        max_tokens: 2800,
         response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: PROMPT }]
       })
