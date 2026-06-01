@@ -1664,8 +1664,10 @@ function loadKindleQueue() {
   try {
     const saved = JSON.parse(localStorage.getItem(SK.kindleQueue) || '[]')
     if (saved.length > 0) {
-      kindleItems = saved
-      return true
+      const seen = loadKindleSeen()
+      kindleItems = saved.filter(item => !seen.has(kindleHighlightHash(item.context || item.word)))
+      if (kindleItems.length < saved.length) localStorage.setItem(SK.kindleQueue, JSON.stringify(kindleItems))
+      return kindleItems.length > 0
     }
   } catch {}
   return false
@@ -3144,7 +3146,7 @@ async function sendToAnki(wordId) {
 
 function skipWord(id) {
   const w = words.find(x => x.id === id); if (!w) return
-  w.status = 'skipped'; saveWords()
+  w.status = 'skipped'; w.updated_at = new Date().toISOString(); saveWords()
   toast(`"${w.word || '(frase)'}" pulada`, 'info')
   renderSidebar()
   const next = words.find(x => ['pending_ai','pending_review'].includes(x.status) && x.id !== id)
@@ -3634,8 +3636,8 @@ async function fbPull() {
       localWords.forEach(w => {
         if (!byId[w.id]) { byId[w.id] = w; return }
         const cloud = byId[w.id]
-        const localAnalyzed = w.status !== 'pending_ai' && w.ai_processed
-        const cloudAnalyzed = cloud.status !== 'pending_ai' && cloud.ai_processed
+        const localAnalyzed = w.status !== "pending_ai"
+        const cloudAnalyzed = cloud.status !== "pending_ai"
         if (localAnalyzed && !cloudAnalyzed) { byId[w.id] = w; return }
         if (!localAnalyzed && cloudAnalyzed) { return } // mantém cloud
         // Ambos analisados: usa o mais recente
@@ -3652,7 +3654,8 @@ async function fbPull() {
     if (decksDoc.exists)  { srsDecks  = decksDoc.data().list || [];    saveSrsDecks() }
     const kindleDoc = await base.collection('data').doc('kindleQueue').get()
     if (kindleDoc.exists && kindleDoc.data().list?.length > 0) {
-      kindleItems = kindleDoc.data().list
+      const seen = loadKindleSeen()
+      kindleItems = (kindleDoc.data().list || []).filter(item => !seen.has(kindleHighlightHash(item.context || item.word)))
       localStorage.setItem(SK.kindleQueue, JSON.stringify(kindleItems))
     }
 
