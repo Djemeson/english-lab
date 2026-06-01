@@ -2702,8 +2702,11 @@ async function preGenerateAudio(cards) {
     await new Promise(r => setTimeout(r, 100))
   }
 
-  // Sync final para garantir que tudo chegou ao Firebase
-  if (generated > 0) autoSyncAfterChange()
+  // Sync final: dados agora, áudio após 30s (não sobrecarrega a cota)
+  if (generated > 0) {
+    autoSyncAfterChange()       // sincroniza dados estruturais imediatamente
+    autoSyncAudioAfterChange()  // sincroniza áudios novos após estabilizar
+  }
 
   el('audio-gen-banner')?.classList.add('hidden')
   toast(
@@ -4198,6 +4201,29 @@ const FB_CONFIG = {
 
 let _fbApp = null, _fbDb = null, _fbAuth = null, _fbUser = null
 let _fbSyncTimer = null
+let _fbAudioSyncTimer = null
+
+// Sincroniza APENAS áudios novos — roda após um delay longo para acumular mudanças
+async function autoSyncAudioAfterChange() {
+  if (!_fbUser || !_fbDb) return
+  clearTimeout(_fbAudioSyncTimer)
+  _fbAudioSyncTimer = setTimeout(async () => {
+    try {
+      const base = _fbDb.collection('users').doc(_fbUser.uid)
+      const audioData = await AudioDB.getAll()
+      const existing = await base.collection('audio').get()
+      const existingKeys = new Set(existing.docs.map(d => d.id))
+      const newEntries = Object.entries(audioData).filter(([k]) => !existingKeys.has(k))
+      if (!newEntries.length) return
+      for (const [key, val] of newEntries) {
+        await base.collection('audio').doc(key).set({ data: val, updatedAt: Date.now() })
+      }
+      console.log(`[Firebase] Audio sync: ${newEntries.length} novos áudios enviados`)
+    } catch(e) {
+      console.warn('[Firebase] audio sync error:', e.code || e.message)
+    }
+  }, 30000) // 30s — deixa acumular antes de sincronizar
+}
 
 function initFirebase() {
   if (_fbApp) return
@@ -4265,41 +4291,62 @@ function userRef(path) {
 }
 
 // ---- PUSH: local → Firestore ----
-async function fbPush() {
+// Push rápido: só words/cards/cfg/log/decks — sem áudio/imagem
+// Usado pelo autoSyncAfterChange (frequente)
+async function fbPushData() {
   if (!_fbUser || !_fbDb) return false
   updateSyncNav('syncing')
   try {
-    const uid = _fbUser.uid
-    const base = _fbDb.collection('users').doc(uid)
-
-    // Dados principais em batch
+    const base = _fbDb.collection('users').doc(_fbUser.uid)
     const batch = _fbDb.batch()
-    batch.set(base.collection('data').doc('words'),    { list: words, updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('srsCards'), { list: srsCards, updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('srsCfg'),   { ...srsCfg, updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('srsLog'),   { list: srsLog, updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('srsDecks'), { list: srsDecks, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('words'),    { list: words,     updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('srsCards'), { list: srsCards,  updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('srsCfg'),   { ...srsCfg,       updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('srsLog'),   { list: srsLog,    updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('srsDecks'), { list: srsDecks,  updatedAt: Date.now() })
     if (kindleItems.length > 0) {
       batch.set(base.collection('data').doc('kindleQueue'), { list: kindleItems, updatedAt: Date.now() })
     }
     await batch.commit()
+    updateSyncNav('ok')
+    return true
+  } catch(e) {
+    console.warn('[Firebase] data push error:', e.code || e.message)
+    updateSyncNav('err')
+    return false
+  }
+}
 
-    // Áudios (cada um como documento separado)
+// Push completo: dados + áudio + imagens — usado só no botão manual "Enviar para nuvem"
+async function fbPush() {
+  const dataOk = await fbPushData()
+  if (!dataOk) return false
+  updateSyncNav('syncing')
+  try {
+    const base = _fbDb.collection('users').doc(_fbUser.uid)
+
+    // Áudios — só escreve os que ainda não existem no Firestore
     const audioData = await AudioDB.getAll()
-    for (const [key, val] of Object.entries(audioData)) {
+    const existingAudio = await base.collection('audio').get()
+    const existingAudioKeys = new Set(existingAudio.docs.map(d => d.id))
+    const newAudioEntries = Object.entries(audioData).filter(([k]) => !existingAudioKeys.has(k))
+    for (const [key, val] of newAudioEntries) {
       await base.collection('audio').doc(key).set({ data: val, updatedAt: Date.now() })
     }
 
-    // Imagens
+    // Imagens — idem
     const imageData = await ImageDB.getAll()
-    for (const [key, val] of Object.entries(imageData)) {
+    const existingImages = await base.collection('images').get()
+    const existingImageKeys = new Set(existingImages.docs.map(d => d.id))
+    const newImageEntries = Object.entries(imageData).filter(([k]) => !existingImageKeys.has(k))
+    for (const [key, val] of newImageEntries) {
       await base.collection('images').doc(key).set({ data: val, updatedAt: Date.now() })
     }
 
     updateSyncNav('ok')
     return true
   } catch(e) {
-    console.warn('[Firebase] push error:', e)
+    console.warn('[Firebase] media push error:', e.code || e.message)
     updateSyncNav('err')
     return false
   }
@@ -4387,8 +4434,9 @@ async function fbPull() {
 async function autoSyncAfterChange() {
   if (!_fbUser) return
   clearTimeout(_fbSyncTimer)
+  // Usa só fbPushData (sem áudio/imagem) — rápido e não esgota cota
   _fbSyncTimer = setTimeout(async () => {
-    await fbPush()
+    await fbPushData()
   }, 2000)
 }
 
@@ -4679,9 +4727,9 @@ function saveToSrs(wordId) {
     renderDashboard()
     updateSrsBadge()
     toast(`📚 ${added} card${added !== 1 ? 's' : ''} salvos no site SRS${skipped ? ` (${skipped} já existiam)` : ''}`, 'success')
-    // Pré-gera áudio para os novos cards (igual ao Anki)
+    // Pré-gera áudio; ao final, sync automático de novos áudios para Firebase
     const newCards = srsCards.slice(-added)
-    preGenerateAudio(newCards)
+    preGenerateAudio(newCards).then(() => autoSyncAudioAfterChange())
   } else {
     toast(`Todos os cards já existem no SRS (${skipped} duplicados)`, 'info')
   }
