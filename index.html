@@ -302,15 +302,15 @@
 <section id="section-configuracoes" class="section">
   <div class="page-header">
     <h1>Configurações</h1>
-    <p>Configure IA, Anki e integrações</p>
+    <p>IA, Anki, nuvem e dados</p>
   </div>
 
   <div class="settings-grid">
 
-    <!-- IA via n8n -->
+    <!-- IA & Áudio -->
     <div class="settings-card full">
-      <h3>🤖 Inteligência Artificial (via n8n)</h3>
-      <p class="desc">Toda análise de vocabulário é processada pelo n8n. Escolha o provider de IA e de áudio — as chaves ficam configuradas diretamente no n8n, não aqui.</p>
+      <h3>🤖 Inteligência Artificial</h3>
+      <p class="desc">Análise de vocabulário e áudio TTS processados diretamente no browser. Configure sua chave API e escolha o modelo.</p>
       <div class="form-row">
         <div class="form-group" style="margin:0">
           <label>Provider de IA</label>
@@ -334,16 +334,9 @@
           </select>
         </div>
         <div class="form-group" style="margin:0">
-          <label>OpenAI API Key <span style="color:var(--text3);font-weight:400;font-size:0.8rem">(para TTS direto no site — fallback se n8n não enviar áudio)</span></label>
+          <label>OpenAI API Key</label>
           <input type="password" id="cfg-openai-key" placeholder="sk-..." autocomplete="off">
         </div>
-      </div>
-      <div id="n8n-ai-test-result" class="test-result hidden">
-        <div class="test-dot" id="n8n-ai-dot"></div>
-        <span id="n8n-ai-msg"></span>
-      </div>
-      <div class="btn-group" style="margin-top:12px">
-        <button class="btn btn-secondary btn-sm" onclick="testN8nAI()">Testar conexão n8n</button>
       </div>
     </div>
 
@@ -391,13 +384,16 @@
       <div class="form-group"><label>Áudio</label><input type="text" id="cfg-f-audio" placeholder="Áudio"></div>
     </div>
 
-    <!-- n8n -->
+    <!-- n8n — somente extração de website -->
     <div class="settings-card">
-      <h3>🔧 n8n</h3>
-      <p class="desc">URL base do seu n8n (Hostinger). Usado para análise de IA, extração de websites e sincronização com Google Sheets.</p>
+      <h3>🔧 Extração de Website (n8n)</h3>
+      <p class="desc">URL do seu n8n. Usado exclusivamente para extrair vocabulário de páginas web — única operação que o browser não consegue fazer diretamente.</p>
       <div class="form-group">
-        <label>URL base do n8n (Hostinger)</label>
-        <input type="url" id="cfg-n8n" placeholder="https://seu-n8n.hostinger.com">
+        <label>URL base do n8n</label>
+        <input type="url" id="cfg-n8n" placeholder="https://n8n.srv1693737.hstgr.cloud">
+      </div>
+      <div class="btn-group" style="margin-top:12px">
+        <button class="btn btn-secondary btn-sm" onclick="testN8nAI()">Testar conexão</button>
       </div>
     </div>
 
@@ -435,10 +431,10 @@
       </div>
     </div>
 
-    <!-- Dados -->
+    <!-- Dados locais -->
     <div class="settings-card full">
       <h3>💾 Dados locais</h3>
-      <p class="desc">Os dados ficam no localStorage do navegador. Faça backups regulares.</p>
+      <p class="desc">Os dados ficam no IndexedDB/localStorage do navegador. Faça backups regulares.</p>
       <div class="btn-group" style="margin-top:4px">
         <button class="btn btn-secondary btn-sm" onclick="exportData()">📥 Exportar JSON</button>
         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click()">📤 Importar JSON</button>
@@ -448,23 +444,23 @@
       </div>
     </div>
 
+    <!-- Manutenção de Áudio -->
+    <div class="settings-card full">
+      <h3>🔊 Manutenção de Áudio</h3>
+      <p class="desc">Gera áudio para cards que ainda não têm. Requer chave OpenAI configurada acima.</p>
+      <div id="audio-maint-status" style="font-size:0.85rem;color:var(--text2);margin-bottom:12px">
+        Clique em "Verificar" para contar cards sem áudio.
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-secondary btn-sm" onclick="checkMissingAudio()">🔍 Verificar</button>
+        <button class="btn btn-primary btn-sm" id="btn-gen-missing-audio" style="display:none" onclick="generateMissingAudio()">⚡ Gerar áudio ausente</button>
+      </div>
+    </div>
+
   </div>
 
-  <div style="margin-top:24px">
+  <div style="margin-top:24px;display:flex;align-items:center;gap:16px">
     <button class="btn btn-primary" onclick="saveSettings()">💾 Salvar configurações</button>
-  </div>
-
-  <!-- Manutenção de Áudio -->
-  <div style="margin-top:32px;padding:20px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--border)">
-    <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px">🔊 Manutenção de Áudio</h3>
-    <p style="font-size:0.83rem;color:var(--text3);margin-bottom:16px">Gera áudio para cards que ainda não têm. Requer chave OpenAI configurada acima.</p>
-    <div id="audio-maint-status" style="font-size:0.85rem;color:var(--text2);margin-bottom:12px">
-      Clique em "Verificar" para contar cards sem áudio.
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-secondary btn-sm" onclick="checkMissingAudio()">🔍 Verificar</button>
-      <button class="btn btn-primary btn-sm" id="btn-gen-missing-audio" style="display:none" onclick="generateMissingAudio()">⚡ Gerar áudio ausente</button>
-    </div>
   </div>
 
   <button class="reset-all-btn" onclick="clearAllData()">apagar todos os dados e começar do zero</button>

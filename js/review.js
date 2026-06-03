@@ -151,40 +151,17 @@ Return ONLY this JSON (no markdown, no explanation):
 async function analyzeWord(wordId) {
   const w = words.find(x => x.id === wordId)
   if (!w) return
-  // Preferir análise direta se chave OpenAI disponível
-  if (cfg.openaiKey) {
-    await analyzeWordDirect(wordId)
-    return
-  }
-  // Fallback: n8n
-  if (!cfg.n8nBase) {
-    toast('Configure a chave OpenAI (ou URL do n8n) em Configurações', 'error')
+  if (!cfg.openaiKey) {
+    toast('Configure a chave OpenAI em Configurações', 'error')
     showSection('configuracoes')
     return
   }
-  const main = el('review-main')
-  if (activeWordId === wordId) {
-    main.innerHTML = `<div class="review-empty-main"><span class="spinner" style="width:32px;height:32px;border-width:3px"></span><p style="margin-top:16px">Analisando via n8n...</p></div>`
-  }
-  try {
-    const result = await callN8n(w.word || w.context, w.context, w.source_type, w.source_title)
-    applyAiResult(w, result)
-    w.ai_provider = result.ai_provider || cfg.aiProvider
-    if (result.audio_base64) w.audio_base64 = result.audio_base64
-    saveWords()
-    renderSidebar()
-    if (activeWordId === wordId) renderWordCard(wordId)
-    renderDashboard()
-    toast(`"${w.word}" analisada via n8n`, 'success')
-  } catch(e) {
-    toast(`Erro na IA: ${e.message}`, 'error')
-    if (activeWordId === wordId) renderWordCard(wordId)
-  }
+  await analyzeWordDirect(wordId)
 }
 
 async function analyzeAll() {
-  if (!cfg.openaiKey && !cfg.n8nBase) {
-    toast('Configure a chave OpenAI (ou URL do n8n) em Configurações', 'error')
+  if (!cfg.openaiKey) {
+    toast('Configure a chave OpenAI em Configurações', 'error')
     showSection('configuracoes')
     return
   }
@@ -295,33 +272,6 @@ async function sendAllToAnki() {
   renderReview(); renderDashboard()
 }
 
-async function callN8n(word, context, sourceType, sourceTitle) {
-  const url = `${cfg.n8nBase}/webhook/en-processar`
-  const ttsProvider = cfg.ttsProvider || 'openai'
-  const payload = {
-    word, context,
-    source_type: sourceType || 'manual',
-    source_title: sourceTitle || '',
-    ai_provider: cfg.aiProvider || 'openai',
-    ai_model: cfg.aiModel || '',
-    tts_provider: ttsProvider
-  }
-  // Voz aleatória do OpenAI TTS a cada card
-  if (ttsProvider === 'openai') payload.tts_voice = randomVoice()
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.message || `n8n retornou ${res.status}`)
-  }
-  const data = await res.json()
-  // n8n pode retornar array de itens — extrair o primeiro
-  return Array.isArray(data) ? data[0] : data
-}
 
 
 // ================================================================
@@ -514,7 +464,7 @@ function selectWord(id) {
 async function analyzeSelected() {
   const ids = [...selectedWordIds]
   if (!ids.length) return
-  if (!cfg.openaiKey && !cfg.n8nBase) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
   toast(`Analisando ${ids.length} palavra${ids.length!==1?'s':''}...`)
   for (const id of ids) {
     await analyzeWord(id)
@@ -863,20 +813,13 @@ async function sendToAnki(wordId) {
     return
   }
 
-  // Áudio do n8n (caso filesystem-v2 seja resolvido futuramente)
-  const n8nAudioRaw = w.audio_base64 || null
   const canFetchTTS = !!cfg.openaiKey
   const totalCards = selected.reduce((s, m) => s + ((m.examples?.length) || 1), 0)
-  if (!n8nAudioRaw && canFetchTTS) toast(`Buscando áudio para ${totalCards} card${totalCards !== 1 ? 's' : ''}...`, 'info')
+  if (canFetchTTS) toast(`Buscando áudio para ${totalCards} card${totalCards !== 1 ? 's' : ''}...`, 'info')
 
-  // Helper: obtém base64 de áudio para um texto (n8n ou OpenAI direto)
+  // Helper: obtém base64 de áudio para um texto via OpenAI TTS
   async function resolveAudio(text) {
-    if (n8nAudioRaw) {
-      // n8n entregou áudio — usa ele (mesmo audio para todos os cards)
-      return String(n8nAudioRaw).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '')
-    }
     if (canFetchTTS && text) {
-      // Frase limpa: remove tags HTML para o TTS
       const cleanText = text.replace(/<[^>]+>/g, '')
       const b64 = await fetchAudioBase64(cleanText)
       return b64 || null

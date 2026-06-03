@@ -46,19 +46,18 @@ function saveSettings() {
 }
 
 async function testN8nAI() {
+  // Testa a conexão com o n8n para extração de websites
   const base = el('cfg-n8n').value.trim()
   if (!base) { toast('Configure a URL do n8n primeiro', 'error'); return }
-  showTestResult('n8n-ai', null, 'Testando...')
   try {
-    const res = await fetch(`${base}/webhook/en-processar`, {
+    const res = await fetch(`${base}/webhook/en-site`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ word: 'test', context: 'This is a test.', ai_provider: el('cfg-ai-provider').value, tts_provider: 'none' })
+      body: JSON.stringify({ url: 'https://example.com', test: true })
     })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    showTestResult('n8n-ai', true, `Conectado! Provider: ${data.ai_provider || el('cfg-ai-provider').value}`)
-  } catch(e) { showTestResult('n8n-ai', false, `Erro: ${e.message}`) }
+    // Qualquer resposta (mesmo erro de parse) confirma que o webhook está ativo
+    toast(res.ok ? 'n8n conectado!' : `n8n respondeu (status ${res.status})`, res.ok ? 'success' : 'warning')
+  } catch(e) { toast(`Não foi possível conectar ao n8n: ${e.message}`, 'error') }
 }
 
 async function loadAnkiDropdowns() {
@@ -116,8 +115,7 @@ async function testAnki() {
 
 function showTestResult(which, ok, msg) {
   const map = {
-    'n8n-ai': ['n8n-ai-test-result', 'n8n-ai-dot', 'n8n-ai-msg'],
-    'anki':   ['anki-test-result',   'anki-tdot',   'anki-tmsg']
+    'anki': ['anki-test-result', 'anki-tdot', 'anki-tmsg']
   }
   const [resId, dotId, msgId] = map[which] || map['anki']
   const resultEl = el(resId), dotEl = el(dotId), msgEl = el(msgId)

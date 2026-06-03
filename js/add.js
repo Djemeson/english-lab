@@ -902,7 +902,7 @@ const AI_MODELS = {
   google: [
     { value: 'gemini-2.5-flash-lite',  label: 'Gemini 2.5 Flash-Lite — rápido, barato (padrão)' },
     { value: 'gemini-2.5-flash',       label: 'Gemini 2.5 Flash — equilibrado' },
-    { value: 'gemini-3.5-flash',       label: 'Gemini 3.5 Flash — mais capaz' }
+    { value: 'gemini-2.5-pro',         label: 'Gemini 2.5 Pro — mais capaz (verifique disponibilidade)' }
   ]
 }
 
