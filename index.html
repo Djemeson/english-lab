@@ -5498,6 +5498,7 @@ async function renderSrsCard() {
   const frente = buildSrsFrente(card)
   // Use async verso to load image from IndexedDB
   const verso = await buildSrsVersoAsync(card)
+  _pendingMine = null  // limpa seleção pendente ao mudar de card
   // Play full EN sentence via OpenAI TTS when card front is shown
   const audioText = card.example_en || card.word || ''
   if (audioText) playSrsTTS(audioText)
@@ -5537,12 +5538,21 @@ async function renderSrsCard() {
     ${ratingBtns}
   </div>
   <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:14px">
-    <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem">
-      <span id="srs-cnt-new"   style="color:var(--primary);font-weight:700">0</span>
+    <div style="display:flex;align-items:center;gap:10px;font-size:0.82rem">
+      <span style="display:flex;flex-direction:column;align-items:center;gap:1px">
+        <span id="srs-cnt-new" style="color:var(--primary);font-weight:700;font-size:1rem">0</span>
+        <span style="color:var(--text3);font-size:0.67rem;text-transform:uppercase;letter-spacing:.04em">novo</span>
+      </span>
       <span style="color:var(--text3)">+</span>
-      <span id="srs-cnt-learn" style="color:var(--error);font-weight:700">0</span>
+      <span style="display:flex;flex-direction:column;align-items:center;gap:1px">
+        <span id="srs-cnt-learn" style="color:var(--error);font-weight:700;font-size:1rem">0</span>
+        <span style="color:var(--text3);font-size:0.67rem;text-transform:uppercase;letter-spacing:.04em">aprender</span>
+      </span>
       <span style="color:var(--text3)">+</span>
-      <span id="srs-cnt-rev"   style="color:var(--success);font-weight:700">0</span>
+      <span style="display:flex;flex-direction:column;align-items:center;gap:1px">
+        <span id="srs-cnt-rev" style="color:var(--success);font-weight:700;font-size:1rem">0</span>
+        <span style="color:var(--text3);font-size:0.67rem;text-transform:uppercase;letter-spacing:.04em">revisar</span>
+      </span>
     </div>
     <button class="btn btn-ghost btn-sm" onclick="flipSrsCard()">
       <span id="srs-flip-hint">👁 Revelar resposta</span>
@@ -5551,9 +5561,15 @@ async function renderSrsCard() {
   updateSrsSessionCounter()
 }
 
+let _pendingMine = null  // seleção capturada antes do flip apagá-la
+
 function flipSrsCard() {
-  // Não vira se o usuário está selecionando texto
-  if (window.getSelection()?.toString().trim()) return
+  // Salva seleção ativa antes de virar (o flip limpa window.getSelection)
+  const sel = window.getSelection()
+  const sentEl = document.getElementById('srs-mine-front')
+  if (sel && sel.toString().trim() && sentEl?.contains(sel.anchorNode)) {
+    _pendingMine = sel.toString().trim()
+  }
   const flip = el('srs-flip')
   const rating = el('srs-rating-area')
   const hint = el('srs-flip-hint')
@@ -5602,17 +5618,21 @@ function rateSrsCardAndNext(cardId, rating) {
   const prevState = JSON.parse(JSON.stringify(card))
   const ratingLabels = {1:'again',2:'hard',3:'good',4:'easy'}
 
-  // Capturar seleção de texto antes de avançar (i+1 mining)
+  // Capturar seleção de texto — pode estar em _pendingMine (salvo antes do flip)
+  // ou ainda ativa se o usuário avaliou sem revelar
   const sel = window.getSelection()
   const sentEl = document.getElementById('srs-mine-front')
-  if (sel && sel.toString().trim() && sentEl && sentEl.contains(sel.anchorNode)) {
-    const raw = sel.toString().trim().replace(/[.,!?;:"""''()\[\]<>]/g, '').trim().toLowerCase()
+  const rawSel = _pendingMine ||
+    (sel && sel.toString().trim() && sentEl?.contains(sel.anchorNode) ? sel.toString().trim() : null)
+  _pendingMine = null
+  if (rawSel) {
+    const raw = rawSel.replace(/[.,!?;:"""''()\[\]<>]/g, '').trim().toLowerCase()
     if (raw && raw !== (card.word || '').toLowerCase() && raw.length > 1) {
       createWord({ word: raw, context: card.example_en || '', source_type: card.source_type || 'series', source_title: card.source_title || '' })
       saveWords()
       toast(`"${raw}" adicionado à revisão`, 'success')
     }
-    sel.removeAllRanges()
+    sel?.removeAllRanges()
   }
 
   rateSrsCard(cardId, rating)
