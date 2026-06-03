@@ -5506,7 +5506,7 @@ async function renderSrsCard() {
   const frente = buildSrsFrente(card)
   // Use async verso to load image from IndexedDB
   const verso = await buildSrsVersoAsync(card)
-  _pendingMine = null  // limpa seleção pendente ao mudar de card
+  _pendingMines = []  // limpa seleções ao mudar de card
   document.getElementById('srs-mine-sel-chip')?.remove()
   // Play full EN sentence via OpenAI TTS when card front is shown
   const audioText = card.example_en || card.word || ''
@@ -5570,7 +5570,8 @@ async function renderSrsCard() {
   updateSrsSessionCounter()
 }
 
-let _pendingMine = null  // seleção capturada antes do flip apagá-la
+let _pendingMines = []   // array de seleções — suporta múltiplas
+let _lastMineTime  = 0   // timestamp da última seleção (evita flip acidental)
 
 // Chamado pelo mouseup na frase do card — captura e realça a seleção
 function srsCaptureSelection(e) {
@@ -5579,40 +5580,44 @@ function srsCaptureSelection(e) {
   if (!sel || !sel.toString().trim()) return
   const raw = sel.toString().trim().replace(/[.,!?;:"""''()\[\]<>]/g, '').trim()
   if (!raw || raw.length < 2) return
-
-  _pendingMine = raw
   sel.removeAllRanges()
 
-  // Mostrar chip de realce abaixo da frase
-  const sentEl = document.getElementById('srs-mine-front')
-  if (!sentEl) return
-  let chip = document.getElementById('srs-mine-sel-chip')
-  if (!chip) {
-    chip = document.createElement('div')
-    chip.id = 'srs-mine-sel-chip'
-    chip.style.cssText = 'display:flex;justify-content:center;margin-top:6px'
-    sentEl.after(chip)
-  }
-  chip.innerHTML = `<span class="srs-mine-selected">
-    📌 ${esc(raw)}
-    <button onclick="srsClearMine()" title="Cancelar">×</button>
-  </span>`
+  // Ignora duplicatas
+  if (_pendingMines.map(s => s.toLowerCase()).includes(raw.toLowerCase())) return
+  _pendingMines.push(raw)
+  _lastMineTime = Date.now()
+
+  // Atualizar chips
+  renderMineChips()
 }
 
-function srsClearMine() {
-  _pendingMine = null
-  const chip = document.getElementById('srs-mine-sel-chip')
-  if (chip) chip.remove()
+function renderMineChips() {
+  const sentEl = document.getElementById('srs-mine-front')
+  if (!sentEl) return
+  let row = document.getElementById('srs-mine-sel-chip')
+  if (!row) {
+    row = document.createElement('div')
+    row.id = 'srs-mine-sel-chip'
+    row.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:8px'
+    sentEl.after(row)
+  }
+  row.innerHTML = _pendingMines.map((txt, i) =>
+    `<span class="srs-mine-selected">📌 ${esc(txt)}
+      <button onclick="event.stopPropagation();srsClearMine(${i})" title="Remover">×</button>
+    </span>`
+  ).join('')
+  if (!_pendingMines.length) row.remove()
+}
+
+function srsClearMine(idx) {
+  _lastMineTime = Date.now()  // impede flip acidental ao clicar ×
+  _pendingMines.splice(idx, 1)
+  renderMineChips()
 }
 
 function flipSrsCard() {
-  // Salva seleção ativa antes de virar (o flip limpa window.getSelection)
-  const sel = window.getSelection()
-  const sentEl = document.getElementById('srs-mine-front')
-  if (sel && sel.toString().trim() && sentEl?.contains(sel.anchorNode)) {
-    srsCaptureSelection({ stopPropagation: () => {} })
-    return  // não vira — deixa o usuário ver o chip antes de revelar
-  }
+  // Não vira se uma seleção acabou de ser feita (mouseup → click são sequenciais)
+  if (Date.now() - _lastMineTime < 300) return
   const flip = el('srs-flip')
   const rating = el('srs-rating-area')
   const hint = el('srs-flip-hint')
@@ -5661,21 +5666,22 @@ function rateSrsCardAndNext(cardId, rating) {
   const prevState = JSON.parse(JSON.stringify(card))
   const ratingLabels = {1:'again',2:'hard',3:'good',4:'easy'}
 
-  // Capturar seleção de texto — pode estar em _pendingMine (salvo antes do flip)
-  // ou ainda ativa se o usuário avaliou sem revelar
-  const sel = window.getSelection()
-  const sentEl = document.getElementById('srs-mine-front')
-  const rawSel = _pendingMine ||
-    (sel && sel.toString().trim() && sentEl?.contains(sel.anchorNode) ? sel.toString().trim() : null)
-  _pendingMine = null
-  if (rawSel) {
-    const raw = rawSel.replace(/[.,!?;:"""''()\[\]<>]/g, '').trim().toLowerCase()
-    if (raw && raw !== (card.word || '').toLowerCase() && raw.length > 1) {
-      createWord({ word: raw, context: card.example_en || '', source_type: card.source_type || 'series', source_title: card.source_title || '' })
+  // Processar todas as seleções mineradas (pode ser mais de uma)
+  if (_pendingMines.length) {
+    const added = []
+    _pendingMines.forEach(rawSel => {
+      const raw = rawSel.replace(/[.,!?;:"""''()\[\]<>]/g, '').trim().toLowerCase()
+      if (raw && raw !== (card.word || '').toLowerCase() && raw.length > 1) {
+        createWord({ word: raw, context: card.example_en || '', source_type: card.source_type || 'series', source_title: card.source_title || '' })
+        added.push(raw)
+      }
+    })
+    if (added.length) {
       saveWords()
-      toast(`"${raw}" adicionado à revisão`, 'success')
+      toast(`${added.length > 1 ? added.length + ' itens adicionados' : `"${added[0]}" adicionado`} à revisão`, 'success')
     }
-    sel?.removeAllRanges()
+    _pendingMines = []
+    window.getSelection()?.removeAllRanges()
   }
 
   rateSrsCard(cardId, rating)
