@@ -1,0 +1,91 @@
+name: Deploy English Lab
+
+on:
+  push:
+    branches: [main]       # publica automaticamente quando faz push no main
+  pull_request:
+    branches: [main]       # valida sintaxe em PRs sem publicar
+
+# Permissões necessárias para publicar no GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Evita deploys simultâneos
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validar JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Checar sintaxe do JavaScript
+        run: |
+          python3 - << 'PYEOF'
+          import re, subprocess, tempfile, os, sys
+
+          with open('index.html') as f:
+              html = f.read()
+
+          # Extrai o bloco <script> principal (o maior)
+          scripts = re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)
+          if not scripts:
+              print("Nenhum script encontrado")
+              sys.exit(1)
+
+          big = max(scripts, key=len)
+          if len(big) < 1000:
+              print("Script muito curto — pode estar em arquivo externo")
+              sys.exit(0)
+
+          with tempfile.NamedTemporaryFile(suffix='.js', mode='w', delete=False) as f:
+              f.write(big)
+              tmp = f.name
+
+          result = subprocess.run(['node', '--check', tmp], capture_output=True, text=True)
+          os.unlink(tmp)
+
+          if result.returncode == 0:
+              print(f"✅ JavaScript OK ({len(big):,} chars)")
+          else:
+              print("❌ Erro de sintaxe no JavaScript:")
+              print(result.stderr)
+              sys.exit(1)
+          PYEOF
+
+  deploy:
+    name: Publicar no GitHub Pages
+    needs: validate          # só publica se a validação passar
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'   # só no push para main, não em PRs
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Empacotar arquivos
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'          # raiz do repositório (onde está o index.html)
+
+      - name: Publicar
+        id: deployment
+        uses: actions/deploy-pages@v4

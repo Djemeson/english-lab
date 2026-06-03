@@ -672,6 +672,17 @@ select option{background:var(--surface)}
   max-width:500px;
 }
 .srs-card-front-sentence b{color:var(--text);font-style:normal}
+.srs-mine-sentence{cursor:text;user-select:text}
+.srs-mine-sentence .wp-tok{cursor:pointer;border-radius:3px;padding:0 1px;transition:background .1s}
+.srs-mine-sentence .wp-tok:hover{background:rgba(59,130,246,.18);color:var(--text)}
+.srs-mine-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  background:var(--primary-glow);border:1px solid rgba(59,130,246,.4);
+  color:var(--primary);border-radius:20px;padding:3px 11px;
+  font-size:0.8rem;font-weight:600;margin:4px 3px;cursor:default;
+}
+.srs-mine-chip button{background:none;border:none;color:var(--primary);cursor:pointer;opacity:.6;font-size:0.9rem;padding:0 0 0 3px}
+.srs-mine-chip button:hover{opacity:1}
 .srs-card-front-hint{
   margin-top:20px;font-size:0.78rem;color:var(--text3);
 }
@@ -1366,7 +1377,13 @@ select option{background:var(--surface)}
     <div class="srs-session-wrap">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div style="display:flex;align-items:center;gap:10px">
-          <span id="srs-session-counter" style="font-size:0.85rem;color:var(--text3)">0 / 0</span>
+          <span id="srs-session-counter" style="font-size:0.85rem;display:flex;align-items:center;gap:6px">
+            <span id="srs-cnt-new"   style="color:var(--primary);font-weight:600">0</span>
+            <span style="color:var(--text3)">+</span>
+            <span id="srs-cnt-learn" style="color:var(--error);font-weight:600">0</span>
+            <span style="color:var(--text3)">+</span>
+            <span id="srs-cnt-rev"   style="color:var(--success);font-weight:600">0</span>
+          </span>
           <button class="srs-undo-btn" id="srs-undo-btn" onclick="undoLastCard()" disabled title="Desfazer última avaliação">↩ Desfazer</button>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="endSrsSession()">✕ Encerrar</button>
@@ -4530,6 +4547,20 @@ function saveSrsLog()   { localStorage.setItem(SK.srsLog, JSON.stringify(srsLog)
 function todayStr() { return new Date().toISOString().slice(0,10) }
 function nowTs()    { return Date.now() }
 
+// Retorna meia-noite (horário local) do dia que contém o timestamp dado.
+// Garante que cards de revisão fiquem disponíveis logo após a virada do dia,
+// não no mesmo horário em que foram revisados.
+function startOfDayTs(ts) {
+  const d = new Date(ts)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+// Para cards em revisão: agenda para meia-noite do dia-alvo
+function dueDays(intervalDays) {
+  return startOfDayTs(Date.now() + intervalDays * 86400000)
+}
+
 // ---- SM-2 Core ----
 // Card schema:
 // { id, wordId, meaningIdx, exampleIdx, state:'new'|'learning'|'review'|'relearning',
@@ -4589,7 +4620,7 @@ function rateSrsCard(cardId, rating) {
       card.state = 'review'
       card.interval = srsCfg.graduateInterval
       card.ease = Math.max(srsCfg.easeMin, card.ease + 0.15)
-      card.due = now + card.interval * 86400000
+      card.due = dueDays(card.interval)
     } else {
       // Difícil ou Bom — advance step
       card.stepIdx = Math.min(card.stepIdx + 1, steps.length - 1)
@@ -4597,7 +4628,7 @@ function rateSrsCard(cardId, rating) {
         // Graduated
         card.state = 'review'
         card.interval = srsCfg.graduateInterval
-        card.due = now + card.interval * 86400000
+        card.due = dueDays(card.interval)
       } else {
         card.state = 'learning'
         card.due = now + steps[card.stepIdx] * 60000
@@ -4628,7 +4659,7 @@ function rateSrsCard(cardId, rating) {
         card.ease = card.ease + 0.15
       }
       card.interval = Math.max(1, newInterval)
-      card.due = now + card.interval * 86400000
+      card.due = dueDays(card.interval)
     }
   }
 
@@ -5464,7 +5495,7 @@ async function renderSrsCard() {
 
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
   el('srs-progress-bar').style.width = pct + '%'
-  el('srs-session-counter').textContent = `${done} / ${total}`
+  updateSrsSessionCounter()
 
   const cardId = queue[current]
   const card = srsCards.find(c => c.id === cardId)
@@ -5474,6 +5505,8 @@ async function renderSrsCard() {
   const frente = buildSrsFrente(card)
   // Use async verso to load image from IndexedDB
   const verso = await buildSrsVersoAsync(card)
+  // Reset mined words para novo card
+  _srsMinedWords = []
   // Play full EN sentence via OpenAI TTS when card front is shown
   const audioText = card.example_en || card.word || ''
   if (audioText) playSrsTTS(audioText)
@@ -5494,10 +5527,10 @@ async function renderSrsCard() {
     <div class="srs-flip-inner">
       <div class="srs-card-face srs-card-front">
         <div class="srs-card-front-word">${esc(card.word)}</div>
-        ${frente ? `<div class="srs-card-front-sentence">${frente}</div>` : ''}
+        ${frente ? `<div class="srs-card-front-sentence srs-mine-sentence" id="srs-mine-front" data-ctx="${escA(card.example_en||'')}" data-src-type="${escA(card.source_type||'')}" data-src-title="${escA(card.source_title||card.source_type||'')}">${frente}</div>` : ''}
         ${buildMetaChips(card)}
         <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
-          <div class="srs-card-front-hint">Clique para revelar</div>
+          <div class="srs-card-front-hint">Clique para revelar · <span style="color:var(--text3);font-size:0.8em">selecione palavras para estudar</span></div>
           <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:0.8rem"
             onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">
             🔊 Repetir
@@ -5517,6 +5550,8 @@ async function renderSrsCard() {
       <span id="srs-flip-hint">👁 Revelar resposta</span>
     </button>
   </div>`
+  // Ativa tokenização para mining de palavras
+  setTimeout(initSrsMineSentence, 0)
 }
 
 function flipSrsCard() {
@@ -5569,6 +5604,7 @@ function rateSrsCardAndNext(cardId, rating) {
   const ratingLabels = {1:'again',2:'hard',3:'good',4:'easy'}
 
   rateSrsCard(cardId, rating)
+  const cardAfter = srsCards.find(c => c.id === cardId)
 
   if (srsSession) {
     srsSession.history.push({ cardId, rating, ratingLabel: ratingLabels[rating], prevState, wasNew })
@@ -5576,12 +5612,104 @@ function rateSrsCardAndNext(cardId, rating) {
     if (wasNew) srsSession.newSeen++
     if (rating >= 3) srsSession.correct++
     srsSession.current++
+
+    // Requeue: se o card ficou em 'learning'/'relearning', adiciona no final da fila
+    // para reaparecer ainda nesta sessão (como o Anki faz)
+    const staysInSession = cardAfter && (cardAfter.state === 'learning' || cardAfter.state === 'relearning')
+    if (staysInSession) {
+      srsSession.queue.push(cardId)
+      srsSession.total++
+    }
   }
 
   updateSrsBadge()
+  updateSrsSessionCounter()
   _histNavIdx = null
   renderHistoryNav()
   renderSrsCard()
+}
+
+// ================================================================
+// I+1 WORD MINING — selecionar palavras nos cards durante o estudo
+// ================================================================
+let _srsMinedWords = []
+
+function initSrsMineSentence() {
+  const el_ = document.getElementById('srs-mine-front')
+  if (!el_) return
+  const ctx = el_.dataset.ctx
+  if (!ctx) return
+  // Tokenize sentence into clickable spans
+  el_.innerHTML = ctx.split(/(\s+)/).map(tok => {
+    if (/^\s+$/.test(tok)) return tok
+    const word = tok.replace(/[.,!?;:"""''()\[\]]/g, '')
+    if (!word) return esc(tok)
+    return `<span class="wp-tok" onclick="event.stopPropagation();srsMineWord(this,'${escA(word)}')">${esc(tok)}</span>`
+  }).join('')
+  // Re-bold the card's own word
+  const card = window._srsCurrentCard
+  if (card?.word) {
+    el_.innerHTML = el_.innerHTML.replace(
+      new RegExp(`(${escR(card.word)})`, 'gi'),
+      '<b>$1</b>'
+    )
+  }
+}
+
+function srsMineWord(tokenEl, word) {
+  if (!word || _srsMinedWords.includes(word.toLowerCase())) return
+  _srsMinedWords.push(word.toLowerCase())
+  tokenEl.style.background = 'rgba(59,130,246,.3)'
+  tokenEl.style.color = 'var(--primary)'
+
+  // Add chip below sentence
+  let chipRow = document.getElementById('srs-mine-chips')
+  if (!chipRow) {
+    chipRow = document.createElement('div')
+    chipRow.id = 'srs-mine-chips'
+    chipRow.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;margin-top:8px'
+    document.getElementById('srs-mine-front')?.after(chipRow)
+  }
+  const chip = document.createElement('span')
+  chip.className = 'srs-mine-chip'
+  chip.innerHTML = `${esc(word)}<button onclick="srsMineRemove('${escA(word)}',this)" title="Remover">×</button>`
+  chipRow.appendChild(chip)
+
+  // Add to study queue with context from the card
+  const card = window._srsCurrentCard
+  createWord({
+    word: word.toLowerCase(),
+    context: card?.example_en || '',
+    source_type: card?.source_type || 'series',
+    source_title: card?.source_title || ''
+  })
+  saveWords()
+  toast(`"${word}" adicionado à fila de revisão`, 'success')
+}
+
+function srsMineRemove(word, btnEl) {
+  _srsMinedWords = _srsMinedWords.filter(w => w !== word.toLowerCase())
+  btnEl.closest('.srs-mine-chip')?.remove()
+  // Remove the word from the queue
+  const idx = words.findIndex(w => w.word?.toLowerCase() === word.toLowerCase() && w.status === 'pending_ai')
+  if (idx !== -1) { words.splice(idx, 1); saveWords() }
+}
+
+function updateSrsSessionCounter() {
+  if (!srsSession) return
+  const { queue, current } = srsSession
+  const remaining = queue.slice(current)
+  let cntNew = 0, cntLearn = 0, cntRev = 0
+  remaining.forEach(id => {
+    const c = srsCards.find(x => x.id === id)
+    if (!c) return
+    if (c.state === 'new') cntNew++
+    else if (c.state === 'learning' || c.state === 'relearning') cntLearn++
+    else if (c.state === 'review') cntRev++
+  })
+  const n = el('srs-cnt-new');   if (n) n.textContent = cntNew
+  const l = el('srs-cnt-learn'); if (l) l.textContent = cntLearn
+  const r = el('srs-cnt-rev');   if (r) r.textContent = cntRev
 }
 
 let _histNavIdx = null  // null = current card; number = index in history
