@@ -673,6 +673,14 @@ select option{background:var(--surface)}
 }
 .srs-card-front-sentence b{color:var(--text);font-style:normal}
 .srs-mine-sentence{cursor:text;user-select:text}
+.srs-mine-selected{
+  display:inline-block;margin-top:8px;
+  background:rgba(59,130,246,.22);border:1px solid rgba(59,130,246,.4);
+  color:var(--primary);border-radius:20px;padding:3px 12px;
+  font-size:0.82rem;font-weight:600;font-style:normal;
+  display:flex;align-items:center;gap:6px;
+}
+.srs-mine-selected button{background:none;border:none;color:var(--primary);cursor:pointer;opacity:.6;font-size:1rem;padding:0}
 .srs-mine-sentence .wp-tok{cursor:pointer;border-radius:3px;padding:0 1px;transition:background .1s}
 .srs-mine-sentence .wp-tok:hover{background:rgba(59,130,246,.18);color:var(--text)}
 .srs-mine-chip{
@@ -5499,6 +5507,7 @@ async function renderSrsCard() {
   // Use async verso to load image from IndexedDB
   const verso = await buildSrsVersoAsync(card)
   _pendingMine = null  // limpa seleção pendente ao mudar de card
+  document.getElementById('srs-mine-sel-chip')?.remove()
   // Play full EN sentence via OpenAI TTS when card front is shown
   const audioText = card.example_en || card.word || ''
   if (audioText) playSrsTTS(audioText)
@@ -5519,7 +5528,7 @@ async function renderSrsCard() {
     <div class="srs-flip-inner">
       <div class="srs-card-face srs-card-front">
         <div class="srs-card-front-word">${esc(card.word)}</div>
-        ${frente ? `<div class="srs-card-front-sentence srs-mine-sentence" id="srs-mine-front">${frente}</div>` : ''}
+        ${frente ? `<div class="srs-card-front-sentence srs-mine-sentence" id="srs-mine-front" onmouseup="srsCaptureSelection(event)">${frente}</div>` : ''}
         ${buildMetaChips(card)}
         <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
           <div class="srs-card-front-hint">Clique para revelar · <span style="color:var(--text3);font-size:0.8em">selecione texto para adicionar à revisão</span></div>
@@ -5563,12 +5572,46 @@ async function renderSrsCard() {
 
 let _pendingMine = null  // seleção capturada antes do flip apagá-la
 
+// Chamado pelo mouseup na frase do card — captura e realça a seleção
+function srsCaptureSelection(e) {
+  e.stopPropagation()
+  const sel = window.getSelection()
+  if (!sel || !sel.toString().trim()) return
+  const raw = sel.toString().trim().replace(/[.,!?;:"""''()\[\]<>]/g, '').trim()
+  if (!raw || raw.length < 2) return
+
+  _pendingMine = raw
+  sel.removeAllRanges()
+
+  // Mostrar chip de realce abaixo da frase
+  const sentEl = document.getElementById('srs-mine-front')
+  if (!sentEl) return
+  let chip = document.getElementById('srs-mine-sel-chip')
+  if (!chip) {
+    chip = document.createElement('div')
+    chip.id = 'srs-mine-sel-chip'
+    chip.style.cssText = 'display:flex;justify-content:center;margin-top:6px'
+    sentEl.after(chip)
+  }
+  chip.innerHTML = `<span class="srs-mine-selected">
+    📌 ${esc(raw)}
+    <button onclick="srsClearMine()" title="Cancelar">×</button>
+  </span>`
+}
+
+function srsClearMine() {
+  _pendingMine = null
+  const chip = document.getElementById('srs-mine-sel-chip')
+  if (chip) chip.remove()
+}
+
 function flipSrsCard() {
   // Salva seleção ativa antes de virar (o flip limpa window.getSelection)
   const sel = window.getSelection()
   const sentEl = document.getElementById('srs-mine-front')
   if (sel && sel.toString().trim() && sentEl?.contains(sel.anchorNode)) {
-    _pendingMine = sel.toString().trim()
+    srsCaptureSelection({ stopPropagation: () => {} })
+    return  // não vira — deixa o usuário ver o chip antes de revelar
   }
   const flip = el('srs-flip')
   const rating = el('srs-rating-area')
@@ -5680,6 +5723,19 @@ function updateSrsSessionCounter() {
   const n = el('srs-cnt-new');   if (n) n.textContent = cntNew
   const l = el('srs-cnt-learn'); if (l) l.textContent = cntLearn
   const r = el('srs-cnt-rev');   if (r) r.textContent = cntRev
+
+  // Sublinhado no contador do card atual (como o Anki faz)
+  const curState = window._srsCurrentCard?.state
+  const isNew   = curState === 'new'
+  const isLearn = curState === 'learning' || curState === 'relearning'
+  const isRev   = curState === 'review'
+  const ul = '2px solid currentColor'
+  if (n) n.style.borderBottom = isNew   ? ul : 'none'
+  if (l) l.style.borderBottom = isLearn ? ul : 'none'
+  if (r) r.style.borderBottom = isRev   ? ul : 'none'
+  if (n) n.style.paddingBottom = '2px'
+  if (l) l.style.paddingBottom = '2px'
+  if (r) r.style.paddingBottom = '2px'
 }
 
 let _histNavIdx = null  // null = current card; number = index in history
