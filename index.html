@@ -1377,13 +1377,6 @@ select option{background:var(--surface)}
     <div class="srs-session-wrap">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div style="display:flex;align-items:center;gap:10px">
-          <span id="srs-session-counter" style="font-size:0.85rem;display:flex;align-items:center;gap:6px">
-            <span id="srs-cnt-new"   style="color:var(--primary);font-weight:600">0</span>
-            <span style="color:var(--text3)">+</span>
-            <span id="srs-cnt-learn" style="color:var(--error);font-weight:600">0</span>
-            <span style="color:var(--text3)">+</span>
-            <span id="srs-cnt-rev"   style="color:var(--success);font-weight:600">0</span>
-          </span>
           <button class="srs-undo-btn" id="srs-undo-btn" onclick="undoLastCard()" disabled title="Desfazer última avaliação">↩ Desfazer</button>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="endSrsSession()">✕ Encerrar</button>
@@ -5505,8 +5498,6 @@ async function renderSrsCard() {
   const frente = buildSrsFrente(card)
   // Use async verso to load image from IndexedDB
   const verso = await buildSrsVersoAsync(card)
-  // Reset mined words para novo card
-  _srsMinedWords = []
   // Play full EN sentence via OpenAI TTS when card front is shown
   const audioText = card.example_en || card.word || ''
   if (audioText) playSrsTTS(audioText)
@@ -5527,10 +5518,10 @@ async function renderSrsCard() {
     <div class="srs-flip-inner">
       <div class="srs-card-face srs-card-front">
         <div class="srs-card-front-word">${esc(card.word)}</div>
-        ${frente ? `<div class="srs-card-front-sentence srs-mine-sentence" id="srs-mine-front" data-ctx="${escA(card.example_en||'')}" data-src-type="${escA(card.source_type||'')}" data-src-title="${escA(card.source_title||card.source_type||'')}">${frente}</div>` : ''}
+        ${frente ? `<div class="srs-card-front-sentence srs-mine-sentence" id="srs-mine-front">${frente}</div>` : ''}
         ${buildMetaChips(card)}
         <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
-          <div class="srs-card-front-hint">Clique para revelar · <span style="color:var(--text3);font-size:0.8em">selecione palavras para estudar</span></div>
+          <div class="srs-card-front-hint">Clique para revelar · <span style="color:var(--text3);font-size:0.8em">selecione texto para adicionar à revisão</span></div>
           <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:0.8rem"
             onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">
             🔊 Repetir
@@ -5545,13 +5536,19 @@ async function renderSrsCard() {
   <div class="srs-rate-buttons hidden" id="srs-rating-area">
     ${ratingBtns}
   </div>
-  <div style="text-align:center;margin-top:12px">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:14px">
+    <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem">
+      <span id="srs-cnt-new"   style="color:var(--primary);font-weight:700">0</span>
+      <span style="color:var(--text3)">+</span>
+      <span id="srs-cnt-learn" style="color:var(--error);font-weight:700">0</span>
+      <span style="color:var(--text3)">+</span>
+      <span id="srs-cnt-rev"   style="color:var(--success);font-weight:700">0</span>
+    </div>
     <button class="btn btn-ghost btn-sm" onclick="flipSrsCard()">
       <span id="srs-flip-hint">👁 Revelar resposta</span>
     </button>
   </div>`
-  // Ativa tokenização para mining de palavras
-  setTimeout(initSrsMineSentence, 0)
+  updateSrsSessionCounter()
 }
 
 function flipSrsCard() {
@@ -5603,6 +5600,19 @@ function rateSrsCardAndNext(cardId, rating) {
   const prevState = JSON.parse(JSON.stringify(card))
   const ratingLabels = {1:'again',2:'hard',3:'good',4:'easy'}
 
+  // Capturar seleção de texto antes de avançar (i+1 mining)
+  const sel = window.getSelection()
+  const sentEl = document.getElementById('srs-mine-front')
+  if (sel && sel.toString().trim() && sentEl && sentEl.contains(sel.anchorNode)) {
+    const raw = sel.toString().trim().replace(/[.,!?;:"""''()\[\]<>]/g, '').trim().toLowerCase()
+    if (raw && raw !== (card.word || '').toLowerCase() && raw.length > 1) {
+      createWord({ word: raw, context: card.example_en || '', source_type: card.source_type || 'series', source_title: card.source_title || '' })
+      saveWords()
+      toast(`"${raw}" adicionado à revisão`, 'success')
+    }
+    sel.removeAllRanges()
+  }
+
   rateSrsCard(cardId, rating)
   const cardAfter = srsCards.find(c => c.id === cardId)
 
@@ -5630,70 +5640,8 @@ function rateSrsCardAndNext(cardId, rating) {
 }
 
 // ================================================================
-// I+1 WORD MINING — selecionar palavras nos cards durante o estudo
-// ================================================================
-let _srsMinedWords = []
-
-function initSrsMineSentence() {
-  const el_ = document.getElementById('srs-mine-front')
-  if (!el_) return
-  const ctx = el_.dataset.ctx
-  if (!ctx) return
-  // Tokenize sentence into clickable spans
-  el_.innerHTML = ctx.split(/(\s+)/).map(tok => {
-    if (/^\s+$/.test(tok)) return tok
-    const word = tok.replace(/[.,!?;:"""''()\[\]]/g, '')
-    if (!word) return esc(tok)
-    return `<span class="wp-tok" onclick="event.stopPropagation();srsMineWord(this,'${escA(word)}')">${esc(tok)}</span>`
-  }).join('')
-  // Re-bold the card's own word
-  const card = window._srsCurrentCard
-  if (card?.word) {
-    el_.innerHTML = el_.innerHTML.replace(
-      new RegExp(`(${escR(card.word)})`, 'gi'),
-      '<b>$1</b>'
-    )
-  }
-}
-
-function srsMineWord(tokenEl, word) {
-  if (!word || _srsMinedWords.includes(word.toLowerCase())) return
-  _srsMinedWords.push(word.toLowerCase())
-  tokenEl.style.background = 'rgba(59,130,246,.3)'
-  tokenEl.style.color = 'var(--primary)'
-
-  // Add chip below sentence
-  let chipRow = document.getElementById('srs-mine-chips')
-  if (!chipRow) {
-    chipRow = document.createElement('div')
-    chipRow.id = 'srs-mine-chips'
-    chipRow.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;margin-top:8px'
-    document.getElementById('srs-mine-front')?.after(chipRow)
-  }
-  const chip = document.createElement('span')
-  chip.className = 'srs-mine-chip'
-  chip.innerHTML = `${esc(word)}<button onclick="srsMineRemove('${escA(word)}',this)" title="Remover">×</button>`
-  chipRow.appendChild(chip)
-
-  // Add to study queue with context from the card
-  const card = window._srsCurrentCard
-  createWord({
-    word: word.toLowerCase(),
-    context: card?.example_en || '',
-    source_type: card?.source_type || 'series',
-    source_title: card?.source_title || ''
-  })
-  saveWords()
-  toast(`"${word}" adicionado à fila de revisão`, 'success')
-}
-
-function srsMineRemove(word, btnEl) {
-  _srsMinedWords = _srsMinedWords.filter(w => w !== word.toLowerCase())
-  btnEl.closest('.srs-mine-chip')?.remove()
-  // Remove the word from the queue
-  const idx = words.findIndex(w => w.word?.toLowerCase() === word.toLowerCase() && w.status === 'pending_ai')
-  if (idx !== -1) { words.splice(idx, 1); saveWords() }
-}
+// I+1 WORD MINING — seleção real de texto durante o estudo
+// A captura acontece em rateSrsCardAndNext() ao avançar o card
 
 function updateSrsSessionCounter() {
   if (!srsSession) return
