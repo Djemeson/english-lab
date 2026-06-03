@@ -5552,6 +5552,8 @@ async function renderSrsCard() {
 }
 
 function flipSrsCard() {
+  // Não vira se o usuário está selecionando texto
+  if (window.getSelection()?.toString().trim()) return
   const flip = el('srs-flip')
   const rating = el('srs-rating-area')
   const hint = el('srs-flip-hint')
