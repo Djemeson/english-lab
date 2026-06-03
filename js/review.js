@@ -1,0 +1,987 @@
+// ================================================================
+// IA — DIRETO NO SITE (OpenAI) + FALLBACK N8N
+// ================================================================
+
+function applyAiResult(w, result) {
+  w.word = result.word || w.word
+  w.type = result.type || 'word'
+  w.ipa = result.ipa || ''
+  if (result.audio_base64) w.audio_base64 = result.audio_base64
+  const rawMeanings = Array.isArray(result.meanings) && result.meanings.length > 0
+    ? result.meanings
+    : [{
+        meaning_pt: result.meaning_pt || '', definition_pt: '', register: 'neutral',
+        level: result.level || '', synonyms: [], antonyms: [],
+        examples: (result.examples || []).map((e,i) => typeof e === 'string'
+          ? (i % 2 === 0 ? { en: e, pt: (result.examples||[])[i+1] || '' } : null)
+          : e).filter(Boolean),
+        context_match: true, tags: result.tags || []
+      }]
+  w.meanings = rawMeanings.map((m, i) => ({
+    id: uid(), selected: true, idx: i,
+    meaning_pt:    m.meaning_pt    || '',
+    definition_pt: m.definition_pt || '',
+    register:      m.register      || 'neutral',
+    level:         m.level         || '',
+    examples:      Array.isArray(m.examples) && m.examples.length > 0
+                     ? m.examples
+                     : (m.example_en ? [{ en: m.example_en, pt: m.example_pt || '' }] : []),
+    example_en:    m.example_en    || (Array.isArray(m.examples) && m.examples[0] ? m.examples[0].en : '') || '',
+    example_pt:    m.example_pt    || (Array.isArray(m.examples) && m.examples[0] ? m.examples[0].pt : '') || '',
+    notes:         m.notes         || [],
+    word_family:   m.word_family   || [],
+    synonyms:      m.synonyms      || [],
+    antonyms:      m.antonyms      || [],
+    grammar:       m.grammar       || '',
+    context_note:  m.context_note  || '',
+    tags:          m.tags          || [],
+    context_match: m.context_match !== false
+  }))
+  w.status = 'pending_review'
+  w.ai_processed = true
+  w.updated_at = new Date().toISOString()
+}
+
+async function analyzeWordDirect(wordId) {
+  const w = words.find(x => x.id === wordId)
+  if (!w || !cfg.openaiKey) return false
+
+  const main = el('review-main')
+  if (activeWordId === wordId) {
+    main.innerHTML = `<div class="review-empty-main"><span class="spinner" style="width:32px;height:32px;border-width:3px"></span><p style="margin-top:16px">Analisando com IA...</p></div>`
+  }
+
+  const target = w.word || w.context
+  const ctx    = w.context || ''
+
+  const PROMPT = `Analyze this English vocabulary item for a Brazilian learner and return ONLY valid JSON.
+
+Item: "${target}"
+${ctx ? `Context sentence: "${ctx}"` : ''}
+
+Rules for examples — CRITICAL, follow exactly:
+- Write EXACTLY 3 examples per meaning
+- Each example MUST use a completely different grammatical tense or construction. Do NOT repeat the same tense. Good variety: #1 present simple, #2 past simple or past perfect, #3 present continuous or future or conditional or imperative or passive
+- Each example MUST have a different subject (mix: he/she/they/I/we/you/a proper name/a noun phrase)
+- Each example MUST describe a genuinely different real-world situation or context (work, relationships, sports, travel, news, etc.)
+- NEVER use formulaic sentence patterns — sentences should feel natural, like they come from a novel, news article, or real conversation
+- Wrap the target word/expression in <b></b> tags exactly as it appears conjugated/inflected in that English sentence
+- NEVER use <b> tags in Portuguese translations — plain text only
+- BAD (avoid): "#1 He backs down. #2 She backed down. #3 They are backing down." — same pattern, different pronouns
+- GOOD: "#1 The senator backed down after facing criticism from his own party. #2 Don't back down just because the situation gets uncomfortable. #3 She never backs down from a challenge, even when the odds are against her."
+
+For Portuguese translations of examples:
+- Translate naturally — don't translate word-for-word
+- Use DIFFERENT Portuguese words/synonyms across the 3 examples when the target word has synonyms (e.g. for "thunderstruck": use "atordoado", "estarrecido", "pasmado" — not "atordoado" × 3)
+- Each Portuguese translation should read like natural Brazilian Portuguese, not like a translation
+
+Rules for meanings — CRITICAL:
+- The context sentence is ONLY used to identify the word correctly and to mark which sense appeared there. It does NOT limit which meanings you return.
+- ALWAYS return ALL distinct senses the word has in common English usage — not just the one from the context.
+- Think of yourself as a dictionary: if the word has 3 senses, return 3 meaning objects. If it has 2, return 2. Never collapse them into one.
+- NEVER merge two different senses into one meaning using semicolons (e.g. "decolar; ter sucesso" is WRONG — those must be two separate objects)
+- NEVER omit a common sense just because it doesn't appear in the context sentence
+- Each meaning MUST have its own 3 examples that illustrate that specific sense
+- Set "context_match": true ONLY for the meaning that matches the context sentence; all others get false
+- Put the context-matching meaning FIRST in the array (so the learner sees their original context first)
+
+Example of CORRECT behavior for "take off" with context "his startup took off overnight":
+meanings: [
+  { meaning_pt: "ter sucesso repentino", ..., context_match: true,  examples: [...] },  ← matches context, comes first
+  { meaning_pt: "decolar",              ..., context_match: false, examples: [...] },  ← different sense, still included
+  { meaning_pt: "tirar, remover",       ..., context_match: false, examples: [...] }   ← different sense, still included
+]
+
+Return ONLY this JSON (no markdown, no explanation):
+{
+  "word": "exact word or expression to study",
+  "type": "word|phrasal_verb|idiom|collocation",
+  "ipa": "/IPA in American English/",
+  "level": "A2|B1|B2|C1|C2",
+  "meanings": [
+    {
+      "meaning_pt": "concise Portuguese translation (1-4 words, ONE sense only — no semicolons)",
+      "definition_pt": "Full definition in Portuguese for THIS specific sense (1-2 sentences)",
+      "register": "neutral|formal|informal|slang",
+      "level": "A2|B1|B2|C1|C2",
+      "context_match": true,
+      "synonyms": ["syn1", "syn2", "syn3"],
+      "antonyms": ["ant1", "ant2"],
+      "examples": [
+        {"en": "Sentence with <b>word</b> in present tense.", "pt": "Tradução natural em português."},
+        {"en": "Sentence with <b>word</b> in past tense.", "pt": "Tradução natural em português."},
+        {"en": "Sentence with <b>word</b> in continuous or other tense.", "pt": "Tradução natural em português."}
+      ]
+    }
+  ]
+}`
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: cfg.aiModel || 'gpt-4o',
+        max_tokens: 2800,
+        response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: PROMPT }]
+      })
+    })
+    if (!res.ok) throw new Error(`OpenAI ${res.status}`)
+    const data = await res.json()
+    const raw = (data.choices?.[0]?.message?.content || '{}').trim()
+    const result = JSON.parse(raw)
+    applyAiResult(w, result)
+    w.ai_provider = 'openai'
+    saveWords()
+    renderSidebar()
+    if (activeWordId === wordId) renderWordCard(wordId)
+    renderDashboard()
+    toast(`"${w.word}" analisada`, 'success')
+    // TTS assíncrono — gera e cacheia no IndexedDB (não bloqueia)
+    ensureSrsAudio(w.word).catch(() => {})
+    return true
+  } catch(e) {
+    toast(`Erro na análise: ${e.message}`, 'error')
+    if (activeWordId === wordId) renderWordCard(wordId)
+    return false
+  }
+}
+
+async function analyzeWord(wordId) {
+  const w = words.find(x => x.id === wordId)
+  if (!w) return
+  // Preferir análise direta se chave OpenAI disponível
+  if (cfg.openaiKey) {
+    await analyzeWordDirect(wordId)
+    return
+  }
+  // Fallback: n8n
+  if (!cfg.n8nBase) {
+    toast('Configure a chave OpenAI (ou URL do n8n) em Configurações', 'error')
+    showSection('configuracoes')
+    return
+  }
+  const main = el('review-main')
+  if (activeWordId === wordId) {
+    main.innerHTML = `<div class="review-empty-main"><span class="spinner" style="width:32px;height:32px;border-width:3px"></span><p style="margin-top:16px">Analisando via n8n...</p></div>`
+  }
+  try {
+    const result = await callN8n(w.word || w.context, w.context, w.source_type, w.source_title)
+    applyAiResult(w, result)
+    w.ai_provider = result.ai_provider || cfg.aiProvider
+    if (result.audio_base64) w.audio_base64 = result.audio_base64
+    saveWords()
+    renderSidebar()
+    if (activeWordId === wordId) renderWordCard(wordId)
+    renderDashboard()
+    toast(`"${w.word}" analisada via n8n`, 'success')
+  } catch(e) {
+    toast(`Erro na IA: ${e.message}`, 'error')
+    if (activeWordId === wordId) renderWordCard(wordId)
+  }
+}
+
+async function analyzeAll() {
+  if (!cfg.openaiKey && !cfg.n8nBase) {
+    toast('Configure a chave OpenAI (ou URL do n8n) em Configurações', 'error')
+    showSection('configuracoes')
+    return
+  }
+  const pending = words.filter(w => w.status === 'pending_ai')
+  if (!pending.length) { toast('Nenhuma palavra pendente de análise', 'info'); return }
+  toast(`Analisando ${pending.length} palavras...`)
+  for (const w of pending) {
+    await analyzeWord(w.id)
+    await sleep(300)
+  }
+  toast('Análise concluída!', 'success')
+}
+
+function updateSendAllBtn() { /* kept for compatibility — buttons moved to sidebar action bar */ }
+
+async function saveAllToSrs() {
+  const ready = words.filter(w => w.status === 'pending_review' && w.meanings?.some(m => m.selected !== false))
+  if (!ready.length) { toast('Nenhuma palavra analisada pronta para salvar', 'warning'); return }
+  const btn = el('btn-save-all-srs')
+  if (btn) { btn.disabled = true; btn.style.opacity = '.45'; btn.innerHTML = `<span class="spinner"></span> Salvando...` }
+  // Suprime toasts individuais durante o batch
+  const _toast = window._batchMode = true
+  let ok = 0, totalCards = 0
+  for (const w of ready) {
+    if (!w.meanings?.length) continue
+    const selected = w.meanings.filter(m => m.selected !== false)
+    if (!selected.length) continue
+    let added = 0
+    selected.forEach(m => {
+      const mi = w.meanings.indexOf(m)
+      const examples = m.examples?.length ? m.examples : [null]
+      examples.forEach((ex, ei) => {
+        const exIdx = ex ? ei : -1
+        const exists = srsCards.find(c => c.wordId === w.id && c.meaningIdx === mi && c.exampleIdx === exIdx)
+        if (exists) return
+        const card = createSrsCard(w.id, mi, exIdx < 0 ? 0 : exIdx)
+        if (card) { srsCards.push(card); added++; totalCards++ }
+      })
+    })
+    if (added > 0) { w.status = 'in_srs'; ok++ }
+  }
+  window._batchMode = false
+  saveSrsCards(); saveWords(); autoSyncAfterChange()
+  if (btn) { btn.innerHTML = '📚 Salvar todos no site'; updateSendAllBtn() }
+  toast(`📚 ${ok} palavra${ok !== 1 ? 's' : ''} (${totalCards} cards) salvas no site`, ok > 0 ? 'success' : 'info')
+  renderReview(); renderDashboard(); renderSidebar(); updateSrsBadge()
+}
+
+function startEditWord(wordId) {
+  const textEl = document.getElementById(`wc-word-text-${wordId}`)
+  const inputEl = document.getElementById(`wc-word-input-${wordId}`)
+  const btnEl = document.getElementById(`wc-edit-btn-${wordId}`)
+  if (!textEl || !inputEl) return
+  textEl.style.display = 'none'
+  btnEl.style.display = 'none'
+  inputEl.style.display = 'inline-block'
+  inputEl.focus()
+  inputEl.select()
+}
+
+function confirmEditWord(wordId) {
+  const textEl = document.getElementById(`wc-word-text-${wordId}`)
+  const inputEl = document.getElementById(`wc-word-input-${wordId}`)
+  const btnEl = document.getElementById(`wc-edit-btn-${wordId}`)
+  if (!textEl || !inputEl) return
+  const newVal = inputEl.value.trim()
+  if (newVal) {
+    const w = words.find(x => x.id === wordId)
+    if (w) { w.word = newVal; saveWords() }
+    textEl.textContent = newVal
+  }
+  textEl.style.display = ''
+  btnEl.style.display = ''
+  inputEl.style.display = 'none'
+}
+
+function handleEditWordKey(e, wordId) {
+  if (e.key === 'Enter') { e.preventDefault(); confirmEditWord(wordId) }
+  if (e.key === 'Escape') {
+    const textEl = document.getElementById(`wc-word-text-${wordId}`)
+    const inputEl = document.getElementById(`wc-word-input-${wordId}`)
+    const btnEl = document.getElementById(`wc-edit-btn-${wordId}`)
+    if (textEl) textEl.style.display = ''
+    if (btnEl) btnEl.style.display = ''
+    if (inputEl) inputEl.style.display = 'none'
+  }
+}
+
+async function sendAllToAnki() {
+  const ready = words.filter(w => w.status === 'pending_review' && w.meanings?.some(m => m.selected !== false))
+  if (!ready.length) { toast('Nenhuma palavra analisada pronta para enviar', 'warning'); return }
+  const btn = el('btn-send-all-anki')
+  if (btn) { btn.disabled = true; btn.style.opacity = '.45'; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
+  toast(`Enviando ${ready.length} palavras pro Anki...`)
+  let ok = 0, fail = 0
+  for (const w of ready) {
+    try {
+      await sendToAnki(w.id)
+      ok++
+    } catch(e) {
+      fail++
+      console.warn(`sendAllToAnki: falhou para "${w.word}":`, e.message)
+    }
+    await sleep(300)
+  }
+  if (btn) { btn.innerHTML = '📤 Enviar todos pro Anki'; updateSendAllBtn() }
+  toast(`${ok} enviadas${fail ? `, ${fail} com erro` : ''}`, ok > 0 ? 'success' : 'error')
+  renderReview(); renderDashboard()
+}
+
+async function callN8n(word, context, sourceType, sourceTitle) {
+  const url = `${cfg.n8nBase}/webhook/en-processar`
+  const ttsProvider = cfg.ttsProvider || 'openai'
+  const payload = {
+    word, context,
+    source_type: sourceType || 'manual',
+    source_title: sourceTitle || '',
+    ai_provider: cfg.aiProvider || 'openai',
+    ai_model: cfg.aiModel || '',
+    tts_provider: ttsProvider
+  }
+  // Voz aleatória do OpenAI TTS a cada card
+  if (ttsProvider === 'openai') payload.tts_voice = randomVoice()
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || `n8n retornou ${res.status}`)
+  }
+  const data = await res.json()
+  // n8n pode retornar array de itens — extrair o primeiro
+  return Array.isArray(data) ? data[0] : data
+}
+
+
+// ================================================================
+// REVIEW SECTION
+// ================================================================
+let selectedWordIds = new Set()
+let sidebarStatusFilter = 'all'
+
+function renderReview() {
+  const reviewable = words.filter(w => ['pending_ai','pending_review'].includes(w.status))
+  el('review-empty').classList.toggle('hidden', reviewable.length > 0)
+  el('review-content').classList.toggle('hidden', reviewable.length === 0)
+  if (!reviewable.length) return
+  // Update header subtitle
+  const pending = reviewable.filter(w => w.status === 'pending_ai').length
+  const ready   = reviewable.filter(w => w.status === 'pending_review').length
+  const parts = []
+  if (pending) parts.push(`${pending} pendente${pending!==1?'s':''} de IA`)
+  if (ready)   parts.push(`${ready} pronta${ready!==1?'s':''} para enviar`)
+  const sub = el('review-header-sub')
+  if (sub) sub.textContent = parts.join(' · ') || 'Tudo em dia!'
+  renderSidebar()
+  if (!activeWordId || !words.find(w => w.id === activeWordId)) {
+    activeWordId = reviewable[0].id
+  }
+  renderWordCard(activeWordId)
+}
+
+function setSidebarFilter(f) {
+  sidebarStatusFilter = f
+  document.querySelectorAll('.rsb-filter').forEach(el => el.classList.toggle('active', el.dataset.filter === f))
+  renderSidebar(el('sidebar-search')?.value || '')
+}
+
+function toggleGroup(key) {
+  if (collapsedGroups.has(key)) collapsedGroups.delete(key)
+  else collapsedGroups.add(key)
+  renderSidebar(el('sidebar-search').value)
+}
+
+function toggleSelectAll() {
+  const reviewable = getFilteredReviewable(el('sidebar-search')?.value || '')
+  const visible = reviewable.flatMap(g => g.words)
+  const allSelected = visible.every(w => selectedWordIds.has(w.id))
+  if (allSelected) {
+    visible.forEach(w => selectedWordIds.delete(w.id))
+  } else {
+    visible.forEach(w => selectedWordIds.add(w.id))
+  }
+  renderSidebar(el('sidebar-search')?.value || '')
+}
+
+function toggleWordSelect(e, id) {
+  e.stopPropagation()
+  if (selectedWordIds.has(id)) selectedWordIds.delete(id)
+  else selectedWordIds.add(id)
+  renderSidebar(el('sidebar-search')?.value || '')
+}
+
+function getFilteredReviewable(search = '') {
+  let reviewable = words.filter(w => ['pending_ai','pending_review'].includes(w.status))
+  if (sidebarStatusFilter !== 'all') reviewable = reviewable.filter(w => w.status === sidebarStatusFilter)
+  if (search) reviewable = reviewable.filter(w => (w.word + (w.context||'')).toLowerCase().includes(search.toLowerCase()))
+  // Group by source
+  const groups = new Map()
+  for (const w of reviewable) {
+    const key = w.source_title || w.source_type || 'desconhecido'
+    if (!groups.has(key)) groups.set(key, { words: [], source_type: w.source_type, source_title: w.source_title, key })
+    groups.get(key).words.push(w)
+  }
+  return [...groups.values()]
+}
+
+function updateActionBar() {
+  // Clean up selectedWordIds — remove words no longer in reviewable
+  const reviewableIds = new Set(words.filter(w => ['pending_ai','pending_review'].includes(w.status)).map(w => w.id))
+  for (const id of selectedWordIds) if (!reviewableIds.has(id)) selectedWordIds.delete(id)
+
+  // Update "Todas" button label
+  const selAllBtn = document.querySelector('.rsb-select-all')
+  if (selAllBtn) {
+    const reviewable = getFilteredReviewable(el('sidebar-search')?.value || '')
+    const visible = reviewable.flatMap(g => g.words)
+    const allSel = visible.length > 0 && visible.every(w => selectedWordIds.has(w.id))
+    selAllBtn.textContent = allSel ? '☑ Todas' : '☐ Todas'
+  }
+  // Update toolbar above word card
+  renderWcToolbarLeft()
+}
+
+// Renders the left side of the wc-toolbar contextually:
+// — batch actions when items are selected
+// — individual actions for the active word otherwise
+function renderWcToolbarLeft() {
+  const leftEl = document.querySelector('.wct-left')
+  if (!leftEl) return
+  const w = words.find(x => x.id === activeWordId)
+  const selCount = selectedWordIds.size
+
+  if (selCount > 0) {
+    leftEl.innerHTML = `
+      <span style="font-size:0.82rem;font-weight:600;color:var(--primary);white-space:nowrap">${selCount} selecionada${selCount!==1?'s':''}</span>
+      <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()">⚡ Analisar</button>
+      <button class="btn btn-success btn-sm" onclick="sendSelectedToAnki()">📤 Anki</button>
+      <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()">📚 Site</button>
+      <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()">🗑 Excluir</button>`
+  } else if (w) {
+    if (w.status === 'pending_review' && w.meanings?.length > 0) {
+      const selM = w.meanings.filter(m => m.selected !== false)
+      const totalCards = selM.reduce((sum, m) => sum + ((m.examples?.length) || 1), 0)
+      leftEl.innerHTML = `
+        <button class="btn btn-success btn-sm" onclick="sendToAnki('${w.id}')">✓ Criar ${totalCards} card${totalCards!==1?'s':''} no Anki</button>
+        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')">📚 Salvar no site</button>
+        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')">🔄 Re-analisar</button>`
+    } else if (w.status === 'pending_ai') {
+      leftEl.innerHTML = `
+        <button class="btn btn-primary btn-sm" onclick="analyzeWord('${w.id}')">⚡ Analisar com IA</button>`
+    } else {
+      leftEl.innerHTML = ''
+    }
+  } else {
+    leftEl.innerHTML = ''
+  }
+}
+
+function renderSidebar(filter = '') {
+  const all = words.filter(w => ['pending_ai','pending_review'].includes(w.status))
+  el('sidebar-count').textContent = all.length
+
+  // Update filter tab counts
+  const pendingCount = all.filter(w => w.status === 'pending_ai').length
+  const readyCount   = all.filter(w => w.status === 'pending_review').length
+  document.querySelectorAll('.rsb-filter').forEach(f => {
+    const s = f.dataset.filter
+    if (s === 'pending_ai')     f.textContent = `⏳ Pendente${pendingCount ? ' '+pendingCount : ''}`
+    if (s === 'pending_review') f.textContent = `✓ Prontas${readyCount ? ' '+readyCount : ''}`
+  })
+
+  const groups = getFilteredReviewable(filter)
+  const showGroups = groups.length > 1
+
+  let html = ''
+  for (const group of groups) {
+    const isCollapsed = collapsedGroups.has(group.key)
+    const icon = srcIcon(group.source_type)
+    const label = group.source_title || group.key
+    const count = group.words.length
+
+    if (showGroups) {
+      html += `<div class="rw-group-header" data-key="${escA(group.key)}" onclick="toggleGroup(this.dataset.key)">
+        <span>${icon} ${esc(label)} <span class="rw-group-count">${count}</span></span>
+        <span class="rw-group-toggle">${isCollapsed ? '▶' : '▼'}</span>
+      </div>`
+    }
+
+    if (!isCollapsed) {
+      for (const w of group.words) {
+        const isActive  = w.id === activeWordId
+        const isChecked = selectedWordIds.has(w.id)
+        const statusHtml = w.status === 'pending_ai'
+          ? `<span class="status-chip pending_ai">⏳ Pendente IA</span>`
+          : `<span class="status-chip pending_review">● ${(w.meanings||[]).length} significado${(w.meanings||[]).length !== 1 ? 's' : ''}</span>`
+        html += `<div class="rw-item ${isActive ? 'active' : ''} ${isChecked ? 'checked' : ''}" onclick="selectWord('${w.id}')">
+          <input type="checkbox" class="rw-cb" ${isChecked ? 'checked' : ''} onclick="toggleWordSelect(event,'${w.id}')" title="Selecionar">
+          <div class="rw-body">
+            <div class="rw-word">${esc(w.word || '(frase)')}</div>
+            <div class="rw-meta">
+              ${statusHtml}
+              ${!showGroups ? `<span class="rw-count">${icon}</span>` : ''}
+            </div>
+          </div>
+        </div>`
+      }
+    }
+  }
+
+  el('review-word-list').innerHTML = html
+  updateActionBar()
+}
+
+function filterSidebar(val) { renderSidebar(val) }
+
+function selectWord(id) {
+  activeWordId = id
+  renderSidebar(el('sidebar-search').value)
+  renderWordCard(id)
+}
+
+// ---- Batch actions on selected items ----
+async function analyzeSelected() {
+  const ids = [...selectedWordIds]
+  if (!ids.length) return
+  if (!cfg.openaiKey && !cfg.n8nBase) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
+  toast(`Analisando ${ids.length} palavra${ids.length!==1?'s':''}...`)
+  for (const id of ids) {
+    await analyzeWord(id)
+    await sleep(250)
+  }
+  toast('Análise concluída!', 'success')
+}
+
+async function sendSelectedToAnki() {
+  const ids = [...selectedWordIds].filter(id => {
+    const w = words.find(x => x.id === id)
+    return w?.status === 'pending_review' && w.meanings?.some(m => m.selected !== false)
+  })
+  if (!ids.length) { toast('Nenhuma das selecionadas está pronta (analise com IA primeiro)', 'warning'); return }
+  toast(`Enviando ${ids.length} para o Anki...`)
+  let ok = 0
+  for (const id of ids) {
+    try { await sendToAnki(id); ok++ } catch(e) { console.warn(e) }
+    await sleep(200)
+  }
+  toast(`${ok} enviadas pro Anki`, ok > 0 ? 'success' : 'error')
+  selectedWordIds.clear()
+  renderReview(); renderDashboard()
+}
+
+async function saveSelectedToSrs() {
+  const ids = [...selectedWordIds].filter(id => {
+    const w = words.find(x => x.id === id)
+    return w?.status === 'pending_review' && w.meanings?.some(m => m.selected !== false)
+  })
+  if (!ids.length) { toast('Nenhuma das selecionadas está pronta', 'warning'); return }
+  let ok = 0, totalCards = 0
+  for (const id of ids) {
+    const w = words.find(x => x.id === id)
+    if (!w?.meanings?.length) continue
+    w.meanings.filter(m => m.selected !== false).forEach((m, mi) => {
+      const examples = m.examples?.length ? m.examples : [null]
+      examples.forEach((ex, ei) => {
+        const exIdx = ex ? ei : -1
+        const exists = srsCards.find(c => c.wordId === w.id && c.meaningIdx === mi && c.exampleIdx === exIdx)
+        if (exists) return
+        const card = createSrsCard(w.id, mi, exIdx < 0 ? 0 : exIdx)
+        if (card) { srsCards.push(card); totalCards++ }
+      })
+    })
+    w.status = 'in_srs'; ok++
+  }
+  saveSrsCards(); saveWords(); autoSyncAfterChange()
+  toast(`📚 ${ok} palavra${ok!==1?'s':''} (${totalCards} cards) salvas`, ok > 0 ? 'success' : 'info')
+  selectedWordIds.clear()
+  renderReview(); renderDashboard(); updateSrsBadge()
+}
+
+function deleteSelected() {
+  const ids = [...selectedWordIds]
+  if (!ids.length) return
+  if (!confirm(`Excluir ${ids.length} item${ids.length!==1?'s':''}?`)) return
+  ids.forEach(id => {
+    markDeleted(id)
+    const idx = words.findIndex(w => w.id === id)
+    if (idx !== -1) words.splice(idx, 1)
+  })
+  selectedWordIds.clear()
+  activeWordId = null
+  saveWords(); renderReview(); renderDashboard()
+  toast(`${ids.length} item${ids.length!==1?'s':''} excluído${ids.length!==1?'s':''}`, 'info')
+}
+
+function getAnkiDeck(w) {
+  const base = cfg.ankiDeck || 'Inglês'
+  const type = (w?.type || '').toLowerCase()
+  if (type === 'idiom')        return `${base}::Idioms`
+  if (type === 'phrasal_verb') return `${base}::Phrasal Verbs`
+  if (type === 'collocation')  return `${base}::Collocations`
+  return `${base}::Vocabulary`
+}
+
+function renderWordCard(wordId) {
+  const w = words.find(x => x.id === wordId)
+  if (!w) return
+  const main = el('review-main')
+
+  // Context with word highlighted
+  const ctxHtml = w.context ? (() => {
+    const safeWord = w.word ? escR(w.word) : null
+    const ctxEsc = esc(w.context)
+    if (!safeWord) return ctxEsc
+    return ctxEsc.replace(new RegExp(`(${safeWord})`, 'gi'), '<span class="ctx-word">$1</span>')
+  })() : ''
+
+  const typeMap = { word:'word', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' }
+
+  const selMeanings = (w.meanings || []).filter(m => m.selected !== false)
+  const selCount = selMeanings.length
+  const totalCards = selMeanings.reduce((sum, m) => sum + ((m.examples && m.examples.length) || 1), 0)
+  let bodyHtml
+
+  if (w.status === 'pending_ai') {
+    bodyHtml = `
+    <div class="wc-pending-ai">
+      <p>Esta palavra ainda não foi analisada pela IA.</p>
+      <button class="btn btn-primary big-btn" onclick="analyzeWord('${w.id}')">
+        ⚡ Analisar com IA agora
+      </button>
+      <p style="margin-top:12px;font-size:0.82rem;color:var(--text3)">
+        A IA vai identificar todos os significados, exemplos, nível e registro automaticamente.
+      </p>
+    </div>`
+  } else {
+    bodyHtml = `
+    <div class="wc-meanings">
+      <div class="meanings-toolbar">
+        <div class="meanings-toolbar-left">
+          <span class="meanings-count">${w.meanings.length} significado${w.meanings.length !== 1 ? 's'  : ''}</span>
+          <span>·</span>
+          <span>${selCount} selecionado${selCount !== 1 ? 's' : ''} · ${totalCards} card${totalCards !== 1 ? 's' : ''}</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="selectAllMeanings('${w.id}',true)">Todos</button>
+          <button class="btn btn-ghost btn-sm" onclick="selectAllMeanings('${w.id}',false)">Nenhum</button>
+        </div>
+      </div>
+      ${w.meanings.map((m, mi) => renderMeaningItem(w.id, m, mi)).join('')}
+    </div>`
+  }
+
+  main.innerHTML = `
+  <div class="wc-toolbar">
+    <div class="wct-left" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"></div>
+    <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+      <button class="btn btn-ghost btn-sm" onclick="speakWord('${escA(w.word || w.context)}')" title="Ouvir">🔊</button>
+      <button class="btn btn-ghost btn-sm" onclick="skipWord('${w.id}')" title="Pular">⟶</button>
+      <button class="btn btn-ghost btn-sm" onclick="deleteWord('${w.id}')" title="Excluir">🗑</button>
+    </div>
+  </div>
+  <div class="word-card">
+    <div class="wc-header">
+      <div class="wc-word" style="display:flex;align-items:center;gap:8px">
+        <span id="wc-word-text-${w.id}">${esc(w.word || '(frase)')}</span>
+        <button class="btn btn-ghost btn-xs" title="Editar" onclick="startEditWord('${w.id}')" id="wc-edit-btn-${w.id}" style="font-size:0.75rem;padding:2px 6px">✏️</button>
+        <input type="text" id="wc-word-input-${w.id}" value="${escA(w.word || '')}" style="display:none;font-size:1.2rem;font-weight:700;background:var(--surface2);border:1px solid var(--primary);border-radius:6px;padding:2px 8px;color:var(--text);width:200px" onkeydown="handleEditWordKey(event,'${w.id}')" onblur="confirmEditWord('${w.id}')">
+      </div>
+      <div class="wc-meta">
+        ${w.type ? `<span class="chip">${typeMap[w.type] || w.type}</span>` : ''}
+        ${w.ipa ? `<span class="wc-ipa">${esc(w.ipa)}</span>` : ''}
+        <span class="wc-source">${srcIcon(w.source_type)} ${esc(w.source_title || w.source_type)}</span>
+      </div>
+      ${ctxHtml ? `<div class="wc-context">"${ctxHtml}"</div>` : ''}
+    </div>
+    ${bodyHtml}
+  </div>`
+  renderWcToolbarLeft()
+}
+
+function renderMeaningItem(wordId, m, mi) {
+  const sel = m.selected !== false
+  const isMatch = m.context_match === true
+  return `
+  <div class="meaning-item ${sel ? 'selected' : ''} ${isMatch ? 'context-match' : ''}"
+       onclick="toggleMeaning('${wordId}',${mi})" id="mi-${wordId}-${mi}">
+    <div class="mi-checkbox"></div>
+    <div class="mi-body">
+      <div class="mi-top">
+        <div class="mi-meaning">${esc(m.meaning_pt)}</div>
+        <div class="mi-chips">
+          ${isMatch ? `<span class="context-match-badge">✓ contexto</span>` : ''}
+          ${m.register ? `<span class="chip register-${m.register}">${m.register}</span>` : ''}
+          ${m.level ? `<span class="chip level-${m.level.toLowerCase()}">${m.level}</span>` : ''}
+        </div>
+      </div>
+      ${m.definition_pt ? `<div class="mi-note" style="font-style:italic;opacity:0.8;margin-top:4px">${esc(m.definition_pt)}</div>` : ''}
+      ${m.context_note ? `<div class="mi-note">${esc(m.context_note)}</div>` : ''}
+      ${m.synonyms && m.synonyms.length ? `<div class="mi-note" style="font-size:0.78rem;color:var(--text3)">↔ ${m.synonyms.slice(0,4).map(esc).join(', ')}</div>` : ''}
+      ${(m.examples && m.examples.length ? m.examples : (m.example_en ? [{en:m.example_en, pt:m.example_pt||''}] : [])).map((ex, ei) => ex.en ? `
+      <div class="mi-example">
+        <div style="display:flex;gap:8px;align-items:baseline">
+          <span style="font-size:0.7rem;color:var(--text3);flex-shrink:0;font-weight:600">#${ei+1}</span>
+          <div style="flex:1">
+            <div class="en">"${allowBold(ex.en)}"</div>
+            ${ex.pt ? `<div class="pt">"${esc(ex.pt.replace(/<\/?b>/gi,''))}"</div>` : ''}
+          </div>
+        </div>
+      </div>` : '').join('')}
+    </div>
+  </div>`
+}
+
+function toggleMeaning(wordId, mi) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  w.meanings[mi].selected = !(w.meanings[mi].selected !== false)
+  saveWords()
+  // Update just this item and actions bar
+  const item = el(`mi-${wordId}-${mi}`)
+  if (item) {
+    const sel = w.meanings[mi].selected !== false
+    item.classList.toggle('selected', sel)
+    item.querySelector('.mi-checkbox').style.cssText = ''
+  }
+  // Update toolbar + meanings count
+  const selM = w.meanings.filter(m => m.selected !== false)
+  const selCount2 = selM.length
+  const totalCards = selM.reduce((sum, m) => sum + ((m.examples && m.examples.length) || 1), 0)
+  renderWcToolbarLeft()
+  const countEl = document.querySelector('.meanings-count')?.parentElement?.querySelector('span:nth-child(3)')
+  if (countEl) countEl.textContent = `${selCount2} selecionado${selCount2 !== 1 ? 's' : ''} · ${totalCards} card${totalCards !== 1 ? 's' : ''}`
+}
+
+function selectAllMeanings(wordId, val) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  w.meanings.forEach(m => m.selected = val)
+  saveWords()
+  renderWordCard(wordId)
+}
+
+
+// ================================================================
+// ANKICONNECT
+// ================================================================
+async function callAnki(action, params = {}) {
+  const res = await fetch(cfg.ankiUrl || 'http://localhost:8765', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ action, version: 6, params })
+  })
+  const d = await res.json()
+  if (d.error) throw new Error(d.error)
+  return d.result
+}
+
+// Permite apenas <b> e </b> no texto do AI (seguro para Anki)
+function allowBold(s) {
+  return String(s || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/&lt;b&gt;/gi,'<b>').replace(/&lt;\/b&gt;/gi,'</b>')
+}
+
+// Capitaliza o primeiro caractere alfabético, mesmo se estiver dentro de <b>
+function capFirst(s) {
+  if (!s) return s
+  return s.replace(/^(<b>)?([a-záàãâéêíóôõúüç])/i, (_, tag, ch) => (tag || '') + ch.toUpperCase())
+}
+
+function buildFrente(w, m, ex) {
+  // Frente = frase exemplo em inglês com a palavra-alvo em negrito
+  const sentence = (ex && ex.en) || m.example_en || w.context || ''
+  if (!sentence) return esc(w.word || '')
+  const wordRaw = (w.word || '').trim()
+  const isMultiWord = wordRaw.includes(' ')
+  // Single word e AI já forneceu <b>: confia no bold do AI
+  if (/<b>/i.test(sentence) && !isMultiWord) return capFirst(allowBold(sentence))
+  // Remove <b> parciais do AI (pode ter boldado apenas a 1ª palavra da expressão)
+  const cleanSentence = sentence.replace(/<\/?b>/gi, '')
+  const wordPattern = wordRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (!wordPattern) return capFirst(esc(cleanSentence))
+  try {
+    // Multi-word: ancora no particle (2ª palavra em diante) e aceita qualquer verbo antes
+    // Ex: "give up" → bola "gave up", "giving up", "gives up" etc.
+    // Single word: aceita inflexões comuns
+    let regex
+    if (isMultiWord) {
+      const parts = wordRaw.split(/\s+/)
+      const particle = parts.slice(1).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
+      regex = new RegExp(`\\b(\\w+(?:'\\w+)?\\s+${particle})\\b`, 'gi')
+    } else {
+      regex = new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi')
+    }
+    const bolded = cleanSentence.replace(regex, '<b>$1</b>')
+    // Se não encontrou a expressão na frase gerada pela IA, retorna sem bold
+    return capFirst(bolded.includes('<b>') ? bolded : esc(cleanSentence))
+  } catch { return capFirst(esc(cleanSentence)) }
+}
+
+function buildVerso(w, m, ex) {
+  const SRC = { series:'série de TV', movie:'filme', youtube:'YouTube', kindle:'e-book/Kindle', podcast:'podcast', website:'site', manual:'input manual' }
+  const TYPE = { word:'vocabulário', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' }
+  const hr = '<hr class="el-hr">'
+  let v = ''
+
+  // 1. Frase PT
+  const ptSentence = (ex && ex.pt) || m.example_pt || ''
+  if (ptSentence) {
+    v += `<span class="el-pt">${capFirst(esc(ptSentence.replace(/<\/?b>/gi, '')))}</span>`
+    v += hr
+  }
+
+  // 2. Expressão + IPA + tipo (badge)
+  v += `<span class="el-word">${esc(w.word || '')}</span>`
+  if (w.ipa) v += `&nbsp;<span class="el-ipa">${esc(w.ipa)}</span>`
+  if (w.type && TYPE[w.type]) v += `&nbsp;<span class="el-type">${TYPE[w.type]}</span>`
+  v += '<br>'
+
+  // 3. Definição
+  if (m.definition_pt) v += `<span class="el-def">${esc(m.definition_pt)}</span><br>`
+
+  // 4. Tradução principal — destaque
+  if (m.meaning_pt) v += `<br><span class="el-meaning">${esc(m.meaning_pt)}</span><br>`
+
+  // 5. Metadados compactos em uma linha
+  const metas = []
+  if (m.origin)    metas.push(`<b>Origem:</b> ${esc(m.origin)}`)
+  if (m.diffusion) metas.push(`<b>Difusão:</b> ${esc(m.diffusion)}`)
+  if (m.tone)      metas.push(`<b>Tom:</b> ${esc(m.tone)}`)
+  if (m.status)    metas.push(`<b>Status:</b> ${esc(m.status)}`)
+  if (m.usage)     metas.push(`<b>Uso:</b> ${esc(m.usage)}`)
+  if (metas.length) {
+    v += hr
+    v += `<span class="el-meta">${metas.join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</span><br>`
+  }
+
+  // 6. Notas de uso
+  if (m.notes && m.notes.length) {
+    v += `<span class="el-meta" style="font-style:italic">${m.notes.map(esc).join('<br>')}</span><br>`
+  }
+
+  // 7. Família / Sinônimos / Antônimos
+  const hasRelated = (m.word_family?.length) || (m.synonyms?.length) || (m.antonyms?.length)
+  if (hasRelated) {
+    v += hr
+    if (m.word_family?.length) v += `<span class="el-related"><b>Família:</b> ${m.word_family.map(esc).join(', ')}</span><br>`
+    if (m.synonyms?.length)    v += `<span class="el-related"><b>Sinônimos:</b> ${m.synonyms.map(esc).join(', ')}</span><br>`
+    if (m.antonyms?.length)    v += `<span class="el-related"><b>Antônimos:</b> ${m.antonyms.map(esc).join(', ')}</span><br>`
+  }
+
+  // 8. Rodapé — gramática + fonte
+  v += hr
+  const srcLabel = SRC[w.source_type] || w.source_type || '?'
+  const gramStr = m.grammar ? `${esc(m.grammar)}&nbsp;&nbsp;·&nbsp;&nbsp;` : ''
+  v += `<span class="el-footer">${gramStr}${esc(srcLabel)}${w.source_title ? ': <i>' + esc(w.source_title) + '</i>' : ''}</span>`
+
+  return v
+}
+
+async function sendToAnki(wordId) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const selected = w.meanings.filter(m => m.selected !== false)
+  if (!selected.length) { toast('Selecione ao menos um significado', 'warning'); return }
+
+  const btn = document.querySelector('.wc-actions .btn-success')
+  if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
+
+  // Verifica conexão com AnkiConnect antes de tentar enviar
+  try {
+    await callAnki('version')
+  } catch(e) {
+    toast(`❌ Anki inacessível: ${e.message}`, 'error')
+    if (btn) { btn.disabled = false; btn.textContent = `✓ Criar cards no Anki` }
+    return
+  }
+
+  // Áudio do n8n (caso filesystem-v2 seja resolvido futuramente)
+  const n8nAudioRaw = w.audio_base64 || null
+  const canFetchTTS = !!cfg.openaiKey
+  const totalCards = selected.reduce((s, m) => s + ((m.examples?.length) || 1), 0)
+  if (!n8nAudioRaw && canFetchTTS) toast(`Buscando áudio para ${totalCards} card${totalCards !== 1 ? 's' : ''}...`, 'info')
+
+  // Helper: obtém base64 de áudio para um texto (n8n ou OpenAI direto)
+  async function resolveAudio(text) {
+    if (n8nAudioRaw) {
+      // n8n entregou áudio — usa ele (mesmo audio para todos os cards)
+      return String(n8nAudioRaw).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '')
+    }
+    if (canFetchTTS && text) {
+      // Frase limpa: remove tags HTML para o TTS
+      const cleanText = text.replace(/<[^>]+>/g, '')
+      const b64 = await fetchAudioBase64(cleanText)
+      return b64 || null
+    }
+    return null
+  }
+
+  let ok = 0, fail = 0, lastError = ''
+
+  const targetDeck = getAnkiDeck(w)
+  console.log(`[English Lab] Deck alvo: "${targetDeck}" | tipo: ${w.type || '?'} | base cfg: "${cfg.ankiDeck}"`)
+  toast(`📤 Enviando para: ${targetDeck}`, 'info')
+
+  for (const m of selected) {
+    // Um card por exemplo (3 exemplos = 3 cards por significado)
+    const exArr = m.examples && m.examples.length > 0
+      ? m.examples
+      : [{ en: m.example_en || '', pt: m.example_pt || '' }]
+
+    for (const ex of exArr) {
+      // Áudio da frase EN deste card específico
+      const sentenceEN = ex.en || m.example_en || w.word || ''
+      let audioTag = ''
+      try {
+        const audioData = await resolveAudio(sentenceEN)
+        if (audioData) {
+          const safeWord = (w.word || 'word').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+          const filename = `el-${safeWord}-${Date.now()}.mp3`
+          await callAnki('storeMediaFile', { filename, data: audioData })
+          audioTag = `[sound:${filename}]`
+        }
+      } catch(e) {
+        console.warn('Anki storeMediaFile falhou:', e.message)
+      }
+
+      try {
+        const noteId = await callAnki('addNote', {
+          note: {
+            deckName: targetDeck,
+            modelName: cfg.ankiModel || 'Inglês Básico',
+            fields: {
+              [cfg.fields.word    || 'Frente'  ]: buildFrente(w, m, ex) + (audioTag ? ' ' + audioTag : ''),
+              [cfg.fields.meaning || 'Verso'   ]: buildVerso(w, m, ex),
+              [cfg.fields.context || 'Contexto']: w.context || '',
+              [cfg.fields.ipa     || 'IPA'     ]: w.ipa || '',
+              [cfg.fields.examples|| 'Exemplos']: [ex.en, ex.pt].filter(Boolean).join('\n'),
+              [cfg.fields.audio   || 'Áudio'   ]: audioTag
+            },
+            tags: ['english-lab', w.source_type, m.register, m.level, w.type].filter(Boolean)
+          }
+        })
+        if (!m.anki_ids) m.anki_ids = []
+        m.anki_ids.push(noteId)
+        ok++
+      } catch(e) {
+        const msg = (e.message || '').toLowerCase()
+        if (msg.includes('duplicate')) {
+          ok++ // trata duplicata como sucesso — card já existe no Anki
+        } else {
+          console.warn('Anki addNote erro:', e.message)
+          lastError = e.message
+          fail++
+        }
+      }
+    }
+  }
+
+  if (ok > 0) {
+    w.status = 'in_anki'
+    saveWords()
+    toast(`✅ ${ok} card${ok !== 1 ? 's' : ''} → ${targetDeck}${fail ? ` (${fail} falhou)` : ''}`, 'success')
+    renderSidebar()
+    // Move to next word
+    const next = words.find(x => ['pending_ai','pending_review'].includes(x.status))
+    if (next) { activeWordId = next.id; renderWordCard(next.id) }
+    else { activeWordId = null; el('review-main').innerHTML = `<div class="review-empty-main"><div class="icon">🎉</div><p>Fila zerada! Adicione mais palavras.</p></div>` }
+    renderDashboard()
+  } else {
+    const errMsg = lastError ? `Erro Anki: ${lastError}` : 'Verifique se o Anki está aberto'
+    toast(errMsg, 'error')
+    if (btn) { btn.disabled = false; btn.textContent = `✓ Criar ${selected.length} cards no Anki` }
+  }
+}
+
+function skipWord(id) {
+  const w = words.find(x => x.id === id); if (!w) return
+  w.status = 'skipped'; w.updated_at = new Date().toISOString(); saveWords()
+  toast(`"${w.word || '(frase)'}" pulada`, 'info')
+  renderSidebar()
+  const next = words.find(x => ['pending_ai','pending_review'].includes(x.status) && x.id !== id)
+  if (next) { activeWordId = next.id; renderWordCard(next.id) }
+  else renderReview()
+  renderDashboard()
+}
+
+function deleteWord(id) {
+  const w = words.find(x => x.id === id)
+  if (!confirm(`Remover "${w?.word || '(frase)'}" permanentemente?`)) return
+  markDeleted(id)
+  words = words.filter(x => x.id !== id); saveWords()
+  toast('Removida', 'info')
+  const next = words.find(x => ['pending_ai','pending_review'].includes(x.status) && x.id !== id)
+  if (next) { activeWordId = next.id }
+  else activeWordId = null
+  renderReview()
+  renderDashboard()
+}
+

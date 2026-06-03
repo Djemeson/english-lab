@@ -32,37 +32,23 @@ jobs:
 
       - name: Checar sintaxe do JavaScript
         run: |
-          python3 - << 'PYEOF'
-          import re, subprocess, tempfile, os, sys
-
-          with open('index.html') as f:
-              html = f.read()
-
-          # Extrai o bloco <script> principal (o maior)
-          scripts = re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)
-          if not scripts:
-              print("Nenhum script encontrado")
-              sys.exit(1)
-
-          big = max(scripts, key=len)
-          if len(big) < 1000:
-              print("Script muito curto — pode estar em arquivo externo")
-              sys.exit(0)
-
-          with tempfile.NamedTemporaryFile(suffix='.js', mode='w', delete=False) as f:
-              f.write(big)
-              tmp = f.name
-
-          result = subprocess.run(['node', '--check', tmp], capture_output=True, text=True)
-          os.unlink(tmp)
-
-          if result.returncode == 0:
-              print(f"✅ JavaScript OK ({len(big):,} chars)")
-          else:
-              print("❌ Erro de sintaxe no JavaScript:")
-              print(result.stderr)
-              sys.exit(1)
-          PYEOF
+          errors=0
+          for f in js/*.js sw.js; do
+            if [ -f "$f" ]; then
+              result=$(node --check "$f" 2>&1)
+              if [ $? -eq 0 ]; then
+                echo "✅ $f"
+              else
+                echo "❌ $f → $result"
+                errors=$((errors+1))
+              fi
+            fi
+          done
+          if [ $errors -gt 0 ]; then
+            echo "Erros de sintaxe: $errors arquivo(s)"
+            exit 1
+          fi
+          echo "Todos os arquivos JS passaram na verificação de sintaxe."
 
   deploy:
     name: Publicar no GitHub Pages
