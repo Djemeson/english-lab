@@ -222,9 +222,43 @@ async function fbPull() {
       words = Object.values(byId)
       saveWords()
     }
-    if (cardsDoc.exists)  { srsCards  = cardsDoc.data().list || [];    saveSrsCards() }
+    if (cardsDoc.exists) {
+      const cloudCards = cardsDoc.data().list || []
+      // Merge: se o card local foi revisado (state != 'new'), ele é mais recente que a nuvem.
+      // Isso evita que a nuvem (stale) sobrescreva cards revisados em sessão abandonada.
+      const localById = {}
+      srsCards.forEach(c => { localById[c.id] = c })
+      const merged = cloudCards.map(cc => {
+        const local = localById[cc.id]
+        if (!local) return cc                  // card novo da nuvem — aceita
+        if (local.state !== 'new') return local // local foi revisado — mantém local
+        if (cc.state !== 'new') return cc       // nuvem mais avançada — aceita nuvem
+        return local                            // ambos 'new' — sem diferença
+      })
+      // Cards que existem só localmente (ainda não chegaram à nuvem)
+      const cloudIds = new Set(cloudCards.map(c => c.id))
+      srsCards.forEach(c => { if (!cloudIds.has(c.id)) merged.push(c) })
+      srsCards = merged
+      saveSrsCards()
+    }
     if (cfgDoc.exists)    { srsCfg    = { ...SRS_DEF_CFG, ...cfgDoc.data() }; persistSrsCfg() }
-    if (logDoc.exists)    { srsLog    = logDoc.data().list || [];       saveSrsLog() }
+    if (logDoc.exists) {
+      const cloudLog = logDoc.data().list || []
+      // Merge: para cada data, mantém o log com mais revisões (sessão mais recente)
+      const localByDate = {}
+      srsLog.forEach(l => { localByDate[l.date] = l })
+      const allDates = new Set([...srsLog.map(l => l.date), ...cloudLog.map(l => l.date)])
+      const cloudByDate = {}
+      cloudLog.forEach(l => { cloudByDate[l.date] = l })
+      srsLog = Array.from(allDates).map(date => {
+        const local = localByDate[date]
+        const cloud = cloudByDate[date]
+        if (!local) return cloud
+        if (!cloud) return local
+        return (local.reviewed || 0) >= (cloud.reviewed || 0) ? local : cloud
+      })
+      saveSrsLog()
+    }
     if (decksDoc.exists)  { srsDecks  = decksDoc.data().list || [];    saveSrsDecks() }
     const kindleDoc = await base.collection('data').doc('kindleQueue').get()
     if (kindleDoc.exists && kindleDoc.data().list?.length > 0) {
@@ -256,48 +290,4 @@ async function fbPull() {
   } catch(e) {
     console.warn('[Firebase] pull error:', e)
     updateSyncNav('err')
-    return false
-  }
-}
-
-// ---- Auto-sync com debounce ----
-async function autoSyncAfterChange() {
-  if (!_fbUser) return
-  clearTimeout(_fbSyncTimer)
-  // Usa só fbPushData (sem áudio/imagem) — rápido e não esgota cota
-  _fbSyncTimer = setTimeout(async () => {
-    await fbPushData()
-  }, 2000)
-}
-
-async function fbForcePush() {
-  const statusBox = el('fb-sync-status')
-  const dot = el('fb-status-dot')
-  const msg = el('fb-status-msg')
-  if (statusBox) statusBox.classList.remove('hidden')
-  if (dot) dot.className = 'sync-dot syncing'
-  if (msg) msg.textContent = 'Enviando dados...'
-  const ok = await fbPush()
-  if (dot) dot.className = 'sync-dot ' + (ok ? 'ok' : 'err')
-  if (msg) msg.textContent = ok ? '✅ Dados enviados com sucesso!' : '❌ Erro ao enviar.'
-  if (ok) toast('⬆ Dados enviados para o Firebase!', 'success')
-}
-
-async function fbForcePull() {
-  const statusBox = el('fb-sync-status')
-  const dot = el('fb-status-dot')
-  const msg = el('fb-status-msg')
-  if (statusBox) statusBox.classList.remove('hidden')
-  if (dot) dot.className = 'sync-dot syncing'
-  if (msg) msg.textContent = 'Baixando dados...'
-  const ok = await fbPull()
-  if (dot) dot.className = 'sync-dot ' + (ok ? 'ok' : 'err')
-  if (msg) msg.textContent = ok ? '✅ Dados baixados com sucesso!' : '❌ Erro ao baixar.'
-  if (ok) { renderDashboard(); renderSrsSection(); updateSrsBadge(); toast('⬇ Dados sincronizados!', 'success') }
-}
-
-// Mantém compatibilidade com chamadas legadas do Gist
-async function initCloudSync() { initFirebase() }
-
-function gistHeaders() { return {} } // legacy stub
-
+    re
