@@ -48,7 +48,81 @@ async function loadSrsAsync() {
     console.warn('[CardsDB] loadSrsAsync failed, falling back to localStorage', e)
     try { srsCards = JSON.parse(localStorage.getItem(SK.srsCards) || '[]') } catch { srsCards = [] }
   }
+  // Aplica backup de sessão abandonada — o IDB pode não ter salvo antes do close
+  _applySessionBackup()
 }
+
+// ---- Backup síncrono de sessão ----
+// O IndexedDB é fire-and-forget: se o browser fechar antes da transação
+// commitar, os estados se perdem. O beforeunload salva no localStorage
+// (síncrono) como fallback; loadSrsAsync() aplica na próxima abertura.
+const SK_BACKUP = 'el-srs-backup'
+
+function _applySessionBackup() {
+  try {
+    const raw = localStorage.getItem(SK_BACKUP)
+    if (!raw) return
+    const backup = JSON.parse(raw)
+    if (!backup.states) return
+    const byId = {}
+    srsCards.forEach(c => { byId[c.id] = c })
+    // Aplica apenas estados mais avançados (não-'new') sobre o IDB
+    Object.entries(backup.states).forEach(([id, s]) => {
+      if (byId[id] && s.state !== 'new') Object.assign(byId[id], s)
+    })
+    srsCards = Object.values(byId)
+    // Aplica log parcial se houver
+    if (backup.log) {
+      const today = todayStr()
+      const entry = backup.log
+      if (entry.date === today) {
+        let log = srsLog.find(l => l.date === today)
+        if (!log) { log = { date: today, reviewed: 0, correct: 0, newSeen: 0 }; srsLog.push(log) }
+        if ((entry.reviewed || 0) > (log.reviewed || 0)) {
+          log.reviewed = entry.reviewed
+          log.correct  = entry.correct
+          log.newSeen  = entry.newSeen
+          saveSrsLog()
+        }
+      }
+    }
+    // Repersiste no IDB com os estados corrigidos
+    CardsDB.save(srsCards)
+    console.log('[SRS] Session backup applied from localStorage')
+  } catch(e) { console.warn('[SRS] Failed to apply session backup', e) }
+}
+
+function _clearSessionBackup() {
+  localStorage.removeItem(SK_BACKUP)
+}
+
+// Salva estados e log parcial no localStorage antes de fechar
+window.addEventListener('beforeunload', () => {
+  try {
+    const states = {}
+    srsCards.forEach(c => {
+      if (c.state !== 'new') {
+        states[c.id] = {
+          state: c.state, due: c.due, interval: c.interval,
+          ease: c.ease, stepIdx: c.stepIdx, lapses: c.lapses
+        }
+      }
+    })
+    if (!Object.keys(states).length && !srsSession) return
+    const backup = { states }
+    if (srsSession) {
+      const today = todayStr()
+      const todayLog = srsLog.find(l => l.date === today)
+      backup.log = {
+        date:     today,
+        reviewed: (todayLog?.reviewed || 0) + srsSession.done,
+        correct:  (todayLog?.correct  || 0) + srsSession.correct,
+        newSeen:  (todayLog?.newSeen  || 0) + srsSession.newSeen
+      }
+    }
+    localStorage.setItem(SK_BACKUP, JSON.stringify(backup))
+  } catch(e) {}
+})
 
 // saveSrsCards — grava no IDB (fire-and-forget, não bloqueia UI)
 function saveSrsCards() { CardsDB.save(srsCards) }
@@ -212,90 +286,4 @@ function fmtDays(d) {
 // ---- Counts ----
 function srsDueCount() {
   const now = nowTs()
-  return srsCards.filter(c => c.due <= now && (c.state === 'review' || c.state === 'relearning')).length
-}
-function srsNewTodayRemaining() {
-  const today = todayStr()
-  const newAdded = srsCards.filter(c => c.addedDate === today && c.state === 'new').length
-  // How many NEW cards already seen today? Count from log
-  const todayLog = srsLog.find(l => l.date === today)
-  const newSeen = todayLog ? (todayLog.newSeen || 0) : 0
-  const newAvail = srsCards.filter(c => c.state === 'new').length
-  return Math.max(0, Math.min(srsCfg.newPerDay - newSeen, newAvail))
-}
-function srsStreak() {
-  if (!srsLog.length) return 0
-  let streak = 0
-  const today = todayStr()
-  let d = new Date()
-  while (true) {
-    const ds = d.toISOString().slice(0,10)
-    if (ds === today && !srsLog.find(l => l.date === ds)) { d.setDate(d.getDate()-1); continue }
-    if (srsLog.find(l => l.date === ds && l.reviewed > 0)) { streak++; d.setDate(d.getDate()-1) }
-    else break
-  }
-  return streak
-}
-
-// ---- Save word to SRS ----
-function saveToSrs(wordId) {
-  const w = words.find(x => x.id === wordId)
-  if (!w || !w.meanings || !w.meanings.length) { toast('Sem significados para salvar', 'warning'); return }
-  const selected = w.meanings.filter(m => m.selected !== false)
-  if (!selected.length) { toast('Selecione ao menos um significado', 'warning'); return }
-
-  let added = 0, skipped = 0
-  selected.forEach((m, _) => {
-    const mi = w.meanings.indexOf(m)
-    const examples = m.examples && m.examples.length ? m.examples : [null]
-    examples.forEach((ex, ei) => {
-      const exIdx = ex ? ei : -1
-      // Check duplicate
-      const exists = srsCards.find(c => c.wordId === wordId && c.meaningIdx === mi && c.exampleIdx === exIdx)
-      if (exists) { skipped++; return }
-      const card = createSrsCard(wordId, mi, exIdx < 0 ? 0 : exIdx)
-      if (card) { srsCards.push(card); added++ }
-    })
-  })
-
-  saveSrsCards()
-  autoSyncAfterChange()
-
-  // Mark word status
-  if (added > 0) {
-    w.status = 'in_srs'
-    saveWords()
-    renderSidebar()
-    renderDashboard()
-    updateSrsBadge()
-    toast(`📚 ${added} card${added !== 1 ? 's' : ''} salvos no site SRS${skipped ? ` (${skipped} já existiam)` : ''}`, 'success')
-    // Pré-gera áudio; ao final, sync automático de novos áudios para Firebase
-    const newCards = srsCards.slice(-added)
-    preGenerateAudio(newCards).then(() => autoSyncAudioAfterChange())
-  } else {
-    toast(`Todos os cards já existem no SRS (${skipped} duplicados)`, 'info')
-  }
-}
-
-// ---- Update SRS badge in nav ----
-function updateSrsBadge() {
-  loadSrs()
-  // During an active session, srsLog hasn't been updated yet with this session's
-  // newSeen — account for it manually so the badge decreases as cards are rated
-  const sessionNewSeen = srsSession ? srsSession.newSeen : 0
-  const today = todayStr()
-  const todayLog = srsLog.find(l => l.date === today)
-  const logNewSeen = todayLog ? (todayLog.newSeen || 0) : 0
-  const effectiveNewSeen = logNewSeen + sessionNewSeen
-
-  const newAvail = srsCards.filter(c => c.state === 'new').length
-  const newRem = Math.max(0, Math.min(srsCfg.newPerDay - effectiveNewSeen, newAvail))
-
-  const due = srsDueCount() + newRem
-  const badge = el('badge-srs')
-  if (badge) {
-    badge.textContent = due
-    badge.classList.toggle('hidden', due === 0)
-  }
-}
-
+  return srsCards.filter(c => c.
