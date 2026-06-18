@@ -280,4 +280,22 @@ function saveToSrs(wordId) {
 // ---- Update SRS badge in nav ----
 function updateSrsBadge() {
   loadSrs()
-  // During an active session, srsLog hasn't been updated yet with 
+  // During an active session, srsLog hasn't been updated yet with this session's
+  // newSeen — account for it manually so the badge decreases as cards are rated
+  const sessionNewSeen = srsSession ? srsSession.newSeen : 0
+  const today = todayStr()
+  const todayLog = srsLog.find(l => l.date === today)
+  const logNewSeen = todayLog ? (todayLog.newSeen || 0) : 0
+  const effectiveNewSeen = logNewSeen + sessionNewSeen
+
+  const newAvail = srsCards.filter(c => c.state === 'new').length
+  const newRem = Math.max(0, Math.min(srsCfg.newPerDay - effectiveNewSeen, newAvail))
+
+  const due = srsDueCount() + newRem
+  const badge = el('badge-srs')
+  if (badge) {
+    badge.textContent = due
+    badge.classList.toggle('hidden', due === 0)
+  }
+}
+
