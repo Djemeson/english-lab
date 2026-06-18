@@ -290,4 +290,48 @@ async function fbPull() {
   } catch(e) {
     console.warn('[Firebase] pull error:', e)
     updateSyncNav('err')
-    re
+    return false
+  }
+}
+
+// ---- Auto-sync com debounce ----
+async function autoSyncAfterChange() {
+  if (!_fbUser) return
+  clearTimeout(_fbSyncTimer)
+  // Usa só fbPushData (sem áudio/imagem) — rápido e não esgota cota
+  _fbSyncTimer = setTimeout(async () => {
+    await fbPushData()
+  }, 2000)
+}
+
+async function fbForcePush() {
+  const statusBox = el('fb-sync-status')
+  const dot = el('fb-status-dot')
+  const msg = el('fb-status-msg')
+  if (statusBox) statusBox.classList.remove('hidden')
+  if (dot) dot.className = 'sync-dot syncing'
+  if (msg) msg.textContent = 'Enviando dados...'
+  const ok = await fbPush()
+  if (dot) dot.className = 'sync-dot ' + (ok ? 'ok' : 'err')
+  if (msg) msg.textContent = ok ? '✅ Dados enviados com sucesso!' : '❌ Erro ao enviar.'
+  if (ok) toast('⬆ Dados enviados para o Firebase!', 'success')
+}
+
+async function fbForcePull() {
+  const statusBox = el('fb-sync-status')
+  const dot = el('fb-status-dot')
+  const msg = el('fb-status-msg')
+  if (statusBox) statusBox.classList.remove('hidden')
+  if (dot) dot.className = 'sync-dot syncing'
+  if (msg) msg.textContent = 'Baixando dados...'
+  const ok = await fbPull()
+  if (dot) dot.className = 'sync-dot ' + (ok ? 'ok' : 'err')
+  if (msg) msg.textContent = ok ? '✅ Dados baixados com sucesso!' : '❌ Erro ao baixar.'
+  if (ok) { renderDashboard(); renderSrsSection(); updateSrsBadge(); toast('⬇ Dados sincronizados!', 'success') }
+}
+
+// Mantém compatibilidade com chamadas legadas do Gist
+async function initCloudSync() { initFirebase() }
+
+function gistHeaders() { return {} } // legacy stub
+
