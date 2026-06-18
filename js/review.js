@@ -100,7 +100,7 @@ Return ONLY this JSON (no markdown, no explanation):
   "level": "A2|B1|B2|C1|C2",
   "meanings": [
     {
-      "meaning_pt": "concise Portuguese translation (1-4 words, ONE sense only — no semicolons)",
+      "meaning_pt": "Portuguese translation preserving word class (noun→noun, verb→infinitive, adj→adjective). List 2–3 natural synonyms/variants separated by commas when they exist (e.g. 'séquito, comitiva, cortejo' for 'retinue'; 'enganar, iludir, ludibriar' for 'deceive'). Max 8 words total. ONE sense only — no semicolons.",
       "definition_pt": "Full definition in Portuguese for THIS specific sense (1-2 sentences)",
       "register": "neutral|formal|informal|slang",
       "level": "A2|B1|B2|C1|C2",

@@ -10,8 +10,9 @@ let srsLog = []    // [{date:'YYYY-MM-DD', reviewed:N, correct:N}]
 const SRS_DEF_CFG = {
   newPerDay: 20,
   revPerDay: 200,
-  steps: [1, 10],        // learning steps in minutes
-  graduateInterval: 1,   // days after learning → review
+  steps: [1, 10],           // learning steps in minutes
+  graduateInterval: 1,      // days after learning → review (Bom)
+  graduateEasyInterval: 3,  // days when Fácil skips learning steps
   easeStart: 2.5,
   easeMin: 1.3,
   easyBonus: 1.3,
@@ -126,9 +127,9 @@ function rateSrsCard(cardId, rating) {
       card.state = 'learning'
       card.due = now + steps[0] * 60000
     } else if (rating === 4) {
-      // Fácil — skip learning, graduate now
+      // Fácil — skip learning, graduate with longer interval
       card.state = 'review'
-      card.interval = srsCfg.graduateInterval
+      card.interval = srsCfg.graduateEasyInterval || 3
       card.ease = Math.max(srsCfg.easeMin, card.ease + 0.15)
       card.due = dueDays(card.interval)
     } else {
@@ -182,7 +183,7 @@ function previewInterval(card, rating) {
   const steps = srsCfg.steps || [1, 10]
   if (card.state === 'new' || card.state === 'learning') {
     if (rating === 1) return fmtDur(steps[0] * 60000)
-    if (rating === 4) return fmtDays(srsCfg.graduateInterval)
+    if (rating === 4) return fmtDays(srsCfg.graduateEasyInterval || 3)
     const nextStep = Math.min(card.stepIdx + 1, steps.length - 1)
     if (nextStep >= steps.length - 1 && rating >= 3) return fmtDays(srsCfg.graduateInterval)
     return fmtDur(steps[nextStep] * 60000)
@@ -279,11 +280,4 @@ function saveToSrs(wordId) {
 // ---- Update SRS badge in nav ----
 function updateSrsBadge() {
   loadSrs()
-  const due = srsDueCount() + srsNewTodayRemaining()
-  const badge = el('badge-srs')
-  if (badge) {
-    badge.textContent = due
-    badge.classList.toggle('hidden', due === 0)
-  }
-}
-
+  // During an active session, srsLog hasn't been updated yet with 

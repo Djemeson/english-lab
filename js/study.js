@@ -705,7 +705,11 @@ function buildSrsVerso(card, imgData) {
   // 1. Frase EN no topo
   if (card.example_en) {
     text += `<div class="srs-back-example">"${buildSrsFrente(card)}"</div>`
-    text += `<button class="btn btn-ghost btn-sm" style="margin:4px 0 10px" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">🔊 Repetir frase</button>`
+    text += `<div style="display:flex;align-items:center;gap:6px;margin:4px 0 10px">
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">🔊 Repetir frase</button>
+      <button class="btn btn-ghost btn-sm" title="Gerar nova frase que reflita melhor a definição" style="opacity:0.45;padding:4px 7px;font-size:0.8rem"
+        onclick="event.stopPropagation();regenerateCardExample('${card.id}',this)">↻</button>
+    </div>`
   }
   // 2. Tradução PT da frase logo abaixo
   if (card.example_pt) text += `<div class="srs-back-translation">"${esc(strip(card.example_pt))}"</div>`
@@ -821,11 +825,4 @@ function openImageLightbox(src, alt) {
 
 // Delegar clique em imagens do card (usando event delegation no body)
 document.addEventListener('click', e => {
-  const img = e.target.closest('.srs-back-image-col img, .bpp-card-image, .srs-card-image')
-  if (img) { e.stopPropagation(); openImageLightbox(img.src, img.alt) }
-})
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { document.getElementById('img-lightbox')?.remove() }
-})
-
-// Bootstrap is handled by initApp() defined above
+  const img = e.target.closest(
