@@ -824,4 +824,84 @@ function openImageLightbox(src, alt) {
   document.body.appendChild(lb)
 }
 
-// Delegar clique em imagens do card (usando event delegation no 
+// Delegar clique em imagens do card (usando event delegation no body)
+document.addEventListener('click', e => {
+  const img = e.target.closest('.srs-back-image-col img, .bpp-card-image, .srs-card-image')
+  if (img) { e.stopPropagation(); openImageLightbox(img.src, img.alt) }
+})
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { document.getElementById('img-lightbox')?.remove() }
+})
+
+// ================================================================
+// REGENERATE EXAMPLE SENTENCE via AI
+// ================================================================
+async function regenerateCardExample(cardId, btnEl) {
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  const card = srsCards.find(c => c.id === cardId)
+  if (!card) return
+
+  btnEl.disabled = true
+  const origHTML = btnEl.innerHTML
+  btnEl.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:2px;display:inline-block;vertical-align:middle"></span>'
+
+  try {
+    const prompt = `Generate ONE example sentence in English for a Brazilian English learner, illustrating exactly this meaning of the word.
+
+Word: "${card.word}"
+Meaning (Portuguese): "${card.meaning_pt}"
+Definition (Portuguese): "${card.definition_pt || card.meaning_pt}"
+
+Rules:
+- The sentence MUST clearly and naturally illustrate the specific meaning above
+- Write like a native speaker — feel free to use a novel, news article or real conversation style
+- Wrap the target word (conjugated/inflected as needed) in <b></b> tags
+- Keep it 10-20 words long
+- Return ONLY valid JSON (no markdown): {"en": "English sentence with <b>word</b>.", "pt": "Natural Brazilian Portuguese translation."}`
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: cfg.aiModel || 'gpt-4o-mini',
+        max_tokens: 200,
+        response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+    if (!res.ok) throw new Error(`OpenAI ${res.status}`)
+    const data = await res.json()
+    const result = JSON.parse(data.choices?.[0]?.message?.content || '{}')
+    if (!result.en) throw new Error('Resposta inválida da IA')
+
+    // Update card snapshot
+    card.example_en = result.en
+    card.example_pt = result.pt || ''
+    saveSrsCards()
+    autoSyncAfterChange()
+
+    // Also update original word data so future cards reflect the change
+    const w = words && words.find(x => x.id === card.wordId)
+    if (w && w.meanings && w.meanings[card.meaningIdx]) {
+      const m = w.meanings[card.meaningIdx]
+      const ei = card.exampleIdx >= 0 ? card.exampleIdx : 0
+      if (m.examples && m.examples[ei]) {
+        m.examples[ei].en = result.en
+        m.examples[ei].pt = result.pt || ''
+      }
+      m.example_en = result.en
+      m.example_pt = result.pt || ''
+      saveWords()
+    }
+
+    // Re-render card back without resetting flip state
+    await renderSrsCardBack()
+    toast('Frase de exemplo atualizada', 'success')
+  } catch(e) {
+    toast(`Erro ao gerar frase: ${e.message}`, 'error')
+    btnEl.disabled = false
+    btnEl.innerHTML = origHTML
+  }
+}
+
+// Bootstrap is handled by initApp() defined above

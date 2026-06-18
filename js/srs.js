@@ -286,4 +286,90 @@ function fmtDays(d) {
 // ---- Counts ----
 function srsDueCount() {
   const now = nowTs()
-  return srsCards.filter(c => c.
+  return srsCards.filter(c => c.due <= now && (c.state === 'review' || c.state === 'relearning')).length
+}
+function srsNewTodayRemaining() {
+  const today = todayStr()
+  const newAdded = srsCards.filter(c => c.addedDate === today && c.state === 'new').length
+  // How many NEW cards already seen today? Count from log
+  const todayLog = srsLog.find(l => l.date === today)
+  const newSeen = todayLog ? (todayLog.newSeen || 0) : 0
+  const newAvail = srsCards.filter(c => c.state === 'new').length
+  return Math.max(0, Math.min(srsCfg.newPerDay - newSeen, newAvail))
+}
+function srsStreak() {
+  if (!srsLog.length) return 0
+  let streak = 0
+  const today = todayStr()
+  let d = new Date()
+  while (true) {
+    const ds = d.toISOString().slice(0,10)
+    if (ds === today && !srsLog.find(l => l.date === ds)) { d.setDate(d.getDate()-1); continue }
+    if (srsLog.find(l => l.date === ds && l.reviewed > 0)) { streak++; d.setDate(d.getDate()-1) }
+    else break
+  }
+  return streak
+}
+
+// ---- Save word to SRS ----
+function saveToSrs(wordId) {
+  const w = words.find(x => x.id === wordId)
+  if (!w || !w.meanings || !w.meanings.length) { toast('Sem significados para salvar', 'warning'); return }
+  const selected = w.meanings.filter(m => m.selected !== false)
+  if (!selected.length) { toast('Selecione ao menos um significado', 'warning'); return }
+
+  let added = 0, skipped = 0
+  selected.forEach((m, _) => {
+    const mi = w.meanings.indexOf(m)
+    const examples = m.examples && m.examples.length ? m.examples : [null]
+    examples.forEach((ex, ei) => {
+      const exIdx = ex ? ei : -1
+      // Check duplicate
+      const exists = srsCards.find(c => c.wordId === wordId && c.meaningIdx === mi && c.exampleIdx === exIdx)
+      if (exists) { skipped++; return }
+      const card = createSrsCard(wordId, mi, exIdx < 0 ? 0 : exIdx)
+      if (card) { srsCards.push(card); added++ }
+    })
+  })
+
+  saveSrsCards()
+  autoSyncAfterChange()
+
+  // Mark word status
+  if (added > 0) {
+    w.status = 'in_srs'
+    saveWords()
+    renderSidebar()
+    renderDashboard()
+    updateSrsBadge()
+    toast(`📚 ${added} card${added !== 1 ? 's' : ''} salvos no site SRS${skipped ? ` (${skipped} já existiam)` : ''}`, 'success')
+    // Pré-gera áudio; ao final, sync automático de novos áudios para Firebase
+    const newCards = srsCards.slice(-added)
+    preGenerateAudio(newCards).then(() => autoSyncAudioAfterChange())
+  } else {
+    toast(`Todos os cards já existem no SRS (${skipped} duplicados)`, 'info')
+  }
+}
+
+// ---- Update SRS badge in nav ----
+function updateSrsBadge() {
+  loadSrs()
+  // During an active session, srsLog hasn't been updated yet with this session's
+  // newSeen — account for it manually so the badge decreases as cards are rated
+  const sessionNewSeen = srsSession ? srsSession.newSeen : 0
+  const today = todayStr()
+  const todayLog = srsLog.find(l => l.date === today)
+  const logNewSeen = todayLog ? (todayLog.newSeen || 0) : 0
+  const effectiveNewSeen = logNewSeen + sessionNewSeen
+
+  const newAvail = srsCards.filter(c => c.state === 'new').length
+  const newRem = Math.max(0, Math.min(srsCfg.newPerDay - effectiveNewSeen, newAvail))
+
+  const due = srsDueCount() + newRem
+  const badge = el('badge-srs')
+  if (badge) {
+    badge.textContent = due
+    badge.classList.toggle('hidden', due === 0)
+  }
+}
+
