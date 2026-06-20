@@ -4,7 +4,7 @@
 // Firebase, OpenAI e AnkiConnect ficam sempre na rede.
 // ================================================================
 
-const CACHE = 'englab-v1'
+const CACHE = 'englab-v2'
 
 // Assets que nunca mudam entre visitas (shell da app)
 const SHELL = [

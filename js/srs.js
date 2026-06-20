@@ -86,8 +86,11 @@ function _applySessionBackup() {
         }
       }
     }
-    // Repersiste no IDB com os estados corrigidos
-    CardsDB.save(srsCards)
+    // Repersiste no IDB com os estados corrigidos (nunca com array vazio)
+    if (srsCards.length) CardsDB.save(srsCards)
+    // Backup já foi aplicado e persistido — limpa para não reaplicar estados
+    // velhos em recarregamentos futuros. O beforeunload o reescreve a cada fecho.
+    _clearSessionBackup()
     console.log('[SRS] Session backup applied from localStorage')
   } catch(e) { console.warn('[SRS] Failed to apply session backup', e) }
 }
@@ -338,6 +341,7 @@ function saveToSrs(wordId) {
   // Mark word status
   if (added > 0) {
     w.status = 'in_srs'
+    w.updated_at = new Date().toISOString()  // bump p/ vencer o merge do fbPull
     saveWords()
     renderSidebar()
     renderDashboard()

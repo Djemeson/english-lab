@@ -220,7 +220,13 @@ const CardsDB = {
     return results.flat()
   },
   // Fire-and-forget — não bloqueia a UI
-  save(cards) {
+  // SEGURANÇA: nunca apaga tudo com array vazio (evita wipe acidental do IDB).
+  // Para limpar de fato, use CardsDB.clear(). Remoções individuais: deleteCard().
+  save(cards, opts = {}) {
+    if ((!cards || !cards.length) && !opts.allowEmpty) {
+      console.warn('[CardsDB] save() ignorado: array vazio (use clear() para apagar de propósito)')
+      return
+    }
     this.open().then(db => {
       const tx = db.transaction('cards','readwrite')
       const store = tx.objectStore('cards')

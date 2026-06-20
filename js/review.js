@@ -201,7 +201,7 @@ async function saveAllToSrs() {
         if (card) { srsCards.push(card); added++; totalCards++ }
       })
     })
-    if (added > 0) { w.status = 'in_srs'; ok++ }
+    if (added > 0) { w.status = 'in_srs'; w.updated_at = new Date().toISOString(); ok++ }
   }
   window._batchMode = false
   saveSrsCards(); saveWords(); autoSyncAfterChange()
@@ -510,7 +510,7 @@ async function saveSelectedToSrs() {
         if (card) { srsCards.push(card); totalCards++ }
       })
     })
-    w.status = 'in_srs'; ok++
+    w.status = 'in_srs'; w.updated_at = new Date().toISOString(); ok++
   }
   saveSrsCards(); saveWords(); autoSyncAfterChange()
   toast(`📚 ${ok} palavra${ok!==1?'s':''} (${totalCards} cards) salvas`, ok > 0 ? 'success' : 'info')
@@ -889,6 +889,7 @@ async function sendToAnki(wordId) {
 
   if (ok > 0) {
     w.status = 'in_anki'
+    w.updated_at = new Date().toISOString()  // bump p/ vencer o merge do fbPull
     saveWords()
     toast(`✅ ${ok} card${ok !== 1 ? 's' : ''} → ${targetDeck}${fail ? ` (${fail} falhou)` : ''}`, 'success')
     renderSidebar()
