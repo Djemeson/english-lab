@@ -927,13 +927,13 @@ async function sendConsulta() {
 Quando o usuário perguntar sobre uma palavra ou expressão em inglês:
 1. Explique o significado em português de forma clara
 2. Mostre a pronúncia (IPA entre barras: //)
-3. Dê 2-3 exemplos de uso em inglês com tradução
+3. Dê 3 exemplos de uso em inglês com tradução
 4. Adicione contexto útil (origem, registros formal/informal, diferenças de uso)
 5. No FINAL da resposta, sempre inclua um bloco JSON assim (mesmo que o usuário pergunte sobre múltiplas coisas, escolha a mais relevante):
 <srs_item>
-{"word":"...","type":"word|phrasal_verb|idiom|collocation","variety":"american|british|australian|canadian|other","register":"slang|informal|formal|colloquial|archaic|literary|technical|vulgar|standard","meaning_pt":"...","ipa":"...","example_en":"...","example_pt":"...","definition_pt":"..."}
+{"word":"...","type":"word|phrasal_verb|idiom|collocation","variety":"general|american|british|australian|canadian","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"...","ipa":"...","definition_pt":"...","examples":[{"en":"Frase com <b>palavra</b> no presente.","pt":"Tradução natural."},{"en":"Frase com <b>palavra</b> em outro tempo verbal.","pt":"Tradução natural."},{"en":"Frase com <b>palavra</b> em outro tempo/contexto.","pt":"Tradução natural."}]}
 </srs_item>
-Preencha variety e register com precisão — são informações pedagógicas importantes para o aprendiz.
+Regras do bloco JSON: inclua EXATAMENTE 3 exemplos no array "examples", cada um em um tempo verbal/construção diferente e em situações reais distintas, com a palavra-alvo envolvida em <b></b> apenas no inglês (nunca no português). Preencha variety e register com precisão (use "general" e "neutral" quando não for específico) — são informações pedagógicas importantes.
 Responda sempre em português (exceto os exemplos em inglês). Seja claro e didático.`
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -992,7 +992,7 @@ function formatConsultaReply(text) {
 function appendConsultaMsg(role, html, srsItem) {
   const msgs = el('consulta-messages')
   const addBtn = srsItem
-    ? `<br><button class="consulta-add-btn" onclick='addConsultaItemToSrs(${JSON.stringify(JSON.stringify(srsItem))})'>➕ Adicionar ao SRS</button>`
+    ? `<br><button class="consulta-add-btn" onclick='addConsultaItemToSrs(${JSON.stringify(JSON.stringify(srsItem))})'>${ic('book','ic-sm')} Adicionar para estudo</button>`
     : ''
   msgs.insertAdjacentHTML('beforeend',
     `<div class="consulta-msg ${role}">${html}${addBtn}</div>`)
@@ -1003,24 +1003,27 @@ function addConsultaItemToSrs(jsonStr) {
   try {
     const item = JSON.parse(jsonStr)
     if (!item.word) { toast('Sem palavra para adicionar', 'warning'); return }
+    // Monta a lista de exemplos (3 do array; fallback p/ exemplo único legado)
+    const exs = (Array.isArray(item.examples) && item.examples.length)
+      ? item.examples.filter(e => e && e.en).map(e => ({ en: e.en, pt: e.pt || '' }))
+      : (item.example_en ? [{ en: item.example_en, pt: item.example_pt || '' }] : [])
     // Cria palavra na lista
     const w = createWord({
       word: item.word,
-      context: item.example_en || '',
+      context: (exs[0] && exs[0].en) || item.example_en || '',
       source_type: 'manual'
     })
-    // Adiciona significado pré-processado
+    // Adiciona significado pré-processado (um card por exemplo)
     w.meanings = [{
       meaning_pt: item.meaning_pt || '',
       definition_pt: item.definition_pt || '',
-      examples: item.example_en ? [{ en: item.example_en, pt: item.example_pt || '' }] : [],
+      examples: exs,
+      variety: item.variety || 'general',
+      register: (item.register && item.register !== 'standard') ? item.register : 'neutral',
       selected: true
     }]
     w.ipa = item.ipa || ''
     w.type = item.type || 'word'
-    // variety e register vão para o significado (meanings[0])
-    if (item.variety) w.meanings[0].variety = item.variety
-    if (item.register && item.register !== 'standard') w.meanings[0].register = item.register
     w.status = 'pending_review'
     w.ai_processed = true
     saveWords()
