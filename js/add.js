@@ -894,6 +894,7 @@ function addSiteSelected() {
 // CONSULTA AI — chat de dúvidas pontuais de inglês
 // ================================================================
 let _consultaHistory = []  // {role, content}
+let _consultaSrsItems = []  // guarda os itens do botão por índice (evita JSON no onclick)
 
 async function sendConsulta() {
   const input = el('consulta-input')
@@ -933,7 +934,11 @@ Quando o usuário perguntar sobre uma palavra ou expressão em inglês:
 <srs_item>
 {"word":"...","type":"word|phrasal_verb|idiom|collocation","variety":"general|american|british|australian|canadian","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"...","ipa":"...","definition_pt":"...","examples":[{"en":"Frase com <b>palavra</b> no presente.","pt":"Tradução natural."},{"en":"Frase com <b>palavra</b> em outro tempo verbal.","pt":"Tradução natural."},{"en":"Frase com <b>palavra</b> em outro tempo/contexto.","pt":"Tradução natural."}]}
 </srs_item>
-Regras do bloco JSON: inclua EXATAMENTE 3 exemplos no array "examples", cada um em um tempo verbal/construção diferente e em situações reais distintas, com a palavra-alvo envolvida em <b></b> apenas no inglês (nunca no português). Preencha variety e register com precisão (use "general" e "neutral" quando não for específico) — são informações pedagógicas importantes.
+Regras do bloco JSON: inclua EXATAMENTE 3 exemplos no array "examples", cada um em um tempo verbal/construção diferente e em situações reais distintas, com a palavra-alvo envolvida em <b></b> apenas no inglês (nunca no português). Preencha variety e register com precisão (use "general" e "neutral" quando não for específico).
+IMPORTANTE sobre a resposta VISÍVEL (o texto que o usuário lê):
+- NÃO escreva "Bloco JSON", "JSON", crases (\`\`\`) nem mostre o JSON. O JSON deve aparecer SOMENTE dentro de <srs_item></srs_item>.
+- NÃO use tags HTML como <b> na parte visível; para destacar, use **negrito** em markdown.
+- NÃO use títulos com # (ex: ### Contexto). Escreva em texto corrido com **negrito** quando precisar destacar.
 Responda sempre em português (exceto os exemplos em inglês). Seja claro e didático.`
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -957,14 +962,26 @@ Responda sempre em português (exceto os exemplos em inglês). Seja claro e did�
     // Remove loading
     el(loadId)?.remove()
 
-    // Extrai bloco SRS se existir
-    const srsMatch = reply.match(/<srs_item>\s*([\s\S]*?)\s*<\/srs_item>/)
-    let srsItem = null
-    if (srsMatch) {
-      try { srsItem = JSON.parse(srsMatch[1]) } catch {}
+    // Extrai o item SRS. Preferência: dentro de <srs_item>. Fallback: do 1º "{" ao último "}"
+    // (pega o JSON inteiro mesmo com chaves aninhadas do array "examples").
+    let srsItem = null, rawJson = null
+    const tagMatch = reply.match(/<srs_item>\s*([\s\S]*?)\s*<\/srs_item>/)
+    if (tagMatch) {
+      rawJson = tagMatch[1].trim()
+    } else {
+      const s = reply.indexOf('{'), e = reply.lastIndexOf('}')
+      if (s !== -1 && e > s) rawJson = reply.slice(s, e + 1)
     }
-    // Exibe resposta sem o bloco JSON
-    const cleanReply = reply.replace(/<srs_item>[\s\S]*?<\/srs_item>/g, '').trim()
+    if (rawJson) { try { srsItem = JSON.parse(rawJson) } catch { srsItem = null } }
+
+    // Limpa o texto visível: remove o bloco srs_item, o JSON cru, blocos ``` e rótulos "Bloco JSON"
+    let cleanReply = reply.replace(/<srs_item>[\s\S]*?<\/srs_item>/g, '')
+    if (rawJson) cleanReply = cleanReply.split(rawJson).join('')
+    cleanReply = cleanReply
+      .replace(/```[a-z]*\s*[\s\S]*?```/gi, '')
+      .replace(/^\s*(bloco\s+json|json)\s*:?.*$/gim, '')
+      .replace(/\{[\s\S]*\}/g, m => /"word"\s*:/.test(m) ? '' : m)
+      .trim()
     appendConsultaMsg('ai', formatConsultaReply(cleanReply), srsItem)
 
   } catch(e) {
@@ -978,31 +995,40 @@ Responda sempre em português (exceto os exemplos em inglês). Seja claro e did�
 }
 
 function formatConsultaReply(text) {
-  // Markdown básico: **bold**, *italic*, listas
-  return text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/`(.+?)`/g,'<code style="background:var(--surface3);padding:1px 4px;border-radius:3px">$1</code>')
-    .replace(/^[-•] (.+)$/gm,'<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/s,'<ul style="padding-left:16px;margin:6px 0">$1</ul>')
-    .replace(/\n/g,'<br>')
+  // 1) escapa tudo (segurança)
+  let t = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  // 2) re-permite apenas tags de ênfase simples que a IA às vezes inclui
+  t = t.replace(/&lt;(\/?(?:b|strong|i|em))&gt;/gi, '<$1>')
+  // 3) cabeçalhos markdown (#, ##, ###...) → linha em destaque
+  t = t.replace(/^\s*#{1,6}\s*(.+?)\s*$/gm, '<div class="cs-h">$1</div>')
+  // 4) markdown inline
+  t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+       .replace(/`(.+?)`/g, '<code class="cs-code">$1</code>')
+  // 5) listas
+  t = t.replace(/^\s*[-•]\s+(.+)$/gm, '<li>$1</li>')
+  t = t.replace(/(<li>[\s\S]*?<\/li>)/, '<ul class="cs-ul">$1</ul>')
+  // 6) quebras de linha (sem duplicar após cabeçalhos/listas)
+  t = t.replace(/<\/div>\n/g, '</div>').replace(/<\/ul>\n/g, '</ul>')
+  t = t.replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>')
+  return t
 }
 
 function appendConsultaMsg(role, html, srsItem) {
   const msgs = el('consulta-messages')
-  const addBtn = srsItem
-    ? `<br><button class="consulta-add-btn" onclick='addConsultaItemToSrs(${JSON.stringify(JSON.stringify(srsItem))})'>${ic('book','ic-sm')} Adicionar para estudo</button>`
-    : ''
+  let addBtn = ''
+  if (srsItem && srsItem.word) {
+    const idx = _consultaSrsItems.push(srsItem) - 1   // referência por índice (sem JSON no atributo)
+    addBtn = `<div class="consulta-add-wrap"><button class="consulta-add-btn" onclick="addConsultaItemToSrs(${idx})">${ic('book','ic-sm')}<span>Adicionar para estudo</span></button></div>`
+  }
   msgs.insertAdjacentHTML('beforeend',
     `<div class="consulta-msg ${role}">${html}${addBtn}</div>`)
   msgs.scrollTop = msgs.scrollHeight
 }
 
-function addConsultaItemToSrs(jsonStr) {
+function addConsultaItemToSrs(idx) {
   try {
-    const item = JSON.parse(jsonStr)
-    if (!item.word) { toast('Sem palavra para adicionar', 'warning'); return }
+    const item = _consultaSrsItems[idx]
+    if (!item || !item.word) { toast('Item não encontrado', 'warning'); return }
     // Monta a lista de exemplos (3 do array; fallback p/ exemplo único legado)
     const exs = (Array.isArray(item.examples) && item.examples.length)
       ? item.examples.filter(e => e && e.en).map(e => ({ en: e.en, pt: e.pt || '' }))
@@ -1029,17 +1055,17 @@ function addConsultaItemToSrs(jsonStr) {
     saveWords()
     renderDashboard()
     updateSrsBadge()
-    // Salvar direto no SRS
+    // Salvar direto no SRS (o saveToSrs já mostra o toast com a contagem de cards)
     saveToSrs(w.id)
-    toast(`"${item.word}" adicionado ao SRS!`, 'success')
   } catch(e) { toast('Erro ao adicionar: ' + e.message, 'error') }
 }
 
 function clearConsulta() {
   _consultaHistory = []
+  _consultaSrsItems = []
   const msgs = el('consulta-messages')
   if (msgs) msgs.innerHTML = `<div class="consulta-empty" id="consulta-empty">
-    <div class="icon">💬</div>
+    ${ic('message','ic-xl')}
     <p style="font-weight:600">Pergunte qualquer coisa em inglês</p>
     <p style="font-size:0.85rem">Ex: "O que significa breaking bad?", "Como usar nevertheless?", "Diferença entre speak e talk"</p>
   </div>`

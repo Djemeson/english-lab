@@ -1186,7 +1186,23 @@ select option{background:var(--surface)}
 
 /* ---- Bolhas do chat ---- */
 .consulta-msg.user{background:var(--primary-grad);box-shadow:0 4px 14px rgba(var(--primary-rgb),0.30)}
-.consulta-msg.ai .consulta-add-btn{background:linear-gradient(135deg,#34D399,#059669)}
+/* Markdown renderizado na resposta da IA */
+.consulta-msg.ai .cs-h{font-weight:700;color:var(--text);margin:11px 0 4px;font-size:0.92rem}
+.consulta-msg.ai .cs-h:first-child{margin-top:0}
+.consulta-msg.ai .cs-code{background:var(--surface3);padding:1px 6px;border-radius:5px;font-family:ui-monospace,monospace;font-size:0.85em}
+.consulta-msg.ai .cs-ul{padding-left:18px;margin:6px 0}
+.consulta-msg.ai .cs-ul li{margin:3px 0}
+.consulta-msg.ai b,.consulta-msg.ai strong{color:var(--text);font-weight:700}
+/* Botão "Adicionar para estudo" premium (selector com especificidade p/ vencer o base) */
+.consulta-add-wrap{margin-top:12px}
+.consulta-msg.ai .consulta-add-btn{
+  display:inline-flex;align-items:center;gap:7px;margin-top:0;
+  padding:8px 15px;border-radius:22px;cursor:pointer;border:none;
+  background:linear-gradient(135deg,#34D399,#059669);color:#fff;font-weight:600;font-size:0.82rem;
+  box-shadow:0 3px 12px rgba(16,185,129,.32);transition:transform .12s ease, box-shadow .15s ease;
+}
+.consulta-msg.ai .consulta-add-btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(16,185,129,.45)}
+.consulta-msg.ai .consulta-add-btn .ic{width:15px;height:15px;flex-shrink:0}
 
 /* ---- Barras de progresso ---- */
 .srs-progress-bar,#audio-gen-bar{background:var(--primary-grad)}
