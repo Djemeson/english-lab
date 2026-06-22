@@ -10,7 +10,7 @@ function applyAiResult(w, result) {
   const rawMeanings = Array.isArray(result.meanings) && result.meanings.length > 0
     ? result.meanings
     : [{
-        meaning_pt: result.meaning_pt || '', definition_pt: '', register: 'neutral',
+        meaning_pt: result.meaning_pt || '', definition_pt: '', variety: 'general', register: 'neutral',
         level: result.level || '', synonyms: [], antonyms: [],
         examples: (result.examples || []).map((e,i) => typeof e === 'string'
           ? (i % 2 === 0 ? { en: e, pt: (result.examples||[])[i+1] || '' } : null)
@@ -21,6 +21,7 @@ function applyAiResult(w, result) {
     id: uid(), selected: true, idx: i,
     meaning_pt:    m.meaning_pt    || '',
     definition_pt: m.definition_pt || '',
+    variety:       m.variety       || 'general',
     register:      m.register      || 'neutral',
     level:         m.level         || '',
     examples:      Array.isArray(m.examples) && m.examples.length > 0
@@ -82,6 +83,7 @@ Rules for meanings — CRITICAL:
 - NEVER merge two different senses into one meaning using semicolons (e.g. "decolar; ter sucesso" is WRONG — those must be two separate objects)
 - NEVER omit a common sense just because it doesn't appear in the context sentence
 - Each meaning MUST have its own 3 examples that illustrate that specific sense
+- CRITICAL: every example placed under a meaning MUST unambiguously illustrate THAT meaning's sense — never another sense of the word. If "${target}" has multiple senses, an example for sense A must NOT make sense if read with sense B. Double-check each example matches its meaning before returning.
 - Set "context_match": true ONLY for the meaning that matches the context sentence; all others get false
 - Put the context-matching meaning FIRST in the array (so the learner sees their original context first)
 
@@ -91,6 +93,10 @@ meanings: [
   { meaning_pt: "decolar",              ..., context_match: false, examples: [...] },  ← different sense, still included
   { meaning_pt: "tirar, remover",       ..., context_match: false, examples: [...] }   ← different sense, still included
 ]
+
+Rules for "variety" and "register" — ALWAYS fill BOTH for every meaning, never leave blank:
+- "variety": which English variety this sense belongs to. Use "general" when the word is standard across all varieties (this is the case for MOST words). Use a specific variety only when the word/spelling/sense is predominantly or exclusively used there: "british" (e.g. "lift" = elevator, "lorry", "colour"), "american" (e.g. "soccer", "elevator", "color"), "australian" (e.g. "arvo", "barbie"), "canadian". Default to "general" when in doubt.
+- "register": the style level of THIS sense. Pick the single best fit: "neutral" (everyday standard — the default for most words), "formal", "informal", "colloquial", "slang", "technical", "literary", "archaic", or "vulgar".
 
 Return ONLY this JSON (no markdown, no explanation):
 {
@@ -102,7 +108,8 @@ Return ONLY this JSON (no markdown, no explanation):
     {
       "meaning_pt": "Portuguese translation preserving word class (noun→noun, verb→infinitive, adj→adjective). List 2–3 natural synonyms/variants separated by commas when they exist (e.g. 'séquito, comitiva, cortejo' for 'retinue'; 'enganar, iludir, ludibriar' for 'deceive'). Max 8 words total. ONE sense only — no semicolons.",
       "definition_pt": "Full definition in Portuguese for THIS specific sense (1-2 sentences)",
-      "register": "neutral|formal|informal|slang",
+      "variety": "general|american|british|australian|canadian",
+      "register": "neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar",
       "level": "A2|B1|B2|C1|C2",
       "context_match": true,
       "synonyms": ["syn1", "syn2", "syn3"],

@@ -739,27 +739,27 @@ function buildSrsVerso(card, imgData, imageBelow) {
         <label style="font-size:0.75rem;color:var(--text3);min-width:70px">Variedade</label>
         <select style="font-size:0.78rem;padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"
           onchange="event.stopPropagation();updateCardMeta('${card.id}','variety',this.value)">
-          <option value="" ${!card.variety?'selected':''}>— não definido</option>
-          <option value="american" ${card.variety==='american'?'selected':''}>🇺🇸 American English</option>
-          <option value="british" ${card.variety==='british'?'selected':''}>🇬🇧 British English</option>
-          <option value="australian" ${card.variety==='australian'?'selected':''}>🇦🇺 Australian English</option>
-          <option value="canadian" ${card.variety==='canadian'?'selected':''}>🇨🇦 Canadian English</option>
-          <option value="other" ${card.variety==='other'?'selected':''}>🌍 Other</option>
+          <option value="general" ${(!card.variety||card.variety==='general')?'selected':''}>Geral (todas as variedades)</option>
+          <option value="american" ${card.variety==='american'?'selected':''}>American English</option>
+          <option value="british" ${card.variety==='british'?'selected':''}>British English</option>
+          <option value="australian" ${card.variety==='australian'?'selected':''}>Australian English</option>
+          <option value="canadian" ${card.variety==='canadian'?'selected':''}>Canadian English</option>
+          <option value="other" ${card.variety==='other'?'selected':''}>Outra</option>
         </select>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <label style="font-size:0.75rem;color:var(--text3);min-width:70px">Registro</label>
         <select style="font-size:0.78rem;padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"
           onchange="event.stopPropagation();updateCardMeta('${card.id}','register',this.value)">
-          <option value="" ${!card.register?'selected':''}>— padrão</option>
-          <option value="slang" ${card.register==='slang'?'selected':''}>💬 Slang</option>
-          <option value="informal" ${card.register==='informal'?'selected':''}>👥 Informal</option>
-          <option value="formal" ${card.register==='formal'?'selected':''}>🎩 Formal</option>
-          <option value="colloquial" ${card.register==='colloquial'?'selected':''}>🗣 Coloquial</option>
-          <option value="archaic" ${card.register==='archaic'?'selected':''}>📜 Arcaico</option>
-          <option value="literary" ${card.register==='literary'?'selected':''}>📖 Literário</option>
-          <option value="technical" ${card.register==='technical'?'selected':''}>⚙️ Técnico</option>
-          <option value="vulgar" ${card.register==='vulgar'?'selected':''}>⚠️ Vulgar</option>
+          <option value="neutral" ${(!card.register||card.register==='neutral')?'selected':''}>Neutro / padrão</option>
+          <option value="informal" ${card.register==='informal'?'selected':''}>Informal</option>
+          <option value="colloquial" ${card.register==='colloquial'?'selected':''}>Coloquial</option>
+          <option value="slang" ${card.register==='slang'?'selected':''}>Gíria (slang)</option>
+          <option value="formal" ${card.register==='formal'?'selected':''}>Formal</option>
+          <option value="technical" ${card.register==='technical'?'selected':''}>Técnico</option>
+          <option value="literary" ${card.register==='literary'?'selected':''}>Literário</option>
+          <option value="archaic" ${card.register==='archaic'?'selected':''}>Arcaico</option>
+          <option value="vulgar" ${card.register==='vulgar'?'selected':''}>Vulgar</option>
         </select>
       </div>
       <button class="btn btn-ghost btn-sm" style="font-size:0.8rem"

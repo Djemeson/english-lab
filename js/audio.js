@@ -595,6 +595,211 @@ function clearLibraryFilter() {
   renderSrsAllCards()
 }
 
+// ---- Reprocessar variedade/registro em massa (IA) ----
+const _VARIETIES = ['general','american','british','australian','canadian','other']
+const _REGISTERS = ['neutral','formal','informal','colloquial','slang','technical','literary','archaic','vulgar']
+function _normVariety(v) { v = String(v||'').toLowerCase().trim(); return _VARIETIES.includes(v) ? v : 'general' }
+function _normRegister(r) { r = String(r||'').toLowerCase().trim(); return _REGISTERS.includes(r) ? r : 'neutral' }
+
+async function classifyMetaBatch(items) {
+  const PROMPT = `Classify each English vocabulary item by VARIETY and REGISTER. Return ONLY valid JSON.
+- variety: "general" (standard across all varieties of English — this is the case for MOST words) OR "american"/"british"/"australian"/"canadian" only when the word/sense is predominantly or exclusively used there (e.g. "lift"=british, "soccer"=american, "arvo"=australian).
+- register: exactly one of "neutral","formal","informal","colloquial","slang","technical","literary","archaic","vulgar". Use "neutral" for everyday standard words.
+Always fill BOTH for every item. Match each result to the item "id".
+Return: {"results":[{"id":0,"variety":"general","register":"neutral"}]}
+Items: ${JSON.stringify(items)}`
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 2200,
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: PROMPT }]
+    })
+  })
+  if (!res.ok) throw new Error('OpenAI ' + res.status)
+  const data = await res.json()
+  const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}')
+  return Array.isArray(parsed.results) ? parsed.results : []
+}
+
+// Executa tarefas async com concorrência limitada (acelera sem estourar rate limit)
+async function runPool(tasks, concurrency, onProgress) {
+  let idx = 0, done = 0
+  const worker = async () => {
+    while (idx < tasks.length) {
+      const my = idx++
+      try { await tasks[my]() } catch (e) { /* tarefa já trata */ }
+      done++; if (onProgress) onProgress(done)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker))
+}
+
+// Reanalisa UM significado: gera frases que batem com o sentido + variedade + registro
+async function regenerateMeaning(it) {
+  const n = Math.max(1, Math.min(it.cards.length, 6))
+  const PROMPT = `You are fixing flashcards for a Brazilian learner of English. Return ONLY valid JSON.
+Word/expression: "${it.word}"${it.type ? ` (type: ${it.type})` : ''}
+This SPECIFIC meaning (in Portuguese): "${it.meaning_pt || '(use the most common sense)'}"
+${it.definition_pt ? `Definition of this sense: "${it.definition_pt}"` : ''}
+
+Generate ${n} example sentence(s) that ALL clearly illustrate THIS specific meaning of "${it.word}" — never any other sense. Also classify variety and register for THIS sense.
+
+Return ONLY this JSON:
+{
+  "variety": "general|american|british|australian|canadian",
+  "register": "neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar",
+  "examples": [
+    {"en": "Natural sentence using <b>${it.word}</b> (inflected as needed) in THIS sense.", "pt": "tradução natural em PT-BR"}
+  ]
+}
+Rules — follow exactly:
+- Return EXACTLY ${n} example object(s).
+- Every example MUST match the meaning "${it.meaning_pt}". If "${it.word}" has other senses, IGNORE them — an example must not make sense under a different meaning.
+- Each example: a different tense/construction, a different subject, a different real-world situation; natural like a novel/news/conversation, never formulaic.
+- Wrap the target word (as it appears inflected) in <b></b> in the English sentence. NEVER use <b> in the Portuguese.
+- Translate the Portuguese naturally (not word-for-word).`
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini', max_tokens: 900,
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: PROMPT }]
+    })
+  })
+  if (!res.ok) throw new Error('OpenAI ' + res.status)
+  const data = await res.json()
+  return JSON.parse(data.choices?.[0]?.message?.content || '{}')
+}
+
+// Botão universal da Biblioteca: corrige frases (que não batiam com o significado)
+// + preenche variedade/registro de TODOS os cards. Preserva o agendamento SRS.
+async function reanalyzeAll() {
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
+  if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }
+
+  const groups = new Map()
+  for (const c of srsCards) {
+    const key = `${c.wordId}|${c.meaningIdx}`
+    if (!groups.has(key)) groups.set(key, {
+      word: c.word || '', type: c.type || 'word',
+      meaning_pt: c.meaning_pt || '', definition_pt: c.definition_pt || '', cards: []
+    })
+    groups.get(key).cards.push(c)
+  }
+  const items = [...groups.values()].filter(g => g.word)
+  if (!items.length) { toast('Nada para reanalisar', 'info'); return }
+
+  if (!confirm(`Reanalisar TODOS os ${items.length} significados (${srsCards.length} cards)?\n\n• Corrige as frases de exemplo para baterem com o significado certo\n• Preenche variedade (AmE/BrE...) e registro (formal, gíria...)\n• Gera o áudio das novas frases automaticamente\n• Mantém o progresso de estudo (agendamento) intacto\n\nUsa a API da OpenAI e pode levar alguns minutos.`)) return
+
+  const btn = document.getElementById('lib-reprocess-btn')
+  const origHtml = btn ? btn.innerHTML : ''
+  if (btn) btn.disabled = true
+  const total = items.length
+  let updated = 0, failed = 0, audioGen = 0
+  const genAudio = cfg.ttsProvider !== 'none' && !!cfg.openaiKey
+
+  const tasks = items.map(it => async () => {
+    try {
+      const r = await regenerateMeaning(it)
+      const variety = _normVariety(r && r.variety)
+      const register = _normRegister(r && r.register)
+      const exs = (r && Array.isArray(r.examples)) ? r.examples.filter(e => e && e.en) : []
+      const audioTexts = new Set()
+      it.cards.forEach((c, i) => {
+        c.variety = variety; c.register = register
+        if (exs.length) {
+          const ex = exs[i % exs.length]
+          if (ex.en) c.example_en = ex.en
+          if (ex.pt) c.example_pt = ex.pt
+        }
+        if (c.example_en) audioTexts.add(c.example_en)
+        updated++
+      })
+      // Gera o áudio das novas frases (mesma string usada na reprodução → chave bate)
+      if (genAudio) {
+        for (const txt of audioTexts) {
+          const made = await ensureSrsAudio(txt)
+          if (made) audioGen++
+        }
+      }
+    } catch (e) {
+      console.warn('[reanalyzeAll] falhou:', it.word, e.message)
+      failed += it.cards.length
+    }
+  })
+
+  await runPool(tasks, 4, d => { if (btn) btn.innerHTML = `<span class="spinner"></span> ${d}/${total}` })
+
+  saveSrsCards(); autoSyncAfterChange()
+  try { await refreshAudioKeyCache() } catch {}
+  if (typeof autoSyncAudioAfterChange === 'function') autoSyncAudioAfterChange()
+  if (btn) { btn.disabled = false; btn.innerHTML = origHtml }
+  if (_browserPreviewCardId) showBrowserCardPreview(_browserPreviewCardId)
+  if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value || '')
+  toast(`${updated} card(s) corrigidos${audioGen ? ` · ${audioGen} áudio(s) gerado(s)` : ''}${failed ? ` · ${failed} falharam (rode de novo)` : ''}`, updated ? 'success' : 'warning')
+}
+
+async function reprocessMetaBulk() {
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
+  if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }
+
+  // Agrupa por significado (wordId|meaningIdx) — todos os cards do mesmo significado
+  // compartilham variedade/registro, então classificamos só 1 vez por significado.
+  const groups = new Map()
+  for (const c of srsCards) {
+    const key = `${c.wordId}|${c.meaningIdx}`
+    if (!groups.has(key)) groups.set(key, { word: c.word || '', meaning: c.meaning_pt || '', example: c.example_en || '', cards: [] })
+    groups.get(key).cards.push(c)
+  }
+  const items = [...groups.values()].filter(g => g.word)
+  if (!items.length) { toast('Nenhum significado para processar', 'info'); return }
+
+  if (!confirm(`Reprocessar variedade e registro de ${items.length} significado(s) (${srsCards.length} cards) com a IA?\n\nIsso fará chamadas à API da OpenAI e pode levar alguns minutos.`)) return
+
+  const btn = document.getElementById('lib-reprocess-btn')
+  const origHtml = btn ? btn.innerHTML : ''
+  if (btn) btn.disabled = true
+
+  const BATCH = 25
+  let done = 0, updated = 0, failed = 0
+  for (let i = 0; i < items.length; i += BATCH) {
+    const batch = items.slice(i, i + BATCH)
+    if (btn) btn.innerHTML = `<span class="spinner"></span> ${done}/${items.length}`
+    try {
+      const payload = batch.map((it, j) => ({
+        id: j,
+        word: it.word,
+        meaning: it.meaning,
+        example: (it.example || '').replace(/<[^>]+>/g, '').slice(0, 160)
+      }))
+      const results = await classifyMetaBatch(payload)
+      const byId = {}; results.forEach(r => { byId[r.id] = r })
+      batch.forEach((it, j) => {
+        const r = byId[j]; if (!r) return
+        const variety = _normVariety(r.variety)
+        const register = _normRegister(r.register)
+        it.cards.forEach(c => { c.variety = variety; c.register = register })
+        updated += it.cards.length
+      })
+    } catch (e) {
+      console.warn('[reprocessMeta] batch falhou:', e.message)
+      failed += batch.length
+    }
+    done += batch.length
+    await sleep(350)
+  }
+
+  saveSrsCards(); autoSyncAfterChange()
+  if (btn) { btn.disabled = false; btn.innerHTML = origHtml }
+  if (_browserPreviewCardId) showBrowserCardPreview(_browserPreviewCardId)
+  if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value || '')
+  toast(`${updated} card(s) atualizados${failed ? ` · ${failed} falharam` : ''}`, updated ? 'success' : 'warning')
+}
+
 function toggleBrowserDeck(deckId) {
   _activeBrowserDeck = deckId
   clearLibraryFilterUI()
