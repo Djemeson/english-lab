@@ -543,16 +543,16 @@ function renderWordCard(wordId) {
   <div class="wc-toolbar">
     <div class="wct-left" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"></div>
     <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
-      <button class="btn btn-ghost btn-sm" onclick="speakWord('${escA(w.word || w.context)}')" title="Ouvir">🔊</button>
-      <button class="btn btn-ghost btn-sm" onclick="skipWord('${w.id}')" title="Pular">⟶</button>
-      <button class="btn btn-ghost btn-sm" onclick="deleteWord('${w.id}')" title="Excluir">🗑</button>
+      <button class="btn btn-ghost btn-sm" onclick="speakWord('${escA(w.word || w.context)}')" title="Ouvir">${ic('volume','ic-sm')}</button>
+      <button class="btn btn-ghost btn-sm" onclick="skipWord('${w.id}')" title="Pular">${ic('arrowRight','ic-sm')}</button>
+      <button class="btn btn-ghost btn-sm" onclick="deleteWord('${w.id}')" title="Excluir">${ic('trash','ic-sm')}</button>
     </div>
   </div>
   <div class="word-card">
     <div class="wc-header">
       <div class="wc-word" style="display:flex;align-items:center;gap:8px">
         <span id="wc-word-text-${w.id}">${esc(w.word || '(frase)')}</span>
-        <button class="btn btn-ghost btn-xs" title="Editar" onclick="startEditWord('${w.id}')" id="wc-edit-btn-${w.id}" style="font-size:0.75rem;padding:2px 6px">✏️</button>
+        <button class="btn btn-ghost btn-xs" title="Editar" onclick="startEditWord('${w.id}')" id="wc-edit-btn-${w.id}" style="padding:2px 6px">${ic('pencil','ic-sm')}</button>
         <input type="text" id="wc-word-input-${w.id}" value="${escA(w.word || '')}" style="display:none;font-size:1.2rem;font-weight:700;background:var(--surface2);border:1px solid var(--primary);border-radius:6px;padding:2px 8px;color:var(--text);width:200px" onkeydown="handleEditWordKey(event,'${w.id}')" onblur="confirmEditWord('${w.id}')">
       </div>
       <div class="wc-meta">

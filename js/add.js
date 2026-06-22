@@ -821,9 +821,7 @@ function handleSentenceMouseUp(event, idx, type) {
   else if (type === 'midia') addMidiaWord(idx, txt)
 }
 
-function srcIcon(t) {
-  return { series:'📺', movie:'🎬', youtube:'▶️', kindle:'📖', podcast:'🎙', website:'🌐', manual:'✍️' }[t] || '📌'
-}
+// srcIcon foi movido para core.js (usado também por review.js, que carrega antes de add.js)
 
 
 // ================================================================

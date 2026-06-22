@@ -23,15 +23,15 @@ function renderSrsSection() {
   if (srsCards.length === 0) {
     startArea.innerHTML = `
     <div class="srs-empty">
-      <div class="icon">📚</div>
+      ${ic('book','ic-xl')}
       <p style="font-size:1rem;font-weight:600;margin-bottom:8px">Nenhum card ainda</p>
-      <p style="font-size:0.88rem;margin-bottom:20px">Revise suas palavras e clique em <strong>"Salvar no site"</strong></p>
-      <button class="btn btn-primary" onclick="showSection('revisar')">➡ Ir para Revisar</button>
+      <p style="font-size:0.88rem;margin-bottom:20px">Revise suas palavras e clique em <strong>"Salvar para estudo"</strong></p>
+      <button class="btn btn-primary" onclick="showSection('revisar')">${ic('arrowRight')}Ir para Revisar</button>
     </div>`
   } else if (total === 0) {
     startArea.innerHTML = `
     <div class="srs-empty">
-      <div class="icon">🎉</div>
+      ${ic('checkCircle','ic-xl')}
       <p style="font-size:1rem;font-weight:600;margin-bottom:8px">Fila zerada!</p>
       <p style="font-size:0.88rem;color:var(--text2)">Volte amanhã — o algoritmo já agendou a próxima revisão.</p>
     </div>`
@@ -44,12 +44,10 @@ function renderSrsSection() {
         ${newRem > 0 ? `<strong style="color:var(--success)">${newRem}</strong> novos` : ''}
       </p>
       <button class="btn btn-primary" style="padding:12px 36px;font-size:1rem" onclick="startSrsSession()">
-        ▶ Começar sessão
+        ${ic('play')}Começar sessão
       </button>
     </div>`
   }
-
-  renderSrsAllCards()
 }
 
 let _focusDeckId = null
@@ -85,7 +83,10 @@ function renderDeckStatsTable() {
     return { novo, aprender, revisar, amanha, total: cards.length }
   }
 
-  function numCell(n, cls) {
+  function numCell(n, cls, type, deckId) {
+    if (n > 0 && type) {
+      return `<td class="${cls} sdt-clickable" onclick="event.stopPropagation();openLibraryFiltered('${type}','${deckId}')" title="Abrir na biblioteca">${n}</td>`
+    }
     return n > 0 ? `<td class="${cls}">${n}</td>` : `<td class="sdt-zero">0</td>`
   }
 
@@ -98,9 +99,9 @@ function renderDeckStatsTable() {
     let rows = `<tr class="deck-row-clickable${isSelected ? ' deck-row-selected' : ''}"
       onclick="showDeckFocus('${deckId}')">
       <td class="sdt-name${depth===0?' root':''}" style="padding-left:${indent}px">${esc(deck.name)}</td>
-      ${numCell(counts.novo,     'sdt-new')}
-      ${numCell(counts.aprender, 'sdt-learn')}
-      ${numCell(counts.revisar,  'sdt-review')}
+      ${numCell(counts.novo,     'sdt-new',    'new',      deckId)}
+      ${numCell(counts.aprender, 'sdt-learn',  'learning', deckId)}
+      ${numCell(counts.revisar,  'sdt-review', 'due',      deckId)}
       ${numCell(counts.amanha,   'sdt-zero')}
     </tr>`
     for (const child of getDeckChildren(deckId)) rows += deckRows(child.id, depth + 1)
@@ -123,7 +124,7 @@ function renderDeckStatsTable() {
       const hasCards = queueSize > 0
       focusPanel = `
       <div class="deck-focus-panel">
-        <div class="deck-focus-title">📚 ${esc(path)}</div>
+        <div class="deck-focus-title">${ic('layers')} ${esc(path)}</div>
         <div class="deck-focus-stats">
           <div class="dfs-item"><span class="dfs-value sdt-new">${counts.novo}</span><span class="dfs-label">Novo</span></div>
           <div class="dfs-item"><span class="dfs-value sdt-learn">${counts.aprender}</span><span class="dfs-label">Aprender</span></div>
@@ -131,7 +132,7 @@ function renderDeckStatsTable() {
           <div class="dfs-item"><span class="dfs-value" style="color:var(--text2)">${counts.amanha}</span><span class="dfs-label">Amanhã</span></div>
         </div>
         ${hasCards
-          ? `<button class="btn btn-primary btn-sm" onclick="startSrsSession('${_focusDeckId}')">▶ Estudar agora (${queueSize} cards)</button>`
+          ? `<button class="btn btn-primary btn-sm" onclick="startSrsSession('${_focusDeckId}')">${ic('play')}Estudar agora (${queueSize} cards)</button>`
           : `<p style="color:var(--text3);font-size:0.88rem;margin:0">Nenhum card para estudar agora neste baralho.</p>`
         }
       </div>`
@@ -267,7 +268,7 @@ async function renderSrsCard() {
           <div class="srs-card-front-hint">Clique para revelar · <span style="color:var(--text3);font-size:0.8em">selecione texto para adicionar à revisão</span></div>
           <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:0.8rem"
             onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">
-            🔊 Repetir
+            ${ic('volume','ic-sm')} Repetir
           </button>
         </div>
       </div>
@@ -707,7 +708,7 @@ function buildSrsVerso(card, imgData) {
   if (card.example_en) {
     text += `<div class="srs-back-example">"${buildSrsFrente(card)}"</div>`
     text += `<div style="display:flex;align-items:center;gap:6px;margin:4px 0 10px">
-      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">🔊 Repetir frase</button>
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">${ic('volume','ic-sm')} Repetir frase</button>
       <button class="btn btn-ghost btn-sm" title="Gerar nova frase que reflita melhor a definição" style="opacity:0.45;padding:4px 7px;font-size:0.8rem"
         onclick="event.stopPropagation();regenerateCardExample('${card.id}',this)">↻</button>
     </div>`
@@ -717,7 +718,7 @@ function buildSrsVerso(card, imgData) {
   // 3. Palavra + IPA + áudio + tipo
   text += `<div class="srs-back-word" style="margin-top:${card.example_en||card.example_pt?'14px':'0'}">${esc(card.word)}</div>`
   if (card.ipa) text += `<div class="srs-back-ipa">${esc(card.ipa)}</div>`
-  text += `<button class="btn btn-ghost btn-sm" style="margin:4px 0 10px" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.word||'')">🔊 ${esc(card.word)}</button>`
+  text += `<button class="btn btn-ghost btn-sm" style="margin:4px 0 10px" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.word||'')">${ic('volume','ic-sm')} ${esc(card.word)}</button>`
   // Type + variety + register chips na mesma linha
   let metaRow = ''
   if (card.type && TYPE[card.type]) metaRow += `<span class="srs-back-type-chip">${TYPE[card.type]}</span>`
@@ -764,7 +765,7 @@ function buildSrsVerso(card, imgData) {
       <button class="btn btn-ghost btn-sm" style="font-size:0.8rem"
         id="img-gen-btn-${card.id}"
         onclick="event.stopPropagation();generateCardImage('${card.id}',this)">
-        🖼️ ${imgData ? 'Regenerar imagem' : 'Gerar imagem'}
+        ${ic('palette','ic-sm')} ${imgData ? 'Regenerar imagem' : 'Gerar imagem'}
       </button>
     </div>
   </details>`

@@ -463,9 +463,9 @@ function renderSrsAllCards() {
       <span class="srs-deck-name">${esc(deck.name)}</span>
       <span class="srs-deck-count">${count}</span>
       <span class="srs-deck-actions">
-        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();editDeckName('${deckId}')" title="Renomear">✏️</button>
-        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();addChildDeck('${deckId}')" title="Subdeck">+</button>
-        ${deckId !== 'dk-root' ? `<button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteDeckUI('${deckId}')">✕</button>` : ''}
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();editDeckName('${deckId}')" title="Renomear">${ic('pencil','ic-sm')}</button>
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();addChildDeck('${deckId}')" title="Subdeck">${ic('plus','ic-sm')}</button>
+        ${deckId !== 'dk-root' ? `<button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteDeckUI('${deckId}')">${ic('x','ic-sm')}</button>` : ''}
       </span></div>
     <div id="bdk-cards-${deckId}"></div>`
     children.forEach(ch => { h += deckNodeHtml(ch.id, depth + 1) }); return h
@@ -474,12 +474,12 @@ function renderSrsAllCards() {
   area.innerHTML = `
   <div class="card-box" style="margin-bottom:0">
     <div class="card-box-header">
-      <h3>📚 Biblioteca (${srsCards.length})</h3>
+      <h3>${srsCards.length} card${srsCards.length!==1?'s':''}</h3>
       <div style="display:flex;gap:8px;align-items:center">
-        <input type="text" id="srs-browser-search" placeholder="🔍 Buscar..."
+        <input type="text" id="srs-browser-search" placeholder="Buscar palavra ou significado..."
           oninput="filterBrowser(this.value)"
-          style="padding:5px 10px;font-size:0.82rem;width:170px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);outline:none">
-        <button class="btn btn-ghost btn-sm" onclick="addRootDeck()">+ Deck</button>
+          style="padding:5px 10px;font-size:0.82rem;width:220px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);outline:none">
+        <button class="btn btn-ghost btn-sm" onclick="addRootDeck()">${ic('plus')}Deck</button>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:220px 1fr 340px;min-height:400px">
@@ -492,9 +492,9 @@ function renderSrsAllCards() {
           <span id="browser-sel-count" style="font-size:0.82rem;font-weight:600;color:var(--primary)"></span>
           <button class="btn btn-ghost btn-sm" onclick="browserSelectAll()">Selecionar tudo</button>
           <button class="btn btn-ghost btn-sm" onclick="browserDeselectAll()">Desmarcar tudo</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--error)" onclick="browserDeleteSelected()">🗑 Excluir</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--primary)" onclick="browserGenerateAudioSelected()">🔊 Gerar áudio</button>
-          <button class="btn btn-ghost btn-sm" style="color:#9b59b6" onclick="browserGenerateImagesSelected()">🖼️ Gerar imagens</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--error)" onclick="browserDeleteSelected()">${ic('trash')}Excluir</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--primary)" onclick="browserGenerateAudioSelected()">${ic('volume')}Gerar áudio</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--purple)" onclick="browserGenerateImagesSelected()">${ic('palette')}Gerar imagens</button>
         </div>
         <!-- Header de colunas clicável -->
         <div class="browser-col-hdr" id="browser-col-hdr" style="display:none">
@@ -518,8 +518,86 @@ function renderSrsAllCards() {
 }
 
 
+// ---- Biblioteca: aba própria + deep-links filtrados ----
+let _pendingLibraryFilter = null   // { type, deckId } aplicado após render
+
+function openBiblioteca() {
+  const emptyEl = el('biblioteca-empty')
+  const area = el('srs-all-cards-area')
+  if (!srsCards.length) {
+    if (area) area.innerHTML = ''
+    if (emptyEl) emptyEl.style.display = ''
+    clearLibraryFilterUI()
+    return
+  }
+  if (emptyEl) emptyEl.style.display = 'none'
+  renderSrsAllCards()
+  if (_pendingLibraryFilter) {
+    const f = _pendingLibraryFilter; _pendingLibraryFilter = null
+    fillLibraryByState(f.type, f.deckId)
+  } else {
+    clearLibraryFilterUI()
+  }
+}
+
+// Chamado pelos contadores do Estudar (números clicáveis)
+function openLibraryFiltered(type, deckId) {
+  _pendingLibraryFilter = { type, deckId: deckId || null }
+  showSection('biblioteca')
+}
+
+function libraryFilterLabel(type) {
+  return { new:'Novos', due:'Para revisar', learning:'Aprendendo', all:'Todos' }[type] || 'Todos'
+}
+
+function fillLibraryByState(type, deckId) {
+  const now = nowTs()
+  let cards = srsCards.slice()
+  if (deckId) {
+    const ids = [deckId, ...getAllDescendantIds(deckId)]
+    cards = cards.filter(c => ids.includes(c.deckId))
+  }
+  if (type === 'new')           cards = cards.filter(c => c.state === 'new')
+  else if (type === 'due')      cards = cards.filter(c => c.state === 'review' && c.due <= now)
+  else if (type === 'learning') cards = cards.filter(c => c.state === 'learning' || c.state === 'relearning')
+  const so = { review:0, relearning:1, learning:2, new:3 }
+  cards.sort((a,b) => ((so[a.state]??9)-(so[b.state]??9)) || (a.word||'').localeCompare(b.word||''))
+  _activeBrowserDeck = null
+  _browserSelected.clear()
+  _browserCurrentCards = cards
+  document.querySelectorAll('.srs-browser-deck').forEach(d => d.classList.remove('active'))
+  const hdr = el('browser-col-hdr'); if (hdr) hdr.style.display = cards.length ? 'flex' : 'none'
+  const panel = el('srs-browser-cards')
+  if (panel) {
+    panel.innerHTML = cards.length
+      ? cards.map(c => buildBrowserRow(c, now)).join('')
+      : `<div style="padding:32px;text-align:center;color:var(--text3)">Nenhum card "${libraryFilterLabel(type)}"</div>`
+  }
+  updateBrowserToolbar()
+  const deckName = deckId ? (getDeckById(deckId)?.name || '') : ''
+  const banner = el('lib-filter-banner')
+  if (banner) {
+    banner.style.display = 'flex'
+    banner.className = 'lib-filter-banner'
+    banner.innerHTML = `<span><strong>${libraryFilterLabel(type)}</strong>${deckName ? ' · ' + esc(deckName) : ''} — ${cards.length} card${cards.length!==1?'s':''}</span>`
+  }
+  const clr = el('lib-filter-clear'); if (clr) clr.style.display = 'inline-flex'
+}
+
+function clearLibraryFilterUI() {
+  const banner = el('lib-filter-banner'); if (banner) banner.style.display = 'none'
+  const clr = el('lib-filter-clear'); if (clr) clr.style.display = 'none'
+}
+
+function clearLibraryFilter() {
+  clearLibraryFilterUI()
+  _pendingLibraryFilter = null
+  renderSrsAllCards()
+}
+
 function toggleBrowserDeck(deckId) {
   _activeBrowserDeck = deckId
+  clearLibraryFilterUI()
   _browserSelected.clear()
   document.querySelectorAll('.srs-browser-deck').forEach(d => d.classList.remove('active'))
   const bd = el('bdk-' + deckId); if (bd) bd.classList.add('active')
@@ -633,10 +711,10 @@ function buildBrowserRow(c, now) {
       <div style="font-size:0.78rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.meaning_pt||'')}</div>
     </div>
     <span style="font-size:0.72rem;color:${SC[c.state]};font-weight:600;white-space:nowrap;width:75px;text-align:center">${SL[c.state]}</span>
-    <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:60px;text-align:center">⏱ ${dueTxt}</span>
+    <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:60px;text-align:center">${dueTxt}</span>
     <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:50px;text-align:center">ease ${c.ease.toFixed(1)}</span>
-    <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();moveSrsCardDeck('${c.id}')" title="Mover">↗</button>
-    <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">✕</button>
+    <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();moveSrsCardDeck('${c.id}')" title="Mover">${ic('folder','ic-sm')}</button>
+    <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">${ic('x','ic-sm')}</button>
   </div>`
 }
 
@@ -714,8 +792,8 @@ async function filterBrowser(query) {
       <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:0.88rem">${esc(c.word)}</div>
       <div style="font-size:0.78rem;color:var(--text2)">${esc(c.meaning_pt||'')}</div></div>
       <span style="font-size:0.72rem;color:${SC[c.state]};font-weight:600;margin-right:8px">${SL[c.state]}</span>
-      <span style="margin-right:4px">${hasAudio?'<span class="audio-badge-ok">🔊</span>':'<span class="audio-badge-no">⚠️</span>'}</span>
-      <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">✕</button>
+      <span style="margin-right:4px">${hasAudio?'<span class="audio-badge-ok">'+ic('volume','ic-sm')+'</span>':'<span class="audio-badge-no">'+ic('alert','ic-sm')+'</span>'}</span>
+      <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">${ic('x','ic-sm')}</button>
     </div>`
   }).join('')
   updateBrowserToolbar()
@@ -777,7 +855,7 @@ async function showBrowserCardPreview(cardId) {
         <div style="font-size:1.1rem;font-weight:700;margin-bottom:6px">${esc(card.word)}</div>
         ${frente ? `<div style="font-size:0.85rem;color:var(--text2)">${frente}</div>` : ''}
         <button class="btn btn-ghost btn-xs" style="margin-top:8px"
-          onclick="playSrsTTS('${(card.example_en||card.word||'').replace(/'/g,"\'")}')">🔊</button>
+          onclick="playSrsTTS('${(card.example_en||card.word||'').replace(/'/g,"\'")}')">${ic('volume','ic-sm')}</button>
       </div>
       <div class="bpp-card-back" style="margin-top:10px">
         <div class="bpp-label">Verso</div>

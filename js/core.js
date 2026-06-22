@@ -83,6 +83,11 @@ const ICONS = {
   zap:'<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/>',
   undo:'<path d="M9 14 4 9l5-5"/><path d="M4 9h11a6 6 0 0 1 0 12h-3"/>',
   x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  alert:'<path d="M10.3 3.2 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.2a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  checkCircle:'<circle cx="12" cy="12" r="10"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   tv:'<rect x="2" y="7" width="20" height="13" rx="2"/><path d="m7 2 5 5 5-5"/>',
   mic:'<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/>',
   clipboard:'<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>',
@@ -91,6 +96,11 @@ const ICONS = {
 function ic(name, extra) {
   const inner = ICONS[name]; if (!inner) return ''
   return `<svg class="ic${extra ? ' ' + extra : ''}" viewBox="0 0 24 24" aria-hidden="true">${inner}</svg>`
+}
+// Ícone por tipo de fonte (série, filme, etc.) — usado em Revisar, Adicionar e Estudar
+function srcIcon(t) {
+  const m = { series:'tv', movie:'film', youtube:'playCircle', kindle:'book', podcast:'mic', website:'globe', manual:'pencil' }
+  return ic(m[t] || 'bookOpen', 'ic-sm')
 }
 function loadWords() {
   try { words = JSON.parse(localStorage.getItem(SK.words) || '[]') } catch { words = [] }
@@ -102,9 +112,10 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 // ================================================================
 // NAVIGATION
 // ================================================================
-const SECTIONS = ['dashboard','adicionar','revisar','estudar','configuracoes']
+const SECTIONS = ['dashboard','adicionar','revisar','estudar','biblioteca','configuracoes']
 // Lazy-load map: section → arquivo JS carregado só na 1ª visita
-const _LAZY = { adicionar: 'js/add.js', estudar: 'js/study.js' }
+// biblioteca usa funções de study.js (buildSrsFrente/Verso/MetaChips/fmtDays)
+const _LAZY = { adicionar: 'js/add.js', estudar: 'js/study.js', biblioteca: 'js/study.js' }
 const _loadedModules = new Set()
 
 function _loadScript(src) {
@@ -138,6 +149,7 @@ function _activateSection(name) {
   if (name === 'revisar') renderReview()
   if (name === 'configuracoes') fillSettings()
   if (name === 'estudar') renderSrsSection()
+  if (name === 'biblioteca') openBiblioteca()
 }
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
@@ -167,10 +179,10 @@ function speakWord(word) {
 }
 
 function toast(msg, type = 'info') {
-  const icons = { success:'✅', error:'❌', warning:'⚠️', info:'ℹ️' }
+  const icons = { success:'checkCircle', error:'x', warning:'alert', info:'info' }
   const t = document.createElement('div')
   t.className = `toast ${type}`
-  t.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${esc(msg)}</span>`
+  t.innerHTML = `${ic(icons[type] || 'info')}<span>${esc(msg)}</span>`
   el('toasts').appendChild(t)
   setTimeout(() => t.remove(), 4500)
 }
