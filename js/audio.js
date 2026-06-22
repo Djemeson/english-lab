@@ -482,11 +482,11 @@ function renderSrsAllCards() {
         <button class="btn btn-ghost btn-sm" onclick="addRootDeck()">${ic('plus')}Deck</button>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:220px 1fr 340px;min-height:400px">
-      <div style="border-right:1px solid var(--border);overflow-y:auto;max-height:420px">
+    <div class="srs-browser-grid">
+      <div class="srs-browser-decks">
         <div id="srs-deck-tree">${treeHtml}</div>
       </div>
-      <div style="display:flex;flex-direction:column;overflow:hidden;max-height:420px">
+      <div class="srs-browser-main">
         <!-- Toolbar de seleção (aparece quando há selecionados) -->
         <div class="browser-toolbar hidden" id="browser-sel-toolbar">
           <span id="browser-sel-count" style="font-size:0.82rem;font-weight:600;color:var(--primary)"></span>
@@ -505,7 +505,7 @@ function renderSrsAllCards() {
           <span style="width:50px;text-align:center" onclick="setBrowserSort('ease')">Ease <span id="bsort-ease"></span></span>
           <span style="width:52px"></span>
         </div>
-        <div id="srs-browser-cards" style="overflow-y:auto;flex:1;min-height:0">
+        <div id="srs-browser-cards" class="srs-browser-cardlist">
           <div style="padding:32px;text-align:center;color:var(--text3);font-size:0.88rem">Clique em um deck para ver os cards</div>
         </div>
       </div>
@@ -806,16 +806,21 @@ function deleteSrsCard(cardId) {
   if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck)
   renderSrsSection(); toast('Card excluído','info')
 }
+function closeMoveModal() { document.getElementById('srs-move-overlay')?.remove() }
 function moveSrsCardDeck(cardId) {
   const card = srsCards.find(c => c.id === cardId); if (!card) return
+  closeMoveModal()
   const modal = document.createElement('div')
-  modal.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)'
-  modal.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:320px;box-shadow:var(--shadow)">
+  modal.id = 'srs-move-overlay'
+  modal.className = 'srs-modal-overlay'
+  // Clicar no fundo (fora da caixa) fecha
+  modal.addEventListener('click', e => { if (e.target === modal) closeMoveModal() })
+  modal.innerHTML = `<div class="srs-modal-box">
     <h4 style="margin-bottom:12px">Mover card para deck</h4>
-    <select id="move-deck-sel" style="width:100%;margin-bottom:16px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"></select>
+    <select id="move-deck-sel" class="srs-modal-select"></select>
     <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-ghost btn-sm" onclick="this.closest('[style]').remove()">Cancelar</button>
-      <button class="btn btn-primary btn-sm" onclick="confirmMoveDeck('${cardId}',document.getElementById('move-deck-sel').value);this.closest('[style]').remove()">Mover</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeMoveModal()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmMoveDeck('${cardId}',document.getElementById('move-deck-sel').value);closeMoveModal()">Mover</button>
     </div></div>`
   document.body.appendChild(modal)
   populateDeckSelect(document.getElementById('move-deck-sel'), card.deckId)
@@ -823,7 +828,9 @@ function moveSrsCardDeck(cardId) {
 function confirmMoveDeck(cardId, newDeckId) {
   const card = srsCards.find(c => c.id === cardId)
   if (card && newDeckId) { card.deckId = newDeckId; saveSrsCards(); autoSyncAfterChange() }
-  if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck); renderSrsSection()
+  if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck)
+  renderSrsSection()
+  toast('Card movido', 'success')
 }
 let _browserPreviewCardId = null
 async function showBrowserCardPreview(cardId) {
@@ -838,7 +845,7 @@ async function showBrowserCardPreview(cardId) {
 
   const imgData = await ImageDB.get(imageKey(card))
   const frente  = buildSrsFrente(card)
-  const verso   = buildSrsVerso(card, imgData)
+  const verso   = buildSrsVerso(card, imgData, true)
 
   const SC = {new:'var(--success)', learning:'var(--warning)', review:'var(--primary)', relearning:'var(--error)'}
   const SL = {new:'Novo', learning:'Aprendendo', review:'Revisão', relearning:'Reaprendendo'}

@@ -698,7 +698,7 @@ async function buildSrsVersoAsync(card) {
   const img = await ImageDB.get(imageKey(card))
   return buildSrsVerso(card, img)
 }
-function buildSrsVerso(card, imgData) {
+function buildSrsVerso(card, imgData, imageBelow) {
   const TYPE = {word:'vocabulário', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation'}
   const strip = s => String(s||'').replace(/<[^>]*>/g,'')
 
@@ -771,7 +771,11 @@ function buildSrsVerso(card, imgData) {
   </details>`
 
   // Imagem dentro do card: grid texto|imagem. Sem imagem: só texto.
-  // Em contextos de preview de biblioteca: imgData como faixa abaixo do texto
+  // Preview da biblioteca (imageBelow): imagem como faixa abaixo do texto — não espreme o texto.
+  if (imgData && imageBelow) {
+    return `${text}<img class="srs-verso-image-below" src="${imgData}" alt="${esc(card.word)}">`
+  }
+  // Sessão de estudo: grid texto|imagem (lado a lado em telas largas; empilha no mobile via CSS).
   if (imgData) {
     return `<div class="srs-back-with-image" data-has-image="1">
       <div class="srs-back-text-col">${text}</div>

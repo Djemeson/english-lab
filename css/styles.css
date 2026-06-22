@@ -1313,3 +1313,58 @@ select option{background:var(--surface)}
   color:var(--text2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:14px;font-size:0.85rem;
 }
 .lib-filter-banner strong{color:var(--primary)}
+
+/* ================================================================
+   BIBLIOTECA — largura total, grid responsivo, preview, modal
+   ================================================================ */
+/* Usa toda a largura disponível (sem o cap de 1180px) */
+#section-biblioteca{max-width:none}
+
+.srs-browser-grid{
+  display:grid;grid-template-columns:240px 1fr minmax(320px,400px);
+  min-height:520px;
+}
+.srs-browser-decks{
+  border-right:1px solid var(--border);overflow-y:auto;
+  max-height:calc(100vh - 230px);
+}
+.srs-browser-main{
+  display:flex;flex-direction:column;overflow:hidden;
+  max-height:calc(100vh - 230px);border-right:1px solid var(--border);
+}
+.srs-browser-cardlist{overflow-y:auto;flex:1;min-height:0}
+.browser-preview-panel{max-height:calc(100vh - 230px)}
+
+/* Linha de deck: nome não deforma no hover (ellipsis em vez de quebrar) */
+.srs-browser-deck{min-height:40px}
+.srs-deck-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srs-deck-count{flex-shrink:0}
+.srs-deck-actions{flex-shrink:0}
+
+/* Imagem do preview: faixa abaixo do texto (não espreme) */
+.srs-verso-image-below{
+  display:block;width:100%;margin-top:12px;border-radius:10px;
+  aspect-ratio:4/3;object-fit:cover;max-height:240px;
+}
+
+/* Modal "Mover card para deck" (e similares) */
+.srs-modal-overlay{
+  position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(3px);
+}
+.srs-modal-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px;width:340px;max-width:92vw;box-shadow:var(--shadow);
+}
+.srs-modal-select{width:100%;margin-bottom:16px}
+
+/* Responsivo da biblioteca */
+@media(max-width:1040px){
+  .srs-browser-grid{grid-template-columns:220px 1fr}
+  .browser-preview-panel{display:none}
+}
+@media(max-width:640px){
+  .srs-browser-grid{grid-template-columns:1fr}
+  .srs-browser-decks{max-height:200px;border-right:none;border-bottom:1px solid var(--border)}
+  .srs-browser-main{max-height:none;border-right:none}
+}
