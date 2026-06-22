@@ -350,19 +350,19 @@ function renderWcToolbarLeft() {
   if (selCount > 0) {
     leftEl.innerHTML = `
       <span style="font-size:0.82rem;font-weight:600;color:var(--primary);white-space:nowrap">${selCount} selecionada${selCount!==1?'s':''}</span>
-      <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()">⚡ Analisar</button>
-      <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()">📚 Salvar para estudo</button>
-      <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()">🗑 Excluir</button>`
+      <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()">${ic('sparkles')}Analisar</button>
+      <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()">${ic('book')}Salvar para estudo</button>
+      <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()">${ic('trash')}Excluir</button>`
   } else if (w) {
     if (w.status === 'pending_review' && w.meanings?.length > 0) {
       const selM = w.meanings.filter(m => m.selected !== false)
       const totalCards = selM.reduce((sum, m) => sum + ((m.examples?.length) || 1), 0)
       leftEl.innerHTML = `
-        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')">📚 Salvar ${totalCards} card${totalCards!==1?'s':''} para estudo</button>
-        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')">🔄 Re-analisar</button>`
+        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')">${ic('book')}Salvar ${totalCards} card${totalCards!==1?'s':''} para estudo</button>
+        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')">${ic('refresh')}Re-analisar</button>`
     } else if (w.status === 'pending_ai') {
       leftEl.innerHTML = `
-        <button class="btn btn-primary btn-sm" onclick="analyzeWord('${w.id}')">⚡ Analisar com IA</button>`
+        <button class="btn btn-primary btn-sm" onclick="analyzeWord('${w.id}')">${ic('sparkles')}Analisar com IA</button>`
     } else {
       leftEl.innerHTML = ''
     }
@@ -515,7 +515,7 @@ function renderWordCard(wordId) {
     <div class="wc-pending-ai">
       <p>Esta palavra ainda não foi analisada pela IA.</p>
       <button class="btn btn-primary big-btn" onclick="analyzeWord('${w.id}')">
-        ⚡ Analisar com IA agora
+        ${ic('sparkles')}Analisar com IA agora
       </button>
       <p style="margin-top:12px;font-size:0.82rem;color:var(--text3)">
         A IA vai identificar todos os significados, exemplos, nível e registro automaticamente.

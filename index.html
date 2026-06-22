@@ -21,10 +21,16 @@
 <div class="app-layout">
 <aside class="sidebar">
   <div class="sb-brand">
-    <div class="sb-brand-name">English <span>Lab</span></div>
-    <div class="sb-brand-sub">Vocabulário</div>
+    <div class="sb-logo">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 3 5v14c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5z"/><path d="M12 6.5V20"/></svg>
+    </div>
+    <div>
+      <div class="sb-brand-name">English <span>Lab</span></div>
+      <div class="sb-brand-sub">Vocabulário</div>
+    </div>
   </div>
   <nav class="sb-nav">
+    <div class="sb-nav-label">Menu</div>
     <button class="nav-item active" id="nav-dashboard" onclick="showSection('dashboard')">
       <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Dashboard</span>
     </button>
@@ -44,18 +50,18 @@
     <button class="nav-item" id="nav-configuracoes" onclick="showSection('configuracoes')">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Configurações</span>
     </button>
-    <div class="sb-indicators">
+    <div class="sb-account">
       <div class="anki-indicator sync-indicator hidden" id="sync-indicator" title="Firebase" onclick="showSection('configuracoes')" style="cursor:pointer">
         <div class="sync-dot" id="sync-dot"></div>
         <span id="sync-label">Nuvem</span>
       </div>
-      <button id="fb-login-btn" class="btn btn-ghost btn-sm" onclick="firebaseSignIn()" style="display:none;font-size:0.72rem;padding:3px 8px;margin-top:4px">
-        Entrar c/ Google
+      <button id="fb-login-btn" class="btn btn-secondary btn-sm btn-full" onclick="firebaseSignIn()" style="display:none;font-size:0.74rem">
+        Entrar com Google
       </button>
-      <div id="fb-user-chip" style="display:none;font-size:0.72rem;color:var(--text3)">
-        <img id="fb-user-photo" src="" style="width:20px;height:20px;border-radius:50%;display:none;vertical-align:middle;margin-right:4px">
-        <span id="fb-user-name"></span>
-        <button class="btn btn-ghost" style="font-size:0.68rem;padding:2px 5px;margin-top:4px;display:block" onclick="firebaseSignOut()">sair</button>
+      <div id="fb-user-chip" style="display:none;font-size:0.74rem;color:var(--text2);align-items:center;gap:7px">
+        <img id="fb-user-photo" src="" style="width:24px;height:24px;border-radius:50%;display:none;flex-shrink:0">
+        <span id="fb-user-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        <button class="btn btn-ghost btn-sm" style="font-size:0.68rem;padding:2px 7px" onclick="firebaseSignOut()">sair</button>
       </div>
     </div>
   </div>
@@ -86,15 +92,18 @@
 <!-- =========== ADICIONAR =========== -->
 <section id="section-adicionar" class="section">
   <div class="page-header">
-    <h1>Adicionar vocabulário</h1>
+    <div class="ph-left">
+      <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Adicionar vocabulário</h1>
+      <p>Capture palavras de várias fontes e analise com IA</p>
+    </div>
   </div>
 
   <div class="tabs">
-    <button class="tab active" onclick="showTab('manual')">Manual</button>
-    <button class="tab" onclick="showTab('kindle')">Kindle</button>
-    <button class="tab" onclick="showTab('midia')">Mídia</button>
-    <button class="tab" onclick="showTab('site')">Website</button>
-    <button class="tab" onclick="showTab('consulta')">Consulta</button>
+    <button class="tab active" onclick="showTab('manual')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Manual</button>
+    <button class="tab" onclick="showTab('kindle')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Kindle</button>
+    <button class="tab" onclick="showTab('midia')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18M17 3v18M3 12h18M3 7.5h4M3 16.5h4M17 7.5h4M17 16.5h4"/></svg>Mídia</button>
+    <button class="tab" onclick="showTab('site')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg>Website</button>
+    <button class="tab" onclick="showTab('consulta')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12 7.7L3 21l1.8-6A8.5 8.5 0 1 1 21 11.5z"/></svg>Consulta</button>
   </div>
 
   <!-- TAB MANUAL -->
@@ -139,7 +148,7 @@
     </div>
     <div class="upload-area" id="kindle-drop" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="this.classList.remove('drag');handleKindleFile({files:event.dataTransfer.files})" onclick="document.getElementById('kindle-file').click()">
       <input type="file" id="kindle-file" accept=".html,.htm,.txt,.csv" onchange="handleKindleFile(this)">
-      <div class="upload-icon">📖</div>
+      <div class="upload-icon"><svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--primary)"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
       <p><strong>Clique</strong> ou arraste o arquivo aqui</p>
       <p>.html (Notas e Destaques) · .txt (My Clippings) · .csv (Vocabulary Builder)</p>
     </div>
@@ -223,7 +232,7 @@
     <div class="consulta-wrap" id="consulta-wrap">
       <div class="consulta-messages" id="consulta-messages">
         <div class="consulta-empty" id="consulta-empty">
-          <div class="icon">💬</div>
+          <svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--primary)"><path d="M21 11.5a8.5 8.5 0 0 1-12 7.7L3 21l1.8-6A8.5 8.5 0 1 1 21 11.5z"/></svg>
           <p style="font-weight:600">Pergunte qualquer coisa em inglês</p>
           <p style="font-size:0.85rem">Ex: "O que significa breaking bad?", "Como usar nevertheless?", "Diferença entre speak e talk"</p>
         </div>
@@ -241,20 +250,20 @@
 
 <!-- =========== REVISAR =========== -->
 <section id="section-revisar" class="section">
-  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
-    <div>
-      <h1>Revisar</h1>
+  <div class="page-header">
+    <div class="ph-left">
+      <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Revisar</h1>
       <p id="review-header-sub">A IA gera todos os significados — selecione e salve para estudo</p>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-ghost btn-sm" onclick="showSection('adicionar')">+ Adicionar</button>
+    <div class="ph-actions">
+      <button class="btn btn-ghost btn-sm" onclick="showSection('adicionar')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Adicionar</button>
     </div>
   </div>
 
   <div id="review-empty" class="empty-state" style="margin-top:40px">
-    <div class="icon">✅</div>
+    <svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
     <p>Nada na fila de revisão ainda.</p>
-    <button class="btn btn-primary mt-4" onclick="showSection('adicionar')" style="margin-top:16px">+ Adicionar palavras</button>
+    <button class="btn btn-primary mt-4" onclick="showSection('adicionar')" style="margin-top:16px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Adicionar palavras</button>
   </div>
 
   <div id="review-content" class="hidden">
@@ -271,12 +280,12 @@
         <!-- Status filter tabs -->
         <div class="rsb-filters">
           <div class="rsb-filter active" data-filter="all" onclick="setSidebarFilter('all')">Todas</div>
-          <div class="rsb-filter" data-filter="pending_ai" onclick="setSidebarFilter('pending_ai')">⏳ Pendente</div>
-          <div class="rsb-filter" data-filter="pending_review" onclick="setSidebarFilter('pending_review')">✓ Prontas</div>
+          <div class="rsb-filter" data-filter="pending_ai" onclick="setSidebarFilter('pending_ai')">Pendentes</div>
+          <div class="rsb-filter" data-filter="pending_review" onclick="setSidebarFilter('pending_review')">Prontas</div>
         </div>
         <!-- Search -->
         <div class="review-search">
-          <input type="text" id="sidebar-search" placeholder="🔍 Buscar..." oninput="filterSidebar(this.value)">
+          <input type="text" id="sidebar-search" placeholder="Buscar palavra..." oninput="filterSidebar(this.value)">
         </div>
         <!-- batch actions moved to wc-toolbar above card -->
         <div class="review-word-list" id="review-word-list"></div>
@@ -285,7 +294,7 @@
       <!-- Main area -->
       <div id="review-main">
         <div class="review-empty-main">
-          <div class="icon">👈</div>
+          <svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           <p>Selecione uma palavra na lista para ver seus significados</p>
         </div>
       </div>
@@ -297,15 +306,20 @@
 <!-- =========== CONFIGURAÇÕES =========== -->
 <section id="section-configuracoes" class="section">
   <div class="page-header">
-    <h1>Configurações</h1>
-    <p>Aparência, IA, nuvem e dados</p>
+    <div class="ph-left">
+      <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações</h1>
+      <p>Aparência, IA, nuvem e dados</p>
+    </div>
+    <div class="ph-actions">
+      <button class="btn btn-primary btn-sm" onclick="saveSettings()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Salvar configurações</button>
+    </div>
   </div>
 
   <div class="settings-grid">
 
     <!-- IA & Áudio -->
     <div class="settings-card full">
-      <h3>🤖 Inteligência Artificial</h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 14l.7 1.8L21.5 16.5l-1.8.7L19 19l-.7-1.8L16.5 16.5l1.8-.7z"/></svg>Inteligência Artificial</h3>
       <p class="desc">Análise de vocabulário e áudio TTS processados diretamente no browser. Configure sua chave API e escolha o modelo.</p>
       <div class="form-row">
         <div class="form-group" style="margin:0">
@@ -338,14 +352,14 @@
 
     <!-- Aparência / Temas -->
     <div class="settings-card full">
-      <h3>🎨 Aparência</h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2h1a4 4 0 0 0 4-4 9 9 0 0 0-9-9z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/></svg>Aparência</h3>
       <p class="desc">Escolha o tema da plataforma. A preferência é salva e sincronizada com sua conta.</p>
       <div class="theme-picker" id="theme-picker"></div>
     </div>
 
     <!-- n8n — somente extração de website -->
     <div class="settings-card">
-      <h3>🔧 Extração de Website (n8n)</h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.1 2.1-2.3-.6-.6-2.3z"/></svg>Extração de Website (n8n)</h3>
       <p class="desc">URL do seu n8n. Usado exclusivamente para extrair vocabulário de páginas web — única operação que o browser não consegue fazer diretamente.</p>
       <div class="form-group">
         <label>URL base do n8n</label>
@@ -358,7 +372,7 @@
 
     <!-- Firebase Sync -->
     <div class="settings-card full">
-      <h3>☁️ Sincronização em nuvem (Firebase)</h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 0 0 .5-9 6 6 0 0 0-11.6-1.5A4 4 0 0 0 7 19z"/></svg>Sincronização em nuvem (Firebase)</h3>
       <p class="desc">Faça login com sua conta Google para sincronizar todos os dados — palavras, cards, áudios e imagens — entre qualquer dispositivo automaticamente.</p>
 
       <!-- Estado: não logado -->
@@ -383,8 +397,8 @@
           <span id="fb-status-msg"></span>
         </div>
         <div class="btn-group" style="margin-top:12px">
-          <button class="btn btn-secondary btn-sm" onclick="fbForcePush()">⬆ Enviar dados para nuvem</button>
-          <button class="btn btn-secondary btn-sm" onclick="fbForcePull()">⬇ Baixar dados da nuvem</button>
+          <button class="btn btn-secondary btn-sm" onclick="fbForcePush()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V9"/><path d="m7 12 5-5 5 5"/><path d="M5 3h14"/></svg>Enviar dados para nuvem</button>
+          <button class="btn btn-secondary btn-sm" onclick="fbForcePull()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg>Baixar dados da nuvem</button>
           <button class="btn btn-ghost btn-sm" onclick="firebaseSignOut()" style="color:var(--error)">Sair da conta</button>
         </div>
       </div>
@@ -392,34 +406,34 @@
 
     <!-- Dados locais -->
     <div class="settings-card full">
-      <h3>💾 Dados locais</h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6a8 3 0 0 0 16 0V5"/><path d="M4 11v6a8 3 0 0 0 16 0v-6"/></svg>Dados locais</h3>
       <p class="desc">Os dados ficam no IndexedDB/localStorage do navegador. Faça backups regulares.</p>
       <div class="btn-group" style="margin-top:4px">
-        <button class="btn btn-secondary btn-sm" onclick="exportData()">📥 Exportar JSON</button>
-        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click()">📤 Importar JSON</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportData()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg>Exportar JSON</button>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V9"/><path d="m7 12 5-5 5 5"/><path d="M5 3h14"/></svg>Importar JSON</button>
         <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(this)">
-        <button class="btn btn-secondary btn-sm" onclick="clearKindleSeen()">📖 Resetar histórico Kindle</button>
-        <button class="btn btn-danger btn-sm" onclick="clearAllData()">🗑 Limpar tudo</button>
+        <button class="btn btn-secondary btn-sm" onclick="clearKindleSeen()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Resetar histórico Kindle</button>
+        <button class="btn btn-danger btn-sm" onclick="clearAllData()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Limpar tudo</button>
       </div>
     </div>
 
     <!-- Manutenção de Áudio -->
     <div class="settings-card full">
-      <h3>🔊 Manutenção de Áudio</h3>
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>Manutenção de Áudio</h3>
       <p class="desc">Gera áudio para cards que ainda não têm. Requer chave OpenAI configurada acima.</p>
       <div id="audio-maint-status" style="font-size:0.85rem;color:var(--text2);margin-bottom:12px">
         Clique em "Verificar" para contar cards sem áudio.
       </div>
       <div class="btn-group">
-        <button class="btn btn-secondary btn-sm" onclick="checkMissingAudio()">🔍 Verificar</button>
-        <button class="btn btn-primary btn-sm" id="btn-gen-missing-audio" style="display:none" onclick="generateMissingAudio()">⚡ Gerar áudio ausente</button>
+        <button class="btn btn-secondary btn-sm" onclick="checkMissingAudio()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Verificar</button>
+        <button class="btn btn-primary btn-sm" id="btn-gen-missing-audio" style="display:none" onclick="generateMissingAudio()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>Gerar áudio ausente</button>
       </div>
     </div>
 
   </div>
 
   <div style="margin-top:24px;display:flex;align-items:center;gap:16px">
-    <button class="btn btn-primary" onclick="saveSettings()">💾 Salvar configurações</button>
+    <button class="btn btn-primary" onclick="saveSettings()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Salvar configurações</button>
   </div>
 
   <button class="reset-all-btn" onclick="clearAllData()">apagar todos os dados e começar do zero</button>
@@ -428,13 +442,13 @@
 <!-- =========== ESTUDAR (SRS) =========== -->
 <section id="section-estudar" class="section">
   <div id="srs-view-dashboard">
-    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div>
-        <h1>Estudar</h1>
-        <p>Revisão espaçada nativa — sem precisar do Anki</p>
+    <div class="page-header">
+      <div class="ph-left">
+        <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Estudar</h1>
+        <p>Revisão espaçada nativa, direto no navegador</p>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn btn-ghost btn-sm" onclick="showSrsCfgModal()">⚙️ Configurar SRS</button>
+      <div class="ph-actions">
+        <button class="btn btn-ghost btn-sm" onclick="showSrsCfgModal()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurar SRS</button>
       </div>
     </div>
     <div class="srs-dashboard">
@@ -448,7 +462,7 @@
       </div>
       <div class="srs-dash-card streak">
         <div class="sdc-value" id="srs-streak">0</div>
-        <div class="sdc-label">Dias de sequência 🔥</div>
+        <div class="sdc-label">Dias de sequência</div>
       </div>
     </div>
     <div id="srs-deck-stats"></div>
@@ -461,9 +475,9 @@
     <div class="srs-session-wrap">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div style="display:flex;align-items:center;gap:10px">
-          <button class="srs-undo-btn" id="srs-undo-btn" onclick="undoLastCard()" disabled title="Desfazer última avaliação">↩ Desfazer</button>
+          <button class="srs-undo-btn" id="srs-undo-btn" onclick="undoLastCard()" disabled title="Desfazer última avaliação"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a6 6 0 0 1 0 12h-3"/></svg>Desfazer</button>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="endSrsSession()">✕ Encerrar</button>
+        <button class="btn btn-ghost btn-sm" onclick="endSrsSession()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>Encerrar</button>
       </div>
       <div class="srs-progress-bar-wrap">
         <div class="srs-progress-bar" id="srs-progress-bar" style="width:0%"></div>
@@ -473,7 +487,7 @@
         <span class="srs-hist-nav-info" id="srs-hist-info"></span>
         <button class="srs-hist-nav-btn" id="srs-hist-next" onclick="navigateHistory(1)" disabled>Atual →</button>
       </div>
-      <div class="srs-hist-viewing-banner" id="srs-hist-banner">👁 Visualizando histórico — avaliação bloqueada</div>
+      <div class="srs-hist-viewing-banner" id="srs-hist-banner">Visualizando histórico — avaliação bloqueada</div>
       <div id="srs-card-area"></div>
     </div>
   </div>
@@ -482,7 +496,7 @@
 <!-- SRS Config Modal -->
 <div id="srs-cfg-modal" class="hidden" style="position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:100%;max-width:440px;box-shadow:var(--shadow)">
-    <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px">⚙️ Configurações do SRS</h3>
+    <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--primary)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações do SRS</h3>
     <p style="font-size:0.82rem;color:var(--text2);margin-bottom:20px">Ajuste os parâmetros do algoritmo SM-2</p>
     <div class="form-row">
       <div class="form-group" style="margin:0">
@@ -510,7 +524,7 @@
     </div>
     <div class="btn-group" style="margin-top:4px;justify-content:flex-end">
       <button class="btn btn-ghost btn-sm" onclick="hideSrsCfgModal()">Cancelar</button>
-      <button class="btn btn-primary btn-sm" onclick="saveSrsCfg()">💾 Salvar</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSrsCfg()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Salvar</button>
     </div>
   </div>
 </div>

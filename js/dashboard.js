@@ -30,16 +30,16 @@ function renderDashboard() {
             <div class="dash-num">${paraHoje}</div>
             <div class="dash-sub">${dueToday} revisão${dueToday!==1?'ões':''} · ${newToday} novo${newToday!==1?'s':''} disponív${newToday!==1?'eis':'el'} hoje</div>
           </div>
-          <button class="btn btn-primary" onclick="showSection('estudar')">Estudar agora →</button>
+          <button class="btn btn-primary" onclick="showSection('estudar')">Estudar agora ${ic('arrowRight')}</button>
         </div>`
     } else {
       mainArea.innerHTML = `
         <div class="dash-action-card" style="background:var(--surface);border-color:var(--border)">
           <div class="dash-action-left">
-            <div class="dash-num" style="color:var(--success)">✓</div>
+            <div class="dash-num" style="color:var(--success);display:flex;align-items:center">${ic('check','ic-xl')}</div>
             <div class="dash-sub">Nada para revisar hoje. Volte amanhã!</div>
           </div>
-          <button class="btn btn-ghost" onclick="showSection('adicionar')">+ Adicionar palavras</button>
+          <button class="btn btn-ghost" onclick="showSection('adicionar')">${ic('plus')}Adicionar palavras</button>
         </div>`
     }
   }
@@ -50,14 +50,26 @@ function renderDashboard() {
     const secondaryHTML = pending > 0 ? `
       <div class="dash-secondary">
         <span>${pendingAI > 0 ? pendingAI + ' palavra' + (pendingAI!==1?'s':'') + ' aguardando IA' : ''}${pendingAI>0&&pendingRev>0?' · ':''}${pendingRev > 0 ? pendingRev + ' pronta' + (pendingRev!==1?'s':'') + ' para revisar' : ''}</span>
-        <button class="btn btn-ghost btn-sm" onclick="showSection('revisar')">${pendingAI > 0 ? '⚡ Ir para revisão' : '👁 Revisar agora'}</button>
+        <button class="btn btn-ghost btn-sm" onclick="showSection('revisar')">${pendingAI > 0 ? ic('sparkles')+'Ir para revisão' : ic('eye')+'Revisar agora'}</button>
       </div>` : ''
     statsArea.innerHTML = secondaryHTML + `
-      <div class="dash-mini-grid">
-        <div class="dash-mini-card"><div class="lbl">Capturadas</div><div class="val">${total}</div></div>
-        <div class="dash-mini-card"><div class="lbl">No SRS</div><div class="val">${inSrs}</div></div>
-        <div class="dash-mini-card"><div class="lbl">Taxa de acerto</div><div class="val">${acerto}%</div></div>
-        <div class="dash-mini-card"><div class="lbl">Sequência</div><div class="val">${streak} 🔥</div></div>
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-icon">${ic('bookOpen')}</div>
+          <div class="metric-body"><div class="mc-val">${total}</div><div class="mc-lbl">Capturadas</div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon purple">${ic('layers')}</div>
+          <div class="metric-body"><div class="mc-val">${inSrs}</div><div class="mc-lbl">Em estudo</div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon green">${ic('target')}</div>
+          <div class="metric-body"><div class="mc-val">${acerto}%</div><div class="mc-lbl">Taxa de acerto</div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon amber">${ic('flame')}</div>
+          <div class="metric-body"><div class="mc-val">${streak}</div><div class="mc-lbl">Sequência</div></div>
+        </div>
       </div>`
   }
 
@@ -72,7 +84,7 @@ function renderDashboard() {
         <span class="dash-recent-chip" style="color:var(--text3);cursor:pointer" onclick="showSection('adicionar')">+ adicionar</span>
       </div>`
   } else if (recentArea) {
-    recentArea.innerHTML = `<div class="empty-state" style="margin-top:20px"><div class="icon">📖</div><p>Nenhuma palavra ainda.</p><button class="btn btn-primary mt-4" onclick="showSection('adicionar')" style="margin-top:12px">+ Adicionar palavras</button></div>`
+    recentArea.innerHTML = `<div class="empty-state" style="margin-top:20px">${ic('bookOpen','ic-xl')}<p>Nenhuma palavra ainda.</p><button class="btn btn-primary mt-4" onclick="showSection('adicionar')" style="margin-top:12px">${ic('plus')}Adicionar palavras</button></div>`
   }
 }
 
