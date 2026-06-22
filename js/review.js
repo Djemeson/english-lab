@@ -250,30 +250,6 @@ function handleEditWordKey(e, wordId) {
   }
 }
 
-async function sendAllToAnki() {
-  const ready = words.filter(w => w.status === 'pending_review' && w.meanings?.some(m => m.selected !== false))
-  if (!ready.length) { toast('Nenhuma palavra analisada pronta para enviar', 'warning'); return }
-  const btn = el('btn-send-all-anki')
-  if (btn) { btn.disabled = true; btn.style.opacity = '.45'; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
-  toast(`Enviando ${ready.length} palavras pro Anki...`)
-  let ok = 0, fail = 0
-  for (const w of ready) {
-    try {
-      await sendToAnki(w.id)
-      ok++
-    } catch(e) {
-      fail++
-      console.warn(`sendAllToAnki: falhou para "${w.word}":`, e.message)
-    }
-    await sleep(300)
-  }
-  if (btn) { btn.innerHTML = '📤 Enviar todos pro Anki'; updateSendAllBtn() }
-  toast(`${ok} enviadas${fail ? `, ${fail} com erro` : ''}`, ok > 0 ? 'success' : 'error')
-  renderReview(); renderDashboard()
-}
-
-
-
 // ================================================================
 // REVIEW SECTION
 // ================================================================
@@ -375,16 +351,14 @@ function renderWcToolbarLeft() {
     leftEl.innerHTML = `
       <span style="font-size:0.82rem;font-weight:600;color:var(--primary);white-space:nowrap">${selCount} selecionada${selCount!==1?'s':''}</span>
       <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()">⚡ Analisar</button>
-      <button class="btn btn-success btn-sm" onclick="sendSelectedToAnki()">📤 Anki</button>
-      <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()">📚 Site</button>
+      <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()">📚 Salvar para estudo</button>
       <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()">🗑 Excluir</button>`
   } else if (w) {
     if (w.status === 'pending_review' && w.meanings?.length > 0) {
       const selM = w.meanings.filter(m => m.selected !== false)
       const totalCards = selM.reduce((sum, m) => sum + ((m.examples?.length) || 1), 0)
       leftEl.innerHTML = `
-        <button class="btn btn-success btn-sm" onclick="sendToAnki('${w.id}')">✓ Criar ${totalCards} card${totalCards!==1?'s':''} no Anki</button>
-        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')">📚 Salvar no site</button>
+        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')">📚 Salvar ${totalCards} card${totalCards!==1?'s':''} para estudo</button>
         <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')">🔄 Re-analisar</button>`
     } else if (w.status === 'pending_ai') {
       leftEl.innerHTML = `
@@ -473,23 +447,6 @@ async function analyzeSelected() {
   toast('Análise concluída!', 'success')
 }
 
-async function sendSelectedToAnki() {
-  const ids = [...selectedWordIds].filter(id => {
-    const w = words.find(x => x.id === id)
-    return w?.status === 'pending_review' && w.meanings?.some(m => m.selected !== false)
-  })
-  if (!ids.length) { toast('Nenhuma das selecionadas está pronta (analise com IA primeiro)', 'warning'); return }
-  toast(`Enviando ${ids.length} para o Anki...`)
-  let ok = 0
-  for (const id of ids) {
-    try { await sendToAnki(id); ok++ } catch(e) { console.warn(e) }
-    await sleep(200)
-  }
-  toast(`${ok} enviadas pro Anki`, ok > 0 ? 'success' : 'error')
-  selectedWordIds.clear()
-  renderReview(); renderDashboard()
-}
-
 async function saveSelectedToSrs() {
   const ids = [...selectedWordIds].filter(id => {
     const w = words.find(x => x.id === id)
@@ -531,15 +488,6 @@ function deleteSelected() {
   activeWordId = null
   saveWords(); renderReview(); renderDashboard()
   toast(`${ids.length} item${ids.length!==1?'s':''} excluído${ids.length!==1?'s':''}`, 'info')
-}
-
-function getAnkiDeck(w) {
-  const base = cfg.ankiDeck || 'Inglês'
-  const type = (w?.type || '').toLowerCase()
-  if (type === 'idiom')        return `${base}::Idioms`
-  if (type === 'phrasal_verb') return `${base}::Phrasal Verbs`
-  if (type === 'collocation')  return `${base}::Collocations`
-  return `${base}::Vocabulary`
 }
 
 function renderWordCard(wordId) {
@@ -681,19 +629,9 @@ function selectAllMeanings(wordId, val) {
 
 
 // ================================================================
-// ANKICONNECT
+// HELPERS DE FORMATAÇÃO DE TEXTO
 // ================================================================
-async function callAnki(action, params = {}) {
-  const res = await fetch(cfg.ankiUrl || 'http://localhost:8765', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ action, version: 6, params })
-  })
-  const d = await res.json()
-  if (d.error) throw new Error(d.error)
-  return d.result
-}
-
-// Permite apenas <b> e </b> no texto do AI (seguro para Anki)
+// Permite apenas <b> e </b> no texto do AI
 function allowBold(s) {
   return String(s || '')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -704,205 +642,6 @@ function allowBold(s) {
 function capFirst(s) {
   if (!s) return s
   return s.replace(/^(<b>)?([a-záàãâéêíóôõúüç])/i, (_, tag, ch) => (tag || '') + ch.toUpperCase())
-}
-
-function buildFrente(w, m, ex) {
-  // Frente = frase exemplo em inglês com a palavra-alvo em negrito
-  const sentence = (ex && ex.en) || m.example_en || w.context || ''
-  if (!sentence) return esc(w.word || '')
-  const wordRaw = (w.word || '').trim()
-  const isMultiWord = wordRaw.includes(' ')
-  // Single word e AI já forneceu <b>: confia no bold do AI
-  if (/<b>/i.test(sentence) && !isMultiWord) return capFirst(allowBold(sentence))
-  // Remove <b> parciais do AI (pode ter boldado apenas a 1ª palavra da expressão)
-  const cleanSentence = sentence.replace(/<\/?b>/gi, '')
-  const wordPattern = wordRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  if (!wordPattern) return capFirst(esc(cleanSentence))
-  try {
-    // Multi-word: ancora no particle (2ª palavra em diante) e aceita qualquer verbo antes
-    // Ex: "give up" → bola "gave up", "giving up", "gives up" etc.
-    // Single word: aceita inflexões comuns
-    let regex
-    if (isMultiWord) {
-      const parts = wordRaw.split(/\s+/)
-      const particle = parts.slice(1).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
-      regex = new RegExp(`\\b(\\w+(?:'\\w+)?\\s+${particle})\\b`, 'gi')
-    } else {
-      regex = new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi')
-    }
-    const bolded = cleanSentence.replace(regex, '<b>$1</b>')
-    // Se não encontrou a expressão na frase gerada pela IA, retorna sem bold
-    return capFirst(bolded.includes('<b>') ? bolded : esc(cleanSentence))
-  } catch { return capFirst(esc(cleanSentence)) }
-}
-
-function buildVerso(w, m, ex) {
-  const SRC = { series:'série de TV', movie:'filme', youtube:'YouTube', kindle:'e-book/Kindle', podcast:'podcast', website:'site', manual:'input manual' }
-  const TYPE = { word:'vocabulário', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' }
-  const hr = '<hr class="el-hr">'
-  let v = ''
-
-  // 1. Frase PT
-  const ptSentence = (ex && ex.pt) || m.example_pt || ''
-  if (ptSentence) {
-    v += `<span class="el-pt">${capFirst(esc(ptSentence.replace(/<\/?b>/gi, '')))}</span>`
-    v += hr
-  }
-
-  // 2. Expressão + IPA + tipo (badge)
-  v += `<span class="el-word">${esc(w.word || '')}</span>`
-  if (w.ipa) v += `&nbsp;<span class="el-ipa">${esc(w.ipa)}</span>`
-  if (w.type && TYPE[w.type]) v += `&nbsp;<span class="el-type">${TYPE[w.type]}</span>`
-  v += '<br>'
-
-  // 3. Definição
-  if (m.definition_pt) v += `<span class="el-def">${esc(m.definition_pt)}</span><br>`
-
-  // 4. Tradução principal — destaque
-  if (m.meaning_pt) v += `<br><span class="el-meaning">${esc(m.meaning_pt)}</span><br>`
-
-  // 5. Metadados compactos em uma linha
-  const metas = []
-  if (m.origin)    metas.push(`<b>Origem:</b> ${esc(m.origin)}`)
-  if (m.diffusion) metas.push(`<b>Difusão:</b> ${esc(m.diffusion)}`)
-  if (m.tone)      metas.push(`<b>Tom:</b> ${esc(m.tone)}`)
-  if (m.status)    metas.push(`<b>Status:</b> ${esc(m.status)}`)
-  if (m.usage)     metas.push(`<b>Uso:</b> ${esc(m.usage)}`)
-  if (metas.length) {
-    v += hr
-    v += `<span class="el-meta">${metas.join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</span><br>`
-  }
-
-  // 6. Notas de uso
-  if (m.notes && m.notes.length) {
-    v += `<span class="el-meta" style="font-style:italic">${m.notes.map(esc).join('<br>')}</span><br>`
-  }
-
-  // 7. Família / Sinônimos / Antônimos
-  const hasRelated = (m.word_family?.length) || (m.synonyms?.length) || (m.antonyms?.length)
-  if (hasRelated) {
-    v += hr
-    if (m.word_family?.length) v += `<span class="el-related"><b>Família:</b> ${m.word_family.map(esc).join(', ')}</span><br>`
-    if (m.synonyms?.length)    v += `<span class="el-related"><b>Sinônimos:</b> ${m.synonyms.map(esc).join(', ')}</span><br>`
-    if (m.antonyms?.length)    v += `<span class="el-related"><b>Antônimos:</b> ${m.antonyms.map(esc).join(', ')}</span><br>`
-  }
-
-  // 8. Rodapé — gramática + fonte
-  v += hr
-  const srcLabel = SRC[w.source_type] || w.source_type || '?'
-  const gramStr = m.grammar ? `${esc(m.grammar)}&nbsp;&nbsp;·&nbsp;&nbsp;` : ''
-  v += `<span class="el-footer">${gramStr}${esc(srcLabel)}${w.source_title ? ': <i>' + esc(w.source_title) + '</i>' : ''}</span>`
-
-  return v
-}
-
-async function sendToAnki(wordId) {
-  const w = words.find(x => x.id === wordId); if (!w) return
-  const selected = w.meanings.filter(m => m.selected !== false)
-  if (!selected.length) { toast('Selecione ao menos um significado', 'warning'); return }
-
-  const btn = document.querySelector('.wc-actions .btn-success')
-  if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Enviando...` }
-
-  // Verifica conexão com AnkiConnect antes de tentar enviar
-  try {
-    await callAnki('version')
-  } catch(e) {
-    toast(`❌ Anki inacessível: ${e.message}`, 'error')
-    if (btn) { btn.disabled = false; btn.textContent = `✓ Criar cards no Anki` }
-    return
-  }
-
-  const canFetchTTS = !!cfg.openaiKey
-  const totalCards = selected.reduce((s, m) => s + ((m.examples?.length) || 1), 0)
-  if (canFetchTTS) toast(`Buscando áudio para ${totalCards} card${totalCards !== 1 ? 's' : ''}...`, 'info')
-
-  // Helper: obtém base64 de áudio para um texto via OpenAI TTS
-  async function resolveAudio(text) {
-    if (canFetchTTS && text) {
-      const cleanText = text.replace(/<[^>]+>/g, '')
-      const b64 = await fetchAudioBase64(cleanText)
-      return b64 || null
-    }
-    return null
-  }
-
-  let ok = 0, fail = 0, lastError = ''
-
-  const targetDeck = getAnkiDeck(w)
-  console.log(`[English Lab] Deck alvo: "${targetDeck}" | tipo: ${w.type || '?'} | base cfg: "${cfg.ankiDeck}"`)
-  toast(`📤 Enviando para: ${targetDeck}`, 'info')
-
-  for (const m of selected) {
-    // Um card por exemplo (3 exemplos = 3 cards por significado)
-    const exArr = m.examples && m.examples.length > 0
-      ? m.examples
-      : [{ en: m.example_en || '', pt: m.example_pt || '' }]
-
-    for (const ex of exArr) {
-      // Áudio da frase EN deste card específico
-      const sentenceEN = ex.en || m.example_en || w.word || ''
-      let audioTag = ''
-      try {
-        const audioData = await resolveAudio(sentenceEN)
-        if (audioData) {
-          const safeWord = (w.word || 'word').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
-          const filename = `el-${safeWord}-${Date.now()}.mp3`
-          await callAnki('storeMediaFile', { filename, data: audioData })
-          audioTag = `[sound:${filename}]`
-        }
-      } catch(e) {
-        console.warn('Anki storeMediaFile falhou:', e.message)
-      }
-
-      try {
-        const noteId = await callAnki('addNote', {
-          note: {
-            deckName: targetDeck,
-            modelName: cfg.ankiModel || 'Inglês Básico',
-            fields: {
-              [cfg.fields.word    || 'Frente'  ]: buildFrente(w, m, ex) + (audioTag ? ' ' + audioTag : ''),
-              [cfg.fields.meaning || 'Verso'   ]: buildVerso(w, m, ex),
-              [cfg.fields.context || 'Contexto']: w.context || '',
-              [cfg.fields.ipa     || 'IPA'     ]: w.ipa || '',
-              [cfg.fields.examples|| 'Exemplos']: [ex.en, ex.pt].filter(Boolean).join('\n'),
-              [cfg.fields.audio   || 'Áudio'   ]: audioTag
-            },
-            tags: ['english-lab', w.source_type, m.register, m.level, w.type].filter(Boolean)
-          }
-        })
-        if (!m.anki_ids) m.anki_ids = []
-        m.anki_ids.push(noteId)
-        ok++
-      } catch(e) {
-        const msg = (e.message || '').toLowerCase()
-        if (msg.includes('duplicate')) {
-          ok++ // trata duplicata como sucesso — card já existe no Anki
-        } else {
-          console.warn('Anki addNote erro:', e.message)
-          lastError = e.message
-          fail++
-        }
-      }
-    }
-  }
-
-  if (ok > 0) {
-    w.status = 'in_anki'
-    w.updated_at = new Date().toISOString()  // bump p/ vencer o merge do fbPull
-    saveWords()
-    toast(`✅ ${ok} card${ok !== 1 ? 's' : ''} → ${targetDeck}${fail ? ` (${fail} falhou)` : ''}`, 'success')
-    renderSidebar()
-    // Move to next word
-    const next = words.find(x => ['pending_ai','pending_review'].includes(x.status))
-    if (next) { activeWordId = next.id; renderWordCard(next.id) }
-    else { activeWordId = null; el('review-main').innerHTML = `<div class="review-empty-main"><div class="icon">🎉</div><p>Fila zerada! Adicione mais palavras.</p></div>` }
-    renderDashboard()
-  } else {
-    const errMsg = lastError ? `Erro Anki: ${lastError}` : 'Verifique se o Anki está aberto'
-    toast(errMsg, 'error')
-    if (btn) { btn.disabled = false; btn.textContent = `✓ Criar ${selected.length} cards no Anki` }
-  }
 }
 
 function skipWord(id) {
@@ -928,4 +667,3 @@ function deleteWord(id) {
   renderReview()
   renderDashboard()
 }
-

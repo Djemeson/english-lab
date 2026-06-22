@@ -61,6 +61,9 @@ function initFirebase() {
     _fbApp  = firebase.initializeApp(FB_CONFIG)
     _fbAuth = firebase.auth()
     _fbDb   = firebase.firestore()
+    // Garante que a sessão de login sobreviva a refresh / fechar e reabrir a aba
+    _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e =>
+      console.warn('[Firebase] setPersistence falhou:', e.message))
     _fbAuth.onAuthStateChanged(user => {
       _fbUser = user
       updateFirebaseUI(user)
@@ -136,6 +139,17 @@ async function fbPushData() {
     batch.set(base.collection('data').doc('srsCfg'),   { ...srsCfg,       updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsLog'),   { list: srsLog,    updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsDecks'), { list: srsDecks,  updatedAt: Date.now() })
+    // Configurações da conta (chave OpenAI, URL do n8n, tema, providers) —
+    // garante que sobrevivam a refresh e sincronizem entre dispositivos
+    batch.set(base.collection('data').doc('cfg'), {
+      openaiKey:   cfg.openaiKey   || '',
+      n8nBase:     cfg.n8nBase      || '',
+      theme:       cfg.theme        || 'midnight',
+      aiProvider:  cfg.aiProvider   || 'openai',
+      aiModel:     cfg.aiModel       || '',
+      ttsProvider: cfg.ttsProvider   || 'openai',
+      updatedAt: Date.now()
+    })
     if (kindleItems.length > 0) {
       batch.set(base.collection('data').doc('kindleQueue'), { list: kindleItems, updatedAt: Date.now() })
     }
@@ -262,6 +276,28 @@ async function fbPull() {
       saveSrsLog()
     }
     if (decksDoc.exists)  { srsDecks  = decksDoc.data().list || [];    saveSrsDecks() }
+
+    // Configurações da conta — restaura chave OpenAI / URL n8n / tema / providers.
+    // Merge seguro: usa o valor da nuvem só quando não estiver vazio,
+    // para não apagar configurações locais quando a nuvem ainda está em branco.
+    const cfgDoc2 = await base.collection('data').doc('cfg').get()
+    if (cfgDoc2.exists) {
+      const c = cfgDoc2.data() || {}
+      if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
+      if (c.n8nBase)     cfg.n8nBase     = c.n8nBase
+      if (c.theme)       cfg.theme       = c.theme
+      if (c.aiProvider)  cfg.aiProvider  = c.aiProvider
+      if (c.aiModel)     cfg.aiModel     = c.aiModel
+      if (c.ttsProvider) cfg.ttsProvider = c.ttsProvider
+      saveCfg()
+      if (typeof applyTheme === 'function') applyTheme(cfg.theme)
+      // Se a tela de configurações estiver aberta, reflete os valores restaurados
+      if (typeof fillSettings === 'function' &&
+          document.getElementById('section-configuracoes')?.classList.contains('active')) {
+        fillSettings()
+      }
+    }
+
     const kindleDoc = await base.collection('data').doc('kindleQueue').get()
     if (kindleDoc.exists && kindleDoc.data().list?.length > 0) {
       const seen = loadKindleSeen()

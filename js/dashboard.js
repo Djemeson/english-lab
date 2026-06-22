@@ -5,7 +5,6 @@ function renderDashboard() {
   // srsCards already in memory via initApp — no loadSrs() needed here
   const total   = words.length
   const inSrs   = words.filter(w => w.status === 'in_srs').length
-  const inAnki  = words.filter(w => w.status === 'in_anki').length
   const pendingAI = words.filter(w => w.status === 'pending_ai').length
   const pendingRev = words.filter(w => w.status === 'pending_review').length
   const pending = pendingAI + pendingRev
@@ -78,7 +77,7 @@ function renderDashboard() {
 }
 
 function statusLabel(s) {
-  return { pending_ai:'⏳ Pendente IA', pending_review:'👁 Revisar', in_anki:'✓ Anki', skipped:'– Pulada' }[s] || s
+  return { pending_ai:'⏳ Pendente IA', pending_review:'👁 Revisar', in_srs:'📚 Em estudo', skipped:'– Pulada' }[s] || s
 }
 
 

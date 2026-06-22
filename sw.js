@@ -1,10 +1,10 @@
 // ================================================================
 // SERVICE WORKER — English Lab
 // Estratégia: Cache-first para assets estáticos (shell da app).
-// Firebase, OpenAI e AnkiConnect ficam sempre na rede.
+// Firebase e OpenAI ficam sempre na rede.
 // ================================================================
 
-const CACHE = 'englab-v2'
+const CACHE = 'englab-v3'
 
 // Assets que nunca mudam entre visitas (shell da app)
 const SHELL = [
@@ -27,7 +27,6 @@ const NETWORK_ONLY = [
   'identitytoolkit.googleapis.com',
   'securetoken.googleapis.com',
   'api.openai.com',
-  'localhost:8765',       // AnkiConnect
   'gistusercontent.com',
   'api.github.com',
 ]

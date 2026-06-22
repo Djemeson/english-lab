@@ -7,17 +7,8 @@ function fillSettings() {
   el('cfg-ai-model').value = cfg.aiModel || AI_MODELS[cfg.aiProvider || 'openai'][0]?.value || ''
   el('cfg-tts-provider').value = cfg.ttsProvider || 'openai'
   el('cfg-openai-key').value = cfg.openaiKey || ''
-  el('cfg-anki-url').value = cfg.ankiUrl || 'http://localhost:8765'
-  el('cfg-anki-deck').value = cfg.ankiDeck || 'Inglês'
-  el('cfg-anki-model').value = cfg.ankiModel || 'Inglês Básico'
-  loadAnkiDropdowns()
   el('cfg-n8n').value = cfg.n8nBase || ''
-  el('cfg-f-word').value = cfg.fields?.word || 'Frente'
-  el('cfg-f-meaning').value = cfg.fields?.meaning || 'Verso'
-  el('cfg-f-context').value = cfg.fields?.context || 'Contexto'
-  el('cfg-f-ipa').value = cfg.fields?.ipa || 'IPA'
-  el('cfg-f-examples').value = cfg.fields?.examples || 'Exemplos'
-  el('cfg-f-audio').value = cfg.fields?.audio || 'Áudio'
+  renderThemePicker()
   // Atualiza UI Firebase com estado atual
   if (_fbUser !== undefined) updateFirebaseUI(_fbUser)
 }
@@ -27,22 +18,36 @@ function saveSettings() {
   cfg.aiModel = el('cfg-ai-model').value
   cfg.ttsProvider = el('cfg-tts-provider').value
   cfg.openaiKey = el('cfg-openai-key').value.trim()
-  cfg.ankiUrl = el('cfg-anki-url').value.trim()
-  const _ds = el('cfg-anki-deck-sel'), _ms = el('cfg-anki-model-sel')
-  cfg.ankiDeck  = (_ds && _ds.style.display !== 'none' ? _ds.value  : el('cfg-anki-deck').value).trim()
-  cfg.ankiModel = (_ms && _ms.style.display !== 'none' ? _ms.value : el('cfg-anki-model').value).trim()
   cfg.n8nBase = el('cfg-n8n').value.trim()
-  // Firebase — sem campos de token para salvar
-  cfg.fields = {
-    word: el('cfg-f-word').value.trim() || 'Frente',
-    meaning: el('cfg-f-meaning').value.trim() || 'Verso',
-    context: el('cfg-f-context').value.trim() || 'Contexto',
-    ipa: el('cfg-f-ipa').value.trim() || 'IPA',
-    examples: el('cfg-f-examples').value.trim() || 'Exemplos',
-    audio: el('cfg-f-audio').value.trim() || 'Áudio'
-  }
   saveCfg()
+  // Envia para a nuvem (se logado) para sobreviver a refresh e sincronizar entre dispositivos
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   toast('Configurações salvas!', 'success')
+}
+
+// ================================================================
+// THEMES — seletor visual nas configurações
+// ================================================================
+function renderThemePicker() {
+  const wrap = el('theme-picker')
+  if (!wrap) return
+  const current = cfg.theme || 'midnight'
+  wrap.innerHTML = THEMES.map(t => `
+    <button type="button" class="theme-swatch${t.id === current ? ' active' : ''}"
+            data-theme-id="${t.id}" onclick="selectTheme('${t.id}')" title="${t.name}">
+      <span class="theme-swatch-preview" style="background:${t.swatch[0]}">
+        <span class="theme-swatch-accent" style="background:${t.swatch[1]}"></span>
+      </span>
+      <span class="theme-swatch-name">${t.name}</span>
+    </button>`).join('')
+}
+
+function selectTheme(id) {
+  applyTheme(id)        // aplica visualmente + grava em cfg.theme
+  saveCfg()             // persiste local imediatamente
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  renderThemePicker()
+  toast(`Tema "${THEMES.find(t => t.id === id)?.name || id}" aplicado`, 'success')
 }
 
 async function testN8nAI() {
@@ -59,76 +64,6 @@ async function testN8nAI() {
     toast(res.ok ? 'n8n conectado!' : `n8n respondeu (status ${res.status})`, res.ok ? 'success' : 'warning')
   } catch(e) { toast(`Não foi possível conectar ao n8n: ${e.message}`, 'error') }
 }
-
-async function loadAnkiDropdowns() {
-  try {
-    const [decks, models] = await Promise.all([ callAnki('deckNames'), callAnki('modelNames') ])
-    const ds = el('cfg-anki-deck-sel'), di = el('cfg-anki-deck')
-    const ms = el('cfg-anki-model-sel'), mi = el('cfg-anki-model')
-    if (ds && decks) {
-      const cur = cfg.ankiDeck || ''
-      ds.innerHTML = decks.sort().map(d => `<option value="${esc(d)}"${d===cur?' selected':''}>${esc(d)}</option>`).join('')
-      ds.style.display = ''; di.style.display = 'none'
-    }
-    if (ms && models) {
-      const cur = cfg.ankiModel || ''
-      ms.innerHTML = models.sort().map(m => `<option value="${esc(m)}"${m===cur?' selected':''}>${esc(m)}</option>`).join('')
-      ms.style.display = ''; mi.style.display = 'none'
-    }
-  } catch {
-    // Anki offline — show text inputs
-    const ds = el('cfg-anki-deck-sel'), di = el('cfg-anki-deck')
-    const ms = el('cfg-anki-model-sel'), mi = el('cfg-anki-model')
-    if (ds) ds.style.display = 'none'; if (di) di.style.display = ''
-    if (ms) ms.style.display = 'none'; if (mi) mi.style.display = ''
-  }
-}
-
-async function testAnki() {
-  showTestResult('anki', null, 'Testando...')
-  try {
-    const v = await callAnki('version')
-    showTestResult('anki', true, `AnkiConnect v${v} — conectado!`)
-    updateAnkiNav(true)
-    // Verifica se o deck existe
-    const decks = await callAnki('deckNames').catch(() => [])
-    const deck = cfg.ankiDeck || 'Inglês'
-    if (decks.length && !decks.includes(deck)) {
-      showTestResult('anki', false, `Conectado, mas o deck "${deck}" não existe. Decks disponíveis: ${decks.slice(0,5).join(', ')}`)
-    }
-  } catch(e) {
-    updateAnkiNav(false)
-    const msg = e.message || ''
-    let dica = ''
-    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('ERR_CONNECTION_REFUSED')) {
-      dica = '❌ Não foi possível conectar. Verifique: (1) O Anki está aberto? (2) O plugin AnkiConnect está instalado? (instale pelo código 2055492159 em Ferramentas → Complementos → Instalar). (3) A URL está correta (padrão: http://localhost:8765)?'
-    } else if (msg.includes('CORS') || msg.includes('cross-origin')) {
-      dica = '❌ Erro de CORS. Nas configurações do AnkiConnect, adicione seu domínio à lista webCorsOriginList (ou use "*").'
-    } else if (msg.toLowerCase().includes('not allowed') || msg.includes('403')) {
-      dica = `❌ Acesso negado pelo AnkiConnect. Vá em Ferramentas → Complementos → AnkiConnect → Configuração e adicione "${location.origin}" em webCorsOriginList.`
-    } else {
-      dica = `❌ Erro: ${msg}. Verifique se o Anki está aberto e o AnkiConnect está ativo.`
-    }
-    showTestResult('anki', false, dica)
-  }
-}
-
-function showTestResult(which, ok, msg) {
-  const map = {
-    'anki': ['anki-test-result', 'anki-tdot', 'anki-tmsg']
-  }
-  const [resId, dotId, msgId] = map[which] || map['anki']
-  const resultEl = el(resId), dotEl = el(dotId), msgEl = el(msgId)
-  resultEl.classList.remove('hidden')
-  dotEl.className = 'test-dot' + (ok === true ? ' ok' : ok === false ? ' err' : '')
-  msgEl.textContent = msg
-}
-
-function updateAnkiNav(on) {
-  el('anki-dot').className = 'anki-dot' + (on ? ' on' : '')
-  el('anki-label').textContent = on ? 'Anki ✓' : 'Anki'
-}
-
 
 // ================================================================
 // DATA MANAGEMENT

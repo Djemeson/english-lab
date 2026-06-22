@@ -10,10 +10,8 @@ function markDeleted(id) { const ids = loadDeletedIds(); ids.add(id); saveDelete
 const DEF_CFG = {
   aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
   openaiKey: '',
-  ankiUrl: 'http://localhost:8765', ankiDeck: 'Inglês', ankiModel: 'Inglês Básico',
   n8nBase: '',
-  gistToken: '', gistId: '',
-  fields: { word: 'Frente', meaning: 'Verso', context: 'Contexto', ipa: 'IPA', examples: 'Exemplos', audio: 'Áudio' }
+  theme: 'midnight'
 }
 
 let cfg = {}
@@ -23,11 +21,31 @@ const collapsedGroups = new Set()
 let kindleItems = [], midiaItems = [], siteItems = []
 
 function loadCfg() {
-  try { cfg = { ...DEF_CFG, ...JSON.parse(localStorage.getItem(SK.settings) || '{}') }
-        if (!cfg.fields) cfg.fields = DEF_CFG.fields
-  } catch { cfg = { ...DEF_CFG } }
+  try { cfg = { ...DEF_CFG, ...JSON.parse(localStorage.getItem(SK.settings) || '{}') } }
+  catch { cfg = { ...DEF_CFG } }
 }
 function saveCfg() { localStorage.setItem(SK.settings, JSON.stringify(cfg)) }
+
+// ================================================================
+// THEMES
+// ================================================================
+const THEMES = [
+  { id: 'midnight', name: 'Midnight',  dark: true,  swatch: ['#06091A', '#3B82F6'] },
+  { id: 'light',    name: 'Light',     dark: false, swatch: ['#F4F6FB', '#2563EB'] },
+  { id: 'sepia',    name: 'Sepia',     dark: false, swatch: ['#F3EAD8', '#B45309'] },
+  { id: 'emerald',  name: 'Emerald',   dark: true,  swatch: ['#07130F', '#10B981'] },
+  { id: 'violet',   name: 'Violet',    dark: true,  swatch: ['#0E0A1C', '#8B5CF6'] },
+]
+function applyTheme(id) {
+  const valid = THEMES.find(t => t.id === id) ? id : 'midnight'
+  document.documentElement.setAttribute('data-theme', valid)
+  cfg.theme = valid
+}
+// Aplica o tema o mais cedo possível (antes mesmo do initApp) p/ evitar flash
+try {
+  const _stored = JSON.parse(localStorage.getItem('englab_cfg') || '{}')
+  document.documentElement.setAttribute('data-theme', _stored.theme || 'midnight')
+} catch { document.documentElement.setAttribute('data-theme', 'midnight') }
 function loadWords() {
   try { words = JSON.parse(localStorage.getItem(SK.words) || '[]') } catch { words = [] }
 }

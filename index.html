@@ -45,10 +45,6 @@
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Configurações</span>
     </button>
     <div class="sb-indicators">
-      <div class="anki-indicator">
-        <div class="anki-dot" id="anki-dot"></div>
-        <span id="anki-label">Anki</span>
-      </div>
       <div class="anki-indicator sync-indicator hidden" id="sync-indicator" title="Firebase" onclick="showSection('configuracoes')" style="cursor:pointer">
         <div class="sync-dot" id="sync-dot"></div>
         <span id="sync-label">Nuvem</span>
@@ -248,7 +244,7 @@
   <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
       <h1>Revisar</h1>
-      <p id="review-header-sub">A IA gera todos os significados — selecione e envie pro Anki</p>
+      <p id="review-header-sub">A IA gera todos os significados — selecione e salve para estudo</p>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="showSection('adicionar')">+ Adicionar</button>
@@ -302,7 +298,7 @@
 <section id="section-configuracoes" class="section">
   <div class="page-header">
     <h1>Configurações</h1>
-    <p>IA, Anki, nuvem e dados</p>
+    <p>Aparência, IA, nuvem e dados</p>
   </div>
 
   <div class="settings-grid">
@@ -340,48 +336,11 @@
       </div>
     </div>
 
-    <!-- AnkiConnect -->
-    <div class="settings-card">
-      <h3>🃏 AnkiConnect</h3>
-      <p class="desc">Anki deve estar aberto com o plugin AnkiConnect instalado (código 2055492159).</p>
-      <div class="form-group">
-        <label>URL do AnkiConnect</label>
-        <input type="url" id="cfg-anki-url" placeholder="http://localhost:8765">
-      </div>
-      <div class="form-group">
-        <label>Deck padrão</label>
-        <div class="model-row">
-          <select id="cfg-anki-deck-sel" style="flex:1"><option value="">— conecte ao Anki para listar —</option></select>
-          <input type="text" id="cfg-anki-deck" placeholder="Inglês" style="flex:1;display:none">
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Modelo de nota</label>
-        <div class="model-row">
-          <select id="cfg-anki-model-sel" style="flex:1"><option value="">— conecte ao Anki para listar —</option></select>
-          <input type="text" id="cfg-anki-model" placeholder="Inglês Básico" style="flex:1;display:none">
-        </div>
-      </div>
-      <div id="anki-test-result" class="test-result hidden">
-        <div class="test-dot" id="anki-tdot"></div>
-        <span id="anki-tmsg"></span>
-      </div>
-      <div class="btn-group" style="margin-top:12px">
-        <button class="btn btn-secondary btn-sm" onclick="testAnki()">Testar conexão</button>
-        <button class="btn btn-ghost btn-sm" onclick="loadAnkiDropdowns()">↻ Atualizar listas</button>
-      </div>
-    </div>
-
-    <!-- Campos Anki -->
-    <div class="settings-card">
-      <h3>📋 Campos do modelo Anki</h3>
-      <p class="desc">Nome exato dos campos no seu tipo de nota.</p>
-      <div class="form-group"><label>Frente (palavra)</label><input type="text" id="cfg-f-word" placeholder="Frente"></div>
-      <div class="form-group"><label>Verso (significado)</label><input type="text" id="cfg-f-meaning" placeholder="Verso"></div>
-      <div class="form-group"><label>Contexto</label><input type="text" id="cfg-f-context" placeholder="Contexto"></div>
-      <div class="form-group"><label>IPA</label><input type="text" id="cfg-f-ipa" placeholder="IPA"></div>
-      <div class="form-group"><label>Exemplos</label><input type="text" id="cfg-f-examples" placeholder="Exemplos"></div>
-      <div class="form-group"><label>Áudio</label><input type="text" id="cfg-f-audio" placeholder="Áudio"></div>
+    <!-- Aparência / Temas -->
+    <div class="settings-card full">
+      <h3>🎨 Aparência</h3>
+      <p class="desc">Escolha o tema da plataforma. A preferência é salva e sincronizada com sua conta.</p>
+      <div class="theme-picker" id="theme-picker"></div>
     </div>
 
     <!-- n8n — somente extração de website -->

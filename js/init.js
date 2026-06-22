@@ -3,6 +3,7 @@
 // ================================================================
 async function initApp() {
   loadCfg()
+  applyTheme(cfg.theme)   // aplica o tema salvo
   loadWords()
   loadSrs()          // loads srsCfg, srsLog, decks
   await loadSrsAsync() // loads srsCards from IDB (migrates if needed)
@@ -17,25 +18,6 @@ if (document.readyState === 'loading') {
   initApp()
 }
 
-
-// ================================================================
-// INIT
-// ================================================================
-async function checkAnkiOnLoad() {
-  try {
-    await callAnki('version')
-    updateAnkiNav(true)
-  } catch(e) {
-    updateAnkiNav(false)
-    // Se estiver em HTTPS e Anki não conectar, avisa sobre Private Network Access
-    if (location.protocol === 'https:') {
-      const msg = (e.message || '').toLowerCase()
-      if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load')) {
-        setTimeout(() => toast('⚠️ Anki não conecta via HTTPS. Abra o site como arquivo local (file://) ou atualize o AnkiConnect.', 'warning'), 1200)
-      }
-    }
-  }
-}
 
 // Atualiza metadado de um card (variety ou register) e propaga para irmãos
 function updateCardMeta(cardId, field, value) {
