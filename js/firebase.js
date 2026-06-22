@@ -139,17 +139,19 @@ async function fbPushData() {
     batch.set(base.collection('data').doc('srsCfg'),   { ...srsCfg,       updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsLog'),   { list: srsLog,    updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsDecks'), { list: srsDecks,  updatedAt: Date.now() })
-    // Configurações da conta (chave OpenAI, URL do n8n, tema, providers) —
-    // garante que sobrevivam a refresh e sincronizem entre dispositivos
-    batch.set(base.collection('data').doc('cfg'), {
-      openaiKey:   cfg.openaiKey   || '',
-      n8nBase:     cfg.n8nBase      || '',
+    // Configurações da conta (chave OpenAI, URL do n8n, tema, providers).
+    // IMPORTANTE: usamos merge:true e SÓ incluímos chave/URL quando NÃO estão vazias.
+    // Assim, uma sessão/dispositivo sem a chave nunca apaga o valor já salvo na nuvem.
+    const cfgPayload = {
       theme:       cfg.theme        || 'midnight',
       aiProvider:  cfg.aiProvider   || 'openai',
       aiModel:     cfg.aiModel       || '',
       ttsProvider: cfg.ttsProvider   || 'openai',
       updatedAt: Date.now()
-    })
+    }
+    if (cfg.openaiKey) cfgPayload.openaiKey = cfg.openaiKey
+    if (cfg.n8nBase)   cfgPayload.n8nBase   = cfg.n8nBase
+    batch.set(base.collection('data').doc('cfg'), cfgPayload, { merge: true })
     if (kindleItems.length > 0) {
       batch.set(base.collection('data').doc('kindleQueue'), { list: kindleItems, updatedAt: Date.now() })
     }

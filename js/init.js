@@ -3,7 +3,8 @@
 // ================================================================
 async function initApp() {
   loadCfg()
-  applyTheme(cfg.theme)   // aplica o tema salvo
+  await restoreCfgFromBackup()  // repõe chave OpenAI / URL n8n / tema se o localStorage foi limpo
+  applyTheme(cfg.theme)   // aplica o tema (já restaurado, se preciso)
   loadWords()
   loadSrs()          // loads srsCfg, srsLog, decks
   await loadSrsAsync() // loads srsCards from IDB (migrates if needed)

@@ -24,7 +24,83 @@ function loadCfg() {
   try { cfg = { ...DEF_CFG, ...JSON.parse(localStorage.getItem(SK.settings) || '{}') } }
   catch { cfg = { ...DEF_CFG } }
 }
-function saveCfg() { localStorage.setItem(SK.settings, JSON.stringify(cfg)) }
+
+// ================================================================
+// BACKUP DA CONFIG EM IndexedDB
+// O localStorage de alguns navegadores é limpo entre sessões (ITP/privacidade),
+// mas o IndexedDB persiste (é onde os cards sobrevivem). Espelhamos a cfg ali
+// para que a chave OpenAI, URL do n8n e tema NÃO se percam no refresh.
+// ================================================================
+const SettingsDB = {
+  _db: null,
+  async open() {
+    if (this._db) return this._db
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('english-lab-settings', 1)
+      req.onupgradeneeded = e => e.target.result.createObjectStore('kv')
+      req.onsuccess = e => { this._db = e.target.result; resolve(this._db) }
+      req.onerror = () => reject(req.error)
+    })
+  },
+  async get(key) {
+    try {
+      const db = await this.open()
+      return await new Promise(res => {
+        const r = db.transaction('kv', 'readonly').objectStore('kv').get(key)
+        r.onsuccess = () => res(r.result ?? null); r.onerror = () => res(null)
+      })
+    } catch { return null }
+  },
+  async set(key, value) {
+    try {
+      const db = await this.open()
+      return await new Promise(res => {
+        const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(value, key)
+        tx.oncomplete = () => res(true); tx.onerror = () => res(false)
+      })
+    } catch { return false }
+  }
+}
+
+// Grava no localStorage E no IndexedDB. O backup em IDB é "pegajoso":
+// nunca sobrescreve chave/URL existentes com valor vazio.
+function saveCfg() {
+  try { localStorage.setItem(SK.settings, JSON.stringify(cfg)) }
+  catch (e) { console.warn('[cfg] localStorage falhou:', e.message) }
+  backupCfgToIDB()
+}
+async function backupCfgToIDB() {
+  try {
+    const prev = (await SettingsDB.get('cfg')) || {}
+    const merged = { ...cfg }
+    // Protege os campos sensíveis: não apaga um valor já salvo com string vazia
+    for (const k of ['openaiKey', 'n8nBase']) {
+      if (!merged[k] && prev[k]) merged[k] = prev[k]
+    }
+    await SettingsDB.set('cfg', merged)
+  } catch (e) { console.warn('[cfg] backup IDB falhou:', e && e.message) }
+}
+
+// Restaura do backup IDB os campos que o localStorage perdeu (vazios/default).
+// Retorna true se restaurou algo.
+async function restoreCfgFromBackup() {
+  let backup = null
+  try { backup = await SettingsDB.get('cfg') } catch {}
+  if (!backup || typeof backup !== 'object') return false
+  let restored = false
+  const keys = ['openaiKey', 'n8nBase', 'theme', 'aiProvider', 'aiModel', 'ttsProvider']
+  for (const k of keys) {
+    const cur = cfg[k]
+    const curEmptyOrDefault = (cur === undefined || cur === '' || cur === DEF_CFG[k])
+    if (curEmptyOrDefault && backup[k] && backup[k] !== cur) { cfg[k] = backup[k]; restored = true }
+  }
+  if (restored) {
+    try { localStorage.setItem(SK.settings, JSON.stringify(cfg)) } catch {}
+    if (typeof applyTheme === 'function') applyTheme(cfg.theme)
+    console.log('[cfg] restaurado do backup IndexedDB')
+  }
+  return restored
+}
 
 // ================================================================
 // THEMES

@@ -143,6 +143,7 @@ async function clearAllData() {
   try { await AudioDB.setAll({}) } catch {}
   try { await ImageDB.setAll({}) } catch {}
   try { await CardsDB.clear() } catch {}
+  try { await SettingsDB.set('cfg', {}) } catch {}
 
   // Reset state
   words = []; srsCards = []; srsLog = []; srsDecks = []
