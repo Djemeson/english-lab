@@ -6,6 +6,9 @@
 let srsCards = []  // array of card objects
 let srsCfg = {}
 let srsLog = []    // [{date:'YYYY-MM-DD', reviewed:N, correct:N}]
+// Estado da sessão de estudo. Declarado aqui (arquivo não-lazy) porque o srs.js
+// referencia srsSession; o study.js (lazy) só atribui valores a ele.
+let srsSession = null
 
 const SRS_DEF_CFG = {
   newPerDay: 20,

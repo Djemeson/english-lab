@@ -1,7 +1,7 @@
 // ================================================================
 // SRS SECTION RENDERING
 // ================================================================
-let srsSession = null  // current session state
+// srsSession é declarado em srs.js (não-lazy); aqui apenas o usamos/atribuímos.
 
 function renderSrsSection() {
   loadSrs()
