@@ -886,41 +886,8 @@ function addSiteSelected() {
 // ================================================================
 // MODELOS E VOZES
 // ================================================================
-const AI_MODELS = {
-  anthropic: [
-    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — rápido, barato (padrão)' },
-    { value: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6 — equilibrado' },
-    { value: 'claude-opus-4-6',           label: 'Claude Opus 4.6 — mais capaz' }
-  ],
-  openai: [
-    { value: 'gpt-4o-mini',   label: 'GPT-4o-mini — rápido, barato (padrão)' },
-    { value: 'gpt-4o',        label: 'GPT-4o — equilibrado' },
-    { value: 'gpt-5',         label: 'GPT-5 — mais capaz (verifique disponibilidade)' }
-  ],
-  google: [
-    { value: 'gemini-2.5-flash-lite',  label: 'Gemini 2.5 Flash-Lite — rápido, barato (padrão)' },
-    { value: 'gemini-2.5-flash',       label: 'Gemini 2.5 Flash — equilibrado' },
-    { value: 'gemini-2.5-pro',         label: 'Gemini 2.5 Pro — mais capaz (verifique disponibilidade)' }
-  ]
-}
-
-const OPENAI_VOICES = ['alloy', 'ash', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer']
-
-function updateModelOptions(keepCurrent = false) {
-  const provider = el('cfg-ai-provider').value
-  const models = AI_MODELS[provider] || []
-  const current = keepCurrent ? el('cfg-ai-model').value : null
-  el('cfg-ai-model').innerHTML = models.map(m =>
-    `<option value="${m.value}" ${m.value === current ? 'selected' : ''}>${m.label}</option>`
-  ).join('')
-  if (!keepCurrent) {
-    el('cfg-ai-model').value = models[0]?.value || ''
-  }
-}
-
-function randomVoice() {
-  return OPENAI_VOICES[Math.floor(Math.random() * OPENAI_VOICES.length)]
-}
+// AI_MODELS/updateModelOptions movidos para settings.js e OPENAI_VOICES/randomVoice
+// para audio.js (arquivos não-lazy), pois são usados fora do add.js (Configurações e áudio).
 
 
 // ================================================================

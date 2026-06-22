@@ -66,6 +66,12 @@ const AudioDB = {
   }
 }
 
+// Vozes da OpenAI TTS (usado por ensureSrsAudio — fica aqui, arquivo não-lazy)
+const OPENAI_VOICES = ['alloy', 'ash', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer']
+function randomVoice() {
+  return OPENAI_VOICES[Math.floor(Math.random() * OPENAI_VOICES.length)]
+}
+
 // Gera chave de cache baseada no texto (hash simples)
 function audioKey(text) {
   let h = 0

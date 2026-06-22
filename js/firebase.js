@@ -370,6 +370,38 @@ async function fbForcePull() {
   if (ok) { renderDashboard(); renderSrsSection(); updateSrsBadge(); toast('⬇ Dados sincronizados!', 'success') }
 }
 
+// Apaga TODOS os dados do usuário no Firestore (data + audio + images).
+// Usado pelo "Limpar tudo" — sem isso, ao reconectar a nuvem restaura tudo.
+async function fbWipeCloud() {
+  if (!_fbDb || !_fbUser) return false
+  // Cancela syncs pendentes para não re-enviar dados depois de apagar
+  clearTimeout(_fbSyncTimer)
+  clearTimeout(_fbAudioSyncTimer)
+  updateSyncNav('syncing')
+  try {
+    const base = _fbDb.collection('users').doc(_fbUser.uid)
+    const [dataDocs, audioDocs, imageDocs] = await Promise.all([
+      base.collection('data').get(),
+      base.collection('audio').get(),
+      base.collection('images').get()
+    ])
+    const refs = [...dataDocs.docs, ...audioDocs.docs, ...imageDocs.docs].map(d => d.ref)
+    // Firestore: máximo de 500 operações por batch
+    for (let i = 0; i < refs.length; i += 450) {
+      const batch = _fbDb.batch()
+      refs.slice(i, i + 450).forEach(ref => batch.delete(ref))
+      await batch.commit()
+    }
+    console.log(`[Firebase] nuvem apagada: ${refs.length} documentos`)
+    updateSyncNav('off')
+    return true
+  } catch (e) {
+    console.warn('[Firebase] fbWipeCloud erro:', e.code || e.message)
+    updateSyncNav('err')
+    return false
+  }
+}
+
 // Mantém compatibilidade com chamadas legadas do Gist
 async function initCloudSync() { initFirebase() }
 

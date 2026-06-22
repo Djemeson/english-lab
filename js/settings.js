@@ -1,6 +1,34 @@
 // ================================================================
 // SETTINGS
 // ================================================================
+// Modelos de IA por provider (usado por fillSettings — fica aqui, arquivo não-lazy)
+const AI_MODELS = {
+  anthropic: [
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — rápido, barato (padrão)' },
+    { value: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6 — equilibrado' },
+    { value: 'claude-opus-4-6',           label: 'Claude Opus 4.6 — mais capaz' }
+  ],
+  openai: [
+    { value: 'gpt-4o-mini',   label: 'GPT-4o-mini — rápido, barato (padrão)' },
+    { value: 'gpt-4o',        label: 'GPT-4o — equilibrado' },
+    { value: 'gpt-5',         label: 'GPT-5 — mais capaz (verifique disponibilidade)' }
+  ],
+  google: [
+    { value: 'gemini-2.5-flash-lite',  label: 'Gemini 2.5 Flash-Lite — rápido, barato (padrão)' },
+    { value: 'gemini-2.5-flash',       label: 'Gemini 2.5 Flash — equilibrado' },
+    { value: 'gemini-2.5-pro',         label: 'Gemini 2.5 Pro — mais capaz (verifique disponibilidade)' }
+  ]
+}
+function updateModelOptions(keepCurrent = false) {
+  const provider = el('cfg-ai-provider').value
+  const models = AI_MODELS[provider] || []
+  const current = keepCurrent ? el('cfg-ai-model').value : null
+  el('cfg-ai-model').innerHTML = models.map(m =>
+    `<option value="${m.value}" ${m.value === current ? 'selected' : ''}>${m.label}</option>`
+  ).join('')
+  if (!keepCurrent) el('cfg-ai-model').value = models[0]?.value || ''
+}
+
 function fillSettings() {
   el('cfg-ai-provider').value = cfg.aiProvider || 'openai'
   updateModelOptions(false)
@@ -130,22 +158,30 @@ async function generateMissingAudio() {
 }
 
 async function clearAllData() {
-  if (!confirm('⚠️ Apagar TODOS os dados?\n\nIsso inclui:\n• Palavras e revisões\n• Cards SRS e progresso\n• Áudios gerados\n• Imagens geradas\n• Configurações\n\nFaça um backup antes.')) return
+  const loggedIn = !!(typeof _fbUser !== 'undefined' && _fbUser)
+  const cloudWarn = loggedIn ? '\n• TUDO na nuvem (Firebase) também será apagado' : ''
+  if (!confirm('⚠️ Apagar TODOS os dados?\n\nIsso inclui:\n• Palavras e revisões\n• Cards SRS e progresso\n• Áudios gerados\n• Imagens geradas\n• Configurações' + cloudWarn + '\n\nFaça um backup antes.')) return
   if (!confirm('Confirma? Esta ação é IRREVERSÍVEL.')) return
 
-  // localStorage
+  // 1) Apaga a nuvem PRIMEIRO (ainda logado) — senão ao reconectar tudo volta
+  if (loggedIn && typeof fbWipeCloud === 'function') {
+    toast('Apagando dados da nuvem...', 'info')
+    await fbWipeCloud()
+  }
+
+  // 2) localStorage
   Object.values(SK).forEach(k => localStorage.removeItem(k))
   localStorage.removeItem('el-kindle-seen')
   localStorage.removeItem(SK.kindleQueue)
   localStorage.removeItem('englab_cfg')
 
-  // IndexedDB — áudio e imagens
+  // 3) IndexedDB — áudio, imagens, cards e backup de configurações
   try { await AudioDB.setAll({}) } catch {}
   try { await ImageDB.setAll({}) } catch {}
   try { await CardsDB.clear() } catch {}
   try { await SettingsDB.set('cfg', {}) } catch {}
 
-  // Reset state
+  // 4) Reset state
   words = []; srsCards = []; srsLog = []; srsDecks = []
   cfg = { ...DEF_CFG }
   srsCfg = { ...SRS_DEF_CFG }
@@ -154,9 +190,10 @@ async function clearAllData() {
   renderDashboard()
   fillSettings()
   updateSrsBadge()
-  toast('✅ Todos os dados apagados. Começando do zero.', 'success')
-  setTimeout(() => showSection('dashboard'), 800)
-  // Sign out Firebase se estiver logado
+  toast('Todos os dados apagados — local e nuvem. Começando do zero.', 'success')
+  setTimeout(() => showSection('dashboard'), 1000)
+
+  // 5) Sign out Firebase por último
   if (_fbAuth && _fbUser) _fbAuth.signOut().catch(() => {})
 }
 
