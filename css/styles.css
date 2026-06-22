@@ -1374,6 +1374,20 @@ select option{background:var(--surface)}
 }
 .srs-modal-select{width:100%;margin-bottom:16px}
 
+/* Seções do modal de configuração do SRS */
+.srs-cfg-section{
+  font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--primary);margin:16px 0 9px;padding-bottom:5px;border-bottom:1px solid var(--border);
+}
+.srs-cfg-section:first-of-type{margin-top:6px}
+
+/* Chip de "sanguessuga" (leech) */
+.srs-leech-chip{
+  display:inline-flex;align-items:center;font-size:0.63rem;font-weight:700;border-radius:20px;
+  padding:2px 8px;letter-spacing:.03em;text-transform:uppercase;
+  background:rgba(239,68,68,.14);color:#ef4444;border:1px solid rgba(239,68,68,.3);
+}
+
 /* Responsivo da biblioteca */
 @media(max-width:1040px){
   .srs-browser-grid{grid-template-columns:220px 1fr}

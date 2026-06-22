@@ -669,6 +669,7 @@ function buildMetaChips(card) {
   const r = REGISTER_LABELS[card.register]
   if (v) chips += `<span class="srs-variety-chip ${v.cls}">${v.flag} ${v.label}</span>`
   if (r) chips += `<span class="srs-register-chip ${r.cls}">${r.icon} ${r.label}</span>`
+  if (card.leech) chips += `<span class="srs-leech-chip" title="Sanguessuga: muitas falhas neste card">leech</span>`
   return chips ? `<div class="srs-meta-chips">${chips}</div>` : ''
 }
 
@@ -790,28 +791,64 @@ function buildSrsVerso(card, imgData, imageBelow) {
 // ---- SRS Config Modal ----
 function showSrsCfgModal() {
   loadSrs()
-  el('srs-cfg-new-day').value = srsCfg.newPerDay
-  el('srs-cfg-rev-day').value = srsCfg.revPerDay
-  el('srs-cfg-steps').value = (srsCfg.steps || [1,10]).join(' ')
-  el('srs-cfg-ease').value = srsCfg.easeStart
-  el('srs-cfg-grad-int').value = srsCfg.graduateInterval
+  _fillSrsCfgForm(srsCfg)
   el('srs-cfg-modal').classList.remove('hidden')
   el('srs-cfg-modal').style.display = 'flex'
+}
+function _fillSrsCfgForm(c) {
+  el('srs-cfg-new-day').value   = c.newPerDay ?? 20
+  el('srs-cfg-rev-day').value   = c.revPerDay ?? 200
+  el('srs-cfg-steps').value     = (c.steps || [1,10]).join(' ')
+  el('srs-cfg-grad-int').value  = c.graduateInterval ?? 1
+  el('srs-cfg-easy-int').value  = c.easyInterval ?? c.graduateEasyInterval ?? 4
+  el('srs-cfg-relearn').value   = (c.relearnSteps || [1,5,10]).join(' ')
+  el('srs-cfg-lapse-int').value = c.lapseNewInterval ?? 0
+  el('srs-cfg-min-int').value   = c.minInterval ?? 1
+  el('srs-cfg-leech').value     = c.leechThreshold ?? 50
+  el('srs-cfg-ease').value      = c.easeStart ?? 2.5
+  el('srs-cfg-easy-bonus').value= c.easyBonus ?? 1.3
+  el('srs-cfg-hard-int').value  = c.hardInterval ?? 1.2
+  el('srs-cfg-int-mod').value   = c.intervalModifier ?? 1.0
+  el('srs-cfg-max-int').value   = c.maxInterval ?? 36500
 }
 function hideSrsCfgModal() {
   el('srs-cfg-modal').classList.add('hidden')
   el('srs-cfg-modal').style.display = ''
 }
+// Preenche o formulário com o preset padrão do Anki (não salva — o usuário revisa e Salva)
+function applyAnkiPreset() {
+  _fillSrsCfgForm({
+    newPerDay: 999, revPerDay: 9999, steps: [1,10], graduateInterval: 1, easyInterval: 4,
+    relearnSteps: [1,5,10], lapseNewInterval: 0, minInterval: 1, leechThreshold: 50,
+    easeStart: 2.5, easyBonus: 1.3, hardInterval: 1.2, intervalModifier: 1.0, maxInterval: 36500
+  })
+  toast('Preset do Anki carregado — clique em Salvar para aplicar', 'info')
+}
+function _parseSteps(str, fallback) {
+  const arr = (str || '').split(/\s+/).map(Number).filter(n => n > 0)
+  return arr.length ? arr : fallback
+}
 function saveSrsCfg() {
   loadSrs()
-  srsCfg.newPerDay = parseInt(el('srs-cfg-new-day').value) || 20
-  srsCfg.revPerDay = parseInt(el('srs-cfg-rev-day').value) || 200
-  srsCfg.steps = (el('srs-cfg-steps').value || '1 10').split(/\s+/).map(Number).filter(Boolean)
-  if (!srsCfg.steps.length) srsCfg.steps = [1, 10]
-  srsCfg.easeStart = parseFloat(el('srs-cfg-ease').value) || 2.5
+  srsCfg.newPerDay        = parseInt(el('srs-cfg-new-day').value) || 0
+  srsCfg.revPerDay        = parseInt(el('srs-cfg-rev-day').value) || 0
+  srsCfg.steps            = _parseSteps(el('srs-cfg-steps').value, [1,10])
   srsCfg.graduateInterval = parseInt(el('srs-cfg-grad-int').value) || 1
+  srsCfg.easyInterval     = parseInt(el('srs-cfg-easy-int').value) || 4
+  srsCfg.relearnSteps     = _parseSteps(el('srs-cfg-relearn').value, [1,5,10])
+  srsCfg.lapseNewInterval = Math.max(0, Math.min(1, parseFloat(el('srs-cfg-lapse-int').value) || 0))
+  srsCfg.minInterval      = parseInt(el('srs-cfg-min-int').value) || 1
+  srsCfg.leechThreshold   = parseInt(el('srs-cfg-leech').value) || 50
+  srsCfg.easeStart        = parseFloat(el('srs-cfg-ease').value) || 2.5
+  srsCfg.easyBonus        = parseFloat(el('srs-cfg-easy-bonus').value) || 1.3
+  srsCfg.hardInterval     = parseFloat(el('srs-cfg-hard-int').value) || 1.2
+  srsCfg.intervalModifier = parseFloat(el('srs-cfg-int-mod').value) || 1.0
+  srsCfg.maxInterval      = parseInt(el('srs-cfg-max-int').value) || 36500
+  delete srsCfg.graduateEasyInterval  // campo legado substituído por easyInterval
   persistSrsCfg()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   hideSrsCfgModal()
+  renderSrsSection()
   toast('Configurações do SRS salvas', 'success')
 }
 

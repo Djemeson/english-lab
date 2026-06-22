@@ -10,17 +10,26 @@ let srsLog = []    // [{date:'YYYY-MM-DD', reviewed:N, correct:N}]
 // referencia srsSession; o study.js (lazy) só atribui valores a ele.
 let srsSession = null
 
+// Padrões espelhando o preset do Anki fornecido
 const SRS_DEF_CFG = {
-  newPerDay: 20,
-  revPerDay: 200,
-  steps: [1, 10],           // learning steps in minutes
-  graduateInterval: 1,      // days after learning → review (Bom)
-  graduateEasyInterval: 3,  // days when Fácil skips learning steps
-  easeStart: 2.5,
-  easeMin: 1.3,
-  easyBonus: 1.3,
-  intervalModifier: 1.0
+  newPerDay: 20,            // limite diário de cards novos (Anki: 999)
+  revPerDay: 200,           // limite diário de revisões (Anki: 9999)
+  steps: [1, 10],           // etapas de aprendizagem (min) — Novos Cartões
+  relearnSteps: [1, 5, 10], // etapas de reaprendizagem (min) — Falhas
+  graduateInterval: 1,      // intervalo de graduação (dias) — "Bom" conclui aprendizado
+  easyInterval: 4,          // intervalo fácil (dias) — "Fácil" pula o aprendizado
+  easeStart: 2.5,           // facilidade inicial
+  easeMin: 1.3,             // facilidade mínima
+  easyBonus: 1.3,           // bônus por ser fácil
+  hardInterval: 1.2,        // multiplicador de "Difícil" na revisão (intervalo árduo)
+  intervalModifier: 1.0,    // modificador de intervalo
+  lapseNewInterval: 0.0,    // % do intervalo mantido ao errar (Anki "Novo intervalo")
+  minInterval: 1,           // intervalo mínimo (dias) após erro
+  maxInterval: 36500,       // intervalo máximo (dias)
+  leechThreshold: 50        // limite de falhas para marcar "sanguessuga" (leech)
 }
+// Compat: configs antigas usavam graduateEasyInterval
+function _easyInterval() { return srsCfg.easyInterval ?? srsCfg.graduateEasyInterval ?? 4 }
 
 // loadSrs — carrega srsCfg, srsLog e decks (srsCards vem do IDB via initApp)
 // Mantido para compatibilidade mas NÃO recarrega srsCards do storage
@@ -192,64 +201,83 @@ function createSrsCard(wordId, meaningIdx, exampleIdx) {
   }
 }
 
-// Rating: 1=again, 2=hard, 3=good, 4=easy
+// Rating: 1=again(Errei), 2=hard(Difícil), 3=good(Bom), 4=easy(Fácil)
 function rateSrsCard(cardId, rating) {
   const card = srsCards.find(c => c.id === cardId)
   if (!card) return
 
-  const steps = srsCfg.steps || [1, 10]
   const now = nowTs()
+  const learnSteps   = (srsCfg.steps && srsCfg.steps.length)        ? srsCfg.steps        : [1, 10]
+  const relearnSteps = (srsCfg.relearnSteps && srsCfg.relearnSteps.length) ? srsCfg.relearnSteps : [10]
+  const easeMin = srsCfg.easeMin ?? 1.3
+  const mod     = srsCfg.intervalModifier ?? 1.0
+  const minInt  = srsCfg.minInterval ?? 1
+  const maxInt  = srsCfg.maxInterval ?? 36500
+  const cap = d => Math.min(maxInt, Math.max(minInt, Math.round(d)))
+  if (card.ease == null) card.ease = srsCfg.easeStart ?? 2.5
+  if (card.stepIdx == null) card.stepIdx = 0
 
   if (card.state === 'new' || card.state === 'learning') {
-    if (rating === 1) {
-      // Errei — restart learning
-      card.stepIdx = 0
+    const steps = learnSteps
+    if (rating === 1) {                       // Errei — volta ao 1º passo
+      card.state = 'learning'; card.stepIdx = 0; card.due = now + steps[0] * 60000
+    } else if (rating === 2) {                // Difícil — repete o passo atual
       card.state = 'learning'
-      card.due = now + steps[0] * 60000
-    } else if (rating === 4) {
-      // Fácil — skip learning, graduate with longer interval
+      card.due = now + steps[Math.min(card.stepIdx, steps.length - 1)] * 60000
+    } else if (rating === 4) {                // Fácil — pula o aprendizado e gradua
       card.state = 'review'
-      card.interval = srsCfg.graduateEasyInterval || 3
-      card.ease = Math.max(srsCfg.easeMin, card.ease + 0.15)
+      card.interval = cap(_easyInterval())
+      card.ease = card.ease + 0.15
       card.due = dueDays(card.interval)
-    } else {
-      // Difícil ou Bom — advance step
-      card.stepIdx = Math.min(card.stepIdx + 1, steps.length - 1)
-      if (card.stepIdx >= steps.length - 1 && rating >= 3) {
-        // Graduated
+    } else {                                  // Bom — avança um passo; gradua só ao concluir
+      const next = card.stepIdx + 1
+      if (next >= steps.length) {
         card.state = 'review'
-        card.interval = srsCfg.graduateInterval
+        card.interval = cap(srsCfg.graduateInterval ?? 1)
         card.due = dueDays(card.interval)
       } else {
-        card.state = 'learning'
-        card.due = now + steps[card.stepIdx] * 60000
+        card.state = 'learning'; card.stepIdx = next; card.due = now + steps[next] * 60000
       }
     }
-  } else if (card.state === 'review' || card.state === 'relearning') {
-    if (rating === 1) {
-      // Errei (lapse)
-      card.lapses++
-      card.ease = Math.max(srsCfg.easeMin, card.ease - 0.20)
-      card.interval = Math.max(1, Math.round(card.interval * 0.2))
-      card.stepIdx = 0
-      card.state = 'relearning'
-      card.due = now + steps[0] * 60000
-    } else {
-      card.state = 'review'
-      let newInterval
-      if (rating === 2) {
-        // Difícil
-        newInterval = Math.round(card.interval * 1.2 * srsCfg.intervalModifier)
-        card.ease = Math.max(srsCfg.easeMin, card.ease - 0.15)
-      } else if (rating === 3) {
-        // Bom
-        newInterval = Math.round(card.interval * card.ease * srsCfg.intervalModifier)
+
+  } else if (card.state === 'relearning') {
+    const steps = relearnSteps
+    if (rating === 1) {                       // Errei — volta ao 1º passo de reaprendizagem
+      card.stepIdx = 0; card.due = now + steps[0] * 60000
+    } else if (rating === 2) {                // Difícil — repete o passo
+      card.due = now + steps[Math.min(card.stepIdx, steps.length - 1)] * 60000
+    } else {                                  // Bom/Fácil — gradua de volta para revisão
+      const next = card.stepIdx + 1
+      if (rating === 4 || next >= steps.length) {
+        card.state = 'review'
+        card.interval = cap(card.interval || minInt)   // intervalo pós-lapso já reduzido
+        card.due = dueDays(card.interval)
       } else {
-        // Fácil
-        newInterval = Math.round(card.interval * card.ease * srsCfg.easyBonus * srsCfg.intervalModifier)
+        card.stepIdx = next; card.due = now + steps[next] * 60000
+      }
+    }
+
+  } else { // review
+    if (rating === 1) {                       // Errei (lapse) → reaprendizagem
+      card.lapses = (card.lapses || 0) + 1
+      card.ease = Math.max(easeMin, card.ease - 0.20)
+      card.interval = cap((card.interval || 1) * (srsCfg.lapseNewInterval ?? 0))
+      card.state = 'relearning'; card.stepIdx = 0
+      card.due = now + relearnSteps[0] * 60000
+      if (srsCfg.leechThreshold && card.lapses >= srsCfg.leechThreshold) card.leech = true
+    } else {
+      let ni
+      if (rating === 2) {                     // Difícil
+        ni = (card.interval || 1) * (srsCfg.hardInterval ?? 1.2)
+        card.ease = Math.max(easeMin, card.ease - 0.15)
+      } else if (rating === 3) {              // Bom
+        ni = (card.interval || 1) * card.ease
+      } else {                                // Fácil
+        ni = (card.interval || 1) * card.ease * (srsCfg.easyBonus ?? 1.3)
         card.ease = card.ease + 0.15
       }
-      card.interval = Math.max(1, newInterval)
+      card.state = 'review'
+      card.interval = cap(ni * mod)
       card.due = dueDays(card.interval)
     }
   }
@@ -260,21 +288,37 @@ function rateSrsCard(cardId, rating) {
 
 // ---- Preview next interval (without modifying card) ----
 function previewInterval(card, rating) {
-  const steps = srsCfg.steps || [1, 10]
+  const learnSteps   = (srsCfg.steps && srsCfg.steps.length)        ? srsCfg.steps        : [1, 10]
+  const relearnSteps = (srsCfg.relearnSteps && srsCfg.relearnSteps.length) ? srsCfg.relearnSteps : [10]
+  const mod    = srsCfg.intervalModifier ?? 1.0
+  const minInt = srsCfg.minInterval ?? 1
+  const maxInt = srsCfg.maxInterval ?? 36500
+  const ease   = card.ease ?? srsCfg.easeStart ?? 2.5
+  const stepIdx = card.stepIdx ?? 0
+  const cap = d => Math.min(maxInt, Math.max(minInt, Math.round(d)))
+
   if (card.state === 'new' || card.state === 'learning') {
+    const steps = learnSteps
     if (rating === 1) return fmtDur(steps[0] * 60000)
-    if (rating === 4) return fmtDays(srsCfg.graduateEasyInterval || 3)
-    const nextStep = Math.min(card.stepIdx + 1, steps.length - 1)
-    if (nextStep >= steps.length - 1 && rating >= 3) return fmtDays(srsCfg.graduateInterval)
-    return fmtDur(steps[nextStep] * 60000)
-  } else {
-    if (rating === 1) return fmtDur(steps[0] * 60000)
-    let ni
-    if (rating === 2) ni = Math.round(card.interval * 1.2 * srsCfg.intervalModifier)
-    else if (rating === 3) ni = Math.round(card.interval * card.ease * srsCfg.intervalModifier)
-    else ni = Math.round(card.interval * card.ease * srsCfg.easyBonus * srsCfg.intervalModifier)
-    return fmtDays(Math.max(1, ni))
+    if (rating === 2) return fmtDur(steps[Math.min(stepIdx, steps.length - 1)] * 60000)
+    if (rating === 4) return fmtDays(cap(_easyInterval()))
+    const next = stepIdx + 1                                   // Bom
+    return next >= steps.length ? fmtDays(cap(srsCfg.graduateInterval ?? 1)) : fmtDur(steps[next] * 60000)
   }
+  if (card.state === 'relearning') {
+    const steps = relearnSteps
+    if (rating === 1) return fmtDur(steps[0] * 60000)
+    if (rating === 2) return fmtDur(steps[Math.min(stepIdx, steps.length - 1)] * 60000)
+    const next = stepIdx + 1                                   // Bom/Fácil
+    return (rating === 4 || next >= steps.length) ? fmtDays(cap(card.interval || minInt)) : fmtDur(steps[next] * 60000)
+  }
+  // review
+  if (rating === 1) return fmtDur(relearnSteps[0] * 60000)
+  let ni
+  if (rating === 2)      ni = (card.interval || 1) * (srsCfg.hardInterval ?? 1.2)
+  else if (rating === 3) ni = (card.interval || 1) * ease
+  else                   ni = (card.interval || 1) * ease * (srsCfg.easyBonus ?? 1.3)
+  return fmtDays(cap(ni * mod))
 }
 
 function fmtDur(ms) {

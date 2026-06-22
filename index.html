@@ -519,36 +519,48 @@
 
 <!-- SRS Config Modal -->
 <div id="srs-cfg-modal" class="hidden" style="position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:100%;max-width:440px;box-shadow:var(--shadow)">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 26px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow)">
     <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--primary)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações do SRS</h3>
-    <p style="font-size:0.82rem;color:var(--text2);margin-bottom:20px">Ajuste os parâmetros do algoritmo SM-2</p>
+    <p style="font-size:0.82rem;color:var(--text2);margin-bottom:16px">Algoritmo SM-2 — parâmetros espelhando o Anki</p>
+
+    <div class="srs-cfg-section">Limites diários</div>
     <div class="form-row">
-      <div class="form-group" style="margin:0">
-        <label>Novos por dia <span class="label-note">(máx)</span></label>
-        <input type="number" id="srs-cfg-new-day" min="1" max="200" value="20" style="width:100%">
-      </div>
-      <div class="form-group" style="margin:0">
-        <label>Revisões por dia <span class="label-note">(máx)</span></label>
-        <input type="number" id="srs-cfg-rev-day" min="1" max="9999" value="200" style="width:100%">
-      </div>
+      <div class="form-group" style="margin:0"><label>Novos por dia</label><input type="number" id="srs-cfg-new-day" min="0" max="9999" value="20"></div>
+      <div class="form-group" style="margin:0"><label>Revisões por dia</label><input type="number" id="srs-cfg-rev-day" min="0" max="99999" value="200"></div>
     </div>
-    <div class="form-group">
-      <label>Learning steps <span class="label-note">(minutos, separados por espaço)</span></label>
-      <input type="text" id="srs-cfg-steps" placeholder="1 10" value="1 10">
+
+    <div class="srs-cfg-section">Novos cartões</div>
+    <div class="form-group"><label>Etapas de aprendizagem <span class="label-note">(min, separadas por espaço)</span></label><input type="text" id="srs-cfg-steps" placeholder="1 10" value="1 10"></div>
+    <div class="form-row">
+      <div class="form-group" style="margin:0"><label>Intervalo de graduação <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-grad-int" min="1" value="1"></div>
+      <div class="form-group" style="margin:0"><label>Intervalo fácil <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-easy-int" min="1" value="4"></div>
+    </div>
+
+    <div class="srs-cfg-section">Falhas</div>
+    <div class="form-group"><label>Etapas de reaprendizagem <span class="label-note">(min)</span></label><input type="text" id="srs-cfg-relearn" placeholder="1 5 10" value="1 5 10"></div>
+    <div class="form-row">
+      <div class="form-group" style="margin:0"><label>Novo intervalo <span class="label-note">(0–1, % ao errar)</span></label><input type="number" id="srs-cfg-lapse-int" min="0" max="1" step="0.05" value="0"></div>
+      <div class="form-group" style="margin:0"><label>Intervalo mínimo <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-min-int" min="1" value="1"></div>
+    </div>
+    <div class="form-group"><label>Limite sanguessuga <span class="label-note">(nº de falhas)</span></label><input type="number" id="srs-cfg-leech" min="1" value="50"></div>
+
+    <div class="srs-cfg-section">Avançado</div>
+    <div class="form-row">
+      <div class="form-group" style="margin:0"><label>Facilidade inicial</label><input type="number" id="srs-cfg-ease" min="1.3" max="5" step="0.1" value="2.5"></div>
+      <div class="form-group" style="margin:0"><label>Bônus por ser fácil</label><input type="number" id="srs-cfg-easy-bonus" min="1" step="0.05" value="1.3"></div>
     </div>
     <div class="form-row">
-      <div class="form-group" style="margin:0">
-        <label>Ease inicial <span class="label-note">(2.5 = padrão)</span></label>
-        <input type="number" id="srs-cfg-ease" min="1.3" max="4.0" step="0.1" value="2.5">
-      </div>
-      <div class="form-group" style="margin:0">
-        <label>Intervalo graduação <span class="label-note">(dias)</span></label>
-        <input type="number" id="srs-cfg-grad-int" min="1" max="10" value="1" style="width:100%">
-      </div>
+      <div class="form-group" style="margin:0"><label>Intervalo árduo <span class="label-note">(difícil)</span></label><input type="number" id="srs-cfg-hard-int" min="1" step="0.05" value="1.2"></div>
+      <div class="form-group" style="margin:0"><label>Modificador de intervalo</label><input type="number" id="srs-cfg-int-mod" min="0.1" step="0.05" value="1.0"></div>
     </div>
-    <div class="btn-group" style="margin-top:4px;justify-content:flex-end">
-      <button class="btn btn-ghost btn-sm" onclick="hideSrsCfgModal()">Cancelar</button>
-      <button class="btn btn-primary btn-sm" onclick="saveSrsCfg()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Salvar</button>
+    <div class="form-group"><label>Intervalo máximo <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-max-int" min="1" value="36500"></div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="applyAnkiPreset()" data-tip="Preenche todos os campos com o preset padrão do Anki">↺ Preset do Anki</button>
+      <div class="btn-group" style="margin:0">
+        <button class="btn btn-ghost btn-sm" onclick="hideSrsCfgModal()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="saveSrsCfg()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Salvar</button>
+      </div>
     </div>
   </div>
 </div>
