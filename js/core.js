@@ -187,6 +187,75 @@ function toast(msg, type = 'info') {
   setTimeout(() => t.remove(), 4500)
 }
 
+// ================================================================
+// MODAL DE INPUT (substitui prompt() nativo) — visual premium
+// ================================================================
+function inputModal({ title, label, value = '', placeholder = '', confirmText = 'Salvar', onConfirm }) {
+  document.getElementById('el-input-modal')?.remove()
+  const overlay = document.createElement('div')
+  overlay.id = 'el-input-modal'
+  overlay.className = 'srs-modal-overlay'
+  const close = () => overlay.remove()
+  overlay.addEventListener('click', e => { if (e.target === overlay) close() })
+  overlay.innerHTML = `<div class="srs-modal-box">
+    <h4 style="font-size:1.02rem;font-weight:700;margin-bottom:${label ? '4px' : '14px'}">${esc(title || '')}</h4>
+    ${label ? `<p style="font-size:0.82rem;color:var(--text2);margin-bottom:14px">${esc(label)}</p>` : ''}
+    <input type="text" id="el-input-modal-field" class="srs-modal-select" placeholder="${escA(placeholder)}" value="${escA(value)}" style="margin-bottom:18px">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" id="el-input-modal-cancel">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="el-input-modal-ok">${esc(confirmText)}</button>
+    </div>
+  </div>`
+  document.body.appendChild(overlay)
+  const field = document.getElementById('el-input-modal-field')
+  const submit = () => { const v = field.value.trim(); close(); if (v && onConfirm) onConfirm(v) }
+  document.getElementById('el-input-modal-ok').onclick = submit
+  document.getElementById('el-input-modal-cancel').onclick = close
+  field.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') close() })
+  setTimeout(() => { field.focus(); field.select() }, 30)
+}
+
+// ================================================================
+// TOOLTIPS GLOBAIS — estilizados, escapam overflow (delegação)
+// Lê data-tip; se ausente, converte um title= existente em tooltip premium.
+// ================================================================
+;(function setupTooltips() {
+  let tipEl = null, tipTarget = null
+  function ensure() {
+    if (!tipEl) { tipEl = document.createElement('div'); tipEl.className = 'el-tip'; document.body.appendChild(tipEl) }
+    return tipEl
+  }
+  function show(target, txt) {
+    const t = ensure()
+    t.textContent = txt; t.style.display = 'block'; t.style.opacity = '0'
+    const r = target.getBoundingClientRect(), tr = t.getBoundingClientRect()
+    let left = r.left + r.width / 2 - tr.width / 2
+    left = Math.max(6, Math.min(left, window.innerWidth - tr.width - 6))
+    let top = r.top - tr.height - 8, below = false
+    if (top < 6) { top = r.bottom + 8; below = true }
+    t.style.left = Math.round(left) + 'px'; t.style.top = Math.round(top) + 'px'
+    t.classList.toggle('below', below)
+    requestAnimationFrame(() => { if (tipEl) tipEl.style.opacity = '1' })
+  }
+  function hide() { if (tipEl) tipEl.style.display = 'none'; tipTarget = null }
+  document.addEventListener('mouseover', e => {
+    const target = e.target.closest && e.target.closest('[data-tip],[title]')
+    if (!target || target === tipTarget) return
+    let txt = target.getAttribute('data-tip')
+    if (!txt) {
+      txt = target.getAttribute('title')
+      if (txt) { target.setAttribute('data-tip', txt); target.removeAttribute('title') }
+    }
+    if (txt) { tipTarget = target; show(target, txt) }
+  })
+  document.addEventListener('mouseout', e => {
+    if (tipTarget && (!e.relatedTarget || !tipTarget.contains(e.relatedTarget))) hide()
+  })
+  document.addEventListener('click', hide, true)
+  window.addEventListener('scroll', hide, true)
+  window.addEventListener('resize', hide)
+})()
+
 // Drag & drop upload
 function setupDrop(areaId, handler) {
   const area = el(areaId); if (!area) return

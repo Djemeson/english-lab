@@ -332,7 +332,7 @@ function updateActionBar() {
     const reviewable = getFilteredReviewable(el('sidebar-search')?.value || '')
     const visible = reviewable.flatMap(g => g.words)
     const allSel = visible.length > 0 && visible.every(w => selectedWordIds.has(w.id))
-    selAllBtn.textContent = allSel ? '☑ Todas' : '☐ Todas'
+    selAllBtn.textContent = allSel ? 'Limpar seleção' : 'Selecionar todas'
   }
   // Update toolbar above word card
   renderWcToolbarLeft()
@@ -350,19 +350,19 @@ function renderWcToolbarLeft() {
   if (selCount > 0) {
     leftEl.innerHTML = `
       <span style="font-size:0.82rem;font-weight:600;color:var(--primary);white-space:nowrap">${selCount} selecionada${selCount!==1?'s':''}</span>
-      <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()">${ic('sparkles')}Analisar</button>
-      <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()">${ic('book')}Salvar para estudo</button>
-      <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()">${ic('trash')}Excluir</button>`
+      <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()" data-tip="Gera significados, exemplos e nível com IA para as selecionadas">${ic('sparkles')}Analisar</button>
+      <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()" data-tip="Cria os cards e envia para a fila de estudo (SRS)">${ic('book')}Salvar para estudo</button>
+      <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()" data-tip="Remove as palavras selecionadas da fila">${ic('trash')}Excluir</button>`
   } else if (w) {
     if (w.status === 'pending_review' && w.meanings?.length > 0) {
       const selM = w.meanings.filter(m => m.selected !== false)
       const totalCards = selM.reduce((sum, m) => sum + ((m.examples?.length) || 1), 0)
       leftEl.innerHTML = `
-        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')">${ic('book')}Salvar ${totalCards} card${totalCards!==1?'s':''} para estudo</button>
-        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')">${ic('refresh')}Re-analisar</button>`
+        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')" data-tip="Cria os cards e envia para a fila de estudo (SRS)">${ic('book')}Salvar ${totalCards} card${totalCards!==1?'s':''} para estudo</button>
+        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Roda a IA novamente para esta palavra">${ic('refresh')}Re-analisar</button>`
     } else if (w.status === 'pending_ai') {
       leftEl.innerHTML = `
-        <button class="btn btn-primary btn-sm" onclick="analyzeWord('${w.id}')">${ic('sparkles')}Analisar com IA</button>`
+        <button class="btn btn-primary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Analisa esta palavra com IA: significados, exemplos, nível e registro">${ic('sparkles')}Analisar com IA</button>`
     } else {
       leftEl.innerHTML = ''
     }
@@ -380,8 +380,9 @@ function renderSidebar(filter = '') {
   const readyCount   = all.filter(w => w.status === 'pending_review').length
   document.querySelectorAll('.rsb-filter').forEach(f => {
     const s = f.dataset.filter
-    if (s === 'pending_ai')     f.textContent = `⏳ Pendente${pendingCount ? ' '+pendingCount : ''}`
-    if (s === 'pending_review') f.textContent = `✓ Prontas${readyCount ? ' '+readyCount : ''}`
+    const n   = s === 'all' ? all.length : s === 'pending_ai' ? pendingCount : readyCount
+    const lbl = s === 'all' ? 'Todas'    : s === 'pending_ai' ? 'Pendentes'  : 'Prontas'
+    f.innerHTML = `${lbl}${n ? ` <span class="rsb-filter-count">${n}</span>` : ''}`
   })
 
   const groups = getFilteredReviewable(filter)
@@ -405,16 +406,17 @@ function renderSidebar(filter = '') {
       for (const w of group.words) {
         const isActive  = w.id === activeWordId
         const isChecked = selectedWordIds.has(w.id)
+        const nMean = (w.meanings || []).length
         const statusHtml = w.status === 'pending_ai'
-          ? `<span class="status-chip pending_ai">⏳ Pendente IA</span>`
-          : `<span class="status-chip pending_review">● ${(w.meanings||[]).length} significado${(w.meanings||[]).length !== 1 ? 's' : ''}</span>`
+          ? `<span class="status-chip pending_ai">Pendente IA</span>`
+          : `<span class="status-chip pending_review">${nMean} significado${nMean !== 1 ? 's' : ''}</span>`
         html += `<div class="rw-item ${isActive ? 'active' : ''} ${isChecked ? 'checked' : ''}" onclick="selectWord('${w.id}')">
-          <input type="checkbox" class="rw-cb" ${isChecked ? 'checked' : ''} onclick="toggleWordSelect(event,'${w.id}')" title="Selecionar">
+          <input type="checkbox" class="rw-cb" ${isChecked ? 'checked' : ''} onclick="toggleWordSelect(event,'${w.id}')" title="Selecionar esta palavra">
           <div class="rw-body">
             <div class="rw-word">${esc(w.word || '(frase)')}</div>
             <div class="rw-meta">
               ${statusHtml}
-              ${!showGroups ? `<span class="rw-count">${icon}</span>` : ''}
+              ${!showGroups ? `<span class="rw-count" title="Fonte">${icon}</span>` : ''}
             </div>
           </div>
         </div>`

@@ -479,7 +479,7 @@ function renderSrsAllCards() {
         <input type="text" id="srs-browser-search" placeholder="Buscar palavra ou significado..."
           oninput="filterBrowser(this.value)"
           style="padding:5px 10px;font-size:0.82rem;width:220px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);outline:none">
-        <button class="btn btn-ghost btn-sm" onclick="addRootDeck()">${ic('plus')}Deck</button>
+        <button class="btn btn-ghost btn-sm" onclick="addRootDeck()" data-tip="Criar um novo baralho na raiz">${ic('plus')}Deck</button>
       </div>
     </div>
     <div class="srs-browser-grid">
@@ -492,9 +492,9 @@ function renderSrsAllCards() {
           <span id="browser-sel-count" style="font-size:0.82rem;font-weight:600;color:var(--primary)"></span>
           <button class="btn btn-ghost btn-sm" onclick="browserSelectAll()">Selecionar tudo</button>
           <button class="btn btn-ghost btn-sm" onclick="browserDeselectAll()">Desmarcar tudo</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--error)" onclick="browserDeleteSelected()">${ic('trash')}Excluir</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--primary)" onclick="browserGenerateAudioSelected()">${ic('volume')}Gerar áudio</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--purple)" onclick="browserGenerateImagesSelected()">${ic('palette')}Gerar imagens</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--error)" onclick="browserDeleteSelected()" data-tip="Excluir os cards selecionados">${ic('trash')}Excluir</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--primary)" onclick="browserGenerateAudioSelected()" data-tip="Gerar áudio (TTS) para os cards selecionados">${ic('volume')}Gerar áudio</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--purple)" onclick="browserGenerateImagesSelected()" data-tip="Gerar imagens ilustrativas com IA para os significados">${ic('palette')}Gerar imagens</button>
         </div>
         <!-- Header de colunas clicável -->
         <div class="browser-col-hdr" id="browser-col-hdr" style="display:none">
@@ -871,11 +871,18 @@ async function showBrowserCardPreview(cardId) {
     </div>`
 }
 
-function addRootDeck()        { const n = prompt('Nome do novo deck:'); if (n) { addDeck(n, null); renderSrsAllCards() } }
-function addChildDeck(pid)    { const n = prompt('Nome do subdeck:');   if (n) { addDeck(n, pid);  renderSrsAllCards() } }
+function addRootDeck() {
+  inputModal({ title:'Novo baralho', label:'Dê um nome ao novo baralho', placeholder:'ex: Negócios, Viagem...', confirmText:'Criar',
+    onConfirm:n => { addDeck(n, null); renderSrsAllCards(); toast('Baralho criado', 'success') } })
+}
+function addChildDeck(pid) {
+  inputModal({ title:'Novo sub-baralho', label:'Nome do sub-baralho', placeholder:'ex: Verbos irregulares', confirmText:'Criar',
+    onConfirm:n => { addDeck(n, pid); renderSrsAllCards(); toast('Sub-baralho criado', 'success') } })
+}
 function editDeckName(deckId) {
   const d = getDeckById(deckId); if (!d) return
-  const n = prompt('Novo nome:', d.name); if (n && n.trim()) { renameDeck(deckId, n); renderSrsAllCards() }
+  inputModal({ title:'Renomear baralho', label:'Novo nome do baralho', value:d.name, confirmText:'Salvar',
+    onConfirm:n => { renameDeck(deckId, n); renderSrsAllCards(); toast('Baralho renomeado', 'success') } })
 }
 function deleteDeckUI(deckId) {
   const d = getDeckById(deckId); if (!d) return
