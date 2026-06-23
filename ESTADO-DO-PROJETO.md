@@ -205,7 +205,8 @@ maxInterval (36500), leechThreshold (50)
     (`#midia-drop`/`#midia-file` → `handleMidiaFile`). PDF lido com **pdf.js** carregado do CDN sob
     demanda (`loadExtScript`/`readPdfTextMidia`). `extractMidiaDoc` faz UMA chamada à IA que lê o
     documento inteiro (limite ~14k chars), infere o gênero e extrai objetos de estudo ricos
-    (termo, tipo, IPA, nível, registro, significado no contexto, exemplo en/pt). Preview rico
+    (termo, tipo, IPA, nível, registro, significado no contexto, **3 exemplos** en/pt → 3 cards).
+    Preview rico
     (`renderMidiaDocItem`); ao adicionar, `createDocWord` cria a palavra em `pending_review`
     preservando o significado/exemplo do doc como `context_match`. Reaproveita a lista/seleção
     existente de Mídia (`midiaProcessed` com flag `doc:true`).
@@ -227,8 +228,8 @@ maxInterval (36500), leechThreshold (50)
       em "pendente de revisão" já com significado/exemplo. Fazer backup (Exportar JSON) antes.
 - [ ] **Testar PDF** (pdf.js do CDN) — precisa de internet na primeira leitura; depois cacheia.
 - [ ] (Opcional) Enriquecimento em lote dos itens importados: hoje cada item vem com 1 sentido +
-      1 exemplo do doc; o botão "Re-analisar" (já sensível à fonte) expande para todos os sentidos
-      + 3 exemplos. Avaliar se vale um "Enriquecer todos" automático na Mídia.
+      3 exemplos (3 cards) do doc; o botão "Re-analisar" (já sensível à fonte) expande para TODOS
+      os sentidos. Avaliar se vale um "Enriquecer todos" automático na Mídia.
 
 ---
 

@@ -816,8 +816,13 @@ function addMidiaProcessed() {
 // Preview rico de um item extraído de documento (já vem com significado + exemplo)
 function renderMidiaDocItem(item, i) {
   const typeLbl = ({ word:'word', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' })[item.type] || item.type || ''
-  const exEn = item.example_en ? allowBold(item.example_en) : ''
-  const exPt = item.example_pt ? esc(item.example_pt.replace(/<\/?b>/gi,'')) : ''
+  const exs = Array.isArray(item.examples) ? item.examples : []
+  const examplesHtml = exs.filter(e => e && e.en).map((e, ei) => `
+        <div class="mi-example" style="margin-top:6px;display:flex;gap:8px;align-items:baseline">
+          <span style="font-size:0.7rem;color:var(--text3);flex-shrink:0;font-weight:600">#${ei+1}</span>
+          <div style="flex:1"><div class="en">"${allowBold(e.en)}"</div>${e.pt ? `<div class="pt">"${esc(e.pt.replace(/<\/?b>/gi,''))}"</div>` : ''}</div>
+        </div>`).join('')
+  const nCards = exs.filter(e => e && e.en).length || 1
   return `
     <div class="parsed-item" id="mi-proc-${i}">
       <input type="checkbox" class="midia-proc-check" data-i="${i}" checked>
@@ -828,10 +833,11 @@ function renderMidiaDocItem(item, i) {
           ${item.level ? `<span class="chip level-${String(item.level).toLowerCase()}">${esc(item.level)}</span>` : ''}
           ${item.register ? `<span class="chip register-${esc(item.register)}">${esc(item.register)}</span>` : ''}
           ${item.ipa ? `<span class="wc-ipa">${esc(item.ipa)}</span>` : ''}
+          <span class="chip" style="opacity:.8">${nCards} card${nCards !== 1 ? 's' : ''}</span>
         </div>
         ${item.meaning_pt ? `<div style="margin-top:4px;font-weight:600;color:var(--text)">${esc(item.meaning_pt)}</div>` : ''}
         ${item.definition_pt ? `<div style="font-style:italic;opacity:.8;font-size:0.85rem;margin-top:2px">${esc(item.definition_pt)}</div>` : ''}
-        ${exEn ? `<div class="mi-example" style="margin-top:6px"><div class="en">"${exEn}"</div>${exPt ? `<div class="pt">"${exPt}"</div>` : ''}</div>` : ''}
+        ${examplesHtml}
         <div class="parsed-meta">${srcIcon(item.source_type)} ${esc(item.source_title || item.source_type)}${item.source_context ? ` · ${esc(item.source_context)}` : ''}</div>
       </div>
     </div>`
@@ -840,9 +846,11 @@ function renderMidiaDocItem(item, i) {
 // Cria a palavra já em "pending_review", preservando os dados do documento como
 // sentido principal (context_match). Fica pronta para salvar no SRS sem perdas.
 function createDocWord(item) {
+  const exs = (Array.isArray(item.examples) ? item.examples : [])
+    .filter(e => e && e.en).map(e => ({ en: e.en, pt: e.pt || '' }))
   const w = createWord({
     word: item.word,
-    context: (item.example_en || '').replace(/<\/?b>/gi,'').trim(),
+    context: (exs[0]?.en || '').replace(/<\/?b>/gi,'').trim(),
     source_type: item.source_type,
     source_title: item.source_title,
     source_context: item.source_context
@@ -856,7 +864,7 @@ function createDocWord(item) {
     variety: item.variety || 'general',
     register: item.register || 'neutral',
     level: item.level || '',
-    examples: item.example_en ? [{ en: item.example_en, pt: item.example_pt || '' }] : [],
+    examples: exs,
     synonyms: [], antonyms: [], notes: [], word_family: [], tags: [],
     context_match: true
   }]
@@ -961,10 +969,14 @@ For EACH item return an object:
 - "variety": "general"|"american"|"british"|"australian"|"canadian"
 - "meaning_pt": Portuguese meaning IN THE SOURCE'S CONTEXT first (2-6 words, ONE sense, no semicolons mixing senses)
 - "definition_pt": one short Portuguese sentence defining that sense
-- "example_en": ONE natural English sentence using the term, with the term wrapped in <b></b>. Prefer an example already present in the document; otherwise write one that fits the source's context
-- "example_pt": natural Brazilian-Portuguese translation of the example (plain text, no <b>)
+- "examples": an array of EXACTLY 3 example objects {"en":"...","pt":"..."} for this sense. Rules:
+   * each "en" is a natural English sentence using the term, wrapped in <b></b> exactly as it appears inflected in that sentence
+   * the 3 examples MUST differ: a different verb tense/construction, a different subject, and a genuinely different real situation — never the same pattern with swapped pronouns
+   * keep them faithful to this sense in the source's genre/context when natural (e.g. for a Survivor term, situations from the game/strategy fit well), but they should also teach general real-world usage
+   * if the document already provides an example for the item, USE it (lightly refined) as one of the 3 and write 2 more
+   * "pt" is a natural Brazilian-Portuguese translation (plain text, NEVER use <b>)
 
-If the document already gives a meaning and/or example for an item, USE and lightly refine it — never discard the curated data.
+If the document already gives a meaning for an item, USE and lightly refine it — never discard the curated data.
 
 Return ONLY valid JSON: {"items":[ ... ]}`
 
@@ -974,7 +986,7 @@ Return ONLY valid JSON: {"items":[ ... ]}`
       headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: cfg.aiModel || 'gpt-4o',
-        max_tokens: 8000,
+        max_tokens: 12000,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM },
@@ -997,8 +1009,8 @@ Return ONLY valid JSON: {"items":[ ... ]}`
       variety: it.variety || 'general',
       meaning_pt: it.meaning_pt || '',
       definition_pt: it.definition_pt || '',
-      example_en: it.example_en || '',
-      example_pt: it.example_pt || '',
+      examples: (Array.isArray(it.examples) ? it.examples : (it.example_en ? [{ en: it.example_en, pt: it.example_pt || '' }] : []))
+        .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '') })),
       source_type: srcType,
       source_title: srcTitle,
       source_context: srcContext
