@@ -823,6 +823,9 @@ function renderMidiaDocItem(item, i) {
           <div style="flex:1"><div class="en">"${allowBold(e.en)}"</div>${e.pt ? `<div class="pt">"${esc(e.pt.replace(/<\/?b>/gi,''))}"</div>` : ''}</div>
         </div>`).join('')
   const nCards = exs.filter(e => e && e.en).length || 1
+  const cardChip = (item.doc && item._enriched === false)
+    ? `<span class="chip" style="opacity:.7"><span class="spinner" style="width:10px;height:10px;border-width:2px;vertical-align:-1px;margin-right:4px"></span>detalhando…</span>`
+    : `<span class="chip" style="opacity:.8">${nCards} card${nCards !== 1 ? 's' : ''}</span>`
   return `
     <div class="parsed-item" id="mi-proc-${i}">
       <input type="checkbox" class="midia-proc-check" data-i="${i}" checked>
@@ -833,7 +836,7 @@ function renderMidiaDocItem(item, i) {
           ${item.level ? `<span class="chip level-${String(item.level).toLowerCase()}">${esc(item.level)}</span>` : ''}
           ${item.register ? `<span class="chip register-${esc(item.register)}">${esc(item.register)}</span>` : ''}
           ${item.ipa ? `<span class="wc-ipa">${esc(item.ipa)}</span>` : ''}
-          <span class="chip" style="opacity:.8">${nCards} card${nCards !== 1 ? 's' : ''}</span>
+          ${cardChip}
         </div>
         ${item.meaning_pt ? `<div style="margin-top:4px;font-weight:600;color:var(--text)">${esc(item.meaning_pt)}</div>` : ''}
         ${item.definition_pt ? `<div style="font-style:italic;opacity:.8;font-size:0.85rem;margin-top:2px">${esc(item.definition_pt)}</div>` : ''}
@@ -934,8 +937,27 @@ async function handleMidiaFile(input) {
   await extractMidiaDoc(text, file.name)
 }
 
-// Chamada de IA que lê o documento inteiro e devolve os objetos de estudo,
-// já no contexto/gênero da fonte (resolve o caso "snuff" do Survivor).
+// Helper: chamada à OpenAI que retorna JSON já parseado
+async function _openaiJSON(messages, maxTokens) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: cfg.aiModel || 'gpt-4o',
+      max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
+      messages
+    })
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data = await res.json()
+  return JSON.parse((data.choices?.[0]?.message?.content || '{}').trim())
+}
+
+// Extração de documento em DUAS FASES (resolve o teto de tokens que cortava itens):
+//  1) Listagem leve — pega TODOS os termos (output pequeno, exaustivo).
+//  2) Enriquecimento em LOTES — IPA, nível, registro, definição e 3 exemplos por termo.
+// Se um lote falhar, o item permanece com o significado/exemplo do doc (nada se perde).
 async function extractMidiaDoc(text, fileName) {
   if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
   const srcType = document.querySelector('.midia-type-chip.active')?.dataset.val || 'series'
@@ -944,84 +966,141 @@ async function extractMidiaDoc(text, fileName) {
   const SRC_LABELS = { series:'TV series', movie:'movie', youtube:'YouTube video', podcast:'podcast' }
   const srcLabel = SRC_LABELS[srcType] || srcType
 
-  const MAX = 14000
+  const MAX = 30000
   let docText = text, truncated = false
   if (docText.length > MAX) { docText = docText.slice(0, MAX); truncated = true }
 
+  const GENRE = `The document comes from a ${srcLabel} titled "${srcTitle || '(untitled)'}"${srcContext ? ` — extra context: ${srcContext}` : ''}. First infer the source's GENRE/DOMAIN (e.g. "Survivor" -> reality survival competition; a police series -> law-enforcement jargon; a fantasy saga -> medieval register). Inside a genre, common words carry special meanings — always capture the meaning AS USED IN THIS SOURCE. Canonical example: "snuff" in Survivor = "apagar (a tocha)", NOT "rape" (tobacco).`
+
   const results = el('midia-proc-results')
   const list = el('midia-proc-list')
+  const countEl = el('midia-proc-count')
   if (results) results.classList.remove('hidden')
-  if (el('midia-proc-count')) el('midia-proc-count').textContent = 'Lendo documento...'
-  if (list) list.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)"><span class="spinner" style="width:28px;height:28px;border-width:3px"></span><div style="margin-top:12px">A IA está lendo o documento e extraindo os cards no contexto da fonte...</div></div>`
+  if (countEl) countEl.textContent = 'Lendo documento...'
+  if (list) list.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)"><span class="spinner" style="width:28px;height:28px;border-width:3px"></span><div style="margin-top:12px">Fase 1/2 — lendo o documento e listando todos os termos de estudo...</div></div>`
 
-  const SYSTEM = `You extract English vocabulary STUDY CARDS from a document, for a Brazilian learner. The document was provided together with its source: a ${srcLabel} titled "${srcTitle || '(untitled)'}"${srcContext ? ` — extra context: ${srcContext}` : ''}.
+  // ── FASE 1 — listar TODOS os termos (leve, exaustiva) ──────────────────────
+  const LIST_SYSTEM = `You list EVERY English vocabulary study item present in a document, for a Brazilian learner. ${GENRE}
 
-STEP 1 — infer the GENRE / DOMAIN of the source from its title and type (e.g. "Survivor" -> reality survival competition; a police series -> law-enforcement jargon; a fantasy saga -> medieval/fantasy register). Inside a genre, common words often carry a special domain meaning — capture THAT meaning, not the generic dictionary one. Canonical example: "snuff" in Survivor = "apagar (a tocha)", NOT "rape" (tobacco).
+List ONLY study-worthy items: meaningful single words, phrasal verbs, idioms, collocations, slang and set phrases. IGNORE titles, section headings, instructions, difficulty legends/emojis, "how to use" text and Portuguese-only filler. Deduplicate.
+BE EXHAUSTIVE: include ALL items, even if there are many dozens. Never stop early or summarize. Do NOT invent items absent from the document.
 
-STEP 2 — read the document and extract ONLY items genuinely useful as English study cards for a B1+ learner: meaningful single words, phrasal verbs, idioms, collocations, slang and set phrases. IGNORE titles, section headings, instructions, difficulty legends/emojis, "how to use" text, and Portuguese-only filler. Deduplicate. Do not invent items absent from the document.
+For each item return: {"word":"<term, lowercase unless proper noun/ritual phrase>","type":"word|phrasal_verb|idiom|collocation","meaning_pt":"<2-6 words, source-context sense>","doc_example_en":"<the example sentence from the document if present, else empty string>"}
+Return ONLY valid JSON: {"items":[ ... ]}`
 
-For EACH item return an object:
-- "word": the English term exactly as studied (lowercase, unless a proper noun or fixed ritual phrase)
-- "type": "word" | "phrasal_verb" | "idiom" | "collocation"
+  let listed = []
+  try {
+    const r1 = await _openaiJSON([
+      { role: 'system', content: LIST_SYSTEM },
+      { role: 'user', content: `DOCUMENT${truncated ? ' (truncated)' : ''}:\n\n${docText}` }
+    ], 4000)
+    listed = Array.isArray(r1.items) ? r1.items : []
+  } catch(e) {
+    toast(`Erro ao ler o documento: ${e.message}`, 'error')
+    if (results) results.classList.add('hidden')
+    return
+  }
+
+  // Monta os itens-base, deduplicando por termo (preserva o exemplo do doc como semente)
+  const seen = new Set()
+  let baseItems = []
+  for (const it of listed) {
+    const word = String(it.word || '').trim()
+    if (!word) continue
+    const key = word.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    const docEx = String(it.doc_example_en || '').trim()
+    baseItems.push({
+      doc: true,
+      word,
+      type: it.type || 'word',
+      ipa: '',
+      level: '',
+      register: 'neutral',
+      variety: 'general',
+      meaning_pt: String(it.meaning_pt || '').trim(),
+      definition_pt: '',
+      examples: docEx ? [{ en: docEx, pt: '' }] : [],
+      _docExample: docEx,
+      _enriched: false,
+      source_type: srcType,
+      source_title: srcTitle,
+      source_context: srcContext
+    })
+  }
+
+  if (!baseItems.length) {
+    toast('Nenhum item de estudo encontrado no documento', 'warning')
+    if (results) results.classList.add('hidden')
+    return
+  }
+
+  // Mostra já os itens listados (com selo "analisando…") enquanto enriquece
+  midiaProcessed = baseItems
+  renderMidiaProcessed()
+
+  // ── FASE 2 — enriquecer em lotes (IPA, nível, registro, definição, 3 exemplos) ──
+  const ENRICH_SYSTEM = `You complete English vocabulary STUDY CARDS for specific terms, for a Brazilian learner. ${GENRE}
+
+You receive the document text and a list of TARGET terms (each with a draft meaning and maybe a document example). For EACH target term return a full card object:
+- "word": the same term (verbatim, so it can be matched back)
+- "type": "word"|"phrasal_verb"|"idiom"|"collocation"
 - "ipa": American IPA between /slashes/ (best effort)
 - "level": "A2"|"B1"|"B2"|"C1"|"C2"
 - "register": "neutral"|"formal"|"informal"|"colloquial"|"slang"|"technical"|"literary"|"archaic"|"vulgar"
 - "variety": "general"|"american"|"british"|"australian"|"canadian"
-- "meaning_pt": Portuguese meaning IN THE SOURCE'S CONTEXT first (2-6 words, ONE sense, no semicolons mixing senses)
+- "meaning_pt": refine the draft to 2-6 words, ONE sense in the source's context (no semicolons mixing senses)
 - "definition_pt": one short Portuguese sentence defining that sense
-- "examples": an array of EXACTLY 3 example objects {"en":"...","pt":"..."} for this sense. Rules:
-   * each "en" is a natural English sentence using the term, wrapped in <b></b> exactly as it appears inflected in that sentence
-   * the 3 examples MUST differ: a different verb tense/construction, a different subject, and a genuinely different real situation — never the same pattern with swapped pronouns
-   * keep them faithful to this sense in the source's genre/context when natural (e.g. for a Survivor term, situations from the game/strategy fit well), but they should also teach general real-world usage
-   * if the document already provides an example for the item, USE it (lightly refined) as one of the 3 and write 2 more
-   * "pt" is a natural Brazilian-Portuguese translation (plain text, NEVER use <b>)
+- "examples": EXACTLY 3 objects {"en":"...","pt":"..."}. Each "en" is a natural sentence using the term wrapped in <b></b> exactly as inflected; the 3 must differ in tense/construction, subject and real situation; keep them faithful to this sense (situations from the source's genre fit well) while also teaching general usage; if a document example is given, use it (lightly refined) as one of the 3; "pt" is a natural Brazilian-Portuguese translation with NO <b>.
 
-If the document already gives a meaning for an item, USE and lightly refine it — never discard the curated data.
+Return JSON for ALL target terms: {"items":[ ... ]}`
 
-Return ONLY valid JSON: {"items":[ ... ]}`
+  const BATCH = 6
+  const byWord = new Map(baseItems.map(it => [it.word.toLowerCase(), it]))
+  const totalBatches = Math.ceil(baseItems.length / BATCH)
+  let enrichedCount = 0, failed = 0
 
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: cfg.aiModel || 'gpt-4o',
-        max_tokens: 12000,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM },
-          { role: 'user', content: `DOCUMENT${truncated ? ' (truncated to the beginning)' : ''}:\n\n${docText}` }
-        ]
-      })
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    const result = JSON.parse((data.choices?.[0]?.message?.content || '{}').trim())
-    const items = Array.isArray(result.items) ? result.items : []
-    if (!items.length) { toast('Nenhum item de estudo encontrado no documento', 'warning'); if (results) results.classList.add('hidden'); return }
-    midiaProcessed = items.map(it => ({
-      doc: true,
-      word: String(it.word || '').trim(),
-      type: it.type || 'word',
-      ipa: it.ipa || '',
-      level: it.level || '',
-      register: it.register || 'neutral',
-      variety: it.variety || 'general',
-      meaning_pt: it.meaning_pt || '',
-      definition_pt: it.definition_pt || '',
-      examples: (Array.isArray(it.examples) ? it.examples : (it.example_en ? [{ en: it.example_en, pt: it.example_pt || '' }] : []))
-        .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '') })),
-      source_type: srcType,
-      source_title: srcTitle,
-      source_context: srcContext
-    })).filter(x => x.word)
+  for (let b = 0; b < totalBatches; b++) {
+    const batch = baseItems.slice(b * BATCH, b * BATCH + BATCH)
+    if (countEl) countEl.textContent = `Fase 2/2 — detalhando ${enrichedCount}/${baseItems.length}...`
+    const targets = batch.map((t, i) =>
+      `${i + 1}. ${t.word}${t.meaning_pt ? ` — draft meaning: ${t.meaning_pt}` : ''}${t._docExample ? ` — document example: "${t._docExample}"` : ''}`
+    ).join('\n')
+    try {
+      const r2 = await _openaiJSON([
+        { role: 'system', content: ENRICH_SYSTEM },
+        { role: 'user', content: `DOCUMENT (for context only):\n\n${docText}\n\nTARGET TERMS (return a card for each):\n${targets}` }
+      ], 4000)
+      const out = Array.isArray(r2.items) ? r2.items : []
+      for (const c of out) {
+        const it = byWord.get(String(c.word || '').trim().toLowerCase())
+        if (!it) continue
+        const exs = (Array.isArray(c.examples) ? c.examples : [])
+          .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '') }))
+        it.type = c.type || it.type
+        it.ipa = c.ipa || it.ipa
+        it.level = c.level || it.level
+        it.register = c.register || it.register
+        it.variety = c.variety || it.variety
+        it.meaning_pt = String(c.meaning_pt || it.meaning_pt || '').trim()
+        it.definition_pt = String(c.definition_pt || '').trim()
+        if (exs.length) it.examples = exs
+        it._enriched = true
+        enrichedCount++
+      }
+    } catch(e) {
+      failed += batch.length
+      console.warn(`[Mídia doc] lote ${b + 1}/${totalBatches} falhou:`, e.message)
+    }
     renderMidiaProcessed()
-    if (results) results.classList.remove('hidden')
-    toast(`${midiaProcessed.length} cards extraídos${truncated ? ' (documento longo — só o início foi lido)' : ''}`, 'success')
-  } catch(e) {
-    toast(`Erro ao extrair do documento: ${e.message}`, 'error')
-    if (results) results.classList.add('hidden')
   }
+
+  if (countEl) countEl.textContent = `${baseItems.length} item${baseItems.length !== 1 ? 's' : ''}`
+  const msg = `${baseItems.length} termos extraídos`
+    + (failed ? ` · ${failed} ficaram com os dados do documento (detalhamento falhou)` : '')
+    + (truncated ? ' · documento longo, só o início foi lido' : '')
+  toast(msg, failed ? 'warning' : 'success')
 }
 
 // ── Mouse selection — Kindle + Mídia ──────────────────────────────────────────

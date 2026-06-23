@@ -203,10 +203,12 @@ maxInterval (36500), leechThreshold (50)
     `source_context` em `createWord` (dashboard.js), propagado em todo o fluxo de Mídia.
 19. **Importação de documento na Mídia** (.md/.txt/.pdf), por clique ou arrastar
     (`#midia-drop`/`#midia-file` → `handleMidiaFile`). PDF lido com **pdf.js** carregado do CDN sob
-    demanda (`loadExtScript`/`readPdfTextMidia`). `extractMidiaDoc` faz UMA chamada à IA que lê o
-    documento inteiro (limite ~14k chars), infere o gênero e extrai objetos de estudo ricos
-    (termo, tipo, IPA, nível, registro, significado no contexto, **3 exemplos** en/pt → 3 cards).
-    Preview rico
+    demanda (`loadExtScript`/`readPdfTextMidia`). `extractMidiaDoc` roda em **DUAS FASES** (helper
+    `_openaiJSON`): (1) listagem leve e exaustiva de TODOS os termos (output pequeno → não corta
+    itens); (2) enriquecimento em **lotes de 6** (IPA, nível, registro, definição, **3 exemplos**
+    en/pt → 3 cards), com progresso visível. Lote que falha mantém o significado/exemplo do doc
+    (nada se perde). Antes era 1 chamada só, que estourava o teto de tokens e cortava itens
+    (ex.: doc com 31 → só 20). Preview rico
     (`renderMidiaDocItem`); ao adicionar, `createDocWord` cria a palavra em `pending_review`
     preservando o significado/exemplo do doc como `context_match`. Reaproveita a lista/seleção
     existente de Mídia (`midiaProcessed` com flag `doc:true`).
