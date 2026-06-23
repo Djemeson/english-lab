@@ -731,6 +731,8 @@ function buildSrsVerso(card, imgData, imageBelow) {
   // 4. Significado + definição
   text += `<div class="srs-back-meaning">${esc(strip(card.meaning_pt))}</div>`
   if (card.definition_pt) text += `<div class="srs-back-def">${esc(strip(card.definition_pt))}</div>`
+  // 4b. Origem / história da expressão (só quando existe)
+  if (card.origin_pt) text += `<div class="srs-back-origin" style="margin-top:10px;padding:9px 12px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:0.85rem;line-height:1.45;color:var(--text2)"><span style="display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--text);font-size:0.78rem;margin-bottom:3px">${ic('sparkles','ic-sm')} Origem</span><div>${esc(strip(card.origin_pt))}</div></div>`
   // Footer + configurações (sempre na coluna de texto)
   const SRC = {series:'série', movie:'filme', youtube:'YouTube', kindle:'Kindle', podcast:'podcast', website:'site', manual:'manual'}
   const deckLabel = card.deckId ? getSrsDeckPath(card.deckId) : ''

@@ -840,6 +840,7 @@ function renderMidiaDocItem(item, i) {
         </div>
         ${item.meaning_pt ? `<div style="margin-top:4px;font-weight:600;color:var(--text)">${esc(item.meaning_pt)}</div>` : ''}
         ${item.definition_pt ? `<div style="font-style:italic;opacity:.8;font-size:0.85rem;margin-top:2px">${esc(item.definition_pt)}</div>` : ''}
+        ${item.origin_pt ? `<div style="margin-top:6px;padding:6px 9px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:0.8rem"><b>Origem:</b> ${esc(item.origin_pt)}</div>` : ''}
         ${examplesHtml}
         <div class="parsed-meta">${srcIcon(item.source_type)} ${esc(item.source_title || item.source_type)}${item.source_context ? ` · ${esc(item.source_context)}` : ''}</div>
       </div>
@@ -864,6 +865,7 @@ function createDocWord(item) {
     id: uid(), selected: true, idx: 0,
     meaning_pt: item.meaning_pt || '',
     definition_pt: item.definition_pt || '',
+    origin_pt: item.origin_pt || '',
     variety: item.variety || 'general',
     register: item.register || 'neutral',
     level: item.level || '',
@@ -1021,6 +1023,7 @@ Return ONLY valid JSON: {"items":[ ... ]}`
       variety: 'general',
       meaning_pt: String(it.meaning_pt || '').trim(),
       definition_pt: '',
+      origin_pt: '',
       examples: docEx ? [{ en: docEx, pt: '' }] : [],
       _docExample: docEx,
       _enriched: false,
@@ -1052,6 +1055,7 @@ You receive the document text and a list of TARGET terms (each with a draft mean
 - "variety": "general"|"american"|"british"|"australian"|"canadian"
 - "meaning_pt": refine the draft to 2-6 words, ONE sense in the source's context (no semicolons mixing senses)
 - "definition_pt": one short Portuguese sentence defining that sense
+- "origin_pt": Brazilian-Portuguese note (1-2 sentences) explaining the ORIGIN / why this expression came to mean this — the image or history behind it. Fill ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. "sitting duck", "on the chopping block", "flagship", "throw under the bus"). Leave it as an EMPTY STRING "" for ordinary words with no notable story. NEVER invent folk etymology — if unsure, leave empty.
 - "examples": EXACTLY 3 objects {"en":"...","pt":"..."}. Each "en" is a natural sentence using the term wrapped in <b></b> exactly as inflected; the 3 must differ in tense/construction, subject and real situation; keep them faithful to this sense (situations from the source's genre fit well) while also teaching general usage; if a document example is given, use it (lightly refined) as one of the 3; "pt" is a natural Brazilian-Portuguese translation with NO <b>.
 
 Return JSON for ALL target terms: {"items":[ ... ]}`
@@ -1085,6 +1089,7 @@ Return JSON for ALL target terms: {"items":[ ... ]}`
         it.variety = c.variety || it.variety
         it.meaning_pt = String(c.meaning_pt || it.meaning_pt || '').trim()
         it.definition_pt = String(c.definition_pt || '').trim()
+        it.origin_pt = String(c.origin_pt || '').trim()
         if (exs.length) it.examples = exs
         it._enriched = true
         enrichedCount++
@@ -1227,7 +1232,7 @@ Quando o usuário perguntar sobre uma palavra ou expressão em inglês:
 4. Adicione contexto útil (origem, registros formal/informal, diferenças de uso)
 5. No FINAL da resposta, sempre inclua um bloco JSON assim (mesmo que o usuário pergunte sobre múltiplas coisas, escolha a mais relevante):
 <srs_item>
-{"word":"...","type":"word|phrasal_verb|idiom|collocation","variety":"general|american|british|australian|canadian","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"...","ipa":"...","definition_pt":"...","examples":[{"en":"Frase com <b>palavra</b> no presente.","pt":"Tradução natural."},{"en":"Frase com <b>palavra</b> em outro tempo verbal.","pt":"Tradução natural."},{"en":"Frase com <b>palavra</b> em outro tempo/contexto.","pt":"Tradução natural."}]}
+{"word":"...","type":"word|phrasal_verb|idiom|collocation","variety":"general|american|british|australian|canadian","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"...","ipa":"...","definition_pt":"...","origin_pt":"Origem/história da expressão em PT (1-2 frases). Preencha SÓ se houver uma etimologia ou imagem realmente interessante (idiomas, expressões, metáforas). Deixe \"\" para palavras comuns sem história. Nunca invente.","examples":[{"en":"Frase com <b>palavra</b> no presente.","pt":"Tradução natural."},{"en":"Frase com <b>palavra</b> em outro tempo verbal.","pt":"Tradução natural."},{"en":"Frase com <b>palavra</b> em outro tempo/contexto.","pt":"Tradução natural."}]}
 </srs_item>
 Regras do bloco JSON: inclua EXATAMENTE 3 exemplos no array "examples", cada um em um tempo verbal/construção diferente e em situações reais distintas, com a palavra-alvo envolvida em <b></b> apenas no inglês (nunca no português). Preencha variety e register com precisão (use "general" e "neutral" quando não for específico).
 IMPORTANTE sobre a resposta VISÍVEL (o texto que o usuário lê):
@@ -1338,6 +1343,7 @@ function addConsultaItemToSrs(idx) {
     w.meanings = [{
       meaning_pt: item.meaning_pt || '',
       definition_pt: item.definition_pt || '',
+      origin_pt: item.origin_pt || '',
       examples: exs,
       variety: item.variety || 'general',
       register: (item.register && item.register !== 'standard') ? item.register : 'neutral',

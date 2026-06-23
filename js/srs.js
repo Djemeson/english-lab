@@ -196,6 +196,7 @@ function createSrsCard(wordId, meaningIdx, exampleIdx) {
     register: m.register || 'neutral',
     meaning_pt: m.meaning_pt || '',
     definition_pt: m.definition_pt || '',
+    origin_pt: m.origin_pt || '',
     example_en: ex ? ex.en : (m.example_en || ''),
     example_pt: ex ? ex.pt : (m.example_pt || '')
   }

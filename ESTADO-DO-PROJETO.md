@@ -63,7 +63,9 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
   `pending_review` → `in_srs` (ou `skipped`).
   - `source_context`: nota opcional de gênero/contexto da fonte (ex.: "reality de sobrevivência").
     Usada pela IA para desambiguar (resolve o caso "snuff" → "apagar a tocha" no Survivor).
-  - `meanings[]`: `{meaning_pt, definition_pt, variety, register, level, examples[], ...}`
+  - `meanings[]`: `{meaning_pt, definition_pt, origin_pt, variety, register, level, examples[], ...}`
+    - `origin_pt`: origem/história da expressão (só quando há etimologia/imagem interessante;
+      vazio para palavras comuns). Vai para o snapshot do card e aparece no estudo e na revisão.
   - `examples[]`: `{en, pt}` (en com a palavra-alvo em `<b>`).
 - **`srsCards[]`** — um card por (wordId, meaningIdx, exampleIdx). Guarda *snapshot*
   do conteúdo + estado SM-2: `{id, wordId, meaningIdx, exampleIdx, deckId, state, due,
@@ -212,6 +214,13 @@ maxInterval (36500), leechThreshold (50)
     (`renderMidiaDocItem`); ao adicionar, `createDocWord` cria a palavra em `pending_review`
     preservando o significado/exemplo do doc como `context_match`. Reaproveita a lista/seleção
     existente de Mídia (`midiaProcessed` com flag `doc:true`).
+20. **Origem/história das expressões** (`origin_pt`): novo campo no significado, preenchido pela
+    IA SÓ quando há etimologia/imagem interessante (idiomas, expressões, metáforas — ex.: "sitting
+    duck", "on the chopping block", "flagship"); vazio para palavras comuns; sem inventar. Gerado
+    em `analyzeWordDirect` (review.js), na importação de doc (`extractMidiaDoc` fase 2), em
+    `regenerateMeaning`/`reanalyzeAll` (audio.js — backfill dos cards já no SRS) e na Consulta.
+    Vai ao snapshot em `createSrsCard` (srs.js) e aparece no card de estudo (`buildSrsVerso`,
+    bloco "Origem") e na revisão (`renderMeaningItem`).
 
 ---
 

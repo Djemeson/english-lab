@@ -657,6 +657,7 @@ Return ONLY this JSON:
 {
   "variety": "general|american|british|australian|canadian",
   "register": "neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar",
+  "origin_pt": "Brazilian-Portuguese note (1-2 sentences) explaining the ORIGIN / why this expression came to mean this. Fill ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. 'sitting duck', 'on the chopping block', 'flagship', 'throw under the bus'). Leave it as an EMPTY STRING for ordinary words with no notable story. NEVER invent folk etymology — if unsure, leave empty.",
   "examples": [
     {"en": "Natural sentence using <b>${it.word}</b> (inflected as needed) in THIS sense.", "pt": "tradução natural em PT-BR"}
   ]
@@ -713,10 +714,12 @@ async function reanalyzeAll() {
       const r = await regenerateMeaning(it)
       const variety = _normVariety(r && r.variety)
       const register = _normRegister(r && r.register)
+      const origin = String((r && r.origin_pt) || '').trim()
       const exs = (r && Array.isArray(r.examples)) ? r.examples.filter(e => e && e.en) : []
       const audioTexts = new Set()
       it.cards.forEach((c, i) => {
         c.variety = variety; c.register = register
+        c.origin_pt = origin
         if (exs.length) {
           const ex = exs[i % exs.length]
           if (ex.en) c.example_en = ex.en

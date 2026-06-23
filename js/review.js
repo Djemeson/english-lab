@@ -21,6 +21,7 @@ function applyAiResult(w, result) {
     id: uid(), selected: true, idx: i,
     meaning_pt:    m.meaning_pt    || '',
     definition_pt: m.definition_pt || '',
+    origin_pt:     m.origin_pt     || '',
     variety:       m.variety       || 'general',
     register:      m.register      || 'neutral',
     level:         m.level         || '',
@@ -130,6 +131,7 @@ Return ONLY this JSON (no markdown, no explanation):
     {
       "meaning_pt": "Portuguese translation preserving word class (noun→noun, verb→infinitive, adj→adjective). List 2–3 natural synonyms/variants separated by commas when they exist (e.g. 'séquito, comitiva, cortejo' for 'retinue'; 'enganar, iludir, ludibriar' for 'deceive'). Max 8 words total. ONE sense only — no semicolons.",
       "definition_pt": "Full definition in Portuguese for THIS specific sense (1-2 sentences)",
+      "origin_pt": "Brazilian-Portuguese note (1-2 sentences) explaining the ORIGIN / why this expression came to mean this — the image or history behind it. Fill ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. 'sitting duck' = a duck floating still is an easy target for a hunter; 'on the chopping block' = the block where animals/heads were cut; 'flagship' = the ship that carried the fleet commander's flag; 'throw under the bus' = sacrifice someone for your own safety). Leave it as an EMPTY STRING \"\" for ordinary words with no notable story. NEVER invent folk etymology — if you are not reasonably sure, leave it empty.",
       "variety": "general|american|british|australian|canadian",
       "register": "neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar",
       "level": "A2|B1|B2|C1|C2",
@@ -615,6 +617,7 @@ function renderMeaningItem(wordId, m, mi) {
         </div>
       </div>
       ${m.definition_pt ? `<div class="mi-note" style="font-style:italic;opacity:0.8;margin-top:4px">${esc(m.definition_pt)}</div>` : ''}
+      ${m.origin_pt ? `<div class="mi-note" style="margin-top:6px;padding:7px 10px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:0.8rem"><b>Origem:</b> ${esc(m.origin_pt)}</div>` : ''}
       ${m.context_note ? `<div class="mi-note">${esc(m.context_note)}</div>` : ''}
       ${m.synonyms && m.synonyms.length ? `<div class="mi-note" style="font-size:0.78rem;color:var(--text3)">↔ ${m.synonyms.slice(0,4).map(esc).join(', ')}</div>` : ''}
       ${(m.examples && m.examples.length ? m.examples : (m.example_en ? [{en:m.example_en, pt:m.example_pt||''}] : [])).map((ex, ei) => ex.en ? `
