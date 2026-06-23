@@ -752,6 +752,89 @@ async function reanalyzeAll() {
   toast(`${updated} card(s) corrigidos${audioGen ? ` · ${audioGen} áudio(s) gerado(s)` : ''}${failed ? ` · ${failed} falharam (rode de novo)` : ''}`, updated ? 'success' : 'warning')
 }
 
+// Botão TEMPORÁRIO da Biblioteca: passada leve que SÓ adiciona a origem/história
+// das expressões que têm uma. NÃO altera significado, definição, frases, variedade,
+// registro nem o agendamento SRS. Pula significados que já têm origem preenchida.
+async function fillOriginsAll() {
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
+  if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }
+
+  // Agrupa por significado (wordId|meaningIdx); só os que ainda NÃO têm origem
+  const groups = new Map()
+  for (const c of srsCards) {
+    const key = `${c.wordId}|${c.meaningIdx}`
+    if (!groups.has(key)) groups.set(key, {
+      wordId: c.wordId, meaningIdx: c.meaningIdx,
+      word: c.word || '', type: c.type || 'word',
+      meaning_pt: c.meaning_pt || '', definition_pt: c.definition_pt || '',
+      hasOrigin: false, cards: []
+    })
+    const g = groups.get(key)
+    g.cards.push(c)
+    if (c.origin_pt && c.origin_pt.trim()) g.hasOrigin = true
+  }
+  const items = [...groups.values()].filter(g => g.word && !g.hasOrigin)
+  if (!items.length) { toast('Todos os significados já têm origem (ou nada a preencher)', 'info'); return }
+
+  if (!confirm(`Preencher a ORIGEM de ${items.length} significado(s)?\n\n• Só adiciona a história das expressões que têm uma\n• NÃO mexe em significado, definição, frases nem no progresso de estudo\n\nUsa a API da OpenAI (chamadas leves).`)) return
+
+  const btn = document.getElementById('lib-fill-origin-btn')
+  const origHtml = btn ? btn.innerHTML : ''
+  if (btn) btn.disabled = true
+  const total = items.length
+  let withStory = 0, noStory = 0, failed = 0, wordsTouched = false
+
+  const tasks = items.map(it => async () => {
+    const PROMPT = `You write the ORIGIN / history of an English word or expression, for a Brazilian learner, in Brazilian Portuguese. Return ONLY valid JSON.
+Word/expression: "${it.word}"${it.type ? ` (type: ${it.type})` : ''}
+Meaning (PT): "${it.meaning_pt || '(most common sense)'}"
+
+Return {"origin_pt":"..."}.
+Rules:
+- origin_pt = 1-2 sentences in PT-BR explaining WHY this expression came to mean this — the image, metaphor, history or etymology behind it.
+- Fill it ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. "sitting duck", "on the chopping block", "flagship", "throw under the bus").
+- For ordinary words with no notable story, return "origin_pt":"".
+- NEVER invent folk etymology. If you are not reasonably sure of the REAL origin, return "".`
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', max_tokens: 220,
+          response_format: { type: 'json_object' },
+          messages: [{ role: 'user', content: PROMPT }]
+        })
+      })
+      if (!res.ok) throw new Error('OpenAI ' + res.status)
+      const data = await res.json()
+      const r = JSON.parse(data.choices?.[0]?.message?.content || '{}')
+      const origin = String(r.origin_pt || '').trim()
+      // Aplica nos cards (snapshot) — nada mais é tocado
+      it.cards.forEach(c => { c.origin_pt = origin })
+      // Atualiza também o significado na palavra de origem (cards futuros herdam)
+      const w = words.find(x => x.id === it.wordId)
+      if (w && Array.isArray(w.meanings) && w.meanings[it.meaningIdx]) {
+        w.meanings[it.meaningIdx].origin_pt = origin
+        wordsTouched = true
+      }
+      if (origin) withStory++; else noStory++
+    } catch (e) {
+      console.warn('[fillOriginsAll] falhou:', it.word, e.message)
+      failed++
+    }
+  })
+
+  await runPool(tasks, 4, d => { if (btn) btn.innerHTML = `<span class="spinner"></span> ${d}/${total}` })
+
+  saveSrsCards()
+  if (wordsTouched && typeof saveWords === 'function') saveWords()
+  autoSyncAfterChange()
+  if (btn) { btn.disabled = false; btn.innerHTML = origHtml }
+  if (_browserPreviewCardId) showBrowserCardPreview(_browserPreviewCardId)
+  if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value || '')
+  toast(`Origem preenchida: ${withStory} com história · ${noStory} sem história notável${failed ? ` · ${failed} falharam` : ''}`, withStory ? 'success' : 'info')
+}
+
 async function reprocessMetaBulk() {
   if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
   if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }

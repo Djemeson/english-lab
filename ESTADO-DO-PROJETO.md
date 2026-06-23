@@ -220,7 +220,12 @@ maxInterval (36500), leechThreshold (50)
     em `analyzeWordDirect` (review.js), na importação de doc (`extractMidiaDoc` fase 2), em
     `regenerateMeaning`/`reanalyzeAll` (audio.js — backfill dos cards já no SRS) e na Consulta.
     Vai ao snapshot em `createSrsCard` (srs.js) e aparece no card de estudo (`buildSrsVerso`,
-    bloco "Origem") e na revisão (`renderMeaningItem`).
+    bloco "Origem") e na revisão (`renderMeaningItem`). Importação de doc grava `_seedMeaning` na
+    palavra para que uma "Re-analisar" por palavra PRESERVE o significado curado (não reinventa).
+21. **Botão TEMPORÁRIO "Preencher origem"** na Biblioteca (`#lib-fill-origin-btn` → `fillOriginsAll`
+    em audio.js): passada leve (gpt-4o-mini) que SÓ adiciona `origin_pt` aos significados que ainda
+    não têm — não toca em significado, definição, frases, variedade/registro nem agendamento. Pula
+    os que já têm origem. **A REMOVER depois do backfill** (botão + função).
 
 ---
 
@@ -238,6 +243,8 @@ maxInterval (36500), leechThreshold (50)
       confirmar que extrai os termos, que "snuff" sai como "apagar a tocha" e que os cards entram
       em "pendente de revisão" já com significado/exemplo. Fazer backup (Exportar JSON) antes.
 - [ ] **Testar PDF** (pdf.js do CDN) — precisa de internet na primeira leitura; depois cacheia.
+- [ ] **REMOVER o botão temporário "Preencher origem"** (`#lib-fill-origin-btn` no index.html +
+      função `fillOriginsAll` em audio.js) depois de rodar o backfill de origem nos cards antigos.
 - [ ] (Opcional) Enriquecimento em lote dos itens importados: hoje cada item vem com 1 sentido +
       3 exemplos (3 cards) do doc; o botão "Re-analisar" (já sensível à fonte) expande para TODOS
       os sentidos. Avaliar se vale um "Enriquecer todos" automático na Mídia.

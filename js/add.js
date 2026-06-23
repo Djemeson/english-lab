@@ -861,6 +861,9 @@ function createDocWord(item) {
   })
   w.type = item.type || 'word'
   w.ipa = item.ipa || ''
+  // Semente: marca o significado curado do documento para que uma eventual
+  // "Re-analisar" (por palavra) PRESERVE este sentido em vez de reinventá-lo.
+  w._seedMeaning = item.meaning_pt || ''
   w.meanings = [{
     id: uid(), selected: true, idx: 0,
     meaning_pt: item.meaning_pt || '',
