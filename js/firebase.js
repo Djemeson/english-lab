@@ -68,10 +68,10 @@ function initFirebase() {
       _fbUser = user
       updateFirebaseUI(user)
       if (user) {
-        updateSyncNav('syncing')
-        fbPull().then(() => { updateSyncNav('ok'); renderDashboard(); updateSrsBadge() })
-               .catch(() => updateSyncNav('err'))
+        // Sincronização em tempo real (a nuvem é a fonte da verdade)
+        attachRealtimeSync()
       } else {
+        detachRealtimeSync()
         // Só mostra "desconectado" após a resolução inicial do auth
         // (evita piscar "off" antes do Firebase confirmar o usuário logado)
         setTimeout(() => { if (!_fbUser) updateSyncNav('off') }, 1500)
@@ -334,6 +334,124 @@ async function fbPull() {
   }
 }
 
+// ================================================================
+// SINCRONIZAÇÃO EM TEMPO REAL — a NUVEM é a fonte da verdade
+// Listener onSnapshot na coleção "data": qualquer mudança/exclusão
+// em outro dispositivo aparece aqui na hora. Sem merge → sem ressuscitar.
+// ================================================================
+let _rtUnsub = null
+let _rtFirst = true
+let _pendingCloudCards = null   // cards da nuvem aguardando (sessão de estudo ativa)
+
+function detachRealtimeSync() {
+  if (_rtUnsub) { try { _rtUnsub() } catch {} _rtUnsub = null }
+}
+
+function attachRealtimeSync() {
+  if (!_fbDb || !_fbUser) return
+  detachRealtimeSync()
+  _rtFirst = true
+  updateSyncNav('syncing')
+  const dataCol = _fbDb.collection('users').doc(_fbUser.uid).collection('data')
+  _rtUnsub = dataCol.onSnapshot(snap => {
+    // Ignora o eco das nossas próprias escritas (exceto a 1ª carga inicial)
+    const fromServer = snap.docChanges().some(ch => !ch.doc.metadata.hasPendingWrites)
+    if (!_rtFirst && !fromServer) return
+    const docs = {}
+    snap.forEach(d => { docs[d.id] = d.data() })
+    applyCloudDocs(docs)
+    if (_rtFirst) { _rtFirst = false; fbPullMedia().catch(() => {}) }
+    updateSyncNav('ok')
+  }, err => {
+    console.warn('[Firebase] realtime erro:', err.code || err.message)
+    updateSyncNav('err')
+  })
+}
+
+// Adota o estado da nuvem (substitui o local — sem merge).
+// Doc presente (mesmo com lista vazia) é adotado → exclusões propagam.
+// Doc ausente é ignorado → não apaga um dispositivo que ainda não sincronizou.
+function applyCloudDocs(docs) {
+  docs = docs || {}
+  if (docs.words)    { words = docs.words.list || []; saveWords() }
+  if (docs.srsCards) {
+    const cloudCards = docs.srsCards.list || []
+    if (srsSession) _pendingCloudCards = cloudCards          // aplica ao fim da sessão
+    else { srsCards = cloudCards; saveSrsCards() }
+  }
+  if (docs.srsCfg)   { srsCfg = { ...SRS_DEF_CFG, ...docs.srsCfg }; persistSrsCfg() }
+  if (docs.srsLog)   { srsLog = docs.srsLog.list || []; saveSrsLog() }
+  if (docs.srsDecks) { srsDecks = docs.srsDecks.list || []; saveSrsDecks() }
+  if (docs.kindleQueue) {
+    const seen = (typeof loadKindleSeen === 'function') ? loadKindleSeen() : new Set()
+    kindleItems = (docs.kindleQueue.list || []).filter(it =>
+      typeof kindleHighlightHash !== 'function' || !seen.has(kindleHighlightHash(it.context || it.word)))
+    localStorage.setItem(SK.kindleQueue, JSON.stringify(kindleItems))
+  }
+  if (docs.cfg) {
+    const c = docs.cfg
+    if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
+    if (c.n8nBase)     cfg.n8nBase     = c.n8nBase
+    if (c.theme)       cfg.theme       = c.theme
+    if (c.aiProvider)  cfg.aiProvider  = c.aiProvider
+    if (c.aiModel)     cfg.aiModel     = c.aiModel
+    if (c.ttsProvider) cfg.ttsProvider = c.ttsProvider
+    saveCfg()
+    if (typeof applyTheme === 'function') applyTheme(cfg.theme)
+  }
+  _refreshActiveViews()
+}
+
+// Aplica cards que chegaram da nuvem durante uma sessão (chamado ao encerrar)
+function flushPendingCloudCards() {
+  if (_pendingCloudCards) {
+    srsCards = _pendingCloudCards; _pendingCloudCards = null
+    saveSrsCards(); _refreshActiveViews()
+  }
+}
+
+// Re-renderiza a tela ativa após adotar dados da nuvem
+function _refreshActiveViews() {
+  try {
+    if (typeof renderDashboard === 'function') renderDashboard()
+    if (typeof updateSrsBadge === 'function') updateSrsBadge()
+    const active = id => document.getElementById(id)?.classList.contains('active')
+    if (active('section-revisar')  && typeof renderReview === 'function')     renderReview()
+    if (active('section-estudar')  && typeof renderSrsSection === 'function' && !srsSession) renderSrsSection()
+    if (active('section-biblioteca') && typeof openBiblioteca === 'function') openBiblioteca()
+    if (active('section-configuracoes') && typeof fillSettings === 'function') fillSettings()
+  } catch(e) { console.warn('[refreshViews]', e.message) }
+}
+
+// Restaura áudio e imagens do Firestore para o IndexedDB (uma vez ao conectar)
+async function fbPullMedia() {
+  if (!_fbUser || !_fbDb) return
+  try {
+    const base = _fbDb.collection('users').doc(_fbUser.uid)
+    const audioDocs = await base.collection('audio').get()
+    const audioMap = {}; audioDocs.forEach(d => { audioMap[d.id] = d.data().data })
+    if (Object.keys(audioMap).length) { await AudioDB.setAll(audioMap); _audioKeyCache = new Set(Object.keys(audioMap)) }
+    const imageDocs = await base.collection('images').get()
+    const imageMap = {}; imageDocs.forEach(d => { imageMap[d.id] = d.data().data })
+    if (Object.keys(imageMap).length) { await ImageDB.setAll(imageMap); _imageKeyCache = new Set(Object.keys(imageMap)) }
+  } catch(e) { console.warn('[Firebase] media pull error:', e.code || e.message) }
+}
+
+// Apaga apenas áudio e imagens da nuvem (os dados são zerados via push de listas vazias)
+async function fbWipeMedia() {
+  if (!_fbDb || !_fbUser) return
+  try {
+    const base = _fbDb.collection('users').doc(_fbUser.uid)
+    const [a, i] = await Promise.all([base.collection('audio').get(), base.collection('images').get()])
+    const refs = [...a.docs, ...i.docs].map(d => d.ref)
+    for (let k = 0; k < refs.length; k += 450) {
+      const batch = _fbDb.batch()
+      refs.slice(k, k + 450).forEach(r => batch.delete(r))
+      await batch.commit()
+    }
+  } catch(e) { console.warn('[Firebase] fbWipeMedia erro:', e.code || e.message) }
+}
+
 // ---- Auto-sync com debounce ----
 async function autoSyncAfterChange() {
   if (!_fbUser) return
@@ -341,7 +459,7 @@ async function autoSyncAfterChange() {
   // Usa só fbPushData (sem áudio/imagem) — rápido e não esgota cota
   _fbSyncTimer = setTimeout(async () => {
     await fbPushData()
-  }, 2000)
+  }, 1200)
 }
 
 async function fbForcePush() {
@@ -364,10 +482,18 @@ async function fbForcePull() {
   if (statusBox) statusBox.classList.remove('hidden')
   if (dot) dot.className = 'sync-dot syncing'
   if (msg) msg.textContent = 'Baixando dados...'
-  const ok = await fbPull()
+  let ok = false
+  try {
+    const dataCol = _fbDb.collection('users').doc(_fbUser.uid).collection('data')
+    const snap = await dataCol.get()
+    const docs = {}; snap.forEach(d => { docs[d.id] = d.data() })
+    applyCloudDocs(docs)
+    await fbPullMedia()
+    ok = true
+  } catch(e) { console.warn('[Firebase] forcePull erro:', e.message) }
   if (dot) dot.className = 'sync-dot ' + (ok ? 'ok' : 'err')
   if (msg) msg.textContent = ok ? '✅ Dados baixados com sucesso!' : '❌ Erro ao baixar.'
-  if (ok) { renderDashboard(); renderSrsSection(); updateSrsBadge(); toast('⬇ Dados sincronizados!', 'success') }
+  if (ok) toast('⬇ Dados sincronizados com a nuvem!', 'success')
 }
 
 // Apaga TODOS os dados do usuário no Firestore (data + audio + images).

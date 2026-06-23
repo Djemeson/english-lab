@@ -163,37 +163,39 @@ async function clearAllData() {
   if (!confirm('⚠️ Apagar TODOS os dados?\n\nIsso inclui:\n• Palavras e revisões\n• Cards SRS e progresso\n• Áudios gerados\n• Imagens geradas\n• Configurações' + cloudWarn + '\n\nFaça um backup antes.')) return
   if (!confirm('Confirma? Esta ação é IRREVERSÍVEL.')) return
 
-  // 1) Apaga a nuvem PRIMEIRO (ainda logado) — senão ao reconectar tudo volta
-  if (loggedIn && typeof fbWipeCloud === 'function') {
-    toast('Apagando dados da nuvem...', 'info')
-    await fbWipeCloud()
-  }
-
-  // 2) localStorage
+  // 1) localStorage
   Object.values(SK).forEach(k => localStorage.removeItem(k))
   localStorage.removeItem('el-kindle-seen')
   localStorage.removeItem(SK.kindleQueue)
   localStorage.removeItem('englab_cfg')
 
-  // 3) IndexedDB — áudio, imagens, cards e backup de configurações
+  // 2) IndexedDB — áudio, imagens, cards e backup de configurações
   try { await AudioDB.setAll({}) } catch {}
   try { await ImageDB.setAll({}) } catch {}
   try { await CardsDB.clear() } catch {}
   try { await SettingsDB.set('cfg', {}) } catch {}
 
-  // 4) Reset state
-  words = []; srsCards = []; srsLog = []; srsDecks = []
+  // 3) Reset do estado em memória (decks voltam ao padrão)
+  words = []; srsCards = []; srsLog = []
+  srsDecks = (typeof DEFAULT_DECKS !== 'undefined') ? JSON.parse(JSON.stringify(DEFAULT_DECKS)) : []
   cfg = { ...DEF_CFG }
   srsCfg = { ...SRS_DEF_CFG }
   _audioKeyCache = null; _imageKeyCache = null
+  if (typeof srsSession !== 'undefined') srsSession = null
+
+  // 4) Zera a NUVEM continuando logado: grava listas vazias (propaga a exclusão
+  //    em tempo real para todos os dispositivos) e apaga áudios/imagens da nuvem.
+  if (loggedIn) {
+    toast('Zerando a nuvem em todos os dispositivos...', 'info')
+    if (typeof clearTimeout === 'function' && typeof _fbSyncTimer !== 'undefined') clearTimeout(_fbSyncTimer)
+    try { if (typeof fbPushData === 'function') await fbPushData() } catch {}
+    try { if (typeof fbWipeMedia === 'function') await fbWipeMedia() } catch {}
+  }
 
   renderDashboard()
   fillSettings()
   updateSrsBadge()
-  toast('Todos os dados apagados — local e nuvem. Começando do zero.', 'success')
-  setTimeout(() => showSection('dashboard'), 1000)
-
-  // 5) Sign out Firebase por último
-  if (_fbAuth && _fbUser) _fbAuth.signOut().catch(() => {})
+  toast('Tudo zerado — local e nuvem, em todos os dispositivos.', 'success')
+  setTimeout(() => showSection('dashboard'), 900)
 }
 

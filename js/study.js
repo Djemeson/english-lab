@@ -638,6 +638,8 @@ function finishSrsSession() {
 
 function endSrsSession() {
   srsSession = null
+  // Aplica cards que chegaram da nuvem (sync em tempo real) durante a sessão
+  if (typeof flushPendingCloudCards === 'function') flushPendingCloudCards()
   el('srs-view-session').classList.add('hidden')
   el('srs-view-dashboard').classList.remove('hidden')
   renderSrsSection()
