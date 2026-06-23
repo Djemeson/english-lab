@@ -180,10 +180,22 @@
       <span class="midia-type-chip" data-val="podcast" onclick="setMidiaType(this)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/></svg>Podcast</span>
     </div>
     <div class="form-group">
-      <input type="text" id="midia-title-new" placeholder="Título (ex: Breaking Bad S01E03)" style="max-width:340px">
+      <input type="text" id="midia-title-new" placeholder="Título (ex: Survivor, Breaking Bad S01E03)" style="max-width:340px">
     </div>
     <div class="form-group">
-      <label>Cole ou digite — uma palavra ou frase por linha</label>
+      <input type="text" id="midia-context-new" placeholder="Contexto / gênero (opcional) — ex: reality de sobrevivência" style="max-width:420px">
+      <div style="font-size:0.72rem;color:var(--text3);margin-top:4px">A IA já tenta deduzir o gênero pelo título. Preencha aqui só se a fonte for obscura ou quiser reforçar o contexto.</div>
+    </div>
+
+    <div class="upload-area" id="midia-drop" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="event.preventDefault();this.classList.remove('drag');handleMidiaFile({files:event.dataTransfer.files})" onclick="document.getElementById('midia-file').click()">
+      <input type="file" id="midia-file" accept=".md,.markdown,.txt,.text,.pdf" onchange="handleMidiaFile(this)">
+      <div class="upload-icon"><svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--primary)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg></div>
+      <p><strong>Clique</strong> ou arraste um documento aqui</p>
+      <p>.md · .txt · .pdf — a IA lê e extrai só o que vira card, no contexto da fonte</p>
+    </div>
+
+    <div class="form-group" style="margin-top:18px">
+      <label>...ou cole / digite — uma palavra ou frase por linha</label>
       <textarea id="midia-text-new" rows="5" placeholder="ephemeral&#10;The beauty of youth is ephemeral.&#10;give up&#10;She decided to give up on her dream."></textarea>
     </div>
     <div class="btn-group" style="margin-top:4px">

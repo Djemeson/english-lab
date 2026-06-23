@@ -103,6 +103,7 @@ function createWord(data) {
     context: (data.context || '').trim(),
     source_type: data.source_type || 'manual',
     source_title: data.source_title || '',
+    source_context: (data.source_context || '').trim(),
     status: 'pending_ai',
     meanings: [],
     ai_processed: false,

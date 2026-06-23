@@ -645,6 +645,7 @@ async function analyzeMidiaText() {
   if (!lines.length) return
   const srcType = document.querySelector('.midia-type-chip.active')?.dataset.val || 'series'
   const srcTitle = (el('midia-title-new')?.value || '').trim()
+  const srcContext = (el('midia-context-new')?.value || '').trim()
   const btn = el('midia-analyze-btn')
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Analisando...' }
   el('midia-proc-results')?.classList.add('hidden')
@@ -700,7 +701,8 @@ Return ONLY valid JSON:
         context: isShort ? '' : line.trim(),
         context_pt: ai?.trans || '',
         source_type: srcType,
-        source_title: srcTitle
+        source_title: srcTitle,
+        source_context: srcContext
       }
     })
     renderMidiaProcessed()
@@ -716,6 +718,7 @@ function renderMidiaProcessed() {
   const list = el('midia-proc-list'); if (!list) return
   el('midia-proc-count').textContent = `${midiaProcessed.length} item${midiaProcessed.length !== 1 ? 's' : ''}`
   list.innerHTML = midiaProcessed.map((item, i) => {
+    if (item.doc) return renderMidiaDocItem(item, i)
     const hasCtx = !!item.context
     const iwords = getItemWords(item)
     const sentHTML = hasCtx
@@ -791,14 +794,15 @@ function addMidiaProcessed() {
   const sel = [...document.querySelectorAll('.midia-proc-check')].filter(c => c.checked).map(c => midiaProcessed[+c.dataset.i]).filter(Boolean)
   if (!sel.length) { toast('Selecione ao menos um item', 'warning'); return }
   sel.forEach(item => {
+    if (item.doc) { createDocWord(item); return }
     const iwords = getItemWords(item)
     if (iwords.length <= 1) {
-      createWord({ word: iwords[0]||item.word, context: item.context, source_type: item.source_type, source_title: item.source_title })
+      createWord({ word: iwords[0]||item.word, context: item.context, source_type: item.source_type, source_title: item.source_title, source_context: item.source_context })
     } else {
-      iwords.forEach(w => createWord({ word: w, context: item.context, source_type: item.source_type, source_title: item.source_title }))
+      iwords.forEach(w => createWord({ word: w, context: item.context, source_type: item.source_type, source_title: item.source_title, source_context: item.source_context }))
     }
   })
-  saveWords(); renderDashboard()
+  saveWords(); renderDashboard(); updateSrsBadge()
   const selSet = new Set(sel)
   midiaProcessed = midiaProcessed.filter(x => !selSet.has(x))
   toast(`${sel.length} item${sel.length!==1?'s':''} adicionado${sel.length!==1?'s':''}!`, 'success')
@@ -806,6 +810,206 @@ function addMidiaProcessed() {
     el('midia-proc-results')?.classList.add('hidden')
     if (el('midia-text-new')) el('midia-text-new').value = ''
   } else { renderMidiaProcessed() }
+}
+
+// ── Importação de documento (.md / .txt / .pdf) → cards prontos ───────────────
+// Preview rico de um item extraído de documento (já vem com significado + exemplo)
+function renderMidiaDocItem(item, i) {
+  const typeLbl = ({ word:'word', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' })[item.type] || item.type || ''
+  const exEn = item.example_en ? allowBold(item.example_en) : ''
+  const exPt = item.example_pt ? esc(item.example_pt.replace(/<\/?b>/gi,'')) : ''
+  return `
+    <div class="parsed-item" id="mi-proc-${i}">
+      <input type="checkbox" class="midia-proc-check" data-i="${i}" checked>
+      <div class="parsed-item-body">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-weight:700;font-size:1.02rem">${esc(item.word || '')}</span>
+          ${typeLbl ? `<span class="chip">${esc(typeLbl)}</span>` : ''}
+          ${item.level ? `<span class="chip level-${String(item.level).toLowerCase()}">${esc(item.level)}</span>` : ''}
+          ${item.register ? `<span class="chip register-${esc(item.register)}">${esc(item.register)}</span>` : ''}
+          ${item.ipa ? `<span class="wc-ipa">${esc(item.ipa)}</span>` : ''}
+        </div>
+        ${item.meaning_pt ? `<div style="margin-top:4px;font-weight:600;color:var(--text)">${esc(item.meaning_pt)}</div>` : ''}
+        ${item.definition_pt ? `<div style="font-style:italic;opacity:.8;font-size:0.85rem;margin-top:2px">${esc(item.definition_pt)}</div>` : ''}
+        ${exEn ? `<div class="mi-example" style="margin-top:6px"><div class="en">"${exEn}"</div>${exPt ? `<div class="pt">"${exPt}"</div>` : ''}</div>` : ''}
+        <div class="parsed-meta">${srcIcon(item.source_type)} ${esc(item.source_title || item.source_type)}${item.source_context ? ` · ${esc(item.source_context)}` : ''}</div>
+      </div>
+    </div>`
+}
+
+// Cria a palavra já em "pending_review", preservando os dados do documento como
+// sentido principal (context_match). Fica pronta para salvar no SRS sem perdas.
+function createDocWord(item) {
+  const w = createWord({
+    word: item.word,
+    context: (item.example_en || '').replace(/<\/?b>/gi,'').trim(),
+    source_type: item.source_type,
+    source_title: item.source_title,
+    source_context: item.source_context
+  })
+  w.type = item.type || 'word'
+  w.ipa = item.ipa || ''
+  w.meanings = [{
+    id: uid(), selected: true, idx: 0,
+    meaning_pt: item.meaning_pt || '',
+    definition_pt: item.definition_pt || '',
+    variety: item.variety || 'general',
+    register: item.register || 'neutral',
+    level: item.level || '',
+    examples: item.example_en ? [{ en: item.example_en, pt: item.example_pt || '' }] : [],
+    synonyms: [], antonyms: [], notes: [], word_family: [], tags: [],
+    context_match: true
+  }]
+  w.status = 'pending_review'
+  w.ai_processed = true
+  w.updated_at = new Date().toISOString()
+  return w
+}
+
+// Carrega um script externo uma única vez (usado para o pdf.js sob demanda)
+function loadExtScript(src) {
+  return new Promise((resolve, reject) => {
+    if ([...document.scripts].some(s => s.src === src)) return resolve()
+    const s = document.createElement('script')
+    s.src = src
+    s.onload = () => resolve()
+    s.onerror = () => reject(new Error('Falha ao carregar ' + src))
+    document.head.appendChild(s)
+  })
+}
+
+// Extrai texto de um PDF usando pdf.js (carregado do CDN na primeira vez)
+async function readPdfTextMidia(file) {
+  const PDFJS  = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+  const WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+  if (!window.pdfjsLib) {
+    await loadExtScript(PDFJS)
+    if (window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER
+  }
+  if (!window.pdfjsLib) throw new Error('pdf.js indisponível (sem internet?)')
+  const buf = await file.arrayBuffer()
+  const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise
+  let out = ''
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p)
+    const tc = await page.getTextContent()
+    out += tc.items.map(it => it.str).join(' ') + '\n\n'
+  }
+  return out
+}
+
+// Lê o arquivo (md/txt/pdf) e dispara a extração por IA
+async function handleMidiaFile(input) {
+  const file = (input && input.files) ? input.files[0] : null
+  if (!file) return
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); showSection('configuracoes'); return }
+  const name = (file.name || '').toLowerCase()
+  const drop = el('midia-drop')
+  let text = ''
+  try {
+    if (name.endsWith('.pdf')) {
+      if (drop) drop.classList.add('drag')
+      toast('Lendo PDF...', 'info')
+      text = await readPdfTextMidia(file)
+    } else {
+      text = await file.text()
+    }
+  } catch(e) {
+    toast('Erro ao ler o arquivo: ' + e.message, 'error')
+    if (drop) drop.classList.remove('drag')
+    return
+  }
+  if (input) { try { input.value = '' } catch {} }
+  if (drop) drop.classList.remove('drag')
+  text = (text || '').trim()
+  if (!text) { toast('Arquivo vazio ou ilegível', 'warning'); return }
+  await extractMidiaDoc(text, file.name)
+}
+
+// Chamada de IA que lê o documento inteiro e devolve os objetos de estudo,
+// já no contexto/gênero da fonte (resolve o caso "snuff" do Survivor).
+async function extractMidiaDoc(text, fileName) {
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  const srcType = document.querySelector('.midia-type-chip.active')?.dataset.val || 'series'
+  const srcTitle = (el('midia-title-new')?.value || '').trim() || (fileName || '').replace(/\.[^.]+$/, '')
+  const srcContext = (el('midia-context-new')?.value || '').trim()
+  const SRC_LABELS = { series:'TV series', movie:'movie', youtube:'YouTube video', podcast:'podcast' }
+  const srcLabel = SRC_LABELS[srcType] || srcType
+
+  const MAX = 14000
+  let docText = text, truncated = false
+  if (docText.length > MAX) { docText = docText.slice(0, MAX); truncated = true }
+
+  const results = el('midia-proc-results')
+  const list = el('midia-proc-list')
+  if (results) results.classList.remove('hidden')
+  if (el('midia-proc-count')) el('midia-proc-count').textContent = 'Lendo documento...'
+  if (list) list.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)"><span class="spinner" style="width:28px;height:28px;border-width:3px"></span><div style="margin-top:12px">A IA está lendo o documento e extraindo os cards no contexto da fonte...</div></div>`
+
+  const SYSTEM = `You extract English vocabulary STUDY CARDS from a document, for a Brazilian learner. The document was provided together with its source: a ${srcLabel} titled "${srcTitle || '(untitled)'}"${srcContext ? ` — extra context: ${srcContext}` : ''}.
+
+STEP 1 — infer the GENRE / DOMAIN of the source from its title and type (e.g. "Survivor" -> reality survival competition; a police series -> law-enforcement jargon; a fantasy saga -> medieval/fantasy register). Inside a genre, common words often carry a special domain meaning — capture THAT meaning, not the generic dictionary one. Canonical example: "snuff" in Survivor = "apagar (a tocha)", NOT "rape" (tobacco).
+
+STEP 2 — read the document and extract ONLY items genuinely useful as English study cards for a B1+ learner: meaningful single words, phrasal verbs, idioms, collocations, slang and set phrases. IGNORE titles, section headings, instructions, difficulty legends/emojis, "how to use" text, and Portuguese-only filler. Deduplicate. Do not invent items absent from the document.
+
+For EACH item return an object:
+- "word": the English term exactly as studied (lowercase, unless a proper noun or fixed ritual phrase)
+- "type": "word" | "phrasal_verb" | "idiom" | "collocation"
+- "ipa": American IPA between /slashes/ (best effort)
+- "level": "A2"|"B1"|"B2"|"C1"|"C2"
+- "register": "neutral"|"formal"|"informal"|"colloquial"|"slang"|"technical"|"literary"|"archaic"|"vulgar"
+- "variety": "general"|"american"|"british"|"australian"|"canadian"
+- "meaning_pt": Portuguese meaning IN THE SOURCE'S CONTEXT first (2-6 words, ONE sense, no semicolons mixing senses)
+- "definition_pt": one short Portuguese sentence defining that sense
+- "example_en": ONE natural English sentence using the term, with the term wrapped in <b></b>. Prefer an example already present in the document; otherwise write one that fits the source's context
+- "example_pt": natural Brazilian-Portuguese translation of the example (plain text, no <b>)
+
+If the document already gives a meaning and/or example for an item, USE and lightly refine it — never discard the curated data.
+
+Return ONLY valid JSON: {"items":[ ... ]}`
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: cfg.aiModel || 'gpt-4o',
+        max_tokens: 8000,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: SYSTEM },
+          { role: 'user', content: `DOCUMENT${truncated ? ' (truncated to the beginning)' : ''}:\n\n${docText}` }
+        ]
+      })
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    const result = JSON.parse((data.choices?.[0]?.message?.content || '{}').trim())
+    const items = Array.isArray(result.items) ? result.items : []
+    if (!items.length) { toast('Nenhum item de estudo encontrado no documento', 'warning'); if (results) results.classList.add('hidden'); return }
+    midiaProcessed = items.map(it => ({
+      doc: true,
+      word: String(it.word || '').trim(),
+      type: it.type || 'word',
+      ipa: it.ipa || '',
+      level: it.level || '',
+      register: it.register || 'neutral',
+      variety: it.variety || 'general',
+      meaning_pt: it.meaning_pt || '',
+      definition_pt: it.definition_pt || '',
+      example_en: it.example_en || '',
+      example_pt: it.example_pt || '',
+      source_type: srcType,
+      source_title: srcTitle,
+      source_context: srcContext
+    })).filter(x => x.word)
+    renderMidiaProcessed()
+    if (results) results.classList.remove('hidden')
+    toast(`${midiaProcessed.length} cards extraídos${truncated ? ' (documento longo — só o início foi lido)' : ''}`, 'success')
+  } catch(e) {
+    toast(`Erro ao extrair do documento: ${e.message}`, 'error')
+    if (results) results.classList.add('hidden')
+  }
 }
 
 // ── Mouse selection — Kindle + Mídia ──────────────────────────────────────────

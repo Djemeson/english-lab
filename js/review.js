@@ -55,10 +55,32 @@ async function analyzeWordDirect(wordId) {
   const target = w.word || w.context
   const ctx    = w.context || ''
 
+  // Bloco de contexto da fonte — faz a IA desambiguar pelo gênero da mídia
+  // (ex.: "snuff" no Survivor = "apagar a tocha", não "rapé").
+  const SRC_LABELS = { series:'TV series', movie:'movie', youtube:'YouTube video', podcast:'podcast', website:'website', kindle:'book', manual:'' }
+  const srcType  = w.source_type || ''
+  const srcTitle = (w.source_title || '').trim()
+  const srcCtx   = (w.source_context || '').trim()
+  const srcLabel = SRC_LABELS[srcType] != null ? SRC_LABELS[srcType] : srcType
+  let sourceBlock = ''
+  if (srcTitle || srcCtx) {
+    sourceBlock = `
+Source of this item${srcLabel ? ` (${srcLabel})` : ''}: ${srcTitle ? `"${srcTitle}"` : '(untitled)'}${srcCtx ? ` — extra context: ${srcCtx}` : ''}
+
+SOURCE-AWARE DISAMBIGUATION — CRITICAL:
+- First infer the GENRE / DOMAIN of this source from its title and type (e.g. "Survivor" → reality survival competition show; "Breaking Bad" → crime drama; a police procedural → law-enforcement jargon; a fantasy novel → medieval/fantasy register).
+- Inside a specific genre, a common word frequently carries a special domain-specific meaning. You MUST treat the sense as it is actually used IN THIS SOURCE'S CONTEXT as the PRIMARY meaning: set its "context_match": true and place it FIRST in the array.
+- Canonical example: "snuff" captured from *Survivor* means "apagar (a tocha)" — the host snuffs the eliminated player's torch — NOT "rapé" (powdered tobacco). The reality-show sense wins because of the source.
+- If a context sentence is present, combine it WITH the inferred genre to choose the right primary sense.
+- You MUST still ALSO return the other common general-English senses with "context_match": false, exactly as usual — never drop them.${w._seedMeaning ? `
+- A curated meaning for this item was already provided from the source material: "${w._seedMeaning}". Preserve THIS as the primary (context_match:true) sense; refine its Portuguese only if it is clearly wrong, and make sure one example illustrates it.` : ''}`
+  }
+
   const PROMPT = `Analyze this English vocabulary item for a Brazilian learner and return ONLY valid JSON.
 
 Item: "${target}"
 ${ctx ? `Context sentence: "${ctx}"` : ''}
+${sourceBlock}
 
 Rules for examples — CRITICAL, follow exactly:
 - Write EXACTLY 3 examples per meaning
