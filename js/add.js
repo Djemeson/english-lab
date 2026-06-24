@@ -1036,14 +1036,18 @@ async function extractMidiaDoc(text, fileName) {
   const LIST_SYSTEM = `You list the English vocabulary items that THIS DOCUMENT ACTUALLY TEACHES, for a Brazilian learner. ${GENRE}
 
 CRITICAL FILTER — include a term ONLY if the document genuinely develops it: it has its own explanation/definition AND/OR at least one real example sentence (in the document) showing it in use.
-EXCLUDE any term that is merely mentioned, listed, enumerated or name-dropped in passing, without its own explanation or example. Concrete example: an article teaching the phrasal verb "run by" may, in a single throw-away sentence, casually list other phrasal verbs ("run out, run into, run off, run over, run up…") just to make a rhetorical point — those are NOT taught here, so DO NOT include them. Only "run by" (and its real sub-structures actually used with examples, like "run something by someone", "run that by me again") qualifies.
+EXCLUDE any term that is merely mentioned, listed, enumerated or name-dropped in passing, without its own explanation or example. Concrete example: an article teaching the phrasal verb "run by" may, in a single throw-away sentence, casually list other phrasal verbs ("run out, run into, run off, run over, run up…") just to make a rhetorical point — those are NOT taught here, so DO NOT include them.
 
-Many articles teach ONE main expression with several senses/sub-structures: include that main expression and its REAL variants that the text uses with examples (as separate items), but NOTHING that is only listed.
+CANONICALIZE AND MERGE — this is critical. Output each distinct EXPRESSION only ONCE, in its base/canonical form. Do NOT create separate entries for:
+- different SENSES of the same expression (e.g. "run by" meaning "falar com alguém", "apresentar uma ideia", "repassar", "dar um pulo", "passar correndo" → still ONE item: "run by"),
+- INFLECTIONS (e.g. "ran by", "running by" → "run by"),
+- STRUCTURAL variants / patterns (e.g. "run something by someone", "run that by me again" → "run by").
+The base form uses the bare verb + particle(s) for phrasal verbs (e.g. "run by"), the infinitive for verbs, the canonical wording for idioms. The multiple senses are added LATER (enrichment); here you only output the single base expression once, with the meaning of its MAIN/first sense.
 
-Eligible item types: meaningful single words, phrasal verbs, idioms, collocations, slang, set phrases. IGNORE titles, section headings, instructions, difficulty legends/emojis, "how to use" text and Portuguese-only filler. Deduplicate.
-Be thorough about the TAUGHT items (capture all of them and their real variants), but never pad the list with merely-mentioned terms. Do NOT invent items absent from the document.
+Eligible item types: meaningful single words, phrasal verbs, idioms, collocations, slang, set phrases. IGNORE titles, section headings, instructions, difficulty legends/emojis, "how to use" text and Portuguese-only filler.
+Be thorough about distinct TAUGHT expressions, but never split one expression into several, and never pad the list with merely-mentioned terms. Do NOT invent items absent from the document.
 
-For each item return: {"word":"<term, lowercase unless proper noun/ritual phrase>","type":"word|phrasal_verb|idiom|collocation","meaning_pt":"<2-6 words, source-context sense>","doc_example_en":"<a real example sentence FROM THE DOCUMENT using this term; this is the proof it is taught — if you cannot find one in the document and the term is not otherwise explained, DROP the item>"}
+For each item return: {"word":"<BASE/canonical form, lowercase unless proper noun/ritual phrase>","type":"word|phrasal_verb|idiom|collocation","meaning_pt":"<2-6 words, main sense>","doc_example_en":"<a real example sentence FROM THE DOCUMENT using this expression; proof it is taught — if you cannot find one and it is not otherwise explained, DROP the item>"}
 Return ONLY valid JSON: {"items":[ ... ]}`
 
   let listed = []
@@ -1121,7 +1125,7 @@ Each sense object has:
 - "register": "neutral"|"formal"|"informal"|"colloquial"|"slang"|"technical"|"literary"|"archaic"|"vulgar"
 - "variety": "general"|"american"|"british"|"australian"|"canadian"
 - "origin_pt": Brazilian-Portuguese note (1-2 sentences) on the ORIGIN / why it means this — ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting etymology; EMPTY STRING "" otherwise; never invent.
-- "examples": 1 to 3 objects {"en":"...","pt":"..."} FOR THIS SENSE. PREFER the document's REAL example sentences that belong to this sense (read the whole document and assign each example sentence to the correct sense). Each "en" wraps the term in <b></b> as inflected; "pt" is a natural Brazilian-Portuguese translation with NO <b>. Only add a non-document example when a sense has fewer than 2 real ones, keeping it faithful to that sense.
+- "examples": EXACTLY 3 objects {"en":"...","pt":"..."} FOR THIS SENSE. PREFER the document's REAL example sentences that belong to this sense (read the whole document — including inflected forms like "ran by" and patterns like "run something by someone" — and assign each sentence to its correct sense). If the document has MORE than 3 for this sense, pick the 3 clearest. If it has FEWER than 3, keep the real ones and ADD natural examples faithful to THIS exact sense to reach 3. Each "en" wraps the term in <b></b> as inflected; the 3 should differ in tense/construction; "pt" is a natural Brazilian-Portuguese translation with NO <b>.
 
 Return JSON for ALL target terms: {"items":[ ... ]}`
 

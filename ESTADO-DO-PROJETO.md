@@ -225,6 +225,13 @@ maxInterval (36500), leechThreshold (50)
     SRS gera cards por sentido × exemplo (reaproveita `saveToSrs`/`createSrsCard`). Preview mostra os
     sentidos numerados + chip "N sentidos". Fallback de sentido único preservado; max_tokens do
     enriquecimento subiu p/ 5000. Itens só MENCIONADos continuam fora (filtro da 3ª rodada).
+31b. **Correção (1ª tentativa falhou)**: a Fase 1 estava SEPARANDO as variações ("run by",
+    "run something by someone", "ran by") em 3 itens — eu havia, por engano, mandado incluir as
+    sub-estruturas como itens separados. Agora a Fase 1 **CANONICALIZA E MESCLA**: cada expressão
+    sai UMA vez na forma base (verbo+partícula p/ phrasal), sem separar por sentido, inflexão
+    ("ran by"→"run by") ou padrão estrutural ("run something by someone"→"run by"). Os sentidos são
+    montados só na Fase 2. Também: exemplos por sentido voltaram a ser **EXATAMENTE 3** (prefere as
+    frases reais do doc; completa com exemplos fiéis ao sentido se o texto tiver menos de 3).
 
 ### Sessão 2026-06-24 (3ª rodada) — extrator de documento: só o que é ENSINADO
 30. **Filtro "ensinado vs mencionado"** na Fase 1 do `extractMidiaDoc` (`add.js` → `LIST_SYSTEM`).
