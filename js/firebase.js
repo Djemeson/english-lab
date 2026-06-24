@@ -155,6 +155,7 @@ async function fbPushData() {
     if (kindleItems.length > 0) {
       batch.set(base.collection('data').doc('kindleQueue'), { list: kindleItems, updatedAt: Date.now() })
     }
+    batch.set(base.collection('data').doc('conversas'), { list: conversas, updatedAt: Date.now() })
     await batch.commit()
     updateSyncNav('ok')
     return true
@@ -307,6 +308,12 @@ async function fbPull() {
       localStorage.setItem(SK.kindleQueue, JSON.stringify(kindleItems))
     }
 
+    const conversasDoc = await base.collection('data').doc('conversas').get()
+    if (conversasDoc.exists) {
+      conversas = conversasDoc.data().list || []
+      saveConversas()
+    }
+
     // Áudios — restaurar no IndexedDB
     const audioDocs = await base.collection('audio').get()
     const audioMap = {}
@@ -388,6 +395,21 @@ function applyCloudDocs(docs) {
       typeof kindleHighlightHash !== 'function' || !seen.has(kindleHighlightHash(it.context || it.word)))
     localStorage.setItem(SK.kindleQueue, JSON.stringify(kindleItems))
   }
+  if (docs.conversas) {
+    // Merge por id mantendo a versão mais recente (updated_at). Evita que um
+    // snapshot da nuvem apague uma conversa recém-criada local ainda não enviada.
+    const cloudConvs = docs.conversas.list || []
+    const byId = {}
+    cloudConvs.forEach(c => { if (c && c.id) byId[c.id] = c })
+    conversas.forEach(c => {
+      if (!c || !c.id) return
+      const cloud = byId[c.id]
+      if (!cloud) { byId[c.id] = c; return }
+      if ((c.updated_at || 0) > (cloud.updated_at || 0)) byId[c.id] = c
+    })
+    conversas = Object.values(byId).sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0))
+    saveConversas()
+  }
   if (docs.cfg) {
     const c = docs.cfg
     if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
@@ -416,6 +438,7 @@ function _refreshActiveViews() {
     if (typeof renderDashboard === 'function') renderDashboard()
     if (typeof updateSrsBadge === 'function') updateSrsBadge()
     const active = id => document.getElementById(id)?.classList.contains('active')
+    if (active('section-assistente') && typeof renderAssistente === 'function') renderAssistente()
     if (active('section-revisar')  && typeof renderReview === 'function')     renderReview()
     if (active('section-estudar')  && typeof renderSrsSection === 'function' && !srsSession) renderSrsSection()
     if (active('section-biblioteca') && typeof openBiblioteca === 'function') openBiblioteca()

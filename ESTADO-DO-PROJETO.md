@@ -3,7 +3,7 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-06-23 — análise sensível à fonte + importação de documentos na Mídia.
+> Última atualização: 2026-06-24 — Assistente (Consulta) virou seção própria: histórico de conversas (sync), streaming e vários itens SRS por resposta com anti-duplicado.
 
 ---
 
@@ -37,9 +37,15 @@ js/dashboard.js   — render do Dashboard
 js/review.js      — fila de Revisar + análise de IA (prompt principal)
 js/settings.js    — Configurações (cfg, temas, AI_MODELS, limpar dados)
 js/init.js        — bootstrap (initApp) + service worker
-js/add.js         — aba Adicionar + Consulta  (CARREGADO LAZY)
+js/add.js         — aba Adicionar (manual/Kindle/Mídia/Website)  (CARREGADO LAZY)
+js/consulta.js    — seção Assistente (chat IA, histórico, streaming, SRS múltiplo)  (NÃO-lazy)
 js/study.js       — UI/sessão do SRS          (CARREGADO LAZY)
 ```
+
+> ⚠️ **`consulta.js` é NÃO-lazy** (incluído sempre no index.html). Motivo: o `firebase.js`
+> precisa de `conversas`/`saveConversas` no sync e re-renderiza o Assistente no snapshot.
+> O ESTADO `conversas`/`activeConversaId` + `loadConversas`/`saveConversas` ficam em `core.js`
+> (não-lazy); só a UI/lógica do chat vive em `consulta.js`.
 
 ### ⚠️ Lazy-loading — a armadilha nº 1 do projeto
 `add.js` e `study.js` são carregados **sob demanda** (só ao abrir "Adicionar"/"Estudar"),
@@ -149,9 +155,19 @@ maxInterval (36500), leechThreshold (50)
 
 ## 7. Telas (seções)
 
-- **Dashboard** — ação principal (estudar hoje) + cards de métrica com ícone.
-- **Adicionar** — abas Manual / Kindle / Mídia / Website / **Consulta** (chat com IA que gera
-  card com 3 exemplos → 3 cards).
+- **Dashboard** — ação principal (estudar hoje) + cards de métrica com ícone. (Mantido como está.)
+- **Assistente** — seção própria (2ª no menu), chat com IA estilo Claude. Layout de duas colunas:
+  histórico de conversas à esquerda (nova/selecionar/renomear/excluir/buscar) e o chat à direita.
+  - **Histórico persistido** em `conversas[]` (localStorage `el-consulta-conversas`) e **sincronizado**
+    via Firebase (doc `data/conversas`, merge por `id` mantendo o `updated_at` mais recente).
+  - **Streaming** (SSE da OpenAI, `stream:true`) — a resposta aparece aos poucos.
+  - **Vários itens SRS por resposta**: o prompt pede um ARRAY `<srs_items>` com TODOS os termos
+    falados (não só um). Cada termo vira um botão "Adicionar"; se já estiver em `words[]`, mostra
+    "já no estudo" (anti-duplicado). Botão "Adicionar todos" quando há mais de um pendente.
+  - Adicionar um item reusa `createWord` + `saveToSrs` (cria a palavra em `pending_review` já com
+    significado/exemplos e salva direto no SRS).
+- **Adicionar** — abas Manual / Kindle / Mídia / Website. (A aba **Consulta** saiu daqui e virou a
+  seção **Assistente**.)
   - **Mídia** tem três entradas: (1) colar texto linha a linha → `analyzeMidiaText`; (2) campo
     opcional de **contexto/gênero** (`#midia-context-new`); (3) **upload/arrastar documento**
     (.md/.txt/.pdf) → `handleMidiaFile` → `extractMidiaDoc`. O doc é lido (PDF via pdf.js do CDN),
@@ -196,6 +212,26 @@ maxInterval (36500), leechThreshold (50)
 16. Correções de bugs lazy/não-lazy (`srcIcon`, `AI_MODELS`/`updateModelOptions`,
     `randomVoice`/`OPENAI_VOICES`, `srsSession`).
 
+### Sessão 2026-06-24 — Assistente (Consulta promovida a seção própria)
+22. **Consulta saiu da aba Adicionar e virou a seção "Assistente"** (2º item do menu). Dashboard
+    mantido como estava. Novo arquivo `js/consulta.js` (NÃO-lazy) com toda a UI/lógica; estado
+    `conversas`/`activeConversaId` + `loadConversas`/`saveConversas` em `core.js`; `'assistente'`
+    adicionado a `SECTIONS` e ao `_activateSection`; `loadConversas()` no boot (`init.js`).
+23. **Histórico de conversas persistido + sincronizado**: `conversas[]` no localStorage e no
+    Firebase. `firebase.js`: `fbPushData` grava `data/conversas`; `fbPull` e `applyCloudDocs`
+    leem (merge por `id` pelo `updated_at` mais recente — não apaga conversa local recém-criada);
+    `_refreshActiveViews` re-renderiza o Assistente no snapshot. Conversa criada na 1ª mensagem
+    (sem conversas vazias); título automático a partir da primeira pergunta.
+24. **Respostas em streaming** (SSE `stream:true`): texto renderizado aos poucos com markdown leve;
+    blocos `<srs_items>` ficam ocultos durante o streaming (`stripSrsBlocks`).
+25. **Vários itens SRS por resposta + anti-duplicado**: prompt agora pede ARRAY `<srs_items>` com
+    TODOS os termos da resposta. Cada um vira botão "Adicionar"; `isWordInStudy` mostra "já no
+    estudo" para os que existem em `words[]`; botão "Adicionar todos". Fallback de parse aceita o
+    `<srs_item>` único legado.
+26. **CSS estilo Claude** (`styles.css`): `.asst-layout` (grid 2 colunas), sidebar de conversas,
+    bolhas, "typing dots", sugestões no empty state, chips de termos SRS e responsivo (sidebar vira
+    drawer em telas estreitas; `#section-assistente{max-width:none}`).
+
 ### Sessão 2026-06-23 — contexto da fonte + importação de documentos
 17. **Análise sensível à fonte** (`review.js` → `analyzeWordDirect`): o prompt agora recebe
     `source_type`/`source_title`/`source_context` e instrui a IA a inferir o GÊNERO da fonte e
@@ -231,6 +267,11 @@ maxInterval (36500), leechThreshold (50)
 
 ## 9. Pendências / a verificar
 
+- [ ] **Testar o Assistente ao vivo** (fazer backup — Exportar JSON — antes, pois o sync mudou):
+      perguntar algo, ver o streaming, conferir os botões "Adicionar"/"Adicionar todos" e o
+      "já no estudo"; recarregar e confirmar que a conversa persiste; checar o doc `data/conversas`
+      no Firebase. Testar uma pergunta com vários termos (ex.: "diferença entre speak e talk") e
+      confirmar que aparecem dois botões.
 - [ ] **Testar o sync em tempo real em 2 dispositivos** (abrir em duas abas/navegadores e
       confirmar propagação e exclusão). Fazer backup (Exportar JSON) antes.
 - [ ] Depois de a versão de sync estar no ar, rodar **"Limpar tudo"** uma vez para zerar a

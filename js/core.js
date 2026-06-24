@@ -1,7 +1,7 @@
 // ================================================================
 // STATE & STORAGE
 // ================================================================
-const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue', deletedWords: 'el-deleted-words' }
+const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue', deletedWords: 'el-deleted-words', conversas: 'el-consulta-conversas' }
 
 function loadDeletedIds() { try { return new Set(JSON.parse(localStorage.getItem(SK.deletedWords) || '[]')) } catch { return new Set() } }
 function saveDeletedIds(ids) { localStorage.setItem(SK.deletedWords, JSON.stringify([...ids])) }
@@ -19,6 +19,13 @@ let words = []
 let activeWordId = null
 const collapsedGroups = new Set()
 let kindleItems = [], midiaItems = [], siteItems = []
+// Assistente (Consulta) — conversas persistidas e sincronizadas.
+// Estado declarado aqui (arquivo NÃO-lazy) para que firebase.js possa
+// referenciá-lo no sync; a UI vive em js/consulta.js.
+let conversas = []
+let activeConversaId = null
+function loadConversas() { try { conversas = JSON.parse(localStorage.getItem(SK.conversas) || '[]') } catch { conversas = [] } }
+function saveConversas() { try { localStorage.setItem(SK.conversas, JSON.stringify(conversas)) } catch(e) { console.warn('[conversas] save falhou:', e.message) } }
 
 function loadCfg() {
   try { cfg = { ...DEF_CFG, ...JSON.parse(localStorage.getItem(SK.settings) || '{}') } }
@@ -188,9 +195,11 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 // ================================================================
 // NAVIGATION
 // ================================================================
-const SECTIONS = ['dashboard','adicionar','revisar','estudar','biblioteca','configuracoes']
+const SECTIONS = ['dashboard','assistente','adicionar','revisar','estudar','biblioteca','configuracoes']
 // Lazy-load map: section → arquivo JS carregado só na 1ª visita
 // biblioteca usa funções de study.js (buildSrsFrente/Verso/MetaChips/fmtDays)
+// (assistente NÃO é lazy — js/consulta.js é carregado sempre, pois firebase.js
+//  precisa de `conversas`/render no sync.)
 const _LAZY = { adicionar: 'js/add.js', estudar: 'js/study.js', biblioteca: 'js/study.js' }
 const _loadedModules = new Set()
 
@@ -221,6 +230,7 @@ function _activateSection(name) {
   if (navEl) navEl.classList.add('active')
   document.getElementById(`section-${name}`).classList.add('active')
   if (name === 'dashboard') renderDashboard()
+  if (name === 'assistente') { if (typeof renderAssistente === 'function') renderAssistente() }
   if (name === 'adicionar') { if (loadKindleQueue()) renderKindleList() }
   if (name === 'revisar') renderReview()
   if (name === 'configuracoes') fillSettings()
