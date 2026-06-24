@@ -24,10 +24,13 @@
     <div class="sb-logo">
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 3 5v14c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5z"/><path d="M12 6.5V20"/></svg>
     </div>
-    <div>
+    <div class="sb-brand-text">
       <div class="sb-brand-name">English <span>Lab</span></div>
       <div class="sb-brand-sub">Vocabulário</div>
     </div>
+    <button class="sb-collapse-btn" onclick="toggleSidebar()" data-tip="Recolher menu" aria-label="Recolher menu">
+      <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
   </div>
   <nav class="sb-nav">
     <div class="sb-nav-label">Menu</div>
@@ -113,12 +116,12 @@
 
     <!-- Coluna do chat -->
     <div class="asst-chat" id="asst-chat">
-      <div class="asst-mobile-bar">
-        <button class="btn btn-ghost btn-sm" onclick="toggleAsstSidebar()" title="Conversas">
-          <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      <div class="asst-chat-top">
+        <button class="asst-icon-btn" onclick="toggleHistory()" data-tip="Mostrar/ocultar conversas" aria-label="Mostrar/ocultar conversas">
+          <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
         </button>
         <span id="asst-mobile-title">Assistente</span>
-        <button class="btn btn-ghost btn-sm" onclick="newConversa()" title="Nova conversa">
+        <button class="asst-icon-btn" onclick="newConversa()" data-tip="Nova conversa" aria-label="Nova conversa">
           <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
       </div>
@@ -238,12 +241,14 @@
     </div>
 
     <div class="form-group" style="margin-top:18px">
-      <label>...ou cole / digite — uma palavra ou frase por linha</label>
-      <textarea id="midia-text-new" rows="5" placeholder="ephemeral&#10;The beauty of youth is ephemeral.&#10;give up&#10;She decided to give up on her dream."></textarea>
+      <label>...ou cole / digite o material aqui</label>
+      <textarea id="midia-text-new" rows="6" placeholder="Cole um artigo/material inteiro (ex: Mairo Vergara) e use 'Extrair material colado'.&#10;&#10;Ou liste uma palavra/frase por linha e use 'Analisar linha a linha':&#10;ephemeral&#10;She decided to give up on her dream."></textarea>
     </div>
-    <div class="btn-group" style="margin-top:4px">
-      <button class="btn btn-primary" id="midia-analyze-btn" onclick="analyzeMidiaText()">⚡ Analisar com IA</button>
+    <div class="btn-group" style="margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="midia-doc-btn" onclick="extractMidiaPasted()"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg> Extrair material colado</button>
+      <button class="btn btn-secondary" id="midia-analyze-btn" onclick="analyzeMidiaText()"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg> Analisar linha a linha</button>
     </div>
+    <div style="font-size:0.72rem;color:var(--text3);margin-top:6px"><strong>Extrair material colado</strong>: lê o texto inteiro como um artigo e tira só o que vira card (igual ao upload de arquivo). <strong>Analisar linha a linha</strong>: trata cada linha como uma palavra/frase.</div>
     <div id="midia-proc-results" class="hidden" style="margin-top:20px">
       <div class="parsed-header">
         <h3 id="midia-proc-count">0 itens</h3>

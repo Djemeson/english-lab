@@ -1530,7 +1530,34 @@ select option{background:var(--surface)}
   border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden;
 }
 .asst-chat .consulta-messages{flex:1;min-height:0}
-.asst-mobile-bar{display:none}
+
+/* Barra superior do chat (sempre visível): toggle do histórico + título + nova */
+.asst-chat-top{
+  display:flex;align-items:center;gap:8px;padding:8px 12px;
+  border-bottom:1px solid var(--border);background:var(--surface);
+}
+.asst-chat-top span{
+  flex:1;font-weight:600;font-size:0.9rem;color:var(--text2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.asst-icon-btn{
+  display:flex;align-items:center;justify-content:center;width:32px;height:32px;
+  border:1px solid var(--border);background:var(--surface2);color:var(--text2);
+  border-radius:9px;cursor:pointer;transition:all .12s;flex-shrink:0;
+}
+.asst-icon-btn:hover{color:var(--text);border-color:var(--border-strong);background:var(--surface3)}
+
+/* Histórico recolhido (desktop) */
+.asst-layout{transition:grid-template-columns .2s ease}
+.asst-layout.hist-collapsed{grid-template-columns:0 1fr}
+.asst-sidebar{transition:opacity .15s ease}
+.asst-layout.hist-collapsed .asst-sidebar{opacity:0;pointer-events:none;min-width:0;border:none;overflow:hidden}
+
+/* Loader "procurando termos para estudo" */
+.asst-srs-loading{
+  display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:11px;
+  border-top:1px dashed var(--border);color:var(--text3);font-size:0.8rem;
+}
 
 /* Input em textarea (auto-grow) */
 .consulta-input-row textarea{
@@ -1594,16 +1621,44 @@ select option{background:var(--surface)}
 
 /* ---- Responsivo ---- */
 @media(max-width:860px){
-  .asst-layout{grid-template-columns:1fr;height:calc(100vh - 96px)}
-  .asst-mobile-bar{
-    display:flex;align-items:center;justify-content:space-between;gap:8px;
-    padding:8px 10px;border-bottom:1px solid var(--border);
-  }
-  .asst-mobile-bar span{font-weight:600;font-size:0.88rem;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .asst-layout,.asst-layout.hist-collapsed{grid-template-columns:1fr;height:calc(100vh - 96px)}
   .asst-sidebar{
     position:absolute;z-index:40;top:0;left:0;bottom:0;width:78%;max-width:300px;
-    transform:translateX(-105%);transition:transform .2s ease;border-radius:0;
+    transform:translateX(-105%);transition:transform .2s ease;border-radius:0;opacity:1;
   }
   .asst-sidebar.open{transform:translateX(0)}
+  .asst-layout.hist-collapsed .asst-sidebar{opacity:1}
   #section-assistente{position:relative}
 }
+
+/* ================================================================
+   SIDEBAR RECOLHÍVEL (rail só-ícones) — independente do histórico
+   ================================================================ */
+.sidebar{transition:width .2s ease}
+.sb-brand{position:relative}
+.sb-brand-text{flex:1;min-width:0}
+.sb-collapse-btn{
+  display:flex;align-items:center;justify-content:center;width:28px;height:28px;
+  flex-shrink:0;border:1px solid var(--border);background:var(--surface2);
+  color:var(--text3);border-radius:8px;cursor:pointer;transition:all .14s;
+}
+.sb-collapse-btn:hover{color:var(--text);border-color:var(--border-strong);background:var(--surface3)}
+.sb-collapse-btn .ic{transition:transform .2s ease}
+
+body.sb-collapsed .sidebar{width:74px}
+body.sb-collapsed .sb-brand{flex-direction:column;gap:12px;padding:18px 0 14px}
+body.sb-collapsed .sb-brand-text,
+body.sb-collapsed .sb-nav-label,
+body.sb-collapsed .nav-item>span:not(.badge),
+body.sb-collapsed #sync-label,
+body.sb-collapsed #fb-user-name,
+body.sb-collapsed #fb-user-chip .btn,
+body.sb-collapsed #fb-login-btn{display:none}
+body.sb-collapsed .sb-collapse-btn .ic{transform:rotate(180deg)}
+body.sb-collapsed .nav-item{justify-content:center;padding-left:0;padding-right:0;position:relative}
+body.sb-collapsed .nav-item .badge{position:absolute;top:3px;right:12px}
+body.sb-collapsed .sb-nav{padding-left:8px;padding-right:8px}
+body.sb-collapsed .sb-foot{padding-left:8px;padding-right:8px}
+body.sb-collapsed .sb-account{display:flex;justify-content:center}
+body.sb-collapsed #fb-user-chip{justify-content:center}
+body.sb-collapsed #fb-user-photo{margin:0}

@@ -942,6 +942,19 @@ async function handleMidiaFile(input) {
   await extractMidiaDoc(text, file.name)
 }
 
+// Extrai material COLADO (sem arquivo) como documento — mesmo fluxo rico do upload.
+// Útil para colar artigos (ex: Mairo Vergara) direto do site.
+async function extractMidiaPasted() {
+  const text = (el('midia-text-new')?.value || '').trim()
+  if (!text) { toast('Cole o material no campo de texto primeiro', 'warning'); return }
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); showSection('configuracoes'); return }
+  if (text.split(/\s+/).filter(Boolean).length < 8) {
+    toast('Texto curto demais para "material" — use "Analisar linha a linha"', 'warning'); return
+  }
+  const srcTitle = (el('midia-title-new')?.value || '').trim()
+  await extractMidiaDoc(text, srcTitle || 'Material colado')
+}
+
 // Helper: chamada à OpenAI que retorna JSON já parseado
 async function _openaiJSON(messages, maxTokens) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {

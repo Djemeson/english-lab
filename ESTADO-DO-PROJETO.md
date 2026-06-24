@@ -3,7 +3,9 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-06-24 — Assistente (Consulta) virou seção própria: histórico de conversas (sync), streaming e vários itens SRS por resposta com anti-duplicado.
+> Última atualização: 2026-06-24 (2ª rodada) — Assistente: extração de SRS robusta (chamada
+> dedicada, funciona em PT→EN), sidebar e histórico recolhíveis (independentes). Mídia: aceita
+> material colado como documento (artigos Mairo Vergara).
 
 ---
 
@@ -211,6 +213,29 @@ maxInterval (36500), leechThreshold (50)
 15. **Sync em tempo real** (onSnapshot, nuvem = verdade; "Limpar tudo" propaga o vazio).
 16. Correções de bugs lazy/não-lazy (`srcIcon`, `AI_MODELS`/`updateModelOptions`,
     `randomVoice`/`OPENAI_VOICES`, `srsSession`).
+
+### Sessão 2026-06-24 (2ª rodada) — robustez do Assistente + recolher + Mídia colada
+27. **Extração de SRS robusta** (`consulta.js`): o botão "Adicionar" não aparecia em perguntas
+    PT→EN ("como se diz X em inglês?"). Mudança de abordagem: a resposta visível agora é
+    **conversacional e limpa** (sem JSON no prompt) e os termos de estudo são extraídos em uma
+    **chamada dedicada** (`extractSrsItems` → `_consultaOpenAIJSON`, `response_format:json_object`)
+    sobre o par pergunta/resposta — explicitamente pega o termo em inglês mesmo com pergunta em PT
+    e ambos os lados em "diferença entre X e Y". Mostra loader "Procurando termos para estudo…".
+    Removidos `parseSrsItems`/`extractSrsRaw` (inline); `stripSrsBlocks`/`cleanConsultaReply` ficam
+    como defesa.
+28. **Sidebar global recolhível** (rail só-ícones) e **coluna de histórico recolhível** —
+    **independentes**, cada uma com seu toggle, ambas premium e persistidas (`el-ui-prefs`).
+    - Sidebar: botão chevron no brand → `body.sb-collapsed` (largura 74px, só ícones, tooltips
+      via `data-tip`). `toggleSidebar`/`applyUiPrefs`/`saveUiPref`/`loadUiPrefs` em `core.js`
+      (aplicado cedo p/ evitar flash).
+    - Histórico: barra superior do chat (`.asst-chat-top`, sempre visível) com toggle →
+      `.asst-layout.hist-collapsed`. No mobile o mesmo botão abre o drawer. `toggleHistory` em
+      `consulta.js`; preferência aplicada em `renderAssistente`.
+29. **Mídia aceita material COLADO como documento** (`add.js` → `extractMidiaPasted`): novo botão
+    "Extrair material colado" roda o mesmo fluxo rico do upload (`extractMidiaDoc`) sobre o texto
+    do `#midia-text-new` — ideal para colar artigos do **Mairo Vergara** (formatos "Como se diz",
+    "O que significa", "Qual a diferença entre", "phrasal verb", "Estruturas"). O botão antigo
+    virou "Analisar linha a linha" (uma palavra/frase por linha). Ambos com legenda explicativa.
 
 ### Sessão 2026-06-24 — Assistente (Consulta promovida a seção própria)
 22. **Consulta saiu da aba Adicionar e virou a seção "Assistente"** (2º item do menu). Dashboard

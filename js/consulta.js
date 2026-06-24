@@ -47,6 +47,11 @@ function isWordInStudy(word) {
 
 // ── Render principal da seção ─────────────────────────────────────
 function renderAssistente() {
+  // Aplica a preferência de histórico recolhido (desktop)
+  const lay = document.querySelector('.asst-layout')
+  if (lay && typeof loadUiPrefs === 'function') {
+    lay.classList.toggle('hist-collapsed', !!loadUiPrefs().histCollapsed)
+  }
   // Se não há conversa ativa e existem conversas, abre a mais recente
   if (!activeConversaId && conversas.length) {
     activeConversaId = conversas[0].id
@@ -192,26 +197,72 @@ function autoGrowConsulta(ta) {
 function toggleAsstSidebar() { el('asst-sidebar')?.classList.toggle('open') }
 function closeAsstSidebar() { el('asst-sidebar')?.classList.remove('open') }
 
+// Recolhe/expande a coluna de histórico (no desktop) ou abre o drawer (no mobile)
+function toggleHistory() {
+  if (window.matchMedia('(max-width:860px)').matches) { toggleAsstSidebar(); return }
+  const lay = document.querySelector('.asst-layout'); if (!lay) return
+  lay.classList.toggle('hist-collapsed')
+  if (typeof saveUiPref === 'function') saveUiPref('histCollapsed', lay.classList.contains('hist-collapsed'))
+}
+
 // ── Envio com streaming ───────────────────────────────────────────
-const CONSULTA_SYSTEM = `Você é um especialista em inglês ajudando um brasileiro a aprender. Responda SEMPRE em português (exceto os exemplos em inglês), de forma clara e didática.
+// A resposta visível é conversacional e limpa (sem JSON). Os itens de estudo
+// são extraídos DEPOIS, numa chamada dedicada (garante os botões mesmo em
+// perguntas PT→EN como "como se diz X em inglês").
+const CONSULTA_SYSTEM = `Você é um tutor de inglês especialista ajudando um brasileiro a aprender. Responda SEMPRE em português (exceto os exemplos em inglês), de forma clara e didática.
 
-Quando o usuário perguntar sobre palavras/expressões em inglês:
-1. Explique o significado em português.
-2. Mostre a pronúncia (IPA entre barras: //).
-3. Dê exemplos de uso em inglês com tradução.
-4. Acrescente contexto útil (origem/história quando interessante, registro formal/informal, diferenças de uso).
+Quando o usuário perguntar sobre palavras/expressões em inglês — ou pedir "como se diz" algo em inglês:
+1. Dê a tradução/expressão em inglês e explique o significado em português.
+2. Mostre a pronúncia em IPA (entre barras: //).
+3. Dê alguns exemplos de uso em inglês com tradução.
+4. Acrescente contexto útil: origem/história quando interessante, registro (formal/informal), diferenças de uso, variações.
 
-No FINAL da resposta, inclua um bloco com TODOS os termos/expressões em inglês mencionados que valem virar card de estudo — não apenas um. Se você comparou "speak" e "talk", inclua os DOIS. Se o usuário tratou de vários assuntos/termos na mesma mensagem, inclua TODOS. Se foi só uma expressão, inclua só ela.
-<srs_items>
-[{"word":"...","type":"word|phrasal_verb|idiom|collocation","variety":"general|american|british|australian|canadian","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"...","ipa":"...","definition_pt":"...","origin_pt":"Origem/história em PT (1-2 frases). Preencha SÓ se houver etimologia/imagem realmente interessante (idiomas, expressões, metáforas). Deixe \\"\\" para palavras comuns. Nunca invente.","examples":[{"en":"Frase com <b>termo</b> no presente.","pt":"Tradução."},{"en":"Frase com <b>termo</b> em outro tempo.","pt":"Tradução."},{"en":"Frase com <b>termo</b> em outro contexto.","pt":"Tradução."}]}]
-</srs_items>
+FORMATO da resposta (texto que o usuário lê):
+- Escreva em texto corrido e natural. Para destacar, use **negrito** (markdown).
+- NÃO use títulos com # nem blocos de código com crases. NÃO mostre JSON.`
 
-Regras do bloco: é um ARRAY JSON com um objeto por termo; cada objeto tem EXATAMENTE 3 exemplos, cada um em tempo/construção diferente, com o termo em <b></b> apenas no inglês (nunca no português). Preencha variety e register com precisão (use "general"/"neutral" quando não for específico).
+// Extrator dedicado de itens de estudo (roda após a resposta)
+const SRS_EXTRACT_SYSTEM = `A partir de um diálogo entre um aprendiz brasileiro e um tutor de inglês, extraia TODOS os termos/expressões EM INGLÊS que valem virar flashcard de estudo.
+Regras:
+- Inclua os termos em inglês MESMO quando a pergunta foi em português (ex.: "como se diz X em inglês?" → extraia a(s) tradução(ões) em inglês dadas na resposta).
+- Em "qual a diferença entre X e Y", inclua X e Y.
+- Inclua palavras significativas, phrasal verbs, idioms, collocations e gírias REALMENTE presentes na resposta. Deduplique. NÃO invente termos ausentes.
+- Se não houver nada que valha a pena estudar, retorne lista vazia.
+Para CADA item retorne:
+{"word":"<termo em inglês>","type":"word|phrasal_verb|idiom|collocation","variety":"general|american|british|australian|canadian","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"2-6 palavras","ipa":"/.../","definition_pt":"uma frase em PT","origin_pt":"origem/história em PT (1-2 frases) SÓ se houver etimologia/imagem interessante; senão \\"\\"","examples":[{"en":"Frase com <b>termo</b>.","pt":"Tradução."},{"en":"Outra frase com <b>termo</b>.","pt":"Tradução."},{"en":"Mais uma com <b>termo</b>.","pt":"Tradução."}]}
+Cada item tem EXATAMENTE 3 exemplos, em tempos/construções diferentes, com o termo em <b></b> apenas no inglês.
+Retorne JSON: {"items":[ ... ]}`
 
-IMPORTANTE sobre a resposta VISÍVEL (o texto que o usuário lê):
-- NÃO escreva "Bloco JSON", "JSON", crases (\`\`\`) nem mostre o JSON. O JSON aparece SOMENTE dentro de <srs_items></srs_items>.
-- NÃO use tags HTML como <b> na parte visível; para destacar, use **negrito** em markdown.
-- NÃO use títulos com # (ex: ### Contexto). Escreva em texto corrido com **negrito** quando precisar destacar.`
+async function _consultaOpenAIJSON(messages, maxTokens) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: cfg.aiModel || 'gpt-4o-mini', max_tokens: maxTokens, response_format: { type: 'json_object' }, messages })
+  })
+  if (!res.ok) throw new Error('HTTP ' + res.status)
+  const data = await res.json()
+  return JSON.parse((data.choices?.[0]?.message?.content || '{}').trim())
+}
+
+async function extractSrsItems(question, answer) {
+  try {
+    const r = await _consultaOpenAIJSON([
+      { role: 'system', content: SRS_EXTRACT_SYSTEM },
+      { role: 'user', content: `PERGUNTA DO ALUNO:\n${question}\n\nRESPOSTA DO TUTOR:\n${answer}` }
+    ], 2500)
+    return Array.isArray(r.items) ? r.items.filter(it => it && it.word) : []
+  } catch (e) { console.warn('[consulta] extração SRS falhou:', e.message); return [] }
+}
+
+// Loader sutil de "procurando termos" no fim da última bolha da IA
+function showSrsLoading() {
+  const msgs = el('consulta-messages'); if (!msgs) return
+  const bubbles = msgs.querySelectorAll('.consulta-msg.ai')
+  const last = bubbles[bubbles.length - 1]; if (!last) return
+  if (last.querySelector('.asst-srs-loading')) return
+  last.insertAdjacentHTML('beforeend', `<div class="asst-srs-loading"><span class="spinner"></span><span>Procurando termos para estudo…</span></div>`)
+  msgs.scrollTop = msgs.scrollHeight
+}
 
 async function sendConsulta() {
   const input = el('consulta-input')
@@ -295,14 +346,20 @@ async function sendConsulta() {
       }
     }
 
-    // Parse final dos itens de estudo + limpeza do texto
-    const srsItems = parseSrsItems(full)
+    // Limpeza do texto visível
     const cleanReply = cleanConsultaReply(full)
 
-    // Persiste a mensagem do assistente
-    c.messages.push({ role: 'assistant', content: cleanReply, srsItems })
+    // Persiste a mensagem do assistente (itens vêm logo a seguir)
+    const aiMsg = { role: 'assistant', content: cleanReply, srsItems: [] }
+    c.messages.push(aiMsg)
     touchConversa(c)
     renderConversaList()
+    renderActiveConversa()
+
+    // Extração dedicada dos termos de estudo (garante os botões, inclusive PT→EN)
+    showSrsLoading()
+    aiMsg.srsItems = await extractSrsItems(question, cleanReply)
+    touchConversa(c)
     renderActiveConversa()
 
   } catch (e) {
@@ -317,26 +374,9 @@ async function sendConsulta() {
   }
 }
 
-// ── Parsing / limpeza da resposta ─────────────────────────────────
-function extractSrsRaw(reply) {
-  let m = reply.match(/<srs_items>\s*([\s\S]*?)\s*<\/srs_items>/)
-  if (m) return { raw: m[1].trim(), array: true }
-  m = reply.match(/<srs_item>\s*([\s\S]*?)\s*<\/srs_item>/)
-  if (m) return { raw: m[1].trim(), array: false }
-  return null
-}
-
-function parseSrsItems(reply) {
-  const found = extractSrsRaw(reply)
-  if (!found) return []
-  try {
-    const parsed = JSON.parse(found.raw)
-    const arr = Array.isArray(parsed) ? parsed : [parsed]
-    return arr.filter(it => it && it.word)
-  } catch { return [] }
-}
-
-// Remove os blocos srs (mesmo incompletos, durante o streaming)
+// ── Limpeza da resposta ───────────────────────────────────────────
+// Remove os blocos srs (mesmo incompletos, durante o streaming) — defensivo,
+// caso o modelo ainda emita algum JSON apesar do prompt pedir texto limpo.
 function stripSrsBlocks(text) {
   let t = text.replace(/<srs_items>[\s\S]*?<\/srs_items>/g, '')
               .replace(/<srs_item>[\s\S]*?<\/srs_item>/g, '')

@@ -27,6 +27,21 @@ let activeConversaId = null
 function loadConversas() { try { conversas = JSON.parse(localStorage.getItem(SK.conversas) || '[]') } catch { conversas = [] } }
 function saveConversas() { try { localStorage.setItem(SK.conversas, JSON.stringify(conversas)) } catch(e) { console.warn('[conversas] save falhou:', e.message) } }
 
+// ── Preferências de interface (recolher sidebar/histórico) ─────────
+const SK_UI = 'el-ui-prefs'
+function loadUiPrefs() { try { return JSON.parse(localStorage.getItem(SK_UI) || '{}') } catch { return {} } }
+function saveUiPref(key, val) { const p = loadUiPrefs(); p[key] = val; try { localStorage.setItem(SK_UI, JSON.stringify(p)) } catch {} }
+function applyUiPrefs() { document.body.classList.toggle('sb-collapsed', !!loadUiPrefs().sbCollapsed) }
+// Recolhe/expande a sidebar global (vira rail só-ícones). Independente do histórico.
+function toggleSidebar() {
+  const collapsed = document.body.classList.toggle('sb-collapsed')
+  saveUiPref('sbCollapsed', collapsed)
+  const btn = document.querySelector('.sb-collapse-btn')
+  if (btn) btn.setAttribute('data-tip', collapsed ? 'Expandir menu' : 'Recolher menu')
+}
+// Aplica o estado recolhido o quanto antes (core.js já roda após o markup) p/ evitar flash
+try { if (document.body) applyUiPrefs() } catch {}
+
 function loadCfg() {
   try { cfg = { ...DEF_CFG, ...JSON.parse(localStorage.getItem(SK.settings) || '{}') } }
   catch { cfg = { ...DEF_CFG } }
