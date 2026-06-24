@@ -232,6 +232,12 @@ maxInterval (36500), leechThreshold (50)
     ("ran by"→"run by") ou padrão estrutural ("run something by someone"→"run by"). Os sentidos são
     montados só na Fase 2. Também: exemplos por sentido voltaram a ser **EXATAMENTE 3** (prefere as
     frases reais do doc; completa com exemplos fiéis ao sentido se o texto tiver menos de 3).
+31c. **Validado ao vivo (Claude in Chrome)** rodando o prompt NOVO direto na API (gpt-4o-mini)
+    sobre o artigo "Pass On" (que NÃO é o exemplo do prompt — generalização honesta): retornou
+    **7 sentidos**, **3 exemplos cada** (`[3,3,3,3,3,3,3]`), com as frases reais do texto. Também
+    blindado: remove `<b>` da tradução PT dos exemplos (o modelo às vezes inseria). ⚠️ Deploy
+    OneDrive→GitHub é assíncrono + service worker cacheia o JS; pode levar alguns minutos / um
+    hard-refresh até a UI ao vivo refletir a versão nova.
 
 ### Sessão 2026-06-24 (3ª rodada) — extrator de documento: só o que é ENSINADO
 30. **Filtro "ensinado vs mencionado"** na Fase 1 do `extractMidiaDoc` (`add.js` → `LIST_SYSTEM`).

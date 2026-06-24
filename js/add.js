@@ -1117,7 +1117,7 @@ You receive the document text and a list of TARGET terms (each with a draft mean
 - "type": "word"|"phrasal_verb"|"idiom"|"collocation"
 - "ipa": American IPA between /slashes/ (best effort)
 - "level": "A2"|"B1"|"B2"|"C1"|"C2"
-- "senses": an ARRAY of sense objects. IMPORTANT: if the document develops the term in MORE THAN ONE distinct meaning (very common when an article teaches a single expression across several numbered senses — e.g. "run by" = "falar com alguém antes de seguir", "apresentar uma ideia", "repassar/mostrar de novo", "dar um pulo num lugar", "passar correndo"), return ONE sense object PER distinct sense the document actually covers. If the term has only one sense, return exactly one. Do NOT invent senses absent from the document.
+- "senses": an ARRAY of sense objects. CRUCIAL STEP: before writing, SCAN THE ENTIRE DOCUMENT for this expression and list EVERY distinct meaning it is given — articles typically NUMBER them ("1 –", "2 –", "3 –", …) or separate them by paragraph. Return ONE sense object PER distinct documented meaning, IN ORDER. Example: the "run by" article develops 5 senses (1: "falar com alguém antes de seguir", 2: "apresentar uma ideia", 3: "repassar/mostrar de novo", 4: "dar um pulo num lugar", 5: "passar correndo") → return 5 sense objects. The hint meaning you receive is ONLY the first sense — NEVER stop at it when the document shows more. Only return a single sense if the document truly gives just one. Do NOT invent senses absent from the document.
 
 Each sense object has:
 - "meaning_pt": 2-6 words, this SINGLE sense (no semicolons mixing senses)
@@ -1138,12 +1138,12 @@ Return JSON for ALL target terms: {"items":[ ... ]}`
     const batch = baseItems.slice(b * BATCH, b * BATCH + BATCH)
     if (countEl) countEl.textContent = `Fase 2/2 — detalhando ${enrichedCount}/${baseItems.length}...`
     const targets = batch.map((t, i) =>
-      `${i + 1}. ${t.word}${t.meaning_pt ? ` — draft meaning: ${t.meaning_pt}` : ''}${t._docExample ? ` — document example: "${t._docExample}"` : ''}`
+      `${i + 1}. ${t.word}${t.meaning_pt ? ` — first-sense hint: ${t.meaning_pt}` : ''}${t._docExample ? ` — one document example: "${t._docExample}"` : ''}`
     ).join('\n')
     try {
       const r2 = await _openaiJSON([
         { role: 'system', content: ENRICH_SYSTEM },
-        { role: 'user', content: `DOCUMENT (for context only):\n\n${docText}\n\nTARGET TERMS (return a card for each):\n${targets}` }
+        { role: 'user', content: `DOCUMENT (read it FULLY — it is the source of the senses and examples):\n\n${docText}\n\nTARGET TERMS — for EACH, return ALL distinct senses the document develops for it (look for numbered meanings 1, 2, 3…); the hint is only the first sense, never stop there:\n${targets}` }
       ], 5000)
       const out = Array.isArray(r2.items) ? r2.items : []
       for (const c of out) {
@@ -1161,7 +1161,7 @@ Return JSON for ALL target terms: {"items":[ ... ]}`
           register: s.register || c.register || 'neutral',
           variety: s.variety || c.variety || 'general',
           examples: (Array.isArray(s.examples) ? s.examples : [])
-            .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '') }))
+            .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '').replace(/<\/?b>/gi, '') }))
         })).filter(s => s.meaning_pt || s.examples.length)
         if (senses.length) {
           it.senses = senses
@@ -1174,7 +1174,7 @@ Return JSON for ALL target terms: {"items":[ ... ]}`
           it.examples = senses.flatMap(s => s.examples)
         } else {
           const exs = (Array.isArray(c.examples) ? c.examples : [])
-            .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '') }))
+            .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '').replace(/<\/?b>/gi, '') }))
           it.register = c.register || it.register
           it.variety = c.variety || it.variety
           it.meaning_pt = String(c.meaning_pt || it.meaning_pt || '').trim()
