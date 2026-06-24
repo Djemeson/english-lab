@@ -814,18 +814,40 @@ function addMidiaProcessed() {
 
 // ── Importação de documento (.md / .txt / .pdf) → cards prontos ───────────────
 // Preview rico de um item extraído de documento (já vem com significado + exemplo)
+function midiaDocExampleHtml(e, ei) {
+  return `
+        <div class="mi-example" style="margin-top:6px;display:flex;gap:8px;align-items:baseline">
+          <span style="font-size:0.7rem;color:var(--text3);flex-shrink:0;font-weight:600">#${ei + 1}</span>
+          <div style="flex:1"><div class="en">"${allowBold(e.en)}"</div>${e.pt ? `<div class="pt">"${esc(e.pt.replace(/<\/?b>/gi, ''))}"</div>` : ''}</div>
+        </div>`
+}
+
 function renderMidiaDocItem(item, i) {
   const typeLbl = ({ word:'word', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' })[item.type] || item.type || ''
-  const exs = Array.isArray(item.examples) ? item.examples : []
-  const examplesHtml = exs.filter(e => e && e.en).map((e, ei) => `
-        <div class="mi-example" style="margin-top:6px;display:flex;gap:8px;align-items:baseline">
-          <span style="font-size:0.7rem;color:var(--text3);flex-shrink:0;font-weight:600">#${ei+1}</span>
-          <div style="flex:1"><div class="en">"${allowBold(e.en)}"</div>${e.pt ? `<div class="pt">"${esc(e.pt.replace(/<\/?b>/gi,''))}"</div>` : ''}</div>
-        </div>`).join('')
-  const nCards = exs.filter(e => e && e.en).length || 1
+  const senses = (Array.isArray(item.senses) && item.senses.length)
+    ? item.senses
+    : [{ meaning_pt: item.meaning_pt, definition_pt: item.definition_pt, origin_pt: item.origin_pt, register: item.register, examples: Array.isArray(item.examples) ? item.examples : [] }]
+  const multi = senses.length > 1
+
+  // Conteúdo dos sentidos
+  const sensesHtml = senses.map((s, si) => {
+    const exs = (Array.isArray(s.examples) ? s.examples : []).filter(e => e && e.en)
+    const exsHtml = exs.map((e, ei) => midiaDocExampleHtml(e, ei)).join('')
+    const meaningLine = s.meaning_pt
+      ? `<div style="font-weight:600;color:var(--text)">${multi ? `<span class="mi-sense-num">${si + 1}</span>` : ''}${esc(s.meaning_pt)}${s.register && s.register !== 'neutral' ? ` <span class="chip register-${esc(s.register)}">${esc(s.register)}</span>` : ''}</div>`
+      : ''
+    const defLine = s.definition_pt ? `<div style="font-style:italic;opacity:.8;font-size:0.85rem;margin-top:2px">${esc(s.definition_pt)}</div>` : ''
+    const origin = s.origin_pt ? `<div style="margin-top:6px;padding:6px 9px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:0.8rem"><b>Origem:</b> ${esc(s.origin_pt)}</div>` : ''
+    const body = `${meaningLine}${defLine}${origin}${exsHtml}`
+    return multi ? `<div class="mi-sense">${body}</div>` : body
+  }).join('')
+
+  const nCards = senses.reduce((a, s) => a + Math.max(1, (Array.isArray(s.examples) ? s.examples.filter(e => e && e.en).length : 0)), 0)
   const cardChip = (item.doc && item._enriched === false)
     ? `<span class="chip" style="opacity:.7"><span class="spinner" style="width:10px;height:10px;border-width:2px;vertical-align:-1px;margin-right:4px"></span>detalhando…</span>`
     : `<span class="chip" style="opacity:.8">${nCards} card${nCards !== 1 ? 's' : ''}</span>`
+  const sensesChip = (multi && item._enriched !== false)
+    ? `<span class="chip" style="opacity:.8;background:rgba(var(--primary-rgb),.14);color:var(--primary)">${senses.length} sentidos</span>` : ''
   return `
     <div class="parsed-item" id="mi-proc-${i}">
       <input type="checkbox" class="midia-proc-check" data-i="${i}" checked>
@@ -834,14 +856,11 @@ function renderMidiaDocItem(item, i) {
           <span style="font-weight:700;font-size:1.02rem">${esc(item.word || '')}</span>
           ${typeLbl ? `<span class="chip">${esc(typeLbl)}</span>` : ''}
           ${item.level ? `<span class="chip level-${String(item.level).toLowerCase()}">${esc(item.level)}</span>` : ''}
-          ${item.register ? `<span class="chip register-${esc(item.register)}">${esc(item.register)}</span>` : ''}
           ${item.ipa ? `<span class="wc-ipa">${esc(item.ipa)}</span>` : ''}
+          ${sensesChip}
           ${cardChip}
         </div>
-        ${item.meaning_pt ? `<div style="margin-top:4px;font-weight:600;color:var(--text)">${esc(item.meaning_pt)}</div>` : ''}
-        ${item.definition_pt ? `<div style="font-style:italic;opacity:.8;font-size:0.85rem;margin-top:2px">${esc(item.definition_pt)}</div>` : ''}
-        ${item.origin_pt ? `<div style="margin-top:6px;padding:6px 9px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:0.8rem"><b>Origem:</b> ${esc(item.origin_pt)}</div>` : ''}
-        ${examplesHtml}
+        <div style="margin-top:4px">${sensesHtml}</div>
         <div class="parsed-meta">${srcIcon(item.source_type)} ${esc(item.source_title || item.source_type)}${item.source_context ? ` · ${esc(item.source_context)}` : ''}</div>
       </div>
     </div>`
@@ -850,32 +869,44 @@ function renderMidiaDocItem(item, i) {
 // Cria a palavra já em "pending_review", preservando os dados do documento como
 // sentido principal (context_match). Fica pronta para salvar no SRS sem perdas.
 function createDocWord(item) {
-  const exs = (Array.isArray(item.examples) ? item.examples : [])
-    .filter(e => e && e.en).map(e => ({ en: e.en, pt: e.pt || '' }))
+  // Sentidos: usa item.senses (vários significados) ou cai para o sentido único legado.
+  const senses = (Array.isArray(item.senses) && item.senses.length)
+    ? item.senses
+    : [{
+        meaning_pt: item.meaning_pt || '', definition_pt: item.definition_pt || '',
+        origin_pt: item.origin_pt || '', register: item.register || 'neutral',
+        variety: item.variety || 'general',
+        examples: (Array.isArray(item.examples) ? item.examples : [])
+      }]
+  // 1ª frase de exemplo disponível vira o contexto da palavra
+  let firstEx = ''
+  for (const s of senses) {
+    const e = (Array.isArray(s.examples) ? s.examples : []).find(x => x && x.en)
+    if (e) { firstEx = e.en; break }
+  }
   const w = createWord({
     word: item.word,
-    context: (exs[0]?.en || '').replace(/<\/?b>/gi,'').trim(),
+    context: (firstEx || '').replace(/<\/?b>/gi, '').trim(),
     source_type: item.source_type,
     source_title: item.source_title,
     source_context: item.source_context
   })
   w.type = item.type || 'word'
   w.ipa = item.ipa || ''
-  // Semente: marca o significado curado do documento para que uma eventual
-  // "Re-analisar" (por palavra) PRESERVE este sentido em vez de reinventá-lo.
-  w._seedMeaning = item.meaning_pt || ''
-  w.meanings = [{
-    id: uid(), selected: true, idx: 0,
-    meaning_pt: item.meaning_pt || '',
-    definition_pt: item.definition_pt || '',
-    origin_pt: item.origin_pt || '',
-    variety: item.variety || 'general',
-    register: item.register || 'neutral',
+  // Semente: marca o 1º significado curado do documento p/ uma eventual "Re-analisar".
+  w._seedMeaning = senses[0].meaning_pt || ''
+  w.meanings = senses.map((s, si) => ({
+    id: uid(), selected: true, idx: si,
+    meaning_pt: s.meaning_pt || '',
+    definition_pt: s.definition_pt || '',
+    origin_pt: s.origin_pt || '',
+    variety: s.variety || item.variety || 'general',
+    register: s.register || item.register || 'neutral',
     level: item.level || '',
-    examples: exs,
+    examples: (Array.isArray(s.examples) ? s.examples : []).filter(e => e && e.en).map(e => ({ en: e.en, pt: e.pt || '' })),
     synonyms: [], antonyms: [], notes: [], word_family: [], tags: [],
-    context_match: true
-  }]
+    context_match: si === 0
+  }))
   w.status = 'pending_review'
   w.ai_processed = true
   w.updated_at = new Date().toISOString()
@@ -997,13 +1028,22 @@ async function extractMidiaDoc(text, fileName) {
   if (countEl) countEl.textContent = 'Lendo documento...'
   if (list) list.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)"><span class="spinner" style="width:28px;height:28px;border-width:3px"></span><div style="margin-top:12px">Fase 1/2 — lendo o documento e listando todos os termos de estudo...</div></div>`
 
-  // ── FASE 1 — listar TODOS os termos (leve, exaustiva) ──────────────────────
-  const LIST_SYSTEM = `You list EVERY English vocabulary study item present in a document, for a Brazilian learner. ${GENRE}
+  // ── FASE 1 — listar os termos que o documento REALMENTE ENSINA ─────────────
+  // Regra-chave: só entra o que o texto desenvolve (explica e/ou exemplifica).
+  // Termos apenas CITADOS de passagem (listas/enumerações) NÃO entram — era o bug
+  // do artigo "run by" do Mairo, que cita uma dúzia de outros phrasal verbs só de
+  // brincadeira e o extrator os capturava como se fossem ensinados.
+  const LIST_SYSTEM = `You list the English vocabulary items that THIS DOCUMENT ACTUALLY TEACHES, for a Brazilian learner. ${GENRE}
 
-List ONLY study-worthy items: meaningful single words, phrasal verbs, idioms, collocations, slang and set phrases. IGNORE titles, section headings, instructions, difficulty legends/emojis, "how to use" text and Portuguese-only filler. Deduplicate.
-BE EXHAUSTIVE: include ALL items, even if there are many dozens. Never stop early or summarize. Do NOT invent items absent from the document.
+CRITICAL FILTER — include a term ONLY if the document genuinely develops it: it has its own explanation/definition AND/OR at least one real example sentence (in the document) showing it in use.
+EXCLUDE any term that is merely mentioned, listed, enumerated or name-dropped in passing, without its own explanation or example. Concrete example: an article teaching the phrasal verb "run by" may, in a single throw-away sentence, casually list other phrasal verbs ("run out, run into, run off, run over, run up…") just to make a rhetorical point — those are NOT taught here, so DO NOT include them. Only "run by" (and its real sub-structures actually used with examples, like "run something by someone", "run that by me again") qualifies.
 
-For each item return: {"word":"<term, lowercase unless proper noun/ritual phrase>","type":"word|phrasal_verb|idiom|collocation","meaning_pt":"<2-6 words, source-context sense>","doc_example_en":"<the example sentence from the document if present, else empty string>"}
+Many articles teach ONE main expression with several senses/sub-structures: include that main expression and its REAL variants that the text uses with examples (as separate items), but NOTHING that is only listed.
+
+Eligible item types: meaningful single words, phrasal verbs, idioms, collocations, slang, set phrases. IGNORE titles, section headings, instructions, difficulty legends/emojis, "how to use" text and Portuguese-only filler. Deduplicate.
+Be thorough about the TAUGHT items (capture all of them and their real variants), but never pad the list with merely-mentioned terms. Do NOT invent items absent from the document.
+
+For each item return: {"word":"<term, lowercase unless proper noun/ritual phrase>","type":"word|phrasal_verb|idiom|collocation","meaning_pt":"<2-6 words, source-context sense>","doc_example_en":"<a real example sentence FROM THE DOCUMENT using this term; this is the proof it is taught — if you cannot find one in the document and the term is not otherwise explained, DROP the item>"}
 Return ONLY valid JSON: {"items":[ ... ]}`
 
   let listed = []
@@ -1041,6 +1081,12 @@ Return ONLY valid JSON: {"items":[ ... ]}`
       definition_pt: '',
       origin_pt: '',
       examples: docEx ? [{ en: docEx, pt: '' }] : [],
+      // sentido provisório (substituído na Fase 2); se o detalhamento falhar,
+      // preserva o significado/exemplo do documento — nada se perde.
+      senses: [{
+        meaning_pt: String(it.meaning_pt || '').trim(), definition_pt: '', origin_pt: '',
+        register: 'neutral', variety: 'general', examples: docEx ? [{ en: docEx, pt: '' }] : []
+      }],
       _docExample: docEx,
       _enriched: false,
       source_type: srcType,
@@ -1062,17 +1108,20 @@ Return ONLY valid JSON: {"items":[ ... ]}`
   // ── FASE 2 — enriquecer em lotes (IPA, nível, registro, definição, 3 exemplos) ──
   const ENRICH_SYSTEM = `You complete English vocabulary STUDY CARDS for specific terms, for a Brazilian learner. ${GENRE}
 
-You receive the document text and a list of TARGET terms (each with a draft meaning and maybe a document example). For EACH target term return a full card object:
-- "word": the same term (verbatim, so it can be matched back)
+You receive the document text and a list of TARGET terms (each with a draft meaning and maybe one document example). For EACH target term return a card object:
+- "word": the same term verbatim (so it can be matched back)
 - "type": "word"|"phrasal_verb"|"idiom"|"collocation"
 - "ipa": American IPA between /slashes/ (best effort)
 - "level": "A2"|"B1"|"B2"|"C1"|"C2"
+- "senses": an ARRAY of sense objects. IMPORTANT: if the document develops the term in MORE THAN ONE distinct meaning (very common when an article teaches a single expression across several numbered senses — e.g. "run by" = "falar com alguém antes de seguir", "apresentar uma ideia", "repassar/mostrar de novo", "dar um pulo num lugar", "passar correndo"), return ONE sense object PER distinct sense the document actually covers. If the term has only one sense, return exactly one. Do NOT invent senses absent from the document.
+
+Each sense object has:
+- "meaning_pt": 2-6 words, this SINGLE sense (no semicolons mixing senses)
+- "definition_pt": one short Portuguese sentence defining this sense
 - "register": "neutral"|"formal"|"informal"|"colloquial"|"slang"|"technical"|"literary"|"archaic"|"vulgar"
 - "variety": "general"|"american"|"british"|"australian"|"canadian"
-- "meaning_pt": refine the draft to 2-6 words, ONE sense in the source's context (no semicolons mixing senses)
-- "definition_pt": one short Portuguese sentence defining that sense
-- "origin_pt": Brazilian-Portuguese note (1-2 sentences) explaining the ORIGIN / why this expression came to mean this — the image or history behind it. Fill ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. "sitting duck", "on the chopping block", "flagship", "throw under the bus"). Leave it as an EMPTY STRING "" for ordinary words with no notable story. NEVER invent folk etymology — if unsure, leave empty.
-- "examples": EXACTLY 3 objects {"en":"...","pt":"..."}. Each "en" is a natural sentence using the term wrapped in <b></b> exactly as inflected; the 3 must differ in tense/construction, subject and real situation; keep them faithful to this sense (situations from the source's genre fit well) while also teaching general usage; if a document example is given, use it (lightly refined) as one of the 3; "pt" is a natural Brazilian-Portuguese translation with NO <b>.
+- "origin_pt": Brazilian-Portuguese note (1-2 sentences) on the ORIGIN / why it means this — ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting etymology; EMPTY STRING "" otherwise; never invent.
+- "examples": 1 to 3 objects {"en":"...","pt":"..."} FOR THIS SENSE. PREFER the document's REAL example sentences that belong to this sense (read the whole document and assign each example sentence to the correct sense). Each "en" wraps the term in <b></b> as inflected; "pt" is a natural Brazilian-Portuguese translation with NO <b>. Only add a non-document example when a sense has fewer than 2 real ones, keeping it faithful to that sense.
 
 Return JSON for ALL target terms: {"items":[ ... ]}`
 
@@ -1091,22 +1140,48 @@ Return JSON for ALL target terms: {"items":[ ... ]}`
       const r2 = await _openaiJSON([
         { role: 'system', content: ENRICH_SYSTEM },
         { role: 'user', content: `DOCUMENT (for context only):\n\n${docText}\n\nTARGET TERMS (return a card for each):\n${targets}` }
-      ], 4000)
+      ], 5000)
       const out = Array.isArray(r2.items) ? r2.items : []
       for (const c of out) {
         const it = byWord.get(String(c.word || '').trim().toLowerCase())
         if (!it) continue
-        const exs = (Array.isArray(c.examples) ? c.examples : [])
-          .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '') }))
         it.type = c.type || it.type
         it.ipa = c.ipa || it.ipa
         it.level = c.level || it.level
-        it.register = c.register || it.register
-        it.variety = c.variety || it.variety
-        it.meaning_pt = String(c.meaning_pt || it.meaning_pt || '').trim()
-        it.definition_pt = String(c.definition_pt || '').trim()
-        it.origin_pt = String(c.origin_pt || '').trim()
-        if (exs.length) it.examples = exs
+        // Novo formato: senses[] (vários sentidos por termo). Mantém compat com o
+        // formato antigo (meaning_pt/examples direto) caso o modelo não retorne senses.
+        const senses = (Array.isArray(c.senses) ? c.senses : []).map(s => ({
+          meaning_pt: String(s.meaning_pt || '').trim(),
+          definition_pt: String(s.definition_pt || '').trim(),
+          origin_pt: String(s.origin_pt || '').trim(),
+          register: s.register || c.register || 'neutral',
+          variety: s.variety || c.variety || 'general',
+          examples: (Array.isArray(s.examples) ? s.examples : [])
+            .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '') }))
+        })).filter(s => s.meaning_pt || s.examples.length)
+        if (senses.length) {
+          it.senses = senses
+          // espelha o 1º sentido nos campos simples (resumo/compatibilidade)
+          it.meaning_pt = senses[0].meaning_pt || it.meaning_pt
+          it.definition_pt = senses[0].definition_pt || ''
+          it.origin_pt = senses[0].origin_pt || ''
+          it.register = senses[0].register || it.register
+          it.variety = senses[0].variety || it.variety
+          it.examples = senses.flatMap(s => s.examples)
+        } else {
+          const exs = (Array.isArray(c.examples) ? c.examples : [])
+            .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '') }))
+          it.register = c.register || it.register
+          it.variety = c.variety || it.variety
+          it.meaning_pt = String(c.meaning_pt || it.meaning_pt || '').trim()
+          it.definition_pt = String(c.definition_pt || '').trim()
+          it.origin_pt = String(c.origin_pt || '').trim()
+          if (exs.length) it.examples = exs
+          it.senses = [{
+            meaning_pt: it.meaning_pt, definition_pt: it.definition_pt, origin_pt: it.origin_pt,
+            register: it.register, variety: it.variety, examples: it.examples
+          }]
+        }
         it._enriched = true
         enrichedCount++
       }

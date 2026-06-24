@@ -214,6 +214,29 @@ maxInterval (36500), leechThreshold (50)
 16. Correções de bugs lazy/não-lazy (`srcIcon`, `AI_MODELS`/`updateModelOptions`,
     `randomVoice`/`OPENAI_VOICES`, `srsSession`).
 
+### Sessão 2026-06-24 (4ª rodada) — múltiplos sentidos por termo (doc)
+31. **Sentidos múltiplos** no extrator de documento (`extractMidiaDoc`/`createDocWord`/
+    `renderMidiaDocItem`). Antes, um termo virava 1 significado só — um artigo do Mairo que ensina
+    "run by" em 5 sentidos (falar com alguém / apresentar ideia / repassar / dar um pulo / passar
+    correndo) colapsava tudo num significado. Agora a Fase 2 retorna `senses[]` (um objeto por
+    sentido que o documento realmente desenvolve), cada sentido com seus próprios
+    significado/definição/registro/origem e os **exemplos reais do texto atribuídos àquele sentido**.
+    `createDocWord` monta `w.meanings[]` com um significado por sentido (todos `selected`), então o
+    SRS gera cards por sentido × exemplo (reaproveita `saveToSrs`/`createSrsCard`). Preview mostra os
+    sentidos numerados + chip "N sentidos". Fallback de sentido único preservado; max_tokens do
+    enriquecimento subiu p/ 5000. Itens só MENCIONADos continuam fora (filtro da 3ª rodada).
+
+### Sessão 2026-06-24 (3ª rodada) — extrator de documento: só o que é ENSINADO
+30. **Filtro "ensinado vs mencionado"** na Fase 1 do `extractMidiaDoc` (`add.js` → `LIST_SYSTEM`).
+    Sintoma: ao colar o artigo "Run By" do Mairo (que ensina só *run by*), o projeto gerou 15 itens —
+    os 3 certos (família *run by*) + 12 phrasal verbs que o artigo só **cita de passagem** numa frase
+    de efeito ("run out, run into, run off…"). A Fase 1 mandava ser EXAUSTIVA e capturava tudo;
+    a Fase 2 então **inventava** exemplos (do conhecimento geral) para esses 12, perdendo a curadoria
+    da fonte. Correção: o prompt agora inclui um termo **só** se o documento o desenvolve (tem
+    explicação própria e/ou frase de exemplo real no texto); termos apenas listados/citados são
+    descartados (com o caso "run by" como exemplo no próprio prompt). `doc_example_en` virou a "prova"
+    de que o termo é ensinado.
+
 ### Sessão 2026-06-24 (2ª rodada) — robustez do Assistente + recolher + Mídia colada
 27. **Extração de SRS robusta** (`consulta.js`): o botão "Adicionar" não aparecia em perguntas
     PT→EN ("como se diz X em inglês?"). Mudança de abordagem: a resposta visível agora é
