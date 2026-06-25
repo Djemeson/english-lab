@@ -595,8 +595,8 @@ select option{background:var(--surface)}
 }
 .srs-dash-card .sdc-value{font-size:2.2rem;font-weight:700;line-height:1;margin-bottom:4px}
 .srs-dash-card .sdc-label{font-size:0.78rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
-.srs-dash-card.due .sdc-value{color:var(--primary)}
-.srs-dash-card.new .sdc-value{color:var(--success)}
+.srs-dash-card.due .sdc-value{color:var(--success)}
+.srs-dash-card.new .sdc-value{color:var(--primary)}
 .srs-dash-card.streak .sdc-value{color:var(--warning)}
 
 /* Study session */

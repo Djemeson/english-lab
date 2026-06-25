@@ -8,11 +8,12 @@ function renderSrsSection() {
   updateSrsBadge()
 
   const due = srsDueCount()
-  const newRem = srsNewTodayRemaining()
+  const newRem = srsNewTodayRemaining()                       // limitado por newPerDay (sessão/badge)
+  const newAvail = srsCards.filter(c => c.state === 'new').length  // acervo real de novos
   const streak = srsStreak()
 
   el('srs-due-count').textContent = due
-  el('srs-new-count').textContent = newRem
+  el('srs-new-count').textContent = newAvail
   el('srs-streak').textContent = streak
 
   renderDeckStatsTable()
@@ -39,9 +40,9 @@ function renderSrsSection() {
     startArea.innerHTML = `
     <div style="text-align:center;padding:24px 0">
       <p style="color:var(--text2);margin-bottom:16px;font-size:0.95rem">
-        ${due > 0 ? `<strong style="color:var(--primary)">${due}</strong> para revisar` : ''}
+        ${due > 0 ? `<strong style="color:var(--success)">${due}</strong> para revisar` : ''}
         ${due > 0 && newRem > 0 ? ' · ' : ''}
-        ${newRem > 0 ? `<strong style="color:var(--success)">${newRem}</strong> novos` : ''}
+        ${newRem > 0 ? `<strong style="color:var(--primary)">${newRem}</strong> novos` : ''}
       </p>
       <button class="btn btn-primary" style="padding:12px 36px;font-size:1rem" onclick="startSrsSession()">
         ${ic('play')}Começar sessão

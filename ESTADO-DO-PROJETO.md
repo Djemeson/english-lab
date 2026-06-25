@@ -3,10 +3,9 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-06-24 (5ª rodada) — Biblioteca: modo **Palavras** (glossário de
-> consulta rápida, cada termo uma vez com todos os sentidos); chip **"sentido X de Y"** nos cards;
-> **negrito perfeito** do objeto de estudo em EN e PT (correção do render + botão IA retroativo +
-> prompts de geração ajustados para todas as novas).
+> Última atualização: 2026-06-25 — Estudar: contador **"Novos disponíveis"** desacoplado do limite
+> diário (mostra o acervo real de novos, não mais o teto `newPerDay`); cor **azul** passou a
+> identificar os **novos** (verde = para revisar), nos cards e no subtítulo da sessão.
 
 ---
 
@@ -191,6 +190,18 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-06-25 — contador "Novos disponíveis" e cor dos novos (Estudar)
+35. **"Novos disponíveis" deixou de ser limitado por `newPerDay`** (`study.js` → `renderSrsSection`).
+    Sintoma relatado: ao mexer em "Novos por dia", o número de "Novos disponíveis" mudava junto (o
+    teto diário "puxava" o contador). Agora o card mostra o **acervo real** de cards novos
+    (`srsCards.filter(c => c.state === 'new').length`). O `newPerDay` continua valendo SÓ onde deve:
+    na **sessão** (`buildSessionQueue`, linha ~196), no **badge** (`updateSrsBadge`) e no **subtítulo**
+    do start-area (`newRem` = `srsNewTodayRemaining()` = quantos novos entram hoje). "Para revisar hoje"
+    segue sendo `srsDueCount()` (review/relearning vencidos), sem relação com limites.
+36. **Azul = novos** (antes azul = revisar). Trocadas as cores em `css/styles.css`
+    (`.srs-dash-card.new` → `--primary`/azul, `.due` → `--success`/verde) e no subtítulo da sessão
+    em `study.js` (mantendo azul nos "novos" e verde no "para revisar"). Streak segue `--warning`.
 
 1. **Persistência da cfg**: backup em IndexedDB (`SettingsDB`, "pegajoso" p/ chave/URL) +
    restauração no boot; `setPersistence(LOCAL)`; cfg sincronizada (merge, omit-empty).
