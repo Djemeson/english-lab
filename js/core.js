@@ -267,6 +267,11 @@ function el(id) { return document.getElementById(id) }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
 function escA(s) { return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;') }
 function escR(s) { return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') }
+// Escapa o texto MAS preserva as tags <b>/</b> (negrito do objeto de estudo).
+// Usada nas frases EN/PT que já vêm com o termo marcado em <b> pela IA.
+function escB(s) {
+  return esc(s).replace(/&lt;b&gt;/gi, '<b>').replace(/&lt;\/b&gt;/gi, '</b>')
+}
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
 function selectAll(cls, val) {

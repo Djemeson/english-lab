@@ -90,7 +90,7 @@ Rules for examples — CRITICAL, follow exactly:
 - Each example MUST describe a genuinely different real-world situation or context (work, relationships, sports, travel, news, etc.)
 - NEVER use formulaic sentence patterns — sentences should feel natural, like they come from a novel, news article, or real conversation
 - Wrap the target word/expression in <b></b> tags exactly as it appears conjugated/inflected in that English sentence
-- NEVER use <b> tags in Portuguese translations — plain text only
+- ALSO wrap, in EACH Portuguese translation, the word or short phrase that translates the target in that sentence (its Portuguese equivalent) in <b></b> tags — exactly one bold span per translation
 - BAD (avoid): "#1 He backs down. #2 She backed down. #3 They are backing down." — same pattern, different pronouns
 - GOOD: "#1 The senator backed down after facing criticism from his own party. #2 Don't back down just because the situation gets uncomfortable. #3 She never backs down from a challenge, even when the odds are against her."
 
@@ -98,6 +98,7 @@ For Portuguese translations of examples:
 - Translate naturally — don't translate word-for-word
 - Use DIFFERENT Portuguese words/synonyms across the 3 examples when the target word has synonyms (e.g. for "thunderstruck": use "atordoado", "estarrecido", "pasmado" — not "atordoado" × 3)
 - Each Portuguese translation should read like natural Brazilian Portuguese, not like a translation
+- Wrap the Portuguese equivalent of the target (the translated word/phrase) in <b></b> in each translation
 
 Rules for meanings — CRITICAL:
 - The context sentence is ONLY used to identify the word correctly and to mark which sense appeared there. It does NOT limit which meanings you return.
@@ -626,7 +627,7 @@ function renderMeaningItem(wordId, m, mi) {
           <span style="font-size:0.7rem;color:var(--text3);flex-shrink:0;font-weight:600">#${ei+1}</span>
           <div style="flex:1">
             <div class="en">"${allowBold(ex.en)}"</div>
-            ${ex.pt ? `<div class="pt">"${esc(ex.pt.replace(/<\/?b>/gi,''))}"</div>` : ''}
+            ${ex.pt ? `<div class="pt">"${allowBold(ex.pt)}"</div>` : ''}
           </div>
         </div>
       </div>` : '').join('')}

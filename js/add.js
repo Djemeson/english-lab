@@ -818,7 +818,7 @@ function midiaDocExampleHtml(e, ei) {
   return `
         <div class="mi-example" style="margin-top:6px;display:flex;gap:8px;align-items:baseline">
           <span style="font-size:0.7rem;color:var(--text3);flex-shrink:0;font-weight:600">#${ei + 1}</span>
-          <div style="flex:1"><div class="en">"${allowBold(e.en)}"</div>${e.pt ? `<div class="pt">"${esc(e.pt.replace(/<\/?b>/gi, ''))}"</div>` : ''}</div>
+          <div style="flex:1"><div class="en">"${allowBold(e.en)}"</div>${e.pt ? `<div class="pt">"${allowBold(e.pt)}"</div>` : ''}</div>
         </div>`
 }
 
@@ -1125,7 +1125,7 @@ Each sense object has:
 - "register": "neutral"|"formal"|"informal"|"colloquial"|"slang"|"technical"|"literary"|"archaic"|"vulgar"
 - "variety": "general"|"american"|"british"|"australian"|"canadian"
 - "origin_pt": Brazilian-Portuguese note (1-2 sentences) on the ORIGIN / why it means this — ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting etymology; EMPTY STRING "" otherwise; never invent.
-- "examples": EXACTLY 3 objects {"en":"...","pt":"..."} FOR THIS SENSE. PREFER the document's REAL example sentences that belong to this sense (read the whole document — including inflected forms like "ran by" and patterns like "run something by someone" — and assign each sentence to its correct sense). If the document has MORE than 3 for this sense, pick the 3 clearest. If it has FEWER than 3, keep the real ones and ADD natural examples faithful to THIS exact sense to reach 3. Each "en" wraps the term in <b></b> as inflected; the 3 should differ in tense/construction; "pt" is a natural Brazilian-Portuguese translation with NO <b>.
+- "examples": EXACTLY 3 objects {"en":"...","pt":"..."} FOR THIS SENSE. PREFER the document's REAL example sentences that belong to this sense (read the whole document — including inflected forms like "ran by" and patterns like "run something by someone" — and assign each sentence to its correct sense). If the document has MORE than 3 for this sense, pick the 3 clearest. If it has FEWER than 3, keep the real ones and ADD natural examples faithful to THIS exact sense to reach 3. Each "en" wraps the term in <b></b> as inflected; the 3 should differ in tense/construction; "pt" is a natural Brazilian-Portuguese translation that ALSO wraps the Portuguese equivalent of the term in <b></b> (exactly one bold span).
 
 Return JSON for ALL target terms: {"items":[ ... ]}`
 
@@ -1161,7 +1161,7 @@ Return JSON for ALL target terms: {"items":[ ... ]}`
           register: s.register || c.register || 'neutral',
           variety: s.variety || c.variety || 'general',
           examples: (Array.isArray(s.examples) ? s.examples : [])
-            .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '').replace(/<\/?b>/gi, '') }))
+            .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '') }))
         })).filter(s => s.meaning_pt || s.examples.length)
         if (senses.length) {
           it.senses = senses
@@ -1174,7 +1174,7 @@ Return JSON for ALL target terms: {"items":[ ... ]}`
           it.examples = senses.flatMap(s => s.examples)
         } else {
           const exs = (Array.isArray(c.examples) ? c.examples : [])
-            .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '').replace(/<\/?b>/gi, '') }))
+            .filter(e => e && e.en).map(e => ({ en: String(e.en), pt: String(e.pt || '') }))
           it.register = c.register || it.register
           it.variety = c.variety || it.variety
           it.meaning_pt = String(c.meaning_pt || it.meaning_pt || '').trim()

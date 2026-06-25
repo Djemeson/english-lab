@@ -1671,3 +1671,115 @@ body.sb-collapsed #fb-user-photo{margin:0}
   margin-right:7px;border-radius:6px;background:rgba(var(--primary-rgb),.16);color:var(--primary);
   font-size:0.7rem;font-weight:700;vertical-align:1px;
 }
+
+/* ============================================================
+   BIBLIOTECA — toggle Cards|Palavras, chip de sentido, glossário
+   ============================================================ */
+
+/* Toggle segmentado Cards | Palavras */
+.lib-mode-toggle{
+  display:inline-flex;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:3px;gap:2px;
+}
+.lmt-btn{
+  display:inline-flex;align-items:center;gap:6px;border:none;background:transparent;
+  color:var(--text2);font-size:0.82rem;font-weight:600;cursor:pointer;
+  padding:6px 13px;border-radius:7px;transition:all .16s ease;font-family:inherit;
+}
+.lmt-btn .ic{width:15px;height:15px}
+.lmt-btn:hover{color:var(--text)}
+.lmt-btn.active{
+  background:var(--primary-grad);color:#fff;
+  box-shadow:0 3px 10px rgba(var(--primary-rgb),.35);
+}
+
+/* Chip "sentido X de Y" nos cards — discreto e sofisticado */
+.srs-sense-chip{
+  display:inline-flex;align-items:center;gap:3px;cursor:pointer;
+  padding:2px 8px;border-radius:999px;font-size:0.72rem;font-weight:700;
+  color:var(--accent-bright);background:rgba(var(--primary-rgb),.10);
+  border:1px solid rgba(var(--primary-rgb),.28);transition:all .15s ease;
+  letter-spacing:.02em;line-height:1.2;
+}
+.srs-sense-chip:hover{
+  background:rgba(var(--primary-rgb),.18);transform:translateY(-1px);
+  box-shadow:0 3px 9px rgba(var(--primary-rgb),.25);
+}
+.srs-sense-chip .ic{width:12px;height:12px;opacity:.85}
+.srs-sense-chip .ssc-sep{opacity:.45;font-weight:500;margin:0 -1px}
+.srs-sense-chip .ssc-tot{opacity:.7}
+
+/* Glossário (modo Palavras) */
+.gloss-header{gap:16px;flex-wrap:wrap}
+.gloss-head-info{display:flex;align-items:baseline;gap:9px}
+.gloss-head-sub{font-size:0.78rem;color:var(--text3);font-weight:500}
+.gloss-search-input{
+  flex:1;min-width:200px;max-width:340px;margin-left:auto;
+  padding:7px 13px;font-size:0.85rem;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);
+  outline:none;transition:border-color .15s, box-shadow .15s;
+}
+.gloss-search-input:focus{border-color:rgba(var(--primary-rgb),.5);box-shadow:var(--ring)}
+.gloss-list{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+
+.gloss-word{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:15px 17px;transition:border-color .2s, box-shadow .2s;
+}
+.gloss-word:hover{border-color:var(--border-strong)}
+.gloss-flash{
+  border-color:rgba(var(--primary-rgb),.6)!important;
+  box-shadow:0 0 0 3px rgba(var(--primary-rgb),.18);
+  animation:glossFlash 1.8s ease;
+}
+@keyframes glossFlash{0%{box-shadow:0 0 0 4px rgba(var(--primary-rgb),.35)}100%{box-shadow:0 0 0 3px rgba(var(--primary-rgb),0)}}
+
+.gloss-word-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;margin-bottom:11px;
+}
+.gloss-word-title{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.gloss-word-en{font-size:1.12rem;font-weight:700;color:var(--text);letter-spacing:-.01em}
+.gloss-word-ipa{font-size:0.84rem;color:var(--text2);font-family:'Inter',monospace}
+.gloss-word-audio{padding:2px 6px!important;align-self:center}
+.gloss-word-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.gloss-type-chip{
+  font-size:0.7rem;font-weight:600;color:var(--text2);background:var(--surface3);
+  padding:2px 9px;border-radius:999px;
+}
+.gloss-count-chip{
+  display:inline-flex;align-items:center;gap:4px;font-size:0.7rem;font-weight:700;
+  color:var(--accent-bright);background:rgba(var(--primary-rgb),.10);
+  border:1px solid rgba(var(--primary-rgb),.25);padding:2px 9px;border-radius:999px;
+}
+.gloss-count-chip .ic{width:12px;height:12px}
+
+.gloss-senses{display:flex;flex-direction:column;gap:12px}
+.gloss-sense{display:flex;gap:11px}
+.gloss-sense-no{
+  flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:7px;background:rgba(var(--primary-rgb),.14);
+  color:var(--accent-bright);font-size:0.74rem;font-weight:700;margin-top:1px;
+}
+.gloss-sense-body{flex:1;min-width:0}
+.gloss-sense-meaning{font-size:0.94rem;font-weight:600;color:var(--text);line-height:1.4}
+.gloss-sense-def{font-size:0.83rem;color:var(--text2);margin-top:2px;line-height:1.45}
+.gloss-sense-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.gloss-ex{
+  margin-top:7px;padding:7px 11px;border-radius:var(--radius-sm);
+  background:var(--surface2);border-left:2px solid rgba(var(--primary-rgb),.35);
+}
+.gloss-ex-en{display:block;font-size:0.85rem;color:var(--text);line-height:1.45}
+.gloss-ex-en b, .gloss-ex-pt b{color:var(--accent-bright);font-weight:700}
+.gloss-ex-pt{display:block;font-size:0.8rem;color:var(--text2);margin-top:2px;line-height:1.4}
+.gloss-origin{
+  margin-top:7px;font-size:0.8rem;color:var(--text2);line-height:1.45;
+  display:flex;gap:5px;align-items:baseline;
+}
+.gloss-origin .ic{width:12px;height:12px;flex-shrink:0;color:var(--accent-bright);opacity:.8}
+
+@media (max-width:640px){
+  .gloss-search-input{margin-left:0;max-width:none}
+  .lib-mode-toggle{width:100%}
+  .lmt-btn{flex:1;justify-content:center}
+}

@@ -667,6 +667,13 @@ const REGISTER_LABELS = {
 
 function buildMetaChips(card) {
   let chips = ''
+  // Indicador de sentido: só aparece quando a palavra tem mais de um significado
+  // em estudo — discreto, sofisticado, com link para o glossário daquele termo.
+  const si = senseInfo(card)
+  if (si.total > 1) {
+    chips += `<span class="srs-sense-chip" data-tip="Sentido ${si.pos} de ${si.total} — esta palavra tem ${si.total} significados em estudo. Clique para ver todos."
+      onclick="event.stopPropagation();openWordGlossary('${card.wordId}')">${ic('layers','ic-sm')}<span class="ssc-num">${si.pos}</span><span class="ssc-sep">/</span><span class="ssc-tot">${si.total}</span></span>`
+  }
   const v = VARIETY_LABELS[card.variety]
   const r = REGISTER_LABELS[card.register]
   if (v) chips += `<span class="srs-variety-chip ${v.cls}">${v.flag} ${v.label}</span>`
@@ -678,6 +685,10 @@ function buildMetaChips(card) {
 function buildSrsFrente(card) {
   const sentence = card.example_en || ''
   if (!sentence) return ''
+  // Se a frase JÁ vem com o termo marcado em <b> (pela IA), confiamos nela —
+  // o regex abaixo não acerta formas irregulares (run→ran, go→went) nem
+  // expressões, então re-marcar por conta própria APAGARIA o negrito correto.
+  if (/<b>/i.test(sentence)) return escB(sentence)
   const wordRaw = (card.word || '').trim()
   if (!wordRaw) return esc(sentence)
   const isMultiWord = wordRaw.includes(' ')
@@ -716,8 +727,8 @@ function buildSrsVerso(card, imgData, imageBelow) {
         onclick="event.stopPropagation();regenerateCardExample('${card.id}',this)">↻</button>
     </div>`
   }
-  // 2. Tradução PT da frase logo abaixo
-  if (card.example_pt) text += `<div class="srs-back-translation">"${esc(strip(card.example_pt))}"</div>`
+  // 2. Tradução PT da frase logo abaixo (preserva o <b> do termo, se houver)
+  if (card.example_pt) text += `<div class="srs-back-translation">"${escB(card.example_pt)}"</div>`
   // 3. Palavra + IPA + áudio + tipo
   text += `<div class="srs-back-word" style="margin-top:${card.example_en||card.example_pt?'14px':'0'}">${esc(card.word)}</div>`
   if (card.ipa) text += `<div class="srs-back-ipa">${esc(card.ipa)}</div>`
@@ -902,8 +913,9 @@ Rules:
 - The sentence MUST clearly and naturally illustrate the specific meaning above
 - Write like a native speaker — feel free to use a novel, news article or real conversation style
 - Wrap the target word (conjugated/inflected as needed) in <b></b> tags
+- ALSO wrap the Portuguese equivalent of the target in <b></b> inside the translation (exactly one bold span)
 - Keep it 10-20 words long
-- Return ONLY valid JSON (no markdown): {"en": "English sentence with <b>word</b>.", "pt": "Natural Brazilian Portuguese translation."}`
+- Return ONLY valid JSON (no markdown): {"en": "English sentence with <b>word</b>.", "pt": "Tradução com a <b>palavra</b> em negrito."}`
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

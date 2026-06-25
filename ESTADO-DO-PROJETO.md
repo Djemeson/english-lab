@@ -3,9 +3,10 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-06-24 (2ª rodada) — Assistente: extração de SRS robusta (chamada
-> dedicada, funciona em PT→EN), sidebar e histórico recolhíveis (independentes). Mídia: aceita
-> material colado como documento (artigos Mairo Vergara).
+> Última atualização: 2026-06-24 (5ª rodada) — Biblioteca: modo **Palavras** (glossário de
+> consulta rápida, cada termo uma vez com todos os sentidos); chip **"sentido X de Y"** nos cards;
+> **negrito perfeito** do objeto de estudo em EN e PT (correção do render + botão IA retroativo +
+> prompts de geração ajustados para todas as novas).
 
 ---
 
@@ -214,6 +215,34 @@ maxInterval (36500), leechThreshold (50)
 16. Correções de bugs lazy/não-lazy (`srcIcon`, `AI_MODELS`/`updateModelOptions`,
     `randomVoice`/`OPENAI_VOICES`, `srsSession`).
 
+### Sessão 2026-06-24 (5ª rodada) — glossário, indicador de sentido e negrito EN+PT
+32. **Modo "Palavras" na Biblioteca** (toggle `Cards | Palavras` no header — `setLibMode`,
+    `_libMode`, `_applyLibModeUI`). O glossário (`renderWordsGlossary`/`glossWordHtml` em audio.js)
+    lista cada objeto de estudo UMA vez, com todos os seus sentidos (significado, definição,
+    variedade/registro, 1 exemplo com negrito, origem), busca com debounce
+    (`renderWordsGlossaryDebounced`) e contagem "N palavras · M sentidos". Resolve a dor de "na
+    Biblioteca aparecem todas as frases de todas as palavras". Deriva tudo de `srsCards` (snapshot),
+    agrupado por `wordId` → `meaningIdx`.
+33. **Chip "sentido X de Y" nos cards** (`senseInfo` em srs.js — não-lazy; chip em `buildMetaChips`).
+    Aparece SÓ quando a palavra tem mais de um sentido em estudo (discreto). Mostra posição/total e,
+    ao clicar, abre o glossário focado naquele termo (`openWordGlossary` → rola e dá um flash).
+34. **Negrito perfeito do objeto de estudo (EN + PT)** — resolve "muitas frases em inglês sem
+    negrito". Causa raiz: `buildSrsFrente` DESCARTAVA o `<b>` que a IA já colocava e tentava refazer
+    por regex, que falha em formas irregulares (run→ran, go→went) e expressões. Correções:
+    - **Render (grátis, instantâneo):** `escB()` em core.js (escapa preservando `<b>`).
+      `buildSrsFrente` agora CONFIA no `<b>` existente (só usa regex quando não há nenhum). O PT da
+      frase passou a renderizar com `escB` (antes era `esc(strip(...))` — removia o negrito). Idem
+      no Revisar e no preview da Mídia (usam `allowBold`, equivalente a `escB`).
+    - **Botão IA retroativo** "Negrito perfeito (IA)" na Biblioteca (`#lib-bold-btn` → `markBoldAll`/
+      `markBoldOne`, gpt-4o-mini, `runPool` concorrência 4). Pega só as frases sem `<b>` (EN ou PT),
+      pede o termo em `<b>` no inglês e o equivalente em `<b>` no português, escreve nos cards e nos
+      significados da palavra. Preserva o agendamento SRS. Deduplica por par exato (palavra+EN+PT).
+    - **Todas as novas** já saem com PT em negrito: prompts ajustados em `review.js` (análise
+      principal), `regenerateMeaning` (audio.js), `regenerateCardExample` (study.js), `consulta.js`
+      (Assistente) e o doc extractor de `add.js`. Removidos os `replace(/<\/?b>/gi,'')` que
+      apagavam o `<b>` do PT no add.js e no review.js.
+    - CSS premium novo: `.lib-mode-toggle/.lmt-btn`, `.srs-sense-chip`, todo o bloco `.gloss-*`.
+
 ### Sessão 2026-06-24 (4ª rodada) — múltiplos sentidos por termo (doc)
 31. **Sentidos múltiplos** no extrator de documento (`extractMidiaDoc`/`createDocWord`/
     `renderMidiaDocItem`). Antes, um termo virava 1 significado só — um artigo do Mairo que ensina
@@ -328,6 +357,12 @@ maxInterval (36500), leechThreshold (50)
 
 ## 9. Pendências / a verificar
 
+- [ ] **Testar ao vivo as melhorias da 5ª rodada** (após o deploy GitHub Pages + hard-refresh):
+      (1) abrir Biblioteca → alternar **Cards/Palavras**, conferir o glossário e a busca; (2) num card
+      de palavra com 2+ sentidos, ver o chip **"sentido X de Y"** e clicar (deve abrir o glossário no
+      termo); (3) rodar **"Negrito perfeito (IA)"** e conferir o `<b>` no inglês e no português (cards
+      antigos); (4) criar/analisar uma palavra nova e confirmar que o PT já vem em negrito. Backup
+      (Exportar JSON) antes do passo 3, pois ele reescreve as frases dos cards.
 - [ ] **Testar o Assistente ao vivo** (fazer backup — Exportar JSON — antes, pois o sync mudou):
       perguntar algo, ver o streaming, conferir os botões "Adicionar"/"Adicionar todos" e o
       "já no estudo"; recarregar e confirmar que a conversa persiste; checar o doc `data/conversas`

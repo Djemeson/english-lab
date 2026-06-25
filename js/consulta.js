@@ -229,8 +229,8 @@ Regras:
 - Inclua palavras significativas, phrasal verbs, idioms, collocations e gírias REALMENTE presentes na resposta. Deduplique. NÃO invente termos ausentes.
 - Se não houver nada que valha a pena estudar, retorne lista vazia.
 Para CADA item retorne:
-{"word":"<termo em inglês>","type":"word|phrasal_verb|idiom|collocation","variety":"general|american|british|australian|canadian","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"2-6 palavras","ipa":"/.../","definition_pt":"uma frase em PT","origin_pt":"origem/história em PT (1-2 frases) SÓ se houver etimologia/imagem interessante; senão \\"\\"","examples":[{"en":"Frase com <b>termo</b>.","pt":"Tradução."},{"en":"Outra frase com <b>termo</b>.","pt":"Tradução."},{"en":"Mais uma com <b>termo</b>.","pt":"Tradução."}]}
-Cada item tem EXATAMENTE 3 exemplos, em tempos/construções diferentes, com o termo em <b></b> apenas no inglês.
+{"word":"<termo em inglês>","type":"word|phrasal_verb|idiom|collocation","variety":"general|american|british|australian|canadian","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"2-6 palavras","ipa":"/.../","definition_pt":"uma frase em PT","origin_pt":"origem/história em PT (1-2 frases) SÓ se houver etimologia/imagem interessante; senão \\"\\"","examples":[{"en":"Frase com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."},{"en":"Outra frase com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."},{"en":"Mais uma com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."}]}
+Cada item tem EXATAMENTE 3 exemplos, em tempos/construções diferentes, com o termo em <b></b> no inglês E o equivalente em português também em <b></b> (exatamente um trecho em negrito por tradução).
 Retorne JSON: {"items":[ ... ]}`
 
 async function _consultaOpenAIJSON(messages, maxTokens) {

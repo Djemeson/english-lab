@@ -543,7 +543,12 @@
       <p>Todos os seus cards, organizados por baralho</p>
     </div>
     <div class="ph-actions">
+      <div class="lib-mode-toggle" id="lib-mode-toggle">
+        <button class="lmt-btn active" data-mode="cards" onclick="setLibMode('cards')" data-tip="Cards por baralho (frases de estudo)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 12 10 5 10-5"/><path d="m2 17 10 5 10-5"/></svg>Cards</button>
+        <button class="lmt-btn" data-mode="words" onclick="setLibMode('words')" data-tip="Consulta rápida: cada palavra uma vez, com todos os significados"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Palavras</button>
+      </div>
       <button class="btn btn-ghost btn-sm" id="lib-filter-clear" style="display:none" onclick="clearLibraryFilter()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>Limpar filtro</button>
+      <button class="btn btn-ghost btn-sm" id="lib-bold-btn" onclick="markBoldAll()" data-tip="Usa a IA para deixar o objeto de estudo em negrito perfeito nas frases — em inglês E em português — nos cards que ainda não têm. Não mexe no agendamento de estudo."><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h8a4 4 0 0 1 0 8H6zM6 12h9a4 4 0 0 1 0 8H6z"/></svg>Negrito perfeito (IA)</button>
       <button class="btn btn-ghost btn-sm" id="lib-fill-origin-btn" onclick="fillOriginsAll()" data-tip="Passada leve que SÓ adiciona a origem/história das expressões que têm uma. Não toca em significado, definição, frases nem agendamento. (Botão temporário.)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.9 4.6L18.5 9l-3.7 3 .9 4.9L12 14.8 8.3 16.9l.9-4.9L5.5 9l4.6-1.4z"/></svg>Preencher origem</button>
       <button class="btn btn-secondary btn-sm" id="lib-reprocess-btn" onclick="reanalyzeAll()" data-tip="Reanalisa todos os cards com IA: corrige as frases que não batiam com o significado, preenche variedade e registro, e gera o áudio das novas frases. Mantém o progresso de estudo."><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>Reanalisar tudo (corrigir)</button>
     </div>

@@ -526,6 +526,9 @@ function renderSrsAllCards() {
 
 // ---- Biblioteca: aba própria + deep-links filtrados ----
 let _pendingLibraryFilter = null   // { type, deckId } aplicado após render
+let _libMode = 'cards'             // 'cards' (browser por baralho) | 'words' (glossário)
+let _pendingGlossFocus = null      // wordId para destacar ao abrir o glossário
+let _glossSearchFocused = false    // true enquanto o usuário digita na busca do glossário
 
 function openBiblioteca() {
   const emptyEl = el('biblioteca-empty')
@@ -537,6 +540,13 @@ function openBiblioteca() {
     return
   }
   if (emptyEl) emptyEl.style.display = 'none'
+  _glossSearchFocused = false
+  _applyLibModeUI()
+  if (_libMode === 'words') {
+    clearLibraryFilterUI()
+    renderWordsGlossary()
+    return
+  }
   renderSrsAllCards()
   if (_pendingLibraryFilter) {
     const f = _pendingLibraryFilter; _pendingLibraryFilter = null
@@ -544,6 +554,158 @@ function openBiblioteca() {
   } else {
     clearLibraryFilterUI()
   }
+}
+
+// Sincroniza o estado visual do toggle Cards|Palavras e oculta os botões
+// específicos de cards (reanalisar/origem) no modo glossário.
+function _applyLibModeUI() {
+  document.querySelectorAll('#lib-mode-toggle .lmt-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === _libMode))
+  const wordsMode = _libMode === 'words'
+  // Botões só fazem sentido no modo Cards — sumem no glossário e voltam nos Cards
+  ;['lib-reprocess-btn', 'lib-fill-origin-btn', 'lib-bold-btn'].forEach(id => {
+    const b = el(id); if (b) b.style.display = wordsMode ? 'none' : ''
+  })
+  // O "Limpar filtro" tem lógica própria; no glossário fica sempre oculto
+  if (wordsMode) { const fc = el('lib-filter-clear'); if (fc) fc.style.display = 'none' }
+}
+
+function setLibMode(mode) {
+  if (_libMode === mode) return
+  _libMode = mode
+  openBiblioteca()
+}
+
+// Abre o glossário (modo Palavras) já focado num termo específico.
+function openWordGlossary(wordId) {
+  _libMode = 'words'
+  _pendingGlossFocus = wordId || null
+  showSection('biblioteca')
+}
+
+// ---- Glossário: cada objeto de estudo UMA vez, com todos os seus sentidos ----
+function renderWordsGlossary(query) {
+  const area = el('srs-all-cards-area'); if (!area) return
+  const q = (query != null ? query : (el('gloss-search')?.value || '')).toLowerCase().trim()
+
+  // Agrupa por palavra → sentidos (meaningIdx) → exemplos (deduplicados)
+  const byWord = new Map()
+  for (const c of srsCards) {
+    let g = byWord.get(c.wordId)
+    if (!g) {
+      g = { wordId: c.wordId, word: c.word || '', ipa: c.ipa || '', type: c.type || '',
+            source_type: c.source_type || '', senses: new Map() }
+      byWord.set(c.wordId, g)
+    }
+    let s = g.senses.get(c.meaningIdx)
+    if (!s) {
+      s = { idx: c.meaningIdx, meaning_pt: c.meaning_pt || '', definition_pt: c.definition_pt || '',
+            origin_pt: c.origin_pt || '', variety: c.variety, register: c.register, examples: [], _seen: new Set() }
+      g.senses.set(c.meaningIdx, s)
+    }
+    if (c.example_en && !s._seen.has(c.example_en)) {
+      s._seen.add(c.example_en)
+      s.examples.push({ en: c.example_en, pt: c.example_pt || '' })
+    }
+  }
+
+  let groups = [...byWord.values()].sort((a, b) =>
+    (a.word || '').localeCompare(b.word || '', 'en', { sensitivity: 'base' }))
+
+  const totalWords = groups.length
+  const totalSenses = groups.reduce((n, g) => n + g.senses.size, 0)
+
+  if (q) {
+    groups = groups.filter(g => (g.word || '').toLowerCase().includes(q) ||
+      [...g.senses.values()].some(s =>
+        (s.meaning_pt || '').toLowerCase().includes(q) || (s.definition_pt || '').toLowerCase().includes(q)))
+  }
+
+  const TYPE = { word: 'vocabulário', phrasal_verb: 'phrasal verb', idiom: 'idiom', collocation: 'collocation' }
+  const cards = groups.map(g => glossWordHtml(g, TYPE)).join('')
+
+  area.innerHTML = `
+  <div class="card-box gloss-box" style="margin-bottom:0">
+    <div class="card-box-header gloss-header">
+      <div class="gloss-head-info">
+        <h3>${totalWords} palavra${totalWords !== 1 ? 's' : ''}</h3>
+        <span class="gloss-head-sub">${totalSenses} sentido${totalSenses !== 1 ? 's' : ''} em estudo</span>
+      </div>
+      <input type="text" id="gloss-search" placeholder="Buscar palavra ou significado..."
+        value="${escA(q)}" oninput="renderWordsGlossaryDebounced(this.value)"
+        class="gloss-search-input">
+    </div>
+    <div class="gloss-list">
+      ${cards || `<div style="padding:40px;text-align:center;color:var(--text3)">Nenhuma palavra encontrada${q ? ' para "' + esc(q) + '"' : ''}.</div>`}
+    </div>
+  </div>`
+
+  // Mantém o foco do input após o re-render da busca (só quando o usuário está buscando)
+  if (_glossSearchFocused) { const inp = el('gloss-search'); if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length) } }
+
+  // Destaca/rola até o termo focado (vindo do chip "sentido X de Y")
+  if (_pendingGlossFocus) {
+    const wid = _pendingGlossFocus; _pendingGlossFocus = null
+    requestAnimationFrame(() => {
+      const node = el('gloss-w-' + wid)
+      if (node) {
+        node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        node.classList.add('gloss-flash')
+        setTimeout(() => node.classList.remove('gloss-flash'), 1800)
+      }
+    })
+  }
+}
+
+let _glossDebounce = null
+function renderWordsGlossaryDebounced(v) {
+  _glossSearchFocused = true
+  clearTimeout(_glossDebounce)
+  _glossDebounce = setTimeout(() => renderWordsGlossary(v), 160)
+}
+
+function glossWordHtml(g, TYPE) {
+  const senses = [...g.senses.values()].sort((a, b) => a.idx - b.idx)
+  const typeLabel = TYPE[g.type] || ''
+  const sensesHtml = senses.map((s, i) => {
+    const v = VARIETY_LABELS[s.variety]
+    const r = REGISTER_LABELS[s.register]
+    let chips = ''
+    if (v) chips += `<span class="srs-variety-chip ${v.cls}">${v.flag} ${v.label}</span>`
+    if (r) chips += `<span class="srs-register-chip ${r.cls}">${r.icon} ${r.label}</span>`
+    const ex = s.examples[0]
+    const exHtml = ex ? `<div class="gloss-ex">
+        <span class="gloss-ex-en">${buildSrsFrente({ example_en: ex.en, word: g.word })}</span>
+        ${ex.pt ? `<span class="gloss-ex-pt">${escB(ex.pt)}</span>` : ''}
+      </div>` : ''
+    const originHtml = s.origin_pt ? `<div class="gloss-origin">${ic('sparkles', 'ic-sm')} ${esc(String(s.origin_pt).replace(/<[^>]*>/g, ''))}</div>` : ''
+    return `<div class="gloss-sense">
+      <span class="gloss-sense-no">${i + 1}</span>
+      <div class="gloss-sense-body">
+        <div class="gloss-sense-meaning">${esc(s.meaning_pt || '—')}</div>
+        ${s.definition_pt ? `<div class="gloss-sense-def">${esc(String(s.definition_pt).replace(/<[^>]*>/g, ''))}</div>` : ''}
+        ${chips ? `<div class="gloss-sense-chips">${chips}</div>` : ''}
+        ${exHtml}
+        ${originHtml}
+      </div>
+    </div>`
+  }).join('')
+
+  return `<div class="gloss-word" id="gloss-w-${g.wordId}">
+    <div class="gloss-word-head">
+      <div class="gloss-word-title">
+        <span class="gloss-word-en">${esc(g.word)}</span>
+        ${g.ipa ? `<span class="gloss-word-ipa">${esc(g.ipa)}</span>` : ''}
+        <button class="btn btn-ghost btn-xs gloss-word-audio" title="Ouvir"
+          onclick="playSrsTTS('${escA(g.word).replace(/'/g, "\\'")}')">${ic('volume', 'ic-sm')}</button>
+      </div>
+      <div class="gloss-word-meta">
+        ${typeLabel ? `<span class="gloss-type-chip">${typeLabel}</span>` : ''}
+        <span class="gloss-count-chip">${ic('layers', 'ic-sm')} ${senses.length} sentido${senses.length !== 1 ? 's' : ''}</span>
+      </div>
+    </div>
+    <div class="gloss-senses">${sensesHtml}</div>
+  </div>`
 }
 
 // Chamado pelos contadores do Estudar (números clicáveis)
@@ -666,7 +828,8 @@ Rules — follow exactly:
 - Return EXACTLY ${n} example object(s).
 - Every example MUST match the meaning "${it.meaning_pt}". If "${it.word}" has other senses, IGNORE them — an example must not make sense under a different meaning.
 - Each example: a different tense/construction, a different subject, a different real-world situation; natural like a novel/news/conversation, never formulaic.
-- Wrap the target word (as it appears inflected) in <b></b> in the English sentence. NEVER use <b> in the Portuguese.
+- Wrap the target word (as it appears inflected) in <b></b> in the English sentence.
+- ALSO wrap the Portuguese equivalent of the target (the translated word/phrase) in <b></b> inside the "pt" translation — exactly one bold span.
 - Translate the Portuguese naturally (not word-for-word).`
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -833,6 +996,106 @@ Rules:
   if (_browserPreviewCardId) showBrowserCardPreview(_browserPreviewCardId)
   if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value || '')
   toast(`Origem preenchida: ${withStory} com história · ${noStory} sem história notável${failed ? ` · ${failed} falharam` : ''}`, withStory ? 'success' : 'info')
+}
+
+// ---- Negrito perfeito (IA): marca o objeto de estudo em <b> no EN e no PT ----
+// Pega só as frases que ainda não têm <b> (no inglês ou no português), pede à IA
+// para envolver o termo (inflexão/expressão) e o equivalente em PT. Preserva o
+// agendamento SRS; também escreve de volta nos significados da palavra de origem.
+async function markBoldOne(it) {
+  const PROMPT = `You mark the STUDY TARGET in bold inside example sentences for a Brazilian English learner. Return ONLY valid JSON.
+
+Study target (English word/expression): "${it.word}"
+English sentence: ${JSON.stringify(it.en)}
+Portuguese translation: ${JSON.stringify(it.pt)}
+
+Return the SAME two sentences, byte-for-byte identical EXCEPT that the study target is wrapped in <b></b>:
+- English: wrap the target exactly as it appears, inflected/conjugated (e.g. "ran" for "run"; for a phrasal verb like "take off" wrap the verb and the particle even if separated: "<b>took</b> the meeting <b>off</b>" is wrong — instead wrap the contiguous match, or both parts if split; for an idiom wrap the whole expression). Wrap the main occurrence.
+- Portuguese: wrap the word or short phrase that TRANSLATES the target in THIS sentence (its Portuguese equivalent).
+- Do NOT change, add, remove or translate anything else. No extra <b>. Keep punctuation and spacing identical.
+- If the Portuguese sentence is empty, return "pt":"".
+
+Return: {"en":"...","pt":"..."}`
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini', max_tokens: 400,
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: PROMPT }]
+    })
+  })
+  if (!res.ok) throw new Error('OpenAI ' + res.status)
+  const data = await res.json()
+  return JSON.parse(data.choices?.[0]?.message?.content || '{}')
+}
+
+async function markBoldAll() {
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
+  if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }
+
+  // Frases que ainda precisam de negrito: EN sem <b> OU PT (existente) sem <b>
+  const need = srsCards.filter(c =>
+    (c.example_en && !/<b>/i.test(c.example_en)) ||
+    (c.example_pt && !/<b>/i.test(c.example_pt)))
+  if (!need.length) { toast('Todos os cards já estão com o negrito marcado', 'info'); return }
+
+  // Deduplica por par exato (palavra + frase EN + frase PT)
+  const map = new Map()
+  for (const c of need) {
+    const key = (c.word || '') + '|||' + (c.example_en || '') + '|||' + (c.example_pt || '')
+    if (!map.has(key)) map.set(key, { word: c.word || '', en: c.example_en || '', pt: c.example_pt || '', cards: [] })
+    map.get(key).cards.push(c)
+  }
+  const items = [...map.values()]
+
+  if (!confirm(`Marcar o negrito perfeito (IA) em ${items.length} frase(s) de ${need.length} card(s)?\n\n• Deixa o objeto de estudo em negrito no inglês E no português\n• Não altera significados, definições nem o progresso de estudo\n\nUsa a API da OpenAI e pode levar um pouco.`)) return
+
+  const btn = el('lib-bold-btn'); const orig = btn ? btn.innerHTML : ''
+  if (btn) btn.disabled = true
+  const total = items.length
+  let ok = 0, fail = 0
+  const wordsTouched = new Set()
+
+  const tasks = items.map(it => async () => {
+    try {
+      const r = await markBoldOne(it)
+      const en = (r && r.en && /<b>/i.test(r.en)) ? r.en : it.en
+      const pt = (r && typeof r.pt === 'string' && /<b>/i.test(r.pt)) ? r.pt : it.pt
+      it.cards.forEach(c => {
+        if (en) c.example_en = en
+        if (pt) c.example_pt = pt
+        const w = words.find(x => x.id === c.wordId)
+        if (w && Array.isArray(w.meanings) && w.meanings[c.meaningIdx]) {
+          const m = w.meanings[c.meaningIdx]
+          const ei = c.exampleIdx >= 0 ? c.exampleIdx : 0
+          if (Array.isArray(m.examples) && m.examples[ei]) {
+            if (en) m.examples[ei].en = en
+            if (pt) m.examples[ei].pt = pt
+          }
+          if (en) m.example_en = en
+          if (pt) m.example_pt = pt
+          wordsTouched.add(w.id)
+        }
+      })
+      ok++
+    } catch (e) {
+      console.warn('[markBoldAll] falhou:', it.word, e.message); fail++
+    }
+  })
+
+  await runPool(tasks, 4, d => { if (btn) btn.innerHTML = `<span class="spinner"></span> ${d}/${total}` })
+
+  saveSrsCards()
+  if (wordsTouched.size && typeof saveWords === 'function') saveWords()
+  autoSyncAfterChange()
+  if (btn) { btn.disabled = false; btn.innerHTML = orig }
+  if (_libMode === 'words') renderWordsGlossary()
+  else {
+    if (_browserPreviewCardId) showBrowserCardPreview(_browserPreviewCardId)
+    if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value || '')
+  }
+  toast(`Negrito marcado em ${ok} frase(s)${fail ? ` · ${fail} falharam (rode de novo)` : ''}`, ok ? 'success' : 'warning')
 }
 
 async function reprocessMetaBulk() {

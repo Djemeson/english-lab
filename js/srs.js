@@ -334,6 +334,18 @@ function fmtDays(d) {
   return Math.round(d/365) + 'a'
 }
 
+// Sentido deste card dentro da palavra: posição e total de sentidos EM ESTUDO.
+// Baseia-se nos cards (snapshot) — robusto mesmo se a palavra original foi apagada.
+// Declarado aqui (não-lazy) porque buildMetaChips é usado também por audio.js.
+function senseInfo(card) {
+  if (!card) return { pos: 1, total: 1 }
+  const idxs = [...new Set(srsCards.filter(c => c.wordId === card.wordId).map(c => c.meaningIdx))]
+    .sort((a, b) => a - b)
+  const total = idxs.length || 1
+  const pos = (idxs.indexOf(card.meaningIdx) + 1) || 1
+  return { pos, total }
+}
+
 // ---- Counts ----
 function srsDueCount() {
   const now = nowTs()
