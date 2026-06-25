@@ -3,9 +3,10 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-06-25 — Estudar: contador **"Novos disponíveis"** desacoplado do limite
-> diário (mostra o acervo real de novos, não mais o teto `newPerDay`); cor **azul** passou a
-> identificar os **novos** (verde = para revisar), nos cards e no subtítulo da sessão.
+> Última atualização: 2026-06-25 — **Fuso do "dia" do SRS corrigido**: `todayStr()` usa data
+> LOCAL (Brasília), o dia vira à meia-noite local (antes renovava às 21h por usar UTC). Estudar:
+> cor **azul** = **novos** (verde = para revisar); "Novos disponíveis" = *quantos novos ainda
+> faltam hoje* (`min(newPerDay − vistos, estoque)`).
 
 ---
 
@@ -191,15 +192,26 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
-### Sessão 2026-06-25 — contador "Novos disponíveis" e cor dos novos (Estudar)
-35. **"Novos disponíveis" deixou de ser limitado por `newPerDay`** (`study.js` → `renderSrsSection`).
-    Sintoma relatado: ao mexer em "Novos por dia", o número de "Novos disponíveis" mudava junto (o
-    teto diário "puxava" o contador). Agora o card mostra o **acervo real** de cards novos
-    (`srsCards.filter(c => c.state === 'new').length`). O `newPerDay` continua valendo SÓ onde deve:
-    na **sessão** (`buildSessionQueue`, linha ~196), no **badge** (`updateSrsBadge`) e no **subtítulo**
-    do start-area (`newRem` = `srsNewTodayRemaining()` = quantos novos entram hoje). "Para revisar hoje"
-    segue sendo `srsDueCount()` (review/relearning vencidos), sem relação com limites.
-36. **Azul = novos** (antes azul = revisar). Trocadas as cores em `css/styles.css`
+### Sessão 2026-06-25 — fuso horário do "dia" do SRS (renovação da contagem)
+37. **`todayStr()` passou a usar a data LOCAL (Brasília)** em vez de `toISOString()` (UTC).
+    Sintoma: o Djemeson não tinha estudado nada "hoje", mas "Novos disponíveis" mostrava 26 (= 50 −
+    24). Causa: o "dia" do SRS renovava às **00:00 UTC = 21:00 de Brasília**, então cards estudados
+    depois das 21h eram contados no dia seguinte. Agora o dia vira à **meia-noite local**. Afeta
+    `srsNewTodayRemaining`, `newLimit` da sessão, `srsStreak`, `addedDate` e o log diário (`srsLog`).
+    ⚠️ Entradas de `srsLog` já gravadas antes desta correção ficaram com data UTC; a correção é só
+    daqui pra frente (uma entrada mal-atribuída ao "hoje" UTC zera sozinha no dia seguinte local).
+    (Possível evolução estilo Anki: "novo dia começa às 4h" configurável — não feito.)
+
+### Sessão 2026-06-25 — cor dos novos (Estudar) + esclarecimento dos contadores
+35. **"Novos disponíveis" = quantos novos ainda faltam hoje** (`study.js` → `renderSrsSection`,
+    `el('srs-new-count') = newRem = srsNewTodayRemaining()` = `min(newPerDay − vistos hoje, estoque)`).
+    Esse SEMPRE foi o comportamento correto/desejado (confirmado pelo Djemeson). Numa 1ª tentativa eu
+    troquei por "estoque total de novos" — **revertido**. Esclarecimento que gerou a dúvida:
+    **"Para revisar hoje"** (`srsDueCount()`) são as **revisões** vencidas (controladas por
+    *Revisões por dia*), NÃO por *Novos por dia* — por isso nunca reflete o valor de "Novos por dia".
+    Quem reage a *Novos por dia* é o card **"Novos disponíveis"** (desconta os já vistos no dia).
+36. **Azul = novos** (antes azul = revisar; alinha com a tabela de baralhos, onde NOVO já é azul).
+    Trocadas as cores em `css/styles.css`
     (`.srs-dash-card.new` → `--primary`/azul, `.due` → `--success`/verde) e no subtítulo da sessão
     em `study.js` (mantendo azul nos "novos" e verde no "para revisar"). Streak segue `--warning`.
 

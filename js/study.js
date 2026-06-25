@@ -8,12 +8,11 @@ function renderSrsSection() {
   updateSrsBadge()
 
   const due = srsDueCount()
-  const newRem = srsNewTodayRemaining()                       // limitado por newPerDay (sessão/badge)
-  const newAvail = srsCards.filter(c => c.state === 'new').length  // acervo real de novos
+  const newRem = srsNewTodayRemaining()   // novos que ainda faltam hoje (min(newPerDay − vistos, estoque))
   const streak = srsStreak()
 
   el('srs-due-count').textContent = due
-  el('srs-new-count').textContent = newAvail
+  el('srs-new-count').textContent = newRem
   el('srs-streak').textContent = streak
 
   renderDeckStatsTable()

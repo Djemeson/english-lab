@@ -144,7 +144,12 @@ function saveSrsCards() { CardsDB.save(srsCards) }
 function persistSrsCfg(){ localStorage.setItem(SK.srsCfg, JSON.stringify(srsCfg)) }
 function saveSrsLog()   { localStorage.setItem(SK.srsLog, JSON.stringify(srsLog)) }
 
-function todayStr() { return new Date().toISOString().slice(0,10) }
+// "Hoje" no horário LOCAL (Brasília) — o dia vira à meia-noite local, não às 21h (00:00 UTC).
+// Não usar toISOString (UTC): no Brasil (UTC−3) faria a contagem renovar às 21h.
+function todayStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
 function nowTs()    { return Date.now() }
 
 // Retorna meia-noite (horário local) do dia que contém o timestamp dado.
