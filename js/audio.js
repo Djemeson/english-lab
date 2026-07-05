@@ -928,14 +928,18 @@ async function reanalyzeAll() {
   toast(`${updated} card(s) corrigidos${audioGen ? ` · ${audioGen} áudio(s) gerado(s)` : ''}${failed ? ` · ${failed} falharam (rode de novo)` : ''}`, updated ? 'success' : 'warning')
 }
 
-// Botão TEMPORÁRIO da Biblioteca: passada leve que SÓ adiciona a origem/história
-// das expressões que têm uma. NÃO altera significado, definição, frases, variedade,
-// registro nem o agendamento SRS. Pula significados que já têm origem preenchida.
-async function fillOriginsAll() {
+// Botão TEMPORÁRIO da Biblioteca: passada leve que só COMPLETA metadados que ainda
+// estão vazios em cada significado já salvo no SRS — IPA, categoria local
+// (type_label), nível e origem/história. NUNCA toca em significado, definição,
+// frases (exemplos), variedade/registro nem no agendamento SRS. Serve para destravar
+// o uso da IA sobre itens JÁ ADICIONADOS (ex.: uma leva de estudo importada de
+// documento) sem risco de perder as frases curadas daquela fonte. Pula significados
+// que já têm tudo preenchido. (Generaliza o antigo "Preencher origem" — mesmo botão.)
+async function fillMissingAll() {
   if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
   if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }
 
-  // Agrupa por significado (wordId|meaningIdx); só os que ainda NÃO têm origem
+  // Agrupa por significado (wordId|meaningIdx); junta o que já está preenchido
   const groups = new Map()
   for (const c of srsCards) {
     const key = `${c.wordId}|${c.meaningIdx}`
@@ -943,40 +947,54 @@ async function fillOriginsAll() {
       wordId: c.wordId, meaningIdx: c.meaningIdx,
       word: c.word || '', type: c.type || 'word', lang: cardLang(c),
       meaning_pt: c.meaning_pt || '', definition_pt: c.definition_pt || '',
-      hasOrigin: false, cards: []
+      ipa: '', type_label: '', origin_pt: '', level: '', cards: []
     })
     const g = groups.get(key)
     g.cards.push(c)
-    if (c.origin_pt && c.origin_pt.trim()) g.hasOrigin = true
+    if (c.ipa && c.ipa.trim()) g.ipa = c.ipa
+    if (c.type_label && c.type_label.trim()) g.type_label = c.type_label
+    if (c.origin_pt && c.origin_pt.trim()) g.origin_pt = c.origin_pt
   }
-  const items = [...groups.values()].filter(g => g.word && !g.hasOrigin)
-  if (!items.length) { toast('Todos os significados já têm origem (ou nada a preencher)', 'info'); return }
+  // "level" só existe no significado da palavra (não é snapshotado no card)
+  for (const g of groups.values()) {
+    const w = words.find(x => x.id === g.wordId)
+    g.wordRef = w
+    const wm = w && Array.isArray(w.meanings) ? w.meanings[g.meaningIdx] : null
+    if (wm && wm.level && wm.level.trim()) g.level = wm.level
+  }
 
-  if (!confirm(`Preencher a ORIGEM de ${items.length} significado(s)?\n\n• Só adiciona a história das expressões que têm uma\n• NÃO mexe em significado, definição, frases nem no progresso de estudo\n\nUsa a API da OpenAI (chamadas leves).`)) return
+  const items = [...groups.values()].filter(g =>
+    g.word && (!g.ipa.trim() || !g.type_label.trim() || !g.origin_pt.trim() || !g.level.trim())
+  )
+  if (!items.length) { toast('Todos os significados já têm IPA, categoria, nível e origem preenchidos', 'info'); return }
+
+  if (!confirm(`Completar dados de ${items.length} significado(s)?\n\n• Só preenche o que estiver VAZIO: IPA, categoria (type_label), nível e origem/história\n• NÃO mexe em significado, definição, frases, variedade/registro nem no progresso de estudo\n\nUsa a API da OpenAI (chamadas leves).`)) return
 
   const btn = document.getElementById('lib-fill-origin-btn')
   const origHtml = btn ? btn.innerHTML : ''
   if (btn) btn.disabled = true
   const total = items.length
-  let withStory = 0, noStory = 0, failed = 0, wordsTouched = false
+  let updated = 0, skipped = 0, failed = 0, wordsTouched = false
 
   const tasks = items.map(it => async () => {
-    const PROMPT = `You write the ORIGIN / history of a ${promptLangName(it.lang)} word or expression, for a Brazilian learner, in Brazilian Portuguese. Return ONLY valid JSON.
+    const PROMPT = `You fill in MISSING metadata for a ${promptLangName(it.lang)} vocabulary flashcard, for a Brazilian learner. Return ONLY valid JSON.
 Word/expression (${promptLangName(it.lang)}): "${it.word}"${it.type ? ` (type: ${it.type})` : ''}
 Meaning (PT): "${it.meaning_pt || '(most common sense)'}"
+${it.definition_pt ? `Definition of this sense: "${it.definition_pt}"` : ''}
 
-Return {"origin_pt":"..."}.
-Rules:
-- origin_pt = 1-2 sentences in PT-BR explaining WHY this expression came to mean this — the image, metaphor, history or etymology behind it.
-- Fill it ONLY for idioms, multi-word verbal expressions, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. "sitting duck", "on the chopping block", "flagship", "throw under the bus").
-- For ordinary words with no notable story, return "origin_pt":"".
-- NEVER invent folk etymology. If you are not reasonably sure of the REAL origin, return "".`
+Return ONLY this JSON:
+{
+  "ipa": ${promptIpaRule(it.lang)},
+  "type_label": "precise local category in Brazilian Portuguese for this kind of word/expression, or empty string for a plain word",
+  "level": "A2|B1|B2|C1|C2",
+  "origin_pt": "1-2 sentences in PT-BR on the ORIGIN/history behind this expression — the image, metaphor or etymology. Fill ONLY for idioms, multi-word verbal expressions, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. 'sitting duck', 'on the chopping block', 'flagship'). Empty string for ordinary words with no notable story. NEVER invent folk etymology — if unsure, return empty."
+}`
     try {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gpt-4o-mini', max_tokens: 220,
+          model: 'gpt-4o-mini', max_tokens: 260,
           response_format: { type: 'json_object' },
           messages: [{ role: 'user', content: PROMPT }]
         })
@@ -984,18 +1002,29 @@ Rules:
       if (!res.ok) throw new Error('OpenAI ' + res.status)
       const data = await res.json()
       const r = JSON.parse(data.choices?.[0]?.message?.content || '{}')
-      const origin = String(r.origin_pt || '').trim()
-      // Aplica nos cards (snapshot) — nada mais é tocado
-      it.cards.forEach(c => { c.origin_pt = origin })
-      // Atualiza também o significado na palavra de origem (cards futuros herdam)
-      const w = words.find(x => x.id === it.wordId)
-      if (w && Array.isArray(w.meanings) && w.meanings[it.meaningIdx]) {
-        w.meanings[it.meaningIdx].origin_pt = origin
-        wordsTouched = true
+
+      // Monta o "patch" só com os campos que estavam VAZIOS — nunca sobrescreve o
+      // que já existia (mesmo que a IA tenha devolvido algo diferente pra esse campo).
+      const patch = {}
+      if (!it.ipa.trim()        && r.ipa)        patch.ipa        = String(r.ipa).trim()
+      if (!it.type_label.trim() && r.type_label) patch.type_label = String(r.type_label).trim()
+      if (!it.origin_pt.trim())                  patch.origin_pt  = String(r.origin_pt || '').trim() // aceita "" (sem história notável)
+      const levelPatch = (!it.level.trim() && r.level) ? String(r.level).trim() : null
+
+      if (Object.keys(patch).length) it.cards.forEach(c => Object.assign(c, patch))
+      const w = it.wordRef
+      if (w) {
+        if (patch.ipa) w.ipa = patch.ipa
+        if (Array.isArray(w.meanings) && w.meanings[it.meaningIdx]) {
+          const wm = w.meanings[it.meaningIdx]
+          if (patch.type_label) wm.type_label = patch.type_label
+          if ('origin_pt' in patch) wm.origin_pt = patch.origin_pt
+          if (levelPatch) wm.level = levelPatch
+        }
       }
-      if (origin) withStory++; else noStory++
+      if (Object.keys(patch).length || levelPatch) { updated++; wordsTouched = true } else skipped++
     } catch (e) {
-      console.warn('[fillOriginsAll] falhou:', it.word, e.message)
+      console.warn('[fillMissingAll] falhou:', it.word, e.message)
       failed++
     }
   })
@@ -1008,7 +1037,7 @@ Rules:
   if (btn) { btn.disabled = false; btn.innerHTML = origHtml }
   if (_browserPreviewCardId) showBrowserCardPreview(_browserPreviewCardId)
   if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value || '')
-  toast(`Origem preenchida: ${withStory} com história · ${noStory} sem história notável${failed ? ` · ${failed} falharam` : ''}`, withStory ? 'success' : 'info')
+  toast(`${updated} significado(s) completados${skipped ? ` · ${skipped} sem nada novo` : ''}${failed ? ` · ${failed} falharam (rode de novo)` : ''}`, updated ? 'success' : 'info')
 }
 
 // ---- Negrito perfeito (IA): marca o objeto de estudo em <b> no EN e no PT ----

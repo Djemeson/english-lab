@@ -4,9 +4,11 @@
 
 function applyAiResult(w, result) {
   w.word = result.word || w.word
-  w.type = result.type || 'word'
-  w.type_label = result.type_label || ''
-  w.ipa = result.ipa || ''
+  // Campos de nível-palavra: preserva o que já existir (não apaga dado curado de uma
+  // importação anterior — ex.: doc/leva) — a IA só PREENCHE o que estiver vazio.
+  w.type       = w.type       || result.type       || 'word'
+  w.type_label = w.type_label || result.type_label  || ''
+  w.ipa        = w.ipa        || result.ipa         || ''
   // Auto-detecção de idioma: se a IA detectou outro idioma, adota (seletor manda, detecção corrige)
   const det = (result.detected_lang || '').toLowerCase().slice(0, 5)
   if (det && det !== wordLang(w)) {
@@ -14,7 +16,7 @@ function applyAiResult(w, result) {
     ensureLangDecks(det)
     toast(`Idioma detectado: ${getLangDef(det).name}`, 'info')
   }
-  if (result.audio_base64) w.audio_base64 = result.audio_base64
+  if (result.audio_base64 && !w.audio_base64) w.audio_base64 = result.audio_base64
   const rawMeanings = Array.isArray(result.meanings) && result.meanings.length > 0
     ? result.meanings
     : [{
@@ -25,7 +27,7 @@ function applyAiResult(w, result) {
           : e).filter(Boolean),
         context_match: true, tags: result.tags || []
       }]
-  w.meanings = rawMeanings.map((m, i) => ({
+  const freshMeanings = rawMeanings.map((m, i) => ({
     id: uid(), selected: true, idx: i,
     meaning_pt:    m.meaning_pt    || '',
     definition_pt: m.definition_pt || '',
@@ -48,6 +50,41 @@ function applyAiResult(w, result) {
     tags:          m.tags          || [],
     context_match: m.context_match !== false
   }))
+
+  // --- Preserva significados já curados com exemplos preenchidos ---
+  // Regra pedida pelo Djemeson: se um significado JÁ TEM frases de exemplo (veio de uma
+  // importação de documento/leva, de uma "Re-analisar" anterior, ou de edição manual), o
+  // botão de IA NUNCA sobrescreve o significado/definição/frases dele — só COMPLETA o que
+  // estiver faltando (origem, categoria local, variedade/registro ainda genéricos, nível,
+  // sinônimos/antônimos). Sentidos novos que a palavra ainda não tinha entram do jeito que
+  // a IA devolveu, exemplos inclusos (nada a preservar ali).
+  const oldMeanings = Array.isArray(w.meanings) ? w.meanings : []
+  const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+  const curated = oldMeanings.filter(om => Array.isArray(om.examples) && om.examples.length > 0)
+  const usedOld = new Set()
+  w.meanings = freshMeanings.map(nm => {
+    let match = curated.find(om => !usedOld.has(om.id) && norm(om.meaning_pt) === norm(nm.meaning_pt))
+    if (!match && nm.context_match) match = curated.find(om => !usedOld.has(om.id) && om.context_match)
+    if (!match) return nm
+    usedOld.add(match.id)
+    return {
+      ...nm,
+      id: match.id,
+      meaning_pt:    match.meaning_pt,
+      definition_pt: match.definition_pt || nm.definition_pt,
+      examples:      match.examples,
+      example_en:    match.example_en,
+      example_pt:    match.example_pt,
+      origin_pt:     (match.origin_pt && match.origin_pt.trim()) ? match.origin_pt : nm.origin_pt,
+      type_label:    match.type_label || nm.type_label,
+      variety:       (match.variety  && match.variety  !== 'general') ? match.variety  : nm.variety,
+      register:      (match.register && match.register !== 'neutral') ? match.register : nm.register,
+      level:         match.level || nm.level,
+      synonyms:      (match.synonyms && match.synonyms.length) ? match.synonyms : nm.synonyms,
+      antonyms:      (match.antonyms && match.antonyms.length) ? match.antonyms : nm.antonyms,
+      selected:      match.selected !== false
+    }
+  })
   w.status = 'pending_review'
   w.ai_processed = true
   w.updated_at = new Date().toISOString()

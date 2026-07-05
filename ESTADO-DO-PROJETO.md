@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-07-05 — **Suporte MULTI-IDIOMA implementado** (qualquer idioma na
+> Última atualização: 2026-07-05 — **Botão de IA passou a PRESERVAR exemplos já curados**
+> ("Analisar com IA"/"Re-analisar" no Revisar não sobrescreve mais significado/frases de um
+> sentido que já tinha exemplos — só completa o que falta). Botão temporário da Biblioteca
+> generalizado: `fillOriginsAll` → `fillMissingAll` ("Completar dados (IA)"), preenche IPA/
+> categoria/nível/origem vazios sem tocar em frases. Ver seção 8 (sessão 2026-07-05, 2ª rodada).
+>
+> **Suporte MULTI-IDIOMA implementado** (qualquer idioma na
 > entrada; PT-BR continua sendo a saída). Novo `js/lang.js` (NÃO-lazy, logo após core.js) com o
 > registro `LANGS` (en/es/fr/de + fallback genérico), seletor de idioma ativo (Adicionar +
 > Assistente), decks por idioma sob demanda, auto-detecção e supertipos universais + `type_label`.
@@ -196,6 +202,30 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-07-05 (2ª rodada) — botão de IA passou a PRESERVAR exemplos já curados
+39. **Motivo**: o Djemeson importou uma leva de estudo de espanhol (`A1.1-leva-01.md`, material
+    com exemplos cuidadosamente ordenados por tempo verbal/pessoa) e ficou com medo de clicar em
+    "Analisar com IA"/"Re-analisar" (Revisar) por essas palavras já terem exemplo — o `applyAiResult`
+    **substituía `w.meanings` por inteiro**, então a IA reescrevia até os significados que já tinham
+    frases boas (o prompt só "pedia com jeitinho" pra IA preservar o `_seedMeaning`, sem garantia).
+    - **`js/review.js` → `applyAiResult`**: agora faz um MERGE. Significados que já têm
+      `examples.length > 0` (vindos de import de doc, de uma análise anterior ou de edição manual)
+      são casados com o retorno da IA (por `meaning_pt` normalizado ou por `context_match`) e têm
+      `meaning_pt/definition_pt/examples` **preservados** — só completa o que estava vazio (`origin_pt`,
+      `type_label`, `variety`/`register` ainda genéricos, `level`, `synonyms`/`antonyms`). Sentidos
+      NOVOS que a IA trouxe (que a palavra ainda não tinha) entram do jeito que vieram, exemplos
+      inclusos — não há nada pra preservar ali. Campos de nível-palavra (`type`, `type_label`, `ipa`)
+      também passaram a só preencher se estavam vazios, em vez de sobrescrever sempre.
+      Afeta TODOS os botões que passam por `analyzeWordDirect` (Analisar com IA, Re-analisar,
+      Analisar selecionadas, Analisar todas) — correção única no ponto central.
+    - **Biblioteca — botão temporário generalizado**: `fillOriginsAll` (`#lib-fill-origin-btn`) virou
+      `fillMissingAll` (`js/audio.js`) — em vez de só completar `origin_pt`, agora completa IPA,
+      `type_label`, nível E origem, sempre só o que estiver VAZIO (nunca mexe em significado, frases,
+      variedade/registro nem agendamento). Botão renomeado para "Completar dados (IA)" — serve pra
+      rodar a IA com segurança sobre itens JÁ ADICIONADOS (qualquer leva/import antigo), sem risco de
+      perder frases curadas. Ainda um botão TEMPORÁRIO (mesmo ciclo de vida do antigo "Preencher
+      origem" — ver pendências).
 
 ### Sessão 2026-07-05 — SUPORTE MULTI-IDIOMA (es/fr/de prioritários; genérico p/ qualquer um)
 38. **Multi-idioma completo** — decisões do Djemeson: idiomas prioritários **Espanhol, Francês e
@@ -456,8 +486,14 @@ maxInterval (36500), leechThreshold (50)
       confirmar que extrai os termos, que "snuff" sai como "apagar a tocha" e que os cards entram
       em "pendente de revisão" já com significado/exemplo. Fazer backup (Exportar JSON) antes.
 - [ ] **Testar PDF** (pdf.js do CDN) — precisa de internet na primeira leitura; depois cacheia.
-- [ ] **REMOVER o botão temporário "Preencher origem"** (`#lib-fill-origin-btn` no index.html +
-      função `fillOriginsAll` em audio.js) depois de rodar o backfill de origem nos cards antigos.
+- [ ] **REMOVER o botão temporário "Completar dados (IA)"** (`#lib-fill-origin-btn` no index.html +
+      função `fillMissingAll` em audio.js — sucessora do antigo "Preencher origem"/`fillOriginsAll`)
+      depois de rodar o backfill de IPA/categoria/nível/origem nos cards antigos.
+- [ ] **Testar ao vivo a preservação de exemplos curados** (após deploy + hard-refresh; backup —
+      Exportar JSON — antes): (1) com a leva `A1.1-leva-01.md` já importada em Revisar, clicar
+      "Re-analisar" numa palavra (ex.: "hablar") e conferir que as frases/significado curados NÃO
+      mudam, só campos vazios (origem etc.) são completados; (2) na Biblioteca, rodar "Completar
+      dados (IA)" e conferir que só preenche o que faltava, sem tocar em frases nem no agendamento.
 - [ ] (Opcional) Enriquecimento em lote dos itens importados: hoje cada item vem com 1 sentido +
       3 exemplos (3 cards) do doc; o botão "Re-analisar" (já sensível à fonte) expande para TODOS
       os sentidos. Avaliar se vale um "Enriquecer todos" automático na Mídia.
