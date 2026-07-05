@@ -398,7 +398,7 @@ async function generateCardImage(cardId, callerEl) {
   const word   = card.word || ''
   const meaning = card.meaning_pt || card.definition_pt || ''
   const context = card.example_en  || ''
-  const prompt  = `Digital illustration, editorial style. English vocabulary flashcard image for the word "${word}". Meaning: "${meaning}". ${context ? 'Example sentence: "'+context+'".' : ''} No text in the image. Detailed, artistic, vivid colors, clean composition. IMPORTANT: Before finalizing, verify anatomical accuracy — all humans and animals must have the correct number of limbs, fingers, and facial features. Reject and redo if any body part appears duplicated, missing, or malformed.`
+  const prompt  = `Digital illustration, editorial style. ${promptLangName(cardLang(card))} vocabulary flashcard image for the word "${word}". Meaning: "${meaning}". ${context ? 'Example sentence: "'+context+'".' : ''} No text in the image. Detailed, artistic, vivid colors, clean composition. IMPORTANT: Before finalizing, verify anatomical accuracy — all humans and animals must have the correct number of limbs, fingers, and facial features. Reject and redo if any body part appears duplicated, missing, or malformed.`
 
   try {
     const res = await fetch('https://api.openai.com/v1/images/generations', {
@@ -594,6 +594,7 @@ function renderWordsGlossary(query) {
     let g = byWord.get(c.wordId)
     if (!g) {
       g = { wordId: c.wordId, word: c.word || '', ipa: c.ipa || '', type: c.type || '',
+            type_label: c.type_label || '', lang: cardLang(c),
             source_type: c.source_type || '', senses: new Map() }
       byWord.set(c.wordId, g)
     }
@@ -621,8 +622,12 @@ function renderWordsGlossary(query) {
         (s.meaning_pt || '').toLowerCase().includes(q) || (s.definition_pt || '').toLowerCase().includes(q)))
   }
 
-  const TYPE = { word: 'vocabulário', phrasal_verb: 'phrasal verb', idiom: 'idiom', collocation: 'collocation' }
-  const cards = groups.map(g => glossWordHtml(g, TYPE)).join('')
+  const cards = groups.map(g => glossWordHtml(g, {
+    word: 'vocabulário',
+    phrasal_verb: typeLabel('phrasal_verb', g.lang, g.type_label),
+    idiom: typeLabel('idiom', g.lang),
+    collocation: 'collocation'
+  })).join('')
 
   area.innerHTML = `
   <div class="card-box gloss-box" style="margin-bottom:0">
@@ -764,14 +769,21 @@ function clearLibraryFilter() {
 }
 
 // ---- Reprocessar variedade/registro em massa (IA) ----
-const _VARIETIES = ['general','american','british','australian','canadian','other']
 const _REGISTERS = ['neutral','formal','informal','colloquial','slang','technical','literary','archaic','vulgar']
-function _normVariety(v) { v = String(v||'').toLowerCase().trim(); return _VARIETIES.includes(v) ? v : 'general' }
+// Multi-idioma: valida a variedade contra a lista do idioma do item (LANGS)
+function _normVariety(v, langCode) {
+  v = String(v||'').toLowerCase().trim()
+  const ok = getLangDef(langCode || 'en').varieties.map(x => x.v)
+  return ok.includes(v) ? v : (v && !LANGS[(langCode||'en')] ? v : 'general')
+}
 function _normRegister(r) { r = String(r||'').toLowerCase().trim(); return _REGISTERS.includes(r) ? r : 'neutral' }
 
 async function classifyMetaBatch(items) {
-  const PROMPT = `Classify each English vocabulary item by VARIETY and REGISTER. Return ONLY valid JSON.
-- variety: "general" (standard across all varieties of English — this is the case for MOST words) OR "american"/"british"/"australian"/"canadian" only when the word/sense is predominantly or exclusively used there (e.g. "lift"=british, "soccer"=american, "arvo"=australian).
+  const langs = [...new Set(items.map(it => it.lang || 'en'))]
+  const varietyRules = langs.map(lc => `- ${promptLangName(lc)} ("lang":"${lc}"): variety is one of ${promptVarietyEnum(lc)}. ${getLangDef(lc).varietyRule}`).join('\n')
+  const PROMPT = `Classify each vocabulary item by VARIETY and REGISTER. Each item has a "lang" (ISO code of its language). Return ONLY valid JSON.
+- variety: "general" (standard across all varieties of that language — this is the case for MOST words) OR a specific variety of the item's language:
+${varietyRules}
 - register: exactly one of "neutral","formal","informal","colloquial","slang","technical","literary","archaic","vulgar". Use "neutral" for everyday standard words.
 Always fill BOTH for every item. Match each result to the item "id".
 Return: {"results":[{"id":0,"variety":"general","register":"neutral"}]}
@@ -808,8 +820,9 @@ async function runPool(tasks, concurrency, onProgress) {
 // Reanalisa UM significado: gera frases que batem com o sentido + variedade + registro
 async function regenerateMeaning(it) {
   const n = Math.max(1, Math.min(it.cards.length, 6))
-  const PROMPT = `You are fixing flashcards for a Brazilian learner of English. Return ONLY valid JSON.
-Word/expression: "${it.word}"${it.type ? ` (type: ${it.type})` : ''}
+  const _rL = getLangDef(it.lang || 'en')
+  const PROMPT = `You are fixing flashcards for a Brazilian learner of ${_rL.nameEn}. Return ONLY valid JSON.
+Word/expression (${_rL.nameEn}): "${it.word}"${it.type ? ` (type: ${it.type})` : ''}
 This SPECIFIC meaning (in Portuguese): "${it.meaning_pt || '(use the most common sense)'}"
 ${it.definition_pt ? `Definition of this sense: "${it.definition_pt}"` : ''}
 
@@ -817,18 +830,18 @@ Generate ${n} example sentence(s) that ALL clearly illustrate THIS specific mean
 
 Return ONLY this JSON:
 {
-  "variety": "general|american|british|australian|canadian",
+  "variety": "${promptVarietyEnum(it.lang || 'en')}",
   "register": "neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar",
-  "origin_pt": "Brazilian-Portuguese note (1-2 sentences) explaining the ORIGIN / why this expression came to mean this. Fill ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. 'sitting duck', 'on the chopping block', 'flagship', 'throw under the bus'). Leave it as an EMPTY STRING for ordinary words with no notable story. NEVER invent folk etymology — if unsure, leave empty.",
+  "origin_pt": "Brazilian-Portuguese note (1-2 sentences) explaining the ORIGIN / why this expression came to mean this. Fill ONLY for idioms, multi-word verbal expressions, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. 'sitting duck', 'on the chopping block', 'flagship', 'throw under the bus'). Leave it as an EMPTY STRING for ordinary words with no notable story. NEVER invent folk etymology — if unsure, leave empty.",
   "examples": [
-    {"en": "Natural sentence using <b>${it.word}</b> (inflected as needed) in THIS sense.", "pt": "tradução natural em PT-BR"}
+    {"en": "Natural ${_rL.nameEn} sentence using <b>${it.word}</b> (inflected as needed) in THIS sense.", "pt": "tradução natural em PT-BR"}
   ]
 }
 Rules — follow exactly:
 - Return EXACTLY ${n} example object(s).
 - Every example MUST match the meaning "${it.meaning_pt}". If "${it.word}" has other senses, IGNORE them — an example must not make sense under a different meaning.
 - Each example: a different tense/construction, a different subject, a different real-world situation; natural like a novel/news/conversation, never formulaic.
-- Wrap the target word (as it appears inflected) in <b></b> in the English sentence.
+- Wrap the target word (as it appears inflected) in <b></b> in the ${_rL.nameEn} sentence.
 - ALSO wrap the Portuguese equivalent of the target (the translated word/phrase) in <b></b> inside the "pt" translation — exactly one bold span.
 - Translate the Portuguese naturally (not word-for-word).`
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -855,7 +868,7 @@ async function reanalyzeAll() {
   for (const c of srsCards) {
     const key = `${c.wordId}|${c.meaningIdx}`
     if (!groups.has(key)) groups.set(key, {
-      word: c.word || '', type: c.type || 'word',
+      word: c.word || '', type: c.type || 'word', lang: cardLang(c),
       meaning_pt: c.meaning_pt || '', definition_pt: c.definition_pt || '', cards: []
     })
     groups.get(key).cards.push(c)
@@ -875,7 +888,7 @@ async function reanalyzeAll() {
   const tasks = items.map(it => async () => {
     try {
       const r = await regenerateMeaning(it)
-      const variety = _normVariety(r && r.variety)
+      const variety = _normVariety(r && r.variety, it.lang)
       const register = _normRegister(r && r.register)
       const origin = String((r && r.origin_pt) || '').trim()
       const exs = (r && Array.isArray(r.examples)) ? r.examples.filter(e => e && e.en) : []
@@ -928,7 +941,7 @@ async function fillOriginsAll() {
     const key = `${c.wordId}|${c.meaningIdx}`
     if (!groups.has(key)) groups.set(key, {
       wordId: c.wordId, meaningIdx: c.meaningIdx,
-      word: c.word || '', type: c.type || 'word',
+      word: c.word || '', type: c.type || 'word', lang: cardLang(c),
       meaning_pt: c.meaning_pt || '', definition_pt: c.definition_pt || '',
       hasOrigin: false, cards: []
     })
@@ -948,14 +961,14 @@ async function fillOriginsAll() {
   let withStory = 0, noStory = 0, failed = 0, wordsTouched = false
 
   const tasks = items.map(it => async () => {
-    const PROMPT = `You write the ORIGIN / history of an English word or expression, for a Brazilian learner, in Brazilian Portuguese. Return ONLY valid JSON.
-Word/expression: "${it.word}"${it.type ? ` (type: ${it.type})` : ''}
+    const PROMPT = `You write the ORIGIN / history of a ${promptLangName(it.lang)} word or expression, for a Brazilian learner, in Brazilian Portuguese. Return ONLY valid JSON.
+Word/expression (${promptLangName(it.lang)}): "${it.word}"${it.type ? ` (type: ${it.type})` : ''}
 Meaning (PT): "${it.meaning_pt || '(most common sense)'}"
 
 Return {"origin_pt":"..."}.
 Rules:
 - origin_pt = 1-2 sentences in PT-BR explaining WHY this expression came to mean this — the image, metaphor, history or etymology behind it.
-- Fill it ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. "sitting duck", "on the chopping block", "flagship", "throw under the bus").
+- Fill it ONLY for idioms, multi-word verbal expressions, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. "sitting duck", "on the chopping block", "flagship", "throw under the bus").
 - For ordinary words with no notable story, return "origin_pt":"".
 - NEVER invent folk etymology. If you are not reasonably sure of the REAL origin, return "".`
     try {
@@ -1003,14 +1016,15 @@ Rules:
 // para envolver o termo (inflexão/expressão) e o equivalente em PT. Preserva o
 // agendamento SRS; também escreve de volta nos significados da palavra de origem.
 async function markBoldOne(it) {
-  const PROMPT = `You mark the STUDY TARGET in bold inside example sentences for a Brazilian English learner. Return ONLY valid JSON.
+  const _bL = getLangDef(it.lang || 'en')
+  const PROMPT = `You mark the STUDY TARGET in bold inside example sentences for a Brazilian learner of ${_bL.nameEn}. Return ONLY valid JSON.
 
-Study target (English word/expression): "${it.word}"
-English sentence: ${JSON.stringify(it.en)}
+Study target (${_bL.nameEn} word/expression): "${it.word}"
+${_bL.nameEn} sentence: ${JSON.stringify(it.en)}
 Portuguese translation: ${JSON.stringify(it.pt)}
 
 Return the SAME two sentences, byte-for-byte identical EXCEPT that the study target is wrapped in <b></b>:
-- English: wrap the target exactly as it appears, inflected/conjugated (e.g. "ran" for "run"; for a phrasal verb like "take off" wrap the verb and the particle even if separated: "<b>took</b> the meeting <b>off</b>" is wrong — instead wrap the contiguous match, or both parts if split; for an idiom wrap the whole expression). Wrap the main occurrence.
+- ${_bL.nameEn}: wrap the target exactly as it appears, inflected/conjugated (e.g. "ran" for "run"; for a multi-word verbal expression wrap all its parts even if separated — e.g. a German separable verb "rufe ... an" gets <b> on both parts; for an idiom wrap the whole expression). Wrap the main occurrence.
 - Portuguese: wrap the word or short phrase that TRANSLATES the target in THIS sentence (its Portuguese equivalent).
 - Do NOT change, add, remove or translate anything else. No extra <b>. Keep punctuation and spacing identical.
 - If the Portuguese sentence is empty, return "pt":"".
@@ -1044,7 +1058,7 @@ async function markBoldAll() {
   const map = new Map()
   for (const c of need) {
     const key = (c.word || '') + '|||' + (c.example_en || '') + '|||' + (c.example_pt || '')
-    if (!map.has(key)) map.set(key, { word: c.word || '', en: c.example_en || '', pt: c.example_pt || '', cards: [] })
+    if (!map.has(key)) map.set(key, { word: c.word || '', lang: cardLang(c), en: c.example_en || '', pt: c.example_pt || '', cards: [] })
     map.get(key).cards.push(c)
   }
   const items = [...map.values()]
@@ -1107,7 +1121,7 @@ async function reprocessMetaBulk() {
   const groups = new Map()
   for (const c of srsCards) {
     const key = `${c.wordId}|${c.meaningIdx}`
-    if (!groups.has(key)) groups.set(key, { word: c.word || '', meaning: c.meaning_pt || '', example: c.example_en || '', cards: [] })
+    if (!groups.has(key)) groups.set(key, { word: c.word || '', meaning: c.meaning_pt || '', example: c.example_en || '', lang: cardLang(c), cards: [] })
     groups.get(key).cards.push(c)
   }
   const items = [...groups.values()].filter(g => g.word)
@@ -1128,6 +1142,7 @@ async function reprocessMetaBulk() {
       const payload = batch.map((it, j) => ({
         id: j,
         word: it.word,
+        lang: it.lang || 'en',
         meaning: it.meaning,
         example: (it.example || '').replace(/<[^>]+>/g, '').slice(0, 160)
       }))
@@ -1135,7 +1150,7 @@ async function reprocessMetaBulk() {
       const byId = {}; results.forEach(r => { byId[r.id] = r })
       batch.forEach((it, j) => {
         const r = byId[j]; if (!r) return
-        const variety = _normVariety(r.variety)
+        const variety = _normVariety(r.variety, it.lang)
         const register = _normRegister(r.register)
         it.cards.forEach(c => { c.variety = variety; c.register = register })
         updated += it.cards.length

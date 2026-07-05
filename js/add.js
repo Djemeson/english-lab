@@ -293,13 +293,14 @@ async function analyzeKindleItems() {
 
   const BATCH = 20  // menor para mais precisão e menos falhas
 
-  const SYSTEM_PROMPT = `Analyze each numbered English sentence. Your job:
-1. Find ALL phrasal verbs, idioms, collocations, and slang present. Be exhaustive — do not skip subtle ones.
+  const _kL = getLangDef(activeLang())
+  const SYSTEM_PROMPT = `Analyze each numbered ${_kL.nameEn} sentence. Your job:
+1. Find ALL ${promptVariantHint(activeLang())} present. Be exhaustive — do not skip subtle ones.
 
-Examples of what to catch:
-- Phrasal verbs: "give up", "trailed off", "lifted it off", "take off", "put up with"
+Examples of what to catch (English illustration — apply the equivalent categories in ${_kL.nameEn}):
+- Verbal expressions (phrasal/pronominal/separable verbs): "give up", "trailed off", "take off", "put up with"
 - Idioms: "grit his teeth", "break the ice", "take the black", "blood ran cold"
-- Collocations: "lick his lips", "blood matted", "raise an eyebrow", "heart sank"
+- Collocations: "lick his lips", "raise an eyebrow", "heart sank"
 - Slang: "freaked out", "bail", "crash"
 
 Do NOT include plain difficult words (e.g. "ephemeral", "gorget"). Only multi-word expressions or set phrases.
@@ -486,7 +487,7 @@ function attachPicker(idx) {
           max_tokens: 15,
           messages: [{
             role: 'user',
-            content: `Sentence: "${context}"\nThe user clicked on the word: "${clickedWord}"\n\nIs "${clickedWord}" part of a phrasal verb, idiom, or fixed multi-word expression in this sentence? If yes, return the complete expression as it appears in the sentence. If no, return just "${clickedWord}". Return ONLY the word or expression, lowercase, no punctuation, no explanation.`
+            content: `Sentence (${promptLangName(activeLang())}): "${context}"\nThe user clicked on the word: "${clickedWord}"\n\nIs "${clickedWord}" part of a multi-word verbal expression (phrasal/pronominal/separable verb), idiom, or fixed multi-word expression in this sentence? If yes, return the complete expression as it appears in the sentence. If no, return just "${clickedWord}". Return ONLY the word or expression, lowercase, no punctuation, no explanation.`
           }]
         })
       })
@@ -556,7 +557,7 @@ async function detectKindleWord(i) {
         max_tokens: 30,
         messages: [{
           role: 'user',
-          content: `Context: "${item.context}"\n\nIdentify the single most interesting vocabulary item to study from this sentence. It can be a word, phrasal verb, idiom, or multi-word expression. Return ONLY the vocabulary item itself, nothing else, no punctuation, no explanation.`
+          content: `Context (${promptLangName(activeLang())}): "${item.context}"\n\nIdentify the single most interesting vocabulary item to study from this sentence. It can be a word, a multi-word verbal expression (phrasal/pronominal/separable verb), an idiom, or another multi-word expression. Return ONLY the vocabulary item itself, nothing else, no punctuation, no explanation.`
         }]
       })
     })
@@ -651,11 +652,12 @@ async function analyzeMidiaText() {
   el('midia-proc-results')?.classList.add('hidden')
   midiaProcessed = []
 
-  const SYSTEM = `For each numbered English sentence, find ONLY phrasal verbs, idioms, collocations, and slang. Do NOT include plain difficult words (e.g. "startup", "setback", "deal", "awesome" alone). Only multi-word expressions or fixed set phrases that fit one of these four categories.
+  const _mL = getLangDef(activeLang())
+  const SYSTEM = `For each numbered ${_mL.nameEn} sentence, find ONLY ${promptVariantHint(activeLang())}. Do NOT include plain difficult words (e.g. "startup", "setback", "deal", "awesome" alone). Only multi-word expressions or fixed set phrases that fit one of these four categories.
 
-Categories:
-- phrasal verb: verb + particle(s), e.g. "put up with", "take off", "back down"
-- idiom: fixed expression with non-literal meaning, e.g. "hit the jackpot", "on the same page", "make a killing"
+Categories (English examples for illustration — apply the equivalent ${_mL.nameEn} categories):
+- phrasal verb: multi-word/pronominal/separable VERBAL EXPRESSION, e.g. "put up with", "take off" (${_mL.nameEn === 'English' ? 'verb + particle' : 'in ' + _mL.nameEn + ': ' + _mL.verbCatLabel})
+- idiom: fixed expression with non-literal meaning, e.g. "hit the jackpot", "on the same page"
 - collocation: words that naturally go together, e.g. "make a huge difference", "heavy rain"
 - slang: informal/colloquial expression, e.g. "like crazy", "bail", "freak out"
 
@@ -823,7 +825,7 @@ function midiaDocExampleHtml(e, ei) {
 }
 
 function renderMidiaDocItem(item, i) {
-  const typeLbl = ({ word:'word', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' })[item.type] || item.type || ''
+  const typeLbl = item.type_label || typeLabel(item.type, activeLang()) || item.type || ''
   const senses = (Array.isArray(item.senses) && item.senses.length)
     ? item.senses
     : [{ meaning_pt: item.meaning_pt, definition_pt: item.definition_pt, origin_pt: item.origin_pt, register: item.register, examples: Array.isArray(item.examples) ? item.examples : [] }]
@@ -892,6 +894,7 @@ function createDocWord(item) {
     source_context: item.source_context
   })
   w.type = item.type || 'word'
+  w.type_label = item.type_label || ''
   w.ipa = item.ipa || ''
   // Semente: marca o 1º significado curado do documento p/ uma eventual "Re-analisar".
   w._seedMeaning = senses[0].meaning_pt || ''
@@ -900,6 +903,7 @@ function createDocWord(item) {
     meaning_pt: s.meaning_pt || '',
     definition_pt: s.definition_pt || '',
     origin_pt: s.origin_pt || '',
+    type_label: s.type_label || item.type_label || '',
     variety: s.variety || item.variety || 'general',
     register: s.register || item.register || 'neutral',
     level: item.level || '',
@@ -1019,7 +1023,7 @@ async function extractMidiaDoc(text, fileName) {
   let docText = text, truncated = false
   if (docText.length > MAX) { docText = docText.slice(0, MAX); truncated = true }
 
-  const GENRE = `The document comes from a ${srcLabel} titled "${srcTitle || '(untitled)'}"${srcContext ? ` — extra context: ${srcContext}` : ''}. First infer the source's GENRE/DOMAIN (e.g. "Survivor" -> reality survival competition; a police series -> law-enforcement jargon; a fantasy saga -> medieval register). Inside a genre, common words carry special meanings — always capture the meaning AS USED IN THIS SOURCE. Canonical example: "snuff" in Survivor = "apagar (a tocha)", NOT "rape" (tobacco).`
+  const GENRE = `The document comes from a ${srcLabel} titled "${srcTitle || '(untitled)'}"${srcContext ? ` — extra context: ${srcContext}` : ''}. First infer the source's GENRE/DOMAIN (e.g. "Survivor" -> reality survival competition; a police series -> law-enforcement jargon; a fantasy saga -> medieval register). Inside a genre, common words carry special meanings — always capture the meaning AS USED IN THIS SOURCE. Canonical example: "snuff" in Survivor = "apagar (a tocha)", NOT "rapé" (powdered tobacco).`
 
   const results = el('midia-proc-results')
   const list = el('midia-proc-list')
@@ -1033,7 +1037,8 @@ async function extractMidiaDoc(text, fileName) {
   // Termos apenas CITADOS de passagem (listas/enumerações) NÃO entram — era o bug
   // do artigo "run by" do Mairo, que cita uma dúzia de outros phrasal verbs só de
   // brincadeira e o extrator os capturava como se fossem ensinados.
-  const LIST_SYSTEM = `You list the English vocabulary items that THIS DOCUMENT ACTUALLY TEACHES, for a Brazilian learner. ${GENRE}
+  const _dL = getLangDef(activeLang())
+  const LIST_SYSTEM = `You list the ${_dL.nameEn} vocabulary items that THIS DOCUMENT ACTUALLY TEACHES, for a Brazilian Portuguese-speaking learner. ${GENRE}
 
 CRITICAL FILTER — include a term ONLY if the document genuinely develops it: it has its own explanation/definition AND/OR at least one real example sentence (in the document) showing it in use.
 EXCLUDE any term that is merely mentioned, listed, enumerated or name-dropped in passing, without its own explanation or example. Concrete example: an article teaching the phrasal verb "run by" may, in a single throw-away sentence, casually list other phrasal verbs ("run out, run into, run off, run over, run up…") just to make a rhetorical point — those are NOT taught here, so DO NOT include them.
@@ -1042,12 +1047,13 @@ CANONICALIZE AND MERGE — this is critical. Output each distinct EXPRESSION onl
 - different SENSES of the same expression (e.g. "run by" meaning "falar com alguém", "apresentar uma ideia", "repassar", "dar um pulo", "passar correndo" → still ONE item: "run by"),
 - INFLECTIONS (e.g. "ran by", "running by" → "run by"),
 - STRUCTURAL variants / patterns (e.g. "run something by someone", "run that by me again" → "run by").
-The base form uses the bare verb + particle(s) for phrasal verbs (e.g. "run by"), the infinitive for verbs, the canonical wording for idioms. The multiple senses are added LATER (enrichment); here you only output the single base expression once, with the meaning of its MAIN/first sense.
+The base form uses the citation form of the language (bare verb + particle(s) for English phrasal verbs, infinitive — including the pronoun for pronominal/separable verbs, e.g. "arrepentirse", "se débrouiller", "aufgeben" — for verbs, the canonical wording for idioms). The multiple senses are added LATER (enrichment); here you only output the single base expression once, with the meaning of its MAIN/first sense.
 
-Eligible item types: meaningful single words, phrasal verbs, idioms, collocations, slang, set phrases. IGNORE titles, section headings, instructions, difficulty legends/emojis, "how to use" text and Portuguese-only filler.
+Eligible item types: meaningful single words, ${promptVariantHint(activeLang())}, set phrases. IGNORE titles, section headings, instructions, difficulty legends/emojis, "how to use" text and Portuguese-only filler.
 Be thorough about distinct TAUGHT expressions, but never split one expression into several, and never pad the list with merely-mentioned terms. Do NOT invent items absent from the document.
 
-For each item return: {"word":"<BASE/canonical form, lowercase unless proper noun/ritual phrase>","type":"word|phrasal_verb|idiom|collocation","meaning_pt":"<2-6 words, main sense>","doc_example_en":"<a real example sentence FROM THE DOCUMENT using this expression; proof it is taught — if you cannot find one and it is not otherwise explained, DROP the item>"}
+Note on "type" (universal supertypes): ${_dL.typeRule}
+For each item return: {"word":"<BASE/canonical form, lowercase unless proper noun/ritual phrase>","type":"word|phrasal_verb|idiom|collocation","type_label":"<precise local category in Brazilian Portuguese, or empty>","meaning_pt":"<2-6 words, main sense>","doc_example_en":"<a real example sentence FROM THE DOCUMENT using this expression; proof it is taught — if you cannot find one and it is not otherwise explained, DROP the item>"}
 Return ONLY valid JSON: {"items":[ ... ]}`
 
   let listed = []
@@ -1077,6 +1083,7 @@ Return ONLY valid JSON: {"items":[ ... ]}`
       doc: true,
       word,
       type: it.type || 'word',
+      type_label: String(it.type_label || '').trim(),
       ipa: '',
       level: '',
       register: 'neutral',
@@ -1110,12 +1117,13 @@ Return ONLY valid JSON: {"items":[ ... ]}`
   renderMidiaProcessed()
 
   // ── FASE 2 — enriquecer em lotes (IPA, nível, registro, definição, 3 exemplos) ──
-  const ENRICH_SYSTEM = `You complete English vocabulary STUDY CARDS for specific terms, for a Brazilian learner. ${GENRE}
+  const ENRICH_SYSTEM = `You complete ${_dL.nameEn} vocabulary STUDY CARDS for specific terms, for a Brazilian Portuguese-speaking learner. ${GENRE}
 
 You receive the document text and a list of TARGET terms (each with a draft meaning and maybe one document example). For EACH target term return a card object:
 - "word": the same term verbatim (so it can be matched back)
-- "type": "word"|"phrasal_verb"|"idiom"|"collocation"
-- "ipa": American IPA between /slashes/ (best effort)
+- "type": "word"|"phrasal_verb"|"idiom"|"collocation" (universal supertypes; ${_dL.typeRule})
+- "type_label": precise local category in Brazilian Portuguese, or empty string
+- "ipa": ${promptIpaRule(activeLang())} (best effort)
 - "level": "A2"|"B1"|"B2"|"C1"|"C2"
 - "senses": an ARRAY of sense objects. CRUCIAL STEP: before writing, SCAN THE ENTIRE DOCUMENT for this expression and list EVERY distinct meaning it is given — articles typically NUMBER them ("1 –", "2 –", "3 –", …) or separate them by paragraph. Return ONE sense object PER distinct documented meaning, IN ORDER. Example: the "run by" article develops 5 senses (1: "falar com alguém antes de seguir", 2: "apresentar uma ideia", 3: "repassar/mostrar de novo", 4: "dar um pulo num lugar", 5: "passar correndo") → return 5 sense objects. The hint meaning you receive is ONLY the first sense — NEVER stop at it when the document shows more. Only return a single sense if the document truly gives just one. Do NOT invent senses absent from the document.
 
@@ -1123,8 +1131,8 @@ Each sense object has:
 - "meaning_pt": 2-6 words, this SINGLE sense (no semicolons mixing senses)
 - "definition_pt": one short Portuguese sentence defining this sense
 - "register": "neutral"|"formal"|"informal"|"colloquial"|"slang"|"technical"|"literary"|"archaic"|"vulgar"
-- "variety": "general"|"american"|"british"|"australian"|"canadian"
-- "origin_pt": Brazilian-Portuguese note (1-2 sentences) on the ORIGIN / why it means this — ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting etymology; EMPTY STRING "" otherwise; never invent.
+- "variety": "${promptVarietyEnum(activeLang())}" — ${_dL.varietyRule}
+- "origin_pt": Brazilian-Portuguese note (1-2 sentences) on the ORIGIN / why it means this — ONLY for idioms, multi-word verbal expressions, metaphors and words with a genuinely interesting etymology; EMPTY STRING "" otherwise; never invent.
 - "examples": EXACTLY 3 objects {"en":"...","pt":"..."} FOR THIS SENSE. PREFER the document's REAL example sentences that belong to this sense (read the whole document — including inflected forms like "ran by" and patterns like "run something by someone" — and assign each sentence to its correct sense). If the document has MORE than 3 for this sense, pick the 3 clearest. If it has FEWER than 3, keep the real ones and ADD natural examples faithful to THIS exact sense to reach 3. Each "en" wraps the term in <b></b> as inflected; the 3 should differ in tense/construction; "pt" is a natural Brazilian-Portuguese translation that ALSO wraps the Portuguese equivalent of the term in <b></b> (exactly one bold span).
 
 Return JSON for ALL target terms: {"items":[ ... ]}`
@@ -1150,6 +1158,7 @@ Return JSON for ALL target terms: {"items":[ ... ]}`
         const it = byWord.get(String(c.word || '').trim().toLowerCase())
         if (!it) continue
         it.type = c.type || it.type
+        it.type_label = String(c.type_label || it.type_label || '').trim()
         it.ipa = c.ipa || it.ipa
         it.level = c.level || it.level
         // Novo formato: senses[] (vários sentidos por termo). Mantém compat com o
@@ -1232,7 +1241,7 @@ async function extractSite() {
     const res = await fetch(`${cfg.n8nBase}/webhook/en-site`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ url, ai_provider: cfg.aiProvider, ai_model: cfg.aiModel })
+      body: JSON.stringify({ url, ai_provider: cfg.aiProvider, ai_model: cfg.aiModel, lang: activeLang(), lang_name: promptLangName(activeLang()) })
     })
     if (!res.ok && res.status !== 200) throw new Error(`n8n retornou status ${res.status}`)
     const data = await res.json()

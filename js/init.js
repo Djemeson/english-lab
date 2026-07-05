@@ -10,6 +10,9 @@ async function initApp() {
   loadConversas()    // conversas do Assistente
   loadSrs()          // loads srsCfg, srsLog, decks
   await loadSrsAsync() // loads srsCards from IDB (migrates if needed)
+  migrateLangFields()  // multi-idioma: words/cards antigos ganham lang:'en' (aditivo)
+  mountLangSelector('lang-selector-add')  // seletor de idioma ativo (Adicionar)
+  mountLangSelector('lang-selector-asst') // seletor de idioma ativo (Assistente)
   renderDashboard()
   updateSrsBadge()
   initFirebase()

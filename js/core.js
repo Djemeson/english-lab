@@ -417,7 +417,9 @@ function getDeckCardCount(deckId) {
   const allIds = [deckId, ...getAllDescendantIds(deckId)]
   return srsCards.filter(c => allIds.includes(c.deckId)).length
 }
-function getWordDeckId(wordType) {
+function getWordDeckId(wordType, langCode) {
+  // Multi-idioma: delega para lang.js (cria os decks do idioma sob demanda).
+  if (typeof deckIdForWord === 'function') return deckIdForWord(wordType, langCode || 'en')
   const m = { phrasal_verb:'dk-phrasal', idiom:'dk-idioms', collocation:'dk-colloc' }
   return m[(wordType||'').toLowerCase()] || 'dk-vocab'
 }

@@ -87,15 +87,22 @@ function renderConversaList() {
 }
 
 function asstEmptyState() {
-  const sugg = [
-    'O que significa "breaking bad"?',
-    'Como usar "nevertheless"?',
-    'Diferença entre "speak" e "talk"',
-    'Me explica o phrasal verb "put up with"'
+  const L = getLangDef(activeLang())
+  const SUGG = {
+    en: ['O que significa "breaking bad"?', 'Como usar "nevertheless"?', 'Diferença entre "speak" e "talk"', 'Me explica o phrasal verb "put up with"'],
+    es: ['O que significa "echar de menos"?', 'Como usar "sin embargo"?', 'Diferença entre "ser" e "estar" em espanhol', 'Me explica o verbo pronominal "ponerse"'],
+    fr: ['O que significa "poser un lapin"?', 'Como usar "quand même"?', 'Diferença entre "savoir" e "connaître"', 'Me explica o verbo pronominal "se débrouiller"'],
+    de: ['O que significa "die Daumen drücken"?', 'Como usar "doch"?', 'Diferença entre "kennen" e "wissen"', 'Me explica o verbo separável "aufgeben"'],
+  }
+  const sugg = SUGG[L.code] || [
+    `O que significa uma expressão comum em ${L.name.toLowerCase()}?`,
+    `Como se diz "sentir falta" em ${L.name.toLowerCase()}?`,
+    `Quais expressões idiomáticas básicas de ${L.name.toLowerCase()}?`,
+    `Me explica uma expressão verbal de ${L.name.toLowerCase()}`
   ]
   return `<div class="consulta-empty" id="consulta-empty">
     ${ic('sparkles','ic-xl')}
-    <p style="font-weight:700;font-size:1.05rem">Pergunte qualquer coisa em inglês</p>
+    <p style="font-weight:700;font-size:1.05rem">Pergunte qualquer coisa em ${esc(L.name.toLowerCase())}</p>
     <p style="font-size:0.86rem;max-width:440px">Significados, pronúncia, diferenças de uso, gírias, origem de expressões — e mande os termos direto para o seu estudo.</p>
     <div class="asst-suggestions">
       ${sugg.map(s => `<button class="asst-sugg" onclick="askSuggestion(${escA(JSON.stringify(s))})">${esc(s)}</button>`).join('')}
@@ -126,7 +133,8 @@ function renderSrsItemsHTML(items, msgIdx) {
   if (!valid.length) return ''
   const chips = valid.map((it, i) => {
     const inStudy = isWordInStudy(it.word)
-    const typeLbl = it.type && it.type !== 'word' ? ` <span class="asst-srs-type">${esc(String(it.type).replace('_',' '))}</span>` : ''
+    const _tl = it.type_label || (it.type && it.type !== 'word' ? String(it.type).replace('_',' ') : '')
+    const typeLbl = _tl ? ` <span class="asst-srs-type">${esc(_tl)}</span>` : ''
     if (inStudy) {
       return `<span class="asst-srs-added">${ic('check','ic-sm')}<span>${esc(it.word)} <em>já no estudo</em></span></span>`
     }
@@ -209,29 +217,39 @@ function toggleHistory() {
 // A resposta visível é conversacional e limpa (sem JSON). Os itens de estudo
 // são extraídos DEPOIS, numa chamada dedicada (garante os botões mesmo em
 // perguntas PT→EN como "como se diz X em inglês").
-const CONSULTA_SYSTEM = `Você é um tutor de inglês especialista ajudando um brasileiro a aprender. Responda SEMPRE em português (exceto os exemplos em inglês), de forma clara e didática.
+// Multi-idioma: os prompts são funções do idioma ativo (seletor na barra do chat)
+function consultaSystem() {
+  const L = getLangDef(activeLang())
+  const nome = L.name.toLowerCase()
+  return `Você é um tutor de ${nome} especialista ajudando um brasileiro a aprender. Responda SEMPRE em português (exceto os exemplos em ${nome}), de forma clara e didática.
 
-Quando o usuário perguntar sobre palavras/expressões em inglês — ou pedir "como se diz" algo em inglês:
-1. Dê a tradução/expressão em inglês e explique o significado em português.
+Quando o usuário perguntar sobre palavras/expressões em ${nome} — ou pedir "como se diz" algo em ${nome}:
+1. Dê a tradução/expressão em ${nome} e explique o significado em português.
 2. Mostre a pronúncia em IPA (entre barras: //).
-3. Dê alguns exemplos de uso em inglês com tradução.
-4. Acrescente contexto útil: origem/história quando interessante, registro (formal/informal), diferenças de uso, variações.
+3. Dê alguns exemplos de uso em ${nome} com tradução.
+4. Acrescente contexto útil: origem/história quando interessante, registro (formal/informal), diferenças de uso, variações regionais.
 
 FORMATO da resposta (texto que o usuário lê):
 - Escreva em texto corrido e natural. Para destacar, use **negrito** (markdown).
 - NÃO use títulos com # nem blocos de código com crases. NÃO mostre JSON.`
+}
 
 // Extrator dedicado de itens de estudo (roda após a resposta)
-const SRS_EXTRACT_SYSTEM = `A partir de um diálogo entre um aprendiz brasileiro e um tutor de inglês, extraia TODOS os termos/expressões EM INGLÊS que valem virar flashcard de estudo.
+function srsExtractSystem() {
+  const L = getLangDef(activeLang())
+  const nome = L.name.toLowerCase()
+  return `A partir de um diálogo entre um aprendiz brasileiro e um tutor de ${nome}, extraia TODOS os termos/expressões EM ${L.name.toUpperCase()} que valem virar flashcard de estudo.
 Regras:
-- Inclua os termos em inglês MESMO quando a pergunta foi em português (ex.: "como se diz X em inglês?" → extraia a(s) tradução(ões) em inglês dadas na resposta).
+- Inclua os termos em ${nome} MESMO quando a pergunta foi em português (ex.: "como se diz X em ${nome}?" → extraia a(s) tradução(ões) em ${nome} dadas na resposta).
 - Em "qual a diferença entre X e Y", inclua X e Y.
-- Inclua palavras significativas, phrasal verbs, idioms, collocations e gírias REALMENTE presentes na resposta. Deduplique. NÃO invente termos ausentes.
+- Inclua palavras significativas e ${L.variantHint} REALMENTE presentes na resposta. Deduplique. NÃO invente termos ausentes.
 - Se não houver nada que valha a pena estudar, retorne lista vazia.
+- Sobre "type" (supertipos universais): ${L.typeRule}
 Para CADA item retorne:
-{"word":"<termo em inglês>","type":"word|phrasal_verb|idiom|collocation","variety":"general|american|british|australian|canadian","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"2-6 palavras","ipa":"/.../","definition_pt":"uma frase em PT","origin_pt":"origem/história em PT (1-2 frases) SÓ se houver etimologia/imagem interessante; senão \\"\\"","examples":[{"en":"Frase com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."},{"en":"Outra frase com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."},{"en":"Mais uma com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."}]}
-Cada item tem EXATAMENTE 3 exemplos, em tempos/construções diferentes, com o termo em <b></b> no inglês E o equivalente em português também em <b></b> (exatamente um trecho em negrito por tradução).
+{"word":"<termo em ${nome}>","type":"word|phrasal_verb|idiom|collocation","type_label":"<categoria local precisa em PT, ou \\"\\">","variety":"${promptVarietyEnum(activeLang())}","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"2-6 palavras","ipa":${promptIpaRule(activeLang())},"definition_pt":"uma frase em PT","origin_pt":"origem/história em PT (1-2 frases) SÓ se houver etimologia/imagem interessante; senão \\"\\"","examples":[{"en":"Frase com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."},{"en":"Outra frase com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."},{"en":"Mais uma com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."}]}
+Cada item tem EXATAMENTE 3 exemplos, em tempos/construções diferentes, com o termo em <b></b> na frase em ${nome} E o equivalente em português também em <b></b> (exatamente um trecho em negrito por tradução).
 Retorne JSON: {"items":[ ... ]}`
+}
 
 async function _consultaOpenAIJSON(messages, maxTokens) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -247,7 +265,7 @@ async function _consultaOpenAIJSON(messages, maxTokens) {
 async function extractSrsItems(question, answer) {
   try {
     const r = await _consultaOpenAIJSON([
-      { role: 'system', content: SRS_EXTRACT_SYSTEM },
+      { role: 'system', content: srsExtractSystem() },
       { role: 'user', content: `PERGUNTA DO ALUNO:\n${question}\n\nRESPOSTA DO TUTOR:\n${answer}` }
     ], 2500)
     return Array.isArray(r.items) ? r.items.filter(it => it && it.word) : []
@@ -310,7 +328,7 @@ async function sendConsulta() {
       headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: cfg.aiModel || 'gpt-4o-mini',
-        messages: [{ role: 'system', content: CONSULTA_SYSTEM }, ...apiHistory],
+        messages: [{ role: 'system', content: consultaSystem() }, ...apiHistory],
         temperature: 0.7,
         stream: true
       })
@@ -418,12 +436,14 @@ function _consultaItemToWord(item) {
   const w = createWord({
     word: item.word,
     context: (exs[0] && exs[0].en ? exs[0].en : item.example_en || '').replace(/<\/?b>/gi, '').trim(),
-    source_type: 'manual'
+    source_type: 'manual',
+    lang: item.lang || activeLang()
   })
   w.meanings = [{
     meaning_pt: item.meaning_pt || '',
     definition_pt: item.definition_pt || '',
     origin_pt: item.origin_pt || '',
+    type_label: item.type_label || '',
     examples: exs,
     variety: item.variety || 'general',
     register: (item.register && item.register !== 'standard') ? item.register : 'neutral',
@@ -431,6 +451,7 @@ function _consultaItemToWord(item) {
   }]
   w.ipa = item.ipa || ''
   w.type = item.type || 'word'
+  w.type_label = item.type_label || ''
   w.status = 'pending_review'
   w.ai_processed = true
   w.updated_at = new Date().toISOString()

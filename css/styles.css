@@ -417,6 +417,14 @@ select option{background:var(--surface)}
 .chip.register-slang{background:rgba(239,68,68,.12);color:#FCA5A5}
 .chip.register-formal{background:rgba(167,139,250,.15);color:var(--purple)}
 .chip.register-technical{background:rgba(16,185,129,.12);color:var(--success)}
+.chip.chip-lang{background:rgba(var(--primary-rgb),.14);color:var(--primary)}
+.lang-select{
+  font-size:0.8rem;font-weight:600;padding:5px 10px;cursor:pointer;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text);
+}
+.lang-select:hover{border-color:rgba(var(--primary-rgb),.5)}
+.lang-select:focus{outline:none;border-color:var(--primary)}
 .chip.level-a1,.chip.level-a2{background:rgba(16,185,129,.15);color:var(--success)}
 .chip.level-b1,.chip.level-b2{background:rgba(var(--primary-rgb),.15);color:var(--primary)}
 .chip.level-c1,.chip.level-c2{background:rgba(167,139,250,.15);color:var(--purple)}

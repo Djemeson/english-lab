@@ -180,7 +180,7 @@ function createSrsCard(wordId, meaningIdx, exampleIdx) {
   if (!m) return null
   const ex = m.examples && m.examples[exampleIdx] ? m.examples[exampleIdx] : null
 
-  const deckId = getWordDeckId(w.type)
+  const deckId = getWordDeckId(w.type, wordLang(w))
   return {
     id: uid(),
     wordId, meaningIdx, exampleIdx,
@@ -196,6 +196,8 @@ function createSrsCard(wordId, meaningIdx, exampleIdx) {
     word: w.word || '',
     ipa: w.ipa || '',
     type: w.type || '',
+    type_label: m.type_label || w.type_label || '',
+    lang: wordLang(w),
     source_type: w.source_type || '',
     variety: m.variety || w.variety || 'general',
     register: m.register || 'neutral',

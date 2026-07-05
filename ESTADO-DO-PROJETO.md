@@ -3,10 +3,11 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-06-25 — **Fuso do "dia" do SRS corrigido**: `todayStr()` usa data
-> LOCAL (Brasília), o dia vira à meia-noite local (antes renovava às 21h por usar UTC). Estudar:
-> cor **azul** = **novos** (verde = para revisar); "Novos disponíveis" = *quantos novos ainda
-> faltam hoje* (`min(newPerDay − vistos, estoque)`).
+> Última atualização: 2026-07-05 — **Suporte MULTI-IDIOMA implementado** (qualquer idioma na
+> entrada; PT-BR continua sendo a saída). Novo `js/lang.js` (NÃO-lazy, logo após core.js) com o
+> registro `LANGS` (en/es/fr/de + fallback genérico), seletor de idioma ativo (Adicionar +
+> Assistente), decks por idioma sob demanda, auto-detecção e supertipos universais + `type_label`.
+> Ver `PLANO-MULTI-IDIOMA.md`. ⚠️ Ainda NÃO testado ao vivo.
 
 ---
 
@@ -33,6 +34,7 @@ index.html        — markup de todas as seções + modais
 css/styles.css    — todo o CSS (tokens/temas no topo, camadas premium no fim)
 sw.js             — service worker (cache do shell)
 js/core.js        — estado, storage, temas, ÍCONES, toast, inputModal, tooltips, navegação
+js/lang.js        — MULTI-IDIOMA: registro LANGS, idioma ativo, prompts, decks/idioma, migração (NÃO-lazy)
 js/firebase.js    — sincronização Firestore (TEMPO REAL)
 js/audio.js       — IndexedDB (AudioDB/CardsDB/ImageDB), TTS, Biblioteca (browser de cards), reanálise
 js/srs.js         — MOTOR SM-2 (estado srsCards/srsCfg/srsLog/srsSession)
@@ -68,8 +70,11 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
 ## 3. Modelo de dados
 
 - **`words[]`** — itens capturados. Cada um: `{id, word, context, source_type, source_title,
-  source_context, status, ipa, type, meanings[], created_at, updated_at}`. `status`: `pending_ai` →
-  `pending_review` → `in_srs` (ou `skipped`).
+  source_context, lang, status, ipa, type, type_label, meanings[], created_at, updated_at}`.
+  `status`: `pending_ai` → `pending_review` → `in_srs` (ou `skipped`).
+  - `lang`: código ISO do idioma do item ('en' padrão/legado). `type` é supertipo universal
+    (`word|phrasal_verb|idiom|collocation`; `phrasal_verb` = expressão verbal do idioma);
+    `type_label` = nome local da categoria em PT (ex.: "verbo separável"). Ver `js/lang.js`.
   - `source_context`: nota opcional de gênero/contexto da fonte (ex.: "reality de sobrevivência").
     Usada pela IA para desambiguar (resolve o caso "snuff" → "apagar a tocha" no Survivor).
   - `meanings[]`: `{meaning_pt, definition_pt, origin_pt, variety, register, level, examples[], ...}`
@@ -78,8 +83,8 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
   - `examples[]`: `{en, pt}` (en com a palavra-alvo em `<b>`).
 - **`srsCards[]`** — um card por (wordId, meaningIdx, exampleIdx). Guarda *snapshot*
   do conteúdo + estado SM-2: `{id, wordId, meaningIdx, exampleIdx, deckId, state, due,
-  interval, ease, lapses, stepIdx, variety, register, word, meaning_pt, example_en,
-  example_pt, leech?}`. `state`: `new|learning|review|relearning`.
+  interval, ease, lapses, stepIdx, variety, register, word, lang, type_label, meaning_pt,
+  example_en, example_pt, leech?}`. `state`: `new|learning|review|relearning`.
 - **`srsDecks[]`** — baralhos (árvore). Padrão em `DEFAULT_DECKS` (core.js).
 - **`srsLog[]`** — `{date, reviewed, correct, newSeen}` por dia.
 - **`srsCfg`** — parâmetros SM-2 (ver seção SRS).
@@ -191,6 +196,41 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-07-05 — SUPORTE MULTI-IDIOMA (es/fr/de prioritários; genérico p/ qualquer um)
+38. **Multi-idioma completo** — decisões do Djemeson: idiomas prioritários **Espanhol, Francês e
+    Alemão**; **seletor de idioma ativo + auto-detecção**; **baralho raiz por idioma**; saída
+    continua PT-BR. Plano completo em **`PLANO-MULTI-IDIOMA.md`**. Implementação:
+    - **`js/lang.js` (novo, NÃO-lazy, carregado logo após core.js no index.html e no sw.js —
+      cache bump p/ `englab-v4`)**: registro `LANGS` (en/es/fr/de + `_langFallback` genérico p/
+      qualquer código ISO) com variedades, regras de prompt (`varietyRule`/`typeRule`/
+      `variantHint`/`ipaNote`) e nome do subdeck de expressões verbais. Helpers: `getLangDef`,
+      `activeLang`/`setActiveLang` (persistido em `cfg.activeLang`, sincronizado),
+      `wordLang`/`cardLang` (fallback 'en'), `typeLabel`, `varietyLabel`, `langChip`, fragmentos
+      de prompt (`promptVarietyRules`, `promptVarietyEnum`, `promptTypeRules`, `promptIpaRule`,
+      `promptLangName`, `promptVariantHint`), `ensureLangDecks` (cria `dk-root-<code>` + 4
+      subdecks sob demanda; inglês mantém ids legados), `deckIdForWord`, `migrateLangFields`
+      (aditiva: words/cards antigos ganham `lang:'en'`; chamada no initApp), `langSelectorHtml`/
+      `mountLangSelector` (seletores `#lang-selector-add` e `#lang-selector-asst`).
+    - **Taxonomia**: enum `type` mantido como SUPERTIPO universal (`phrasal_verb` = "expressão
+      verbal": phrasal/pronominal/separável/perífrase); novo campo **`type_label`** (nome local
+      da categoria em PT, ex. "verbo separável (trennbares Verb)") na palavra, nos meanings e no
+      snapshot do card. Gíria continua via `register`. Roteamento de deck pelo supertipo.
+    - **Prompts parametrizados por idioma**: review.js (análise principal + `detected_lang` p/
+      auto-detecção — se divergir, a palavra adota o idioma detectado, cria os decks e avisa),
+      add.js (Kindle, clique-na-palavra, linha a linha, extrator de doc LIST/ENRICH; o webhook
+      do site agora envia `lang`/`lang_name` ao n8n — **falta ajustar o workflow n8n**),
+      audio.js (reanálise, classificação variety/register em lote c/ `lang` por item, origem,
+      negrito perfeito, prompt de imagem), study.js (regenerar exemplo), consulta.js
+      (`CONSULTA_SYSTEM`/`SRS_EXTRACT_SYSTEM` viraram FUNÇÕES `consultaSystem()`/
+      `srsExtractSystem()` do idioma ativo; sugestões do empty state por idioma).
+    - **UI**: seletor de idioma no header do Adicionar e na barra do Assistente (CSS
+      `.lang-select`); chip de idioma (`.chip-lang`) no Revisar e nos cards quando ≠ inglês;
+      dropdown de variedade do card dinâmico pelo idioma (`getLangDef(...).varieties`);
+      `_normVariety` agora valida contra as variedades do idioma do item.
+    - **Dados (aditivo, sem migração destrutiva)**: `words[]`+`lang`/`type_label`;
+      `srsCards[]`+`lang`/`type_label` no snapshot; `cfg`+`activeLang`. Sync inalterado.
+    - Typo pré-existente corrigido no prompt do doc ("rape"→"rapé").
 
 ### Sessão 2026-06-25 — fuso horário do "dia" do SRS (renovação da contagem)
 37. **`todayStr()` passou a usar a data LOCAL (Brasília)** em vez de `toISOString()` (UTC).
@@ -380,6 +420,19 @@ maxInterval (36500), leechThreshold (50)
 
 ## 9. Pendências / a verificar
 
+- [ ] **Testar o MULTI-IDIOMA ao vivo** (após deploy + hard-refresh; backup — Exportar JSON —
+      antes): (1) trocar o seletor p/ Espanhol no Adicionar, adicionar "echar de menos" e
+      analisar — conferir type=phrasal_verb c/ type_label "perífrase verbal", IPA, variedades
+      es no dropdown do card e deck "Espanhol" criado; (2) auto-detecção: com seletor em Inglês,
+      adicionar "se débrouiller" com frase de contexto em francês → deve avisar "Idioma
+      detectado: Francês" e ir p/ o deck certo; (3) Assistente: trocar o idioma na barra do chat
+      e conferir sugestões + resposta como tutor do idioma + termos extraídos no idioma;
+      (4) TTS de uma frase em espanhol/alemão (tts-1 é multilíngue); (5) conferir chip de idioma
+      nos cards não-ingleses e o glossário.
+- [ ] **Ajustar o workflow do n8n** (`webhook/en-site`): o app agora envia `lang` e `lang_name`
+      no payload — usar no prompt do workflow p/ extrair vocabulário do idioma certo.
+- [ ] (Multi-idioma, opcional) Filtro por idioma na Biblioteca/glossário; nome exibido do app
+      ("English Lab" → "Language Lab"?) — infra (repo/URL/Firebase) fica como está.
 - [ ] **Testar ao vivo as melhorias da 5ª rodada** (após o deploy GitHub Pages + hard-refresh):
       (1) abrir Biblioteca → alternar **Cards/Palavras**, conferir o glossário e a busca; (2) num card
       de palavra com 2+ sentidos, ver o chip **"sentido X de Y"** e clicar (deve abrir o glossário no

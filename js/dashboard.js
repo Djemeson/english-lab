@@ -104,6 +104,7 @@ function createWord(data) {
     source_type: data.source_type || 'manual',
     source_title: data.source_title || '',
     source_context: (data.source_context || '').trim(),
+    lang: (data.lang || (typeof activeLang === 'function' ? activeLang() : 'en')),
     status: 'pending_ai',
     meanings: [],
     ai_processed: false,

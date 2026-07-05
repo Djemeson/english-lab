@@ -4,7 +4,7 @@
 // Firebase e OpenAI ficam sempre na rede.
 // ================================================================
 
-const CACHE = 'englab-v3'
+const CACHE = 'englab-v4'
 
 // Assets que nunca mudam entre visitas (shell da app)
 const SHELL = [
@@ -12,6 +12,7 @@ const SHELL = [
   '/index.html',
   '/css/styles.css',
   '/js/core.js',
+  '/js/lang.js',
   '/js/firebase.js',
   '/js/audio.js',
   '/js/srs.js',

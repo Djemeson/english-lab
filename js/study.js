@@ -674,9 +674,12 @@ function buildMetaChips(card) {
     chips += `<span class="srs-sense-chip" data-tip="Sentido ${si.pos} de ${si.total} — esta palavra tem ${si.total} significados em estudo. Clique para ver todos."
       onclick="event.stopPropagation();openWordGlossary('${card.wordId}')">${ic('layers','ic-sm')}<span class="ssc-num">${si.pos}</span><span class="ssc-sep">/</span><span class="ssc-tot">${si.total}</span></span>`
   }
+  // Chip de idioma (só quando não é inglês)
+  chips += langChip(cardLang(card))
   const v = VARIETY_LABELS[card.variety]
   const r = REGISTER_LABELS[card.register]
   if (v) chips += `<span class="srs-variety-chip ${v.cls}">${v.flag} ${v.label}</span>`
+  else if (card.variety && card.variety !== 'general') chips += `<span class="srs-variety-chip other">🌍 ${esc(varietyLabel(card.variety, cardLang(card)))}</span>`
   if (r) chips += `<span class="srs-register-chip ${r.cls}">${r.icon} ${r.label}</span>`
   if (card.leech) chips += `<span class="srs-leech-chip" title="Sanguessuga: muitas falhas neste card">leech</span>`
   return chips ? `<div class="srs-meta-chips">${chips}</div>` : ''
@@ -713,7 +716,13 @@ async function buildSrsVersoAsync(card) {
   return buildSrsVerso(card, img)
 }
 function buildSrsVerso(card, imgData, imageBelow) {
-  const TYPE = {word:'vocabulário', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation'}
+  const _cl = cardLang(card)
+  const TYPE = {
+    word: 'vocabulário',
+    phrasal_verb: typeLabel('phrasal_verb', _cl, card.type_label),
+    idiom: typeLabel('idiom', _cl, card.type === 'idiom' ? card.type_label : ''),
+    collocation: 'collocation'
+  }
   const strip = s => String(s||'').replace(/<[^>]*>/g,'')
 
   // Coluna de texto (sempre presente)
@@ -755,11 +764,7 @@ function buildSrsVerso(card, imgData, imageBelow) {
         <label style="font-size:0.75rem;color:var(--text3);min-width:70px">Variedade</label>
         <select style="font-size:0.78rem;padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"
           onchange="event.stopPropagation();updateCardMeta('${card.id}','variety',this.value)">
-          <option value="general" ${(!card.variety||card.variety==='general')?'selected':''}>Geral (todas as variedades)</option>
-          <option value="american" ${card.variety==='american'?'selected':''}>American English</option>
-          <option value="british" ${card.variety==='british'?'selected':''}>British English</option>
-          <option value="australian" ${card.variety==='australian'?'selected':''}>Australian English</option>
-          <option value="canadian" ${card.variety==='canadian'?'selected':''}>Canadian English</option>
+          ${getLangDef(_cl).varieties.map(x => `<option value="${x.v}" ${((card.variety || 'general') === x.v) ? 'selected' : ''}>${x.v === 'general' ? 'Geral (todas as variedades)' : esc(x.label)}</option>`).join('')}
           <option value="other" ${card.variety==='other'?'selected':''}>Outra</option>
         </select>
       </div>
@@ -903,9 +908,10 @@ async function regenerateCardExample(cardId, btnEl) {
   btnEl.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:2px;display:inline-block;vertical-align:middle"></span>'
 
   try {
-    const prompt = `Generate ONE example sentence in English for a Brazilian English learner, illustrating exactly this meaning of the word.
+    const _gL = getLangDef(cardLang(card))
+    const prompt = `Generate ONE example sentence in ${_gL.nameEn} for a Brazilian learner of ${_gL.nameEn}, illustrating exactly this meaning of the word.
 
-Word: "${card.word}"
+Word (${_gL.nameEn}): "${card.word}"
 Meaning (Portuguese): "${card.meaning_pt}"
 Definition (Portuguese): "${card.definition_pt || card.meaning_pt}"
 
@@ -915,7 +921,7 @@ Rules:
 - Wrap the target word (conjugated/inflected as needed) in <b></b> tags
 - ALSO wrap the Portuguese equivalent of the target in <b></b> inside the translation (exactly one bold span)
 - Keep it 10-20 words long
-- Return ONLY valid JSON (no markdown): {"en": "English sentence with <b>word</b>.", "pt": "Tradução com a <b>palavra</b> em negrito."}`
+- Return ONLY valid JSON (no markdown): {"en": "${_gL.nameEn} sentence with <b>word</b>.", "pt": "Tradução com a <b>palavra</b> em negrito."}`
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

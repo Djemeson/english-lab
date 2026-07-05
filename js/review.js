@@ -5,7 +5,15 @@
 function applyAiResult(w, result) {
   w.word = result.word || w.word
   w.type = result.type || 'word'
+  w.type_label = result.type_label || ''
   w.ipa = result.ipa || ''
+  // Auto-detecção de idioma: se a IA detectou outro idioma, adota (seletor manda, detecção corrige)
+  const det = (result.detected_lang || '').toLowerCase().slice(0, 5)
+  if (det && det !== wordLang(w)) {
+    w.lang = det
+    ensureLangDecks(det)
+    toast(`Idioma detectado: ${getLangDef(det).name}`, 'info')
+  }
   if (result.audio_base64) w.audio_base64 = result.audio_base64
   const rawMeanings = Array.isArray(result.meanings) && result.meanings.length > 0
     ? result.meanings
@@ -22,6 +30,7 @@ function applyAiResult(w, result) {
     meaning_pt:    m.meaning_pt    || '',
     definition_pt: m.definition_pt || '',
     origin_pt:     m.origin_pt     || '',
+    type_label:    m.type_label    || result.type_label || '',
     variety:       m.variety       || 'general',
     register:      m.register      || 'neutral',
     level:         m.level         || '',
@@ -73,13 +82,18 @@ SOURCE-AWARE DISAMBIGUATION — CRITICAL:
 - Inside a specific genre, a common word frequently carries a special domain-specific meaning. You MUST treat the sense as it is actually used IN THIS SOURCE'S CONTEXT as the PRIMARY meaning: set its "context_match": true and place it FIRST in the array.
 - Canonical example: "snuff" captured from *Survivor* means "apagar (a tocha)" — the host snuffs the eliminated player's torch — NOT "rapé" (powdered tobacco). The reality-show sense wins because of the source.
 - If a context sentence is present, combine it WITH the inferred genre to choose the right primary sense.
-- You MUST still ALSO return the other common general-English senses with "context_match": false, exactly as usual — never drop them.${w._seedMeaning ? `
+- You MUST still ALSO return the other common general senses with "context_match": false, exactly as usual — never drop them.${w._seedMeaning ? `
 - A curated meaning for this item was already provided from the source material: "${w._seedMeaning}". Preserve THIS as the primary (context_match:true) sense; refine its Portuguese only if it is clearly wrong, and make sure one example illustrates it.` : ''}`
   }
 
-  const PROMPT = `Analyze this English vocabulary item for a Brazilian learner and return ONLY valid JSON.
+  const L = getLangDef(wordLang(w))
+  const PROMPT = `Analyze this ${L.nameEn} vocabulary item for a Brazilian Portuguese-speaking learner and return ONLY valid JSON.
 
 Item: "${target}"
+
+LANGUAGE CHECK:
+- The learner expects this item to be ${L.nameEn}. Set "detected_lang" to the ISO 639-1 code of the language the item is ACTUALLY in.
+- If the item is valid in ${L.nameEn} (even if it also exists in other languages), keep "detected_lang": "${L.code}". Only return a different code when the item clearly belongs to another language (use the context sentence to decide). In that case, analyze it in ITS language.
 ${ctx ? `Context sentence: "${ctx}"` : ''}
 ${sourceBlock}
 
@@ -89,7 +103,7 @@ Rules for examples — CRITICAL, follow exactly:
 - Each example MUST have a different subject (mix: he/she/they/I/we/you/a proper name/a noun phrase)
 - Each example MUST describe a genuinely different real-world situation or context (work, relationships, sports, travel, news, etc.)
 - NEVER use formulaic sentence patterns — sentences should feel natural, like they come from a novel, news article, or real conversation
-- Wrap the target word/expression in <b></b> tags exactly as it appears conjugated/inflected in that English sentence
+- Wrap the target word/expression in <b></b> tags exactly as it appears conjugated/inflected in that ${L.nameEn} sentence
 - ALSO wrap, in EACH Portuguese translation, the word or short phrase that translates the target in that sentence (its Portuguese equivalent) in <b></b> tags — exactly one bold span per translation
 - BAD (avoid): "#1 He backs down. #2 She backed down. #3 They are backing down." — same pattern, different pronouns
 - GOOD: "#1 The senator backed down after facing criticism from his own party. #2 Don't back down just because the situation gets uncomfortable. #3 She never backs down from a challenge, even when the odds are against her."
@@ -102,7 +116,7 @@ For Portuguese translations of examples:
 
 Rules for meanings — CRITICAL:
 - The context sentence is ONLY used to identify the word correctly and to mark which sense appeared there. It does NOT limit which meanings you return.
-- ALWAYS return ALL distinct senses the word has in common English usage — not just the one from the context.
+- ALWAYS return ALL distinct senses the word has in common ${L.nameEn} usage — not just the one from the context.
 - Think of yourself as a dictionary: if the word has 3 senses, return 3 meaning objects. If it has 2, return 2. Never collapse them into one.
 - NEVER merge two different senses into one meaning using semicolons (e.g. "decolar; ter sucesso" is WRONG — those must be two separate objects)
 - NEVER omit a common sense just because it doesn't appear in the context sentence
@@ -119,21 +133,26 @@ meanings: [
 ]
 
 Rules for "variety" and "register" — ALWAYS fill BOTH for every meaning, never leave blank:
-- "variety": which English variety this sense belongs to. Use "general" when the word is standard across all varieties (this is the case for MOST words). Use a specific variety only when the word/spelling/sense is predominantly or exclusively used there: "british" (e.g. "lift" = elevator, "lorry", "colour"), "american" (e.g. "soccer", "elevator", "color"), "australian" (e.g. "arvo", "barbie"), "canadian". Default to "general" when in doubt.
+${promptVarietyRules(wordLang(w))}
 - "register": the style level of THIS sense. Pick the single best fit: "neutral" (everyday standard — the default for most words), "formal", "informal", "colloquial", "slang", "technical", "literary", "archaic", or "vulgar".
+
+Rules for "type" and "type_label":
+${promptTypeRules(wordLang(w))}
 
 Return ONLY this JSON (no markdown, no explanation):
 {
   "word": "exact word or expression to study",
+  "detected_lang": "${L.code}",
   "type": "word|phrasal_verb|idiom|collocation",
-  "ipa": "/IPA in American English/",
+  "type_label": "precise local category in Brazilian Portuguese, or empty string",
+  "ipa": ${promptIpaRule(wordLang(w))},
   "level": "A2|B1|B2|C1|C2",
   "meanings": [
     {
       "meaning_pt": "Portuguese translation preserving word class (noun→noun, verb→infinitive, adj→adjective). List 2–3 natural synonyms/variants separated by commas when they exist (e.g. 'séquito, comitiva, cortejo' for 'retinue'; 'enganar, iludir, ludibriar' for 'deceive'). Max 8 words total. ONE sense only — no semicolons.",
       "definition_pt": "Full definition in Portuguese for THIS specific sense (1-2 sentences)",
       "origin_pt": "Brazilian-Portuguese note (1-2 sentences) explaining the ORIGIN / why this expression came to mean this — the image or history behind it. Fill ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. 'sitting duck' = a duck floating still is an easy target for a hunter; 'on the chopping block' = the block where animals/heads were cut; 'flagship' = the ship that carried the fleet commander's flag; 'throw under the bus' = sacrifice someone for your own safety). Leave it as an EMPTY STRING \"\" for ordinary words with no notable story. NEVER invent folk etymology — if you are not reasonably sure, leave it empty.",
-      "variety": "general|american|british|australian|canadian",
+      "variety": "${promptVarietyEnum(wordLang(w))}",
       "register": "neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar",
       "level": "A2|B1|B2|C1|C2",
       "context_match": true,
@@ -537,7 +556,7 @@ function renderWordCard(wordId) {
     return ctxEsc.replace(new RegExp(`(${safeWord})`, 'gi'), '<span class="ctx-word">$1</span>')
   })() : ''
 
-  const typeMap = { word:'word', phrasal_verb:'phrasal verb', idiom:'idiom', collocation:'collocation' }
+  const typeMap = { word:'word', phrasal_verb: typeLabel('phrasal_verb', wordLang(w), w.type_label), idiom:'idiom', collocation:'collocation' }
 
   const selMeanings = (w.meanings || []).filter(m => m.selected !== false)
   const selCount = selMeanings.length
@@ -590,6 +609,7 @@ function renderWordCard(wordId) {
         <input type="text" id="wc-word-input-${w.id}" value="${escA(w.word || '')}" style="display:none;font-size:1.2rem;font-weight:700;background:var(--surface2);border:1px solid var(--primary);border-radius:6px;padding:2px 8px;color:var(--text);width:200px" onkeydown="handleEditWordKey(event,'${w.id}')" onblur="confirmEditWord('${w.id}')">
       </div>
       <div class="wc-meta">
+        ${langChip(wordLang(w))}
         ${w.type ? `<span class="chip">${typeMap[w.type] || w.type}</span>` : ''}
         ${w.ipa ? `<span class="wc-ipa">${esc(w.ipa)}</span>` : ''}
         <span class="wc-source">${srcIcon(w.source_type)} ${esc(w.source_title || w.source_type)}</span>
