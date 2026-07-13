@@ -3,7 +3,14 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-07-05 — **Botão de IA passou a PRESERVAR exemplos já curados**
+> Última atualização: 2026-07-13 — **Reskin visual "Papel"** (app renomeado para "Language
+> Lab" na interface; novo 6º tema `papel` claro com paleta azul-tinta; fonte serifada
+> Newsreader nos títulos/palavras/números grandes; cantos mais arredondados e sombras mais
+> quentes nos 6 temas; hero card do Dashboard em gradiente; chips/tabs em pílula). Mudança
+> só de CSS/tokens — nenhum id/classe usado pelo JS foi tocado. Ver seção 8 (sessão
+> 2026-07-13).
+>
+> Última atualização anterior: 2026-07-05 — **Botão de IA passou a PRESERVAR exemplos já curados**
 > ("Analisar com IA"/"Re-analisar" no Revisar não sobrescreve mais significado/frases de um
 > sentido que já tinha exemplos — só completa o que falta). Botão temporário da Biblioteca
 > generalizado: `fillOriginsAll` → `fillMissingAll` ("Completar dados (IA)"), preenche IPA/
@@ -153,10 +160,18 @@ maxInterval (36500), leechThreshold (50)
 
 ## 6. Identidade visual / Premium
 
-- **Temas:** `data-theme` no `<html>`. 5 temas em `THEMES` (core.js): `midnight` (padrão),
-  `light`, `sepia`, `emerald`, `violet`. Trocados em Configurações → Aparência. `applyTheme()`
+- **Temas:** `data-theme` no `<html>`. 6 temas em `THEMES` (core.js): `midnight` (padrão),
+  `light`, `sepia`, `emerald`, `violet`, `papel` (novo, sessão 2026-07-13 — claro, acento
+  azul-tinta `#2E4BC6`, estética "paper"). Trocados em Configurações → Aparência. `applyTheme()`
   grava em `cfg.theme` (persistido + sincronizado). TODA cor usa variáveis CSS (`var(--...)`);
-  acentos usam `rgba(var(--primary-rgb), …)` para seguir o tema.
+  acentos usam `rgba(var(--primary-rgb), …)` para seguir o tema. `--radius`/`--radius-sm`
+  (16px/11px) e as sombras (`--shadow*`) são compartilhados pelos 6 temas com tom mais quente
+  desde o reskin "Papel".
+- **Fonte:** Inter (corpo/UI) + **Newsreader** (serifada, só em `.page-header h1`, palavra do
+  card de Revisar `.wc-word`, palavra da flashcard `.srs-card-front-word`/`.srs-back-word` e
+  números grandes `.mc-val`/`.sdc-value`/`.dash-num`) — carregada via Google Fonts em
+  `index.html`. Regras do reskin ficam numa seção nova no FIM de `css/styles.css` (depois do
+  bloco "Biblioteca Cards|Palavras"), para vencer a cascata sem editar as regras antigas.
 - **Ícones:** SEM emojis na interface. Use `ic('nome')` (core.js, mapa `ICONS`, SVG de linha).
   `srcIcon(tipo)` para fontes (série/filme/etc.). HTML estático usa `<svg class="ic">` inline.
 - **Tooltips:** sistema global em core.js — qualquer elemento com `data-tip` ou `title`
@@ -202,6 +217,52 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-07-13 — Reskin visual "Papel" + rename para "Language Lab"
+40. **Contexto**: o Djemeson trouxe um mockup do Claude Design ("App Redesign.dc.html", projeto
+    "Landing page para línguas") com uma linguagem visual nova (fundo "papel" cremoso, azul-tinta
+    como acento, tipografia serifada Newsreader nos títulos, cantos mais arredondados, sombras
+    mais quentes, hero card em gradiente, chips em pílula). Pedido: "implementar" o mockup.
+    - **Decisão de estratégia (validada com o usuário)**: em vez de reescrever o HTML/CSS/classes
+      1:1 com o mockup (que exigiria também atualizar as classes hard-coded nas strings de
+      template de 7 arquivos JS — dashboard/revisar/estudar/biblioteca/configurações/assistente/
+      adicionar — sem suíte de testes, alto risco de quebrar `onclick`/ids ao vivo), foi feito um
+      **reskin**: só `css/styles.css` (tokens + restilização de classes já existentes),
+      `index.html` (fonte + texto da marca) e `js/core.js` (1 entrada nova em `THEMES`) foram
+      tocados. Nenhum id, classe usada por JS ou handler `onclick` mudou de nome.
+    - **Tokens globais**: `--radius`/`--radius-sm` 14px/9px → **16px/11px** (`:root`).
+      `--shadow`/`--shadow-sm`/`--shadow-card` dos 5 temas existentes recoloridos de preto puro
+      para um tom mais quente (mesma opacidade/blur, só a cor muda); `sepia` já era quente, não
+      mexido; `hue` de cada tema (`--primary`/`--surface`/`--bg`/etc.) preservado 100%.
+    - **Novo 6º tema `papel`** (`[data-theme="papel"]`, claro): paleta literal do mockup mapeada
+      para os nomes de variável já existentes (`--bg:#F6F4EF`, `--primary:#2E4BC6`, etc., com
+      `--success`/`--warning` dessaturados para não ficarem berrantes em fundo branco). Entrada
+      correspondente em `THEMES` (`js/core.js`) — `js/settings.js` já renderiza o seletor de
+      temas genericamente a partir do array, **nenhuma mudança nele foi necessária**.
+    - **Fonte**: adicionada **Newsreader** (Google Fonts) ao lado de Inter em `index.html`,
+      aplicada só em títulos/palavra-chave/números grandes (ver seção 6 acima); todo o resto
+      (botões, nav, chips, inputs) continua Inter.
+    - **Restilização de componentes** (regras novas no fim de `styles.css`, não edições nas
+      regras antigas — vencem a cascata por ordem de origem): hero card do Dashboard
+      (`.dash-action-card`) ganhou gradiente sólido + texto branco, mas **só quando o elemento
+      não tem `style` inline** (`:not([style])`) — o estado "nada para revisar hoje" usa um
+      `style` inline próprio em `dashboard.js` e continua neutro, sem ficar azul por engano.
+      Chips/tabs viraram pílula total (`border-radius:999px`); `.btn-primary` ganhou sombra mais
+      forte; `.wc-word`/`.srs-card-front-word` (palavra da flashcard) aumentaram de tamanho;
+      `.srs-rate-btn` ganhou borda tintada em repouso (não só no hover).
+    - **Rename "English Lab" → "Language Lab"** (só texto, na sidebar e no `<title>`) — resolve a
+      pendência opcional que já estava registrada na seção 9 por causa do suporte multi-idioma.
+      Infraestrutura (repo, URL do GitHub Pages, Firebase) continua `english-lab`.
+    - **Validado ao vivo** (servidor HTTP local + Claude Browser, já que `file://` é bloqueado):
+      `getComputedStyle` confirmou os 6 temas no seletor, o tema `papel` aplicando os tokens
+      certos, o hero card em gradiente com texto branco só no estado populado (o estado vazio
+      manteve `--surface` e o ícone verde inline intactos), fonte Newsreader nos seletores certos,
+      chips/tabs em pílula (999px), navegação entre as 7 telas (inclusive `adicionar`/`estudar`/
+      `biblioteca`, que são lazy-loaded) sem nenhum erro no console, e ausência de qualquer texto
+      "English Lab" residual no DOM. ⚠️ A ferramenta de screenshot do Claude Browser ficou
+      indisponível (timeout) nesta sessão — a validação visual foi feita via `getComputedStyle`/
+      leitura de página, não por captura de tela; vale um hard-refresh + olhada visual manual
+      depois do deploy (ver pendências, seção 9).
 
 ### Sessão 2026-07-05 (2ª rodada) — botão de IA passou a PRESERVAR exemplos já curados
 39. **Motivo**: o Djemeson importou uma leva de estudo de espanhol (`A1.1-leva-01.md`, material
@@ -461,8 +522,16 @@ maxInterval (36500), leechThreshold (50)
       nos cards não-ingleses e o glossário.
 - [ ] **Ajustar o workflow do n8n** (`webhook/en-site`): o app agora envia `lang` e `lang_name`
       no payload — usar no prompt do workflow p/ extrair vocabulário do idioma certo.
-- [ ] (Multi-idioma, opcional) Filtro por idioma na Biblioteca/glossário; nome exibido do app
-      ("English Lab" → "Language Lab"?) — infra (repo/URL/Firebase) fica como está.
+- [x] Nome exibido do app trocado para "Language Lab" (sessão 2026-07-13) — infra
+      (repo/URL/Firebase) continua `english-lab` como já era a decisão.
+- [ ] (Multi-idioma, opcional) Filtro por idioma na Biblioteca/glossário.
+- [ ] **Conferir visualmente o reskin "Papel" ao vivo** (após deploy + hard-refresh): a
+      ferramenta de screenshot não funcionou nesta sessão, então a validação foi só por
+      `getComputedStyle`/DOM — olhar as 7 telas nos 6 temas (principalmente o hero card do
+      Dashboard com dados reais/`paraHoje > 0`, a flashcard de Estudar com a palavra maior em
+      Newsreader, e o tema `papel` novo) e ajustar valores a olho se algo parecer errado
+      (radius/sombra/contraste). Conferir também em mobile (o `.srs-card-front-word` maior pode
+      cortar em telas estreitas — ver checklist de risco do plano desta sessão).
 - [ ] **Testar ao vivo as melhorias da 5ª rodada** (após o deploy GitHub Pages + hard-refresh):
       (1) abrir Biblioteca → alternar **Cards/Palavras**, conferir o glossário e a busca; (2) num card
       de palavra com 2+ sentidos, ver o chip **"sentido X de Y"** e clicar (deve abrir o glossário no

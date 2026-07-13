@@ -23,11 +23,11 @@
   --text2: #7C93B0;
   --text3: #3D5470;
   --scrollbar-track: #03050E;
-  --radius: 14px;
-  --radius-sm: 9px;
-  --shadow: 0 18px 50px rgba(0,0,0,0.55);
-  --shadow-sm: 0 2px 10px rgba(0,0,0,0.35);
-  --shadow-card: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 30px rgba(0,0,0,0.30);
+  --radius: 16px;
+  --radius-sm: 11px;
+  --shadow: 0 18px 50px rgba(20,14,8,0.55);
+  --shadow-sm: 0 2px 10px rgba(20,14,8,0.35);
+  --shadow-card: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 30px rgba(20,14,8,0.30);
   --ring: 0 0 0 3px rgba(var(--primary-rgb),0.25);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -944,9 +944,9 @@ select option{background:var(--surface)}
   --text2:#475569;
   --text3:#94A3B8;
   --scrollbar-track:#E5EAF2;
-  --shadow:0 18px 50px rgba(15,23,42,0.14);
-  --shadow-sm:0 2px 10px rgba(15,23,42,0.08);
-  --shadow-card:0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.06);
+  --shadow:0 18px 50px rgba(40,35,25,0.14);
+  --shadow-sm:0 2px 10px rgba(40,35,25,0.08);
+  --shadow-card:0 1px 2px rgba(40,35,25,0.04), 0 8px 24px rgba(40,35,25,0.06);
   --ring:0 0 0 3px rgba(37,99,235,0.18);
 }
 
@@ -999,9 +999,9 @@ select option{background:var(--surface)}
   --text2:#7FA99A;
   --text3:#4A6B5E;
   --scrollbar-track:#040B08;
-  --shadow:0 18px 50px rgba(0,0,0,0.55);
-  --shadow-sm:0 2px 10px rgba(0,0,0,0.35);
-  --shadow-card:inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 30px rgba(0,0,0,0.30);
+  --shadow:0 18px 50px rgba(18,16,10,0.55);
+  --shadow-sm:0 2px 10px rgba(18,16,10,0.35);
+  --shadow-card:inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 30px rgba(18,16,10,0.30);
   --ring:0 0 0 3px rgba(16,185,129,0.25);
 }
 
@@ -1027,10 +1027,37 @@ select option{background:var(--surface)}
   --text2:#9A8CC0;
   --text3:#5E5080;
   --scrollbar-track:#080518;
-  --shadow:0 18px 50px rgba(0,0,0,0.55);
-  --shadow-sm:0 2px 10px rgba(0,0,0,0.35);
-  --shadow-card:inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 30px rgba(0,0,0,0.35);
+  --shadow:0 18px 50px rgba(18,14,10,0.55);
+  --shadow-sm:0 2px 10px rgba(18,14,10,0.35);
+  --shadow-card:inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 30px rgba(18,14,10,0.35);
   --ring:0 0 0 3px rgba(139,92,246,0.28);
+}
+
+/* ---- PAPEL (claro, acento azul-tinta, estética "paper") ---- */
+[data-theme="papel"]{
+  --bg:#F6F4EF;
+  --bg-grad:radial-gradient(1100px 560px at 85% -15%, rgba(46,75,198,0.07), transparent 60%);
+  --surface:#FFFFFF;
+  --surface2:#F0EDE4;
+  --surface3:#E6E1D4;
+  --sidebar-bg:#FFFFFF;
+  --border:rgba(40,35,25,0.10);
+  --border-strong:rgba(40,35,25,0.18);
+  --primary:#2E4BC6;
+  --primary-d:#24399C;
+  --accent-bright:#5B76E0;
+  --primary-glow:rgba(46,75,198,0.08);
+  --primary-rgb:46,75,198;
+  --primary-grad:linear-gradient(135deg,#2E4BC6,#5B76E0);
+  --success:#2F8F5B; --warning:#B8860B; --error:#C13F3F; --purple:#7C5CBF;
+  --text:#241F17;
+  --text2:#5C5445;
+  --text3:#948A75;
+  --scrollbar-track:#EDE9DE;
+  --shadow:0 18px 50px rgba(40,35,25,0.16);
+  --shadow-sm:0 2px 10px rgba(40,35,25,0.09);
+  --shadow-card:0 1px 2px rgba(40,35,25,0.05), 0 8px 24px rgba(40,35,25,0.07);
+  --ring:0 0 0 3px rgba(46,75,198,0.20);
 }
 
 /* ================================================================
@@ -1791,3 +1818,63 @@ body.sb-collapsed #fb-user-photo{margin:0}
   .lib-mode-toggle{width:100%}
   .lmt-btn{flex:1;justify-content:center}
 }
+
+/* ================================================================
+   RESKIN "PAPEL" — geometria/tipografia/cor refinadas (Newsreader +
+   paleta warm-paper). Regras no fim do arquivo: vencem o cascade.
+   ================================================================ */
+
+/* ---- Tipografia serifada (títulos e números grandes) ---- */
+.page-header h1,
+.dash-action-left .dash-num,
+.wc-word,
+.srs-card-front-word,
+.srs-back-word,
+.metric-body .mc-val,
+.srs-dash-card .sdc-value{
+  font-family:'Newsreader',Georgia,serif;
+}
+
+/* ---- Hero card do Dashboard: gradiente sólido (só no estado com
+   revisões pendentes — o estado "nada para revisar" tem style inline
+   próprio em dashboard.js e não deve virar azul) ---- */
+.dash-action-card:not([style]){
+  background:var(--primary-grad);
+  border:none;
+  box-shadow:0 18px 40px rgba(var(--primary-rgb),0.35), var(--shadow-card);
+}
+.dash-action-card::after{opacity:.6}
+.dash-action-card:not([style]) .dash-action-left .dash-num,
+.dash-action-card:not([style]) .dash-action-left .dash-sub{color:#fff}
+.dash-action-card:not([style]) .dash-action-left .dash-sub{opacity:.85}
+.dash-action-card:not([style]) .btn-primary{background:#fff;color:var(--primary-d);box-shadow:0 4px 14px rgba(0,0,0,0.20)}
+.dash-action-card:not([style]) .btn-primary:hover:not(:disabled){box-shadow:0 6px 20px rgba(0,0,0,0.28)}
+
+/* ---- Cards de métrica ---- */
+.metric-icon{border-radius:12px}
+.metric-body .mc-val{font-weight:700}
+
+/* ---- Chips em pílula ---- */
+.chip,.src-chip,.midia-type-chip{border-radius:999px}
+
+/* ---- Botão primário: sombra reforçada ---- */
+.btn-primary{box-shadow:0 6px 18px rgba(var(--primary-rgb),0.40)}
+.btn-primary:hover:not(:disabled){box-shadow:0 8px 24px rgba(var(--primary-rgb),0.55);transform:translateY(-1px)}
+
+/* ---- Tabs em pílula segmentada ---- */
+.tabs{border-radius:999px}
+.tab{border-radius:999px}
+.tab.active{box-shadow:var(--shadow-sm)}
+
+/* ---- Word-card (Revisar): palavra maior ---- */
+.wc-word{font-size:2rem;font-weight:600}
+
+/* ---- Flashcard (Estudar): palavra maior ---- */
+.srs-card-front-word{font-size:2.3rem;font-weight:600}
+.srs-back-word{font-weight:600}
+
+/* ---- Botões de avaliação: cor tingida em repouso (não só no hover) ---- */
+.srs-rate-btn.again{border-color:rgba(239,68,68,.25)}
+.srs-rate-btn.hard{border-color:rgba(245,158,11,.25)}
+.srs-rate-btn.good{border-color:rgba(16,185,129,.25)}
+.srs-rate-btn.easy{border-color:rgba(var(--primary-rgb),.25)}

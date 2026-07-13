@@ -133,6 +133,7 @@ const THEMES = [
   { id: 'sepia',    name: 'Sepia',     dark: false, swatch: ['#F3EAD8', '#B45309'] },
   { id: 'emerald',  name: 'Emerald',   dark: true,  swatch: ['#07130F', '#10B981'] },
   { id: 'violet',   name: 'Violet',    dark: true,  swatch: ['#0E0A1C', '#8B5CF6'] },
+  { id: 'papel',    name: 'Papel',     dark: false, swatch: ['#F6F4EF', '#2E4BC6'] },
 ]
 function applyTheme(id) {
   const valid = THEMES.find(t => t.id === id) ? id : 'midnight'
