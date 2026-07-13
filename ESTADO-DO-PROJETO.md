@@ -3,7 +3,16 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-07-13 — **Reskin visual "Papel"** (app renomeado para "Language
+> Última atualização: 2026-07-13 (2ª rodada) — **Precisão do negrito do objeto de estudo**
+> revisada em todos os 7 pontos que geram frases (review.js, audio.js × 2, study.js,
+> consulta.js, add.js × 2): prompts padronizados/reforçados (flexão, expressão de várias
+> palavras/separável, idiom, ocorrência repetida), mismatch entre a regra e o exemplo de
+> schema JSON corrigido em review.js/audio.js, rede de segurança adicionada na Fase 1 do
+> extrator de documento, e o botão "Negrito perfeito (IA)" da Biblioteca passou a validar
+> com precisão (exatamente 1 span, não vazio, não a frase inteira) em vez de só checar se
+> existe algum `<b>`. Ver seção 8 (sessão 2026-07-13, 2ª rodada).
+>
+> Última atualização anterior: 2026-07-13 — **Reskin visual "Papel"** (app renomeado para "Language
 > Lab" na interface; novo 6º tema `papel` claro com paleta azul-tinta; fonte serifada
 > Newsreader nos títulos/palavras/números grandes; cantos mais arredondados e sombras mais
 > quentes nos 6 temas; hero card do Dashboard em gradiente; chips/tabs em pílula). Mudança
@@ -217,6 +226,53 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-07-13 (2ª rodada) — Precisão do negrito do objeto de estudo (EN + PT)
+41. **Motivo**: o Djemeson reportou que o negrito do objeto de estudo (a palavra/expressão
+    sendo estudada) está inconsistente e impreciso, tanto na frase em inglês quanto na
+    tradução em português. Investigação (agente Explore) mapeou os 7 pontos que geram frases
+    com negrito e achou 3 causas raiz reais (nenhuma era bug de renderização — `escB`/
+    `allowBold` já preservam `<b>` corretamente em todo lugar; o problema é 100% na geração):
+    - **Mismatch schema × regra** em `review.js` (`analyzeWordDirect`) e `audio.js`
+      (`regenerateMeaning`): a regra em prosa pedia negrito também no lado PT, mas o EXEMPLO
+      de JSON do prompt (o que o modelo mais "copia") mostrava `"pt"` **sem** `<b>` nenhum —
+      contradição direta que plausivelmente fazia o negrito do PT sumir nesses dois fluxos.
+      Corrigido: os exemplos de schema agora mostram `<b>equivalente</b>` no PT também.
+    - **Fase 1 do extrator de documento** (`add.js` → `LIST_SYSTEM`) não tinha NENHUMA
+      instrução de negrito pro `doc_example_en` (a frase-semente tirada do documento), e essa
+      semente **fica permanente** se a Fase 2 (enriquecimento) falhar pra aquele lote — um
+      caminho real e reproduzível pra um card ficar pra sempre com a frase em inglês sem
+      negrito nenhum e a tradução vazia. Corrigido: Fase 1 agora pede o negrito na semente
+      também (rede de segurança), e a instrução de negrito da Fase 2 (`ENRICH_SYSTEM`), que
+      antes estava escondida no meio de um parágrafo denso, virou um bloco de regras próprio
+      e explícito.
+    - **Validação fraca no botão "Negrito perfeito (IA)"** (`audio.js` → `markBoldAll`/
+      `markBoldOne`): tanto o filtro de "quais cards precisam de correção" quanto a checagem
+      de aceitação da resposta da IA usavam só `/<b>/i.test(...)` — ou seja, só checavam se
+      existia ALGUM `<b>` em algum lugar, não se o negrito estava no lugar certo, era um span
+      só, ou não cobria a frase inteira. Um negrito errado (palavra errada, duplicado, ou a
+      frase toda em negrito) passava como "corrigido" e ficava assim pra sempre.
+      **Corrigido**: nova função `boldSpanOk(s)` (audio.js) exige EXATAMENTE um par
+      `<b>...</b>`, não vazio, e cobrindo menos de 85% do texto puro — usada tanto pra decidir
+      o que precisa de correção (agora pega negrito ausente E malformado, não só ausente)
+      quanto pra validar a resposta da IA antes de aceitar como corrigido.
+    - **Prompts padronizados**: os 7 pontos que pedem negrito (review.js, audio.js ×2 —
+      `regenerateMeaning` e `markBoldOne`, study.js `regenerateCardExample`, consulta.js
+      `srsExtractSystem`, add.js ×2 — `LIST_SYSTEM` e `ENRICH_SYSTEM`) agora seguem a mesma
+      regra completa (a de `markBoldOne`, que já era a mais precisa): negrito na forma
+      flexionada/conjugada como aparece na frase (não a forma de dicionário), todas as partes
+      de uma expressão de várias palavras/verbo separável mesmo com outra palavra no meio,
+      idiom inteiro, só a ocorrência principal se o termo repetir, exatamente um span por lado.
+    - **Não tocado**: renderização (`escB`/`allowBold`/`buildSrsFrente`) já estava correta;
+      `fillMissingAll` (não mexe em exemplos, por desenho); Kindle (não gera frases próprias,
+      depende do `review.js` na hora de analisar).
+    - ⚠️ **Não testado ao vivo com a API real** (só validação sintática/lógica local — `node`
+      não roda no bash deste ambiente conforme já documentado; `boldSpanOk` foi testado direto
+      no browser com casos sintéticos). Recomenda-se: (1) analisar uma palavra nova em Revisar
+      e conferir o negrito nos dois lados; (2) rodar "Negrito perfeito (IA)" na Biblioteca uma
+      vez (ele agora vai pegar bem mais cards que antes, incluindo os com negrito malformado —
+      **fazer backup/Exportar JSON antes**, já que reescreve frases); (3) importar um documento
+      novo na Mídia e conferir o negrito da semente da Fase 1 se a Fase 2 falhar algum lote.
 
 ### Sessão 2026-07-13 — Reskin visual "Papel" + rename para "Language Lab"
 40. **Contexto**: o Djemeson trouxe um mockup do Claude Design ("App Redesign.dc.html", projeto
@@ -525,6 +581,12 @@ maxInterval (36500), leechThreshold (50)
 - [x] Nome exibido do app trocado para "Language Lab" (sessão 2026-07-13) — infra
       (repo/URL/Firebase) continua `english-lab` como já era a decisão.
 - [ ] (Multi-idioma, opcional) Filtro por idioma na Biblioteca/glossário.
+- [ ] **Testar a precisão do negrito ao vivo** (sessão 2026-07-13, 2ª rodada — fazer backup/
+      Exportar JSON antes do passo 2, que reescreve frases): (1) analisar uma palavra nova em
+      Revisar/Assistente e conferir negrito nos dois lados; (2) rodar "Negrito perfeito (IA)"
+      na Biblioteca — deve pegar mais cards que antes (agora detecta negrito malformado, não só
+      ausente); (3) importar um documento na Mídia e, se algum lote da Fase 2 falhar, conferir
+      se a semente da Fase 1 ainda saiu com negrito no inglês.
 - [ ] **Conferir visualmente o reskin "Papel" ao vivo** (após deploy + hard-refresh): a
       ferramenta de screenshot não funcionou nesta sessão, então a validação foi só por
       `getComputedStyle`/DOM — olhar as 7 telas nos 6 temas (principalmente o hero card do

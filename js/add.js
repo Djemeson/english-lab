@@ -1053,7 +1053,7 @@ Eligible item types: meaningful single words, ${promptVariantHint(activeLang())}
 Be thorough about distinct TAUGHT expressions, but never split one expression into several, and never pad the list with merely-mentioned terms. Do NOT invent items absent from the document.
 
 Note on "type" (universal supertypes): ${_dL.typeRule}
-For each item return: {"word":"<BASE/canonical form, lowercase unless proper noun/ritual phrase>","type":"word|phrasal_verb|idiom|collocation","type_label":"<precise local category in Brazilian Portuguese, or empty>","meaning_pt":"<2-6 words, main sense>","doc_example_en":"<a real example sentence FROM THE DOCUMENT using this expression; proof it is taught — if you cannot find one and it is not otherwise explained, DROP the item>"}
+For each item return: {"word":"<BASE/canonical form, lowercase unless proper noun/ritual phrase>","type":"word|phrasal_verb|idiom|collocation","type_label":"<precise local category in Brazilian Portuguese, or empty>","meaning_pt":"<2-6 words, main sense>","doc_example_en":"<a real example sentence FROM THE DOCUMENT using this expression, with the expression wrapped in <b></b> exactly as it appears inflected in that sentence (all parts, if multi-word/separable) — proof it is taught; if you cannot find one and it is not otherwise explained, DROP the item>"}
 Return ONLY valid JSON: {"items":[ ... ]}`
 
   let listed = []
@@ -1133,7 +1133,13 @@ Each sense object has:
 - "register": "neutral"|"formal"|"informal"|"colloquial"|"slang"|"technical"|"literary"|"archaic"|"vulgar"
 - "variety": "${promptVarietyEnum(activeLang())}" — ${_dL.varietyRule}
 - "origin_pt": Brazilian-Portuguese note (1-2 sentences) on the ORIGIN / why it means this — ONLY for idioms, multi-word verbal expressions, metaphors and words with a genuinely interesting etymology; EMPTY STRING "" otherwise; never invent.
-- "examples": EXACTLY 3 objects {"en":"...","pt":"..."} FOR THIS SENSE. PREFER the document's REAL example sentences that belong to this sense (read the whole document — including inflected forms like "ran by" and patterns like "run something by someone" — and assign each sentence to its correct sense). If the document has MORE than 3 for this sense, pick the 3 clearest. If it has FEWER than 3, keep the real ones and ADD natural examples faithful to THIS exact sense to reach 3. Each "en" wraps the term in <b></b> as inflected; the 3 should differ in tense/construction; "pt" is a natural Brazilian-Portuguese translation that ALSO wraps the Portuguese equivalent of the term in <b></b> (exactly one bold span).
+- "examples": EXACTLY 3 objects {"en":"...","pt":"..."} FOR THIS SENSE. PREFER the document's REAL example sentences that belong to this sense (read the whole document — including inflected forms like "ran by" and patterns like "run something by someone" — and assign each sentence to its correct sense). If the document has MORE than 3 for this sense, pick the 3 clearest. If it has FEWER than 3, keep the real ones and ADD natural examples faithful to THIS exact sense to reach 3. The 3 should differ in tense/construction.
+
+Rules for bold in "examples" — CRITICAL, on BOTH sides of every example:
+- "en": wrap the target in <b></b> exactly as it appears conjugated/inflected in that sentence (e.g. "ran by" for "run by"). For a multi-word or separable expression wrap ALL its parts even when another word sits between them; for an idiom wrap the whole expression.
+- "pt": wrap the word or short phrase that is the Portuguese equivalent of the target IN THAT SENTENCE in <b></b>.
+- If the target appears more than once in a sentence, bold ONLY the main occurrence.
+- Exactly ONE bold span per side. Do not bold anything else.
 
 Return JSON for ALL target terms: {"items":[ ... ]}`
 

@@ -834,15 +834,18 @@ Return ONLY this JSON:
   "register": "neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar",
   "origin_pt": "Brazilian-Portuguese note (1-2 sentences) explaining the ORIGIN / why this expression came to mean this. Fill ONLY for idioms, multi-word verbal expressions, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. 'sitting duck', 'on the chopping block', 'flagship', 'throw under the bus'). Leave it as an EMPTY STRING for ordinary words with no notable story. NEVER invent folk etymology — if unsure, leave empty.",
   "examples": [
-    {"en": "Natural ${_rL.nameEn} sentence using <b>${it.word}</b> (inflected as needed) in THIS sense.", "pt": "tradução natural em PT-BR"}
+    {"en": "Natural ${_rL.nameEn} sentence using <b>${it.word}</b> (inflected as needed) in THIS sense.", "pt": "Tradução natural em PT-BR com o <b>equivalente</b> em negrito."}
   ]
 }
 Rules — follow exactly:
 - Return EXACTLY ${n} example object(s).
 - Every example MUST match the meaning "${it.meaning_pt}". If "${it.word}" has other senses, IGNORE them — an example must not make sense under a different meaning.
 - Each example: a different tense/construction, a different subject, a different real-world situation; natural like a novel/news/conversation, never formulaic.
-- Wrap the target word (as it appears inflected) in <b></b> in the ${_rL.nameEn} sentence.
-- ALSO wrap the Portuguese equivalent of the target (the translated word/phrase) in <b></b> inside the "pt" translation — exactly one bold span.
+- Rules for bold — CRITICAL, on BOTH sides of every example:
+  - ${_rL.nameEn}: wrap the target in <b></b> exactly as it appears conjugated/inflected in that sentence (e.g. "ran" for "run"). For a multi-word or separable expression wrap ALL its parts even when another word sits between them; for an idiom wrap the whole expression.
+  - Portuguese: wrap the word or short phrase that is the Portuguese equivalent of the target IN THAT SENTENCE in <b></b>.
+  - If the target appears more than once in a sentence, bold ONLY the main occurrence.
+  - Exactly ONE bold span per side. Do not bold anything else.
 - Translate the Portuguese naturally (not word-for-word).`
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -1041,9 +1044,24 @@ Return ONLY this JSON:
 }
 
 // ---- Negrito perfeito (IA): marca o objeto de estudo em <b> no EN e no PT ----
-// Pega só as frases que ainda não têm <b> (no inglês ou no português), pede à IA
-// para envolver o termo (inflexão/expressão) e o equivalente em PT. Preserva o
-// agendamento SRS; também escreve de volta nos significados da palavra de origem.
+// Pega as frases sem negrito OU com negrito malformado (nenhum span, mais de um,
+// span vazio, ou span cobrindo quase a frase toda) — no inglês ou no português —,
+// pede à IA para envolver o termo (inflexão/expressão) e o equivalente em PT.
+// Preserva o agendamento SRS; também escreve de volta nos significados da palavra
+// de origem.
+// Verifica se `s` tem EXATAMENTE um span <b>...</b> bem formado (não vazio, não a
+// frase inteira) — usado tanto pra decidir o que precisa de correção quanto pra
+// validar a resposta da IA antes de aceitar como "corrigido".
+function boldSpanOk(s) {
+  if (!s) return false
+  const opens = (s.match(/<b>/gi) || []).length
+  const closes = (s.match(/<\/b>/gi) || []).length
+  if (opens !== 1 || closes !== 1) return false
+  const m = s.match(/<b>([\s\S]*?)<\/b>/i)
+  if (!m || !m[1].trim()) return false
+  const plain = s.replace(/<\/?b>/gi, '')
+  return m[1].length < plain.length * 0.85
+}
 async function markBoldOne(it) {
   const _bL = getLangDef(it.lang || 'en')
   const PROMPT = `You mark the STUDY TARGET in bold inside example sentences for a Brazilian learner of ${_bL.nameEn}. Return ONLY valid JSON.
@@ -1077,10 +1095,10 @@ async function markBoldAll() {
   if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
   if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }
 
-  // Frases que ainda precisam de negrito: EN sem <b> OU PT (existente) sem <b>
+  // Frases que precisam de negrito: EN ou PT (quando existente) sem span <b> preciso
   const need = srsCards.filter(c =>
-    (c.example_en && !/<b>/i.test(c.example_en)) ||
-    (c.example_pt && !/<b>/i.test(c.example_pt)))
+    (c.example_en && !boldSpanOk(c.example_en)) ||
+    (c.example_pt && !boldSpanOk(c.example_pt)))
   if (!need.length) { toast('Todos os cards já estão com o negrito marcado', 'info'); return }
 
   // Deduplica por par exato (palavra + frase EN + frase PT)
@@ -1103,8 +1121,8 @@ async function markBoldAll() {
   const tasks = items.map(it => async () => {
     try {
       const r = await markBoldOne(it)
-      const en = (r && r.en && /<b>/i.test(r.en)) ? r.en : it.en
-      const pt = (r && typeof r.pt === 'string' && /<b>/i.test(r.pt)) ? r.pt : it.pt
+      const en = (r && r.en && boldSpanOk(r.en)) ? r.en : it.en
+      const pt = (r && typeof r.pt === 'string' && (boldSpanOk(r.pt) || (r.pt === '' && !it.pt))) ? r.pt : it.pt
       it.cards.forEach(c => {
         if (en) c.example_en = en
         if (pt) c.example_pt = pt

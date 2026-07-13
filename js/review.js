@@ -140,16 +140,19 @@ Rules for examples — CRITICAL, follow exactly:
 - Each example MUST have a different subject (mix: he/she/they/I/we/you/a proper name/a noun phrase)
 - Each example MUST describe a genuinely different real-world situation or context (work, relationships, sports, travel, news, etc.)
 - NEVER use formulaic sentence patterns — sentences should feel natural, like they come from a novel, news article, or real conversation
-- Wrap the target word/expression in <b></b> tags exactly as it appears conjugated/inflected in that ${L.nameEn} sentence
-- ALSO wrap, in EACH Portuguese translation, the word or short phrase that translates the target in that sentence (its Portuguese equivalent) in <b></b> tags — exactly one bold span per translation
 - BAD (avoid): "#1 He backs down. #2 She backed down. #3 They are backing down." — same pattern, different pronouns
 - GOOD: "#1 The senator backed down after facing criticism from his own party. #2 Don't back down just because the situation gets uncomfortable. #3 She never backs down from a challenge, even when the odds are against her."
+
+Rules for bold — CRITICAL, follow exactly on BOTH sides of every example:
+- ${L.nameEn}: wrap the target word/expression in <b></b> exactly as it appears conjugated/inflected in that sentence (e.g. "ran" for "run", not the base form). For a multi-word or separable expression (phrasal verb, separable verb), wrap ALL its parts even when another word sits between them. For an idiom, wrap the whole expression.
+- Portuguese: wrap the word or short phrase that is the Portuguese equivalent of the target IN THAT SENTENCE (its translation there, not a dictionary gloss) in <b></b>.
+- If the target word/expression appears more than once in a sentence, bold ONLY the main occurrence — never bold it twice.
+- Exactly ONE bold span per side per example. Do not bold anything else.
 
 For Portuguese translations of examples:
 - Translate naturally — don't translate word-for-word
 - Use DIFFERENT Portuguese words/synonyms across the 3 examples when the target word has synonyms (e.g. for "thunderstruck": use "atordoado", "estarrecido", "pasmado" — not "atordoado" × 3)
 - Each Portuguese translation should read like natural Brazilian Portuguese, not like a translation
-- Wrap the Portuguese equivalent of the target (the translated word/phrase) in <b></b> in each translation
 
 Rules for meanings — CRITICAL:
 - The context sentence is ONLY used to identify the word correctly and to mark which sense appeared there. It does NOT limit which meanings you return.
@@ -196,9 +199,9 @@ Return ONLY this JSON (no markdown, no explanation):
       "synonyms": ["syn1", "syn2", "syn3"],
       "antonyms": ["ant1", "ant2"],
       "examples": [
-        {"en": "Sentence with <b>word</b> in present tense.", "pt": "Tradução natural em português."},
-        {"en": "Sentence with <b>word</b> in past tense.", "pt": "Tradução natural em português."},
-        {"en": "Sentence with <b>word</b> in continuous or other tense.", "pt": "Tradução natural em português."}
+        {"en": "Sentence with <b>word</b> in present tense.", "pt": "Tradução natural com o <b>equivalente</b> em português."},
+        {"en": "Sentence with <b>word</b> in past tense.", "pt": "Tradução natural com o <b>equivalente</b> em português."},
+        {"en": "Sentence with <b>word</b> in continuous or other tense.", "pt": "Tradução natural com o <b>equivalente</b> em português."}
       ]
     }
   ]

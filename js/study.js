@@ -918,9 +918,11 @@ Definition (Portuguese): "${card.definition_pt || card.meaning_pt}"
 Rules:
 - The sentence MUST clearly and naturally illustrate the specific meaning above
 - Write like a native speaker — feel free to use a novel, news article or real conversation style
-- Wrap the target word (conjugated/inflected as needed) in <b></b> tags
-- ALSO wrap the Portuguese equivalent of the target in <b></b> inside the translation (exactly one bold span)
 - Keep it 10-20 words long
+- Rules for bold — CRITICAL, on BOTH sides:
+  - ${_gL.nameEn}: wrap the target in <b></b> exactly as it appears conjugated/inflected in the sentence. For a multi-word or separable expression wrap ALL its parts even when another word sits between them; for an idiom wrap the whole expression.
+  - Portuguese: wrap the word or short phrase that is the Portuguese equivalent of the target IN THAT SENTENCE in <b></b>.
+  - Exactly ONE bold span per side. Do not bold anything else.
 - Return ONLY valid JSON (no markdown): {"en": "${_gL.nameEn} sentence with <b>word</b>.", "pt": "Tradução com a <b>palavra</b> em negrito."}`
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {

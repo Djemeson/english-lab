@@ -247,7 +247,12 @@ Regras:
 - Sobre "type" (supertipos universais): ${L.typeRule}
 Para CADA item retorne:
 {"word":"<termo em ${nome}>","type":"word|phrasal_verb|idiom|collocation","type_label":"<categoria local precisa em PT, ou \\"\\">","variety":"${promptVarietyEnum(activeLang())}","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"2-6 palavras","ipa":${promptIpaRule(activeLang())},"definition_pt":"uma frase em PT","origin_pt":"origem/história em PT (1-2 frases) SÓ se houver etimologia/imagem interessante; senão \\"\\"","examples":[{"en":"Frase com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."},{"en":"Outra frase com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."},{"en":"Mais uma com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."}]}
-Cada item tem EXATAMENTE 3 exemplos, em tempos/construções diferentes, com o termo em <b></b> na frase em ${nome} E o equivalente em português também em <b></b> (exatamente um trecho em negrito por tradução).
+Cada item tem EXATAMENTE 3 exemplos, em tempos/construções diferentes.
+Regras de negrito — CRÍTICO, nos dois lados de cada exemplo:
+- Frase em ${nome}: envolva o termo em <b></b> exatamente como aparece flexionado/conjugado naquela frase (ex.: "ran" para "run", não a forma de dicionário). Para expressão de múltiplas palavras ou verbo separável, envolva TODAS as partes mesmo que haja outra palavra no meio; para idiom, envolva a expressão inteira.
+- Português: envolva a palavra ou trecho curto que é o equivalente em português do termo NAQUELA frase (a tradução ali, não um significado de dicionário) em <b></b>.
+- Se o termo aparecer mais de uma vez na frase, envolva só a ocorrência principal.
+- Exatamente UM trecho em negrito por lado. Não envolva mais nada.
 Retorne JSON: {"items":[ ... ]}`
 }
 
