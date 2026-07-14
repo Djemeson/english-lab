@@ -3,7 +3,14 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-07-13 (2ª rodada) — **Precisão do negrito do objeto de estudo**
+> Última atualização: 2026-07-14 — **Correção de bug de pluralização no Dashboard**: em
+> `js/dashboard.js`, `renderDashboard()`, a linha do hero (`dash-action-card`) concatenava
+> o sufixo `'ões'` diretamente ao singular `'revisão'`, gerando "revisãoões" sempre que
+> `dueToday !== 1`. Corrigido para escolher entre duas strings completas ("revisão" /
+> "revisões"). Bug pré-existente (não introduzido nesta sessão), encontrado ao validar a
+> implementação do Dashboard. Ver seção 8.
+>
+> Última atualização anterior: 2026-07-13 (2ª rodada) — **Precisão do negrito do objeto de estudo**
 > revisada em todos os 7 pontos que geram frases (review.js, audio.js × 2, study.js,
 > consulta.js, add.js × 2): prompts padronizados/reforçados (flexão, expressão de várias
 > palavras/separável, idiom, ocorrência repetida), mismatch entre a regra e o exemplo de
@@ -226,6 +233,16 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-07-14 — Correção de bug de pluralização no Dashboard
+42. **Motivo**: bug encontrado ao validar a implementação do Dashboard.dc.html (pré-existente,
+    não introduzido na sessão). Em [js/dashboard.js](js/dashboard.js:31), `renderDashboard()`,
+    a linha do hero (`dash-action-card`) montava a pluralização de "revisão" concatenando um
+    sufixo (`'revisão' + (dueToday!==1?'ões':'')`), o que produzia "revisãoões" para qualquer
+    `dueToday !== 1` (inclusive 0), já que o singular não termina em "revis".
+    **Correção**: trocado para escolher entre duas strings completas —
+    `` `${dueToday} ${dueToday!==1?'revisões':'revisão'}` ``. Mudança isolada, sem impacto em
+    sync/SRS/dados.
 
 ### Sessão 2026-07-13 (2ª rodada) — Precisão do negrito do objeto de estudo (EN + PT)
 41. **Motivo**: o Djemeson reportou que o negrito do objeto de estudo (a palavra/expressão

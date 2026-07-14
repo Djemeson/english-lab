@@ -28,7 +28,7 @@ function renderDashboard() {
         <div class="dash-action-card">
           <div class="dash-action-left">
             <div class="dash-num">${paraHoje}</div>
-            <div class="dash-sub">${dueToday} revisão${dueToday!==1?'ões':''} · ${newToday} novo${newToday!==1?'s':''} disponív${newToday!==1?'eis':'el'} hoje</div>
+            <div class="dash-sub">${dueToday} ${dueToday!==1?'revisões':'revisão'} · ${newToday} novo${newToday!==1?'s':''} disponív${newToday!==1?'eis':'el'} hoje</div>
           </div>
           <button class="btn btn-primary" onclick="showSection('estudar')">Estudar agora ${ic('arrowRight')}</button>
         </div>`
