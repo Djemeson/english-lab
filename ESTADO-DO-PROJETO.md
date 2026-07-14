@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-07-13 (2ª rodada) — **Precisão do negrito do objeto de estudo**
+> Última atualização: 2026-07-14 — **Dashboard implementado a partir do mockup Claude Design**
+> ("Dashboard.dc.html", projeto "Redesign da aba"): 7 seções novas com DADOS REAIS (nenhuma
+> mockada) — atividade (heatmap 12 meses), tendência de acerto (14 dias), progresso por
+> baralho/idioma, "travando na memória" (leeches), palavra em destaque do dia, fontes do
+> vocabulário e conquistas (6 marcos calculados). Ver seção 8 (sessão 2026-07-14).
+>
+> Última atualização anterior: 2026-07-13 (2ª rodada) — **Precisão do negrito do objeto de estudo**
 > revisada em todos os 7 pontos que geram frases (review.js, audio.js × 2, study.js,
 > consulta.js, add.js × 2): prompts padronizados/reforçados (flexão, expressão de várias
 > palavras/separável, idiom, ocorrência repetida), mismatch entre a regra e o exemplo de
@@ -193,7 +199,12 @@ maxInterval (36500), leechThreshold (50)
 
 ## 7. Telas (seções)
 
-- **Dashboard** — ação principal (estudar hoje) + cards de métrica com ícone. (Mantido como está.)
+- **Dashboard** — ação principal (estudar hoje, com chip de sequência quando streak > 0) + 4
+  cards de métrica + grade de 2 colunas com: atividade (heatmap 12 meses), tendência de acerto
+  (14 dias), progresso por baralho/idioma, "travando na memória" (leeches); coluna direita:
+  palavra em destaque do dia + fontes do vocabulário. Abaixo: card de conquistas (6 marcos) +
+  recentes. Tudo com dados reais, sem estado novo persistido (deriva de `srsLog`/`srsCards`/
+  `words` já existentes). Ver `js/dashboard.js` (funções `dash*`) e seção 8 (sessão 2026-07-14).
 - **Assistente** — seção própria (2ª no menu), chat com IA estilo Claude. Layout de duas colunas:
   histórico de conversas à esquerda (nova/selecionar/renomear/excluir/buscar) e o chat à direita.
   - **Histórico persistido** em `conversas[]` (localStorage `el-consulta-conversas`) e **sincronizado**
@@ -226,6 +237,60 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-07-14 — Dashboard implementado a partir do mockup Claude Design
+42. **Contexto**: o Djemeson trouxe o mockup "Dashboard.dc.html" do projeto Claude Design
+    "Redesign da aba" (mesmo projeto do reskin "Papel" de 2026-07-13; projectId
+    `18938966-2928-4595-80ed-382898ddf0a5`, tem também `Adicionar - Mídia.dc.html`,
+    `Canvas.dc.html`, `Estudar.dc.html` e `Gamificação.dc.html` — ainda não implementados).
+    Pedido: "implementar" o mockup do Dashboard. Diferente do reskin "Papel" (só CSS), este
+    mockup tinha 7 seções **novas** que não existiam (heatmap, tendência, idiomas, leeches,
+    palavra do dia, fontes, conquistas) — perguntei ao Djemeson o escopo antes de mexer; ele
+    escolheu **"tudo, com dados reais"** (não mockado) em vez de reskin visual só ou pular
+    conquistas.
+    - **`js/dashboard.js`**: novas funções `dashHeatCells` (371 dias a partir de `srsLog`,
+      alinhado p/ começar num domingo), `dashAccuracyTrend` (14 dias, `correct/reviewed` do
+      `srsLog`, SVG polyline), `dashLangRows` (agrupa `srsCards` por `lang`/`state`),
+      `dashLeeches` (cards com `card.leech`, um chip por palavra), `dashWordOfDay` (escolha
+      determinística pelo hash da data — mesma palavra o dia todo — entre cards com
+      `origin_pt`, senão qualquer card com `meaning_pt`), `dashSources` (agrupa `words` por
+      `source_title`/`source_type`), `dashAchievements` (6 marcos calculados: 1ª palavra,
+      50 cards maduros — `state==='review' && interval>=21` —, streak 7 dias, 2+ idiomas,
+      100 idioms, 500 palavras — **sem sistema de gamificação novo por trás**, só thresholds
+      sobre dados existentes). `renderDashboardGrid`/`renderDashboardAchievements` chamadas
+      no fim de `renderDashboard()`. Chip de sequência (🔥 N dias) adicionado ao hero
+      existente (`dash-action-card`) só quando `streak > 0` — hero em si NÃO foi tocado
+      (já estava bom, gradiente do reskin "Papel").
+    - **`index.html`**: `section-dashboard` ganhou `page-header` (padrão das outras seções)
+      e dois containers novos — `dash-grid-area` (grade 2 colunas) e `dash-achv-area`
+      (conquistas) — preenchidos via JS; `dash-main-action`/`dash-stats-area`/
+      `dash-recent-area` (existentes) intocados.
+    - **`css/styles.css`**: bloco novo no fim do arquivo (`.dash-hero-streak*`, `.dash-grid`,
+      `.dash-card*`, `.dash-hm-*`, `.dash-trend-*`, `.dash-lang-*`/`.dash-lr-*`,
+      `.dash-leech-*`, `.dash-wod-*`, `.dash-src-*`, `.dash-badge*`), todo via variáveis de
+      tema (`--primary`, `--surface`, `--success`, `--warning`, `--error` etc.) — funciona
+      nos 6 temas sem hardcode de cor. Responsivo: grade vira 1 coluna e badges 3→2 colunas
+      em telas estreitas.
+    - **`js/core.js`**: 2 ícones novos em `ICONS` (`lock`, `heart`) — faltavam para as
+      conquistas "Poliglota" e "100 idioms" (os outros 4 ícones do mockup já existiam:
+      `pencil`, `sparkles`, `clock`, `book`).
+    - **Empty states**: cada seção nova trata a ausência de dados sem quebrar (heatmap todo
+      cinza, tendência com mensagem, idiomas/fontes/palavra-do-dia com texto neutro, card de
+      leech só aparece se houver algum). Testado ao vivo (servidor HTTP local + Claude
+      Browser) com o app **zerado** (sem erro) e com **dados sintéticos injetados via
+      console** (`words`/`srsCards`/`srsLog` em memória) cobrindo os 6 temas via
+      `getComputedStyle` — grade 2 colunas (1.7fr/1fr), cor do heatmap/badges seguindo
+      `--primary` de cada tema, badges bloqueados com opacidade reduzida, chip de sequência
+      branco sobre o gradiente do hero. ⚠️ Ferramenta de screenshot do Claude Browser
+      indisponível (timeout) nesta sessão também — validação por `getComputedStyle`/
+      `get_page_text`, não por captura visual.
+    - **Achado (fora do escopo, não corrigido aqui)**: bug pré-existente de pluralização no
+      hero (`js/dashboard.js`) — quando `dueToday` é 0, o template gera "0 revisãoões" (o
+      sufixo condicional "ões" é concatenado a "revisão", que já não termina em "revis").
+      Sinalizado como tarefa separada (`task_36f52dbd`), não uma regressão desta sessão.
+    - **Não tocado**: `Adicionar - Mídia.dc.html`, `Canvas.dc.html`, `Estudar.dc.html` e
+      `Gamificação.dc.html` do mesmo projeto Claude Design — ficam para sessões futuras se o
+      Djemeson pedir.
 
 ### Sessão 2026-07-13 (2ª rodada) — Precisão do negrito do objeto de estudo (EN + PT)
 41. **Motivo**: o Djemeson reportou que o negrito do objeto de estudo (a palavra/expressão
@@ -567,6 +632,21 @@ maxInterval (36500), leechThreshold (50)
 
 ## 9. Pendências / a verificar
 
+- [ ] **Conferir visualmente o novo Dashboard ao vivo** (após deploy + hard-refresh; a
+      validação desta sessão foi só por `getComputedStyle`/dados sintéticos, sem screenshot):
+      com dados reais de uso, olhar o heatmap (cores fazem sentido com o histórico real de
+      `srsLog`?), a tendência de acerto, o card de "travando na memória" (só aparece se
+      houver leech de verdade), a palavra em destaque (troca a cada dia?) e o card de
+      conquistas nos 6 temas — inclusive em mobile (grade 2 colunas deve virar 1 coluna,
+      badges 6→3→2 por linha).
+- [ ] **Corrigir bug de pluralização "0 revisãoões"** no hero do Dashboard quando não há
+      revisões pendentes (`js/dashboard.js` → `renderDashboard`) — sinalizado como tarefa
+      separada (`task_36f52dbd`), achado ao validar a sessão de 2026-07-14, não é regressão
+      dela.
+- [ ] (Opcional) Avaliar implementar os outros mockups do mesmo projeto Claude Design
+      ("Redesign da aba"): `Adicionar - Mídia.dc.html`, `Canvas.dc.html`, `Estudar.dc.html`
+      e `Gamificação.dc.html` (este último provavelmente cobre um sistema de conquistas mais
+      rico que os 6 marcos simples do Dashboard).
 - [ ] **Testar o MULTI-IDIOMA ao vivo** (após deploy + hard-refresh; backup — Exportar JSON —
       antes): (1) trocar o seletor p/ Espanhol no Adicionar, adicionar "echar de menos" e
       analisar — conferir type=phrasal_verb c/ type_label "perífrase verbal", IPA, variedades
