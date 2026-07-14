@@ -29,7 +29,7 @@ function renderDashboard() {
           ${streak > 0 ? `<div class="dash-hero-streak-row"><span class="dash-hero-streak">${ic('flame','ic-sm')}${streak} dia${streak!==1?'s':''} de sequência</span></div>` : ''}
           <div class="dash-action-left">
             <div class="dash-num">${paraHoje}</div>
-            <div class="dash-sub">${dueToday} revisão${dueToday!==1?'ões':''} · ${newToday} novo${newToday!==1?'s':''} disponív${newToday!==1?'eis':'el'} hoje</div>
+            <div class="dash-sub">${dueToday} ${dueToday!==1?'revisões':'revisão'} · ${newToday} novo${newToday!==1?'s':''} disponív${newToday!==1?'eis':'el'} hoje</div>
           </div>
           <button class="btn btn-primary" onclick="showSection('estudar')">Estudar agora ${ic('arrowRight')}</button>
         </div>`

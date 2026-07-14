@@ -3,11 +3,20 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
+<<<<<<< HEAD
 > Última atualização: 2026-07-14 — **Dashboard implementado a partir do mockup Claude Design**
 > ("Dashboard.dc.html", projeto "Redesign da aba"): 7 seções novas com DADOS REAIS (nenhuma
 > mockada) — atividade (heatmap 12 meses), tendência de acerto (14 dias), progresso por
 > baralho/idioma, "travando na memória" (leeches), palavra em destaque do dia, fontes do
 > vocabulário e conquistas (6 marcos calculados). Ver seção 8 (sessão 2026-07-14).
+=======
+> Última atualização: 2026-07-14 — **Correção de bug de pluralização no Dashboard**: em
+> `js/dashboard.js`, `renderDashboard()`, a linha do hero (`dash-action-card`) concatenava
+> o sufixo `'ões'` diretamente ao singular `'revisão'`, gerando "revisãoões" sempre que
+> `dueToday !== 1`. Corrigido para escolher entre duas strings completas ("revisão" /
+> "revisões"). Bug pré-existente (não introduzido nesta sessão), encontrado ao validar a
+> implementação do Dashboard. Ver seção 8.
+>>>>>>> claude/youthful-thompson-8f87f3
 >
 > Última atualização anterior: 2026-07-13 (2ª rodada) — **Precisão do negrito do objeto de estudo**
 > revisada em todos os 7 pontos que geram frases (review.js, audio.js × 2, study.js,
@@ -238,6 +247,7 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+<<<<<<< HEAD
 ### Sessão 2026-07-14 — Dashboard implementado a partir do mockup Claude Design
 42. **Contexto**: o Djemeson trouxe o mockup "Dashboard.dc.html" do projeto Claude Design
     "Redesign da aba" (mesmo projeto do reskin "Papel" de 2026-07-13; projectId
@@ -291,6 +301,17 @@ maxInterval (36500), leechThreshold (50)
     - **Não tocado**: `Adicionar - Mídia.dc.html`, `Canvas.dc.html`, `Estudar.dc.html` e
       `Gamificação.dc.html` do mesmo projeto Claude Design — ficam para sessões futuras se o
       Djemeson pedir.
+=======
+### Sessão 2026-07-14 — Correção de bug de pluralização no Dashboard
+42. **Motivo**: bug encontrado ao validar a implementação do Dashboard.dc.html (pré-existente,
+    não introduzido na sessão). Em [js/dashboard.js](js/dashboard.js:31), `renderDashboard()`,
+    a linha do hero (`dash-action-card`) montava a pluralização de "revisão" concatenando um
+    sufixo (`'revisão' + (dueToday!==1?'ões':'')`), o que produzia "revisãoões" para qualquer
+    `dueToday !== 1` (inclusive 0), já que o singular não termina em "revis".
+    **Correção**: trocado para escolher entre duas strings completas —
+    `` `${dueToday} ${dueToday!==1?'revisões':'revisão'}` ``. Mudança isolada, sem impacto em
+    sync/SRS/dados.
+>>>>>>> claude/youthful-thompson-8f87f3
 
 ### Sessão 2026-07-13 (2ª rodada) — Precisão do negrito do objeto de estudo (EN + PT)
 41. **Motivo**: o Djemeson reportou que o negrito do objeto de estudo (a palavra/expressão
