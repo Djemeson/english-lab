@@ -877,7 +877,11 @@ select option{background:var(--surface)}
    SOMA ao padding da celula. Antes era um padding-left inline que brigava
    com a regra do mobile — o !important daquele bloco vencia e achatava a
    arvore inteira no celular. */
-.sdt-name{font-weight:500;cursor:default;padding-left:calc(14px + var(--indent,0px))}
+.sdt-name{font-weight:500;cursor:default}
+/* Especificidade (0,2,1) de proposito: precisa vencer
+   ".srs-deck-table td{padding:12px 10px}" do bloco mobile, que e (0,1,1)
+   e vem depois no arquivo. Sem isso a arvore achata no celular. */
+.srs-deck-table td.sdt-name{padding-left:calc(14px + var(--indent,0px))}
 .sdt-name.root{font-weight:700}
 .sdt-new{color:var(--primary);text-align:right;font-weight:600}
 .sdt-learn{color:#e67e22;text-align:right;font-weight:600}
