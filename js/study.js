@@ -98,7 +98,7 @@ function renderDeckStatsTable() {
     const isSelected = _focusDeckId === deckId
     let rows = `<tr class="deck-row-clickable${isSelected ? ' deck-row-selected' : ''}"
       onclick="showDeckFocus('${deckId}')">
-      <td class="sdt-name${depth===0?' root':''}" style="padding-left:${indent}px">${esc(deck.name)}</td>
+      <td class="sdt-name${depth===0?' root':''}" style="--indent:${indent}px">${esc(deck.name)}</td>
       ${numCell(counts.novo,     'sdt-new',    'new',      deckId)}
       ${numCell(counts.aprender, 'sdt-learn',  'learning', deckId)}
       ${numCell(counts.revisar,  'sdt-review', 'due',      deckId)}
