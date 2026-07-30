@@ -114,7 +114,7 @@
       <div class="sync-dot" id="sync-dot-mob"></div>
     </div>
     <!-- Profile picture / Login button for mobile -->
-    <button id="fb-login-btn-mob" class="btn btn-secondary btn-sm" onclick="firebaseSignIn()" style="display:none; font-size:0.7rem; padding: 4px 8px;">
+    <button id="fb-login-btn-mob" class="btn btn-secondary btn-sm" onclick="firebaseSignIn()" style="display:none; font-size:var(--fs-2xs); padding: 4px 8px;">
       Entrar
     </button>
     <div id="fb-user-chip-mob" style="display:none; align-items:center; gap:6px" onclick="showSection('configuracoes')">
@@ -174,13 +174,13 @@
         <div class="sync-dot" id="sync-dot"></div>
         <span id="sync-label">Nuvem</span>
       </div>
-      <button id="fb-login-btn" class="btn btn-secondary btn-sm btn-full" onclick="firebaseSignIn()" style="display:none;font-size:0.74rem">
+      <button id="fb-login-btn" class="btn btn-secondary btn-sm btn-full" onclick="firebaseSignIn()" style="display:none;font-size:var(--fs-xs)">
         Entrar com Google
       </button>
-      <div id="fb-user-chip" style="display:none;font-size:0.74rem;color:var(--text2);align-items:center;gap:7px">
+      <div id="fb-user-chip" style="display:none;font-size:var(--fs-xs);color:var(--text2);align-items:center;gap:7px">
         <img id="fb-user-photo" src="" style="width:24px;height:24px;border-radius:50%;display:none;flex-shrink:0">
         <span id="fb-user-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-        <button class="btn btn-ghost btn-sm" style="font-size:0.68rem;padding:2px 7px" onclick="firebaseSignOut()">sair</button>
+        <button class="btn btn-ghost btn-sm" style="font-size:var(--fs-2xs);padding:2px 7px" onclick="firebaseSignOut()">sair</button>
       </div>
     </div>
   </div>
@@ -192,13 +192,13 @@
 <!-- Audio generation progress banner -->
 <div id="audio-gen-banner" class="hidden">
   <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-    <span style="font-size:0.82rem;font-weight:600;color:var(--text)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg> Gerando áudio</span>
-    <button onclick="cancelAudioGen()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:1rem;line-height:1;padding:0" title="Cancelar" aria-label="Cancelar"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    <span style="font-size:var(--fs-sm);font-weight:600;color:var(--text)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg> Gerando áudio</span>
+    <button onclick="cancelAudioGen()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:var(--fs-base);line-height:1;padding:0" title="Cancelar" aria-label="Cancelar"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
   </div>
   <div id="audio-gen-bar-wrap"><div id="audio-gen-bar" style="width:0%"></div></div>
   <div style="display:flex;justify-content:space-between;align-items:center">
-    <span id="audio-gen-label" style="font-size:0.75rem;color:var(--text3)">0 / 0</span>
-    <span style="font-size:0.72rem;color:var(--text3)">Fechar aba cancela</span>
+    <span id="audio-gen-label" style="font-size:var(--fs-xs);color:var(--text3)">0 / 0</span>
+    <span style="font-size:var(--fs-2xs);color:var(--text3)">Fechar aba cancela</span>
   </div>
 </div>
 
@@ -286,11 +286,11 @@
         <input type="text" id="m-ctx" placeholder="ex: She decided to give up on her dream." onkeydown="if(event.key==='Enter')addManual()">
       </div>
     </div>
-    <div id="m-dup-warn" style="display:none;background:var(--warning-bg,rgba(234,179,8,.12));border:1px solid rgba(234,179,8,.35);border-radius:6px;padding:8px 12px;font-size:0.8rem;color:#ca8a04;margin-bottom:12px;display:none;align-items:center;gap:8px">
+    <div id="m-dup-warn" style="display:none;background:var(--warning-bg,rgba(234,179,8,.12));border:1px solid rgba(234,179,8,.35);border-radius:var(--radius-xs);padding:8px 12px;font-size:var(--fs-sm);color:#ca8a04;margin-bottom:12px;display:none;align-items:center;gap:8px">
       <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg> "<strong id="m-dup-word"></strong>" já está na sua fila.
     </div>
     <div style="margin-bottom:16px">
-      <div style="font-size:0.75rem;color:var(--text3);margin-bottom:7px">Fonte</div>
+      <div style="font-size:var(--fs-xs);color:var(--text3);margin-bottom:7px">Fonte</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap" id="m-source-chips">
         <span class="src-chip active" data-val="manual" onclick="setManualSource(this)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Manual</span>
         <span class="src-chip" data-val="series" onclick="setManualSource(this)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="m7 2 5 5 5-5"/></svg>Série</span>
@@ -305,7 +305,7 @@
     </div>
     <div style="display:flex;gap:10px;align-items:center">
       <button class="btn btn-primary" onclick="addManual()">Adicionar para revisão</button>
-      <span style="font-size:0.75rem;color:var(--text3)">ou Enter</span>
+      <span style="font-size:var(--fs-xs);color:var(--text3)">ou Enter</span>
     </div>
   </div>
 
@@ -349,7 +349,7 @@
     </div>
     <div class="form-group">
       <input type="text" id="midia-context-new" placeholder="Contexto / gênero (opcional) — ex: reality de sobrevivência" style="max-width:420px">
-      <div style="font-size:0.72rem;color:var(--text3);margin-top:4px">A IA já tenta deduzir o gênero pelo título. Preencha aqui só se a fonte for obscura ou quiser reforçar o contexto.</div>
+      <div style="font-size:var(--fs-2xs);color:var(--text3);margin-top:4px">A IA já tenta deduzir o gênero pelo título. Preencha aqui só se a fonte for obscura ou quiser reforçar o contexto.</div>
     </div>
 
     <div class="upload-area" id="midia-drop" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="event.preventDefault();this.classList.remove('drag');handleMidiaFile({files:event.dataTransfer.files})" onclick="document.getElementById('midia-file').click()">
@@ -367,7 +367,7 @@
       <button class="btn btn-primary" id="midia-doc-btn" onclick="extractMidiaPasted()"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg> Extrair material colado</button>
       <button class="btn btn-secondary" id="midia-analyze-btn" onclick="analyzeMidiaText()"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg> Analisar linha a linha</button>
     </div>
-    <div style="font-size:0.72rem;color:var(--text3);margin-top:6px"><strong>Extrair material colado</strong>: lê o texto inteiro como um artigo e tira só o que vira card (igual ao upload de arquivo). <strong>Analisar linha a linha</strong>: trata cada linha como uma palavra/frase.</div>
+    <div style="font-size:var(--fs-2xs);color:var(--text3);margin-top:6px"><strong>Extrair material colado</strong>: lê o texto inteiro como um artigo e tira só o que vira card (igual ao upload de arquivo). <strong>Analisar linha a linha</strong>: trata cada linha como uma palavra/frase.</div>
     <div id="midia-proc-results" class="hidden" style="margin-top:20px">
       <div class="parsed-header">
         <h3 id="midia-proc-count">0 itens</h3>
@@ -378,7 +378,7 @@
           <button class="btn btn-primary btn-sm" onclick="addMidiaProcessed()"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Adicionar selecionados</button>
         </div>
       </div>
-      <div style="font-size:0.75rem;color:var(--text3);margin-bottom:10px">Selecione com o mouse o objeto de estudo para ajustar a sugestão da IA</div>
+      <div style="font-size:var(--fs-xs);color:var(--text3);margin-bottom:10px">Selecione com o mouse o objeto de estudo para ajustar a sugestão da IA</div>
       <div id="midia-proc-list"></div>
     </div>
   </div>
@@ -460,9 +460,9 @@
       <p class="desc">A chave de API é usada diretamente pelo navegador para traduzir palavras, obter definições, transcrições IPA, gerar pronúncias por voz (TTS) e criar imagens de auxílio visual.</p>
       
       <div class="form-group" style="margin: 0; max-width: 580px;">
-        <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.85rem; color: var(--text2);">OpenAI API Key</label>
+        <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: var(--fs-md); color: var(--text2);">OpenAI API Key</label>
         <div style="position: relative; display: flex; align-items: center;">
-          <input type="password" id="cfg-openai-key" placeholder="sk-proj-..." autocomplete="off" style="width: 100%; padding-right: 46px; height: 42px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); padding-left: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.9rem;">
+          <input type="password" id="cfg-openai-key" placeholder="sk-proj-..." autocomplete="off" style="width: 100%; padding-right: 46px; height: 42px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); padding-left: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: var(--fs-md);">
           <button type="button" onclick="togglePasswordVisibility('cfg-openai-key')" style="position: absolute; right: 12px; background: none; border: none; color: var(--text3); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; transition: color 0.15s;" onmouseover="this.style.color='var(--text2)'" onmouseout="this.style.color='var(--text3)'">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -470,7 +470,7 @@
             </svg>
           </button>
         </div>
-        <p style="font-size: 0.76rem; color: var(--text3); margin-top: 6px; line-height: 1.4;">Sua chave é mantida segura localmente em seu navegador e nunca é enviada a servidores de terceiros (com exceção direta à API oficial da OpenAI).</p>
+        <p style="font-size: var(--fs-xs); color: var(--text3); margin-top: 6px; line-height: 1.4;">Sua chave é mantida segura localmente em seu navegador e nunca é enviada a servidores de terceiros (com exceção direta à API oficial da OpenAI).</p>
       </div>
     </div>
 
@@ -488,22 +488,22 @@
 
       <!-- Estado: não logado -->
       <div id="fb-settings-logged-out" style="margin-top: 4px;">
-        <button class="btn btn-primary" onclick="firebaseSignIn()" style="display: inline-flex; align-items: center; gap: 10px; height: 42px; padding: 0 18px; border-radius: 10px; box-shadow: var(--shadow-sm);">
+        <button class="btn btn-primary" onclick="firebaseSignIn()" style="display: inline-flex; align-items: center; gap: 10px; height: 42px; padding: 0 18px; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm);">
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 18px; height: 18px; display: block;">
           Fazer Login com o Google
         </button>
       </div>
 
       <!-- Estado: logado -->
-      <div id="fb-settings-logged-in" style="display:none; background: var(--surface2); padding: 16px; border-radius: 12px; border: 1px solid var(--border);">
+      <div id="fb-settings-logged-in" style="display:none; background: var(--surface2); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
         <div class="sync-status-row" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
           <div class="sync-dot ok" style="width: 10px; height: 10px; border-radius: 50%; background: var(--success); filter: drop-shadow(0 0 4px var(--success));"></div>
           <div>
-            <span id="fb-settings-email" style="font-weight:600; font-size: 0.92rem; color: var(--text);"></span>
-            <span style="color:var(--text3); margin-left:8px; font-size:0.8rem; background: var(--surface3); padding: 2px 8px; border-radius: 10px;">Conectado</span>
+            <span id="fb-settings-email" style="font-weight:600; font-size: var(--fs-base); color: var(--text);"></span>
+            <span style="color:var(--text3); margin-left:8px; font-size:var(--fs-sm); background: var(--surface3); padding: 2px 8px; border-radius: var(--radius-sm);">Conectado</span>
           </div>
         </div>
-        <div id="fb-sync-status" class="sync-status-row hidden" style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 0.85rem; color: var(--text2);">
+        <div id="fb-sync-status" class="sync-status-row hidden" style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: var(--fs-md); color: var(--text2);">
           <div class="sync-dot" id="fb-status-dot" style="width: 8px; height: 8px; border-radius: 50%;"></div>
           <span id="fb-status-msg"></span>
         </div>
@@ -521,7 +521,7 @@
     <div class="settings-card">
       <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>Manutenção de Áudio</h3>
       <p class="desc">Verifique a integridade da sua biblioteca e gere o áudio falado (TTS) para os cards que ainda não o possuem.</p>
-      <div id="audio-maint-status" style="font-size:0.83rem; color:var(--text2); margin-bottom:14px; min-height: 20px; display: flex; align-items: center;">
+      <div id="audio-maint-status" style="font-size:var(--fs-sm); color:var(--text2); margin-bottom:14px; min-height: 20px; display: flex; align-items: center;">
         Aperte em "Verificar" para validar os arquivos locais de voz.
       </div>
       <div class="btn-group" style="display: flex; gap: 8px;">
@@ -546,7 +546,7 @@
   </div>
 
   <div style="margin-top:28px; display:flex; align-items:center; gap:16px;">
-    <button class="btn btn-primary" onclick="saveSettings()" style="height: 44px; padding: 0 24px; font-weight: 600; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 8px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:18px; height:18px;"><path d="M20 6 9 17l-5-5"/></svg>Salvar todas as alterações</button>
+    <button class="btn btn-primary" onclick="saveSettings()" style="height: 44px; padding: 0 24px; font-weight: 600; font-size: var(--fs-base); display: inline-flex; align-items: center; gap: 8px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:18px; height:18px;"><path d="M20 6 9 17l-5-5"/></svg>Salvar todas as alterações</button>
   </div>
 </section>
 
@@ -626,8 +626,8 @@
   <div id="srs-all-cards-area"></div>
   <div id="biblioteca-empty" class="srs-empty" style="display:none">
     <svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 12 10 5 10-5"/><path d="m2 17 10 5 10-5"/></svg>
-    <p style="font-size:1rem;font-weight:600;margin-bottom:8px">Biblioteca vazia</p>
-    <p style="font-size:0.88rem;margin-bottom:20px">Revise palavras e salve-as para estudo para vê-las aqui.</p>
+    <p style="font-size:var(--fs-base);font-weight:600;margin-bottom:8px">Biblioteca vazia</p>
+    <p style="font-size:var(--fs-md);margin-bottom:20px">Revise palavras e salve-as para estudo para vê-las aqui.</p>
     <button class="btn btn-primary" onclick="showSection('revisar')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>Ir para Revisar</button>
   </div>
 </section>
@@ -635,8 +635,8 @@
 <!-- SRS Config Modal -->
 <div id="srs-cfg-modal" class="hidden" style="position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 26px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow)">
-    <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--primary)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações do SRS</h3>
-    <p style="font-size:0.82rem;color:var(--text2);margin-bottom:16px">Algoritmo SM-2 — parâmetros espelhando o Anki</p>
+    <h3 style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--primary)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações do SRS</h3>
+    <p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:16px">Algoritmo SM-2 — parâmetros espelhando o Anki</p>
 
     <div class="srs-cfg-section">Limites diários</div>
     <div class="form-row">

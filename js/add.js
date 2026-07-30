@@ -103,7 +103,7 @@ function handleKindleFile(input) {
     el('kindle-list').innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)">
       <div style="margin-bottom:12px;color:var(--primary)">${ic('refresh','ic-xl')}</div>
       <div>Processando todos os destaques com IA...</div>
-      <div style="font-size:0.82rem;margin-top:8px;color:var(--text3)">Isso pode levar alguns segundos</div>
+      <div style="font-size:var(--fs-sm);margin-top:8px;color:var(--text3)">Isso pode levar alguns segundos</div>
     </div>`
     // Processa em lote e depois salva + renderiza
     await analyzeKindleItems()
@@ -259,15 +259,15 @@ function renderKindleList(skipped, total) {
     const hasContext = !!item.context
     const iwords = getItemWords(item)
     const chipContent = iwords.length
-      ? `<div id="ke-wrap-${i}" style="display:flex;gap:5px;flex-wrap:wrap">${iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeKindleWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1">×</span></span>`).join('')}</div>`
+      ? `<div id="ke-wrap-${i}" style="display:flex;gap:5px;flex-wrap:wrap">${iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeKindleWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:var(--fs-base);line-height:1">×</span></span>`).join('')}</div>`
       : (cfg.openaiKey
-          ? `<div id="ke-wrap-${i}"><span style="font-size:0.75rem;color:var(--text3);font-style:italic">analisando...</span></div>`
-          : `<div id="ke-wrap-${i}"><span style="font-size:0.75rem;color:var(--text3);font-style:italic">selecione com o mouse</span></div>`)
+          ? `<div id="ke-wrap-${i}"><span style="font-size:var(--fs-xs);color:var(--text3);font-style:italic">analisando...</span></div>`
+          : `<div id="ke-wrap-${i}"><span style="font-size:var(--fs-xs);color:var(--text3);font-style:italic">selecione com o mouse</span></div>`)
     const sentenceHTML = hasContext ? esc(item.context) : esc(item.word || '')
     const vocabRefHTML = item.vocab_ref?.length
-      ? `<div style="font-size:0.78rem;color:var(--text2);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px">`
+      ? `<div style="font-size:var(--fs-sm);color:var(--text2);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px">`
         + item.vocab_ref.map(v => v.expr
-          ? `<span>${ic('target','ic-sm')} ${v.expr}${v.type ? ` <span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
+          ? `<span>${ic('target','ic-sm')} ${v.expr}${v.type ? ` <span style="font-size:var(--fs-3xs);background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
           : '').filter(Boolean).join(' ')
         + '</div>'
       : ''
@@ -535,9 +535,9 @@ function updateKindleWordsDisplay(i) {
   const wrap = el(`ke-wrap-${i}`)
   if (wrap) {
     if (iwords.length) {
-      wrap.innerHTML = iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeKindleWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1">×</span></span>`).join('')
+      wrap.innerHTML = iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeKindleWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:var(--fs-base);line-height:1">×</span></span>`).join('')
     } else {
-      wrap.innerHTML = `<span class="kindle-expr-chip loading" style="color:var(--text3);font-size:0.75rem">Selecione com o mouse</span>`
+      wrap.innerHTML = `<span class="kindle-expr-chip loading" style="color:var(--text3);font-size:var(--fs-xs)">Selecione com o mouse</span>`
     }
   }
 }
@@ -727,12 +727,12 @@ function renderMidiaProcessed() {
       ? (iwords.length ? highlightMultipleExprs(item.context, iwords) : esc(item.context))
       : esc(iwords[0] || '')
     const chipsHTML = iwords.length
-      ? iwords.map((w,wi) => `<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeMidiaWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1" title="remover">×</span></span>`).join('')
-      : `<span style="font-size:0.75rem;color:var(--text3);font-style:italic">selecione com o mouse</span>`
+      ? iwords.map((w,wi) => `<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeMidiaWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:var(--fs-base);line-height:1" title="remover">×</span></span>`).join('')
+      : `<span style="font-size:var(--fs-xs);color:var(--text3);font-style:italic">selecione com o mouse</span>`
     const vocabRefHTML = item.vocab_ref?.length
-      ? `<div style="font-size:0.78rem;color:var(--text2);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px">`
+      ? `<div style="font-size:var(--fs-sm);color:var(--text2);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px">`
         + item.vocab_ref.map(v => v.expr
-          ? `<span>${ic('target','ic-sm')} ${v.expr}${v.type ? ` <span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
+          ? `<span>${ic('target','ic-sm')} ${v.expr}${v.type ? ` <span style="font-size:var(--fs-3xs);background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
           : '').filter(Boolean).join(' ')
         + '</div>'
       : ''
@@ -776,8 +776,8 @@ function updateMidiaWordsDisplay(idx) {
   const wrap = el(`me-wrap-${idx}`)
   if (wrap) {
     wrap.innerHTML = iwords.length
-      ? iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeMidiaWord(${idx},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1">×</span></span>`).join('')
-      : `<span class="kindle-expr-chip loading" style="color:var(--text3);font-size:0.75rem">Selecione com o mouse</span>`
+      ? iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeMidiaWord(${idx},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:var(--fs-base);line-height:1">×</span></span>`).join('')
+      : `<span class="kindle-expr-chip loading" style="color:var(--text3);font-size:var(--fs-xs)">Selecione com o mouse</span>`
   }
 }
 
@@ -819,7 +819,7 @@ function addMidiaProcessed() {
 function midiaDocExampleHtml(e, ei) {
   return `
         <div class="mi-example" style="margin-top:6px;display:flex;gap:8px;align-items:baseline">
-          <span style="font-size:0.7rem;color:var(--text3);flex-shrink:0;font-weight:600">#${ei + 1}</span>
+          <span style="font-size:var(--fs-2xs);color:var(--text3);flex-shrink:0;font-weight:600">#${ei + 1}</span>
           <div style="flex:1"><div class="en">"${allowBold(e.en)}"</div>${e.pt ? `<div class="pt">"${allowBold(e.pt)}"</div>` : ''}</div>
         </div>`
 }
@@ -838,8 +838,8 @@ function renderMidiaDocItem(item, i) {
     const meaningLine = s.meaning_pt
       ? `<div style="font-weight:600;color:var(--text)">${multi ? `<span class="mi-sense-num">${si + 1}</span>` : ''}${esc(s.meaning_pt)}${s.register && s.register !== 'neutral' ? ` <span class="chip register-${esc(s.register)}">${esc(s.register)}</span>` : ''}</div>`
       : ''
-    const defLine = s.definition_pt ? `<div style="font-style:italic;opacity:.8;font-size:0.85rem;margin-top:2px">${esc(s.definition_pt)}</div>` : ''
-    const origin = s.origin_pt ? `<div style="margin-top:6px;padding:6px 9px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:0.8rem"><b>Origem:</b> ${esc(s.origin_pt)}</div>` : ''
+    const defLine = s.definition_pt ? `<div style="font-style:italic;opacity:.8;font-size:var(--fs-md);margin-top:2px">${esc(s.definition_pt)}</div>` : ''
+    const origin = s.origin_pt ? `<div style="margin-top:6px;padding:6px 9px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:var(--fs-sm)"><b>Origem:</b> ${esc(s.origin_pt)}</div>` : ''
     const body = `${meaningLine}${defLine}${origin}${exsHtml}`
     return multi ? `<div class="mi-sense">${body}</div>` : body
   }).join('')
@@ -855,7 +855,7 @@ function renderMidiaDocItem(item, i) {
       <input type="checkbox" class="midia-proc-check" data-i="${i}" checked>
       <div class="parsed-item-body">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span style="font-weight:700;font-size:1.02rem">${esc(item.word || '')}</span>
+          <span style="font-weight:700;font-size:var(--fs-base)">${esc(item.word || '')}</span>
           ${typeLbl ? `<span class="chip">${esc(typeLbl)}</span>` : ''}
           ${item.level ? `<span class="chip level-${String(item.level).toLowerCase()}">${esc(item.level)}</span>` : ''}
           ${item.ipa ? `<span class="wc-ipa">${esc(item.ipa)}</span>` : ''}

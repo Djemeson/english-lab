@@ -102,8 +102,8 @@ function asstEmptyState() {
   ]
   return `<div class="consulta-empty" id="consulta-empty">
     ${ic('sparkles','ic-xl')}
-    <p style="font-weight:700;font-size:1.05rem">Pergunte qualquer coisa em ${esc(L.name.toLowerCase())}</p>
-    <p style="font-size:0.86rem;max-width:440px">Significados, pronúncia, diferenças de uso, gírias, origem de expressões — e mande os termos direto para o seu estudo.</p>
+    <p style="font-weight:700;font-size:var(--fs-lg)">Pergunte qualquer coisa em ${esc(L.name.toLowerCase())}</p>
+    <p style="font-size:var(--fs-md);max-width:440px">Significados, pronúncia, diferenças de uso, gírias, origem de expressões — e mande os termos direto para o seu estudo.</p>
     <div class="asst-suggestions">
       ${sugg.map(s => `<button class="asst-sugg" onclick="askSuggestion(${escA(JSON.stringify(s))})">${esc(s)}</button>`).join('')}
     </div>

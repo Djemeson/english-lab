@@ -440,7 +440,7 @@ function renderWcToolbarLeft() {
 
   if (selCount > 0) {
     leftEl.innerHTML = `
-      <span style="font-size:0.82rem;font-weight:600;color:var(--primary);white-space:nowrap">${selCount} selecionada${selCount!==1?'s':''}</span>
+      <span style="font-size:var(--fs-sm);font-weight:600;color:var(--primary);white-space:nowrap">${selCount} selecionada${selCount!==1?'s':''}</span>
       <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()" data-tip="Gera significados, exemplos e nível com IA para as selecionadas">${ic('sparkles')}Analisar</button>
       <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()" data-tip="Cria os cards e envia para a fila de estudo (SRS)">${ic('book')}Salvar para estudo</button>
       <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()" data-tip="Remove as palavras selecionadas da fila">${ic('trash')}Excluir</button>`
@@ -610,7 +610,7 @@ function renderWordCard(wordId) {
       <button class="btn btn-primary big-btn" onclick="analyzeWord('${w.id}')">
         ${ic('sparkles')}Analisar com IA agora
       </button>
-      <p style="margin-top:12px;font-size:0.82rem;color:var(--text3)">
+      <p style="margin-top:12px;font-size:var(--fs-sm);color:var(--text3)">
         A IA vai identificar todos os significados, exemplos, nível e registro automaticamente.
       </p>
     </div>`
@@ -646,7 +646,7 @@ function renderWordCard(wordId) {
       <div class="wc-word" style="display:flex;align-items:center;gap:8px">
         <span id="wc-word-text-${w.id}">${esc(w.word || '(frase)')}</span>
         <button class="btn btn-ghost btn-xs" title="Editar" onclick="startEditWord('${w.id}')" id="wc-edit-btn-${w.id}" style="padding:2px 6px">${ic('pencil','ic-sm')}</button>
-        <input type="text" id="wc-word-input-${w.id}" value="${escA(w.word || '')}" style="display:none;font-size:1.2rem;font-weight:700;background:var(--surface2);border:1px solid var(--primary);border-radius:6px;padding:2px 8px;color:var(--text);width:200px" onkeydown="handleEditWordKey(event,'${w.id}')" onblur="confirmEditWord('${w.id}')">
+        <input type="text" id="wc-word-input-${w.id}" value="${escA(w.word || '')}" style="display:none;font-size:var(--fs-lg);font-weight:700;background:var(--surface2);border:1px solid var(--primary);border-radius:var(--radius-xs);padding:2px 8px;color:var(--text);width:200px" onkeydown="handleEditWordKey(event,'${w.id}')" onblur="confirmEditWord('${w.id}')">
       </div>
       <div class="wc-meta">
         ${langChip(wordLang(w))}
@@ -678,13 +678,13 @@ function renderMeaningItem(wordId, m, mi) {
         </div>
       </div>
       ${m.definition_pt ? `<div class="mi-note" style="font-style:italic;opacity:0.8;margin-top:4px">${esc(m.definition_pt)}</div>` : ''}
-      ${m.origin_pt ? `<div class="mi-note" style="margin-top:6px;padding:7px 10px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:0.8rem"><b>Origem:</b> ${esc(m.origin_pt)}</div>` : ''}
+      ${m.origin_pt ? `<div class="mi-note" style="margin-top:6px;padding:7px 10px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:var(--fs-sm)"><b>Origem:</b> ${esc(m.origin_pt)}</div>` : ''}
       ${m.context_note ? `<div class="mi-note">${esc(m.context_note)}</div>` : ''}
-      ${m.synonyms && m.synonyms.length ? `<div class="mi-note" style="font-size:0.78rem;color:var(--text3)">↔ ${m.synonyms.slice(0,4).map(esc).join(', ')}</div>` : ''}
+      ${m.synonyms && m.synonyms.length ? `<div class="mi-note" style="font-size:var(--fs-sm);color:var(--text3)">↔ ${m.synonyms.slice(0,4).map(esc).join(', ')}</div>` : ''}
       ${(m.examples && m.examples.length ? m.examples : (m.example_en ? [{en:m.example_en, pt:m.example_pt||''}] : [])).map((ex, ei) => ex.en ? `
       <div class="mi-example">
         <div style="display:flex;gap:8px;align-items:baseline">
-          <span style="font-size:0.7rem;color:var(--text3);flex-shrink:0;font-weight:600">#${ei+1}</span>
+          <span style="font-size:var(--fs-2xs);color:var(--text3);flex-shrink:0;font-weight:600">#${ei+1}</span>
           <div style="flex:1">
             <div class="en">"${allowBold(ex.en)}"</div>
             ${ex.pt ? `<div class="pt">"${allowBold(ex.pt)}"</div>` : ''}

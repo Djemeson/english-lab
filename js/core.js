@@ -338,8 +338,8 @@ function inputModal({ title, label, value = '', placeholder = '', confirmText = 
   const close = () => overlay.remove()
   overlay.addEventListener('click', e => { if (e.target === overlay) close() })
   overlay.innerHTML = `<div class="srs-modal-box">
-    <h4 style="font-size:1.02rem;font-weight:700;margin-bottom:${label ? '4px' : '14px'}">${esc(title || '')}</h4>
-    ${label ? `<p style="font-size:0.82rem;color:var(--text2);margin-bottom:14px">${esc(label)}</p>` : ''}
+    <h4 style="font-size:var(--fs-base);font-weight:700;margin-bottom:${label ? '4px' : '14px'}">${esc(title || '')}</h4>
+    ${label ? `<p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">${esc(label)}</p>` : ''}
     <input type="text" id="el-input-modal-field" class="srs-modal-select" placeholder="${escA(placeholder)}" value="${escA(value)}" style="margin-bottom:18px">
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn btn-ghost btn-sm" id="el-input-modal-cancel">Cancelar</button>

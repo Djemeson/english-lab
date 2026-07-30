@@ -87,7 +87,7 @@ function renderDashboard() {
   if (recentArea && words.length > 0) {
     const recent = [...words].sort((a,b) => new Date(b.created_at)-new Date(a.created_at)).slice(0,20)
     recentArea.innerHTML = `
-      <div style="font-size:0.78rem;color:var(--text3);margin-bottom:8px">Adicionadas recentemente</div>
+      <div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:8px">Adicionadas recentemente</div>
       <div class="dash-recent-chips">
         ${recent.map(w => `<span class="dash-recent-chip" onclick="showSection('revisar')" style="cursor:pointer" title="${esc(w.context||'')}">${esc(w.word||'(frase)')}</span>`).join('')}
         <span class="dash-recent-chip" style="color:var(--text3);cursor:pointer" onclick="showSection('adicionar')">+ adicionar</span>
@@ -429,7 +429,7 @@ function renderDashboardGrid() {
 
           ${barsHTML}
         </svg>
-        <div style="display: flex; gap: 14px; align-items: center; justify-content: center; font-size: 0.72rem; color: var(--text3); margin-top: 4px;">
+        <div style="display: flex; gap: 14px; align-items: center; justify-content: center; font-size: var(--fs-2xs); color: var(--text3); margin-top: 4px;">
           <div style="display: flex; align-items: center; gap: 4px;">
             <span style="width: 8px; height: 8px; border-radius: 2px; background: var(--success);"></span>
             <span>Acertos</span>
@@ -449,7 +449,7 @@ function renderDashboardGrid() {
         <div class="dash-trend-num"><div class="v">${trend.avg != null ? trend.avg + '%' : '—'}</div><div class="l">média do período</div></div>
         ${trend.hasData
           ? `<svg class="dash-trend-svg" viewBox="0 0 300 52" preserveAspectRatio="none"><polyline points="${trend.svgPoints}" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-          : `<p style="color:var(--text3);font-size:0.85rem">Estude alguns dias para ver a tendência aqui.</p>`}
+          : `<p style="color:var(--text3);font-size:var(--fs-md)">Estude alguns dias para ver a tendência aqui.</p>`}
       </div>
     </div>`
 
@@ -459,7 +459,7 @@ function renderDashboardGrid() {
       ${langs.length ? `<div class="dash-lang-rows">${langs.map(lg => `
         <div class="dash-lang-row"><div class="lr-top"><strong>${esc(lg.name)}</strong><span>${lg.total} card${lg.total!==1?'s':''}</span></div>
         <div class="dash-lr-bar"><span class="b-new" style="width:${lg.newPct}"></span><span class="b-learn" style="width:${lg.learnPct}"></span><span class="b-review" style="width:${lg.revPct}"></span></div></div>
-      `).join('')}</div>` : `<p style="color:var(--text3);font-size:0.85rem">Nenhum card em estudo ainda.</p>`}
+      `).join('')}</div>` : `<p style="color:var(--text3);font-size:var(--fs-md)">Nenhum card em estudo ainda.</p>`}
     </div>`
 
   const leechCard = leeches.length ? `
@@ -477,7 +477,7 @@ function renderDashboardGrid() {
     </div>` : `
     <div class="dash-card">
       <div class="dash-wod-badge">Palavra em destaque</div>
-      <p style="color:var(--text3);font-size:0.85rem;margin-top:6px">Salve palavras para estudo para ver uma em destaque aqui.</p>
+      <p style="color:var(--text3);font-size:var(--fs-md);margin-top:6px">Salve palavras para estudo para ver uma em destaque aqui.</p>
     </div>`
 
   const sourcesCard = `
@@ -487,7 +487,7 @@ function renderDashboardGrid() {
         <div class="dash-src-row"><div class="dash-src-icon">${srcIcon(s.type)}</div>
           <div class="dash-src-body"><div class="dash-src-top"><span class="name">${esc(s.name)}</span><span class="count">${s.count} palavra${s.count!==1?'s':''}</span></div>
           <div class="dash-src-bar"><span style="width:${s.pct}"></span></div></div></div>
-      `).join('')}</div>` : `<p style="color:var(--text3);font-size:0.85rem">Nenhuma palavra capturada ainda.</p>`}
+      `).join('')}</div>` : `<p style="color:var(--text3);font-size:var(--fs-md)">Nenhuma palavra capturada ainda.</p>`}
     </div>`
 
   area.innerHTML = `

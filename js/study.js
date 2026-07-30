@@ -24,26 +24,26 @@ function renderSrsSection() {
     startArea.innerHTML = `
     <div class="srs-empty">
       ${ic('book','ic-xl')}
-      <p style="font-size:1rem;font-weight:600;margin-bottom:8px">Nenhum card ainda</p>
-      <p style="font-size:0.88rem;margin-bottom:20px">Revise suas palavras e clique em <strong>"Salvar para estudo"</strong></p>
+      <p style="font-size:var(--fs-base);font-weight:600;margin-bottom:8px">Nenhum card ainda</p>
+      <p style="font-size:var(--fs-md);margin-bottom:20px">Revise suas palavras e clique em <strong>"Salvar para estudo"</strong></p>
       <button class="btn btn-primary" onclick="showSection('revisar')">${ic('arrowRight')}Ir para Revisar</button>
     </div>`
   } else if (total === 0) {
     startArea.innerHTML = `
     <div class="srs-empty">
       ${ic('checkCircle','ic-xl')}
-      <p style="font-size:1rem;font-weight:600;margin-bottom:8px">Fila zerada!</p>
-      <p style="font-size:0.88rem;color:var(--text2)">Volte amanhã — o algoritmo já agendou a próxima revisão.</p>
+      <p style="font-size:var(--fs-base);font-weight:600;margin-bottom:8px">Fila zerada!</p>
+      <p style="font-size:var(--fs-md);color:var(--text2)">Volte amanhã — o algoritmo já agendou a próxima revisão.</p>
     </div>`
   } else {
     startArea.innerHTML = `
     <div style="text-align:center;padding:24px 0">
-      <p style="color:var(--text2);margin-bottom:16px;font-size:0.95rem">
+      <p style="color:var(--text2);margin-bottom:16px;font-size:var(--fs-base)">
         ${due > 0 ? `<strong style="color:var(--success)">${due}</strong> para revisar` : ''}
         ${due > 0 && newRem > 0 ? ' · ' : ''}
         ${newRem > 0 ? `<strong style="color:var(--primary)">${newRem}</strong> novos` : ''}
       </p>
-      <button class="btn btn-primary" style="padding:12px 36px;font-size:1rem" onclick="startSrsSession()">
+      <button class="btn btn-primary" style="padding:12px 36px;font-size:var(--fs-base)" onclick="startSrsSession()">
         ${ic('play')}Começar sessão
       </button>
     </div>`
@@ -133,7 +133,7 @@ function renderDeckStatsTable() {
         </div>
         ${hasCards
           ? `<button class="btn btn-primary btn-sm" onclick="startSrsSession('${_focusDeckId}')">${ic('play')}Estudar agora (${queueSize} cards)</button>`
-          : `<p style="color:var(--text3);font-size:0.88rem;margin:0">Nenhum card para estudar agora neste baralho.</p>`
+          : `<p style="color:var(--text3);font-size:var(--fs-md);margin:0">Nenhum card para estudar agora neste baralho.</p>`
         }
       </div>`
     }
@@ -267,7 +267,7 @@ async function renderSrsCard() {
         ${buildMetaChips(card)}
         <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
           <div class="srs-card-front-hint">Clique para revelar · <span style="color:var(--text3);font-size:0.8em">selecione texto para adicionar à revisão</span></div>
-          <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:0.8rem"
+          <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:var(--fs-sm)"
             onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">
             ${ic('volume','ic-sm')} Repetir <span class="srb-key-inline" style="margin-left:4px">R</span>
           </button>
@@ -282,20 +282,20 @@ async function renderSrsCard() {
     ${ratingBtns}
   </div>
   <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:14px">
-    <div style="display:flex;align-items:center;gap:10px;font-size:0.82rem">
+    <div style="display:flex;align-items:center;gap:10px;font-size:var(--fs-sm)">
       <span style="display:flex;flex-direction:column;align-items:center;gap:1px">
-        <span id="srs-cnt-new" style="color:var(--primary);font-weight:700;font-size:1rem">0</span>
-        <span style="color:var(--text3);font-size:0.67rem;text-transform:uppercase;letter-spacing:.04em">novo</span>
+        <span id="srs-cnt-new" style="color:var(--primary);font-weight:700;font-size:var(--fs-base)">0</span>
+        <span style="color:var(--text3);font-size:var(--fs-3xs);text-transform:uppercase;letter-spacing:.04em">novo</span>
       </span>
       <span style="color:var(--text3)">+</span>
       <span style="display:flex;flex-direction:column;align-items:center;gap:1px">
-        <span id="srs-cnt-learn" style="color:var(--error);font-weight:700;font-size:1rem">0</span>
-        <span style="color:var(--text3);font-size:0.67rem;text-transform:uppercase;letter-spacing:.04em">aprender</span>
+        <span id="srs-cnt-learn" style="color:var(--error);font-weight:700;font-size:var(--fs-base)">0</span>
+        <span style="color:var(--text3);font-size:var(--fs-3xs);text-transform:uppercase;letter-spacing:.04em">aprender</span>
       </span>
       <span style="color:var(--text3)">+</span>
       <span style="display:flex;flex-direction:column;align-items:center;gap:1px">
-        <span id="srs-cnt-rev" style="color:var(--success);font-weight:700;font-size:1rem">0</span>
-        <span style="color:var(--text3);font-size:0.67rem;text-transform:uppercase;letter-spacing:.04em">revisar</span>
+        <span id="srs-cnt-rev" style="color:var(--success);font-weight:700;font-size:var(--fs-base)">0</span>
+        <span style="color:var(--text3);font-size:var(--fs-3xs);text-transform:uppercase;letter-spacing:.04em">revisar</span>
       </span>
     </div>
     <button class="btn btn-ghost btn-sm" onclick="flipSrsCard()">
@@ -597,7 +597,7 @@ async function renderHistoryOrCurrent() {
     ${ratingBtns}
   </div>
   <div style="text-align:center;margin-top:12px">
-    <span style="font-size:0.78rem;color:var(--text3)">avaliado como
+    <span style="font-size:var(--fs-sm);color:var(--text3)">avaliado como
       <strong style="color:${{1:'#F87171',2:'var(--warning)',3:'var(--success)',4:'var(--primary)'}[entry.rating]}">${{1:'Errei',2:'Difícil',3:'Bom',4:'Fácil'}[entry.rating]}</strong>
     </span>
   </div>`
@@ -731,7 +731,7 @@ function buildSrsVerso(card, imgData, imageBelow) {
     text += `<div class="srs-back-example">"${buildSrsFrente(card)}"</div>`
     text += `<div style="display:flex;align-items:center;gap:6px;margin:4px 0 10px">
       <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">${ic('volume','ic-sm')} Repetir frase</button>
-      <button class="btn btn-ghost btn-sm" title="Gerar nova frase que reflita melhor a definição" style="opacity:0.45;padding:4px 7px;font-size:0.8rem"
+      <button class="btn btn-ghost btn-sm" title="Gerar nova frase que reflita melhor a definição" style="opacity:0.45;padding:4px 7px;font-size:var(--fs-sm)"
         onclick="event.stopPropagation();regenerateCardExample('${card.id}',this)">↻</button>
     </div>`
   }
@@ -751,7 +751,7 @@ function buildSrsVerso(card, imgData, imageBelow) {
   text += `<div class="srs-back-meaning">${esc(strip(card.meaning_pt))}</div>`
   if (card.definition_pt) text += `<div class="srs-back-def">${esc(strip(card.definition_pt))}</div>`
   // 4b. Origem / história da expressão (só quando existe)
-  if (card.origin_pt) text += `<div class="srs-back-origin" style="margin-top:10px;padding:9px 12px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:0.85rem;line-height:1.45;color:var(--text2)"><span style="display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--text);font-size:0.78rem;margin-bottom:3px">${ic('sparkles','ic-sm')} Origem</span><div>${esc(strip(card.origin_pt))}</div></div>`
+  if (card.origin_pt) text += `<div class="srs-back-origin" style="margin-top:10px;padding:9px 12px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:var(--fs-md);line-height:1.45;color:var(--text2)"><span style="display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--text);font-size:var(--fs-sm);margin-bottom:3px">${ic('sparkles','ic-sm')} Origem</span><div>${esc(strip(card.origin_pt))}</div></div>`
   // Footer + configurações (sempre na coluna de texto)
   const SRC = {series:'série', movie:'filme', youtube:'YouTube', kindle:'Kindle', podcast:'podcast', website:'site', manual:'manual'}
   const deckLabel = card.deckId ? getSrsDeckPath(card.deckId) : ''
@@ -760,16 +760,16 @@ function buildSrsVerso(card, imgData, imageBelow) {
     <summary>configurações</summary>
     <div class="srs-card-settings-body" style="flex-direction:column;gap:10px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <label style="font-size:0.75rem;color:var(--text3);min-width:70px">Variedade</label>
-        <select style="font-size:0.78rem;padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"
+        <label style="font-size:var(--fs-xs);color:var(--text3);min-width:70px">Variedade</label>
+        <select style="font-size:var(--fs-sm);padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"
           onchange="event.stopPropagation();updateCardMeta('${card.id}','variety',this.value)">
           ${getLangDef(_cl).varieties.map(x => `<option value="${x.v}" ${((card.variety || 'general') === x.v) ? 'selected' : ''}>${x.v === 'general' ? 'Geral (todas as variedades)' : esc(x.label)}</option>`).join('')}
           <option value="other" ${card.variety==='other'?'selected':''}>Outra</option>
         </select>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <label style="font-size:0.75rem;color:var(--text3);min-width:70px">Registro</label>
-        <select style="font-size:0.78rem;padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"
+        <label style="font-size:var(--fs-xs);color:var(--text3);min-width:70px">Registro</label>
+        <select style="font-size:var(--fs-sm);padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"
           onchange="event.stopPropagation();updateCardMeta('${card.id}','register',this.value)">
           <option value="neutral" ${(!card.register||card.register==='neutral')?'selected':''}>Neutro / padrão</option>
           <option value="informal" ${card.register==='informal'?'selected':''}>Informal</option>
@@ -782,7 +782,7 @@ function buildSrsVerso(card, imgData, imageBelow) {
           <option value="vulgar" ${card.register==='vulgar'?'selected':''}>Vulgar</option>
         </select>
       </div>
-      <button class="btn btn-ghost btn-sm" style="font-size:0.8rem"
+      <button class="btn btn-ghost btn-sm" style="font-size:var(--fs-sm)"
         id="img-gen-btn-${card.id}"
         onclick="event.stopPropagation();generateCardImage('${card.id}',this)">
         ${ic('palette','ic-sm')} ${imgData ? 'Regenerar imagem' : 'Gerar imagem'}

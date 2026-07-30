@@ -484,7 +484,7 @@ function renderSrsAllCards() {
       <div style="display:flex;gap:8px;align-items:center">
         <input type="text" id="srs-browser-search" placeholder="Buscar palavra ou significado..."
           oninput="filterBrowser(this.value)"
-          style="padding:5px 10px;font-size:0.82rem;width:220px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);outline:none">
+          style="padding:5px 10px;font-size:var(--fs-sm);width:220px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);outline:none">
         <button class="btn btn-ghost btn-sm" onclick="addRootDeck()" data-tip="Criar um novo baralho na raiz">${ic('plus')}Deck</button>
       </div>
     </div>
@@ -495,7 +495,7 @@ function renderSrsAllCards() {
       <div class="srs-browser-main">
         <!-- Toolbar de seleção (aparece quando há selecionados) -->
         <div class="browser-toolbar hidden" id="browser-sel-toolbar">
-          <span id="browser-sel-count" style="font-size:0.82rem;font-weight:600;color:var(--primary)"></span>
+          <span id="browser-sel-count" style="font-size:var(--fs-sm);font-weight:600;color:var(--primary)"></span>
           <button class="btn btn-ghost btn-sm" onclick="browserSelectAll()">Selecionar tudo</button>
           <button class="btn btn-ghost btn-sm" onclick="browserDeselectAll()">Desmarcar tudo</button>
           <button class="btn btn-ghost btn-sm" style="color:var(--error)" onclick="browserDeleteSelected()" data-tip="Excluir os cards selecionados">${ic('trash')}Excluir</button>
@@ -512,7 +512,7 @@ function renderSrsAllCards() {
           <span style="width:52px"></span>
         </div>
         <div id="srs-browser-cards" class="srs-browser-cardlist">
-          <div style="padding:32px;text-align:center;color:var(--text3);font-size:0.88rem">Clique em um deck para ver os cards</div>
+          <div style="padding:32px;text-align:center;color:var(--text3);font-size:var(--fs-md)">Clique em um deck para ver os cards</div>
         </div>
       </div>
       <!-- Preview panel (3ª coluna) -->
@@ -1372,12 +1372,12 @@ function buildBrowserRow(c, now) {
   return `<div class="srs-browser-row${isSel?' selected':''}" data-id="${c.id}" onclick="showBrowserCardPreview('${c.id}')">
     <input type="checkbox" class="browser-cb" ${isSel?'checked':''} onchange="event.stopPropagation();browserToggleCard('${c.id}',this.checked)">
     <div style="flex:1;min-width:0">
-      <div style="font-weight:600;font-size:0.88rem">${esc(c.word)}</div>
-      <div style="font-size:0.78rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.meaning_pt||'')}</div>
+      <div style="font-weight:600;font-size:var(--fs-md)">${esc(c.word)}</div>
+      <div style="font-size:var(--fs-sm);color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.meaning_pt||'')}</div>
     </div>
-    <span style="font-size:0.72rem;color:${SC[c.state]};font-weight:600;white-space:nowrap;width:75px;text-align:center">${SL[c.state]}</span>
-    <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:60px;text-align:center">${dueTxt}</span>
-    <span style="font-size:0.72rem;color:var(--text3);white-space:nowrap;width:50px;text-align:center">ease ${c.ease.toFixed(1)}</span>
+    <span style="font-size:var(--fs-2xs);color:${SC[c.state]};font-weight:600;white-space:nowrap;width:75px;text-align:center">${SL[c.state]}</span>
+    <span style="font-size:var(--fs-2xs);color:var(--text3);white-space:nowrap;width:60px;text-align:center">${dueTxt}</span>
+    <span style="font-size:var(--fs-2xs);color:var(--text3);white-space:nowrap;width:50px;text-align:center">ease ${c.ease.toFixed(1)}</span>
     <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();moveSrsCardDeck('${c.id}')" title="Mover">${ic('folder','ic-sm')}</button>
     <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">${ic('x','ic-sm')}</button>
   </div>`
@@ -1387,7 +1387,7 @@ let _browserRenderedCount = 0
 
 async function renderBrowserCardList(deckId, query) {
   const panel = el('srs-browser-cards'); if (!panel) return
-  panel.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text3);font-size:0.85rem">Carregando...</div>`
+  panel.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text3);font-size:var(--fs-md)">Carregando...</div>`
   const allIds = [deckId, ...getAllDescendantIds(deckId)]
   // Query indexada por deckId — não filtra o array inteiro em memória
   let cards = await CardsDB.getByDecks(allIds)
@@ -1454,9 +1454,9 @@ async function filterBrowser(query) {
     const isSel = _browserSelected.has(c.id)
     return `<div class="srs-browser-row${isSel?' selected':''}" data-id="${c.id}">
       <input type="checkbox" class="browser-cb" ${isSel?'checked':''} onchange="browserToggleCard('${c.id}',this.checked)">
-      <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:0.88rem">${esc(c.word)}</div>
-      <div style="font-size:0.78rem;color:var(--text2)">${esc(c.meaning_pt||'')}</div></div>
-      <span style="font-size:0.72rem;color:${SC[c.state]};font-weight:600;margin-right:8px">${SL[c.state]}</span>
+      <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:var(--fs-md)">${esc(c.word)}</div>
+      <div style="font-size:var(--fs-sm);color:var(--text2)">${esc(c.meaning_pt||'')}</div></div>
+      <span style="font-size:var(--fs-2xs);color:${SC[c.state]};font-weight:600;margin-right:8px">${SL[c.state]}</span>
       <span style="margin-right:4px">${hasAudio?'<span class="audio-badge-ok">'+ic('volume','ic-sm')+'</span>':'<span class="audio-badge-no">'+ic('alert','ic-sm')+'</span>'}</span>
       <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">${ic('x','ic-sm')}</button>
     </div>`
@@ -1517,21 +1517,21 @@ async function showBrowserCardPreview(cardId) {
 
   panel.innerHTML = `
     <div>
-      <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">
+      <div style="font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">
         <span style="color:${SC[card.state]}">${SL[card.state]}</span>
         · ease ${card.ease.toFixed(1)}
       </div>
       ${buildMetaChips(card)}
       <div class="bpp-card-front">
         <div class="bpp-label">Frente</div>
-        <div style="font-size:1.1rem;font-weight:700;margin-bottom:6px">${esc(card.word)}</div>
-        ${frente ? `<div style="font-size:0.85rem;color:var(--text2)">${frente}</div>` : ''}
+        <div style="font-size:var(--fs-lg);font-weight:700;margin-bottom:6px">${esc(card.word)}</div>
+        ${frente ? `<div style="font-size:var(--fs-md);color:var(--text2)">${frente}</div>` : ''}
         <button class="btn btn-ghost btn-xs" style="margin-top:8px"
           onclick="playSrsTTS('${(card.example_en||card.word||'').replace(/'/g,"\'")}')">${ic('volume','ic-sm')}</button>
       </div>
       <div class="bpp-card-back" style="margin-top:10px">
         <div class="bpp-label">Verso</div>
-        <div class="srs-card-back-body" style="font-size:0.88rem">${verso}</div>
+        <div class="srs-card-back-body" style="font-size:var(--fs-md)">${verso}</div>
       </div>
     </div>`
 }
@@ -1684,7 +1684,7 @@ function renderPlaylistPlayerUI() {
 
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:24px">
         <span style="color:var(--primary);display:flex;align-items:center">${ic('volume')}</span>
-        <h3 style="font-size:1.15rem;font-weight:700;margin:0">Playlist de áudio</h3>
+        <h3 style="font-size:var(--fs-lg);font-weight:700;margin:0">Playlist de áudio</h3>
       </div>
 
       <div class="pl-stage">
