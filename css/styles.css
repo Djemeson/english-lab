@@ -53,7 +53,10 @@
   --ring: 0 0 0 3px rgba(var(--primary-rgb),0.25);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{font-size:var(--fs-base)}
+/* NAO trocar por token: rem e relativo a esta raiz, entao usar um token
+   da escala aqui encolheria a interface inteira (era o que acontecia:
+   0.95rem => raiz de 15.2px => tudo 5% menor). */
+html{font-size:16px}
 body{
   font-family:'Inter',system-ui,sans-serif;background:var(--bg);
   background-image:var(--bg-grad);background-attachment:fixed;background-repeat:no-repeat;
@@ -1970,7 +1973,13 @@ body.sb-collapsed #fb-user-photo{margin:0}
    ================================================================ */
 /* O chip de sequência era branco sobre o azul chapado. Com o hero claro,
    branco-sobre-claro some — virou item da quebra, junto de revisões/novos. */
-.dash-hero-split{display:flex;align-items:center;gap:26px;padding-left:26px;border-left:1px solid var(--border)}
+.dash-hero-split{
+  display:flex;align-items:center;gap:26px;
+  padding-left:26px;border-left:1px solid var(--border);
+  /* Ocupa a folga do cartao e espalha os itens: antes sobravam 615px
+     de vazio entre a quebra e o botao, num cartao de 1120px. */
+  flex:1;justify-content:space-evenly;
+}
 .dhs-item{display:flex;flex-direction:column;gap:1px;min-width:0}
 .dhs-item b{
   font-family:var(--font-display);font-size:var(--fs-xl);font-weight:600;line-height:1.1;color:var(--text);

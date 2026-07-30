@@ -4,7 +4,7 @@
 // Firebase e OpenAI ficam sempre na rede.
 // ================================================================
 
-const CACHE = 'englab-v13'
+const CACHE = 'englab-v14'
 
 // Assets que nunca mudam entre visitas (shell da app).
 // RELATIVOS de propósito: resolvidos contra o scope do SW, então funcionam tanto
