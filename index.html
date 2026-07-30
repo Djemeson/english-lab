@@ -25,10 +25,26 @@
 <body>
 
 <!-- =========== TELA DE LOGIN (primeira visita / após sair) =========== -->
-<!-- Fica oculta por padrão; js/firebase.js decide quando mostrar. Entrar é
-     OPCIONAL: o app funciona 100% local, então há sempre a saída "sem conta". -->
+<!-- Oculta por padrão; js/firebase.js decide quando mostrar. Entrar é OPCIONAL:
+     o app funciona 100% local, então há sempre a saída "sem conta".
+     O herói é um flashcard vivo — o próprio gesto que o app ensina: a palavra
+     aparece, você tenta lembrar, o significado se revela. Cicla pelos 4 idiomas
+     suportados com palavras que só existem naquela língua. -->
 <div id="login-screen" class="login-screen" hidden>
-  <div class="login-aurora" aria-hidden="true"></div>
+
+  <!-- Campo de palavras ao fundo: o vocabulário como textura -->
+  <div class="login-wordfield" aria-hidden="true">
+    <span style="--x:6%;  --y:14%; --s:2.6rem; --d:0s">Fernweh</span>
+    <span style="--x:74%; --y:9%;  --s:1.7rem; --d:-6s">madrugar</span>
+    <span style="--x:22%; --y:76%; --s:2.1rem; --d:-11s">dépaysement</span>
+    <span style="--x:83%; --y:64%; --s:2.9rem; --d:-3s">serendipity</span>
+    <span style="--x:47%; --y:5%;  --s:1.4rem; --d:-14s">Sehnsucht</span>
+    <span style="--x:11%; --y:44%; --s:1.5rem; --d:-8s">sobremesa</span>
+    <span style="--x:90%; --y:33%; --s:1.6rem; --d:-17s">flâner</span>
+    <span style="--x:62%; --y:88%; --s:1.9rem; --d:-9s">wanderlust</span>
+    <span style="--x:33%; --y:28%; --s:1.3rem; --d:-20s">estrenar</span>
+    <span style="--x:5%;  --y:90%; --s:1.5rem; --d:-13s">Kummerspeck</span>
+  </div>
 
   <main class="login-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
     <div class="login-brand">
@@ -38,26 +54,40 @@
       <span class="login-wordmark">Language <span>Lab</span></span>
     </div>
 
-    <h1 id="login-title" class="login-title">Seu vocabulário,<br>em todos os aparelhos.</h1>
-    <p class="login-sub">
-      Entre com o Google para levar palavras, cards, áudios e o progresso de estudo
-      do computador para o celular — e de volta — sem exportar nada.
-    </p>
+    <!-- Flashcard em ciclo. Decorativo: o conteúdo textual real está no h1. -->
+    <div class="login-stage" aria-hidden="true">
+      <div class="lg-card" style="--i:0">
+        <span class="lg-lang">Alemão</span>
+        <span class="lg-word">Fernweh</span>
+        <span class="lg-ipa">/ˈfɛʁnveː/</span>
+        <span class="lg-meaning">saudade de um lugar onde você nunca esteve</span>
+      </div>
+      <div class="lg-card" style="--i:1">
+        <span class="lg-lang">Francês</span>
+        <span class="lg-word">dépaysement</span>
+        <span class="lg-ipa">/de.pɛ.iz.mɑ̃/</span>
+        <span class="lg-meaning">o estranhamento bom de estar longe de casa</span>
+      </div>
+      <div class="lg-card" style="--i:2">
+        <span class="lg-lang">Espanhol</span>
+        <span class="lg-word">estrenar</span>
+        <span class="lg-ipa">/es.tɾeˈnaɾ/</span>
+        <span class="lg-meaning">usar ou fazer algo pela primeira vez</span>
+      </div>
+      <div class="lg-card" style="--i:3">
+        <span class="lg-lang">Inglês</span>
+        <span class="lg-word">serendipity</span>
+        <span class="lg-ipa">/ˌser.ənˈdɪp.ə.ti/</span>
+        <span class="lg-meaning">encontrar algo bom sem estar procurando</span>
+      </div>
+      <div class="lg-progress"><i></i></div>
+    </div>
 
-    <ul class="login-perks">
-      <li>
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 0 0 .5-9 6 6 0 0 0-11.6-1.5A4 4 0 0 0 7 19z"/></svg>
-        <div><strong>Sincronização em tempo real</strong><span>O que você estuda aqui aparece lá na hora.</span></div>
-      </li>
-      <li>
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <div><strong>Sua chave da OpenAI vai junto</strong><span>Configure uma vez; ela chega nos outros aparelhos.</span></div>
-      </li>
-      <li>
-        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <div><strong>Backup automático</strong><span>Trocou de celular? O estudo continua de onde parou.</span></div>
-      </li>
-    </ul>
+    <h1 id="login-title" class="login-title">Palavras que só existem<br>em outra língua.</h1>
+    <p class="login-sub">
+      Entre com o Google e leve as suas para todo lugar — as que você capturou,
+      os áudios, e o dia exato em que cada uma volta para revisão.
+    </p>
 
     <button class="login-google" onclick="firebaseSignIn()">
       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" width="18" height="18">
@@ -67,8 +97,7 @@
     <button class="login-skip" onclick="dismissLoginScreen()">Usar só neste aparelho</button>
 
     <p class="login-note">
-      Sem conta, tudo continua funcionando — mas os dados ficam apenas
-      neste navegador e não são copiados para lugar nenhum.
+      Sem conta tudo funciona igual — mas o estudo fica preso a este navegador.
     </p>
   </main>
 </div>

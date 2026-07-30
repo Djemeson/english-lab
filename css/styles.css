@@ -2663,65 +2663,121 @@ body.sb-collapsed #fb-user-photo{margin:0}
 
 /* ================================================================
    TELA DE LOGIN
-   Identidade do projeto: fundo do tema com um brilho suave do acento,
-   título em Newsreader (a serifada usada nos headers e nas flashcards),
-   corpo em Inter. Zero cor fixa — funciona nos 6 temas.
+   Conceito: a tela É o produto acontecendo. Um flashcard vivo cicla por
+   palavras que só existem em outra língua — aparece a palavra, há uma
+   pausa para tentar lembrar, o significado se revela. Ao fundo, o
+   vocabulário como textura. Tudo em variáveis de tema (funciona nos 6).
    ================================================================ */
 .login-screen{
   position:fixed;inset:0;z-index:4000;
   display:flex;align-items:center;justify-content:center;
   padding:24px;overflow-y:auto;
-  background:var(--bg);
-  animation:login-fade .45s ease both;
+  background:var(--bg);background-image:var(--bg-grad);
+  animation:login-fade .5s ease both;
 }
 .login-screen[hidden]{display:none}
 
-/* Brilho de acento atrás do cartão — o mesmo vocabulário visual do --bg-grad */
-.login-aurora{
-  position:absolute;inset:0;pointer-events:none;
-  background:
-    radial-gradient(720px 420px at 18% 8%,  rgba(var(--primary-rgb),.20), transparent 62%),
-    radial-gradient(640px 400px at 88% 96%, rgba(var(--primary-rgb),.13), transparent 60%);
+/* ---- Campo de palavras ao fundo ---- */
+.login-wordfield{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.login-wordfield span{
+  position:absolute;left:var(--x);top:var(--y);
+  font-family:var(--font-display);font-size:var(--s);
+  font-style:italic;font-weight:500;white-space:nowrap;
+  color:var(--text);opacity:.055;
+  animation:wf-drift 26s var(--d) ease-in-out infinite;
+}
+@keyframes wf-drift{
+  0%,100%{transform:translate3d(0,0,0)}
+  50%    {transform:translate3d(0,-22px,0)}
 }
 
 .login-card{
-  position:relative;width:100%;max-width:430px;
+  position:relative;width:100%;max-width:428px;
   background:var(--surface);
   border:1px solid var(--border);
   border-radius:calc(var(--radius) + 6px);
   box-shadow:var(--shadow);
-  padding:38px 34px 30px;
-  animation:login-rise .5s cubic-bezier(.22,1,.36,1) both;
+  padding:30px 32px 26px;
+  animation:login-rise .55s cubic-bezier(.22,1,.36,1) both;
 }
 
-.login-brand{display:flex;align-items:center;gap:10px;margin-bottom:26px}
+.login-brand{display:flex;align-items:center;gap:10px;margin-bottom:20px}
 .login-mark{
-  display:grid;place-items:center;width:38px;height:38px;flex-shrink:0;
-  border-radius:11px;background:var(--primary-grad);
-  box-shadow:0 6px 18px rgba(var(--primary-rgb),.32);
+  display:grid;place-items:center;width:34px;height:34px;flex-shrink:0;
+  border-radius:10px;background:var(--primary-grad);
+  box-shadow:0 6px 16px rgba(var(--primary-rgb),.30);
 }
-.login-mark svg{width:21px;height:21px;fill:none;stroke:#fff;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.login-wordmark{font-size:1.03rem;font-weight:700;letter-spacing:-.2px;color:var(--text)}
+.login-mark svg{width:19px;height:19px;fill:none;stroke:#fff;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.login-wordmark{font-size:.97rem;font-weight:700;letter-spacing:-.2px;color:var(--text)}
 .login-wordmark span{
   background:var(--primary-grad);-webkit-background-clip:text;background-clip:text;
   -webkit-text-fill-color:transparent;
 }
 
+/* ---- O flashcard em ciclo (o herói da tela) ---- */
+.login-stage{
+  position:relative;height:184px;margin-bottom:22px;
+  border-radius:var(--radius);
+  background:
+    linear-gradient(180deg, rgba(var(--primary-rgb),.07), rgba(var(--primary-rgb),.02));
+  border:1px solid var(--border);
+  overflow:hidden;
+}
+.lg-card{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:20px 22px;text-align:center;
+  opacity:0;
+  animation:lg-cycle 22s calc(var(--i) * 5.5s) infinite;
+}
+.lg-lang{
+  font-size:.62rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--primary);margin-bottom:11px;
+}
+.lg-word{
+  font-family:var(--font-display);
+  font-size:2.15rem;font-weight:600;line-height:1.08;letter-spacing:-.5px;
+  color:var(--text);
+}
+.lg-ipa{
+  font-family:var(--font-mono);font-size:.76rem;color:var(--text3);
+  margin-top:7px;letter-spacing:.01em;
+}
+/* O significado entra depois — a pausa entre os dois é o recall */
+.lg-meaning{
+  font-size:.85rem;line-height:1.45;color:var(--success);font-weight:600;
+  margin-top:13px;max-width:29ch;
+  opacity:0;
+  animation:lg-reveal 22s calc(var(--i) * 5.5s) infinite;
+}
+@keyframes lg-cycle{
+  0%     {opacity:0;transform:translateY(9px) scale(.985)}
+  2.2%   {opacity:1;transform:none}
+  22%    {opacity:1;transform:none}
+  25%    {opacity:0;transform:translateY(-9px) scale(.985)}
+  100%   {opacity:0;transform:translateY(9px) scale(.985)}
+}
+@keyframes lg-reveal{
+  0%,9%  {opacity:0;transform:translateY(6px)}
+  13%    {opacity:1;transform:none}
+  22%    {opacity:1;transform:none}
+  25%,100%{opacity:0;transform:translateY(-6px)}
+}
+/* Barra fina que marca o tempo de cada card */
+.lg-progress{position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--border)}
+.lg-progress i{
+  display:block;height:100%;width:25%;
+  background:var(--primary-grad);
+  animation:lg-bar 22s linear infinite;
+}
+@keyframes lg-bar{ from{transform:translateX(0)} to{transform:translateX(400%)} }
+
 .login-title{
   font-family:var(--font-display);
-  font-size:1.92rem;font-weight:600;line-height:1.18;letter-spacing:-.4px;
-  color:var(--text);margin-bottom:12px;
+  font-size:1.62rem;font-weight:600;line-height:1.2;letter-spacing:-.35px;
+  color:var(--text);margin-bottom:10px;
 }
-.login-sub{font-size:.9rem;line-height:1.62;color:var(--text2);margin-bottom:26px}
-
-.login-perks{list-style:none;display:flex;flex-direction:column;gap:15px;margin-bottom:28px}
-.login-perks li{display:flex;gap:12px;align-items:flex-start}
-.login-perks .ic{
-  width:17px;height:17px;flex-shrink:0;margin-top:2px;color:var(--primary);
-  fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;
-}
-.login-perks strong{display:block;font-size:.845rem;font-weight:600;color:var(--text);margin-bottom:1px}
-.login-perks span{display:block;font-size:.79rem;line-height:1.5;color:var(--text2)}
+.login-sub{font-size:.865rem;line-height:1.6;color:var(--text2);margin-bottom:22px}
 
 .login-google{
   width:100%;height:46px;
@@ -2732,23 +2788,23 @@ body.sb-collapsed #fb-user-photo{margin:0}
   cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.16);
   transition:transform .16s ease, box-shadow .16s ease, filter .16s ease;
 }
-/* O botão do Google tem cor de marca fixa por exigência da identidade dele —
-   é a única cor não-temática da tela, e por isso o hover mexe só no brilho. */
+/* Cor de marca do Google é fixa por exigência da identidade deles —
+   é a única cor não-temática da tela. */
 .login-google:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.22);filter:brightness(.985)}
 .login-google:active{transform:translateY(0)}
 .login-google img{display:block}
 
 .login-skip{
-  width:100%;margin-top:11px;padding:10px;
-  font-family:inherit;font-size:.845rem;font-weight:600;
+  width:100%;margin-top:10px;padding:9px;
+  font-family:inherit;font-size:.84rem;font-weight:600;
   color:var(--text2);background:none;border:none;border-radius:var(--radius-sm);
   cursor:pointer;transition:color .16s ease,background .16s ease;
 }
 .login-skip:hover{color:var(--text);background:var(--surface2)}
 
 .login-note{
-  margin-top:18px;padding-top:16px;border-top:1px solid var(--border);
-  font-size:.75rem;line-height:1.55;color:var(--text2);text-align:center;
+  margin-top:15px;padding-top:14px;border-top:1px solid var(--border);
+  font-size:.75rem;line-height:1.5;color:var(--text2);text-align:center;
 }
 
 @keyframes login-fade{from{opacity:0}to{opacity:1}}
@@ -2756,14 +2812,20 @@ body.sb-collapsed #fb-user-photo{margin:0}
 
 @media(max-width:480px){
   .login-screen{padding:16px;align-items:flex-start}
-  .login-card{padding:30px 22px 24px;border-radius:var(--radius)}
-  .login-title{font-size:1.6rem}
-  .login-perks{gap:13px;margin-bottom:24px}
+  .login-card{padding:26px 20px 22px;border-radius:var(--radius)}
+  .login-stage{height:166px}
+  .lg-word{font-size:1.85rem}
+  .login-title{font-size:1.42rem}
+  /* Menos palavras ao fundo em tela pequena: viram ruído atrás do cartão */
+  .login-wordfield span:nth-child(n+6){display:none}
 }
-/* Telas baixas (celular deitado): o cartão rola em vez de estourar */
-@media(max-height:640px){ .login-screen{align-items:flex-start} }
+@media(max-height:680px){ .login-screen{align-items:flex-start} }
 
+/* Sem movimento: mostra o primeiro card completo, com significado à vista */
 @media(prefers-reduced-motion:reduce){
-  .login-screen,.login-card{animation:none}
+  .login-screen,.login-card,.login-wordfield span,.lg-progress i{animation:none}
+  .lg-card{animation:none;opacity:0}
+  .lg-card[style*="--i:0"]{opacity:1}
+  .lg-meaning{animation:none;opacity:1;transform:none}
   .login-google{transition:none}
 }
