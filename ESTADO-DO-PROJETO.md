@@ -53,9 +53,17 @@ Djemeson estudar inglês por leitura progressiva. Captura vocabulário de vária
 analisa com IA (OpenAI), gera áudio (TTS) e estuda com **repetição espaçada (SRS) nativa**
 (algoritmo SM-2 estilo Anki). Sincroniza entre dispositivos via **Firebase/Firestore**.
 
-- **Hospedagem:** GitHub Pages → `https://djemeson.github.io/english-lab/`
-- **Deploy:** AUTOMÁTICO. A pasta é um reppositório git sincronizado; qualquer edição
-  salva já é enviada ao GitHub e publicada. **Não é preciso commitar manualmente.**
+- **Hospedagem (DOIS destinos, desde 2026-07-30):**
+  - GitHub Pages → `https://djemeson.github.io/english-lab/`
+  - Vercel → projeto do time `djemeson's projects`
+- **Deploy:** `git push origin main` publica nos **dois** (Actions do Pages + integração Git da
+  Vercel). Decisão do Djemeson: **toda alteração vai para os dois destinos**. Confirme o
+  Actions (`gh run list --branch main --limit 1`) antes de dar a tarefa por concluída.
+  ⚠️ Ao contrário do que este arquivo dizia antes, a pasta **não** faz deploy sozinha: é
+  preciso commitar e dar push de verdade.
+- **Firebase e domínios:** o login Google só funciona em domínios autorizados
+  (Console → Authentication → Settings → Authorized domains). URL nova = login quebrado até
+  adicionar. Precisam estar lá: `djemeson.github.io`, `localhost` e o domínio da Vercel.
 - **IA:** OpenAI (chave fica em `cfg.openaiKey`). Análise e TTS rodam direto no browser.
 - **n8n:** usado APENAS para extrair vocabulário de páginas web (única coisa que o
   browser não faz sozinho). URL em `cfg.n8nBase`.
@@ -724,13 +732,20 @@ maxInterval (36500), leechThreshold (50)
 
 ## 9. Pendências / a verificar
 
-- [ ] **DECIDIR o que fazer com a divergência `english-lab-2.0` × `origin/main`** (sessão
-      2026-07-30): o commit local `melhorias-2.0` tem ~1.400 linhas que **não estão no GitHub**
-      (camada mobile, player de playlist, redesenho das Configurações, atalhos de teclado,
-      gráfico semanal + estatísticas do heatmap) mais as correções desta sessão. Nada foi
-      enviado. Ao publicar: `git push -u origin melhorias-2.0`, abrir PR (ou mergear em `main`)
-      e **fazer backup — Exportar JSON — antes**, porque o SW muda de versão (`englab-v5`) e
-      exige hard-refresh.
+- [x] **Publicado no GitHub** em 2026-07-30 (`main` = `5e4a32f`, Actions verde, service worker
+      confirmado ao vivo em `/english-lab/` com o cache `englab-v5` e 14 arquivos).
+- [ ] **AÇÃO MANUAL — importar o repositório na Vercel** (uma vez só; o Djemeson tem conta,
+      time `djemeson's projects`, ainda sem nenhum projeto). Em vercel.com → *Add New… →
+      Project* → importar `Djemeson/english-lab`, aceitar tudo (o `vercel.json` já define
+      site estático sem build) → *Deploy*. A partir daí, **todo push no `main` publica nos dois
+      destinos sozinho**. Não usar o deploy por upload de arquivos: o app tem ~580KB de fonte
+      e criaria um projeto desconectado do git, exigindo re-upload a cada mudança.
+- [ ] **AÇÃO MANUAL — autorizar o domínio da Vercel no Firebase**, logo depois do import:
+      Console → Authentication → Settings → Authorized domains → adicionar o domínio exato de
+      produção (`*.vercel.app` não funciona como curinga). Sem isso o login Google na Vercel
+      falha com `auth/unauthorized-domain` e o app não sincroniza por lá.
+- [ ] **Hard-refresh + backup depois de abrir a versão nova** (Exportar JSON antes): o service
+      worker mudou de `englab-v4` para `englab-v5`.
 - [ ] **Testar o player "Ouvir playlist" com áudio real** (a validação desta sessão usou TTS
       falso para provar que pular durante a fala não pula card): abrir a Biblioteca, tocar nos
       3 modos (Completo / Desafio / Só o idioma), pular e voltar durante a fala, e conferir que
