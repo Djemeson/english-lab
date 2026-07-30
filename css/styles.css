@@ -1343,12 +1343,17 @@ select option{background:var(--surface)}
 .metric-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:var(--border-strong)}
 .metric-icon{
   width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;background:rgba(var(--primary-rgb),0.12);color:var(--primary);
+  flex-shrink:0;background:var(--surface2);color:var(--text2);
 }
 .metric-icon .ic{width:21px;height:21px}
-.metric-icon.green{background:rgba(16,185,129,.14);color:var(--success)}
-.metric-icon.amber{background:rgba(245,158,11,.16);color:var(--warning)}
-.metric-icon.purple{background:rgba(167,139,250,.16);color:var(--purple)}
+/* Antes: quatro cores diferentes (azul/roxo/verde/âmbar) em hex FIXO, sem
+   significado nenhum — "96%" era verde tanto a 96% quanto a 12%. Cor que não
+   codifica informação é ruído, e era o principal motivo do visual picotado.
+   Agora todos os ícones são neutros; a cor volta a ser exclusividade do
+   acento (hero) e dos estados reais (erro, alerta). */
+.metric-icon.green,.metric-icon.amber,.metric-icon.purple{
+  background:var(--surface2);color:var(--text2);
+}
 .metric-body{min-width:0}
 .metric-body .mc-val{font-size:1.5rem;font-weight:800;line-height:1.1}
 .metric-body .mc-lbl{font-size:0.73rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-top:2px}
@@ -1889,17 +1894,27 @@ body.sb-collapsed #fb-user-photo{margin:0}
 /* ---- Hero card do Dashboard: gradiente sólido (só no estado com
    revisões pendentes — o estado "nada para revisar" tem style inline
    próprio em dashboard.js e não deve virar azul) ---- */
+/* O hero era um retângulo azul chapado de ponta a ponta: 1120px de largura
+   com 663px de VAZIO entre o número e o botão, num sistema onde todo o resto
+   é cartão claro com borda. Ele não era hierarquia — era um bloco solto.
+   Agora é da mesma família dos outros cartões, com o acento no lugar certo
+   (o número e uma faixa lateral), e o botão junto do dado, não exilado. */
 .dash-action-card:not([style]){
-  background:var(--primary-grad);
-  border:none;
-  box-shadow:0 18px 40px rgba(var(--primary-rgb),0.35), var(--shadow-card);
+  background:
+    linear-gradient(135deg, rgba(var(--primary-rgb),.10), rgba(var(--primary-rgb),.03)),
+    var(--surface);
+  border:1px solid rgba(var(--primary-rgb),.22);
+  border-left:3px solid var(--primary);
+  box-shadow:var(--shadow-card);
+  justify-content:flex-start;
+  gap:28px;
 }
-.dash-action-card::after{opacity:.6}
-.dash-action-card:not([style]) .dash-action-left .dash-num,
-.dash-action-card:not([style]) .dash-action-left .dash-sub{color:#fff}
-.dash-action-card:not([style]) .dash-action-left .dash-sub{opacity:.85}
-.dash-action-card:not([style]) .btn-primary{background:#fff;color:var(--primary-d);box-shadow:0 4px 14px rgba(0,0,0,0.20)}
-.dash-action-card:not([style]) .btn-primary:hover:not(:disabled){box-shadow:0 6px 20px rgba(0,0,0,0.28)}
+.dash-action-card::after{opacity:.45}
+.dash-action-card:not([style]) .dash-action-left .dash-num{color:var(--primary)}
+.dash-action-card:not([style]) .dash-action-left .dash-sub{color:var(--text2)}
+/* Empurra o botão para a direita SEM abrir um vão de 663px no meio do nada:
+   o espaço agora fica entre grupos de informação, não dentro de um deles. */
+.dash-action-card:not([style]) .btn-primary{margin-left:auto}
 
 /* ---- Cards de métrica ---- */
 .metric-icon{border-radius:12px}
@@ -1935,9 +1950,22 @@ body.sb-collapsed #fb-user-photo{margin:0}
    fontes e conquistas (mockup "Dashboard.dc.html", implementado com
    dados reais de srsLog/srsCards/words).
    ================================================================ */
-.dash-hero-streak-row{margin-bottom:12px}
-.dash-hero-streak{display:inline-flex;align-items:center;gap:6px;font-size:0.76rem;font-weight:700;background:rgba(255,255,255,.18);border-radius:999px;padding:5px 12px;color:#fff}
-.dash-hero-streak .ic{width:13px;height:13px}
+/* O chip de sequência era branco sobre o azul chapado. Com o hero claro,
+   branco-sobre-claro some — virou item da quebra, junto de revisões/novos. */
+.dash-hero-split{display:flex;align-items:center;gap:26px;padding-left:26px;border-left:1px solid var(--border)}
+.dhs-item{display:flex;flex-direction:column;gap:1px;min-width:0}
+.dhs-item b{
+  font-family:var(--font-display);font-size:1.32rem;font-weight:600;line-height:1.1;color:var(--text);
+  display:inline-flex;align-items:center;gap:5px;
+}
+.dhs-item span{font-size:0.72rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text2)}
+.dhs-item.streak b{color:var(--warning)}
+.dhs-item.streak .ic{width:15px;height:15px}
+@media(max-width:900px){
+  .dash-hero-split{padding-left:0;border-left:none;gap:20px;width:100%;order:3;margin-top:4px}
+  .dash-action-card:not([style]) .btn-primary{margin-left:0;order:4;width:100%;justify-content:center}
+  .dash-action-card{flex-wrap:wrap;row-gap:16px}
+}
 
 .dash-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:18px;align-items:start;margin-top:20px}
 .dash-col{display:flex;flex-direction:column;gap:18px;min-width:0}
@@ -1950,7 +1978,11 @@ body.sb-collapsed #fb-user-photo{margin:0}
 /* Heatmap de atividade */
 .dash-hm-days-and-grid {
   display: flex;
-  align-items: flex-end;
+  /* Era flex-end: os rótulos Seg/Qua/Sex acabavam 12px ABAIXO das linhas
+     correspondentes, porque o lado direito carrega a faixa de meses e o
+     padding do wrap. Agora alinham pelo topo e descem exatamente a altura
+     da faixa de meses (18px + 5px) + o padding da grade (2px). */
+  align-items: flex-start;
   gap: 8px;
 }
 .dash-hm-days {
@@ -1964,7 +1996,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   padding-right: 2px;
   line-height: 11px;
   user-select: none;
-  margin-bottom: 2px;
+  margin-top: 25px;
 }
 .dash-hm-container {
   flex: 1;
@@ -1985,8 +2017,10 @@ body.sb-collapsed #fb-user-photo{margin:0}
   position: absolute;
   font-size: 0.68rem;
   font-weight: 600;
-  color: var(--text3);
-  transform: translateX(-50%);
+  color: var(--text2);
+  /* translateX(-50%) jogava metade do primeiro rótulo para fora do container
+     — era o "ul" no lugar de "Jul" na tela do Djemeson. Alinhado pela borda
+     esquerda da coluna, como o GitHub faz. */
 }
 .dash-hm-grid {
   display: grid;

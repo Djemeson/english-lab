@@ -26,12 +26,18 @@ function renderDashboard() {
   const mainArea = el('dash-main-action')
   if (mainArea) {
     if (paraHoje > 0) {
+      // O número precisa de rótulo: "183" sozinho não diz do que se trata.
+      // E a quebra revisões/novos vira dado legível, não uma linha cinza solta.
       mainArea.innerHTML = `
         <div class="dash-action-card">
-          ${streak > 0 ? `<div class="dash-hero-streak-row"><span class="dash-hero-streak">${ic('flame','ic-sm')}${streak} dia${streak!==1?'s':''} de sequência</span></div>` : ''}
           <div class="dash-action-left">
+            <div class="dash-eyebrow">Para estudar hoje</div>
             <div class="dash-num">${paraHoje}</div>
-            <div class="dash-sub">${dueToday} ${dueToday!==1?'revisões':'revisão'} · ${newToday} novo${newToday!==1?'s':''} disponív${newToday!==1?'eis':'el'} hoje</div>
+          </div>
+          <div class="dash-hero-split">
+            <div class="dhs-item"><b>${dueToday}</b><span>${dueToday !== 1 ? 'revisões' : 'revisão'}</span></div>
+            <div class="dhs-item"><b>${newToday}</b><span>novo${newToday !== 1 ? 's' : ''}</span></div>
+            ${streak > 0 ? `<div class="dhs-item streak"><b>${ic('flame','ic-sm')}${streak}</b><span>dia${streak!==1?'s':''} seguido${streak!==1?'s':''}</span></div>` : ''}
           </div>
           <button class="btn btn-primary" onclick="showSection('estudar')">Estudar agora ${ic('arrowRight')}</button>
         </div>`
