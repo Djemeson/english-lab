@@ -303,6 +303,32 @@ maxInterval (36500), leechThreshold (50)
       Dashboard quando há pouco histórico.
     - `CACHE` do `sw.js`: `englab-v11` → **`v16`** (5 deploys nesta rodada).
 
+### Sessão 2026-07-30 (5ª rodada) — Fecha o que a auditoria tinha deixado aberto
+47. **Sombras** — correção do que eu havia afirmado: das 47 "distintas", **32 são brilhos
+    coloridos semânticos** (verde no sucesso, azul no primário), variedade legítima, não
+    desleixo. Soltas mesmo eram **9 neutras**, agora todas em `--shadow-sm`/`--shadow-card`/
+    `--shadow`, mais um token novo **`--shadow-up`** para a barra inferior do mobile (sombra
+    ascendente não existia na paleta). Restam **0** sombras neutras literais.
+48. **Heatmap** — 97% das células ficam vazias e o `--surface3` dava peso visual próprio ao
+    "nada", transformando o cartão num retângulo cinza. O vazio virou textura (13% do
+    `--text3`) e os níveis de atividade ficaram mais separados, então os dias estudados saltam.
+49. **`!important`: 137 → 19.** Os 118 do bloco `@media (max-width: 768px)` (herança do AI
+    Studio) foram removidos com **verificação empírica**: capturei os estilos computados de 17
+    seletores-chave a 375px antes e depois. **16 computaram idênticos.**
+50. **O 17º revelou um bug real**: o `!important` não protegia nada — estava **atropelando a
+    indentação da árvore de baralhos** no celular (todos os subdecks apareciam alinhados com a
+    raiz). A indentação passou de `padding-left` inline para a variável `--indent`, que o CSS
+    **soma** ao padding, e a regra ganhou especificidade `(0,2,1)` para vencer
+    `.srs-deck-table td` do bloco responsivo. Verificado no mobile: raiz 14px, filhos 32px.
+    > Lição registrada: `!important` num bloco responsivo costuma esconder um conflito de
+    > propriedade, não resolver um. Vale checar o que ele está calando antes de mantê-lo.
+51. **Estado final medido** (1440px, 42 combinações tema × tela): **0 problemas**, 0 erros de
+    console, 13 tamanhos de fonte (10 da escala + 8px/9px de atributos SVG + 16px da raiz),
+    9 raios (5 tokens + 2–4px micro + 50% + pill), 10 formas de sombra.
+    `CACHE`: `v17` → **`v20`**.
+    - **Ainda aberto**: ~338 `style=` inline de LAYOUT (display/gap/align — os de tipografia e
+      raio já saíram), e o estado vazio do Dashboard quando há pouco histórico.
+
 
 
 ### Sessão 2026-07-30 (3ª rodada) — Fim do n8n, tela de login, filtro de idioma
