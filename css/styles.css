@@ -2227,14 +2227,14 @@ body.sb-collapsed #fb-user-photo{margin:0}
   }
   
   .sidebar {
-    display: none !important; /* Hide desktop sidebar completely */
+    display: none; /* Hide desktop sidebar completely */
   }
   
   .main {
-    padding: 16px 14px 92px !important; /* Extra spacing so bottom nav never overlaps contents */
-    max-height: none !important;
-    height: auto !important;
-    overflow-y: visible !important;
+    padding: 16px 14px 92px; /* Extra spacing so bottom nav never overlaps contents */
+    max-height: none;
+    height: auto;
+    overflow-y: visible;
   }
 
   /* Beautiful Glassmorphic Header - Theme Compliant */
@@ -2244,7 +2244,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
     justify-content: space-between;
     height: 58px;
     padding: 0 16px;
-    background: var(--sidebar-bg) !important;
+    background: var(--sidebar-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
@@ -2319,7 +2319,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
     left: 0;
     right: 0;
     height: 68px;
-    background: var(--sidebar-bg) !important;
+    background: var(--sidebar-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-top: 1px solid var(--border);
@@ -2345,7 +2345,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     padding: 6px 0;
     position: relative;
-    border-left: none !important;
+    border-left: none;
     outline: none;
     user-select: none;
   }
@@ -2360,9 +2360,9 @@ body.sb-collapsed #fb-user-photo{margin:0}
   }
   
   .mobile-bottom-nav .nav-item span:not(.badge) {
-    display: block !important;
-    font-size: var(--fs-3xs) !important;
-    font-weight: 600 !important;
+    display: block;
+    font-size: var(--fs-3xs);
+    font-weight: 600;
     letter-spacing: 0.2px;
     opacity: 0.8;
   }
@@ -2391,21 +2391,21 @@ body.sb-collapsed #fb-user-photo{margin:0}
     top: 5px;
     right: calc(50% - 19px);
     margin: 0;
-    display: inline-flex !important;
+    display: inline-flex;
     box-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
   }
 
   /* Page Header Mobile Refinements */
   .page-header {
     flex-direction: column;
-    align-items: flex-start !important;
+    align-items: flex-start;
     gap: 12px;
     margin-bottom: 24px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border);
   }
   .page-header h1 {
-    font-size: var(--fs-xl) !important;
+    font-size: var(--fs-xl);
   }
   .ph-actions {
     width: 100%;
@@ -2414,205 +2414,205 @@ body.sb-collapsed #fb-user-photo{margin:0}
 
   /* Form & Tab Layouts Stacked with elegant flow */
   .form-row {
-    grid-template-columns: 1fr !important;
-    gap: 14px !important;
+    grid-template-columns: 1fr;
+    gap: 14px;
   }
   
   /* Tabs fill width and look beautiful - Theme Compliant */
   .tabs {
-    width: 100% !important;
-    display: flex !important;
-    gap: 4px !important;
-    background: var(--surface2) !important;
-    padding: 4px !important;
-    border-radius: var(--radius-sm) !important;
-    border: 1px solid var(--border) !important;
+    width: 100%;
+    display: flex;
+    gap: 4px;
+    background: var(--surface2);
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
   }
   .tab {
-    flex: 1 !important;
-    justify-content: center !important;
-    padding: 10px 4px !important;
-    font-size: var(--fs-sm) !important;
-    border-radius: var(--radius-xs) !important;
-    display: flex !important;
+    flex: 1;
+    justify-content: center;
+    padding: 10px 4px;
+    font-size: var(--fs-sm);
+    border-radius: var(--radius-xs);
+    display: flex;
     align-items: center;
     gap: 6px;
-    border: none !important;
+    border: none;
   }
   .tab.active {
-    background: var(--surface3) !important;
-    box-shadow: var(--shadow-sm) !important;
+    background: var(--surface3);
+    box-shadow: var(--shadow-sm);
   }
 
   /* Metric Dashboard Layout for Mobile - Theme Compliant */
   .metric-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 12px !important;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
   }
   .metric-card {
-    padding: 14px 16px !important;
-    gap: 10px !important;
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius) !important;
+    padding: 14px 16px;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
   }
   .metric-icon {
-    width: 38px !important;
-    height: 38px !important;
-    border-radius: var(--radius-sm) !important;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-sm);
   }
   .metric-icon .ic {
-    width: 20px !important;
-    height: 20px !important;
+    width: 20px;
+    height: 20px;
   }
   .metric-body .mc-val {
-    font-size: var(--fs-xl) !important;
-    font-weight: 800 !important;
+    font-size: var(--fs-xl);
+    font-weight: 800;
   }
 
   /* Home Dashboard Card */
   .dash-action-card {
-    flex-direction: column !important;
-    align-items: center !important;
-    text-align: center !important;
-    gap: 18px !important;
-    padding: 24px 20px !important;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 18px;
+    padding: 24px 20px;
   }
   .dash-action-left {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
   .dash-action-left .dash-num {
-    font-size: var(--fs-3xl) !important;
+    font-size: var(--fs-3xl);
     letter-spacing: -1px;
-    font-weight: 800 !important;
+    font-weight: 800;
   }
   .dash-action-card .btn {
-    width: 100% !important;
-    justify-content: center !important;
-    padding: 12px 20px !important;
+    width: 100%;
+    justify-content: center;
+    padding: 12px 20px;
   }
 
   /* Premium Mobile Flashcards (SRS System) - Theme Compliant Layout & Flip Mechanics */
   #srs-flashcard-stage {
-    min-height: 240px !important;
-    padding: 10px 0 !important;
+    min-height: 240px;
+    padding: 10px 0;
   }
   .srs-card-face {
-    padding: 24px 18px !important;
-    min-height: 200px !important;
-    border-radius: var(--radius) !important;
+    padding: 24px 18px;
+    min-height: 200px;
+    border-radius: var(--radius);
     /* Do NOT set display: flex here to avoid breaking desktop flip mechanics! */
   }
   .srs-card-front-word {
-    font-size: var(--fs-2xl) !important;
-    font-weight: 800 !important;
+    font-size: var(--fs-2xl);
+    font-weight: 800;
     letter-spacing: -0.5px;
-    line-height: 1.25 !important;
+    line-height: 1.25;
   }
   .srs-card-front-sentence {
-    font-size: var(--fs-base) !important;
-    line-height: 1.6 !important;
-    margin-top: 14px !important;
+    font-size: var(--fs-base);
+    line-height: 1.6;
+    margin-top: 14px;
   }
   
   /* SRS Rate Buttons premium touch feedback */
   .srs-rate-buttons {
-    gap: 8px !important;
-    margin-top: 18px !important;
+    gap: 8px;
+    margin-top: 18px;
   }
   .srs-rate-btn {
-    padding: 12px 8px !important;
-    border-radius: var(--radius-sm) !important;
-    font-size: var(--fs-sm) !important;
-    font-weight: 700 !important;
+    padding: 12px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--fs-sm);
+    font-weight: 700;
     display: flex;
     flex-direction: column;
     gap: 3px;
-    border: 1px solid var(--border) !important;
+    border: 1px solid var(--border);
   }
   .srs-rate-btn .srb-time {
-    font-size: var(--fs-3xs) !important;
+    font-size: var(--fs-3xs);
     opacity: 0.8;
   }
 
   /* Beautiful asymmetric mobile chat bubble design */
   .consulta-messages {
-    padding: 16px 12px !important;
-    gap: 16px !important;
+    padding: 16px 12px;
+    gap: 16px;
   }
   .consulta-msg {
-    max-width: 85% !important;
-    font-size: var(--fs-base) !important;
-    line-height: 1.55 !important;
+    max-width: 85%;
+    font-size: var(--fs-base);
+    line-height: 1.55;
     box-shadow: var(--shadow-sm);
   }
   .consulta-msg.user {
-    border-radius: 18px 18px 2px 18px !important;
-    padding: 12px 16px !important;
+    border-radius: 18px 18px 2px 18px;
+    padding: 12px 16px;
   }
   .consulta-msg.ai {
-    border-radius: 18px 18px 18px 2px !important;
-    padding: 14px 18px !important;
-    border: 1px solid var(--border) !important;
+    border-radius: 18px 18px 18px 2px;
+    padding: 14px 18px;
+    border: 1px solid var(--border);
   }
 
   /* Chatbot layout & text input on mobile */
   .asst-layout {
-    grid-template-columns: 1fr !important;
-    height: calc(100vh - 146px) !important;
+    grid-template-columns: 1fr;
+    height: calc(100vh - 146px);
   }
   .consulta-input-row {
-    padding: 10px 12px !important;
-    background: var(--surface) !important;
-    border-top: 1px solid var(--border) !important;
+    padding: 10px 12px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
     display: flex;
     gap: 8px;
     align-items: center;
   }
   .consulta-input-row textarea {
-    border-radius: var(--radius-lg) !important;
-    padding: 10px 16px !important;
-    font-size: var(--fs-md) !important;
-    background: var(--surface2) !important;
-    border: 1px solid var(--border) !important;
-    max-height: 110px !important;
+    border-radius: var(--radius-lg);
+    padding: 10px 16px;
+    font-size: var(--fs-md);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    max-height: 110px;
   }
   .asst-send {
-    width: 40px !important;
-    height: 40px !important;
-    border-radius: 50% !important;
-    background: var(--primary-grad) !important;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary-grad);
   }
 
   /* Library & word details overlays */
   .srs-library-wrap {
-    margin: 0 -14px !important;
-    width: calc(100% + 28px) !important;
+    margin: 0 -14px;
+    width: calc(100% + 28px);
   }
   .srs-deck-table td, .srs-deck-table th {
-    padding: 12px 10px !important;
-    font-size: var(--fs-sm) !important;
+    padding: 12px 10px;
+    font-size: var(--fs-sm);
   }
 
   /* Modal boxes on mobile */
   .srs-modal-box {
-    width: 92% !important;
-    padding: 24px 20px !important;
-    border-radius: var(--radius-lg) !important;
+    width: 92%;
+    padding: 24px 20px;
+    border-radius: var(--radius-lg);
   }
   
   /* Audio banner adjustments */
   #audio-gen-banner {
-    position: fixed !important;
-    bottom: 78px !important;
-    left: 12px !important;
-    right: 12px !important;
-    z-index: 450 !important;
-    width: auto !important;
-    border-radius: var(--radius) !important;
-    box-shadow: var(--shadow-card) !important;
+    position: fixed;
+    bottom: 78px;
+    left: 12px;
+    right: 12px;
+    z-index: 450;
+    width: auto;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
   }
 }
 
