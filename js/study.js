@@ -252,7 +252,8 @@ async function renderSrsCard() {
     { cls: 'good',  label: 'Bom',     r: 3 },
     { cls: 'easy',  label: 'Fácil',   r: 4 }
   ].map(b => `
-    <button class="srs-rate-btn ${b.cls}" onclick="rateSrsCardAndNext('${card.id}',${b.r})">
+    <button class="srs-rate-btn ${b.cls}" onclick="rateSrsCardAndNext('${card.id}',${b.r})" style="position:relative;">
+      <span class="srb-key">${b.r}</span>
       <span class="srb-label">${b.label}</span>
       <span class="srb-interval">${previewInterval(card, b.r)}</span>
     </button>`).join('')
@@ -268,7 +269,7 @@ async function renderSrsCard() {
           <div class="srs-card-front-hint">Clique para revelar · <span style="color:var(--text3);font-size:0.8em">selecione texto para adicionar à revisão</span></div>
           <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:0.8rem"
             onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">
-            ${ic('volume','ic-sm')} Repetir
+            ${ic('volume','ic-sm')} Repetir <span class="srb-key-inline" style="margin-left:4px">R</span>
           </button>
         </div>
       </div>
@@ -298,7 +299,7 @@ async function renderSrsCard() {
       </span>
     </div>
     <button class="btn btn-ghost btn-sm" onclick="flipSrsCard()">
-      <span id="srs-flip-hint">👁 Revelar resposta</span>
+      <span id="srs-flip-hint">${ic('eye','ic-sm')} Revelar resposta <kbd class="srb-key-inline">Espaço</kbd></span>
     </button>
   </div>`
   updateSrsSessionCounter()
@@ -336,7 +337,7 @@ function renderMineChips() {
     sentEl.after(row)
   }
   row.innerHTML = _pendingMines.map((txt, i) =>
-    `<span class="srs-mine-selected">📌 ${esc(txt)}
+    `<span class="srs-mine-selected">${ic('target','ic-sm')} ${esc(txt)}
       <button onclick="event.stopPropagation();srsClearMine(${i})" title="Remover">×</button>
     </span>`
   ).join('')
@@ -358,25 +359,63 @@ function flipSrsCard() {
   if (!flip) return
   const isFlipped = flip.classList.toggle('flipped')
   if (rating) rating.classList.toggle('hidden', !isFlipped)
-  if (hint) hint.textContent = isFlipped ? '↩ Ver frente' : '👁 Revelar resposta'
+  if (hint) hint.innerHTML = (isFlipped ? ic('undo','ic-sm') + ' Ver frente' : ic('eye','ic-sm') + ' Revelar resposta') + ' <kbd class="srb-key-inline">Espaço</kbd>'
 }
 
-// Atalho de teclado: Espaço = revelar / Bom
+// Atalhos de teclado robustos para estudo
 document.addEventListener('keydown', e => {
-  if (e.code !== 'Space') return
   if (!srsSession) return
   // Evita acionar quando está digitando em inputs
   if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return
-  e.preventDefault()
+
   const flip = el('srs-flip')
   if (!flip) return
-  if (!flip.classList.contains('flipped')) {
-    // 1ª vez: revelar verso
-    flipSrsCard()
-  } else {
-    // 2ª vez: avaliar como "Bom"
+  const isFlipped = flip.classList.contains('flipped')
+
+  // Espaço ou Enter: Revelar ou classificar como Bom (3)
+  if (e.code === 'Space' || e.code === 'Enter') {
+    e.preventDefault()
+    if (!isFlipped) {
+      flipSrsCard()
+    } else {
+      const card = window._srsCurrentCard
+      if (card) rateSrsCardAndNext(card.id, 3)
+    }
+    return
+  }
+
+  // Teclas de número 1, 2, 3, 4
+  const numKeyMap = { 'Digit1': 1, 'Numpad1': 1, '1': 1,
+                      'Digit2': 2, 'Numpad2': 2, '2': 2,
+                      'Digit3': 3, 'Numpad3': 3, '3': 3,
+                      'Digit4': 4, 'Numpad4': 4, '4': 4 }
+  
+  const rating = numKeyMap[e.code] || numKeyMap[e.key]
+  if (rating) {
+    e.preventDefault()
+    if (!isFlipped) {
+      // Se não estiver virado, primeiro revela o card
+      flipSrsCard()
+    } else {
+      const card = window._srsCurrentCard
+      if (card) rateSrsCardAndNext(card.id, rating)
+    }
+    return
+  }
+
+  // Desfazer: Z ou Backspace ou Ctrl+Z
+  if (e.code === 'Backspace' || e.key === 'z' || e.key === 'Z') {
+    e.preventDefault()
+    undoLastCard()
+    return
+  }
+
+  // Repetir Áudio: R ou S (de Speak)
+  if (e.key === 'r' || e.key === 'R' || e.key === 's' || e.key === 'S') {
+    e.preventDefault()
     const card = window._srsCurrentCard
-    if (card) rateSrsCardAndNext(card.id, 3)
+    if (card) playSrsTTS(card.example_en || card.word || '')
+    return
   }
 })
 
@@ -589,7 +628,7 @@ async function undoLastCard() {
   if (flip) {
     flip.classList.add('flipped')
     const rating = el('srs-rating-area'); if (rating) rating.classList.remove('hidden')
-    const hint = el('srs-flip-hint'); if (hint) hint.textContent = '↩ Ver frente'
+    const hint = el('srs-flip-hint'); if (hint) hint.innerHTML = ic('undo','ic-sm') + ' Ver frente <kbd class="srb-key-inline">Espaço</kbd>'
   }
 }
 
@@ -612,7 +651,7 @@ function finishSrsSession() {
 
   el('srs-card-area').innerHTML = `
   <div class="srs-session-end">
-    <div class="srs-end-icon">${pct >= 80 ? '🏆' : pct >= 50 ? '✅' : '💪'}</div>
+    <div class="srs-end-icon">${ic(pct >= 80 ? 'target' : pct >= 50 ? 'checkCircle' : 'zap')}</div>
     <div class="srs-end-title">${pct >= 80 ? 'Excelente!' : pct >= 50 ? 'Bom trabalho!' : 'Continue praticando!'}</div>
     <div class="srs-end-sub">Sessão concluída</div>
     <div class="srs-end-stats">

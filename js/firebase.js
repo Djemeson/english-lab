@@ -9,10 +9,19 @@ function updateSyncNav(state) {
   const ind = el('sync-indicator')
   const dot = el('sync-dot')
   const lbl = el('sync-label')
+  const indMob = el('sync-indicator-mob')
+  const dotMob = el('sync-dot-mob')
   if (!ind) return
-  if (state === 'off') { ind.classList.add('hidden'); return }
+  if (state === 'off') {
+    ind.classList.add('hidden')
+    if (indMob) indMob.classList.add('hidden')
+    return
+  }
   ind.classList.remove('hidden')
-  dot.className = 'sync-dot' + (state === 'ok' ? ' ok' : state === 'err' ? ' err' : state === 'syncing' ? ' syncing' : '')
+  if (indMob) indMob.classList.remove('hidden')
+  const dotClass = 'sync-dot' + (state === 'ok' ? ' ok' : state === 'err' ? ' err' : state === 'syncing' ? ' syncing' : '')
+  dot.className = dotClass
+  if (dotMob) dotMob.className = dotClass
   lbl.textContent = state === 'ok' ? 'Nuvem' : state === 'err' ? 'Sync erro' : 'Sincronizando...'
 }
 
@@ -83,16 +92,24 @@ function initFirebase() {
 function updateFirebaseUI(user) {
   const loginBtn   = el('fb-login-btn')
   const userChip   = el('fb-user-chip')
+  const loginBtnMob = el('fb-login-btn-mob')
+  const userChipMob = el('fb-user-chip-mob')
   const loggedOut  = el('fb-settings-logged-out')
   const loggedIn   = el('fb-settings-logged-in')
 
   if (user) {
     if (loginBtn)  loginBtn.style.display  = 'none'
     if (userChip)  userChip.style.display  = 'flex'
+    if (loginBtnMob) loginBtnMob.style.display = 'none'
+    if (userChipMob) userChipMob.style.display = 'flex'
     const photo = el('fb-user-photo')
     const name  = el('fb-user-name')
     if (photo && user.photoURL) { photo.src = user.photoURL; photo.style.display = 'block' }
     if (name) name.textContent = user.displayName || user.email
+    
+    const photoMob = el('fb-user-photo-mob')
+    if (photoMob && user.photoURL) { photoMob.src = user.photoURL }
+
     if (loggedOut) loggedOut.style.display = 'none'
     if (loggedIn)  loggedIn.style.display  = 'block'
     const emailEl = el('fb-settings-email')
@@ -100,6 +117,8 @@ function updateFirebaseUI(user) {
   } else {
     if (loginBtn)  loginBtn.style.display  = 'block'
     if (userChip)  { userChip.style.display = 'none'; userChip.style.cssText += ';display:none' }
+    if (loginBtnMob) loginBtnMob.style.display = 'block'
+    if (userChipMob) userChipMob.style.display = 'none'
     if (loggedOut) loggedOut.style.display = 'block'
     if (loggedIn)  loggedIn.style.display  = 'none'
   }
@@ -494,8 +513,8 @@ async function fbForcePush() {
   if (msg) msg.textContent = 'Enviando dados...'
   const ok = await fbPush()
   if (dot) dot.className = 'sync-dot ' + (ok ? 'ok' : 'err')
-  if (msg) msg.textContent = ok ? '✅ Dados enviados com sucesso!' : '❌ Erro ao enviar.'
-  if (ok) toast('⬆ Dados enviados para o Firebase!', 'success')
+  if (msg) msg.textContent = ok ? 'Dados enviados com sucesso.' : 'Erro ao enviar.'
+  if (ok) toast('Dados enviados para o Firebase', 'success')
 }
 
 async function fbForcePull() {
@@ -515,8 +534,8 @@ async function fbForcePull() {
     ok = true
   } catch(e) { console.warn('[Firebase] forcePull erro:', e.message) }
   if (dot) dot.className = 'sync-dot ' + (ok ? 'ok' : 'err')
-  if (msg) msg.textContent = ok ? '✅ Dados baixados com sucesso!' : '❌ Erro ao baixar.'
-  if (ok) toast('⬇ Dados sincronizados com a nuvem!', 'success')
+  if (msg) msg.textContent = ok ? 'Dados baixados com sucesso.' : 'Erro ao baixar.'
+  if (ok) toast('Dados sincronizados com a nuvem', 'success')
 }
 
 // Apaga TODOS os dados do usuário no Firestore (data + audio + images).

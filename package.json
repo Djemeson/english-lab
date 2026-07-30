@@ -1,0 +1,14 @@
+{
+  "name": "english-lab",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Language Lab — estudo de idiomas com SRS (SM-2), análise por IA e áudio. Site estático, sem build.",
+  "homepage": "https://djemeson.github.io/english-lab/",
+  "scripts": {
+    "dev": "node server.js",
+    "check": "node --check js/core.js && node --check js/lang.js && node --check js/firebase.js && node --check js/audio.js && node --check js/srs.js && node --check js/dashboard.js && node --check js/review.js && node --check js/settings.js && node --check js/consulta.js && node --check js/init.js && node --check js/add.js && node --check js/study.js && node --check sw.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

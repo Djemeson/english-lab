@@ -136,7 +136,7 @@ function _updateAudioBanner(done, total, saved) {
   banner.classList.remove('hidden')
   const pct = Math.round((done / total) * 100)
   if (bar)   bar.style.width = pct + '%'
-  if (label) label.textContent = `${done} / ${total}${saved ? ` · ✓ ${saved} salvos` : ''}`
+  if (label) label.textContent = `${done} / ${total}${saved ? ` · ${saved} salvos` : ''}`
 }
 
 async function preGenerateAudio(cards) {
@@ -175,7 +175,7 @@ async function preGenerateAudio(cards) {
   toast(
     _audioGenAbort
       ? `Cancelado — ${generated} áudio${generated!==1?'s':''} salvos`
-      : `✅ ${generated}/${total} áudio${generated!==1?'s':''} gerados e salvos`,
+      : `${generated}/${total} áudio${generated!==1?'s':''} gerados e salvos`,
     generated > 0 ? 'success' : 'info'
   )
 }
@@ -425,7 +425,7 @@ async function generateCardImage(cardId, callerEl) {
 
     // Conta cards irmãos (mesmo significado)
     const siblings = srsCards.filter(c => c.wordId === card.wordId && c.meaningIdx === card.meaningIdx).length
-    toast(`🖼️ Imagem gerada${siblings > 1 ? ` · aplicada a ${siblings} cards` : ''}`, 'success')
+    toast(`Imagem gerada${siblings > 1 ? ` · aplicada a ${siblings} cards` : ''}`, 'success')
 
     // Atualiza visualizações ativas
     if (window._srsCurrentCard?.id === cardId) renderSrsCardBack()
@@ -436,7 +436,7 @@ async function generateCardImage(cardId, callerEl) {
   } catch(e) {
     toast('Erro ao gerar imagem: ' + e.message, 'error')
   } finally {
-    if (callerEl) { callerEl.disabled = false; callerEl.innerHTML = '🖼️ Gerar imagem' }
+    if (callerEl) { callerEl.disabled = false; callerEl.innerHTML = ic('image','ic-sm') + ' Gerar imagem' }
   }
 }
 
@@ -449,7 +449,7 @@ async function browserGenerateImagesSelected() {
   // Deduplica por chave de imagem (evita gerar a mesma imagem duas vezes)
   const seen = new Set()
   const toGenerate = cards.filter(c => { const k = imageKey(c); if (seen.has(k)) return false; seen.add(k); return true })
-  toast(`🖼️ Gerando imagens para ${toGenerate.length} significado(s)...`, 'info')
+  toast(`Gerando imagens para ${toGenerate.length} significado(s)...`, 'info')
   for (const card of toGenerate) await generateCardImage(card.id, null)
   await refreshImageKeyCache()
   if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value||'')
@@ -1296,7 +1296,7 @@ async function browserGenerateAudioSelected() {
   if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
   const ids = [..._browserSelected]
   const cards = srsCards.filter(c => ids.includes(c.id))
-  toast(`🎵 Gerando áudio para ${cards.length} card(s)...`, 'info')
+  toast(`Gerando áudio para ${cards.length} card(s)...`, 'info')
   let generated = 0
   const textsToGenerate = new Set()
   for (const card of cards) {
@@ -1312,7 +1312,7 @@ async function browserGenerateAudioSelected() {
   await refreshAudioKeyCache()
   if (generated > 0) {
     autoSyncAfterChange()
-    toast(`✅ Áudio gerado para ${generated} card(s)`, 'success')
+    toast(`Áudio gerado para ${generated} card(s)`, 'success')
     if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck)
   } else {
     toast('Todos os cards selecionados já têm áudio', 'info')
@@ -1513,4 +1513,399 @@ function deleteDeckUI(deckId) {
   if (!confirm(msg)) return
   deleteDeck(deckId); renderSrsAllCards(); renderSrsSection()
 }
+
+// ================================================================
+// CONTINUOUS AUDIO PLAYLIST PLAYER (Modo Listening Passivo)
+// ================================================================
+let _playlistCards = [];
+let _playlistIndex = 0;
+let _playlistPlaying = false;
+let _playlistTimer = null;
+let _playlistMode = 'completo'; // 'completo' | 'desafio' | 'ingles'
+let _playlistInterval = 3;      // segundos de intervalo de fixação
+let _playlistLoop = false;
+// Token de geração: toda ação do usuário (play/pause/próximo/anterior/fechar) incrementa.
+// A cadeia async de reprodução guarda o token do momento em que começou e desiste
+// assim que ele muda — sem isso, um `await` antigo terminava depois e chamava
+// playlistNext() de novo, pulando cards.
+let _playlistGen = 0;
+let _playlistRejectDelay = null;
+
+// Promisified version of TTS play to wait until audio ends
+async function playSrsTTSPromise(text) {
+  if (!text) return;
+  return new Promise(async (resolve) => {
+    // Para qualquer reprodução anterior
+    if (_srsAudio) { try { _srsAudio.pause() } catch(e){} ; _srsAudio = null }
+
+    const key = audioKey(text)
+    const cached = await AudioDB.get(key)
+    if (cached) {
+      _srsAudio = new Audio(cached)
+      _srsAudio.onended = () => resolve();
+      _srsAudio.onerror = () => resolve();
+      _srsAudio.play().catch(() => resolve());
+      return
+    }
+
+    if (cfg.openaiKey) {
+      const b64 = await ensureSrsAudio(text)
+      if (b64) {
+        _srsAudio = new Audio(b64)
+        _srsAudio.onended = () => resolve();
+        _srsAudio.onerror = () => resolve();
+        _srsAudio.play().catch(() => resolve());
+        autoSyncAfterChange()
+        return
+      }
+    }
+
+    // Fallback: Web Speech API
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = 0.85
+      u.onend = () => resolve();
+      u.onerror = () => resolve();
+      speechSynthesis.cancel(); speechSynthesis.speak(u)
+    } else {
+      resolve();
+    }
+  });
+}
+
+function playTranslationTTS(text, langCode = 'pt-BR') {
+  return new Promise((resolve) => {
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance(text); u.lang = langCode; u.rate = 0.9
+      u.onend = () => resolve();
+      u.onerror = () => resolve();
+      speechSynthesis.cancel(); speechSynthesis.speak(u)
+    } else {
+      resolve();
+    }
+  });
+}
+
+function openLibraryAudioPlayer() {
+  if (_libMode === 'cards' && _browserCurrentCards && _browserCurrentCards.length > 0) {
+    _playlistCards = [..._browserCurrentCards];
+  } else {
+    _playlistCards = [...srsCards];
+  }
+
+  if (!_playlistCards.length) {
+    toast('Nenhum card disponível para ouvir!', 'warning');
+    return;
+  }
+
+  _playlistIndex = 0;
+  _playlistPlaying = false;
+  _playlistGen++;
+
+  let overlay = el('playlist-player-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'playlist-player-overlay';
+    overlay.className = 'srs-modal-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Player de playlist de áudio');
+    // Clicar fora do cartão fecha (mesmo comportamento dos outros modais)
+    overlay.addEventListener('click', e => { if (e.target === overlay) closePlaylistPlayer() });
+    document.body.appendChild(overlay);
+  }
+
+  renderPlaylistPlayerUI();
+  overlay.style.display = 'flex';
+}
+
+function renderPlaylistPlayerUI() {
+  const overlay = el('playlist-player-overlay');
+  if (!overlay) return;
+
+  const card = _playlistCards[_playlistIndex];
+  if (!card) return;
+
+  const total = _playlistCards.length;
+  const currentNum = _playlistIndex + 1;
+
+  const playPauseIcon = _playlistPlaying ? ic('pause', 'ic-lg') : ic('play', 'ic-lg');
+  const lc = cardLang(card);
+  const langName = lc === 'en' ? '' : getLangDef(lc).name;
+
+  overlay.innerHTML = `
+    <div class="srs-modal-box playlist-player-card" style="width:480px;max-width:95vw;padding:28px;position:relative">
+      <button class="pl-close" onclick="closePlaylistPlayer()" aria-label="Fechar player"
+        style="position:absolute;top:18px;right:18px;background:none;border:none;color:var(--text3);cursor:pointer">
+        ${ic('x')}
+      </button>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:24px">
+        <span style="color:var(--primary);display:flex;align-items:center">${ic('volume')}</span>
+        <h3 style="font-size:1.15rem;font-weight:700;margin:0">Playlist de áudio</h3>
+      </div>
+
+      <div class="pl-stage">
+        <div class="pl-counter">Card ${currentNum} de ${total}${langName ? ' · ' + esc(langName) : ''}</div>
+
+        <div id="playlist-status-msg" class="pl-status is-paused" role="status" aria-live="polite">
+          ${ic('clock')} Pausado
+        </div>
+
+        <div class="pl-word">${esc(card.word)}</div>
+
+        <div class="pl-sentence">${card.example_en ? '“' + escB(card.example_en) + '”' : ''}</div>
+
+        <div id="playlist-translation" class="pl-translation"
+          style="display:${_playlistMode === 'desafio' && _playlistPlaying ? 'none' : 'block'}">
+          ${esc(card.meaning_pt)}
+        </div>
+      </div>
+
+      <div class="pl-controls">
+        <button class="btn btn-ghost pl-btn-round" onclick="playlistPrev()" aria-label="Card anterior" data-tip="Anterior">
+          ${ic('skip')}
+        </button>
+        <button class="btn btn-primary pl-btn-play" onclick="playlistTogglePlay()"
+          aria-label="${_playlistPlaying ? 'Pausar' : 'Reproduzir'}" data-tip="Reproduzir / pausar">
+          ${playPauseIcon}
+        </button>
+        <button class="btn btn-ghost pl-btn-round" onclick="playlistNext()" aria-label="Próximo card" data-tip="Próximo">
+          ${ic('skip')}
+        </button>
+      </div>
+
+      <div class="pl-options">
+        <div class="pl-options-grid">
+          <div>
+            <label class="pl-label" for="playlist-mode">Modo de estudo</label>
+            <select id="playlist-mode" onchange="setPlaylistMode(this.value)" style="width:100%">
+              <option value="completo" ${_playlistMode === 'completo' ? 'selected' : ''}>Completo (frase + tradução)</option>
+              <option value="desafio" ${_playlistMode === 'desafio' ? 'selected' : ''}>Desafio (recall ativo)</option>
+              <option value="ingles" ${_playlistMode === 'ingles' ? 'selected' : ''}>Só o idioma estudado</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="pl-label" for="playlist-interval">
+              Pausa de fixação: <span id="playlist-interval-val" style="color:var(--primary)">${_playlistInterval}s</span>
+            </label>
+            <input type="range" id="playlist-interval" min="1" max="10" step="1" value="${_playlistInterval}"
+              oninput="setPlaylistInterval(this.value)" style="width:100%;accent-color:var(--primary)">
+          </div>
+        </div>
+
+        <div class="pl-foot">
+          <span class="pl-hint">Atalhos: <kbd class="srb-key-inline">Espaço</kbd> reproduzir · <kbd class="srb-key-inline">←</kbd> <kbd class="srb-key-inline">→</kbd> navegar · <kbd class="srb-key-inline">Esc</kbd> fechar</span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="playlist-loop" onchange="playlistToggleLoop(this.checked)"
+              style="accent-color:var(--primary)" ${_playlistLoop ? 'checked' : ''}>
+            <span>Repetir playlist</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Seta do "anterior" é a mesma do "próximo", espelhada — evita um ícone novo só para isso.
+  const prevIcon = overlay.querySelector('.pl-controls .pl-btn-round .ic');
+  if (prevIcon) prevIcon.style.transform = 'scaleX(-1)';
+
+  if (_playlistPlaying) playlistSetStatus('play', 'Reproduzindo...');
+}
+
+// Status do player em um único ponto — sem emoji, com ícone e classe de cor.
+function playlistSetStatus(kind, text) {
+  const st = el('playlist-status-msg');
+  if (!st) return;
+  const map = {
+    play:   ['', 'volume'],
+    pause:  ['is-paused', 'clock'],
+    recall: ['is-recall', 'clock'],
+    reveal: ['is-reveal', 'volume'],
+    wait:   ['is-paused', 'clock'],
+  };
+  const [cls, icon] = map[kind] || map.wait;
+  st.className = 'pl-status' + (cls ? ' ' + cls : '');
+  st.innerHTML = `${ic(icon)} ${esc(text)}`;
+}
+
+function playlistToggleLoop(checked) {
+  _playlistLoop = checked;
+}
+
+function setPlaylistMode(val) {
+  _playlistMode = val;
+  const transEl = el('playlist-translation');
+  if (transEl) transEl.style.display = _playlistMode === 'desafio' && _playlistPlaying ? 'none' : 'block';
+}
+
+function setPlaylistInterval(val) {
+  _playlistInterval = parseInt(val);
+  const valEl = el('playlist-interval-val');
+  if (valEl) valEl.textContent = val + 's';
+}
+
+function playlistTogglePlay() {
+  _playlistPlaying = !_playlistPlaying;
+  renderPlaylistPlayerUI();
+  if (_playlistPlaying) {
+    playlistPlayCurrent();
+  } else {
+    playlistPause();
+  }
+}
+
+function playlistPause() {
+  _playlistPlaying = false;
+  _playlistGen++;                 // invalida qualquer cadeia de reprodução em curso
+  playlistCancelDelay();
+  if (_srsAudio) { try { _srsAudio.pause() } catch(e){} }
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  playlistSetStatus('pause', 'Pausado');
+}
+
+async function playlistPlayCurrent() {
+  if (!_playlistPlaying) return;
+  playlistCancelDelay();
+  if (window.speechSynthesis) speechSynthesis.cancel();
+
+  const card = _playlistCards[_playlistIndex];
+  if (!card) {
+    closePlaylistPlayer();
+    return;
+  }
+
+  // Cada cadeia carrega o token do momento em que começou. Se o usuário mexer
+  // (próximo/anterior/pausa/fechar), o token muda e esta cadeia desiste em silêncio.
+  const myGen = ++_playlistGen;
+  const alive = () => _playlistPlaying && _playlistGen === myGen;
+
+  renderPlaylistPlayerUI();
+
+  const transEl = el('playlist-translation');
+  const langNameOf = c => { const l = cardLang(c); return l === 'en' ? 'inglês' : getLangDef(l).name.toLowerCase() };
+
+  try {
+    // Passo 1: falar no idioma estudado
+    playlistSetStatus('play', `Ouvindo em ${langNameOf(card)}...`);
+    if (transEl) transEl.style.display = _playlistMode === 'desafio' ? 'none' : 'block';
+
+    await playSrsTTSPromise(card.example_en || card.word || '');
+    if (!alive()) return;
+
+    if (_playlistMode === 'desafio') {
+      // Pausa de recall ANTES de revelar
+      playlistSetStatus('recall', `Tente lembrar... (${_playlistInterval}s)`);
+      await playlistDelay(_playlistInterval * 1000);
+      if (!alive()) return;
+
+      const t = el('playlist-translation');
+      if (t) t.style.display = 'block';
+      playlistSetStatus('reveal', 'Revelando a tradução...');
+      await playTranslationTTS(card.meaning_pt);
+      if (!alive()) return;
+
+      await playlistDelay(1500);
+    } else if (_playlistMode === 'completo') {
+      playlistSetStatus('reveal', 'Ouvindo a tradução...');
+      await playTranslationTTS(card.meaning_pt);
+      if (!alive()) return;
+
+      playlistSetStatus('wait', `Intervalo (${_playlistInterval}s)...`);
+      await playlistDelay(_playlistInterval * 1000);
+    } else {
+      playlistSetStatus('wait', `Intervalo (${_playlistInterval}s)...`);
+      await playlistDelay(_playlistInterval * 1000);
+    }
+
+    if (!alive()) return;
+    playlistNext();
+
+  } catch (error) {
+    console.error('Erro na playlist:', error);
+    if (alive()) playlistNext(); // avança mesmo sob erro para não travar
+  }
+}
+
+// Delay cancelável: cancelar rejeita a Promise em vez de deixá-la pendente para sempre.
+function playlistDelay(ms) {
+  return new Promise((resolve, reject) => {
+    _playlistRejectDelay = reject;
+    _playlistTimer = setTimeout(() => { _playlistRejectDelay = null; resolve() }, ms);
+  }).catch(() => {}); // cancelamento não é erro
+}
+
+function playlistCancelDelay() {
+  if (_playlistTimer) { clearTimeout(_playlistTimer); _playlistTimer = null }
+  if (_playlistRejectDelay) { const r = _playlistRejectDelay; _playlistRejectDelay = null; r(new Error('cancelado')) }
+}
+
+function playlistNext() {
+  playlistCancelDelay();
+  _playlistGen++;
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (_srsAudio) { try { _srsAudio.pause() } catch(e){} }
+
+  _playlistIndex++;
+  if (_playlistIndex >= _playlistCards.length) {
+    if (_playlistLoop) {
+      _playlistIndex = 0;
+    } else {
+      _playlistIndex = _playlistCards.length - 1;
+      playlistPause();
+      toast('Playlist finalizada', 'success');
+      renderPlaylistPlayerUI();
+      return;
+    }
+  }
+
+  if (_playlistPlaying) {
+    playlistPlayCurrent();
+  } else {
+    renderPlaylistPlayerUI();
+  }
+}
+
+function playlistPrev() {
+  playlistCancelDelay();
+  _playlistGen++;
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (_srsAudio) { try { _srsAudio.pause() } catch(e){} }
+
+  _playlistIndex = Math.max(0, _playlistIndex - 1);
+
+  if (_playlistPlaying) {
+    playlistPlayCurrent();
+  } else {
+    renderPlaylistPlayerUI();
+  }
+}
+
+function closePlaylistPlayer() {
+  playlistPause();
+  const overlay = el('playlist-player-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+// Escuta de teclado para o player de áudio contínuo
+document.addEventListener('keydown', e => {
+  const overlay = el('playlist-player-overlay');
+  if (overlay && overlay.style.display === 'flex') {
+    // Não sequestrar as setas do slider nem o espaço do checkbox/select
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) && e.key !== 'Escape') return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      playlistTogglePlay();
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      playlistNext();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      playlistPrev();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closePlaylistPlayer();
+    }
+  }
+});
 

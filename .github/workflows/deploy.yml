@@ -50,6 +50,30 @@ jobs:
           fi
           echo "Todos os arquivos JS passaram na verificação de sintaxe."
 
+      - name: Checar marcadores de conflito de merge
+        run: |
+          if grep -rInE '^(<{7}|={7}|>{7})( |$)' \
+               --include='*.js' --include='*.css' --include='*.html' \
+               --include='*.md' --include='*.json' --include='*.yml' \
+               --exclude-dir=.git .; then
+            echo "Marcador de conflito de merge encontrado — resolva antes de publicar."
+            exit 1
+          fi
+          echo "Nenhum marcador de conflito."
+
+      - name: Checar JSON válido
+        run: |
+          errors=0
+          for f in manifest.webmanifest metadata.json package.json n8n/*.json; do
+            [ -f "$f" ] || continue
+            if node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))"; then
+              echo "OK $f"
+            else
+              echo "JSON inválido: $f"; errors=$((errors+1))
+            fi
+          done
+          [ $errors -eq 0 ] || exit 1
+
   deploy:
     name: Publicar no GitHub Pages
     needs: validate          # só publica se a validação passar

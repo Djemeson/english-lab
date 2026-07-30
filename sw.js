@@ -4,22 +4,26 @@
 // Firebase e OpenAI ficam sempre na rede.
 // ================================================================
 
-const CACHE = 'englab-v4'
+const CACHE = 'englab-v5'
 
-// Assets que nunca mudam entre visitas (shell da app)
+// Assets que nunca mudam entre visitas (shell da app).
+// RELATIVOS de propósito: resolvidos contra o scope do SW, então funcionam tanto
+// na raiz (dev local) quanto em subpasta (GitHub Pages → /english-lab/).
 const SHELL = [
-  '/',
-  '/index.html',
-  '/css/styles.css',
-  '/js/core.js',
-  '/js/lang.js',
-  '/js/firebase.js',
-  '/js/audio.js',
-  '/js/srs.js',
-  '/js/dashboard.js',
-  '/js/review.js',
-  '/js/settings.js',
-  '/js/init.js',
+  './',
+  './index.html',
+  './css/styles.css',
+  './js/core.js',
+  './js/lang.js',
+  './js/firebase.js',
+  './js/audio.js',
+  './js/srs.js',
+  './js/dashboard.js',
+  './js/review.js',
+  './js/settings.js',
+  './js/consulta.js',
+  './js/init.js',
+  './manifest.webmanifest',
 ]
 
 // URLs que sempre precisam da rede (nunca cachear)
@@ -33,9 +37,13 @@ const NETWORK_ONLY = [
 ]
 
 // ── Install: pré-cacheia o shell ────────────────────────────────
+// Cacheia um por um em vez de addAll(): com addAll, UM único 404 rejeita a Promise
+// inteira e o service worker nunca instala (era o que acontecia no GitHub Pages).
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE).then(c => Promise.all(
+      SHELL.map(url => c.add(url).catch(err => console.warn('[SW] não cacheou', url, err)))
+    )).then(() => self.skipWaiting())
   )
 })
 

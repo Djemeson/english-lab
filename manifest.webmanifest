@@ -1,0 +1,21 @@
+{
+  "name": "Language Lab",
+  "short_name": "Lang Lab",
+  "description": "Plataforma pessoal de estudo de idiomas por leitura progressiva, com repetição espaçada (SM-2), análise por IA e áudio.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0B1220",
+  "theme_color": "#0B1220",
+  "lang": "pt-BR",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -177,6 +177,9 @@ const ICONS = {
   target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
   flame:'<path d="M12 2s5 4 5 9a5 5 0 0 1-10 0c0-1.6 1-3 1-3s2 1.5 2 3c1.5 0 2-2 2-3 0-3-2-6-2-6z"/>',
   play:'<path d="M6 4l14 8-14 8z"/>',
+  pause:'<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+  image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>',
+  skip:'<path d="M5 4l10 8-10 8z"/><path d="M19 5v14"/>',
   playCircle:'<circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4z"/>',
   arrowRight:'<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
   zap:'<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/>',
@@ -246,6 +249,8 @@ function _activateSection(name) {
   document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'))
   const navEl = document.getElementById(`nav-${name}`)
   if (navEl) navEl.classList.add('active')
+  const navMobEl = document.getElementById(`nav-${name}-mob`)
+  if (navMobEl) navMobEl.classList.add('active')
   document.getElementById(`section-${name}`).classList.add('active')
   if (name === 'dashboard') renderDashboard()
   if (name === 'assistente') { if (typeof renderAssistente === 'function') renderAssistente() }

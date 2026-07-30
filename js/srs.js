@@ -413,7 +413,7 @@ function saveToSrs(wordId) {
     renderSidebar()
     renderDashboard()
     updateSrsBadge()
-    toast(`📚 ${added} card${added !== 1 ? 's' : ''} salvos no site SRS${skipped ? ` (${skipped} já existiam)` : ''}`, 'success')
+    toast(`${added} card${added !== 1 ? 's' : ''} salvos no site SRS${skipped ? ` (${skipped} já existiam)` : ''}`, 'success')
     // Pré-gera áudio; ao final, sync automático de novos áudios para Firebase
     const newCards = srsCards.slice(-added)
     preGenerateAudio(newCards).then(() => autoSyncAudioAfterChange())
@@ -441,6 +441,11 @@ function updateSrsBadge() {
   if (badge) {
     badge.textContent = due
     badge.classList.toggle('hidden', due === 0)
+  }
+  const badgeMob = el('badge-srs-mob')
+  if (badgeMob) {
+    badgeMob.textContent = due
+    badgeMob.classList.toggle('hidden', due === 0)
   }
 }
 

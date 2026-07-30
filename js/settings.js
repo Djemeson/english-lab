@@ -20,7 +20,9 @@ const AI_MODELS = {
   ]
 }
 function updateModelOptions(keepCurrent = false) {
-  const provider = el('cfg-ai-provider').value
+  const providerEl = el('cfg-ai-provider')
+  if (!providerEl) return
+  const provider = providerEl.value
   const models = AI_MODELS[provider] || []
   const current = keepCurrent ? el('cfg-ai-model').value : null
   el('cfg-ai-model').innerHTML = models.map(m =>
@@ -30,10 +32,17 @@ function updateModelOptions(keepCurrent = false) {
 }
 
 function fillSettings() {
-  el('cfg-ai-provider').value = cfg.aiProvider || 'openai'
-  updateModelOptions(false)
-  el('cfg-ai-model').value = cfg.aiModel || AI_MODELS[cfg.aiProvider || 'openai'][0]?.value || ''
-  el('cfg-tts-provider').value = cfg.ttsProvider || 'openai'
+  const providerEl = el('cfg-ai-provider')
+  if (providerEl) {
+    providerEl.value = cfg.aiProvider || 'openai'
+    updateModelOptions(false)
+    const modelEl = el('cfg-ai-model')
+    if (modelEl) modelEl.value = cfg.aiModel || AI_MODELS[cfg.aiProvider || 'openai'][0]?.value || ''
+  }
+  const ttsEl = el('cfg-tts-provider')
+  if (ttsEl) {
+    ttsEl.value = cfg.ttsProvider || 'openai'
+  }
   el('cfg-openai-key').value = cfg.openaiKey || ''
   el('cfg-n8n').value = cfg.n8nBase || ''
   renderThemePicker()
@@ -42,9 +51,20 @@ function fillSettings() {
 }
 
 function saveSettings() {
-  cfg.aiProvider = el('cfg-ai-provider').value
-  cfg.aiModel = el('cfg-ai-model').value
-  cfg.ttsProvider = el('cfg-tts-provider').value
+  const providerEl = el('cfg-ai-provider')
+  if (providerEl) {
+    cfg.aiProvider = providerEl.value
+    cfg.aiModel = el('cfg-ai-model')?.value || 'gpt-4o-mini'
+  } else {
+    cfg.aiProvider = 'openai'
+    cfg.aiModel = 'gpt-4o-mini'
+  }
+  const ttsEl = el('cfg-tts-provider')
+  if (ttsEl) {
+    cfg.ttsProvider = ttsEl.value
+  } else {
+    cfg.ttsProvider = 'openai'
+  }
   cfg.openaiKey = el('cfg-openai-key').value.trim()
   cfg.n8nBase = el('cfg-n8n').value.trim()
   saveCfg()
@@ -136,9 +156,9 @@ async function checkMissingAudio() {
   const missing = texts.filter(t => !_audioKeyCache?.has(audioKey(t)))
   if (statusEl) {
     if (missing.length === 0) {
-      statusEl.innerHTML = `<span style="color:var(--success)">✅ Todos os ${texts.length} cards têm áudio.</span>`
+      statusEl.innerHTML = `<span style="color:var(--success)">${ic('checkCircle','ic-sm')} Todos os ${texts.length} cards têm áudio.</span>`
     } else {
-      statusEl.innerHTML = `<span style="color:var(--warning)">⚠️ ${missing.length} de ${texts.length} cards sem áudio.</span>`
+      statusEl.innerHTML = `<span style="color:var(--warning)">${ic('alert','ic-sm')} ${missing.length} de ${texts.length} cards sem áudio.</span>`
     }
   }
   if (btn) btn.style.display = missing.length > 0 ? 'inline-flex' : 'none'
@@ -160,7 +180,7 @@ async function generateMissingAudio() {
 async function clearAllData() {
   const loggedIn = !!(typeof _fbUser !== 'undefined' && _fbUser)
   const cloudWarn = loggedIn ? '\n• TUDO na nuvem (Firebase) também será apagado' : ''
-  if (!confirm('⚠️ Apagar TODOS os dados?\n\nIsso inclui:\n• Palavras e revisões\n• Cards SRS e progresso\n• Áudios gerados\n• Imagens geradas\n• Configurações' + cloudWarn + '\n\nFaça um backup antes.')) return
+  if (!confirm('Apagar TODOS os dados?\n\nIsso inclui:\n• Palavras e revisões\n• Cards SRS e progresso\n• Áudios gerados\n• Imagens geradas\n• Configurações' + cloudWarn + '\n\nFaça um backup antes.')) return
   if (!confirm('Confirma? Esta ação é IRREVERSÍVEL.')) return
 
   // 1) localStorage
@@ -197,5 +217,15 @@ async function clearAllData() {
   updateSrsBadge()
   toast('Tudo zerado — local e nuvem, em todos os dispositivos.', 'success')
   setTimeout(() => showSection('dashboard'), 900)
+}
+
+function togglePasswordVisibility(id) {
+  const input = el(id)
+  if (!input) return
+  if (input.type === 'password') {
+    input.type = 'text'
+  } else {
+    input.type = 'password'
+  }
 }
 

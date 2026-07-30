@@ -3,20 +3,18 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-<<<<<<< HEAD
-> Última atualização: 2026-07-14 — **Dashboard implementado a partir do mockup Claude Design**
-> ("Dashboard.dc.html", projeto "Redesign da aba"): 7 seções novas com DADOS REAIS (nenhuma
-> mockada) — atividade (heatmap 12 meses), tendência de acerto (14 dias), progresso por
+> Última atualização: 2026-07-30 — **Sessão de infraestrutura + correções + melhorias na cópia
+> `english-lab-2.0`**: repositório git configurado apontando para `Djemeson/english-lab`,
+> service worker consertado para GitHub Pages, PWA instalável, variáveis CSS que não existiam,
+> corrida de cards no player de playlist, viewport que bloqueava zoom, emojis residuais e
+> documentação obsoleta. Ver seção 8 (sessão 2026-07-30).
+>
+> Última atualização anterior: 2026-07-14 — **Dashboard implementado a partir do mockup Claude
+> Design** ("Dashboard.dc.html", projeto "Redesign da aba"): 7 seções novas com DADOS REAIS
+> (nenhuma mockada) — atividade (heatmap 12 meses), tendência de acerto (14 dias), progresso por
 > baralho/idioma, "travando na memória" (leeches), palavra em destaque do dia, fontes do
-> vocabulário e conquistas (6 marcos calculados). Ver seção 8 (sessão 2026-07-14).
-=======
-> Última atualização: 2026-07-14 — **Correção de bug de pluralização no Dashboard**: em
-> `js/dashboard.js`, `renderDashboard()`, a linha do hero (`dash-action-card`) concatenava
-> o sufixo `'ões'` diretamente ao singular `'revisão'`, gerando "revisãoões" sempre que
-> `dueToday !== 1`. Corrigido para escolher entre duas strings completas ("revisão" /
-> "revisões"). Bug pré-existente (não introduzido nesta sessão), encontrado ao validar a
-> implementação do Dashboard. Ver seção 8.
->>>>>>> claude/youthful-thompson-8f87f3
+> vocabulário e conquistas (6 marcos calculados). Na mesma data, **correção do bug de
+> pluralização** no hero do Dashboard ("0 revisãoões"). Ver seção 8 (sessão 2026-07-14).
 >
 > Última atualização anterior: 2026-07-13 (2ª rodada) — **Precisão do negrito do objeto de estudo**
 > revisada em todos os 7 pontos que geram frases (review.js, audio.js × 2, study.js,
@@ -247,7 +245,82 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
-<<<<<<< HEAD
+### Sessão 2026-07-30 — Cópia `english-lab-2.0`: git, correções e melhorias transversais
+43. **Contexto**: o Djemeson trouxe a pasta `english-lab-2.0` — uma cópia do repositório que
+    passou pelo **Google AI Studio** e voltou com trabalho novo (uma camada mobile completa e um
+    player de playlist de áudio), mas **sem `.git`** e com o boilerplate do AI Studio por cima.
+    Pedido: configurar o controle remoto, achar e corrigir erros, aplicar ajustes e melhorias.
+    - **Git configurado**: `git init` + `origin` → `https://github.com/Djemeson/english-lab.git`,
+      branch `main` adotando `origin/main` **sem tocar na árvore de trabalho** (`git branch main
+      origin/main` + `symbolic-ref` + `reset`, nunca `checkout` — que teria sobrescrito o
+      trabalho local). O diff local × remoto era de ~1.400 linhas: mobile header + bottom nav,
+      redesenho da tela de Configurações, atalhos de teclado do SRS, estatísticas e gráfico
+      semanal no Dashboard, e o player de playlist. **Nada foi enviado ao GitHub** — commit
+      local numa branch, push fica a critério do Djemeson.
+    - **`.gitignore` criado** (não existia): `node_modules/`, `dist/`, `.env*`, backups JSON
+      exportados pelo app, lixo de SO/editor.
+    - **Service worker consertado (erro que quebrava o GitHub Pages)**: `js/init.js` registrava
+      `/sw.js` com escopo `/` — inexistente em `djemeson.github.io/english-lab/`; e o `SHELL` do
+      `sw.js` usava caminhos de raiz (`/index.html`, `/css/...`), o que fazia o `addAll()`
+      rejeitar inteiro num 404 e o SW **nunca instalar** em produção. Agora tudo é **relativo**
+      (`new URL('sw.js', document.baseURI)`, escopo `./`, `'./index.html'`…), funciona na raiz
+      e em subpasta; o install cacheia **um por um** (um 404 não derruba mais o resto);
+      `js/consulta.js` (não-lazy, faltava) entrou no shell; `CACHE` foi para `englab-v5`.
+    - **PWA**: novos `manifest.webmanifest` e `icon.svg`; `<link rel=manifest>`, `theme-color`,
+      `apple-touch-icon` e `color-scheme` no `<head>`. O app já tinha service worker mas não era
+      instalável.
+    - **Viewport duplicado + zoom bloqueado**: o `<head>` tinha **duas** tags `viewport`, a
+      primeira com `maximum-scale=1.0` (impede pinch-zoom — falha de acessibilidade). Sobrou uma,
+      sem `maximum-scale`, com `viewport-fit=cover`. Removido também um `<script type="module">`
+      vazio.
+    - **Variáveis CSS que não existiam** (confirmado ao vivo por `getComputedStyle`): o código do
+      AI Studio usava `--surface-hover`, `--font-mono` e `--font-display`, nenhuma definida — o
+      painel do player ficava **sem fundo** e as fontes caíam no padrão. `--font-display` e
+      `--font-mono` agora são tokens de `:root` (compartilhados pelos 6 temas) e o
+      `--surface-hover` virou `--surface2`. `.hm-stat-num` deixou de repetir a família de fonte
+      na mão.
+    - **`.srb-key` / `.srb-key-inline` sem CSS**: as dicas de atalho (`1`–`4`, `Espaço`) eram
+      texto solto. Agora são chips estilo `<kbd>`, e somem em telas de toque (`hover: none`).
+    - **Player de playlist (`js/audio.js`) — 5 correções**: (1) **corrida de cards** — pular/voltar
+      durante a fala deixava a cadeia `async` antiga terminar depois e chamar `playlistNext()` de
+      novo, **pulando um card**; resolvido com token de geração (`_playlistGen`) que invalida
+      cadeias órfãs (validado com TTS falso: pular durante a fala avança exatamente 1);
+      (2) `playlistDelay` agora é **cancelável** (antes o `clearTimeout` deixava a Promise pendente
+      para sempre); (3) a frase era injetada **sem escape** — passou a usar `escB()` como o resto
+      do app; (4) bloco de **IPA morto** (o snapshot de `srsCards` não tem `ipa`) removido;
+      (5) fecha ao clicar fora, `role="dialog"`/`aria-label`, e as setas/espaço deixaram de
+      sequestrar o slider e o checkbox.
+    - **Dashboard**: rótulos do heatmap passaram a cobrir o **nº real de colunas** (era fixo em 53,
+      e as células de padding do começo deixavam a última coluna sem rótulo); a largura da linha
+      de meses agora vem do JS e bate exatamente com a grade (753px = 753px). A legenda do gráfico
+      semanal dizia "Erros / Lapso" para a barra que representa o **total revisado** — corrigido
+      para "Acertos" / "Total revisado".
+    - **Emojis removidos da interface** (pendência antiga, seção 9): varredura em `index.html` e
+      em 8 arquivos JS trocando emoji por `ic()` ou removendo quando era redundante (o `toast()`
+      já desenha o próprio ícone). Confirmado ao vivo: **0 emojis em nós de texto do DOM** nas
+      7 telas. **Exceção deliberada**: o mapa de chips de variedade/registro em `js/study.js`
+      (linhas ~694-721) — são 8 símbolos que formam um vocabulário visual próprio; trocar exige
+      desenhar 8 ícones e uma passada de design, não um find/replace.
+    - **CSS morto removido**: `.tab span{display:none}` no mobile não casava com nada (os rótulos
+      das tabs são nós de texto, não `<span>`) e viraria uma armadilha se alguém envolvesse.
+    - **Documentação**: `README.md`, `metadata.json` e `.env.example` eram **boilerplate do Google
+      AI Studio** (falavam de Gemini, `GEMINI_API_KEY`, `.env.local` — nada disso existe aqui).
+      Reescritos. `setup.md` descrevia um app extinto (`plataforma-ingles.html`, AnkiConnect,
+      Google Sheets) e `instrucoes-projeto.md` afirmava que o projeto é "um `index.html` único de
+      ~220KB com toda a lógica num `<script>`" (falso desde a divisão em `js/*.js`) — ambos
+      reescritos. `package.json` ganhou um script `check` (`node --check` em todos os JS) no lugar
+      de um `build` morto que nem rodava no Windows.
+    - **Marcadores de conflito de merge** (`<<<<<<< HEAD` … `>>>>>>> claude/youthful-thompson-8f87f3`)
+      estavam **commitados** no `ESTADO-DO-PROJETO.md`, em dois pontos — inclusive no `main` do
+      GitHub. Resolvidos (as duas versões eram complementares, ambas ficaram) e o
+      **CI ganhou um guarda** que falha o build se algum marcador voltar, além de uma checagem
+      de JSON válido (`.github/workflows/deploy.yml`).
+    - **Validado ao vivo** (servidor local + Claude Browser): 0 erros de console nas 7 telas,
+      0 IDs duplicados, 0 handlers `onclick` apontando para função inexistente, SW instalando com
+      os 14 arquivos do shell, `manifest` carregado, layout mobile (375px) sem estouro horizontal,
+      e `node --check` limpo em todos os JS. ⚠️ A ferramenta de **screenshot continua indisponível**
+      (timeout) — a validação visual foi por `getComputedStyle`/DOM, como nas sessões anteriores.
+
 ### Sessão 2026-07-14 — Dashboard implementado a partir do mockup Claude Design
 42. **Contexto**: o Djemeson trouxe o mockup "Dashboard.dc.html" do projeto Claude Design
     "Redesign da aba" (mesmo projeto do reskin "Papel" de 2026-07-13; projectId
@@ -301,9 +374,8 @@ maxInterval (36500), leechThreshold (50)
     - **Não tocado**: `Adicionar - Mídia.dc.html`, `Canvas.dc.html`, `Estudar.dc.html` e
       `Gamificação.dc.html` do mesmo projeto Claude Design — ficam para sessões futuras se o
       Djemeson pedir.
-=======
-### Sessão 2026-07-14 — Correção de bug de pluralização no Dashboard
-42. **Motivo**: bug encontrado ao validar a implementação do Dashboard.dc.html (pré-existente,
+### Sessão 2026-07-14 (mesma data) — Correção de bug de pluralização no Dashboard
+42b. **Motivo**: bug encontrado ao validar a implementação do Dashboard.dc.html (pré-existente,
     não introduzido na sessão). Em [js/dashboard.js](js/dashboard.js:31), `renderDashboard()`,
     a linha do hero (`dash-action-card`) montava a pluralização de "revisão" concatenando um
     sufixo (`'revisão' + (dueToday!==1?'ões':'')`), o que produzia "revisãoões" para qualquer
@@ -311,7 +383,6 @@ maxInterval (36500), leechThreshold (50)
     **Correção**: trocado para escolher entre duas strings completas —
     `` `${dueToday} ${dueToday!==1?'revisões':'revisão'}` ``. Mudança isolada, sem impacto em
     sync/SRS/dados.
->>>>>>> claude/youthful-thompson-8f87f3
 
 ### Sessão 2026-07-13 (2ª rodada) — Precisão do negrito do objeto de estudo (EN + PT)
 41. **Motivo**: o Djemeson reportou que o negrito do objeto de estudo (a palavra/expressão
@@ -653,6 +724,25 @@ maxInterval (36500), leechThreshold (50)
 
 ## 9. Pendências / a verificar
 
+- [ ] **DECIDIR o que fazer com a divergência `english-lab-2.0` × `origin/main`** (sessão
+      2026-07-30): o commit local `melhorias-2.0` tem ~1.400 linhas que **não estão no GitHub**
+      (camada mobile, player de playlist, redesenho das Configurações, atalhos de teclado,
+      gráfico semanal + estatísticas do heatmap) mais as correções desta sessão. Nada foi
+      enviado. Ao publicar: `git push -u origin melhorias-2.0`, abrir PR (ou mergear em `main`)
+      e **fazer backup — Exportar JSON — antes**, porque o SW muda de versão (`englab-v5`) e
+      exige hard-refresh.
+- [ ] **Testar o player "Ouvir playlist" com áudio real** (a validação desta sessão usou TTS
+      falso para provar que pular durante a fala não pula card): abrir a Biblioteca, tocar nos
+      3 modos (Completo / Desafio / Só o idioma), pular e voltar durante a fala, e conferir que
+      a tradução em PT sai no modo Desafio só depois da pausa de recall.
+- [ ] **Conferir o app instalado como PWA** (manifest + `icon.svg` novos): "Adicionar à tela de
+      início" no celular, ver o ícone e se abre em `standalone` sem a barra do navegador.
+- [ ] **Confirmar o service worker no GitHub Pages** depois do deploy (era o erro que o impedia
+      de instalar em `/english-lab/`): DevTools → Application → Service Workers deve mostrar
+      escopo `https://djemeson.github.io/english-lab/` e o cache `englab-v5` com 14 entradas.
+- [ ] (Opcional) **Chips de variedade/registro em `js/study.js`** (~linhas 694-721) — únicos
+      emojis que sobraram na interface, deixados de propósito por formarem um vocabulário visual
+      de 8 símbolos. Trocar exige desenhar 8 ícones em `ICONS` e uma passada de design.
 - [ ] **Conferir visualmente o novo Dashboard ao vivo** (após deploy + hard-refresh; a
       validação desta sessão foi só por `getComputedStyle`/dados sintéticos, sem screenshot):
       com dados reais de uso, olhar o heatmap (cores fazem sentido com o histórico real de
@@ -660,10 +750,8 @@ maxInterval (36500), leechThreshold (50)
       houver leech de verdade), a palavra em destaque (troca a cada dia?) e o card de
       conquistas nos 6 temas — inclusive em mobile (grade 2 colunas deve virar 1 coluna,
       badges 6→3→2 por linha).
-- [ ] **Corrigir bug de pluralização "0 revisãoões"** no hero do Dashboard quando não há
-      revisões pendentes (`js/dashboard.js` → `renderDashboard`) — sinalizado como tarefa
-      separada (`task_36f52dbd`), achado ao validar a sessão de 2026-07-14, não é regressão
-      dela.
+- [x] **Bug de pluralização "0 revisãoões"** no hero do Dashboard — corrigido em 2026-07-14
+      (confirmado no código em 2026-07-30: `js/dashboard.js` usa duas strings completas).
 - [ ] (Opcional) Avaliar implementar os outros mockups do mesmo projeto Claude Design
       ("Redesign da aba"): `Adicionar - Mídia.dc.html`, `Canvas.dc.html`, `Estudar.dc.html`
       e `Gamificação.dc.html` (este último provavelmente cobre um sistema de conquistas mais
@@ -710,8 +798,9 @@ maxInterval (36500), leechThreshold (50)
       confirmar propagação e exclusão). Fazer backup (Exportar JSON) antes.
 - [ ] Depois de a versão de sync estar no ar, rodar **"Limpar tudo"** uma vez para zerar a
       nuvem (que ainda guarda dados antigos), se o objetivo for recomeçar.
-- [ ] Emojis residuais de baixa visibilidade (ex.: tela de fim de sessão 🏆/✅/💪, alguns
-      toasts) — opcional trocar por ícones.
+- [x] Emojis residuais trocados por ícones `ic()` em 2026-07-30 (tela de fim de sessão, toasts,
+      botões de Kindle/Mídia/Website, banner de áudio, avisos). Sobra só o mapa de chips de
+      variedade/registro em `study.js` — ver item opcional acima.
 - [ ] (Opcional) varredura final para mover qualquer símbolo restante de arquivos lazy
       usado fora deles.
 - [ ] **Testar ao vivo a importação de documento** (subir o `survivor-vocabulario-ingles.md`):
@@ -744,3 +833,16 @@ maxInterval (36500), leechThreshold (50)
 - **Toda cor via variável CSS**; acentos via `rgba(var(--primary-rgb), …)`.
 - **Sem emojis na UI** — usar `ic()`.
 - **Mudanças de dados/sync são de alto risco** — sugerir backup (Exportar JSON) antes de testar.
+- **Caminhos do service worker são RELATIVOS de propósito** (`js/init.js` e o `SHELL` do
+  `sw.js`). O app roda na raiz em desenvolvimento e em `/english-lab/` no GitHub Pages;
+  caminho absoluto quebra um dos dois. **Ao mudar qualquer arquivo do shell, bumpe a constante
+  `CACHE` em `sw.js`** e lembre-se de incluir arquivos novos no `SHELL`.
+- **Antes de usar `var(--alguma-coisa)`, confirme que a variável existe** em `css/styles.css`.
+  Variável inexistente não dá erro: some silenciosamente (foi assim que o painel do player
+  ficou sem fundo). Vale o mesmo para classes CSS referenciadas pelo JS.
+- **Nunca use `git checkout` para "adotar" uma pasta como cópia de trabalho** — sobrescreve os
+  arquivos locais. O caminho seguro é `git branch <b> origin/<b>` + `git symbolic-ref HEAD` +
+  `git reset` (mixed), que só mexe no índice.
+- **O CI falha se houver marcador de conflito de merge** (`<<<<<<<`/`=======`/`>>>>>>>`) em
+  qualquer `.js`/`.css`/`.html`/`.md`/`.json`/`.yml` — guarda adicionado em 2026-07-30 depois de
+  encontrar marcadores commitados no `main`.

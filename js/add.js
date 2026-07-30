@@ -99,9 +99,9 @@ function handleKindleFile(input) {
     // Mostra loading enquanto processa em lote
     el('kindle-drop').classList.add('hidden')
     el('kindle-result').classList.remove('hidden')
-    el('kindle-count').textContent = `⏳ Traduzindo ${kindleItems.length} destaques...`
+    el('kindle-count').textContent = `Traduzindo ${kindleItems.length} destaques...`
     el('kindle-list').innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)">
-      <div style="font-size:1.5rem;margin-bottom:12px">🔄</div>
+      <div style="margin-bottom:12px;color:var(--primary)">${ic('refresh','ic-xl')}</div>
       <div>Processando todos os destaques com IA...</div>
       <div style="font-size:0.82rem;margin-top:8px;color:var(--text3)">Isso pode levar alguns segundos</div>
     </div>`
@@ -261,13 +261,13 @@ function renderKindleList(skipped, total) {
     const chipContent = iwords.length
       ? `<div id="ke-wrap-${i}" style="display:flex;gap:5px;flex-wrap:wrap">${iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeKindleWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:1rem;line-height:1">×</span></span>`).join('')}</div>`
       : (cfg.openaiKey
-          ? `<div id="ke-wrap-${i}"><span style="font-size:0.75rem;color:var(--text3);font-style:italic">⏳ analisando...</span></div>`
+          ? `<div id="ke-wrap-${i}"><span style="font-size:0.75rem;color:var(--text3);font-style:italic">analisando...</span></div>`
           : `<div id="ke-wrap-${i}"><span style="font-size:0.75rem;color:var(--text3);font-style:italic">selecione com o mouse</span></div>`)
     const sentenceHTML = hasContext ? esc(item.context) : esc(item.word || '')
     const vocabRefHTML = item.vocab_ref?.length
       ? `<div style="font-size:0.78rem;color:var(--text2);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px">`
         + item.vocab_ref.map(v => v.expr
-          ? `<span>📌 ${v.expr}${v.type ? ` <span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
+          ? `<span>${ic('target','ic-sm')} ${v.expr}${v.type ? ` <span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
           : '').filter(Boolean).join(' ')
         + '</div>'
       : ''
@@ -281,7 +281,7 @@ function renderKindleList(skipped, total) {
         <div class="kindle-expr-row" style="flex-wrap:wrap;gap:5px;margin-top:6px">
           ${chipContent}
         </div>
-        <div class="parsed-meta">📖 ${esc(item.source_title)}${item.chapter ? ' · ' + esc(item.chapter) : ''}</div>
+        <div class="parsed-meta">${ic('book','ic-sm')} ${esc(item.source_title)}${item.chapter ? ' · ' + esc(item.chapter) : ''}</div>
       </div>
     </div>`
   }).join('')
@@ -547,7 +547,7 @@ async function detectKindleWord(i) {
   const item = kindleItems[i]
   if (!item.context) { toast('Sem contexto para analisar', 'warning'); return }
   const btn = el(`kb-${i}`)
-  if (btn) { btn.disabled = true; btn.textContent = '⏳' }
+  if (btn) { btn.disabled = true; btn.textContent = '...' }
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -578,7 +578,7 @@ async function detectKindleWord(i) {
   } catch(e) {
     toast(`Erro na detecção: ${e.message}`, 'error')
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🤖' }
+    if (btn) { btn.disabled = false; btn.innerHTML = ic('sparkles','ic-sm') }
   }
 }
 
@@ -712,7 +712,7 @@ Return ONLY valid JSON:
   } catch(e) {
     toast(`Erro na análise: ${e.message}`, 'error')
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '⚡ Analisar com IA' }
+    if (btn) { btn.disabled = false; btn.innerHTML = ic('zap','ic-sm') + ' Analisar com IA' }
   }
 }
 
@@ -732,7 +732,7 @@ function renderMidiaProcessed() {
     const vocabRefHTML = item.vocab_ref?.length
       ? `<div style="font-size:0.78rem;color:var(--text2);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px">`
         + item.vocab_ref.map(v => v.expr
-          ? `<span>📌 ${v.expr}${v.type ? ` <span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
+          ? `<span>${ic('target','ic-sm')} ${v.expr}${v.type ? ` <span style="font-size:0.65rem;background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
           : '').filter(Boolean).join(' ')
         + '</div>'
       : ''
@@ -1256,7 +1256,7 @@ async function extractSite() {
     if (!siteItems.length) { toast('Nenhuma palavra encontrada nesta página', 'warning'); return }
     renderSiteList()
   } catch(e) { toast(`Erro: ${e.message}`, 'error') }
-  finally { btn.disabled = false; btn.textContent = '🌐 Extrair vocabulário' }
+  finally { btn.disabled = false; btn.innerHTML = ic('globe') + ' Extrair vocabulário' }
 }
 
 function renderSiteList() {

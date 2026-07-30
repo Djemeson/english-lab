@@ -1,143 +1,76 @@
-# English Lab — Guia de Configuração
+# Language Lab — Guia de Configuração
+
+> Atualizado em 2026-07-30. A versão anterior deste arquivo descrevia um app que não existe
+> mais (arquivo `plataforma-ingles.html`, envio de cards para o Anki via AnkiConnect e planilha
+> do Google Sheets). Tudo isso foi removido do projeto — o SRS hoje é **nativo** e os dados
+> ficam no navegador + Firebase.
 
 ## Passo 1 — Abrir a plataforma
 
-Abra o arquivo `plataforma-ingles.html` no seu navegador (Chrome recomendado). A plataforma funciona localmente, sem servidor.
+- **No ar:** https://djemeson.github.io/english-lab/
+- **Local:** o login do Google não funciona em `file://`. Suba um servidor:
 
----
-
-## Passo 2 — Configurar o n8n (Hostinger)
-
-### 2.1 Importar os workflows
-
-No seu n8n (Hostinger), importe os 3 arquivos da pasta `n8n/`:
-
-1. `processar-palavra.json` — processamento com IA + áudio
-2. `extrair-website.json` — extração de vocabulário de sites
-3. `gerenciar-fila.json` — atualização de status + ping de teste
-
-Para importar: no n8n, clique em **Workflows → Import from file**.
-
-### 2.2 Configurar credenciais
-
-#### Anthropic (Claude) — para o workflow `processar-palavra`
-1. No n8n: **Settings → Credentials → New → HTTP Header Auth**
-2. Name: `x-api-key`
-3. Value: sua chave da Anthropic (https://console.anthropic.com)
-4. Vincule ao node "Claude AI — Analisar"
-
-> Alternativamente, você pode colar a chave diretamente no campo `x-api-key` do node HTTP Request (menos seguro).
-
-#### OpenAI (TTS) — para o workflow `processar-palavra`
-1. No n8n: **Settings → Credentials → New → HTTP Header Auth**
-2. Name: `Authorization`
-3. Value: `Bearer SUA_CHAVE_OPENAI` (https://platform.openai.com)
-4. Vincule ao node "OpenAI TTS — Áudio"
-
-> Se não quiser usar OpenAI TTS, desconecte o node de TTS. O áudio virá do browser (Web Speech API).
-
-#### Google Sheets — para os workflows `processar-palavra` e `gerenciar-fila`
-1. No n8n: **Settings → Credentials → New → Google Sheets OAuth2**
-2. Siga o fluxo de autenticação com sua conta Google
-3. Crie uma planilha com as colunas abaixo e copie o ID da URL
-
-### 2.3 Criar a planilha Google Sheets
-
-Crie uma nova planilha no Google Drive com aba chamada **Vocabulário** e estas colunas na linha 1:
-
-```
-id | word | type | ipa | meaning_pt | examples | level | context | source_type | source_title | status | tags | has_audio | anki_id | created_at | updated_at
+```bash
+python -m http.server 8765
 ```
 
-O ID da planilha está na URL:  
-`https://docs.google.com/spreadsheets/d/**ID_AQUI**/edit`
+E abra `http://localhost:8765`.
 
-Cole esse ID nos nodes "Salvar Google Sheets" e "Atualizar Sheets" (campo `documentId`).
+## Passo 2 — Chave da OpenAI (obrigatória para a IA e o áudio)
 
-### 2.4 Ativar os workflows
+**Configurações → Inteligência Artificial → OpenAI API Key** (chave em
+https://platform.openai.com). É ela que faz:
 
-Após configurar as credenciais, ative cada workflow clicando no toggle no canto superior direito.
+- análise de vocabulário (significados, definições, IPA, nível, frases de exemplo);
+- áudio das frases e das palavras (TTS);
+- imagens de auxílio visual dos cards.
 
----
+A chave fica só no seu aparelho (localStorage + backup no IndexedDB) e é enviada apenas para
+`api.openai.com`. Sem chave, o app continua funcionando: você preenche os significados à mão e
+o áudio cai no sintetizador do próprio navegador.
 
-## Passo 3 — Configurar AnkiConnect
+Clique em **Salvar todas as alterações** ao terminar.
 
-1. Instale o Anki desktop: https://apps.ankiweb.net
-2. Instale o plugin AnkiConnect: Anki → Ferramentas → Complementos → Código: `2055492159`
-3. Reinicie o Anki
-4. O AnkiConnect fica disponível em `http://localhost:8765`
+## Passo 3 — Sincronização em nuvem (opcional, mas recomendada)
 
-### Criar o modelo de nota (Note Type)
+**Configurações → Sincronização em Nuvem → Fazer Login com o Google.**
 
-No Anki: **Ferramentas → Gerenciar tipos de nota → Adicionar → Básico**
+A partir daí, palavras, cards, áudios, imagens e progresso de estudo sincronizam **em tempo
+real** entre todos os aparelhos logados na mesma conta.
 
-Renomeie para **"Inglês Básico"** e adicione estes campos:
-- `Frente` (obrigatório)
-- `Verso` (obrigatório)
-- `Contexto`
-- `IPA`
-- `Exemplos`
-- `Áudio`
+> A nuvem é a fonte da verdade: uma exclusão feita em um aparelho se propaga para os outros.
+> Antes de testar qualquer coisa relacionada a sync, faça um backup em
+> **Configurações → Exportar JSON**.
 
-Template sugerido para **Frente**:
-```html
-<div class="word">{{Frente}}</div>
-{{#IPA}}<div class="ipa">{{IPA}}</div>{{/IPA}}
-{{#Contexto}}<div class="context">{{Contexto}}</div>{{/Contexto}}
-```
+## Passo 4 — n8n (opcional, só para a aba "Website")
 
-Template sugerido para **Verso**:
-```html
-{{FrontSide}}
-<hr>
-<div class="meaning">{{Verso}}</div>
-{{#Exemplos}}<div class="examples">{{Exemplos}}</div>{{/Exemplos}}
-{{#Áudio}}{{Áudio}}{{/Áudio}}
-```
+Extrair vocabulário de uma página web é a única coisa que o navegador não consegue fazer
+sozinho (CORS). Para essa aba funcionar:
 
----
+1. Importe `n8n/extrair-website.json` no seu n8n (**Workflows → Import from file**).
+2. Configure a credencial de IA usada pelo workflow e ative-o.
+3. Em **Configurações → Extração de Website (n8n)**, informe a URL base da sua instância
+   (sem barra no final) e clique em **Testar conexão**.
 
-## Passo 4 — Configurar a plataforma
-
-Abra `plataforma-ingles.html` e vá em **Configurações**:
-
-1. **URL base do n8n**: `https://seu-n8n.hostinger.com` (sem barra no final)
-2. **Deck padrão**: `Inglês` (ou o nome do seu deck)
-3. **Modelo de nota**: `Inglês Básico`
-4. Mapeie os campos conforme os nomes que você usou
-5. Clique **Testar conexão** para verificar n8n e AnkiConnect
-6. **Salvar configurações**
-
----
+> O arquivo `n8n/gerenciar-fila.obsoleto.json` é de uma arquitetura antiga (Google Sheets) e
+> não deve ser importado.
 
 ## Uso diário
 
-### Fluxo Kindle
-1. No Kindle, exporte `My Clippings.txt` (copie do Kindle via USB)
-2. Na plataforma → Adicionar → Kindle → arraste o arquivo
-3. Clique na palavra alvo dentro de cada frase destacada
-4. Selecione os itens e clique **Processar com IA**
-
-### Fluxo Language Reactor
-1. Enquanto assiste, anote palavras desconhecidas em TXT: `palavra :: frase onde apareceu`
-2. Na plataforma → Adicionar → Language Reactor → cole ou arraste o arquivo
-3. Processe os selecionados
-
-### Fluxo Website
-1. Na plataforma → Adicionar → Website → cole a URL
-2. O n8n busca e o Claude identifica vocabulário B2+
-3. Selecione o que quer estudar
-
-### Revisar e enviar ao Anki
-1. Vá para **Revisar**
-2. Confira cada card — edite se necessário
-3. Clique **Enviar ao Anki** (o Anki precisa estar aberto)
-
----
+| Fluxo | Como |
+|---|---|
+| **Kindle** | Copie o `My Clippings.txt` do Kindle → Adicionar → Kindle → arraste o arquivo → clique na palavra-alvo dentro de cada frase → selecione e processe. |
+| **Mídia / séries** | Adicionar → Mídia. Cole linha a linha (`palavra :: frase`), cole um artigo inteiro, ou arraste um `.md`/`.txt`/`.pdf`. O campo de contexto ("reality de sobrevivência") ajuda a IA a escolher o sentido certo. |
+| **Website** | Adicionar → Website → cole a URL (precisa do n8n). |
+| **Assistente** | Pergunte em português ou no idioma estudado; os termos citados viram botões "Adicionar". |
+| **Revisar** | Confira os significados, escolha quais quer estudar e clique em "Salvar para estudo" — isso cria os cards do SRS. |
+| **Estudar** | Sessão de flashcards. Atalhos: `Espaço` revela / avalia "Bom", `1`–`4` avaliam, `R` repete o áudio, `Z` desfaz. |
+| **Biblioteca** | Todos os cards por baralho, glossário por palavra e o player "Ouvir playlist" (listening passivo). |
 
 ## Dicas
 
-- O áudio é gerado pelo OpenAI (voz "nova") e fica como arquivo MP3 no Anki
-- Se o n8n não estiver configurado, você pode usar a plataforma offline: adiciona palavras sem IA e preenche o significado manualmente na revisão
-- Faça backup periodicamente: Configurações → Exportar JSON
-- O badge vermelho na aba "Revisar" mostra quantas palavras estão aguardando
+- Faça backup periodicamente: **Configurações → Exportar JSON**.
+- O badge vermelho em "Revisar" mostra quantas palavras estão aguardando.
+- O app é instalável (PWA): no celular, use "Adicionar à tela de início".
+- Depois de um deploy, pode ser preciso um *hard refresh* para o service worker pegar a
+  versão nova.

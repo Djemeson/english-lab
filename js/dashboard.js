@@ -19,6 +19,8 @@ function renderDashboard() {
   // Badge nav
   const badge = el('badge-review')
   if (badge) { badge.textContent = pending; badge.classList.toggle('hidden', pending === 0) }
+  const badgeMob = el('badge-review-mob')
+  if (badgeMob) { badgeMob.textContent = pending; badgeMob.classList.toggle('hidden', pending === 0) }
 
   // ── Ação principal ──
   const mainArea = el('dash-main-action')
@@ -234,11 +236,204 @@ function renderDashboardGrid() {
   const wod = dashWordOfDay()
   const sources = dashSources()
 
+  // Calculate statistics for the heatmap stats row
+  const activeDays = srsLog.filter(l => (l.reviewed || 0) > 0).length
+  const totalReviews = srsLog.reduce((sum, l) => sum + (l.reviewed || 0), 0)
+  const maxReviews = srsLog.length ? Math.max(...srsLog.map(l => l.reviewed || 0), 0) : 0
+  const dailyAverage = activeDays > 0 ? (totalReviews / activeDays).toFixed(1) : '0'
+  const streak = srsStreak()
+
+  // Month labels calculation based on column dates
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const totalDays = 371
+  const start = new Date(today); start.setDate(start.getDate() - (totalDays - 1))
+  const padOffset = start.getDay()
+
+  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+  // Nº real de colunas: as células de padding do começo empurram a grade, então
+  // fixar 53 deixava a última coluna sem rótulo em parte do ano.
+  const totalCols = Math.ceil((padOffset + totalDays) / 7)
+  const monthLabels = []
+  let lastMonth = -1
+  for (let col = 0; col < totalCols; col++) {
+    const cellIdx = col * 7
+    const dayIndex = cellIdx - padOffset
+    const colDate = new Date(start)
+    colDate.setDate(start.getDate() + dayIndex)
+    const m = colDate.getMonth()
+    if (m !== lastMonth) {
+      monthLabels.push({ col, name: monthNames[m] })
+      lastMonth = m
+    }
+  }
+
+  // Filter labels to prevent overlaps (must be at least 3 columns apart)
+  const finalMonthLabels = []
+  let lastCol = -9
+  monthLabels.forEach(lbl => {
+    if (lbl.col - lastCol >= 3) {
+      finalMonthLabels.push(lbl)
+      lastCol = lbl.col
+    }
+  })
+
+  const gridWidthPx = totalCols * 14 - 3 // 11px de célula + 3px de gap, sem o gap final
+  const monthLabelsHTML = finalMonthLabels.map(lbl => {
+    const leftPx = lbl.col * 14
+    return `<span class="dash-hm-month-lbl" style="left:${leftPx}px">${lbl.name}</span>`
+  }).join('')
+
   const heatmapCard = `
     <div class="dash-card">
-      <div class="dash-card-h"><div><div class="dash-eyebrow">Atividade</div><h3>Últimos 12 meses</h3></div><span class="dash-metaval">${totalMonthReviews} revis${totalMonthReviews===1?'ão':'ões'} este mês</span></div>
-      <div class="dash-hm-wrap"><div class="dash-hm-grid">${heatCells.map(c => `<div class="dash-hm-cell ${c.cls}" ${c.tip ? `title="${escA(c.tip)}"` : ''}></div>`).join('')}</div></div>
-      <div class="dash-hm-legend"><span>Menos</span><div class="dash-hm-cell"></div><div class="dash-hm-cell l1"></div><div class="dash-hm-cell l2"></div><div class="dash-hm-cell l3"></div><div class="dash-hm-cell l4"></div><span>Mais</span></div>
+      <div class="dash-card-h">
+        <div>
+          <div class="dash-eyebrow">Atividade</div>
+          <h3>Frequência de Estudos</h3>
+        </div>
+        <span class="dash-metaval">${totalMonthReviews} revis${totalMonthReviews===1?'ão':'ões'} este mês</span>
+      </div>
+      
+      <div class="dash-hm-days-and-grid">
+        <div class="dash-hm-days">
+          <div></div>
+          <div>Seg</div>
+          <div></div>
+          <div>Qua</div>
+          <div></div>
+          <div>Sex</div>
+          <div></div>
+        </div>
+        <div class="dash-hm-container">
+          <div class="dash-hm-wrap">
+            <div class="dash-hm-months-row" style="min-width:${gridWidthPx}px">${monthLabelsHTML}</div>
+            <div class="dash-hm-grid">${heatCells.map(c => `<div class="dash-hm-cell ${c.cls}" ${c.tip ? `title="${escA(c.tip)}"` : ''}></div>`).join('')}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="dash-hm-legend">
+        <span>Menos</span>
+        <div class="dash-hm-cell"></div>
+        <div class="dash-hm-cell l1"></div>
+        <div class="dash-hm-cell l2"></div>
+        <div class="dash-hm-cell l3"></div>
+        <div class="dash-hm-cell l4"></div>
+        <span>Mais</span>
+      </div>
+
+      <div class="dash-hm-stats">
+        <div class="hm-stat">
+          <div class="hm-stat-num">${totalReviews}</div>
+          <div class="hm-stat-lbl">Revisões</div>
+        </div>
+        <div class="hm-stat">
+          <div class="hm-stat-num">${activeDays}</div>
+          <div class="hm-stat-lbl">Dias Ativos</div>
+        </div>
+        <div class="hm-stat">
+          <div class="hm-stat-num">${dailyAverage}</div>
+          <div class="hm-stat-lbl">Média Diária</div>
+        </div>
+        <div class="hm-stat">
+          <div class="hm-stat-num">${maxReviews}</div>
+          <div class="hm-stat-lbl">Recorde</div>
+        </div>
+        <div class="hm-stat">
+          <div class="hm-stat-num" style="color:var(--warning); display:flex; align-items:center; gap:4px">${streak}${ic('flame','ic-sm')}</div>
+          <div class="hm-stat-lbl">Sequência</div>
+        </div>
+      </div>
+    </div>`
+
+  // --- Weekly Reviews Stats and Chart ---
+  const todayDate = new Date(); todayDate.setHours(0,0,0,0)
+  const dayOfWeek = todayDate.getDay() // 0 = dom, 1 = seg...
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const monday = new Date(todayDate)
+  monday.setDate(todayDate.getDate() + diffToMonday)
+
+  const daysLabel = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+  const reviewsCount = []
+  const correctCount = []
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + i)
+    const ds = _dateStr(d)
+    const log = srsLog.find(l => l.date === ds)
+    reviewsCount.push(log ? (log.reviewed || 0) : 0)
+    correctCount.push(log ? (log.correct || 0) : 0)
+  }
+
+  const weeklyTotal = reviewsCount.reduce((s, c) => s + c, 0)
+  const maxInWeek = Math.max(...reviewsCount, 5) // Mínimo 5 para escala agradável
+  const halfInWeek = Math.round(maxInWeek / 2)
+
+  let barsHTML = ''
+  for (let i = 0; i < 7; i++) {
+    const count = reviewsCount[i]
+    const correct = correctCount[i]
+    const x = 30 + i * 48
+    const barWidth = 20
+    const maxHeight = 85 // Altura máxima da barra em pixels
+    const barHeight = (count / maxInWeek) * maxHeight
+    const correctHeight = (correct / maxInWeek) * maxHeight
+
+    const y = 110 - barHeight
+    const cy = 110 - correctHeight
+
+    // Track de fundo (opcional, deixa mais visual)
+    const bgTrack = `<rect x="${x}" y="25" width="${barWidth}" height="${maxHeight}" rx="4" fill="var(--border)" opacity="0.15" />`
+    
+    // Barra de revisados (azul translúcido/fundo)
+    const reviewedBar = `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="4" fill="var(--primary)" opacity="0.35" />`
+    
+    // Barra de corretos (verde sólido por cima)
+    const correctBar = correct > 0 ? `<rect x="${x}" y="${cy}" width="${barWidth}" height="${correctHeight}" rx="4" fill="var(--success)" />` : ''
+
+    // Texto de contador de revisões (somente se maior que zero)
+    const labelText = count > 0 ? `<text x="${x + 10}" y="${y - 4}" fill="var(--text)" font-size="8" font-weight="700" text-anchor="middle" font-family="var(--font-mono)">${count}</text>` : ''
+    
+    // Rótulo do dia
+    const dayLabel = `<text x="${x + 10}" y="125" fill="var(--text2)" font-size="9" text-anchor="middle" font-weight="600">${daysLabel[i]}</text>`
+
+    barsHTML += `${bgTrack}${reviewedBar}${correctBar}${labelText}${dayLabel}`
+  }
+
+  const weeklyReviewsCard = `
+    <div class="dash-card" style="margin-top:20px">
+      <div class="dash-card-h">
+        <div>
+          <div class="dash-eyebrow">Atividade Semanal</div>
+          <h3>Volume de Estudos</h3>
+        </div>
+        <span class="dash-metaval">${weeklyTotal} revis${weeklyTotal===1?'ão':'ões'} esta semana</span>
+      </div>
+      <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 12px;">
+        <svg viewBox="0 0 380 140" style="width: 100%; height: auto; overflow: visible;">
+          <!-- Linhas de grade -->
+          <line x1="25" y1="25" x2="365" y2="25" stroke="var(--border)" stroke-dasharray="3,3" />
+          <line x1="25" y1="67" x2="365" y2="67" stroke="var(--border)" stroke-dasharray="3,3" />
+          <line x1="25" y1="110" x2="365" y2="110" stroke="var(--border-strong)" stroke-width="1.2" />
+
+          <!-- Eixos Y labels -->
+          <text x="5" y="28" fill="var(--text3)" font-size="8" font-family="var(--font-mono)">${maxInWeek}</text>
+          <text x="5" y="70" fill="var(--text3)" font-size="8" font-family="var(--font-mono)">${halfInWeek}</text>
+          <text x="5" y="113" fill="var(--text3)" font-size="8" font-family="var(--font-mono)">0</text>
+
+          ${barsHTML}
+        </svg>
+        <div style="display: flex; gap: 14px; align-items: center; justify-content: center; font-size: 0.72rem; color: var(--text3); margin-top: 4px;">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 8px; height: 8px; border-radius: 2px; background: var(--success);"></span>
+            <span>Acertos</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 8px; height: 8px; border-radius: 2px; background: var(--primary); opacity: 0.5;"></span>
+            <span>Total revisado</span>
+          </div>
+        </div>
+      </div>
     </div>`
 
   const trendCard = `
@@ -291,7 +486,7 @@ function renderDashboardGrid() {
 
   area.innerHTML = `
     <div class="dash-grid">
-      <div class="dash-col">${heatmapCard}${trendCard}${langsCard}${leechCard}</div>
+      <div class="dash-col">${heatmapCard}${weeklyReviewsCard}${trendCard}${langsCard}${leechCard}</div>
       <div class="dash-col">${wodCard}${sourcesCard}</div>
     </div>`
 }
@@ -315,7 +510,7 @@ function renderDashboardAchievements() {
 }
 
 function statusLabel(s) {
-  return { pending_ai:'⏳ Pendente IA', pending_review:'👁 Revisar', in_srs:'📚 Em estudo', skipped:'– Pulada' }[s] || s
+  return { pending_ai:'Pendente IA', pending_review:'Revisar', in_srs:'Em estudo', skipped:'Pulada' }[s] || s
 }
 
 

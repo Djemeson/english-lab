@@ -1,0 +1,6 @@
+{
+  "name": "Language Lab",
+  "description": "Plataforma de estudo de idiomas com repetição espaçada (SM-2), análise de vocabulário por IA (OpenAI), áudio TTS e geração de imagens. Site estático, sem backend próprio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

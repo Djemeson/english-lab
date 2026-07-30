@@ -44,8 +44,11 @@ function updateCardMeta(cardId, field, value) {
 }
 
 // ── Service Worker ──────────────────────────────────────────────
+// Caminho RELATIVO de propósito: o app roda tanto na raiz (dev local, preview)
+// quanto em subpasta (GitHub Pages → /english-lab/). Caminho absoluto quebra em um dos dois.
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/english-lab/sw.js', { scope: '/english-lab/' })
+  const swUrl = new URL('sw.js', document.baseURI)
+  navigator.serviceWorker.register(swUrl, { scope: './' })
     .then(r => console.log('[SW] registrado, scope:', r.scope))
     .catch(e => console.warn('[SW] falha ao registrar:', e))
 }

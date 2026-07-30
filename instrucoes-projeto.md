@@ -1,186 +1,119 @@
-# English Lab — Instruções do Projeto
+# Language Lab — Referência técnica rápida
 
-## O que é este projeto
+> **Este arquivo é um complemento.** A documentação principal é
+> [`ESTADO-DO-PROJETO.md`](./ESTADO-DO-PROJETO.md) (arquitetura, modelo de dados, sincronização,
+> SRS, histórico e pendências) — leia-a primeiro. Aqui ficam só as informações de
+> infraestrutura que não mudam de sessão para sessão.
+>
+> Atualizado em 2026-07-30. A versão anterior descrevia uma arquitetura que não existe mais
+> (um `index.html` único de ~220KB com toda a lógica num só `<script>`, envio de cards para o
+> Anki via AnkiConnect e um modelo de dados antigo). O código está dividido em `js/*.js` desde
+> meados de 2026 e a integração com o Anki foi removida.
 
-Plataforma pessoal de estudo de inglês do Djemeson. Captura vocabulário de múltiplas fontes, processa com IA, gera flashcards com SRS nativo (SM-2), áudio TTS e imagens geradas por IA. Funciona como site estático no GitHub Pages com sincronização via Firebase.
-
-## Stack atual
+## Stack
 
 ```
-[Fontes de Input] → [index.html (GitHub Pages)] → [OpenAI API direto]
-                                 ↓                        ↓
-                          [Firebase Firestore]      [IndexedDB local]
-                          (cards, words, config,    (cache áudio/imagem)
-                           áudio base64, imagens)
-                                 ↓
-                          [AnkiConnect local - opcional]
-                          (http://localhost:8765)
+[Kindle · Mídia · Documento · Website · Assistente]
+                    ↓
+        index.html + js/*.js  (site estático, GitHub Pages)
+             ↓                          ↓
+   api.openai.com              Firebase Firestore
+   (análise, TTS, imagens)     (words, cards, cfg, áudio/imagem em base64)
+             ↓
+   IndexedDB local (cache de áudio, imagem, cards e backup da cfg)
 ```
 
-- **Frontend**: `index.html` único — GitHub Pages (branch `main`)
-- **Dev branch**: `dev` → merge para `main` para publicar
-- **IA**: OpenAI API direto do browser (GPT-4o-mini padrão, configurável)
-- **Áudio TTS**: OpenAI TTS-1, voz aleatória, pré-gerado ao salvar card
-- **Imagens**: gpt-image-1 (DALL-E descontinuado em maio 2026), "digital illustration, editorial style"
-- **SRS**: algoritmo SM-2 nativo
-- **Sync**: Firebase Firestore (Google Auth) — cards, words, config, áudio base64, imagens base64
-- **Flashcards Anki**: opcional, via AnkiConnect local
+- **Frontend**: HTML/CSS/JS puros, **sem build**. Um arquivo JS por área (ver
+  `ESTADO-DO-PROJETO.md`, seção 2 — e a armadilha do *lazy-loading* descrita lá).
+- **Branches**: `dev` para trabalhar, `main` publica. O workflow
+  `.github/workflows/deploy.yml` valida a sintaxe do JS e publica no GitHub Pages.
+- **IA**: OpenAI direto do navegador (gpt-4o-mini como padrão).
+- **TTS**: OpenAI `tts-1`, voz aleatória, pré-gerado ao salvar o card. Fallback: Web Speech API.
+- **Imagens**: `gpt-image-1` (o DALL·E 3 foi descontinuado em maio/2026).
+- **SRS**: SM-2 nativo (`js/srs.js`). Sem Anki.
+- **Sync**: Firestore em tempo real (`onSnapshot`), nuvem = fonte da verdade.
 
 ## REGRA CRÍTICA — n8n
 
-**NÃO modificar os arquivos JSON do n8n**. As regras manuais do Switch node seriam perdidas ao reimportar. Mudanças no n8n = instrução manual de UI apenas. O site funciona completamente independente do n8n.
+**Não modificar os arquivos JSON em `n8n/`.** As regras manuais do nó Switch se perdem ao
+reimportar. Mudança no n8n = instrução manual pela interface. O site funciona por completo sem
+o n8n; ele só existe para a aba **Website**.
 
-## REGRA CRÍTICA — Edição de index.html
+## Persistência
 
-**NUNCA usar o Edit tool no index.html** — arquivo >220KB, Edit trunca o arquivo. Sempre usar Python script com str.replace(). Testar sintaxe com `node --check` após cada mudança.
+**localStorage**
 
-## Arquitetura do index.html
-
-Arquivo único ~220KB, ~4500 linhas. Toda lógica em um único `<script>` no final.
-
-### Chaves de localStorage (SK)
 ```javascript
-const SK = {
-  settings:    'englab_cfg',
-  words:       'englab_words',
-  srsCards:    'el-srs-cards',
-  srsCfg:      'el-srs-cfg',
-  srsLog:      'el-srs-log',
-  srsDecks:    'el-srs-decks',
-  kindleSeen:  'el-kindle-seen',   // hashes de highlights já processados
-  kindleQueue: 'el-kindle-queue',  // fila Kindle pendente (cross-device)
-}
+englab_cfg              // cfg (chave OpenAI, URL n8n, tema, provider, idioma ativo)
+englab_words            // words[]
+el-srs-cards            // srsCards[]  (fonte primária é o IndexedDB CardsDB)
+el-srs-cfg              // parâmetros SM-2
+el-srs-log              // log diário {date, reviewed, correct, newSeen}
+el-srs-decks            // árvore de baralhos
+el-kindle-seen          // hashes de destaques já processados
+el-kindle-queue         // fila do Kindle pendente (cross-device)
+el-consulta-conversas   // histórico do Assistente
+el-ui-prefs             // sidebar/histórico recolhidos
 ```
 
-### IndexedDB
-- `english-lab-audio` (store `audio`): áudio base64 por hash de texto
-- `english-lab-images` (store `images`): imagem base64 por chave `img_{wordId}_{meaningIdx}`
+**IndexedDB**
 
-### Firebase (Firestore)
+- `CardsDB` — cards (fonte local primária)
+- `AudioDB` — áudio em base64, indexado por hash do texto
+- `ImageDB` — imagens em base64, chave `img_{wordId}_{meaningIdx}`
+- `SettingsDB` — backup da `cfg` (sobrevive à limpeza do localStorage)
+
+**Firestore**
+
 ```
 users/{uid}/
-  data/words        → { list: [...], updatedAt }
-  data/srsCards     → { list: [...], updatedAt }
-  data/srsCfg       → { ...config, updatedAt }
-  data/srsLog       → { list: [...], updatedAt }
-  data/srsDecks     → { list: [...], updatedAt }
-  data/kindleQueue  → { list: [...], updatedAt }
-  audio/{hash}      → { data: "base64...", updatedAt }
-  images/{key}      → { data: "base64...", updatedAt }
+  data/{words, srsCards, srsCfg, srsLog, srsDecks, cfg, kindleQueue, conversas}
+  audio/{hash}   → { data: "base64...", updatedAt }
+  images/{key}   → { data: "base64...", updatedAt }
 ```
 
-## Firebase Config (hardcoded no index.html)
-```javascript
-const FB_CONFIG = {
-  apiKey: "AIzaSyCwMSwO27_UKQiOhnvhxvTQ7-ykD31mLEw",
-  authDomain: "english-lab-726e7.firebaseapp.com",
-  projectId: "english-lab-726e7",
-  storageBucket: "english-lab-726e7.firebasestorage.app",
-  messagingSenderId: "181422619156",
-  appId: "1:181422619156:web:7bb0bedbe6dd106dfe4501"
-}
+Firebase **Storage não é usado** (exigiria o plano Blaze) — os binários vão para o Firestore.
+
+## Firebase
+
+Config em `js/firebase.js`. Auth via Google (`signInWithPopup`), `setPersistence(LOCAL)`.
+Domínios autorizados: `djemeson.github.io` e `localhost`.
+
+> A `apiKey` do Firebase web é pública por natureza (vai no bundle de qualquer app web). Quem
+> protege os dados são as **regras de segurança do Firestore** — cada usuário só pode ler e
+> escrever em `users/{seu_uid}/`. Confira isso no console antes de assumir que está seguro.
+
+## Baralhos
+
 ```
-- Auth: Google login (signInWithPopup)
-- Domínios autorizados: `djemeson.github.io`, `localhost`
-- Sync automático: debounce 2s após mudança → fbPush()
-- Firebase Storage NÃO usado (requer plano pago) — binários ficam no Firestore
-
-## Seções do site
-
-### Dashboard
-- 8 métricas: total capturado, no SRS, no Anki, para processar | para hoje, amanhã, taxa acerto, sequência
-- Tabela de decks estilo Anki (Novo/Aprender/Revisar/Amanhã) — clicável, abre painel de foco com "Estudar agora"
-- Adição rápida + lista recente
-
-### Adicionar (tabs)
-- **Manual**: palavra + contexto + fonte
-- **Kindle**: upload → batch translation (lotes de 25, tudo antes de mostrar) → fila persistida Firebase → classificação cross-device
-- **Mídia**: Language Reactor / séries / filmes
-- **Website**: URL → extração via n8n
-- **Consulta AI**: chat GPT-4o-mini, extrai srs_item JSON, botão "Adicionar ao SRS"
-
-### Revisar
-- Fila pendente de processamento IA → seleciona significados → "Salvar no site" cria cards SRS → envio Anki opcional
-
-### Estudar (SRS)
-- Frente: palavra + frase EN + chips variedade/registro + áudio automático
-- Verso: frase EN topo → tradução PT → palavra + IPA + áudio + tipo → significado → imagem lateral direita (220px grid, mobile: empilha)
-- Botões: Errei/Difícil/Bom/Fácil com previsão de intervalo
-- Atalho teclado: Espaço = revelar / Espaço = Bom
-- Desfazer: reverte última avaliação e estado SM-2
-- Histórico: ← Anterior (somente leitura, botões desabilitados)
-- Biblioteca: árvore decks + lista com sort/filtro/seleção múltipla + ações em lote (áudio/imagem/excluir) + preview lateral
-- Lightbox: clicar em imagem abre fullscreen, ESC fecha
-
-### Configurações
-- IA (provider/modelo), OpenAI key, TTS, AnkiConnect, n8n
-- Firebase: login/logout Google, forçar push/pull
-- Dados: exportar/importar JSON, resetar histórico Kindle, limpar tudo
-- Botão reset sutil no rodapé (quase invisível)
-
-## Modelo de dados
-
-### Word
-```javascript
-{ id, word, type, context, source_type, source_title, ipa, variety, status, ai_processed, created_at,
-  meanings: [{ meaning_pt, definition_pt, examples:[{en,pt}], variety, register, selected }] }
+dk-root (Inglês)                     ← ids legados; outros idiomas usam dk-root-<código>
+  dk-vocab    (Vocabulary)           ← padrão
+  dk-phrasal  (Phrasal Verbs)        ← type === 'phrasal_verb' (expressão verbal do idioma)
+  dk-idioms   (Idioms)               ← type === 'idiom'
+  dk-colloc   (Collocations)         ← type === 'collocation'
 ```
 
-### SRS Card (snapshot do significado)
-```javascript
-{ id, wordId, meaningIdx, exampleIdx, deckId,
-  state, due, interval, ease, lapses, stepIdx, addedDate,
-  word, ipa, type, source_type, variety, register,
-  meaning_pt, definition_pt, example_en, example_pt }
-```
+Os baralhos de outros idiomas são criados sob demanda por `ensureLangDecks()` em `js/lang.js`.
 
-## Chips de variedade e registro
-- **Variedade**: 🇺🇸 AmE · 🇬🇧 BrE · 🇦🇺 AuE · 🇨🇦 CanE · 🌍 Other
-- **Registro**: 💬 slang · 👥 informal · 🎩 formal · 🗣 coloquial · 📜 arcaico · 📖 literário · ⚙️ técnico · ⚠️ vulgar
-- Mostrado na frente (sutil) e verso (junto com type chip)
-- Editável via "⚙ configurações" no verso → propaga para todos os cards do mesmo significado
+## Fluxo de git
 
-## Sistema de áudio
-1. `preGenerateAudio(cards)` ao salvar: gera MP3 para `example_en` E `word` via OpenAI TTS-1
-2. Armazenado em IndexedDB por hash do texto + sincronizado no Firebase
-3. Fallback: Web Speech API (sem chave OpenAI)
-
-## Sistema de imagens
-1. `generateCardImage(cardId)` via gpt-image-1
-2. Chave: `img_{wordId}_{meaningIdx}` — compartilhada entre cards do mesmo significado
-3. Propaga automaticamente para todos os cards irmãos
-4. Armazenado em IndexedDB + Firebase
-
-## Fluxo Kindle
-1. Upload → parser → filtra hashes vistos → loading "Traduzindo X destaques..."
-2. `analyzeKindleItems()`: lotes de 25 → GPT-4o-mini → extrai palavra-alvo + tradução PT
-3. Salva fila no Firebase (kindleQueue)
-4. Renderiza com tudo pronto
-5. Usuário seleciona → "Adicionar" → itens ficam no SRS, fila atualizada
-6. Fila persiste para classificação em outro dispositivo
-7. "Descartar tudo" limpa a fila
-
-## Hierarquia de decks SRS
-```
-dk-root (Inglês)
-  dk-vocab    (Vocabulary)     ← padrão
-  dk-phrasal  (Phrasal Verbs)  ← type === 'phrasal_verb'
-  dk-idioms   (Idioms)         ← type === 'idiom'
-  dk-colloc   (Collocations)   ← type === 'collocation'
-```
-
-## Git workflow
 ```bash
 git checkout dev
-git add index.html
+git add -A
 git commit -m "feat: descrição"
 git push origin dev
-# Publicar: merge dev → main no GitHub Desktop → Push origin
+# Publicar: merge dev → main (o Actions publica sozinho)
 ```
 
 ## Problemas conhecidos
-- `index.lock`: deletar `.git/index.lock` manualmente no Windows se travar
-- Firebase Storage requer plano Blaze (pago) — NÃO usar
-- DALL-E 3 descontinuado em maio 2026 — usar `gpt-image-1`
-- `file://` não suporta Firebase Auth — usar servidor HTTP ou GitHub Pages
-- `response_format: 'b64_json'` não existe na API gpt-image-1 — usar URL padrão + blobToBase64
+
+- `file://` não suporta Firebase Auth — use um servidor HTTP.
+- O service worker cacheia o shell: depois de um deploy pode ser preciso um *hard refresh*.
+  Ao mudar arquivos do shell, **bumpe a constante `CACHE` em `sw.js`**.
+- Os caminhos do `sw.js` e do registro em `js/init.js` são **relativos** de propósito: o app
+  roda na raiz em desenvolvimento e em `/english-lab/` no GitHub Pages. Não troque por
+  caminhos absolutos.
+- `index.lock`: no Windows, apagar `.git/index.lock` manualmente se o git travar.
+- `response_format: 'b64_json'` não existe na API `gpt-image-1` — usar URL + `blobToBase64`.
+- O shell (bash) pode enxergar cópias desatualizadas dos arquivos por causa da sincronização
+  do OneDrive; valide com a ferramenta de leitura ou com o app rodando ao vivo.

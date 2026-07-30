@@ -1,0 +1,23 @@
+# Dependências
+node_modules/
+
+# Build local (o deploy do GitHub Pages publica a raiz, não o dist)
+dist/
+
+# Segredos — a chave da OpenAI vive no navegador (localStorage/IndexedDB),
+# nunca em arquivo. Estes existem só para quem rodar um servidor próprio.
+.env
+.env.local
+.env.*.local
+
+# Backups exportados pelo app (Configurações → Exportar JSON)
+english-lab-backup*.json
+language-lab-backup*.json
+
+# Sistema operacional / editores
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+.vscode/
+.idea/

@@ -296,8 +296,8 @@ async function saveAllToSrs() {
   }
   window._batchMode = false
   saveSrsCards(); saveWords(); autoSyncAfterChange()
-  if (btn) { btn.innerHTML = '📚 Salvar todos no site'; updateSendAllBtn() }
-  toast(`📚 ${ok} palavra${ok !== 1 ? 's' : ''} (${totalCards} cards) salvas no site`, ok > 0 ? 'success' : 'info')
+  if (btn) { btn.innerHTML = 'Salvar todos no site'; updateSendAllBtn() }
+  toast(`${ok} palavra${ok !== 1 ? 's' : ''} (${totalCards} cards) salvas no site`, ok > 0 ? 'success' : 'info')
   renderReview(); renderDashboard(); renderSidebar(); updateSrsBadge()
 }
 
@@ -563,7 +563,7 @@ async function saveSelectedToSrs() {
     w.status = 'in_srs'; w.updated_at = new Date().toISOString(); ok++
   }
   saveSrsCards(); saveWords(); autoSyncAfterChange()
-  toast(`📚 ${ok} palavra${ok!==1?'s':''} (${totalCards} cards) salvas`, ok > 0 ? 'success' : 'info')
+  toast(`${ok} palavra${ok!==1?'s':''} (${totalCards} cards) salvas`, ok > 0 ? 'success' : 'info')
   selectedWordIds.clear()
   renderReview(); renderDashboard(); updateSrsBadge()
 }
@@ -672,7 +672,7 @@ function renderMeaningItem(wordId, m, mi) {
       <div class="mi-top">
         <div class="mi-meaning">${esc(m.meaning_pt)}</div>
         <div class="mi-chips">
-          ${isMatch ? `<span class="context-match-badge">✓ contexto</span>` : ''}
+          ${isMatch ? `<span class="context-match-badge">${ic('check','ic-sm')} contexto</span>` : ''}
           ${m.register ? `<span class="chip register-${m.register}">${m.register}</span>` : ''}
           ${m.level ? `<span class="chip level-${m.level.toLowerCase()}">${m.level}</span>` : ''}
         </div>
