@@ -4,7 +4,7 @@
 async function initApp() {
   applyUiPrefs()     // estado recolhido da sidebar
   loadCfg()
-  await restoreCfgFromBackup()  // repõe chave OpenAI / URL n8n / tema se o localStorage foi limpo
+  await restoreCfgFromBackup()  // repõe chave OpenAI / tema se o localStorage foi limpo
   applyTheme(cfg.theme)   // aplica o tema (já restaurado, se preciso)
   loadWords()
   loadConversas()    // conversas do Assistente

@@ -44,7 +44,6 @@ function fillSettings() {
     ttsEl.value = cfg.ttsProvider || 'openai'
   }
   el('cfg-openai-key').value = cfg.openaiKey || ''
-  el('cfg-n8n').value = cfg.n8nBase || ''
   renderThemePicker()
   // Atualiza UI Firebase com estado atual
   if (_fbUser !== undefined) updateFirebaseUI(_fbUser)
@@ -66,7 +65,6 @@ function saveSettings() {
     cfg.ttsProvider = 'openai'
   }
   cfg.openaiKey = el('cfg-openai-key').value.trim()
-  cfg.n8nBase = el('cfg-n8n').value.trim()
   saveCfg()
   // Envia para a nuvem (se logado) para sobreviver a refresh e sincronizar entre dispositivos
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
@@ -98,22 +96,7 @@ function selectTheme(id) {
   toast(`Tema "${THEMES.find(t => t.id === id)?.name || id}" aplicado`, 'success')
 }
 
-async function testN8nAI() {
-  // Testa a conexão com o n8n para extração de websites
-  const base = el('cfg-n8n').value.trim()
-  if (!base) { toast('Configure a URL do n8n primeiro', 'error'); return }
-  try {
-    const res = await fetch(`${base}/webhook/en-site`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: 'https://example.com', test: true })
-    })
-    // Qualquer resposta (mesmo erro de parse) confirma que o webhook está ativo
-    toast(res.ok ? 'n8n conectado!' : `n8n respondeu (status ${res.status})`, res.ok ? 'success' : 'warning')
-  } catch(e) { toast(`Não foi possível conectar ao n8n: ${e.message}`, 'error') }
-}
-
-// ================================================================
+async // ================================================================
 // DATA MANAGEMENT
 // ================================================================
 function exportData() {

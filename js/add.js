@@ -1235,65 +1235,6 @@ function handleSentenceMouseUp(event, idx, type) {
 
 
 // ================================================================
-// SITE EXTRACTOR
-// ================================================================
-async function extractSite() {
-  const url = el('site-url').value.trim()
-  if (!url) { toast('Digite uma URL', 'error'); return }
-  if (!cfg.n8nBase) { toast('Configure o n8n nas Configurações para usar esta função', 'warning'); return }
-  const btn = el('site-btn')
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Extraindo...'
-  try {
-    const res = await fetch(`${cfg.n8nBase}/webhook/en-site`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ url, ai_provider: cfg.aiProvider, ai_model: cfg.aiModel, lang: activeLang(), lang_name: promptLangName(activeLang()) })
-    })
-    if (!res.ok && res.status !== 200) throw new Error(`n8n retornou status ${res.status}`)
-    const data = await res.json()
-    if (data && data.error) { toast(data.error, 'error'); return }
-    siteItems = Array.isArray(data) ? data : (data.words || [])
-    if (!siteItems.length) { toast('Nenhuma palavra encontrada nesta página', 'warning'); return }
-    renderSiteList()
-  } catch(e) { toast(`Erro: ${e.message}`, 'error') }
-  finally { btn.disabled = false; btn.innerHTML = ic('globe') + ' Extrair vocabulário' }
-}
-
-function renderSiteList() {
-  const list = el('site-list')
-  el('site-count').textContent = `${siteItems.length} palavras`
-  el('site-result').classList.remove('hidden')
-  list.innerHTML = siteItems.map((item, i) => {
-    const w = typeof item === 'string' ? item : (item.word || item)
-    const ctx = item.context || ''
-    return `<div class="parsed-item">
-      <input type="checkbox" class="site-check" data-i="${i}" checked>
-      <div class="parsed-item-body">
-        <div class="parsed-word">${esc(w)}</div>
-        ${ctx ? `<div class="parsed-context">${esc(ctx)}</div>` : ''}
-        ${item.level ? `<span class="chip level-${(item.level||'').toLowerCase()}">${item.level}</span>` : ''}
-      </div>
-    </div>`
-  }).join('')
-}
-
-function addSiteSelected() {
-  const src = el('site-url').value.trim()
-  const sel = [...document.querySelectorAll('.site-check')].filter(c => c.checked).map(c => {
-    const item = siteItems[+c.dataset.i]
-    return typeof item === 'string'
-      ? { word: item, context: '', source_type:'website', source_title: src }
-      : { ...item, word: item.word||item, source_type:'website', source_title: src }
-  })
-  if (!sel.length) { toast('Selecione ao menos um item', 'warning'); return }
-  sel.forEach(i => createWord(i))
-  saveWords(); renderDashboard()
-  toast(`${sel.length} itens adicionados!`, 'success')
-  el('site-result').classList.add('hidden')
-}
-
-
-// ================================================================
 // MODELOS E VOZES
 // ================================================================
 // AI_MODELS/updateModelOptions movidos para settings.js e OPENAI_VOICES/randomVoice

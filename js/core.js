@@ -10,7 +10,6 @@ function markDeleted(id) { const ids = loadDeletedIds(); ids.add(id); saveDelete
 const DEF_CFG = {
   aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
   openaiKey: '',
-  n8nBase: '',
   theme: 'midnight'
 }
 
@@ -18,7 +17,7 @@ let cfg = {}
 let words = []
 let activeWordId = null
 const collapsedGroups = new Set()
-let kindleItems = [], midiaItems = [], siteItems = []
+let kindleItems = [], midiaItems = []
 // Assistente (Consulta) — conversas persistidas e sincronizadas.
 // Estado declarado aqui (arquivo NÃO-lazy) para que firebase.js possa
 // referenciá-lo no sync; a UI vive em js/consulta.js.
@@ -51,7 +50,7 @@ function loadCfg() {
 // BACKUP DA CONFIG EM IndexedDB
 // O localStorage de alguns navegadores é limpo entre sessões (ITP/privacidade),
 // mas o IndexedDB persiste (é onde os cards sobrevivem). Espelhamos a cfg ali
-// para que a chave OpenAI, URL do n8n e tema NÃO se percam no refresh.
+// para que a chave OpenAI e o tema NÃO se percam no refresh.
 // ================================================================
 const SettingsDB = {
   _db: null,
@@ -85,7 +84,7 @@ const SettingsDB = {
 }
 
 // Grava no localStorage E no IndexedDB. O backup em IDB é "pegajoso":
-// nunca sobrescreve chave/URL existentes com valor vazio.
+// nunca sobrescreve a chave existente com valor vazio.
 function saveCfg() {
   try { localStorage.setItem(SK.settings, JSON.stringify(cfg)) }
   catch (e) { console.warn('[cfg] localStorage falhou:', e.message) }
@@ -96,7 +95,7 @@ async function backupCfgToIDB() {
     const prev = (await SettingsDB.get('cfg')) || {}
     const merged = { ...cfg }
     // Protege os campos sensíveis: não apaga um valor já salvo com string vazia
-    for (const k of ['openaiKey', 'n8nBase']) {
+    for (const k of ['openaiKey']) {
       if (!merged[k] && prev[k]) merged[k] = prev[k]
     }
     await SettingsDB.set('cfg', merged)
@@ -110,7 +109,7 @@ async function restoreCfgFromBackup() {
   try { backup = await SettingsDB.get('cfg') } catch {}
   if (!backup || typeof backup !== 'object') return false
   let restored = false
-  const keys = ['openaiKey', 'n8nBase', 'theme', 'aiProvider', 'aiModel', 'ttsProvider']
+  const keys = ['openaiKey', 'theme', 'aiProvider', 'aiModel', 'ttsProvider']
   for (const k of keys) {
     const cur = cfg[k]
     const curEmptyOrDefault = (cur === undefined || cur === '' || cur === DEF_CFG[k])

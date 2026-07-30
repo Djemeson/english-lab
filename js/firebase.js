@@ -158,9 +158,9 @@ async function fbPushData() {
     batch.set(base.collection('data').doc('srsCfg'),   { ...srsCfg,       updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsLog'),   { list: srsLog,    updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsDecks'), { list: srsDecks,  updatedAt: Date.now() })
-    // Configurações da conta (chave OpenAI, URL do n8n, tema, providers).
-    // IMPORTANTE: usamos merge:true e SÓ incluímos chave/URL quando NÃO estão vazias.
-    // Assim, uma sessão/dispositivo sem a chave nunca apaga o valor já salvo na nuvem.
+    // Configurações da conta (chave OpenAI, tema, providers).
+    // IMPORTANTE: usamos merge:true e SÓ incluímos a chave quando NÃO está vazia.
+    // Assim, um dispositivo sem a chave nunca apaga o valor já salvo na nuvem.
     const cfgPayload = {
       theme:       cfg.theme        || 'midnight',
       aiProvider:  cfg.aiProvider   || 'openai',
@@ -169,7 +169,6 @@ async function fbPushData() {
       updatedAt: Date.now()
     }
     if (cfg.openaiKey) cfgPayload.openaiKey = cfg.openaiKey
-    if (cfg.n8nBase)   cfgPayload.n8nBase   = cfg.n8nBase
     batch.set(base.collection('data').doc('cfg'), cfgPayload, { merge: true })
     if (kindleItems.length > 0) {
       batch.set(base.collection('data').doc('kindleQueue'), { list: kindleItems, updatedAt: Date.now() })
@@ -299,14 +298,13 @@ async function fbPull() {
     }
     if (decksDoc.exists)  { srsDecks  = decksDoc.data().list || [];    saveSrsDecks() }
 
-    // Configurações da conta — restaura chave OpenAI / URL n8n / tema / providers.
+    // Configurações da conta — restaura chave OpenAI / tema / providers.
     // Merge seguro: usa o valor da nuvem só quando não estiver vazio,
     // para não apagar configurações locais quando a nuvem ainda está em branco.
     const cfgDoc2 = await base.collection('data').doc('cfg').get()
     if (cfgDoc2.exists) {
       const c = cfgDoc2.data() || {}
       if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
-      if (c.n8nBase)     cfg.n8nBase     = c.n8nBase
       if (c.theme)       cfg.theme       = c.theme
       if (c.aiProvider)  cfg.aiProvider  = c.aiProvider
       if (c.aiModel)     cfg.aiModel     = c.aiModel
@@ -432,7 +430,6 @@ function applyCloudDocs(docs) {
   if (docs.cfg) {
     const c = docs.cfg
     if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
-    if (c.n8nBase)     cfg.n8nBase     = c.n8nBase
     if (c.theme)       cfg.theme       = c.theme
     if (c.aiProvider)  cfg.aiProvider  = c.aiProvider
     if (c.aiModel)     cfg.aiModel     = c.aiModel

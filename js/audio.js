@@ -293,7 +293,7 @@ async function playSrsTTS(text) {
   }
 }
 
-// Busca áudio diretamente da OpenAI TTS (fallback quando n8n não entrega base64)
+// Busca áudio diretamente da OpenAI TTS
 async function fetchAudioBase64(word) {
   const key = cfg.openaiKey || ''
   if (!key || !word) return null
