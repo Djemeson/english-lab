@@ -742,13 +742,14 @@ maxInterval (36500), leechThreshold (50)
       servido como **estático** (`server: Vercel`, sem função Node). Os caminhos relativos do
       SW provaram seu valor: o mesmo código funciona em `/english-lab/` no Pages e em `/` na
       Vercel, sem condicional.
-- [ ] **AÇÃO MANUAL — autorizar `english-lab-seven.vercel.app` no Firebase**:
-      Console → Authentication → Settings → Authorized domains → *Add domain*. Sem isso o
-      login Google na Vercel falha com `auth/unauthorized-domain` e o app **não sincroniza**
-      por lá (funciona local, mas os dados ficam presos naquele navegador).
-      ⚠️ `*.vercel.app` não funciona como curinga. Cada **preview deploy** ganha uma URL
-      própria — o login só vai funcionar nos domínios explicitamente autorizados, então na
-      prática use a URL de produção para estudar de verdade.
+- [x] **`english-lab-seven.vercel.app` autorizado no Firebase** (2026-07-30, feito pelo
+      Djemeson) — login Google e sync funcionam na Vercel. Na mesma passada ele removeu as
+      três sobras do Google AI Studio (`aistudio.google.com`, `ais-dev-…`, `ais-pre-…`), que
+      davam a páginas de terceiros a capacidade de iniciar o login do projeto.
+      Lista atual: `localhost`, `english-lab-726e7.firebaseapp.com`,
+      `english-lab-726e7.web.app`, `djemeson.github.io`, `english-lab-seven.vercel.app`.
+      ⚠️ `*.vercel.app` não funciona como curinga: cada **preview deploy** tem URL própria e
+      **não autentica**. Para estudar de verdade, sempre a URL de produção.
 - [ ] **Hard-refresh + backup depois de abrir a versão nova** (Exportar JSON antes): o service
       worker mudou de `englab-v4` para `englab-v5`.
 - [ ] **Testar o player "Ouvir playlist" com áudio real** (a validação desta sessão usou TTS
