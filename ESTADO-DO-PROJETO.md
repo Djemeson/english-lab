@@ -275,16 +275,31 @@ maxInterval (36500), leechThreshold (50)
       passaram. A causa é operacional — **é preciso estar logado nos dois aparelhos**, e até
       2026-07-30 o login no domínio da Vercel estava bloqueado no Firebase. Nada na interface
       deixava isso óbvio, o que motivou a tela de login abaixo.
-    - **Tela de login (nova)**: aparece na primeira visita de quem não está logado. Entrar é
+    - **Tela de login — 1ª versão REJEITADA e refeita**: a primeira tentativa era um cartão de
+      marketing genérico (marca, título, 3 bullets de benefício, botão). O Djemeson devolveu:
+      *"queria uma tela com design lindo e vc só me deu uma tela de informações"* — e estava
+      certo, trocando o texto aquilo serviria para qualquer SaaS, não tinha nada de idiomas.
+      **Conceito da versão final: a tela É o produto acontecendo.** Um flashcard vivo cicla por
+      quatro palavras que só existem em outra língua (`Fernweh`, `dépaysement`, `estrenar`,
+      `serendipity`) — aparece a palavra com o IPA, há uma **pausa de recall de ~2,5s**, e o
+      significado se revela em verde. É exatamente o gesto que o app ensina, e mostra os 4
+      idiomas suportados sem precisar dizer. Ao fundo, o vocabulário como textura: palavras em
+      Newsreader itálico derivando a 5% de opacidade. Os 3 bullets sumiram; o texto ficou curto
+      e específico. Animação 100% CSS (ciclo de 22s, 4 cards com delay escalonado), sem timer JS.
+    - **Tela de login (comportamento)**: aparece na primeira visita de quem não está logado. Entrar é
       **opcional** — o app funciona inteiro sem conta, só não sincroniza — então há sempre
       "Usar só neste aparelho", que grava `el-login-skipped` e não volta a perguntar; sair da
       conta limpa essa flag. Identidade do projeto: título em **Newsreader**, marca do livro
       sobre `--primary-grad`, brilho de fundo no mesmo vocabulário do `--bg-grad`, **tudo em
       variáveis de tema** (funciona nos 6). `role="dialog"`, foco inicial no botão principal,
-      trava o scroll do fundo, responsiva e respeita `prefers-reduced-motion`. Medido:
-      título 11.6–17.8:1 e subtítulo 5.8–7.6:1 nos 6 temas; descrições e rodapé subiram de
-      `--text3` para `--text2` porque ficavam em 2.36–3.41:1.
-      A única cor fixa é a do botão do Google, por exigência da identidade deles.
+      trava o scroll do fundo, responsiva (338×614 em 375px, sem rolar) e respeita
+      `prefers-reduced-motion` (mostra o 1º card estático já com o significado à vista).
+      **Contraste medido nos 6 temas, sobre o fundo do palco**: na 1ª medição o significado —
+      a linha mais importante da tela — ficava em **3.77:1** no tema light, o IPA reprovava em
+      **todos** (2.36–3.41) e o rótulo do idioma raspava em 4.36 no violet. Corrigido com a
+      mesma técnica dos chips (puxar o acento em direção ao `--text` do tema, preservando o
+      matiz): **0 reprovações, pior caso 5.70:1**. A única cor fixa é a do botão do Google,
+      por exigência da identidade deles.
     - **Filtro de idioma na Biblioteca**: chips com contagem (`Todos 11 · Inglês 6 · Espanhol 3`)
       no **glossário (modo Palavras)**, renderizados só quando há **2+ idiomas** em estudo.
       **Não foi para o modo Cards de propósito**: lá os baralhos (`dk-root-<código>`, criados por
