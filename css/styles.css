@@ -2721,7 +2721,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;
 }
 .login-perks strong{display:block;font-size:.845rem;font-weight:600;color:var(--text);margin-bottom:1px}
-.login-perks span{display:block;font-size:.79rem;line-height:1.5;color:var(--text3)}
+.login-perks span{display:block;font-size:.79rem;line-height:1.5;color:var(--text2)}
 
 .login-google{
   width:100%;height:46px;
@@ -2748,7 +2748,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
 
 .login-note{
   margin-top:18px;padding-top:16px;border-top:1px solid var(--border);
-  font-size:.735rem;line-height:1.55;color:var(--text3);text-align:center;
+  font-size:.75rem;line-height:1.55;color:var(--text2);text-align:center;
 }
 
 @keyframes login-fade{from{opacity:0}to{opacity:1}}
