@@ -2732,7 +2732,9 @@ body.sb-collapsed #fb-user-photo{margin:0}
 }
 .lg-lang{
   font-size:.62rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
-  color:var(--primary);margin-bottom:11px;
+  /* Acento puro raspava em 4.36:1 no violet — puxa 25% p/ o --text do tema */
+  color:color-mix(in srgb, var(--primary) 75%, var(--text));
+  margin-bottom:11px;
 }
 .lg-word{
   font-family:var(--font-display);
@@ -2740,12 +2742,16 @@ body.sb-collapsed #fb-user-photo{margin:0}
   color:var(--text);
 }
 .lg-ipa{
-  font-family:var(--font-mono);font-size:.76rem;color:var(--text3);
+  font-family:var(--font-mono);font-size:.76rem;color:var(--text2);
   margin-top:7px;letter-spacing:.01em;
 }
 /* O significado entra depois — a pausa entre os dois é o recall */
 .lg-meaning{
-  font-size:.85rem;line-height:1.45;color:var(--success);font-weight:600;
+  /* Verde é a cor da "resposta" no app (igual .srs-back-meaning), mas puro
+     reprovava em 3.77:1 no tema light. 70% mantém a identidade e passa AA. */
+  font-size:.85rem;line-height:1.45;font-weight:600;
+  color:var(--success);
+  color:color-mix(in srgb, var(--success) 70%, var(--text));
   margin-top:13px;max-width:29ch;
   opacity:0;
   animation:lg-reveal 22s calc(var(--i) * 5.5s) infinite;
