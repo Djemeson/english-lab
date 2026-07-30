@@ -107,6 +107,8 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
 - `AI_MODELS` / `updateModelOptions` → settings.js
 - `OPENAI_VOICES` / `randomVoice` → audio.js
 - `srsSession` → srs.js
+- `VARIETY_LABELS` / `REGISTER_LABELS` + `varietyChip`/`registerChip` → **lang.js** (2026-07-30)
+- `buildSrsFrente` → **core.js** (2026-07-30)
 **Ao criar algo novo, verifique quem usa antes de decidir onde declarar.**
 
 ---
@@ -253,6 +255,63 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-07-30 (2ª rodada) — Chips de variedade/registro: emoji, contraste e lazy
+44. **Pedido**: aplicar o item que ficou de fora da 1ª rodada (os chips de variedade/registro,
+    únicos emojis restantes na interface). Ao abrir o código, o que era "trocar 13 emojis" virou
+    um bolo de quatro problemas — os três últimos descobertos durante a análise:
+    - **(a) Emoji na interface**: bandeiras 🇺🇸🇬🇧🇦🇺🇨🇦🌍 nas variedades e 💬👥🎩🗣📜📖⚙️⚠️ nos
+      registros. Em todos os casos **o rótulo de texto ao lado já dizia a mesma coisa**
+      ("🇺🇸 AmE", "💬 slang") — o emoji era redundante, não informativo.
+    - **(b) Armadilha nº 1 (lazy)**: `VARIETY_LABELS`/`REGISTER_LABELS` eram declarados em
+      `js/study.js` (**lazy**) e consumidos por `js/audio.js` (**não-lazy**, glossário da
+      Biblioteca). Idem `buildSrsFrente`. Comprovado no console: fora do caminho que carrega o
+      study.js, ambos lançam `ReferenceError`. Hoje é **latente** — `_LAZY.biblioteca` aponta
+      para `study.js`, então na prática não quebra — mas basta mexer nesse mapa para virar crash.
+    - **(c) Cor fixa em hex**, violando "toda cor via variável CSS": 14 regras com `#1d4ed8`,
+      `#be185d`, `#0f766e`… iguais nos 6 temas.
+    - **(d) Contraste reprovado**, consequência de (c). Medido com um verificador WCAG rodando
+      nos 6 temas: **3 a 7 dos 9 chips abaixo de 4.5:1 em cada tema**, pior caso **1.90:1**
+      ("arcaico" no midnight) — praticamente ilegível.
+    - **Correções aplicadas**:
+      - `VARIETY_LABELS`/`REGISTER_LABELS` + os novos `varietyChip()`/`registerChip()`/
+        `varietyShort()` foram para **`js/lang.js` (não-lazy)** — que já era a casa de
+        `varietyLabel`/`typeLabel`/`langChip`. `study.js` e `audio.js` agora chamam os mesmos
+        helpers, o que também **eliminou a duplicação** do bloco de 2 linhas que existia nos dois.
+      - `buildSrsFrente` foi para **`js/core.js`** (ao lado do `escB`, que ela usa). Na mudança
+        passou a reaproveitar o `escR()` que já existia no core — a versão antiga reimplementava
+        o escape de regex inline **três vezes**. **E ganhou escape**: o ramo que insere o `<b>`
+        por regex devolvia a frase **crua** para o `innerHTML`; agora sai por `escB()`. Verificado:
+        `a <script>x</script> & "b" run by` → `a &lt;script&gt;… &amp; &quot;b&quot; <b>run by</b>`.
+      - **Variedade ficou neutra e multi-idioma**: um só caminho para todos os idiomas. Antes o
+        inglês tinha bandeiras e espanhol/francês/alemão caíam num fallback com 🌍. Agora usa
+        `varietyShort()` — "AmE"/"BrE" no inglês (campo `short` novo em `LANGS.en`) e o rótulo
+        próprio nos demais ("Rio da Prata (AR/UY)", "Áustria"). Cor uniforme: são dezenas de
+        variedades somando 4 idiomas, pintar cada uma seria arbitrário e não escalaria.
+      - **Registro passou a ter cor semântica por FAMÍLIA**, toda vinda do tema: vulgar→`--error`,
+        gíria→`--warning`, informal/coloquial→`--purple`, formal/técnico→`--primary`,
+        arcaico/literário→`--text2`. A cor diz a família; o texto diz o termo exato.
+        "slang" virou "gíria" (a interface é toda em PT).
+      - **Fórmula de contraste**: o texto não usa o acento puro — puxa 45% na direção do `--text`
+        do tema (`color-mix(… 55%, var(--text))`), com fundo a 12%. Como `--text` é escuro nos
+        temas claros e claro nos escuros, a mistura empurra para o lado certo **dos dois lados**,
+        sem `if` por tema. Fallback neutro antes das linhas de `color-mix` para navegador antigo.
+    - **Resultado medido (mesmo verificador, antes × depois)**: reprovações por tema
+      `midnight 7→0, light 3→0, sepia 6→0, emerald 7→0, violet 7→0, papel 3→0`; pior caso
+      global **1.90:1 → 4.68:1**. Matizes seguem distinguíveis (vermelho/âmbar/violeta/azul/neutro).
+    - ⚠️ **Nota sobre a medição**: a primeira versão do meu verificador lia o fundo via
+      `getComputedStyle(body).backgroundColor` — mas o `body` tem `transition:background-color
+      .35s`, então eu lia o valor **em transição** e media 5 dos 6 temas contra o fundo errado.
+      Corrigido lendo `--bg` direto. Os números acima são os do verificador corrigido.
+    - **Validado ao vivo**: helpers disponíveis **sem** o study.js carregado (a correção de (b)),
+      glossário com 8/8 chips de registro e 7 de variedade incluindo espanhol e alemão,
+      flashcard com chips na frente e no verso, `general` e registro inexistente devolvendo
+      vazio, 0 emojis em nós de texto no DOM inteiro, 0 erros de console.
+      `CACHE` do `sw.js`: `englab-v5` → **`englab-v6`**.
+    - **Armadilha de desenvolvimento encontrada**: o `python -m http.server` não manda
+      `Cache-Control`, e o Chrome segurou `styles.css`/`lang.js` antigos por várias recargas —
+      inclusive depois de desregistrar o service worker. Truque que resolve: abrir por
+      **`127.0.0.1` em vez de `localhost`** (origem diferente = cache separado).
 
 ### Sessão 2026-07-30 — Cópia `english-lab-2.0`: git, correções e melhorias transversais
 43. **Contexto**: o Djemeson trouxe a pasta `english-lab-2.0` — uma cópia do repositório que
@@ -761,9 +820,9 @@ maxInterval (36500), leechThreshold (50)
 - [ ] **Confirmar o service worker no GitHub Pages** depois do deploy (era o erro que o impedia
       de instalar em `/english-lab/`): DevTools → Application → Service Workers deve mostrar
       escopo `https://djemeson.github.io/english-lab/` e o cache `englab-v5` com 14 entradas.
-- [ ] (Opcional) **Chips de variedade/registro em `js/study.js`** (~linhas 694-721) — únicos
-      emojis que sobraram na interface, deixados de propósito por formarem um vocabulário visual
-      de 8 símbolos. Trocar exige desenhar 8 ícones em `ICONS` e uma passada de design.
+- [x] **Chips de variedade/registro** — feito na 2ª rodada de 2026-07-30 (item 44): emoji
+      removido, movidos para `js/lang.js` (não-lazy), cor pelas variáveis do tema e contraste
+      WCAG AA nos 6 temas. A interface está **100% sem emoji** agora.
 - [ ] **Conferir visualmente o novo Dashboard ao vivo** (após deploy + hard-refresh; a
       validação desta sessão foi só por `getComputedStyle`/dados sintéticos, sem screenshot):
       com dados reais de uso, olhar o heatmap (cores fazem sentido com o histórico real de

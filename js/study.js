@@ -685,24 +685,8 @@ function endSrsSession() {
 }
 
 // ---- Card content builders (for study session) ----
-// ---- Helpers de variedade e registro ----
-const VARIETY_LABELS = {
-  american:   { flag: '🇺🇸', label: 'AmE',     cls: 'american'  },
-  british:    { flag: '🇬🇧', label: 'BrE',     cls: 'british'   },
-  australian: { flag: '🇦🇺', label: 'AuE',     cls: 'australian'},
-  canadian:   { flag: '🇨🇦', label: 'CanE',    cls: 'canadian'  },
-  other:      { flag: '🌍',  label: 'Other',   cls: 'other'     },
-}
-const REGISTER_LABELS = {
-  slang:      { icon: '💬', label: 'slang',      cls: 'slang'      },
-  informal:   { icon: '👥', label: 'informal',   cls: 'informal'   },
-  formal:     { icon: '🎩', label: 'formal',     cls: 'formal'     },
-  colloquial: { icon: '🗣',  label: 'coloquial',  cls: 'colloquial' },
-  archaic:    { icon: '📜', label: 'arcaico',    cls: 'archaic'    },
-  literary:   { icon: '📖', label: 'literário',  cls: 'literary'   },
-  technical:  { icon: '⚙️',  label: 'técnico',   cls: 'technical'  },
-  vulgar:     { icon: '⚠️',  label: 'vulgar',    cls: 'vulgar'     },
-}
+// VARIETY_LABELS/REGISTER_LABELS e os renderizadores de chip vivem em js/lang.js
+// (não-lazy), porque o glossário da Biblioteca (audio.js) também os usa.
 
 function buildMetaChips(card) {
   let chips = ''
@@ -715,39 +699,15 @@ function buildMetaChips(card) {
   }
   // Chip de idioma (só quando não é inglês)
   chips += langChip(cardLang(card))
-  const v = VARIETY_LABELS[card.variety]
-  const r = REGISTER_LABELS[card.register]
-  if (v) chips += `<span class="srs-variety-chip ${v.cls}">${v.flag} ${v.label}</span>`
-  else if (card.variety && card.variety !== 'general') chips += `<span class="srs-variety-chip other">🌍 ${esc(varietyLabel(card.variety, cardLang(card)))}</span>`
-  if (r) chips += `<span class="srs-register-chip ${r.cls}">${r.icon} ${r.label}</span>`
+  // Um caminho só para qualquer idioma — antes o inglês tinha bandeiras e os
+  // demais caíam num fallback genérico com globo.
+  chips += varietyChip(card.variety, cardLang(card))
+  chips += registerChip(card.register)
   if (card.leech) chips += `<span class="srs-leech-chip" title="Sanguessuga: muitas falhas neste card">leech</span>`
   return chips ? `<div class="srs-meta-chips">${chips}</div>` : ''
 }
 
-function buildSrsFrente(card) {
-  const sentence = card.example_en || ''
-  if (!sentence) return ''
-  // Se a frase JÁ vem com o termo marcado em <b> (pela IA), confiamos nela —
-  // o regex abaixo não acerta formas irregulares (run→ran, go→went) nem
-  // expressões, então re-marcar por conta própria APAGARIA o negrito correto.
-  if (/<b>/i.test(sentence)) return escB(sentence)
-  const wordRaw = (card.word || '').trim()
-  if (!wordRaw) return esc(sentence)
-  const isMultiWord = wordRaw.includes(' ')
-  const cleanSentence = sentence.replace(/<\/?b>/gi, '')
-  const wordPattern = wordRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  try {
-    let regex
-    if (isMultiWord) {
-      const parts = wordRaw.split(/\s+/)
-      const particle = parts.slice(1).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
-      regex = new RegExp(`\\b(\\w+(?:'\\w+)?\\s+${particle})\\b`, 'gi')
-    } else {
-      regex = new RegExp(`\\b(${wordPattern}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi')
-    }
-    return cleanSentence.replace(regex, '<b>$1</b>')
-  } catch { return esc(cleanSentence) }
-}
+// buildSrsFrente foi movida para js/core.js (não-lazy) — ver comentário lá.
 
 // Async version checks ImageDB; sync version used for browser preview (no image check)
 async function buildSrsVersoAsync(card) {

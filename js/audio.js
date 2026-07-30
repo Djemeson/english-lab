@@ -673,11 +673,9 @@ function glossWordHtml(g, TYPE) {
   const senses = [...g.senses.values()].sort((a, b) => a.idx - b.idx)
   const typeLabel = TYPE[g.type] || ''
   const sensesHtml = senses.map((s, i) => {
-    const v = VARIETY_LABELS[s.variety]
-    const r = REGISTER_LABELS[s.register]
-    let chips = ''
-    if (v) chips += `<span class="srs-variety-chip ${v.cls}">${v.flag} ${v.label}</span>`
-    if (r) chips += `<span class="srs-register-chip ${r.cls}">${r.icon} ${r.label}</span>`
+    // Renderizadores em js/lang.js (não-lazy) — este arquivo não pode depender
+    // do study.js, que só carrega ao abrir Estudar/Biblioteca.
+    const chips = varietyChip(s.variety, g.lang) + registerChip(s.register)
     const ex = s.examples[0]
     const exHtml = ex ? `<div class="gloss-ex">
         <span class="gloss-ex-en">${buildSrsFrente({ example_en: ex.en, word: g.word })}</span>

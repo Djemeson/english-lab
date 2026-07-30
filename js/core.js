@@ -280,6 +280,33 @@ function escR(s) { return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') }
 function escB(s) {
   return esc(s).replace(/&lt;b&gt;/gi, '<b>').replace(/&lt;\/b&gt;/gi, '</b>')
 }
+
+// Frente do card: a frase com o objeto de estudo em negrito.
+// Mora aqui (NÃO-lazy) porque o glossário da Biblioteca (audio.js, não-lazy)
+// também usa — antes vivia no study.js, que é lazy.
+function buildSrsFrente(card) {
+  const sentence = card.example_en || ''
+  if (!sentence) return ''
+  // Se a frase JÁ vem com o termo marcado em <b> (pela IA), confiamos nela —
+  // o regex abaixo não acerta formas irregulares (run→ran, go→went) nem
+  // expressões, então re-marcar por conta própria APAGARIA o negrito correto.
+  if (/<b>/i.test(sentence)) return escB(sentence)
+  const wordRaw = (card.word || '').trim()
+  if (!wordRaw) return esc(sentence)
+  const cleanSentence = sentence.replace(/<\/?b>/gi, '')
+  try {
+    let regex
+    if (wordRaw.includes(' ')) {
+      // Expressão de várias palavras (phrasal/separável): casa o verbo flexionado
+      // + a(s) partícula(s), tolerando outra palavra no meio.
+      const particle = wordRaw.split(/\s+/).slice(1).map(escR).join('\\s+')
+      regex = new RegExp(`\\b(\\w+(?:'\\w+)?\\s+${particle})\\b`, 'gi')
+    } else {
+      regex = new RegExp(`\\b(${escR(wordRaw)}(?:s|es|ed|d|ing|er|est|ly|'s)?)\\b`, 'gi')
+    }
+    return escB(cleanSentence.replace(regex, '<b>$1</b>'))
+  } catch { return esc(cleanSentence) }
+}
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
 function selectAll(cls, val) {

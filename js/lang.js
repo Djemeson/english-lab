@@ -12,10 +12,10 @@ const LANGS = {
     ipaNote: 'American English',
     varieties: [
       { v: 'general',    label: 'Geral' },
-      { v: 'american',   label: 'American English' },
-      { v: 'british',    label: 'British English' },
-      { v: 'australian', label: 'Australian English' },
-      { v: 'canadian',   label: 'Canadian English' },
+      { v: 'american',   label: 'American English',   short: 'AmE'  },
+      { v: 'british',    label: 'British English',    short: 'BrE'  },
+      { v: 'australian', label: 'Australian English', short: 'AuE'  },
+      { v: 'canadian',   label: 'Canadian English',   short: 'CanE' },
     ],
     varietyRule: 'Use a specific variety only when the word/spelling/sense is predominantly or exclusively used there: "british" (e.g. "lift" = elevator, "lorry", "colour"), "american" (e.g. "soccer", "elevator", "color"), "australian" (e.g. "arvo", "barbie"), "canadian".',
     typeRule: '"phrasal_verb" = verb + particle(s), e.g. "give up", "put up with", "take off". In "type_label" call it "phrasal verb".',
@@ -118,6 +118,50 @@ function varietyLabel(v, langCode) {
 function langChip(langCode) {
   if (!langCode || langCode === 'en') return ''
   return `<span class="chip chip-lang">${esc(getLangDef(langCode).name)}</span>`
+}
+
+// ---------- chips de variedade e registro ----------
+// Moram AQUI (lang.js é NÃO-lazy) de propósito: quem desenha esses chips é o
+// study.js (lazy, na flashcard) E o audio.js (não-lazy, no glossário da
+// Biblioteca). Enquanto os mapas viviam no study.js, o audio.js dependia de um
+// arquivo lazy — a "armadilha nº 1" do projeto. Ver ESTADO-DO-PROJETO, seção 2.
+
+// Registro agrupado por FAMÍLIA de uso: a COR do chip diz a família (ver CSS) e
+// o TEXTO diz o termo exato. Sem emoji — o rótulo já carrega o significado.
+const REGISTER_LABELS = {
+  slang:      { label: 'gíria',      cls: 'slang'      },
+  informal:   { label: 'informal',   cls: 'informal'   },
+  colloquial: { label: 'coloquial',  cls: 'colloquial' },
+  formal:     { label: 'formal',     cls: 'formal'     },
+  technical:  { label: 'técnico',    cls: 'technical'  },
+  literary:   { label: 'literário',  cls: 'literary'   },
+  archaic:    { label: 'arcaico',    cls: 'archaic'    },
+  vulgar:     { label: 'vulgar',     cls: 'vulgar'     },
+}
+
+// Forma curta da variedade: "AmE" em vez de "American English". Só o inglês tem
+// abreviação consagrada; nos outros idiomas o próprio rótulo já é curto
+// ("Quebec", "México", "Áustria"), então cai no label normal.
+function varietyShort(v, langCode) {
+  if (!v || v === 'general') return ''
+  const found = getLangDef(langCode).varieties.find(x => x.v === v)
+  return found ? (found.short || found.label) : v
+}
+
+// Variedade é NEUTRA de propósito: são dezenas de valores somando os 4 idiomas
+// (AmE, BrE, Quebec, Rio da Prata, Áustria…) e pintar cada um seria arbitrário e
+// não escalaria. O rótulo já é preciso; a cor fica reservada ao registro.
+function varietyChip(variety, langCode) {
+  const label = varietyShort(variety, langCode)
+  if (!label) return ''
+  const full = varietyLabel(variety, langCode)
+  return `<span class="srs-variety-chip" data-tip="Variedade: ${escA(full)}">${esc(label)}</span>`
+}
+
+function registerChip(register) {
+  const r = REGISTER_LABELS[register]
+  if (!r) return ''
+  return `<span class="srs-register-chip ${r.cls}">${r.label}</span>`
 }
 
 // ---------- fragmentos de prompt (fonte única da parte dependente de idioma) ----------
