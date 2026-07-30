@@ -8,9 +8,13 @@ fontes (Kindle, séries/filmes, documentos, sites), analisa com IA, gera áudio 
 > modelo de dados, sincronização, SRS, histórico e pendências. Leia antes de mexer em qualquer
 > coisa. Este README é só o resumo de entrada.
 
-- **No ar:** https://djemeson.github.io/english-lab/
-- **Deploy:** push na branch `main` → GitHub Actions valida a sintaxe do JS e publica no
-  GitHub Pages (`.github/workflows/deploy.yml`).
+- **No ar (dois destinos):**
+  - GitHub Pages → https://djemeson.github.io/english-lab/
+  - Vercel → https://english-lab-seven.vercel.app/
+- **Deploy:** um `git push origin main` publica nos **dois**. O GitHub Actions valida a
+  sintaxe do JS, procura marcador de conflito e publica no Pages
+  (`.github/workflows/deploy.yml`); a Vercel republica pela integração Git, como site
+  estático (`vercel.json`).
 
 ## Como é feito
 

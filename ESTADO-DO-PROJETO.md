@@ -55,7 +55,8 @@ analisa com IA (OpenAI), gera áudio (TTS) e estuda com **repetição espaçada 
 
 - **Hospedagem (DOIS destinos, desde 2026-07-30):**
   - GitHub Pages → `https://djemeson.github.io/english-lab/`
-  - Vercel → projeto do time `djemeson's projects`
+  - Vercel → `https://english-lab-seven.vercel.app/` (projeto `english-lab`, time
+    `djemeson's projects`, importado do GitHub em 2026-07-30)
 - **Deploy:** `git push origin main` publica nos **dois** (Actions do Pages + integração Git da
   Vercel). Decisão do Djemeson: **toda alteração vai para os dois destinos**. Confirme o
   Actions (`gh run list --branch main --limit 1`) antes de dar a tarefa por concluída.
@@ -734,16 +735,20 @@ maxInterval (36500), leechThreshold (50)
 
 - [x] **Publicado no GitHub** em 2026-07-30 (`main` = `5e4a32f`, Actions verde, service worker
       confirmado ao vivo em `/english-lab/` com o cache `englab-v5` e 14 arquivos).
-- [ ] **AÇÃO MANUAL — importar o repositório na Vercel** (uma vez só; o Djemeson tem conta,
-      time `djemeson's projects`, ainda sem nenhum projeto). Em vercel.com → *Add New… →
-      Project* → importar `Djemeson/english-lab`, aceitar tudo (o `vercel.json` já define
-      site estático sem build) → *Deploy*. A partir daí, **todo push no `main` publica nos dois
-      destinos sozinho**. Não usar o deploy por upload de arquivos: o app tem ~580KB de fonte
-      e criaria um projeto desconectado do git, exigindo re-upload a cada mudança.
-- [ ] **AÇÃO MANUAL — autorizar o domínio da Vercel no Firebase**, logo depois do import:
-      Console → Authentication → Settings → Authorized domains → adicionar o domínio exato de
-      produção (`*.vercel.app` não funciona como curinga). Sem isso o login Google na Vercel
-      falha com `auth/unauthorized-domain` e o app não sincroniza por lá.
+- [x] **Repositório importado na Vercel** em 2026-07-30 → `https://english-lab-seven.vercel.app/`.
+      Verificado ao vivo: 0 erros de console, service worker registrado no escopo `/` com o
+      cache `englab-v5` e 14 arquivos, `manifest.webmanifest` servido como
+      `application/manifest+json`, `sw.js` com `must-revalidate`, as 7 telas navegando e
+      servido como **estático** (`server: Vercel`, sem função Node). Os caminhos relativos do
+      SW provaram seu valor: o mesmo código funciona em `/english-lab/` no Pages e em `/` na
+      Vercel, sem condicional.
+- [ ] **AÇÃO MANUAL — autorizar `english-lab-seven.vercel.app` no Firebase**:
+      Console → Authentication → Settings → Authorized domains → *Add domain*. Sem isso o
+      login Google na Vercel falha com `auth/unauthorized-domain` e o app **não sincroniza**
+      por lá (funciona local, mas os dados ficam presos naquele navegador).
+      ⚠️ `*.vercel.app` não funciona como curinga. Cada **preview deploy** ganha uma URL
+      própria — o login só vai funcionar nos domínios explicitamente autorizados, então na
+      prática use a URL de produção para estudar de verdade.
 - [ ] **Hard-refresh + backup depois de abrir a versão nova** (Exportar JSON antes): o service
       worker mudou de `englab-v4` para `englab-v5`.
 - [ ] **Testar o player "Ouvir playlist" com áudio real** (a validação desta sessão usou TTS
