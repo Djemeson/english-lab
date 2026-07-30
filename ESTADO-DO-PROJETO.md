@@ -256,6 +256,55 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+### Sessão 2026-07-30 (4ª rodada) — Auditoria de design do projeto inteiro
+46. **Motivo**: o Djemeson reportou um incômodo difuso ("não sei se as cores, ou a bagunça
+    visual, o blob, a falta de sofisticação em embutir certas coisas") e pediu uma auditoria por
+    ÁREAS, no projeto todo — não só na tela que mostrou. A abordagem foi **medir, não opinar**.
+    - **Causa raiz: dispersão de valores.** O que faz uma interface parecer bagunçada quase nunca
+      é uma escolha ruim isolada — são muitos valores diferentes fazendo o mesmo trabalho.
+      Medido no CSS: **77 tamanhos de fonte distintos** (treze deles espremidos entre 0.7 e
+      0.95rem — diferenças invisíveis uma a uma que somadas destroem o ritmo), **36 raios**,
+      **47 sombras**, **46 hex + 61 rgba fixos** fora dos blocos de tema, **137 `!important`**,
+      **129 `style=` inline no index.html** (374 declarações) e **209 nos templates JS**.
+    - **Escala tipográfica** (`--fs-3xs` … `--fs-3xl`, 10 degraus): 255 substituições no CSS +
+      101 nos estilos inline. Renderizado no app: 77 → **escala + 8px/9px**, que são atributos
+      de SVG do gráfico semanal, não CSS.
+    - **Raios** (`--radius-xs/-sm/base/-lg/-pill`): 73 substituições. Sobram só 2–4px em
+      detalhes micro, 50% em círculos e os tokens.
+    - **Cor**: 44 `rgba()` fixos viraram `color-mix()` sobre `--success`/`--error`/`--purple`/
+      `--primary`, então acompanham os 6 temas. Os 22 restantes são `rgba(0,0,0)`/
+      `rgba(255,255,255)` em sombras e overlays, onde preto/branco literal é correto.
+    - **`--text3` reprovava contraste nos 6 temas** (2.36:1 no midnight, 2.37 no light, 3.11 no
+      papel). É o cinza de TODOS os rótulos pequenos do app — sozinho, deixava de 25 a 45
+      elementos ilegíveis por tema. Cada tema recebeu um valor calculado caminhando do valor
+      antigo na direção do `--text2` do próprio tema até cruzar 4.6:1 contra `--surface` E
+      `--bg`. Continua sendo o tom mais leve da hierarquia. **Agora passa AA nos 6.**
+    - **Dashboard (o "blob")**: o hero era um retângulo azul chapado de 1120px com **663px de
+      vazio** entre o número e o botão, num sistema onde todo o resto é cartão claro com borda.
+      Virou cartão da mesma família, com acento no número e numa faixa lateral; o "183" ganhou
+      rótulo (antes era um número sem legenda) e a quebra revisões/novos/sequência passou a
+      ocupar a folga. **Vão: 663px → 28px.**
+    - **Cor sem significado**: os 4 ícones de métrica usavam azul/roxo/verde/âmbar em hex fixo
+      sem codificar nada ("96%" era verde tanto a 96% quanto a 12%). Cor que não carrega
+      informação é ruído — ficaram neutros.
+    - **Dois defeitos de precisão no heatmap**: os rótulos Seg/Qua/Sex ficavam **12px abaixo**
+      das linhas correspondentes (medido: 503,517,531 contra 491,505,519 → agora 0px), e o
+      primeiro rótulo de mês era cortado ao meio por um `translateX(-50%)` — era o "ul" no lugar
+      de "Jul" na tela do Djemeson.
+    - ⚠️ **Regressão que eu mesmo causei e corrigi na sequência**: o script da escala tratou
+      `html{font-size:16px}` como mais um tamanho de texto e o trocou por `var(--fs-base)`
+      (0.95rem). Como `rem` é relativo à raiz, isso virou uma raiz de 15.2px e **encolheu a
+      interface inteira em 5%**. Pego ao medir os tamanhos renderizados (apareciam 10.64,
+      10.944, 11.248… em vez dos tokens). Restaurado para 16px, com comentário no CSS.
+    - **Validado**: 7 telas × 6 temas, 0 erros de console, 0 telas quebradas, raiz em 16px.
+    - **Aberto para a próxima rodada** (medido, não corrigido): 47 sombras distintas,
+      137 `!important`, 338 `style=` inline restantes (a maioria layout, não tipografia),
+      o heatmap com **97% das células vazias** ocupando 344px, e o estado vazio geral do
+      Dashboard quando há pouco histórico.
+    - `CACHE` do `sw.js`: `englab-v11` → **`v16`** (5 deploys nesta rodada).
+
+
+
 ### Sessão 2026-07-30 (3ª rodada) — Fim do n8n, tela de login, filtro de idioma
 45. **Pedidos do Djemeson**: remover o n8n ("não vai mais ser preciso mandar link"), filtro de
     idioma na Biblioteca, uma tela de login "linda e sofisticada", e entender por que a chave da
