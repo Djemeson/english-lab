@@ -66,8 +66,8 @@ analisa com IA (OpenAI), gera áudio (TTS) e estuda com **repetição espaçada 
   (Console → Authentication → Settings → Authorized domains). URL nova = login quebrado até
   adicionar. Precisam estar lá: `djemeson.github.io`, `localhost` e o domínio da Vercel.
 - **IA:** OpenAI (chave fica em `cfg.openaiKey`). Análise e TTS rodam direto no browser.
-- **n8n:** usado APENAS para extrair vocabulário de páginas web (única coisa que o
-  browser não faz sozinho). URL em `cfg.n8nBase`.
+- **n8n:** REMOVIDO em 2026-07-30. O app não depende de nenhum serviço externo próprio —
+  é só navegador + OpenAI + Firebase.
 
 ---
 
@@ -233,8 +233,8 @@ maxInterval (36500), leechThreshold (50)
     "já no estudo" (anti-duplicado). Botão "Adicionar todos" quando há mais de um pendente.
   - Adicionar um item reusa `createWord` + `saveToSrs` (cria a palavra em `pending_review` já com
     significado/exemplos e salva direto no SRS).
-- **Adicionar** — abas Manual / Kindle / Mídia / Website. (A aba **Consulta** saiu daqui e virou a
-  seção **Assistente**.)
+- **Adicionar** — abas Manual / Kindle / Mídia. (A aba **Consulta** virou a seção **Assistente**;
+  a aba **Website** saiu junto com o n8n em 2026-07-30.)
   - **Mídia** tem três entradas: (1) colar texto linha a linha → `analyzeMidiaText`; (2) campo
     opcional de **contexto/gênero** (`#midia-context-new`); (3) **upload/arrastar documento**
     (.md/.txt/.pdf) → `handleMidiaFile` → `extractMidiaDoc`. O doc é lido (PDF via pdf.js do CDN),
@@ -255,6 +255,53 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-07-30 (3ª rodada) — Fim do n8n, tela de login, filtro de idioma
+45. **Pedidos do Djemeson**: remover o n8n ("não vai mais ser preciso mandar link"), filtro de
+    idioma na Biblioteca, uma tela de login "linda e sofisticada", e entender por que a chave da
+    OpenAI configurada no notebook não aparecia no telefone.
+    - **n8n removido por completo**: o n8n existia para UMA coisa — extrair vocabulário de uma
+      URL, a única operação que o navegador não faz sozinho (CORS). Saíram: a aba **Website** e
+      seu painel (`index.html`), o cartão de configuração, `extractSite`/`renderSiteList`/
+      `addSiteSelected` (`add.js`), `testN8nAI` (`settings.js`), o campo `n8nBase` da `cfg`
+      (`core.js`) e do sync (`firebase.js`), a variável `siteItems` e a pasta `n8n/`.
+      **O app agora é 100% navegador + OpenAI + Firebase**, sem nenhum serviço externo próprio
+      para manter. ⚠️ `cfg.n8nBase` pode sobrar no localStorage de quem já usava — é dado morto,
+      ninguém lê, não vale migração.
+    - **Chave da OpenAI que "não aparecia no telefone" — NÃO era bug.** Li o caminho inteiro
+      (`fbPushData` grava a chave com `merge:true` e omite quando vazia; `applyCloudDocs`
+      adota campos não-vazios e chama `fillSettings()` se a tela estiver aberta) e testei os 3
+      cenários ao vivo, inclusive "a nuvem chega enquanto o usuário está em outra tela": todos
+      passaram. A causa é operacional — **é preciso estar logado nos dois aparelhos**, e até
+      2026-07-30 o login no domínio da Vercel estava bloqueado no Firebase. Nada na interface
+      deixava isso óbvio, o que motivou a tela de login abaixo.
+    - **Tela de login (nova)**: aparece na primeira visita de quem não está logado. Entrar é
+      **opcional** — o app funciona inteiro sem conta, só não sincroniza — então há sempre
+      "Usar só neste aparelho", que grava `el-login-skipped` e não volta a perguntar; sair da
+      conta limpa essa flag. Identidade do projeto: título em **Newsreader**, marca do livro
+      sobre `--primary-grad`, brilho de fundo no mesmo vocabulário do `--bg-grad`, **tudo em
+      variáveis de tema** (funciona nos 6). `role="dialog"`, foco inicial no botão principal,
+      trava o scroll do fundo, responsiva e respeita `prefers-reduced-motion`. Medido:
+      título 11.6–17.8:1 e subtítulo 5.8–7.6:1 nos 6 temas; descrições e rodapé subiram de
+      `--text3` para `--text2` porque ficavam em 2.36–3.41:1.
+      A única cor fixa é a do botão do Google, por exigência da identidade deles.
+    - **Filtro de idioma na Biblioteca**: chips com contagem (`Todos 11 · Inglês 6 · Espanhol 3`)
+      no **glossário (modo Palavras)**, renderizados só quando há **2+ idiomas** em estudo.
+      **Não foi para o modo Cards de propósito**: lá os baralhos (`dk-root-<código>`, criados por
+      `ensureLangDecks`) já separam os idiomas na própria árvore — seria redundante. Os totais do
+      topo respeitam o filtro; a busca, que é passageira, não mexe neles. Deriva de `srsCards`,
+      sem estado novo persistido. Novos: `_libLang`, `libLangCounts()`, `libLangChipsHtml()`,
+      `setLibLang()` em `audio.js` e o bloco `.gloss-lang-*` no CSS.
+    - **Auto-update do service worker**: o `sw.js` já fazia `skipWaiting()`+`clients.claim()`,
+      mas o HTML/JS **já carregado** continuava sendo o antigo até um hard-refresh. Isso me
+      enganou **quatro vezes** nesta sessão (cheguei a diagnosticar como bug de código o que era
+      `fillSettings` velho em cache) e enganaria o Djemeson a cada deploy, ainda mais no celular.
+      Agora `init.js` escuta `controllerchange` e recarrega **uma vez** (guard contra laço).
+    - `CACHE` do `sw.js`: `englab-v7` → `v8` → **`v9`**.
+    - **Validado ao vivo na Vercel** (cache limpo): tela de login nos 6 temas e em 375px sem
+      estouro, "Usar só neste aparelho" fechando e não voltando, filtro de idioma narrando
+      11→3→2→11 com os totais certos, chips somindo com 1 idioma só e no modo Cards, as 3 abas
+      restantes do Adicionar abrindo, as 7 telas navegando, 0 erros de console.
 
 ### Sessão 2026-07-30 (2ª rodada) — Chips de variedade/registro: emoji, contraste e lazy
 44. **Pedido**: aplicar o item que ficou de fora da 1ª rodada (os chips de variedade/registro,
@@ -845,11 +892,10 @@ maxInterval (36500), leechThreshold (50)
       e conferir sugestões + resposta como tutor do idioma + termos extraídos no idioma;
       (4) TTS de uma frase em espanhol/alemão (tts-1 é multilíngue); (5) conferir chip de idioma
       nos cards não-ingleses e o glossário.
-- [ ] **Ajustar o workflow do n8n** (`webhook/en-site`): o app agora envia `lang` e `lang_name`
-      no payload — usar no prompt do workflow p/ extrair vocabulário do idioma certo.
+- [x] ~~Ajustar o workflow do n8n~~ — a integração inteira foi removida em 2026-07-30.
 - [x] Nome exibido do app trocado para "Language Lab" (sessão 2026-07-13) — infra
       (repo/URL/Firebase) continua `english-lab` como já era a decisão.
-- [ ] (Multi-idioma, opcional) Filtro por idioma na Biblioteca/glossário.
+- [x] Filtro por idioma no glossário da Biblioteca — feito em 2026-07-30 (item 45).
 - [ ] **Testar a precisão do negrito ao vivo** (sessão 2026-07-13, 2ª rodada — fazer backup/
       Exportar JSON antes do passo 2, que reescreve frases): (1) analisar uma palavra nova em
       Revisar/Assistente e conferir negrito nos dois lados; (2) rodar "Negrito perfeito (IA)"

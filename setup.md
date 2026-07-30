@@ -42,26 +42,12 @@ real** entre todos os aparelhos logados na mesma conta.
 > Antes de testar qualquer coisa relacionada a sync, faça um backup em
 > **Configurações → Exportar JSON**.
 
-## Passo 4 — n8n (opcional, só para a aba "Website")
-
-Extrair vocabulário de uma página web é a única coisa que o navegador não consegue fazer
-sozinho (CORS). Para essa aba funcionar:
-
-1. Importe `n8n/extrair-website.json` no seu n8n (**Workflows → Import from file**).
-2. Configure a credencial de IA usada pelo workflow e ative-o.
-3. Em **Configurações → Extração de Website (n8n)**, informe a URL base da sua instância
-   (sem barra no final) e clique em **Testar conexão**.
-
-> O arquivo `n8n/gerenciar-fila.obsoleto.json` é de uma arquitetura antiga (Google Sheets) e
-> não deve ser importado.
-
 ## Uso diário
 
 | Fluxo | Como |
 |---|---|
 | **Kindle** | Copie o `My Clippings.txt` do Kindle → Adicionar → Kindle → arraste o arquivo → clique na palavra-alvo dentro de cada frase → selecione e processe. |
 | **Mídia / séries** | Adicionar → Mídia. Cole linha a linha (`palavra :: frase`), cole um artigo inteiro, ou arraste um `.md`/`.txt`/`.pdf`. O campo de contexto ("reality de sobrevivência") ajuda a IA a escolher o sentido certo. |
-| **Website** | Adicionar → Website → cole a URL (precisa do n8n). |
 | **Assistente** | Pergunte em português ou no idioma estudado; os termos citados viram botões "Adicionar". |
 | **Revisar** | Confira os significados, escolha quais quer estudar e clique em "Salvar para estudo" — isso cria os cards do SRS. |
 | **Estudar** | Sessão de flashcards. Atalhos: `Espaço` revela / avalia "Bom", `1`–`4` avaliam, `R` repete o áudio, `Z` desfaz. |

@@ -13,7 +13,7 @@
 ## Stack
 
 ```
-[Kindle · Mídia · Documento · Website · Assistente]
+[Kindle · Mídia · Documento · Assistente]
                     ↓
         index.html + js/*.js  (site estático, GitHub Pages)
              ↓                          ↓
@@ -28,23 +28,18 @@
 - **Branches**: `dev` para trabalhar, `main` publica. O workflow
   `.github/workflows/deploy.yml` valida a sintaxe do JS e publica no GitHub Pages.
 - **IA**: OpenAI direto do navegador (gpt-4o-mini como padrão).
+- **Sem serviços próprios**: a integração com n8n foi removida em 2026-07-30.
 - **TTS**: OpenAI `tts-1`, voz aleatória, pré-gerado ao salvar o card. Fallback: Web Speech API.
 - **Imagens**: `gpt-image-1` (o DALL·E 3 foi descontinuado em maio/2026).
 - **SRS**: SM-2 nativo (`js/srs.js`). Sem Anki.
 - **Sync**: Firestore em tempo real (`onSnapshot`), nuvem = fonte da verdade.
-
-## REGRA CRÍTICA — n8n
-
-**Não modificar os arquivos JSON em `n8n/`.** As regras manuais do nó Switch se perdem ao
-reimportar. Mudança no n8n = instrução manual pela interface. O site funciona por completo sem
-o n8n; ele só existe para a aba **Website**.
 
 ## Persistência
 
 **localStorage**
 
 ```javascript
-englab_cfg              // cfg (chave OpenAI, URL n8n, tema, provider, idioma ativo)
+englab_cfg              // cfg (chave OpenAI, tema, provider, idioma ativo)
 englab_words            // words[]
 el-srs-cards            // srsCards[]  (fonte primária é o IndexedDB CardsDB)
 el-srs-cfg              // parâmetros SM-2

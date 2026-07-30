@@ -27,7 +27,6 @@ css/styles.css         todo o CSS (tokens/temas no topo, camadas novas no fim)
 sw.js                  service worker (cache do shell)
 manifest.webmanifest   PWA (instalável no celular)
 js/                    um arquivo por área — ver ESTADO-DO-PROJETO.md, seção 2
-n8n/                   workflows do n8n (usado só para extrair vocabulário de sites)
 ```
 
 ## Rodar localmente
@@ -55,7 +54,7 @@ interface, em **Configurações**:
    Fica no `localStorage`/IndexedDB do aparelho e é enviada apenas para `api.openai.com`.
 2. **Sincronização em nuvem** — login com Google (Firebase). Sincroniza palavras, cards, áudios
    e progresso em tempo real entre dispositivos.
-3. **URL do n8n** *(opcional)* — só é necessária para a aba **Website**, a única operação que o
-   navegador não consegue fazer sozinho.
+O app não depende de nenhum serviço externo próprio: é o navegador falando direto com a
+OpenAI e com o Firebase.
 
 Faça backup de vez em quando: **Configurações → Exportar JSON**.
