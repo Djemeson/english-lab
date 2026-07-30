@@ -77,10 +77,12 @@ function initFirebase() {
       _fbUser = user
       updateFirebaseUI(user)
       if (user) {
+        hideLoginScreen()
         // Sincronização em tempo real (a nuvem é a fonte da verdade)
         attachRealtimeSync()
       } else {
         detachRealtimeSync()
+        maybeShowLoginScreen()
         // Só mostra "desconectado" após a resolução inicial do auth
         // (evita piscar "off" antes do Firebase confirmar o usuário logado)
         setTimeout(() => { if (!_fbUser) updateSyncNav('off') }, 1500)
@@ -136,7 +138,43 @@ async function firebaseSignOut() {
   if (!confirm('Sair da conta Google? Os dados locais são mantidos.')) return
   await _fbAuth?.signOut()
   updateSyncNav('off')
+  // Sair é uma decisão explícita: a tela de login volta a fazer sentido,
+  // então limpamos o "usar só neste aparelho" de antes.
+  try { localStorage.removeItem(SK_LOGIN_SKIP) } catch {}
   toast('Saiu da conta.', 'info')
+}
+
+// ================================================================
+// TELA DE LOGIN
+// Aparece na primeira visita de quem não está logado. Entrar é OPCIONAL —
+// o app funciona inteiro sem conta, só não sincroniza. Quem dispensa uma vez
+// não vê de novo (a porta de entrada continua em Configurações → Nuvem).
+// ================================================================
+const SK_LOGIN_SKIP = 'el-login-skipped'
+
+function maybeShowLoginScreen() {
+  const tela = el('login-screen')
+  if (!tela || _fbUser) return
+  let dispensou = false
+  try { dispensou = localStorage.getItem(SK_LOGIN_SKIP) === '1' } catch {}
+  if (dispensou) return
+  tela.hidden = false
+  document.body.style.overflow = 'hidden'
+  // Foco no botão principal, para teclado e leitor de tela
+  setTimeout(() => tela.querySelector('.login-google')?.focus(), 60)
+}
+
+function hideLoginScreen() {
+  const tela = el('login-screen')
+  if (!tela || tela.hidden) return
+  tela.hidden = true
+  document.body.style.overflow = ''
+}
+
+// "Usar só neste aparelho" — fecha e não volta a perguntar.
+function dismissLoginScreen() {
+  try { localStorage.setItem(SK_LOGIN_SKIP, '1') } catch {}
+  hideLoginScreen()
 }
 
 function userRef(path) {

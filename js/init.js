@@ -51,4 +51,18 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register(swUrl, { scope: './' })
     .then(r => console.log('[SW] registrado, scope:', r.scope))
     .catch(e => console.warn('[SW] falha ao registrar:', e))
+
+  // Atualização automática após um deploy.
+  // O sw.js faz skipWaiting()+clients.claim(), então a versão nova assume o
+  // controle da aba na hora — mas o HTML/JS já carregado continua sendo o
+  // ANTIGO até um refresh. Sem isto, o app fica numa versão velha até o
+  // usuário lembrar de dar hard-refresh (e no celular quase nunca lembra).
+  // Recarregamos UMA vez quando o controlador troca; o guard evita laço.
+  let _swRecarregando = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (_swRecarregando) return
+    _swRecarregando = true
+    console.log('[SW] versão nova assumiu — recarregando')
+    location.reload()
+  })
 }

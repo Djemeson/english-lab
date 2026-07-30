@@ -529,6 +529,45 @@ let _pendingLibraryFilter = null   // { type, deckId } aplicado após render
 let _libMode = 'cards'             // 'cards' (browser por baralho) | 'words' (glossário)
 let _pendingGlossFocus = null      // wordId para destacar ao abrir o glossário
 let _glossSearchFocused = false    // true enquanto o usuário digita na busca do glossário
+let _libLang = 'all'               // filtro de idioma do glossário ('all' = todos)
+
+// Idiomas realmente presentes no estudo, com a contagem de palavras de cada um.
+// Deriva de srsCards — nenhum estado novo persistido.
+function libLangCounts() {
+  const porIdioma = new Map()
+  const vistos = new Set()
+  for (const c of srsCards) {
+    const chave = c.wordId + '|' + cardLang(c)
+    if (vistos.has(chave)) continue
+    vistos.add(chave)
+    const l = cardLang(c)
+    porIdioma.set(l, (porIdioma.get(l) || 0) + 1)
+  }
+  return [...porIdioma.entries()]
+    .map(([code, n]) => ({ code, n, nome: getLangDef(code).name }))
+    .sort((a, b) => b.n - a.n || a.nome.localeCompare(b.nome, 'pt-BR'))
+}
+
+// Só faz sentido oferecer o filtro quando há mais de um idioma em estudo —
+// no modo Cards ele nem aparece, porque lá os baralhos (dk-root-<código>) já
+// separam os idiomas na própria árvore.
+function libLangChipsHtml() {
+  const idiomas = libLangCounts()
+  if (idiomas.length < 2) return ''
+  const total = idiomas.reduce((s, i) => s + i.n, 0)
+  const chip = (code, rotulo, n) => `<button class="gloss-lang-chip${_libLang === code ? ' active' : ''}"
+    onclick="setLibLang('${code}')">${esc(rotulo)}<span class="glc-n">${n}</span></button>`
+  return `<div class="gloss-lang-filter" role="group" aria-label="Filtrar por idioma">
+    ${chip('all', 'Todos', total)}${idiomas.map(i => chip(i.code, i.nome, i.n)).join('')}
+  </div>`
+}
+
+function setLibLang(code) {
+  if (_libLang === code) return
+  _libLang = code
+  _glossSearchFocused = false
+  renderWordsGlossary()
+}
 
 function openBiblioteca() {
   const emptyEl = el('biblioteca-empty')
@@ -613,6 +652,10 @@ function renderWordsGlossary(query) {
   let groups = [...byWord.values()].sort((a, b) =>
     (a.word || '').localeCompare(b.word || '', 'en', { sensitivity: 'base' }))
 
+  // Filtro de idioma ANTES da contagem: os totais no topo devem refletir o
+  // escopo escolhido. A busca, que é passageira, não mexe nesses números.
+  if (_libLang !== 'all') groups = groups.filter(g => g.lang === _libLang)
+
   const totalWords = groups.length
   const totalSenses = groups.reduce((n, g) => n + g.senses.size, 0)
 
@@ -634,8 +677,10 @@ function renderWordsGlossary(query) {
     <div class="card-box-header gloss-header">
       <div class="gloss-head-info">
         <h3>${totalWords} palavra${totalWords !== 1 ? 's' : ''}</h3>
-        <span class="gloss-head-sub">${totalSenses} sentido${totalSenses !== 1 ? 's' : ''} em estudo</span>
+        <span class="gloss-head-sub">${totalSenses} sentido${totalSenses !== 1 ? 's' : ''} em estudo${
+          _libLang !== 'all' ? ' · ' + esc(getLangDef(_libLang).name) : ''}</span>
       </div>
+      ${libLangChipsHtml()}
       <input type="text" id="gloss-search" placeholder="Buscar palavra ou significado..."
         value="${escA(q)}" oninput="renderWordsGlossaryDebounced(this.value)"
         class="gloss-search-input">

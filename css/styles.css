@@ -1774,6 +1774,30 @@ body.sb-collapsed #fb-user-photo{margin:0}
 /* Glossário (modo Palavras) */
 .gloss-header{gap:16px;flex-wrap:wrap}
 .gloss-head-info{display:flex;align-items:baseline;gap:9px}
+
+/* Filtro de idioma do glossário — só renderizado quando há 2+ idiomas em estudo */
+.gloss-lang-filter{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.gloss-lang-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 11px;border-radius:999px;cursor:pointer;
+  font-size:0.76rem;font-weight:600;white-space:nowrap;
+  background:var(--surface2);color:var(--text2);
+  border:1px solid var(--border);
+  transition:background .15s ease,color .15s ease,border-color .15s ease;
+}
+.gloss-lang-chip:hover{background:var(--surface3);color:var(--text)}
+.gloss-lang-chip.active{
+  background:rgba(var(--primary-rgb),.14);
+  color:var(--primary);
+  border-color:rgba(var(--primary-rgb),.42);
+}
+.gloss-lang-chip .glc-n{
+  font-size:0.68rem;font-weight:700;opacity:.7;
+  font-variant-numeric:tabular-nums;
+}
+@media(max-width:768px){
+  .gloss-lang-filter{margin-left:0;width:100%;order:3}
+}
 .gloss-head-sub{font-size:0.78rem;color:var(--text3);font-weight:500}
 .gloss-search-input{
   flex:1;min-width:200px;max-width:340px;margin-left:auto;
@@ -2636,3 +2660,110 @@ body.sb-collapsed #fb-user-photo{margin:0}
   .pl-word { font-size: 1.5rem }
 }
 
+
+/* ================================================================
+   TELA DE LOGIN
+   Identidade do projeto: fundo do tema com um brilho suave do acento,
+   título em Newsreader (a serifada usada nos headers e nas flashcards),
+   corpo em Inter. Zero cor fixa — funciona nos 6 temas.
+   ================================================================ */
+.login-screen{
+  position:fixed;inset:0;z-index:4000;
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;overflow-y:auto;
+  background:var(--bg);
+  animation:login-fade .45s ease both;
+}
+.login-screen[hidden]{display:none}
+
+/* Brilho de acento atrás do cartão — o mesmo vocabulário visual do --bg-grad */
+.login-aurora{
+  position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(720px 420px at 18% 8%,  rgba(var(--primary-rgb),.20), transparent 62%),
+    radial-gradient(640px 400px at 88% 96%, rgba(var(--primary-rgb),.13), transparent 60%);
+}
+
+.login-card{
+  position:relative;width:100%;max-width:430px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:calc(var(--radius) + 6px);
+  box-shadow:var(--shadow);
+  padding:38px 34px 30px;
+  animation:login-rise .5s cubic-bezier(.22,1,.36,1) both;
+}
+
+.login-brand{display:flex;align-items:center;gap:10px;margin-bottom:26px}
+.login-mark{
+  display:grid;place-items:center;width:38px;height:38px;flex-shrink:0;
+  border-radius:11px;background:var(--primary-grad);
+  box-shadow:0 6px 18px rgba(var(--primary-rgb),.32);
+}
+.login-mark svg{width:21px;height:21px;fill:none;stroke:#fff;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.login-wordmark{font-size:1.03rem;font-weight:700;letter-spacing:-.2px;color:var(--text)}
+.login-wordmark span{
+  background:var(--primary-grad);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+.login-title{
+  font-family:var(--font-display);
+  font-size:1.92rem;font-weight:600;line-height:1.18;letter-spacing:-.4px;
+  color:var(--text);margin-bottom:12px;
+}
+.login-sub{font-size:.9rem;line-height:1.62;color:var(--text2);margin-bottom:26px}
+
+.login-perks{list-style:none;display:flex;flex-direction:column;gap:15px;margin-bottom:28px}
+.login-perks li{display:flex;gap:12px;align-items:flex-start}
+.login-perks .ic{
+  width:17px;height:17px;flex-shrink:0;margin-top:2px;color:var(--primary);
+  fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;
+}
+.login-perks strong{display:block;font-size:.845rem;font-weight:600;color:var(--text);margin-bottom:1px}
+.login-perks span{display:block;font-size:.79rem;line-height:1.5;color:var(--text3)}
+
+.login-google{
+  width:100%;height:46px;
+  display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  font-family:inherit;font-size:.92rem;font-weight:600;
+  color:#3c4043;background:#fff;
+  border:1px solid rgba(0,0,0,.10);border-radius:calc(var(--radius-sm) + 1px);
+  cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.16);
+  transition:transform .16s ease, box-shadow .16s ease, filter .16s ease;
+}
+/* O botão do Google tem cor de marca fixa por exigência da identidade dele —
+   é a única cor não-temática da tela, e por isso o hover mexe só no brilho. */
+.login-google:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.22);filter:brightness(.985)}
+.login-google:active{transform:translateY(0)}
+.login-google img{display:block}
+
+.login-skip{
+  width:100%;margin-top:11px;padding:10px;
+  font-family:inherit;font-size:.845rem;font-weight:600;
+  color:var(--text2);background:none;border:none;border-radius:var(--radius-sm);
+  cursor:pointer;transition:color .16s ease,background .16s ease;
+}
+.login-skip:hover{color:var(--text);background:var(--surface2)}
+
+.login-note{
+  margin-top:18px;padding-top:16px;border-top:1px solid var(--border);
+  font-size:.735rem;line-height:1.55;color:var(--text3);text-align:center;
+}
+
+@keyframes login-fade{from{opacity:0}to{opacity:1}}
+@keyframes login-rise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+
+@media(max-width:480px){
+  .login-screen{padding:16px;align-items:flex-start}
+  .login-card{padding:30px 22px 24px;border-radius:var(--radius)}
+  .login-title{font-size:1.6rem}
+  .login-perks{gap:13px;margin-bottom:24px}
+}
+/* Telas baixas (celular deitado): o cartão rola em vez de estourar */
+@media(max-height:640px){ .login-screen{align-items:flex-start} }
+
+@media(prefers-reduced-motion:reduce){
+  .login-screen,.login-card{animation:none}
+  .login-google{transition:none}
+}

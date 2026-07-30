@@ -24,6 +24,55 @@
 </head>
 <body>
 
+<!-- =========== TELA DE LOGIN (primeira visita / após sair) =========== -->
+<!-- Fica oculta por padrão; js/firebase.js decide quando mostrar. Entrar é
+     OPCIONAL: o app funciona 100% local, então há sempre a saída "sem conta". -->
+<div id="login-screen" class="login-screen" hidden>
+  <div class="login-aurora" aria-hidden="true"></div>
+
+  <main class="login-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
+    <div class="login-brand">
+      <span class="login-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 6.5C10 5 7 4.5 3 5v14c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5z"/><path d="M12 6.5V20"/></svg>
+      </span>
+      <span class="login-wordmark">Language <span>Lab</span></span>
+    </div>
+
+    <h1 id="login-title" class="login-title">Seu vocabulário,<br>em todos os aparelhos.</h1>
+    <p class="login-sub">
+      Entre com o Google para levar palavras, cards, áudios e o progresso de estudo
+      do computador para o celular — e de volta — sem exportar nada.
+    </p>
+
+    <ul class="login-perks">
+      <li>
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 0 0 .5-9 6 6 0 0 0-11.6-1.5A4 4 0 0 0 7 19z"/></svg>
+        <div><strong>Sincronização em tempo real</strong><span>O que você estuda aqui aparece lá na hora.</span></div>
+      </li>
+      <li>
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <div><strong>Sua chave da OpenAI vai junto</strong><span>Configure uma vez; ela chega nos outros aparelhos.</span></div>
+      </li>
+      <li>
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div><strong>Backup automático</strong><span>Trocou de celular? O estudo continua de onde parou.</span></div>
+      </li>
+    </ul>
+
+    <button class="login-google" onclick="firebaseSignIn()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" width="18" height="18">
+      Entrar com o Google
+    </button>
+
+    <button class="login-skip" onclick="dismissLoginScreen()">Usar só neste aparelho</button>
+
+    <p class="login-note">
+      Sem conta, tudo continua funcionando — mas os dados ficam apenas
+      neste navegador e não são copiados para lugar nenhum.
+    </p>
+  </main>
+</div>
+
 <!-- MOBILE HEADER -->
 <header class="mobile-header">
   <div class="mob-logo-brand" onclick="showSection('dashboard')" style="cursor: pointer;">
