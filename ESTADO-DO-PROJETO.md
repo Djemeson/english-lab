@@ -256,6 +256,55 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+### Sessão 2026-07-31 — Abas: informação solta vira informação organizada
+52. **Pedido**: "aplique abas sofisticadas e inteligentes onde for necessário — na dashboard tem
+    muita informação solta". A decisão de ONDE foi medida, não achada:
+
+    | Tela | Rolagem | Blocos | Recebeu aba? |
+    |---|---|---|---|
+    | Dashboard | **2,2×** | **13** | sim |
+    | Configurações | 1,2× | 5 | sim |
+    | Biblioteca / Estudar / Revisar / Assistente / Adicionar | ≤ 0,8× | 0–1 | **não** |
+
+    Só duas telas justificavam. As outras **não ganharam aba** — pôr aba onde não há acúmulo
+    troca rolagem por clique, o que é pior.
+    - **Dashboard → 3 painéis**, agrupados pela PERGUNTA que cada bloco responde, não por tipo
+      de gráfico: **Progresso** (como estou indo no tempo — heatmap, volume semanal, acerto),
+      **Vocabulário** (o que eu tenho e de onde veio — idiomas, fontes, leeches, palavra em
+      destaque, adicionadas recentemente) e **Conquistas** (os 6 marcos).
+      **Hero e as 4 métricas ficam SEMPRE visíveis acima das abas** — esconder a ação principal
+      atrás de uma aba seria trocar bagunça por fricção.
+      Resultado: 1980px → **1191/1085/692px** por aba.
+    - **Configurações → 4 painéis**, agrupados por INTENÇÃO (quem entra ali quer resolver UMA
+      coisa): **Conta**, **IA e áudio** (a chave e a manutenção de TTS vivem juntas porque a
+      chave é o que alimenta o áudio), **Aparência**, **Dados**. 1085px → **324px**.
+      O botão de salvar saiu do rodapé da página e foi para a aba de IA, a única com campo
+      editável — solto no fim, ele sugeria que salvava tudo.
+    - **O que faz as abas serem "inteligentes" e não só abas**: só o painel ativo é renderizado
+      (os gráficos são SVG montado em string — não vale construir três telas para esconder
+      duas); a aba escolhida **persiste** em `el-ui-prefs`, então voltar devolve onde você
+      estava; e **as abas avisam o que têm dentro** — Conquistas mostra `2/6` e Vocabulário
+      ganha um sinal âmbar com a contagem de cards travando na memória.
+    - **Acessibilidade**: `role="tablist"/"tab"/"tabpanel"`, `aria-selected`, `aria-controls`,
+      roving `tabindex` e setas ←/→ · Home/End percorrendo as abas, com o foco acompanhando.
+    - **Componente compartilhado**: em vez de duplicar, as abas viraram `.seg-tabs`/`.seg-tab`
+      e as duas telas usam o mesmo visual, a mesma semântica e o mesmo comportamento.
+    - ⚠️ **Dois bugs meus, achados por medição e corrigidos**:
+      1. A cirurgia nas Configurações deixou **um `</div>` sobrando** (192 aberturas × 193
+         fechamentos). O navegador corrige sozinho, então a tela "funcionava" — mas a árvore
+         ficava aninhada errado. Achado por contagem de profundidade, não a olho.
+      2. Anexei o estado das abas no **fim** do `settings.js`, mas `fillSettings()` usa
+         `_settingsTab` e roda assim que a seção abre → `Cannot access '_settingsTab' before
+         initialization` (zona morta temporal do `let`), e a tela de Configurações parava de
+         abrir. As declarações foram para o topo dos dois arquivos.
+         > Lição registrada: **função que roda no boot não pode depender de `let`/`const`
+         > declarado depois no mesmo arquivo** — o hoisting salva a função, não a variável.
+    - **Validado**: 42 combinações tema × tela sem problema, teclado e persistência conferidos,
+      todos os controles críticos (chave, 6 temas, os 4 botões de dados, login) alcançáveis.
+      `CACHE`: `v21` → **`v24`**.
+
+
+
 ### Sessão 2026-07-30 (4ª rodada) — Auditoria de design do projeto inteiro
 46. **Motivo**: o Djemeson reportou um incômodo difuso ("não sei se as cores, ou a bagunça
     visual, o blob, a falta de sofisticação em embutir certas coisas") e pediu uma auditoria por
