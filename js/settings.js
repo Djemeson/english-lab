@@ -1,4 +1,14 @@
 // ================================================================
+// ABAS DAS CONFIGURAÇÕES — estado
+// Declarado no TOPO de propósito: fillSettings() usa _settingsTab e é
+// chamada assim que a seção abre. Com o `let` no fim do arquivo, qualquer
+// chamada antes daquela linha caía na zona morta temporal (TDZ) e
+// derrubava a tela inteira de Configurações.
+// ================================================================
+const SETTINGS_TABS = ['conta', 'ia', 'aparencia', 'dados']
+let _settingsTab = (typeof loadUiPrefs === 'function' && loadUiPrefs().settingsTab) || 'conta'
+
+// ================================================================
 // SETTINGS
 // ================================================================
 // Modelos de IA por provider (usado por fillSettings — fica aqui, arquivo não-lazy)
@@ -220,8 +230,6 @@ function togglePasswordVisibility(id) {
 // quem entra aqui quer resolver uma coisa — conectar a conta, colar a
 // chave, trocar o tema ou mexer nos dados — não ler cinco cartões.
 // ================================================================
-const SETTINGS_TABS = ['conta', 'ia', 'aparencia', 'dados']
-let _settingsTab = (typeof loadUiPrefs === 'function' && loadUiPrefs().settingsTab) || 'conta'
 
 function setSettingsTab(tab, foco) {
   if (!SETTINGS_TABS.includes(tab)) tab = 'conta'

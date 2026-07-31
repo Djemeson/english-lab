@@ -1,3 +1,8 @@
+// Estado das abas do painel — no TOPO pelo mesmo motivo do settings.js:
+// renderDashboard() chama setDashTab(_dashTab) e roda no boot.
+let _dashTab = (typeof loadUiPrefs === 'function' && loadUiPrefs().dashTab) || 'progresso'
+const DASH_TABS = ['progresso', 'vocabulario', 'conquistas']
+
 // ================================================================
 // DASHBOARD
 // ================================================================
@@ -525,8 +530,6 @@ function dashRecentCard() {
 // não vale construir três telas para esconder duas. A aba escolhida
 // persiste em el-ui-prefs, então voltar ao painel devolve onde você estava.
 // ================================================================
-let _dashTab = (typeof loadUiPrefs === 'function' && loadUiPrefs().dashTab) || 'progresso'
-const DASH_TABS = ['progresso', 'vocabulario', 'conquistas']
 
 function setDashTab(tab, foco) {
   if (!DASH_TABS.includes(tab)) tab = 'progresso'
