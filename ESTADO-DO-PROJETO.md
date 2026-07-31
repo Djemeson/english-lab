@@ -256,6 +256,41 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+### Sessão 2026-07-31 (6ª rodada) — Assistente auditado pelo print + fim dos confirm() nativos
+57. **Pedido**: migrar os `confirm()` restantes e auditar o print do Assistente (melhorias,
+    correções, layout, design).
+    - **IPA com barras duplas (`//ˈbɛtər...//`) — causa raiz no PRÓPRIO prompt**: o
+      `consultaSystem()` pedia a pronúncia "entre barras: //" e o modelo obedecia ao pé da
+      letra. Agora pede barras SIMPLES com exemplo (`/ˈwɔːtər/`), e `formatConsultaReply`
+      normaliza as mensagens **antigas** no render (`//…//` → `/…/`, regex de span curto que
+      não encosta em URLs — verificado com `https://example.com/path` intacta).
+    - **Exemplos repetidos** (a mesma frase 3× no print): o prompt agora exige exemplos
+      genuinamente diferentes (tempos verbais, sujeitos e situações distintas), na linha do que
+      o `review.js` já fazia.
+    - **Layout do chat**: a bolha da IA esticava a 90+ caracteres por linha — medida travada em
+      `min(70ch, 92%)`, line-height 1.65. **Placeholder acompanha o idioma ativo** (dizia
+      "em inglês" fixo mesmo com o seletor em espanhol). **Botão copiar** em cada resposta da
+      IA (hover, feedback de check, `navigator.clipboard`).
+    - **ZERO `confirm()` nativos no app** (eram 15):
+      - Os 4 dos lotes de IA eram **confirmação dupla** com o modal de custo — fundidos:
+        `aiConfirmBatch` ganhou `opts.detalhe` (os tópicos entram no próprio modal de custo)
+        e `opts.sempre` (operações que REESCREVEM conteúdo confirmam mesmo custando centavos:
+        reanalisar, negrito, reprocessar variedade).
+      - Os 11 restantes viraram `confirmModal`: excluir cards/card/baralho/conversa/itens/
+        palavra (danger), sair da conta (copy melhorada: "nada é apagado"), importar backup,
+        resetar Kindle, e **"apagar todos os dados" — que era um confirm DUPLO** e virou um
+        único modal danger com a lista do que será apagado (inclui o aviso de nuvem quando
+        logado) e o lembrete de backup.
+      - Funções que eram síncronas viraram async (`deleteSrsCard`, `deleteDeckUI`,
+        `deleteConversa`, `deleteSelected`, `deleteWord`, `clearKindleSeen`, callback do
+        `importData`).
+    - **Validado ao vivo** (Vercel, v29): IPA antigo normalizado e URL preservada, prompt novo
+      com as duas regras, bolha em 70ch com copiar no hover, modal "Sair da conta" e "Apagar
+      todos os dados" (danger, 4 itens, botão "Apagar tudo"), lote com custo+detalhe no mesmo
+      modal, 0 erros de console.
+
+
+
 ### Sessão 2026-07-31 (5ª rodada) — Custos em reais + modal de confirmação de verdade
 56. **Pedido**: os custos estavam em dólar (a OpenAI cobra em dólar) e a janela era o
     `confirm()` nativo — "aquela de quando a pessoa aprende a programar".
