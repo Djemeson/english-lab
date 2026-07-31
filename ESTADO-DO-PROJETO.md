@@ -256,6 +256,28 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+### Sessão 2026-07-31 (5ª rodada) — Custos em reais + modal de confirmação de verdade
+56. **Pedido**: os custos estavam em dólar (a OpenAI cobra em dólar) e a janela era o
+    `confirm()` nativo — "aquela de quando a pessoa aprende a programar".
+    - **Conversão para reais**: `aiUsdBrl()` busca a cotação comercial USD→BRL do dia na
+      **AwesomeAPI** (gratuita, sem chave, timeout 3,5s), cacheia 24h no localStorage
+      (`el-usd-brl`); se a consulta falhar usa a última cotação conhecida mesmo vencida e, em
+      último caso, câmbio fixo 5,50. `aiEstimate`/`aiConfirmBatch` viraram **async** — os 6
+      call sites receberam `await`.
+    - **`confirmModal()` genérico em core.js** (Promise<boolean>): overlay com blur no padrão
+      do `inputModal`, cartão do tema, `role="alertdialog"`, Enter confirma, Esc/clique-fora
+      cancelam, foco inicial no botão de ação. Disponível para substituir os demais
+      `confirm()` nativos do app no futuro (sair da conta, limpar dados, excluir deck…).
+    - **O diálogo de lote virou informativo de verdade**: linhas Operação / Chamadas à OpenAI /
+      Modelo (com a qualidade da imagem por extenso) / **Custo estimado em destaque**
+      (Newsreader, cor do acento), nota com a cotação usada, e o botão de confirmar carrega o
+      valor: **"Continuar — R$ 6,41"**. Limiar de não-interromper mantido (~R$ 0,12).
+    - **Validado ao vivo na Vercel**: cotação real da API (R$ 5,08 em 189ms), cache 24h
+      funcionando (2ª chamada 0ms), modal com todas as linhas, Cancelar→false, Continuar→true,
+      Esc→false, lote barato passa sem modal, 0 erros de console. `CACHE`: **`englab-v28`**.
+
+
+
 ### Sessão 2026-07-31 (4ª rodada) — Kindle e Mídia a partir de prints de produção
 55. **Pedido**: analisar dois prints reais (Kindle com 41 destaques em tradução; aba Mídia
     "cheia de campos") e corrigir/empoderar. Cada mudança nasceu de um defeito visível no print:
