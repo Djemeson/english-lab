@@ -256,6 +256,37 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+### Sessão 2026-07-31 (4ª rodada) — Kindle e Mídia a partir de prints de produção
+55. **Pedido**: analisar dois prints reais (Kindle com 41 destaques em tradução; aba Mídia
+    "cheia de campos") e corrigir/empoderar. Cada mudança nasceu de um defeito visível no print:
+    - **BUG de entidades HTML no Kindle**: `&quot;Your fault, Gaius` aparecia CRU na tela — o
+      export do Kindle é HTML e o parser (`parseKindleHTML`) nunca decodificava entidades, que
+      vazavam para a interface **e para os prompts de IA**. Novo `decodeEntities()` (textarea
+      trick) no título/capítulo/texto + **migração leve em `loadKindleQueue`** para consertar
+      itens já persistidos na fila. Títulos-nome-de-arquivo ("Emperor_ The Gates of Rome_ A N")
+      normalizados por `cleanSourceTitle()` (underscores → espaço).
+    - **Kindle — progresso real**: "Traduzindo 41 destaques..." (estático) virou
+      "Traduzindo 20/41..." por lote, com rótulo final "tradução concluída".
+    - **Kindle — contador vivo**: "Adicionar selecionados (N)" atualiza a cada checkbox
+      (delegação de `change`).
+    - **Kindle — empoderamento**: botão **"Sugerir alvos (IA)"** — para cada destaque
+      selecionado ainda sem palavra-alvo, a IA aponta o melhor item de estudo da frase
+      (pool de 4, custo confirmado via `aiConfirmBatch`, reusa `detectKindleWord`). Antes a
+      única via era clicar palavra por palavra em 41 frases.
+    - **Mídia — estrutura**: a pilha de campos soltos virou **dois passos com moldura**
+      ("1 · Fonte": chips + título/contexto lado a lado com placeholders completos — antes
+      truncavam sem fechar parêntese; "2 · Material": dropzone compacta AO LADO do textarea).
+    - **Mídia — botão único inteligente**: "Extrair material colado" × "Analisar linha a
+      linha" exigiam saber a diferença. Agora `midiaDetectMode()` classifica pelo formato
+      (mediana de palavras por linha ≤ 8 = lista), o hint anuncia o modo **antes** de rodar e o
+      rótulo do botão muda junto ("Analisar 3 linhas" / "Extrair material completo"). As duas
+      funções originais continuam por trás — zero mudança de lógica de análise.
+    - **Validado ao vivo** (Vercel, v27): parser decodificando (`"Your fault, Gaius," he said
+      & laughed.`), fila migrada, 2 grupos na Mídia, detecção lista/artigo/vazio trocando hint
+      e rótulo, botões novos no lugar, 0 erros de console.
+
+
+
 ### Sessão 2026-07-31 (3ª rodada) — Reforma visual "profissional + personalizável" + 4 propostas de IA
 54. **Pedido**: "visualmente parece brincadeira de criança — deixe profissional, comercial e
     personalizável" + aplicar as 4 propostas de IA do item 53. O que fazia parecer amador tinha
