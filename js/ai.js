@@ -193,8 +193,10 @@ async function aiUsdBrl() {
 }
 
 function _aiUnitUsd(tipo) {
+  // Cada imagem custa também a chamada de texto que descreve a cena
+  // (buildImageScene, em audio.js) — ~2% do total, mas entra na conta.
   return tipo === 'image'
-    ? (AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium)
+    ? (AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium) + AI_COST.chat
     : (AI_COST[tipo] || 0.001)
 }
 

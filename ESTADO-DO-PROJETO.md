@@ -3,7 +3,14 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-07-31 — **Sidebar reformada (7ª rodada)**: os 254px de vazio (35% da
+> Última atualização: 2026-07-31 — **Imagem do card ilustra o SENTIDO (11ª rodada)**: o prompt
+> mandava a palavra estrangeira + o significado em português para o modelo de imagem, que
+> ancorava no sentido mais comum ("tally" 2/2 = concordar saía como marcas de contagem). Agora
+> `buildImageScene()` traduz o sentido numa cena em inglês, com os outros sentidos da palavra
+> como proibição, e a palavra não vai mais para o modelo de imagem.
+> Ver seção 8 (sessão 2026-07-31, 11ª rodada).
+>
+> Última atualização anterior: 2026-07-31 — **Sidebar reformada (7ª rodada)**: os 254px de vazio (35% da
 > altura) viraram um bloco **"Hoje"** ancorado no fim do menu (progresso do dia + sequência),
 > o rótulo "MENU" virou dois grupos ("Geral" e "Vocabulário"), o item ativo trocou gradiente +
 > anel por tinta chapada + marca de 3px no vinco da barra, os contadores viraram pílulas tintas
@@ -263,6 +270,34 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-07-31 (11ª rodada) — A imagem do card passa a ilustrar O SENTIDO, não a palavra
+62. **Pedido**: um print do card de "tally" no sentido **2/2** ("bater, concordar com") com uma
+    imagem de **marcas de contagem** — o sentido 1. "Já foi a segunda tentativa."
+    - **Causa raiz no prompt, não no modelo**: `generateCardImage` montava
+      `...flashcard image for the word "tally". Meaning: "bater, concordar (com)"` — a palavra
+      estrangeira em destaque e o significado em **português** para um modelo que só entende
+      cena. Ele ancorava no sentido mais comum da palavra e ignorava o resto. Nada no prompt
+      dizia que existia outro sentido, nem que ele era proibido; e a frase de exemplo
+      ("evidence presented in court") ainda empurrava para o tribunal do print.
+    - **Correção — descrever a cena antes de desenhar**: novo **`buildImageScene(card)`**
+      (`js/audio.js`, não-lazy) faz uma chamada de texto barata (gpt-4o-mini, ~US$ 0,001 = 2%
+      do custo da imagem) que recebe a palavra, o sentido, a definição, a frase **e a lista dos
+      OUTROS sentidos como proibição explícita**, e devolve `{"scene": "..."}`: uma cena
+      concreta em inglês, incompatível com os outros sentidos. **A palavra não vai mais para o
+      modelo de imagem** — era justamente ela que puxava para o sentido errado.
+    - **Proibições reforçadas**: o antigo "No text or lettering" virou "No text, letters,
+      numbers, symbols, **tally marks**, signs or captions" — as marcas de contagem do print
+      passavam pela regra antiga.
+    - **Fallback**: se a descrição falhar (chave inválida, rede), o prompt antigo continua
+      valendo — pior para palavra polissêmica, melhor que não gerar nada. O botão mostra
+      "Descrevendo..." e depois "Gerando...".
+    - **Custo**: `_aiUnitUsd('image')` passou a somar a chamada de texto, então a estimativa em
+      reais dos lotes continua honesta.
+    - **Validado ao vivo com `fetch` stubado** (zero dólar gasto): com "tally" sentido 2, o
+      prompt de texto lista `"contagem, registro"` como proibido e o prompt de imagem sai
+      **sem a palavra**, só com a cena + proibições; com a chamada de texto retornando 401, cai
+      no prompt antigo e ainda gera. `CACHE`: `englab-v36` → **`englab-v37`**.
 
 ### Sessão 2026-07-31 (10ª rodada) — Sessão de estudo usa a tela inteira + mobile
 61. **Pedido**: "muita margem nas laterais, sem aproveitamento — a imagem podia ser bem maior;

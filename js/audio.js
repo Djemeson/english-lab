@@ -353,6 +353,53 @@ async function refreshImageKeyCache() {
   _imageKeyCache = new Set(Object.keys(all))
 }
 
+// Descreve a CENA antes de desenhar.
+//
+// Por que existe (2026-07-31): o prompt mandava a palavra estrangeira em
+// destaque e o significado em PORTUGUÊS para um modelo de imagem que só
+// entende cena. Resultado: ele ancorava no sentido MAIS COMUM da palavra e
+// ignorava o sentido do card. O caso que expôs isso foi "tally" — o card era
+// o sentido 2 ("bater, concordar com"), e as duas tentativas desenharam
+// marcas de contagem (o sentido 1), ainda por cima com marcas na imagem,
+// violando o "no text".
+//
+// A correção é dar ao modelo de imagem só o que ele sabe usar: uma cena
+// concreta em inglês. Um modelo de texto barato (~US$ 0,001 = 2% do custo
+// da imagem) traduz o sentido em cena, recebendo os OUTROS sentidos da
+// mesma palavra como lista de proibições. A palavra em si não vai para o
+// modelo de imagem — é justamente ela que puxava para o sentido errado.
+async function buildImageScene(card) {
+  const w = words.find(x => x.id === card.wordId)
+  const sense = w?.meanings?.[card.meaningIdx] || {}
+  const significado = card.meaning_pt || sense.meaning_pt || ''
+  const definicao   = sense.definition_pt || card.definition_pt || ''
+  const frase       = (card.example_en || '').replace(/<[^>]*>/g, '')
+  const outros = (w?.meanings || [])
+    .map((m, i) => i === card.meaningIdx ? null : (m.meaning_pt || '').trim())
+    .filter(Boolean)
+
+  const r = await aiJSON([
+    { role: 'system', content: 'Você descreve cenas para ilustrações de flashcards de vocabulário. Responda sempre em JSON.' },
+    { role: 'user', content:
+`Palavra (${promptLangName(cardLang(card))}): "${card.word}"
+Sentido a ilustrar (PT-BR): "${significado}"${definicao ? '\nDefinição: ' + definicao : ''}
+Frase de exemplo: "${frase}"
+${outros.length ? 'OUTROS sentidos da MESMA palavra, que NÃO podem aparecer na cena: ' + outros.map(o => `"${o}"`).join(', ') : ''}
+
+Descreva UMA cena concreta, em INGLÊS, que faça alguém entender ESSE sentido só de olhar.
+Regras:
+- Mostre o sentido acontecendo, não a palavra. Nada de texto, letras, números, símbolos, marcas de contagem, placas ou legendas.
+- Se a palavra tiver outros sentidos, a cena precisa ser INCOMPATÍVEL com eles.
+- Sentido abstrato vira situação humana concreta (gesto, reação, comparação entre duas coisas).
+- Pessoas e animais anatomicamente corretos.
+- 1 a 3 frases, sem nomear a palavra.
+Responda: {"scene": "..."}` }
+  ], { maxTokens: 300 })
+
+  const s = (r.scene || '').trim()
+  return s.length > 15 ? s : ''
+}
+
 // Gera imagem via DALL-E 3 para o significado do card
 // Propaga automaticamente para todos os cards que compartilham o mesmo significado
 // force=true (botão individual) regenera por cima; force=false (lote) pula
@@ -368,13 +415,29 @@ async function generateCardImage(cardId, callerEl, force = true) {
   // Spinner no botão chamador
   if (callerEl) { callerEl.disabled = true; callerEl.innerHTML = '<span class="gen-spinner"></span> Gerando...' }
 
-  const word   = card.word || ''
-  const meaning = card.meaning_pt || card.definition_pt || ''
-  const context = card.example_en  || ''
   // Sem "verify before finalizing / reject and redo": modelo de imagem não
   // itera sobre a própria saída — instrução impossível só gastava prompt.
   // Restrições anatômicas valem como descrição POSITIVA da cena.
-  const prompt  = `Digital illustration, editorial style. ${promptLangName(cardLang(card))} vocabulary flashcard image for the word "${word}". Meaning: "${meaning}". ${context ? 'Example sentence: "'+context.replace(/<[^>]*>/g,'')+'".' : ''} No text or lettering anywhere in the image. Anatomically correct people and animals. Detailed, artistic, vivid colors, clean composition.`
+  const PROIBIDO = 'No text, letters, numbers, symbols, tally marks, signs or captions anywhere in the image.'
+  const ESTILO   = 'Anatomically correct people and animals. Detailed, artistic, vivid colors, clean composition.'
+
+  let scene = ''
+  try {
+    if (callerEl) callerEl.innerHTML = '<span class="gen-spinner"></span> Descrevendo...'
+    scene = await buildImageScene(card)
+  } catch (e) {
+    console.warn('[imagem] cena não descrita, usando prompt direto:', e.message)
+  }
+  if (callerEl) callerEl.innerHTML = '<span class="gen-spinner"></span> Gerando...'
+
+  // Fallback (a descrição falhou): prompt antigo, com a palavra — pior para
+  // palavras polissêmicas, mas melhor que não gerar nada.
+  const word    = card.word || ''
+  const meaning = card.meaning_pt || card.definition_pt || ''
+  const context = (card.example_en || '').replace(/<[^>]*>/g, '')
+  const prompt = scene
+    ? `Digital illustration, editorial style. ${scene} ${PROIBIDO} ${ESTILO}`
+    : `Digital illustration, editorial style. ${promptLangName(cardLang(card))} vocabulary flashcard image for the word "${word}". Meaning: "${meaning}". ${context ? 'Example sentence: "' + context + '".' : ''} ${PROIBIDO} ${ESTILO}`
 
   try {
     const b64 = await aiImage(prompt)
