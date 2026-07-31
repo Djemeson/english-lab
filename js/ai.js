@@ -155,31 +155,80 @@ async function aiTestKey(key) {
 }
 
 // ================================================================
-// ESTIMATIVA DE CUSTO para operações em lote.
-// Ordens de grandeza (jul/2026) — o objetivo é avisar ANTES de gastar,
-// não faturar com precisão de centavo.
+// ESTIMATIVA DE CUSTO para operações em lote — exibida em REAIS.
+// A OpenAI cobra em dólar; convertemos com a cotação comercial do dia
+// (AwesomeAPI, gratuita, cacheada por 24h) e caímos num câmbio fixo se
+// a consulta falhar. Ordens de grandeza, não fatura.
 // ================================================================
 const AI_COST = {
   chat:  0.001,                                    // por item analisado (mini)
   tts:   0.008,                                    // por frase (~80 caracteres)
   image: { low: 0.011, medium: 0.042, high: 0.167 } // por imagem 1024×1024
 }
+const AI_USD_BRL_FALLBACK = 5.5
+const SK_USD_BRL = 'el-usd-brl'
 
-function aiEstimate(tipo, n) {
-  const unit = tipo === 'image' ? (AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium) : (AI_COST[tipo] || 0.001)
-  const total = unit * n
-  const valor = total < 0.01 ? '< US$ 0,01' : 'US$ ' + total.toFixed(2).replace('.', ',')
-  return valor
+async function aiUsdBrl() {
+  try {
+    const cache = JSON.parse(localStorage.getItem(SK_USD_BRL) || 'null')
+    if (cache && Date.now() - cache.at < 24 * 3600e3) return cache.rate
+  } catch {}
+  try {
+    const ctl = new AbortController()
+    const t = setTimeout(() => ctl.abort(), 3500)
+    const res = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL', { signal: ctl.signal })
+    clearTimeout(t)
+    const j = await res.json()
+    const rate = parseFloat(j?.USDBRL?.bid)
+    if (rate > 0) {
+      try { localStorage.setItem(SK_USD_BRL, JSON.stringify({ rate, at: Date.now() })) } catch {}
+      return rate
+    }
+  } catch {}
+  try {
+    const velho = JSON.parse(localStorage.getItem(SK_USD_BRL) || 'null')
+    if (velho?.rate > 0) return velho.rate           // cotação vencida > chute fixo
+  } catch {}
+  return AI_USD_BRL_FALLBACK
 }
 
-// Confirmação padrão antes de um lote que custa dinheiro. Lotes pequenos
-// (abaixo de ~US$ 0,02) não interrompem — confirmar centavos é atrito.
-function aiConfirmBatch(tipo, n, rotulo) {
-  const unit = tipo === 'image' ? (AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium) : (AI_COST[tipo] || 0.001)
-  if (unit * n < 0.02) return true
-  return confirm(`${rotulo}
+function _aiUnitUsd(tipo) {
+  return tipo === 'image'
+    ? (AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium)
+    : (AI_COST[tipo] || 0.001)
+}
 
-${n} chamada${n !== 1 ? 's' : ''} à OpenAI — custo estimado: ${aiEstimate(tipo, n)}.
+function _brl(v) { return 'R$ ' + (v < 0.01 ? '0,01' : v.toFixed(2).replace('.', ',')) }
 
-Continuar?`)
+// Mantida para exibições avulsas — agora precisa da cotação, então é async.
+async function aiEstimate(tipo, n) {
+  const usd = _aiUnitUsd(tipo) * n
+  return _brl(usd * await aiUsdBrl())
+}
+
+// Confirmação antes de um lote que custa dinheiro — modal de verdade,
+// com o detalhamento em reais. Lotes < ~R$ 0,12 não interrompem
+// (confirmar centavos é atrito).
+async function aiConfirmBatch(tipo, n, rotulo) {
+  const usd = _aiUnitUsd(tipo) * n
+  if (usd < 0.022) return true
+  const rate = await aiUsdBrl()
+  const total = usd * rate
+  const NOMES = { chat: 'Análise com IA', tts: 'Geração de áudio (TTS)', image: 'Geração de imagens' }
+  const detalheModelo = tipo === 'chat' ? aiModel()
+    : tipo === 'tts' ? AI_TTS_MODEL
+    : `gpt-image-1 · qualidade ${({low:'econômica',medium:'padrão',high:'alta'})[cfg.imgQuality || 'medium']}`
+  return confirmModal({
+    title: rotulo || NOMES[tipo] || 'Operação com IA',
+    icon: 'sparkles',
+    confirmText: 'Continuar — ' + _brl(total),
+    html: `
+      <div class="cost-rows">
+        <div class="cost-row"><span>Operação</span><b>${esc(NOMES[tipo] || tipo)}</b></div>
+        <div class="cost-row"><span>Chamadas à OpenAI</span><b>${n}</b></div>
+        <div class="cost-row"><span>Modelo</span><b>${esc(detalheModelo)}</b></div>
+        <div class="cost-row total"><span>Custo estimado</span><b>${_brl(total)}</b></div>
+      </div>
+      <p class="cost-note">Estimativa pela cotação de hoje (US$ 1 ≈ R$ ${rate.toFixed(2).replace('.', ',')}). A cobrança real é feita pela OpenAI, em dólar, na sua conta.</p>`
+  })
 }

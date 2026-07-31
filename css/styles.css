@@ -3005,3 +3005,36 @@ body.sb-collapsed #fb-user-photo{margin:0}
 @media(max-width:768px){
   .midia-src-grid,.midia-input-grid{grid-template-columns:1fr}
 }
+
+/* ================================================================
+   MODAL DE CONFIRMAÇÃO + detalhamento de custo
+   ================================================================ */
+.confirm-box{width:400px}
+.confirm-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.confirm-head h4{font-size:var(--fs-base);font-weight:700;margin:0}
+.confirm-icon{
+  display:grid;place-items:center;width:34px;height:34px;flex-shrink:0;
+  border-radius:var(--radius-sm);
+  background:color-mix(in srgb, var(--primary) 14%, transparent);color:var(--primary);
+}
+.confirm-icon.danger{background:color-mix(in srgb, var(--error) 14%, transparent);color:var(--error)}
+.confirm-icon .ic{width:17px;height:17px}
+.confirm-body{margin-bottom:18px}
+.confirm-actions{display:flex;gap:8px;justify-content:flex-end}
+
+.cost-rows{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);overflow:hidden;
+}
+.cost-row{
+  display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:9px 13px;font-size:var(--fs-sm);color:var(--text2);
+}
+.cost-row + .cost-row{border-top:1px solid var(--border)}
+.cost-row b{color:var(--text);font-weight:600;text-align:right}
+.cost-row.total{background:color-mix(in srgb, var(--primary) 8%, transparent)}
+.cost-row.total span{font-weight:700;color:var(--text)}
+.cost-row.total b{
+  font-family:var(--font-display);font-size:var(--fs-lg);font-weight:700;color:var(--primary);
+}
+.cost-note{font-size:var(--fs-2xs);color:var(--text3);line-height:1.5;margin-top:10px}

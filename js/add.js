@@ -1238,7 +1238,7 @@ async function detectKindleTargetsAll() {
     .map(c => +c.dataset.i)
     .filter(i => kindleItems[i] && !getItemWords(kindleItems[i]).length && (kindleItems[i].context || '').trim())
   if (!alvo.length) { toast('Todos os destaques selecionados já têm palavra-alvo', 'info'); return }
-  if (!aiConfirmBatch('chat', alvo.length, 'Sugerir alvos de estudo (IA)')) return
+  if (!(await aiConfirmBatch('chat', alvo.length, 'Sugerir alvos de estudo (IA)'))) return
   toast(`Sugerindo alvos para ${alvo.length} destaque${alvo.length !== 1 ? 's' : ''}...`, 'info')
   const tasks = alvo.map(i => () => detectKindleWord(i))
   await runPool(tasks, 4)

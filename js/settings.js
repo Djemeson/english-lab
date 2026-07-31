@@ -162,7 +162,7 @@ async function generateMissingAudio() {
   const texts = [...new Set(srsCards.map(c => c.example_en || c.word).filter(Boolean))]
   const missing = texts.filter(t => !_audioKeyCache?.has(audioKey(t)))
   if (!missing.length) { toast('Todos os cards já têm áudio', 'info'); if (btn) btn.disabled = false; return }
-  if (!aiConfirmBatch('tts', missing.length, 'Gerar áudio ausente')) { if (btn) btn.disabled = false; return }
+  if (!(await aiConfirmBatch('tts', missing.length, 'Gerar áudio ausente'))) { if (btn) btn.disabled = false; return }
   await preGenerateAudio(missing.map(t => ({ example_en: t })))
   if (btn) btn.disabled = false
   checkMissingAudio()

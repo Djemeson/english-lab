@@ -370,6 +370,41 @@ function toast(msg, type = 'info') {
 }
 
 // ================================================================
+// MODAL DE CONFIRMAÇÃO (substitui confirm() nativo) — Promise<boolean>
+// html: corpo livre (já escapado por quem chama). Enter confirma, Esc cancela.
+// ================================================================
+function confirmModal({ title, html = '', confirmText = 'Continuar', cancelText = 'Cancelar', icon = 'info', danger = false }) {
+  return new Promise(resolve => {
+    document.getElementById('el-confirm-modal')?.remove()
+    const overlay = document.createElement('div')
+    overlay.id = 'el-confirm-modal'
+    overlay.className = 'srs-modal-overlay'
+    const done = ok => { overlay.remove(); document.removeEventListener('keydown', teclas); resolve(ok) }
+    overlay.addEventListener('click', e => { if (e.target === overlay) done(false) })
+    overlay.innerHTML = `<div class="srs-modal-box confirm-box" role="alertdialog" aria-labelledby="el-confirm-title">
+      <div class="confirm-head">
+        <span class="confirm-icon${danger ? ' danger' : ''}">${ic(icon)}</span>
+        <h4 id="el-confirm-title">${esc(title || 'Confirmar')}</h4>
+      </div>
+      <div class="confirm-body">${html}</div>
+      <div class="confirm-actions">
+        <button class="btn btn-ghost btn-sm" id="el-confirm-cancel">${esc(cancelText)}</button>
+        <button class="btn ${danger ? 'btn-danger' : 'btn-primary'} btn-sm" id="el-confirm-ok">${esc(confirmText)}</button>
+      </div>
+    </div>`
+    document.body.appendChild(overlay)
+    const teclas = e => {
+      if (e.key === 'Escape') { e.preventDefault(); done(false) }
+      if (e.key === 'Enter')  { e.preventDefault(); done(true) }
+    }
+    document.addEventListener('keydown', teclas)
+    document.getElementById('el-confirm-ok').onclick = () => done(true)
+    document.getElementById('el-confirm-cancel').onclick = () => done(false)
+    setTimeout(() => document.getElementById('el-confirm-ok')?.focus(), 30)
+  })
+}
+
+// ================================================================
 // MODAL DE INPUT (substitui prompt() nativo) — visual premium
 // ================================================================
 function inputModal({ title, label, value = '', placeholder = '', confirmText = 'Salvar', onConfirm }) {
