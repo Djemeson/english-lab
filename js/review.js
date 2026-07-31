@@ -555,10 +555,11 @@ async function saveSelectedToSrs() {
   renderReview(); renderDashboard(); updateSrsBadge()
 }
 
-function deleteSelected() {
+async function deleteSelected() {
   const ids = [...selectedWordIds]
   if (!ids.length) return
-  if (!confirm(`Excluir ${ids.length} item${ids.length!==1?'s':''}?`)) return
+  if (!(await confirmModal({ title: 'Excluir itens', icon: 'trash', danger: true, confirmText: 'Excluir',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Excluir <b>${ids.length} item${ids.length !== 1 ? 's' : ''}</b> da revisão?</p>` }))) return
   ids.forEach(id => {
     markDeleted(id)
     const idx = words.findIndex(w => w.id === id)
@@ -737,9 +738,10 @@ function skipWord(id) {
   renderDashboard()
 }
 
-function deleteWord(id) {
+async function deleteWord(id) {
   const w = words.find(x => x.id === id)
-  if (!confirm(`Remover "${w?.word || '(frase)'}" permanentemente?`)) return
+  if (!(await confirmModal({ title: 'Remover palavra', icon: 'trash', danger: true, confirmText: 'Remover',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Remover <b>"${esc(w?.word || '(frase)')}"</b> permanentemente?</p>` }))) return
   markDeleted(id)
   words = words.filter(x => x.id !== id); saveWords()
   toast('Removida', 'info')

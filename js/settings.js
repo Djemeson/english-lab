@@ -116,11 +116,12 @@ function exportData() {
 function importData(input) {
   const file = input.files[0]; if (!file) return
   const reader = new FileReader()
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const d = JSON.parse(e.target.result)
       if (d.words) {
-        if (!confirm(`Importar ${d.words.length} palavras (mescla com dados existentes)?`)) return
+        if (!(await confirmModal({ title: 'Importar backup', icon: 'upload', confirmText: 'Importar',
+          html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Importar <b>${d.words.length} palavras</b>? Elas serão <b>mescladas</b> com os dados existentes — nada é apagado.</p>` }))) return
         const ids = new Set(words.map(w => w.id))
         words = [...words, ...d.words.filter(w => !ids.has(w.id))]
         saveWords(); renderDashboard()
@@ -131,8 +132,9 @@ function importData(input) {
   reader.readAsText(file); input.value = ''
 }
 
-function clearKindleSeen() {
-  if (!confirm('Resetar histórico do Kindle?\nOs destaques já adicionados voltarão a aparecer na próxima importação.')) return
+async function clearKindleSeen() {
+  if (!(await confirmModal({ title: 'Resetar histórico do Kindle', icon: 'refresh', confirmText: 'Resetar',
+    html: '<p style="font-size:var(--fs-sm);color:var(--text2)">Os destaques já adicionados <b>voltarão a aparecer</b> na próxima importação. Nenhum card de estudo é afetado.</p>' }))) return
   localStorage.removeItem(SK.kindleSeen)
   toast('Histórico Kindle resetado. Próxima importação mostrará todos os destaques.', 'info')
 }
@@ -171,8 +173,11 @@ async function generateMissingAudio() {
 async function clearAllData() {
   const loggedIn = !!(typeof _fbUser !== 'undefined' && _fbUser)
   const cloudWarn = loggedIn ? '\n• TUDO na nuvem (Firebase) também será apagado' : ''
-  if (!confirm('Apagar TODOS os dados?\n\nIsso inclui:\n• Palavras e revisões\n• Cards SRS e progresso\n• Áudios gerados\n• Imagens geradas\n• Configurações' + cloudWarn + '\n\nFaça um backup antes.')) return
-  if (!confirm('Confirma? Esta ação é IRREVERSÍVEL.')) return
+  const itens = ['Palavras e revisões', 'Cards SRS e progresso de estudo', 'Áudios e imagens gerados', 'Configurações']
+  if (loggedIn) itens.push('TUDO na nuvem (Firebase) — propaga para os outros aparelhos')
+  if (!(await confirmModal({ title: 'Apagar todos os dados', icon: 'alert', danger: true, confirmText: 'Apagar tudo',
+    html: `<ul class="cost-bullets danger">${itens.map(x => `<li>${x}</li>`).join('')}</ul>
+      <p class="cost-note"><b>Esta ação é irreversível.</b> Faça um backup antes (Exportar JSON, logo acima).</p>` }))) return
 
   // 1) localStorage
   Object.values(SK).forEach(k => localStorage.removeItem(k))

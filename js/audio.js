@@ -865,7 +865,6 @@ async function reanalyzeAll() {
   const items = [...groups.values()].filter(g => g.word)
   if (!items.length) { toast('Nada para reanalisar', 'info'); return }
 
-  if (!confirm(`Reanalisar TODOS os ${items.length} significados (${srsCards.length} cards)?\n\n• Corrige as frases de exemplo para baterem com o significado certo\n• Preenche variedade (AmE/BrE...) e registro (formal, gíria...)\n• Gera o áudio das novas frases automaticamente\n• Mantém o progresso de estudo (agendamento) intacto\n\nUsa a API da OpenAI e pode levar alguns minutos.`)) return
 
   const btn = document.getElementById('lib-reprocess-btn')
   const origHtml = btn ? btn.innerHTML : ''
@@ -875,7 +874,7 @@ async function reanalyzeAll() {
   const genAudio = cfg.ttsProvider !== 'none' && !!cfg.openaiKey
 
   const tasks = items.map(it => async () => {
-  if (!(await aiConfirmBatch('chat', tasks.length, 'Reanalisar tudo (corrigir)'))) return
+  if (!(await aiConfirmBatch('chat', tasks.length, 'Reanalisar tudo (corrigir)', { sempre: true, detalhe: ['Corrige as frases para baterem com o significado', 'Preenche variedade e registro', 'Gera o áudio das novas frases', 'Mantém o agendamento de estudo intacto'] }))) return
     try {
       const r = await regenerateMeaning(it)
       const variety = _normVariety(r && r.variety, it.lang)
@@ -958,7 +957,6 @@ async function fillMissingAll() {
   )
   if (!items.length) { toast('Todos os significados já têm IPA, categoria, nível e origem preenchidos', 'info'); return }
 
-  if (!confirm(`Completar dados de ${items.length} significado(s)?\n\n• Só preenche o que estiver VAZIO: IPA, categoria (type_label), nível e origem/história\n• NÃO mexe em significado, definição, frases, variedade/registro nem no progresso de estudo\n\nUsa a API da OpenAI (chamadas leves).`)) return
 
   const btn = document.getElementById('lib-fill-origin-btn')
   const origHtml = btn ? btn.innerHTML : ''
@@ -967,7 +965,7 @@ async function fillMissingAll() {
   let updated = 0, skipped = 0, failed = 0, wordsTouched = false
 
   const tasks = items.map(it => async () => {
-  if (!(await aiConfirmBatch('chat', tasks.length, 'Completar dados (IA)'))) return
+  if (!(await aiConfirmBatch('chat', tasks.length, 'Completar dados (IA)', { detalhe: ['Só preenche o que estiver vazio: IPA, categoria, nível, origem', 'Não mexe em significado, frases nem agendamento'] }))) return
     const PROMPT = `You fill in MISSING metadata for a ${promptLangName(it.lang)} vocabulary flashcard, for a Brazilian learner. Return ONLY valid JSON.
 Word/expression (${promptLangName(it.lang)}): "${it.word}"${it.type ? ` (type: ${it.type})` : ''}
 Meaning (PT): "${it.meaning_pt || '(most common sense)'}"
@@ -1076,7 +1074,6 @@ async function markBoldAll() {
   }
   const items = [...map.values()]
 
-  if (!confirm(`Marcar o negrito perfeito (IA) em ${items.length} frase(s) de ${need.length} card(s)?\n\n• Deixa o objeto de estudo em negrito no inglês E no português\n• Não altera significados, definições nem o progresso de estudo\n\nUsa a API da OpenAI e pode levar um pouco.`)) return
 
   const btn = el('lib-bold-btn'); const orig = btn ? btn.innerHTML : ''
   if (btn) btn.disabled = true
@@ -1085,7 +1082,7 @@ async function markBoldAll() {
   const wordsTouched = new Set()
 
   const tasks = items.map(it => async () => {
-  if (!(await aiConfirmBatch('chat', tasks.length, 'Negrito perfeito (IA)'))) return
+  if (!(await aiConfirmBatch('chat', tasks.length, 'Negrito perfeito (IA)', { sempre: true, detalhe: ['Negrito do objeto de estudo nos dois idiomas', 'Não altera significados nem o progresso'] }))) return
     try {
       const r = await markBoldOne(it)
       const en = (r && r.en && boldSpanOk(r.en)) ? r.en : it.en
@@ -1141,7 +1138,7 @@ async function reprocessMetaBulk() {
   const items = [...groups.values()].filter(g => g.word)
   if (!items.length) { toast('Nenhum significado para processar', 'info'); return }
 
-  if (!confirm(`Reprocessar variedade e registro de ${items.length} significado(s) (${srsCards.length} cards) com a IA?\n\nIsso fará chamadas à API da OpenAI e pode levar alguns minutos.`)) return
+  if (!(await aiConfirmBatch('chat', items.length, 'Reprocessar variedade e registro', { sempre: true, detalhe: ['Reclassifica variedade (AmE/BrE…) e registro (formal, gíria…)', 'Não altera frases nem agendamento'] }))) return
 
   const btn = document.getElementById('lib-reprocess-btn')
   const origHtml = btn ? btn.innerHTML : ''
@@ -1248,7 +1245,8 @@ function updateBrowserToolbar() {
 
 async function browserDeleteSelected() {
   if (!_browserSelected.size) return
-  if (!confirm(`Excluir ${_browserSelected.size} card(s)?`)) return
+  if (!(await confirmModal({ title: 'Excluir cards', icon: 'trash', danger: true, confirmText: 'Excluir',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Excluir <b>${_browserSelected.size} card${_browserSelected.size !== 1 ? 's' : ''}</b> do estudo? O progresso deles se perde.</p>` }))) return
   srsCards = srsCards.filter(c => !_browserSelected.has(c.id))
   _browserSelected.clear()
   saveSrsCards(); autoSyncAfterChange()
@@ -1387,8 +1385,9 @@ async function filterBrowser(query) {
   }).join('')
   updateBrowserToolbar()
 }
-function deleteSrsCard(cardId) {
-  if (!confirm('Excluir este card?')) return
+async function deleteSrsCard(cardId) {
+  if (!(await confirmModal({ title: 'Excluir card', icon: 'trash', danger: true, confirmText: 'Excluir',
+    html: '<p style="font-size:var(--fs-sm);color:var(--text2)">Excluir este card do estudo? O progresso dele se perde.</p>' }))) return
   srsCards = srsCards.filter(c => c.id !== cardId)
   _browserSelected.delete(cardId)
   saveSrsCards(); autoSyncAfterChange()
@@ -1473,11 +1472,12 @@ function editDeckName(deckId) {
   inputModal({ title:'Renomear baralho', label:'Novo nome do baralho', value:d.name, confirmText:'Salvar',
     onConfirm:n => { renameDeck(deckId, n); renderSrsAllCards(); toast('Baralho renomeado', 'success') } })
 }
-function deleteDeckUI(deckId) {
+async function deleteDeckUI(deckId) {
   const d = getDeckById(deckId); if (!d) return
   const cnt = getDeckCardCount(deckId)
-  const msg = cnt > 0 ? `Excluir "${d.name}"? Os ${cnt} cards serão movidos para o deck pai.` : `Excluir "${d.name}"?`
-  if (!confirm(msg)) return
+  const corpo = cnt > 0 ? `Os <b>${cnt} cards</b> serão movidos para o baralho pai — nada se perde.` : 'O baralho está vazio.'
+  if (!(await confirmModal({ title: `Excluir "${d.name}"`, icon: 'trash', danger: true, confirmText: 'Excluir',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">${corpo}</p>` }))) return
   deleteDeck(deckId); renderSrsAllCards(); renderSrsSection()
 }
 

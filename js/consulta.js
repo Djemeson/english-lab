@@ -47,6 +47,10 @@ function isWordInStudy(word) {
 
 // ── Render principal da seção ─────────────────────────────────────
 function renderAssistente() {
+  // Placeholder acompanha o idioma ativo (antes dizia "em inglês" fixo)
+  const _inp = el('consulta-input')
+  if (_inp) _inp.placeholder = `Pergunte qualquer coisa em ${getLangDef(activeLang()).name.toLowerCase()} — significado, uso, diferenças, gírias...`
+
   // Aplica a preferência de histórico recolhido (desktop)
   const lay = document.querySelector('.asst-layout')
   if (lay && typeof loadUiPrefs === 'function') {
@@ -124,7 +128,9 @@ function renderMsgHTML(m, idx) {
   if (m.role === 'user') {
     return `<div class="consulta-msg user">${esc(m.content)}</div>`
   }
-  return `<div class="consulta-msg ai" id="cmsg-${idx}">${formatConsultaReply(m.content || '')}${renderSrsItemsHTML(m.srsItems, idx)}</div>`
+  return `<div class="consulta-msg ai" id="cmsg-${idx}">
+    <button class="cmsg-copy" onclick="copiarMensagem(${idx}, this)" data-tip="Copiar resposta" aria-label="Copiar resposta">${ic('clipboard','ic-sm')}</button>
+    ${formatConsultaReply(m.content || '')}${renderSrsItemsHTML(m.srsItems, idx)}</div>`
 }
 
 function renderSrsItemsHTML(items, msgIdx) {
@@ -161,9 +167,10 @@ function selectConversa(id) {
   renderActiveConversa()
 }
 
-function deleteConversa(id) {
+async function deleteConversa(id) {
   const c = conversas.find(x => x.id === id); if (!c) return
-  if (!confirm(`Excluir a conversa "${c.title || 'Conversa'}"? Isso não pode ser desfeito.`)) return
+  if (!(await confirmModal({ title: 'Excluir conversa', icon: 'trash', danger: true, confirmText: 'Excluir',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Excluir <b>"${esc(c.title || 'Conversa')}"</b>? Isso não pode ser desfeito.</p>` }))) return
   conversas = conversas.filter(x => x.id !== id)
   if (activeConversaId === id) activeConversaId = conversas.length ? conversas[0].id : null
   saveConversas()
@@ -225,8 +232,8 @@ function consultaSystem() {
 
 Quando o usuário perguntar sobre palavras/expressões em ${nome} — ou pedir "como se diz" algo em ${nome}:
 1. Dê a tradução/expressão em ${nome} e explique o significado em português.
-2. Mostre a pronúncia em IPA (entre barras: //).
-3. Dê alguns exemplos de uso em ${nome} com tradução.
+2. Mostre a pronúncia em IPA entre barras SIMPLES, ex.: /ˈwɔːtər/ — nunca use barra dupla.
+3. Dê 2–3 exemplos de uso em ${nome} com tradução. Os exemplos devem ser GENUINAMENTE diferentes entre si: tempos verbais diferentes, sujeitos diferentes e situações diferentes (trabalho, viagem, conversa cotidiana…). NUNCA repita a mesma construção trocando só o começo da frase.
 4. Acrescente contexto útil: origem/história quando interessante, registro (formal/informal), diferenças de uso, variações regionais.
 
 FORMATO da resposta (texto que o usuário lê):
@@ -424,6 +431,11 @@ function cleanConsultaReply(reply) {
 
 // Renderiza markdown leve da resposta da IA (mesma lógica do projeto)
 function formatConsultaReply(text) {
+  // Mensagens antigas foram geradas com o prompt que pedia "entre barras: //"
+  // e o modelo obedecia ao pé da letra. Normaliza só spans curtos sem barra
+  // interna — não encosta em URLs (https://... não tem // de fechamento).
+  text = String(text || '').replace(/\/\/([^\/\n]{2,80}?)\/\//g, '/$1/')
+
   let t = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   t = t.replace(/&lt;(\/?(?:b|strong|i|em))&gt;/gi, '<$1>')
   t = t.replace(/^\s*#{1,6}\s*(.+?)\s*$/gm, '<div class="cs-h">$1</div>')
@@ -496,4 +508,16 @@ function addAllConsultaItems(msgIdx) {
     renderActiveConversa()
     toast(`${n} termo${n !== 1 ? 's' : ''} adicionado${n !== 1 ? 's' : ''} ao estudo`, 'success')
   } catch (e) { toast('Erro ao adicionar: ' + e.message, 'error') }
+}
+
+
+// Copia o texto puro da resposta (sem HTML) para a área de transferência.
+async function copiarMensagem(idx, btn) {
+  const c = conversas.find(x => x.id === activeConversaId)
+  const m = c?.messages?.[idx]
+  if (!m) return
+  try {
+    await navigator.clipboard.writeText(m.content || '')
+    if (btn) { btn.innerHTML = ic('check','ic-sm'); setTimeout(() => { btn.innerHTML = ic('clipboard','ic-sm') }, 1400) }
+  } catch { toast('Não foi possível copiar', 'error') }
 }

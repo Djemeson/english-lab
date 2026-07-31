@@ -209,9 +209,10 @@ async function aiEstimate(tipo, n) {
 // Confirmação antes de um lote que custa dinheiro — modal de verdade,
 // com o detalhamento em reais. Lotes < ~R$ 0,12 não interrompem
 // (confirmar centavos é atrito).
-async function aiConfirmBatch(tipo, n, rotulo) {
+async function aiConfirmBatch(tipo, n, rotulo, opts = {}) {
   const usd = _aiUnitUsd(tipo) * n
-  if (usd < 0.022) return true
+  // "sempre": operações que REESCREVEM conteúdo confirmam mesmo custando centavos.
+  if (usd < 0.022 && !opts.sempre) return true
   const rate = await aiUsdBrl()
   const total = usd * rate
   const NOMES = { chat: 'Análise com IA', tts: 'Geração de áudio (TTS)', image: 'Geração de imagens' }
@@ -229,6 +230,7 @@ async function aiConfirmBatch(tipo, n, rotulo) {
         <div class="cost-row"><span>Modelo</span><b>${esc(detalheModelo)}</b></div>
         <div class="cost-row total"><span>Custo estimado</span><b>${_brl(total)}</b></div>
       </div>
+      ${opts.detalhe ? `<ul class="cost-bullets">${opts.detalhe.map(d => `<li>${esc(d)}</li>`).join('')}</ul>` : ''}
       <p class="cost-note">Estimativa pela cotação de hoje (US$ 1 ≈ R$ ${rate.toFixed(2).replace('.', ',')}). A cobrança real é feita pela OpenAI, em dólar, na sua conta.</p>`
   })
 }

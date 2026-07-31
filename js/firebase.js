@@ -135,7 +135,8 @@ async function firebaseSignIn() {
 }
 
 async function firebaseSignOut() {
-  if (!confirm('Sair da conta Google? Os dados locais são mantidos.')) return
+  if (!(await confirmModal({ title: 'Sair da conta', icon: 'cloud', confirmText: 'Sair',
+    html: '<p style="font-size:var(--fs-sm);color:var(--text2)">Este aparelho para de sincronizar, mas <b>nada é apagado</b> — os dados locais e os da nuvem ficam onde estão.</p>' }))) return
   await _fbAuth?.signOut()
   updateSyncNav('off')
   // Sair é uma decisão explícita: a tela de login volta a fazer sentido,
