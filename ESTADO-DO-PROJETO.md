@@ -264,6 +264,31 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+### Sessão 2026-07-31 (8ª rodada) — Revisar e Biblioteca: o que a estrutura deles pedia
+59. **Pedido**: "estude o que a estrutura deles pede" — as duas telas que ficaram fora do
+    padrão de grupos numerados. Conclusão do estudo: são **ferramentas de trabalho contínuo**
+    (mestre-detalhe no Revisar; browser de três colunas na Biblioteca), não fluxos em passos —
+    esticar o padrão da Mídia nelas seria forçado. O que a estrutura pedia era outra coisa:
+    - **UM idioma de controle segmentado.** O app tinha TRÊS desenhos para o mesmo trabalho:
+      `.seg-tab` (painel/configurações — ativo = cartão claro + sombra), `.rsb-filter`
+      (Revisar — ativo = pílula com gradiente do acento) e `.lmt-btn` (Biblioteca — idem).
+      Os três agora computam **exatamente o mesmo estilo de ativo** (verificado ao vivo:
+      mesmos valores de fundo e cor nos três). Só CSS; nenhuma classe ou handler mudou.
+    - **Cabeçalho da Biblioteca**: 6 controles misturando naturezas — trocar de visão
+      (toggle Cards|Palavras), ação de uso diário (Ouvir playlist) e TRÊS operações pesadas de
+      IA que rodam raramente e custam dinheiro (Negrito perfeito, Completar dados, Reanalisar
+      tudo). As três foram para um **menu "Manutenção IA"** (popover com título + descrição
+      por item, clique-fora fecha, `aria-haspopup`/`aria-expanded`). Cabeçalho final: toggle +
+      playlist + menu. **Os ids originais foram preservados nos itens do menu** — o código de
+      progresso (que salva/restaura `innerHTML` durante os lotes) continua funcionando sem
+      mudança. No modo Palavras o gatilho some inteiro (antes 3 botões sumiam um a um).
+    - **Validado ao vivo** (Vercel, v33): os 3 segmentados com estilo de ativo idêntico,
+      cabeçalho da Biblioteca reduzido a "Ouvir playlist | Manutenção IA", menu abrindo com os
+      3 itens, clique-fora fechando, gatilho sumindo no modo Palavras e voltando no Cards,
+      0 erros de console.
+
+
+
 ### Sessão 2026-07-31 (7ª rodada) — O padrão da Mídia vira a linguagem do app + escala de tamanhos
 58. **Pedido**: o Djemeson apontou a aba Mídia como referência ("organização e estrutura bem
     montada") e pediu o mesmo para todos os painéis, mais uma análise de TAMANHOS.
