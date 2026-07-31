@@ -140,8 +140,8 @@ function renderDeckStatsTable() {
   }
 
   area.innerHTML = `
-  <div class="srs-deck-table-wrap">
-    <h3>Baralhos</h3>
+  <div class="srs-deck-table-wrap panel-group" style="margin-top:14px">
+    <div class="panel-eyebrow">Baralhos</div>
     <table class="srs-deck-table">
       <thead>
         <tr>

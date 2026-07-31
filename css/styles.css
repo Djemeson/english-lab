@@ -32,6 +32,7 @@
   --radius-xs: 8px;
   --radius-lg: 22px;
   --radius-pill: 999px;
+  --control-h: 40px;
   --radius: 16px;
   --radius-sm: 11px;
   /* Famílias tipográficas — compartilhadas pelos 6 temas (definidas em :root
@@ -220,7 +221,11 @@ select option{background:var(--surface)}
 /* ===== BUTTONS ===== */
 .btn{
   display:inline-flex;align-items:center;gap:7px;
-  padding:9px 18px;border:none;border-radius:var(--radius-sm);
+  /* Escala de 3 alturas (38/30/24). Antes havia CINCO alturas de botão
+     visíveis ao mesmo tempo (26,28,35,36,38px) — o tipo de ruído que não
+     se nota de propósito, mas tira a sensação de sofisticação. */
+  min-height:38px;
+  padding:8px 18px;border:none;border-radius:var(--radius-sm);
   font-weight:600;font-size:var(--fs-md);cursor:pointer;white-space:nowrap;
   transition:transform .12s ease, box-shadow .15s ease, background .15s ease, color .15s ease, opacity .15s;
 }
@@ -236,7 +241,7 @@ select option{background:var(--surface)}
 .btn-secondary:hover:not(:disabled){background:var(--surface3)}
 .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
 .btn-ghost:hover:not(:disabled){background:var(--surface2);color:var(--text)}
-.btn-sm{padding:5px 12px;font-size:var(--fs-sm)}
+.btn-sm{padding:4px 12px;font-size:var(--fs-sm);min-height:30px}
 .btn-full{width:100%;justify-content:center}
 .btn-group{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 
@@ -302,7 +307,7 @@ select option{background:var(--surface)}
 .kindle-expr-chip.loading{color:var(--text3);border-color:var(--border);background:transparent;font-style:italic;font-weight:400}
 .kindle-override{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 .kindle-override.hidden{display:none}
-.btn-xs{padding:2px 8px!important;font-size:var(--fs-xs) !important;min-width:0}
+.btn-xs{padding:2px 8px!important;font-size:var(--fs-xs) !important;min-width:0;min-height:24px}
 
 /* ===== DIVIDER ===== */
 .divider{height:1px;background:var(--border);margin:18px 0}
@@ -2982,14 +2987,14 @@ body.sb-collapsed #fb-user-photo{margin:0}
 /* ================================================================
    ABA MÍDIA — dois passos agrupados (1·Fonte, 2·Material)
    ================================================================ */
-.midia-group{
+.midia-group,.panel-group{
   background:var(--surface);
   border:1px solid var(--border);
   border-radius:var(--radius);
   padding:16px 18px;
   margin-bottom:14px;
 }
-.midia-eyebrow{
+.midia-eyebrow,.panel-eyebrow{
   font-size:var(--fs-3xs);font-weight:700;letter-spacing:.08em;
   text-transform:uppercase;color:var(--text2);margin-bottom:12px;
 }
@@ -3206,4 +3211,12 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 
 @media(max-width:700px){
   .sb-today{display:none}
+}
+
+
+/* Controles de formulário numa altura única (token --control-h) */
+.tab-panel input[type=text], .tab-panel input[type=url],
+.settings-card input[type=text], .settings-card input[type=url], .settings-card input[type=password],
+.settings-card select, .midia-src-grid input{
+  height:var(--control-h);
 }
