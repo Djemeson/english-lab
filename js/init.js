@@ -18,6 +18,8 @@ async function initApp() {
   // Setas ←/→ percorrem as abas do painel (padrão de tablist acessível)
   const tl = document.getElementById('dash-tablist')
   if (tl) tl.addEventListener('keydown', _dashTabKeys)
+  const stl = document.getElementById('settings-tablist')
+  if (stl) stl.addEventListener('keydown', _settingsTabKeys)
   initFirebase()
 }
 // Kick off when DOM is ready

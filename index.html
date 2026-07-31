@@ -215,23 +215,23 @@
   <div id="dash-main-action"></div>
   <div id="dash-stats-area"></div>
 
-  <div class="dash-tabs" role="tablist" aria-label="Seções do painel" id="dash-tablist">
-    <button class="dash-tab active" role="tab" id="dtab-progresso" aria-controls="dpanel-progresso"
+  <div class="seg-tabs" role="tablist" aria-label="Seções do painel" id="seg-tablist">
+    <button class="seg-tab active" role="tab" id="dtab-progresso" aria-controls="dpanel-progresso"
       aria-selected="true" onclick="setDashTab('progresso')">
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
       Progresso
     </button>
-    <button class="dash-tab" role="tab" id="dtab-vocabulario" aria-controls="dpanel-vocabulario"
+    <button class="seg-tab" role="tab" id="dtab-vocabulario" aria-controls="dpanel-vocabulario"
       aria-selected="false" tabindex="-1" onclick="setDashTab('vocabulario')">
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       Vocabulário
-      <span class="dash-tab-flag hidden" id="dtab-vocab-flag"></span>
+      <span class="seg-tab-flag hidden" id="dtab-vocab-flag"></span>
     </button>
-    <button class="dash-tab" role="tab" id="dtab-conquistas" aria-controls="dpanel-conquistas"
+    <button class="seg-tab" role="tab" id="dtab-conquistas" aria-controls="dpanel-conquistas"
       aria-selected="false" tabindex="-1" onclick="setDashTab('conquistas')">
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="m8.5 14-1.5 7 5-3 5 3-1.5-7"/></svg>
       Conquistas
-      <span class="dash-tab-count" id="dtab-conq-count"></span>
+      <span class="seg-tab-count" id="dtab-conq-count"></span>
     </button>
   </div>
 
@@ -476,36 +476,32 @@
     </div>
   </div>
 
-  <div class="settings-grid">
+  <div class="seg-tabs" role="tablist" aria-label="Seções das configurações" id="settings-tablist">
+    <button class="seg-tab active" role="tab" id="stab-conta" aria-controls="spanel-conta"
+      aria-selected="true" onclick="setSettingsTab('conta')">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 0 0 .5-9 6 6 0 0 0-11.6-1.5A4 4 0 0 0 7 19z"/></svg>
+      Conta
+    </button>
+    <button class="seg-tab" role="tab" id="stab-ia" aria-controls="spanel-ia"
+      aria-selected="false" tabindex="-1" onclick="setSettingsTab('ia')">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
+      IA e áudio
+    </button>
+    <button class="seg-tab" role="tab" id="stab-aparencia" aria-controls="spanel-aparencia"
+      aria-selected="false" tabindex="-1" onclick="setSettingsTab('aparencia')">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2h1a4 4 0 0 0 4-4 9 9 0 0 0-9-9z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/></svg>
+      Aparência
+    </button>
+    <button class="seg-tab" role="tab" id="stab-dados" aria-controls="spanel-dados"
+      aria-selected="false" tabindex="-1" onclick="setSettingsTab('dados')">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6a8 3 0 0 0 16 0V5"/><path d="M4 11v6a8 3 0 0 0 16 0v-6"/></svg>
+      Dados
+    </button>
+  </div>
 
-    <!-- IA & Áudio -->
-    <div class="settings-card full">
-      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 14l.7 1.8L21.5 16.5l-1.8.7L19 19l-.7-1.8L16.5 16.5l1.8-.7z"/></svg>Inteligência Artificial (OpenAI)</h3>
-      <p class="desc">A chave de API é usada diretamente pelo navegador para traduzir palavras, obter definições, transcrições IPA, gerar pronúncias por voz (TTS) e criar imagens de auxílio visual.</p>
-      
-      <div class="form-group" style="margin: 0; max-width: 580px;">
-        <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: var(--fs-md); color: var(--text2);">OpenAI API Key</label>
-        <div style="position: relative; display: flex; align-items: center;">
-          <input type="password" id="cfg-openai-key" placeholder="sk-proj-..." autocomplete="off" style="width: 100%; padding-right: 46px; height: 42px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); padding-left: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: var(--fs-md);">
-          <button type="button" onclick="togglePasswordVisibility('cfg-openai-key')" style="position: absolute; right: 12px; background: none; border: none; color: var(--text3); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; transition: color 0.15s;" onmouseover="this.style.color='var(--text2)'" onmouseout="this.style.color='var(--text3)'">
-            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </button>
-        </div>
-        <p style="font-size: var(--fs-xs); color: var(--text3); margin-top: 6px; line-height: 1.4;">Sua chave é mantida segura localmente em seu navegador e nunca é enviada a servidores de terceiros (com exceção direta à API oficial da OpenAI).</p>
-      </div>
-    </div>
-
-    <!-- Aparência / Temas -->
-    <div class="settings-card full">
-      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2h1a4 4 0 0 0 4-4 9 9 0 0 0-9-9z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/></svg>Tema de Aparência</h3>
-      <p class="desc">Escolha a paleta de cores ideal para o seu foco de estudos. O tema selecionado é sincronizado automaticamente.</p>
-      <div class="theme-picker" id="theme-picker"></div>
-    </div>
-
-    <!-- Firebase Sync -->
+  <div id="spanel-conta" role="tabpanel" aria-labelledby="stab-conta">
+    <div class="settings-grid">
+<!-- Firebase Sync -->
     <div class="settings-card full">
       <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 0 0 .5-9 6 6 0 0 0-11.6-1.5A4 4 0 0 0 7 19z"/></svg>Sincronização em Nuvem</h3>
       <p class="desc">Conecte sua conta Google para salvar com segurança todas as palavras de estudo, cards de memorização, áudios e progresso de SRS na nuvem.</p>
@@ -540,8 +536,31 @@
     </div>
 
     </div>
+    </div>
+  </div>
 
-    <!-- Manutenção de Áudio -->
+  <div id="spanel-ia" role="tabpanel" aria-labelledby="stab-ia" hidden>
+    <div class="settings-grid">
+<!-- IA & Áudio -->
+    <div class="settings-card full">
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 14l.7 1.8L21.5 16.5l-1.8.7L19 19l-.7-1.8L16.5 16.5l1.8-.7z"/></svg>Inteligência Artificial (OpenAI)</h3>
+      <p class="desc">A chave de API é usada diretamente pelo navegador para traduzir palavras, obter definições, transcrições IPA, gerar pronúncias por voz (TTS) e criar imagens de auxílio visual.</p>
+      
+      <div class="form-group" style="margin: 0; max-width: 580px;">
+        <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: var(--fs-md); color: var(--text2);">OpenAI API Key</label>
+        <div style="position: relative; display: flex; align-items: center;">
+          <input type="password" id="cfg-openai-key" placeholder="sk-proj-..." autocomplete="off" style="width: 100%; padding-right: 46px; height: 42px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); padding-left: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: var(--fs-md);">
+          <button type="button" onclick="togglePasswordVisibility('cfg-openai-key')" style="position: absolute; right: 12px; background: none; border: none; color: var(--text3); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; transition: color 0.15s;" onmouseover="this.style.color='var(--text2)'" onmouseout="this.style.color='var(--text3)'">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <p style="font-size: var(--fs-xs); color: var(--text3); margin-top: 6px; line-height: 1.4;">Sua chave é mantida segura localmente em seu navegador e nunca é enviada a servidores de terceiros (com exceção direta à API oficial da OpenAI).</p>
+      </div>
+    </div>
+<!-- Manutenção de Áudio -->
     <div class="settings-card">
       <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>Manutenção de Áudio</h3>
       <p class="desc">Verifique a integridade da sua biblioteca e gere o áudio falado (TTS) para os cards que ainda não o possuem.</p>
@@ -553,8 +572,26 @@
         <button class="btn btn-primary btn-sm" id="btn-gen-missing-audio" style="display:none; align-items: center; gap: 6px;" onclick="generateMissingAudio()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:15px; height:15px;"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>Gerar áudios em lote</button>
       </div>
     </div>
+    </div>
+    <div style="margin-top:20px">
+      <button class="btn btn-primary" onclick="saveSettings()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Salvar chave</button>
+    </div>
+  </div>
 
-    <!-- Dados locais -->
+  <div id="spanel-aparencia" role="tabpanel" aria-labelledby="stab-aparencia" hidden>
+    <div class="settings-grid">
+<!-- Aparência / Temas -->
+    <div class="settings-card full">
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2h1a4 4 0 0 0 4-4 9 9 0 0 0-9-9z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/></svg>Tema de Aparência</h3>
+      <p class="desc">Escolha a paleta de cores ideal para o seu foco de estudos. O tema selecionado é sincronizado automaticamente.</p>
+      <div class="theme-picker" id="theme-picker"></div>
+    </div>
+    </div>
+  </div>
+
+  <div id="spanel-dados" role="tabpanel" aria-labelledby="stab-dados" hidden>
+    <div class="settings-grid">
+<!-- Dados locais -->
     <div class="settings-card full">
       <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6a8 3 0 0 0 16 0V5"/><path d="M4 11v6a8 3 0 0 0 16 0v-6"/></svg>Gestão de Dados Locais</h3>
       <p class="desc">A plataforma salva tudo no armazenamento seguro do seu próprio navegador. Use os comandos abaixo para fazer backups regulares ou reiniciar do zero.</p>
@@ -566,12 +603,9 @@
         <button class="btn btn-danger btn-sm" onclick="clearAllData()" style="display: inline-flex; align-items: center; gap: 6px; margin-left: auto;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Apagar todos os dados</button>
       </div>
     </div>
-
+    </div>
   </div>
 
-  <div style="margin-top:28px; display:flex; align-items:center; gap:16px;">
-    <button class="btn btn-primary" onclick="saveSettings()" style="height: 44px; padding: 0 24px; font-weight: 600; font-size: var(--fs-base); display: inline-flex; align-items: center; gap: 8px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:18px; height:18px;"><path d="M20 6 9 17l-5-5"/></svg>Salvar todas as alterações</button>
-  </div>
 </section>
 
 <!-- =========== ESTUDAR (SRS) =========== -->

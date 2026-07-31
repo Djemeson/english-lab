@@ -44,6 +44,7 @@ function fillSettings() {
     ttsEl.value = cfg.ttsProvider || 'openai'
   }
   el('cfg-openai-key').value = cfg.openaiKey || ''
+  setSettingsTab(_settingsTab)
   renderThemePicker()
   // Atualiza UI Firebase com estado atual
   if (_fbUser !== undefined) updateFirebaseUI(_fbUser)
@@ -212,3 +213,42 @@ function togglePasswordVisibility(id) {
   }
 }
 
+
+// ================================================================
+// ABAS DAS CONFIGURAÇÕES
+// Mesmo componente visual do painel (.seg-tab*). Agrupa por INTENÇÃO:
+// quem entra aqui quer resolver uma coisa — conectar a conta, colar a
+// chave, trocar o tema ou mexer nos dados — não ler cinco cartões.
+// ================================================================
+const SETTINGS_TABS = ['conta', 'ia', 'aparencia', 'dados']
+let _settingsTab = (typeof loadUiPrefs === 'function' && loadUiPrefs().settingsTab) || 'conta'
+
+function setSettingsTab(tab, foco) {
+  if (!SETTINGS_TABS.includes(tab)) tab = 'conta'
+  _settingsTab = tab
+  if (typeof saveUiPref === 'function') saveUiPref('settingsTab', tab)
+  SETTINGS_TABS.forEach(t => {
+    const btn = el('stab-' + t), painel = el('spanel-' + t)
+    const ativo = t === tab
+    if (btn) {
+      btn.classList.toggle('active', ativo)
+      btn.setAttribute('aria-selected', ativo ? 'true' : 'false')
+      btn.tabIndex = ativo ? 0 : -1
+      if (ativo && foco) btn.focus()
+    }
+    if (painel) painel.hidden = !ativo
+  })
+}
+
+function _settingsTabKeys(e) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
+  const i = SETTINGS_TABS.indexOf(_settingsTab)
+  let novo = i
+  if (e.key === 'ArrowLeft')  novo = (i - 1 + SETTINGS_TABS.length) % SETTINGS_TABS.length
+  if (e.key === 'ArrowRight') novo = (i + 1) % SETTINGS_TABS.length
+  if (e.key === 'Home') novo = 0
+  if (e.key === 'End')  novo = SETTINGS_TABS.length - 1
+  if (novo === i) return
+  e.preventDefault()
+  setSettingsTab(SETTINGS_TABS[novo], true)
+}
