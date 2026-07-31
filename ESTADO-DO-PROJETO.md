@@ -256,6 +256,50 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+### Sessão 2026-07-31 (2ª rodada) — Reestruturação da camada de IA (gateway único)
+53. **Pedido**: auditar tudo que a IA faz (análise, TTS, imagens, cards, lotes) e aplicar
+    melhorias/correções/reestruturação. Inventário: **16 pontos de chamada em 6 arquivos**,
+    com **5 implementações duplicadas** do mesmo fetch JSON e três defeitos sistêmicos:
+    nenhuma chamada tinha **timeout** (rede pendurada = spinner infinito), nenhuma tinha
+    **retry** (um 429 no meio de um lote — Kindle 25 itens, enriquecimento, pool de áudio —
+    perdia itens em silêncio) e os erros subiam como "HTTP 401" **sem a mensagem real** da
+    OpenAI.
+    - **Novo `js/ai.js`** (NÃO-lazy, carregado após `lang.js`; incluído no SHELL do sw.js):
+      `aiJSON` / `aiText` / `aiTTS` / `aiImage` / `aiTestKey` / `aiModel()`. Timeout por
+      AbortController (90s chat, 60s TTS, 180s imagem), retry 2× em 429/5xx/queda de rede com
+      backoff e respeito a `Retry-After`, 4xx real nunca retenta, mensagem de erro da API
+      exposta ao usuário, e `max_completion_tokens` automático para gpt-5/o* (rejeitam
+      `max_tokens`). **Streaming do Assistente fica FORA por desenho** — retry automático em
+      SSE duplicaria a resposta na tela.
+    - **Correções achadas na auditoria**:
+      - Lote do Kindle e análise linha-a-linha usavam **`gpt-4o` hardcoded** (≈30× o preço do
+        mini) e `_openaiJSON` caía em gpt-4o com cfg vazia — o resto do app usa gpt-4o-mini.
+        Unificado via `aiModel()`.
+      - `AI_MODELS` listava **Anthropic/Google, mas TODAS as chamadas vão para api.openai.com**
+        — selecionar outro provider mandaria `claude-*` para a API errada e quebraria toda a
+        IA. Catálogo agora é só OpenAI (4o-mini padrão, 4.1-mini, 4o, 5-mini, 5) e `aiModel()`
+        ignora um `cfg.aiModel` não-OpenAI vindo da nuvem.
+      - **"Gerar imagens" em lote re-gerava (e re-PAGAVA) imagens existentes** — a deduplicação
+        era só dentro da seleção. `generateCardImage(id, el, force)`: lote passa `force=false`
+        e pula quem já tem (reportando quantas economizou); botão individual mantém regeneração.
+      - Prompt de imagem pedia *"verify before finalizing, reject and redo"* — modelo de imagem
+        não itera; instrução impossível. E o `example_en` ia com `<b></b>` cru para o prompt.
+      - `fetchAudioBase64`: **zero chamadores**, removida.
+    - **UI nova (aba IA)**: o **seletor de modelo voltou** (a reforma do AI Studio tinha
+      removido o `<select>` e deixado o modelo inescolhível) e botão **"Testar chave"** via
+      `GET /v1/models` (não consome token), com resultado inline.
+    - **Validado ao vivo na Vercel com fetch stubado**: retry 429→500→200 em 3 tentativas;
+      401 não retenta e expõe "Incorrect API key provided"; sem chave → mensagem amigável;
+      `claude-*` na cfg → cai no default; análise ponta-a-ponta via gateway populando
+      meanings/ipa; lote de imagem pulando existente (`skip`, 0 chamadas) e force regenerando;
+      seletor com os 5 modelos; 7 telas sem erro de console. `CACHE`: **`englab-v25`**.
+    - **Propostas ANOTADAS, não aplicadas** (decidir com o Djemeson): estimativa de custo antes
+      de lotes grandes; TTS `gpt-4o-mini-tts` (mais barato e com instruções de estilo) no lugar
+      do `tts-1`; timeout+retry de conexão para o streaming do Assistente; `quality`/`size`
+      configuráveis na geração de imagem.
+
+
+
 ### Sessão 2026-07-31 — Abas: informação solta vira informação organizada
 52. **Pedido**: "aplique abas sofisticadas e inteligentes onde for necessário — na dashboard tem
     muita informação solta". A decisão de ONDE foi medida, não achada:
