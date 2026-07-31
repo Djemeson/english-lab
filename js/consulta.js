@@ -324,16 +324,23 @@ async function sendConsulta() {
 
   let full = ''
   try {
+    // Timeout SÓ até o primeiro byte: aberto o stream, o timer desliga —
+    // abortar no meio do texto num retry duplicaria a resposta, e retry
+    // automático em SSE é justamente o que não fazemos.
+    const ctl = new AbortController()
+    const connTimer = setTimeout(() => ctl.abort(), 45000)
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+      signal: ctl.signal,
       body: JSON.stringify({
-        model: cfg.aiModel || 'gpt-4o-mini',
+        model: aiModel(),
         messages: [{ role: 'system', content: consultaSystem() }, ...apiHistory],
         temperature: 0.7,
         stream: true
       })
     })
+    clearTimeout(connTimer)
     if (!res.ok) { let e = {}; try { e = await res.json() } catch {} throw new Error(e.error?.message || ('HTTP ' + res.status)) }
 
     const reader = res.body.getReader()

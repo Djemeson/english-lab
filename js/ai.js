@@ -105,19 +105,33 @@ async function aiText(messages, { maxTokens, model, timeoutMs, retries } = {}) {
   return (data.choices?.[0]?.message?.content || '').trim()
 }
 
-// TTS — modelo e velocidade centralizados (antes 'tts-1' aparecia
-// hardcoded em dois lugares com speed divergente).
-const AI_TTS_MODEL = 'tts-1'
+// TTS — tenta o gpt-4o-mini-tts (mais barato, aceita instrução de estilo);
+// se a conta/modelo recusar, cai no tts-1 clássico na mesma chamada.
+// O resultado é cacheado por texto no AudioDB, então o fallback custa
+// no máximo uma tentativa extra por frase nova.
+const AI_TTS_MODEL = 'gpt-4o-mini-tts'
+const AI_TTS_FALLBACK = 'tts-1'
 async function aiTTS(text, { voice, speed = 0.9, timeoutMs = 60000 } = {}) {
   if (!cfg.openaiKey) throw new Error('Chave da OpenAI não configurada')
-  const res = await _aiFetch('https://api.openai.com/v1/audio/speech', {
-    model: AI_TTS_MODEL, input: text, voice: voice || randomVoice(), speed
-  }, { timeoutMs, retries: 1 })
-  return blobToBase64(await res.blob())
+  const v = voice || randomVoice()
+  try {
+    const res = await _aiFetch('https://api.openai.com/v1/audio/speech', {
+      model: AI_TTS_MODEL, input: text, voice: v,
+      instructions: 'Speak clearly at a slightly slow pace, for a language learner.'
+    }, { timeoutMs, retries: 0 })
+    return blobToBase64(await res.blob())
+  } catch (e) {
+    const res = await _aiFetch('https://api.openai.com/v1/audio/speech', {
+      model: AI_TTS_FALLBACK, input: text, voice: v, speed
+    }, { timeoutMs, retries: 1 })
+    return blobToBase64(await res.blob())
+  }
 }
 
 // Imagem — retorna data URL base64.
-async function aiImage(prompt, { size = '1024x1024', quality = 'medium', timeoutMs = 180000 } = {}) {
+async function aiImage(prompt, { size = '1024x1024', quality, timeoutMs = 180000 } = {}) {
+  // Qualidade configurável (Configurações → IA): low ≈ 1/4 do custo de medium.
+  quality = quality || cfg.imgQuality || 'medium'
   if (!cfg.openaiKey) throw new Error('Chave da OpenAI não configurada')
   const res = await _aiFetch('https://api.openai.com/v1/images/generations', {
     model: 'gpt-image-1', prompt, n: 1, size, quality
@@ -138,4 +152,34 @@ async function aiTestKey(key) {
   let msg = 'HTTP ' + res.status
   try { const e = await res.json(); if (e.error?.message) msg = e.error.message } catch {}
   return { ok: false, msg }
+}
+
+// ================================================================
+// ESTIMATIVA DE CUSTO para operações em lote.
+// Ordens de grandeza (jul/2026) — o objetivo é avisar ANTES de gastar,
+// não faturar com precisão de centavo.
+// ================================================================
+const AI_COST = {
+  chat:  0.001,                                    // por item analisado (mini)
+  tts:   0.008,                                    // por frase (~80 caracteres)
+  image: { low: 0.011, medium: 0.042, high: 0.167 } // por imagem 1024×1024
+}
+
+function aiEstimate(tipo, n) {
+  const unit = tipo === 'image' ? (AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium) : (AI_COST[tipo] || 0.001)
+  const total = unit * n
+  const valor = total < 0.01 ? '< US$ 0,01' : 'US$ ' + total.toFixed(2).replace('.', ',')
+  return valor
+}
+
+// Confirmação padrão antes de um lote que custa dinheiro. Lotes pequenos
+// (abaixo de ~US$ 0,02) não interrompem — confirmar centavos é atrito.
+function aiConfirmBatch(tipo, n, rotulo) {
+  const unit = tipo === 'image' ? (AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium) : (AI_COST[tipo] || 0.001)
+  if (unit * n < 0.02) return true
+  return confirm(`${rotulo}
+
+${n} chamada${n !== 1 ? 's' : ''} à OpenAI — custo estimado: ${aiEstimate(tipo, n)}.
+
+Continuar?`)
 }

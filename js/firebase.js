@@ -201,6 +201,8 @@ async function fbPushData() {
     // Assim, um dispositivo sem a chave nunca apaga o valor já salvo na nuvem.
     const cfgPayload = {
       theme:       cfg.theme        || 'midnight',
+      accent:      cfg.accent       || '',
+      imgQuality:  cfg.imgQuality   || 'medium',
       aiProvider:  cfg.aiProvider   || 'openai',
       aiModel:     cfg.aiModel       || '',
       ttsProvider: cfg.ttsProvider   || 'openai',
@@ -344,6 +346,10 @@ async function fbPull() {
       const c = cfgDoc2.data() || {}
       if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
       if (c.theme)       cfg.theme       = c.theme
+    if (c.accent !== undefined) cfg.accent = c.accent
+    if (c.imgQuality) cfg.imgQuality = c.imgQuality
+      if (c.accent !== undefined) cfg.accent = c.accent
+      if (c.imgQuality) cfg.imgQuality = c.imgQuality
       if (c.aiProvider)  cfg.aiProvider  = c.aiProvider
       if (c.aiModel)     cfg.aiModel     = c.aiModel
       if (c.ttsProvider) cfg.ttsProvider = c.ttsProvider

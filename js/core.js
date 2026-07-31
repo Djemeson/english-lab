@@ -109,7 +109,7 @@ async function restoreCfgFromBackup() {
   try { backup = await SettingsDB.get('cfg') } catch {}
   if (!backup || typeof backup !== 'object') return false
   let restored = false
-  const keys = ['openaiKey', 'theme', 'aiProvider', 'aiModel', 'ttsProvider']
+  const keys = ['openaiKey', 'theme', 'accent', 'aiProvider', 'aiModel', 'ttsProvider']
   for (const k of keys) {
     const cur = cfg[k]
     const curEmptyOrDefault = (cur === undefined || cur === '' || cur === DEF_CFG[k])
@@ -138,6 +138,48 @@ function applyTheme(id) {
   const valid = THEMES.find(t => t.id === id) ? id : 'midnight'
   document.documentElement.setAttribute('data-theme', valid)
   cfg.theme = valid
+  applyAccent(cfg.accent)
+}
+
+// ================================================================
+// ACENTO PERSONALIZÁVEL
+// O usuário escolhe a cor de destaque por cima de QUALQUER tema — é o que
+// torna o visual dele, e não o nosso. Só o --primary e derivados mudam;
+// success/warning/error são semânticos e ficam com o tema.
+// ================================================================
+const ACCENTS = [
+  { id: '',        name: 'Padrão do tema' },
+  { id: '#4F6BED', name: 'Índigo' },
+  { id: '#0E8DA3', name: 'Petróleo' },
+  { id: '#2F9E6E', name: 'Esmeralda' },
+  { id: '#C2703D', name: 'Terracota' },
+  { id: '#B84A6B', name: 'Framboesa' },
+  { id: '#7A5CC6', name: 'Ametista' },
+  { id: '#946B21', name: 'Dourado' },
+]
+
+function _hexRgb(h) {
+  h = (h || '').replace('#', '')
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]
+}
+function _mixHex(hex, alvo, t) {  // alvo: [r,g,b]; t: 0..1
+  const c = _hexRgb(hex).map((v,i) => Math.round(v + (alvo[i]-v)*t))
+  return '#' + c.map(v => v.toString(16).padStart(2,'0')).join('')
+}
+
+function applyAccent(hex) {
+  const root = document.documentElement
+  const PROPS = ['--primary','--primary-rgb','--primary-d','--accent-bright','--primary-grad','--primary-glow']
+  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) { PROPS.forEach(p => root.style.removeProperty(p)); return }
+  const rgb = _hexRgb(hex).join(',')
+  const escuro = _mixHex(hex, [0,0,0], .18)
+  const claro  = _mixHex(hex, [255,255,255], .25)
+  root.style.setProperty('--primary', hex)
+  root.style.setProperty('--primary-rgb', rgb)
+  root.style.setProperty('--primary-d', escuro)
+  root.style.setProperty('--accent-bright', claro)
+  root.style.setProperty('--primary-grad', `linear-gradient(135deg, ${hex} 0%, ${escuro} 100%)`)
+  root.style.setProperty('--primary-glow', `rgba(${rgb},0.10)`)
 }
 // Aplica o tema o mais cedo possível (antes mesmo do initApp) p/ evitar flash
 try {

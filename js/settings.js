@@ -35,8 +35,10 @@ function updateModelOptions() {
 function fillSettings() {
   el('cfg-openai-key').value = cfg.openaiKey || ''
   updateModelOptions()
+  const q = el('cfg-img-quality'); if (q) q.value = cfg.imgQuality || 'medium'
   setSettingsTab(_settingsTab)
   renderThemePicker()
+  renderAccentPicker()
   // Atualiza UI Firebase com estado atual
   if (_fbUser !== undefined) updateFirebaseUI(_fbUser)
 }
@@ -47,6 +49,7 @@ function saveSettings() {
   cfg.aiModel = el('cfg-ai-model')?.value || AI_DEFAULT_MODEL
   cfg.ttsProvider = 'openai'
   cfg.openaiKey = el('cfg-openai-key').value.trim()
+  cfg.imgQuality = el('cfg-img-quality')?.value || 'medium'
   saveCfg()
   // Envia para a nuvem (se logado) para sobreviver a refresh e sincronizar entre dispositivos
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
@@ -70,6 +73,27 @@ function renderThemePicker() {
       <span class="theme-swatch-name">${t.name}</span>
     </button>`).join('')
 }
+// Acentos: fileira de bolinhas de cor abaixo dos temas. O acento vale por
+// cima de qualquer tema e sincroniza entre aparelhos (cfg.accent).
+function renderAccentPicker() {
+  const area = el('accent-picker'); if (!area) return
+  area.innerHTML = ACCENTS.map(a => {
+    const ativo = (cfg.accent || '') === a.id
+    const cor = a.id || null
+    return `<button type="button" class="accent-dot${ativo ? ' active' : ''}" data-tip="${escA(a.name)}"
+      aria-label="${escA(a.name)}" onclick="setAccent('${a.id}')"
+      style="${cor ? 'background:' + cor : ''}">${cor ? '' : ic('x','ic-sm')}</button>`
+  }).join('')
+}
+
+function setAccent(id) {
+  cfg.accent = id || ''
+  applyAccent(cfg.accent)
+  saveCfg()
+  renderAccentPicker()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+}
+
 
 function selectTheme(id) {
   applyTheme(id)        // aplica visualmente + grava em cfg.theme
@@ -138,6 +162,7 @@ async function generateMissingAudio() {
   const texts = [...new Set(srsCards.map(c => c.example_en || c.word).filter(Boolean))]
   const missing = texts.filter(t => !_audioKeyCache?.has(audioKey(t)))
   if (!missing.length) { toast('Todos os cards já têm áudio', 'info'); if (btn) btn.disabled = false; return }
+  if (!aiConfirmBatch('tts', missing.length, 'Gerar áudio ausente')) { if (btn) btn.disabled = false; return }
   await preGenerateAudio(missing.map(t => ({ example_en: t })))
   if (btn) btn.disabled = false
   checkMissingAudio()

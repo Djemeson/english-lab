@@ -409,6 +409,7 @@ async function browserGenerateImagesSelected() {
   // Deduplica por chave de imagem (evita gerar a mesma imagem duas vezes)
   const seen = new Set()
   const toGenerate = cards.filter(c => { const k = imageKey(c); if (seen.has(k)) return false; seen.add(k); return true })
+  if (!aiConfirmBatch('image', toGenerate.length, 'Gerar imagens')) return
   toast(`Gerando imagens para ${toGenerate.length} significado(s)...`, 'info')
   let feitos = 0, pulados = 0
   for (const card of toGenerate) {
@@ -874,6 +875,7 @@ async function reanalyzeAll() {
   const genAudio = cfg.ttsProvider !== 'none' && !!cfg.openaiKey
 
   const tasks = items.map(it => async () => {
+  if (!aiConfirmBatch('chat', tasks.length, 'Reanalisar tudo (corrigir)')) return
     try {
       const r = await regenerateMeaning(it)
       const variety = _normVariety(r && r.variety, it.lang)
@@ -965,6 +967,7 @@ async function fillMissingAll() {
   let updated = 0, skipped = 0, failed = 0, wordsTouched = false
 
   const tasks = items.map(it => async () => {
+  if (!aiConfirmBatch('chat', tasks.length, 'Completar dados (IA)')) return
     const PROMPT = `You fill in MISSING metadata for a ${promptLangName(it.lang)} vocabulary flashcard, for a Brazilian learner. Return ONLY valid JSON.
 Word/expression (${promptLangName(it.lang)}): "${it.word}"${it.type ? ` (type: ${it.type})` : ''}
 Meaning (PT): "${it.meaning_pt || '(most common sense)'}"
@@ -1082,6 +1085,7 @@ async function markBoldAll() {
   const wordsTouched = new Set()
 
   const tasks = items.map(it => async () => {
+  if (!aiConfirmBatch('chat', tasks.length, 'Negrito perfeito (IA)')) return
     try {
       const r = await markBoldOne(it)
       const en = (r && r.en && boldSpanOk(r.en)) ? r.en : it.en

@@ -15,10 +15,10 @@
   --primary-glow: rgba(var(--primary-rgb),0.10);
   --primary-rgb: 59,130,246;
   --primary-grad: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-  --success: #34D399;
-  --warning: #FBBF24;
-  --error: #F87171;
-  --purple: #A78BFA;
+  --success: #4CC39A;
+  --warning: #E7BA53;
+  --error: #ED7A74;
+  --purple: #A896E4;
   --text: #E2E8F0;
   --text2: #7C93B0;
   /* --text3 e usado nos rotulos pequenos de TODA a interface (eyebrows,
@@ -104,7 +104,7 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 }
 .nav-item:hover{color:var(--text2);background:rgba(var(--primary-rgb),0.06)}
 .nav-item.active{color:var(--accent-bright);background:linear-gradient(90deg,rgba(var(--primary-rgb),0.16),rgba(var(--primary-rgb),0.02));border-left:2px solid var(--accent-bright)}
-.nav-item.active svg{filter:drop-shadow(0 0 6px rgba(var(--primary-rgb),0.5))}
+.nav-item.active svg{/* glow removido: brilho atras de icone lê como brinquedo */}
 .nav-item svg{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
 .badge{
   display:inline-flex;align-items:center;justify-content:center;
@@ -1055,7 +1055,7 @@ select option{background:var(--surface)}
   --primary-glow:color-mix(in srgb, var(--success) 10%, transparent);
   --primary-rgb:16,185,129;
   --primary-grad:linear-gradient(135deg,#10B981,#059669);
-  --success:#34D399; --warning:#FBBF24; --error:#F87171; --purple:#A78BFA;
+  --success:#4CC39A; --warning:#E7BA53; --error:#ED7A74; --purple:#A896E4;
   --text:#DCF5EC;
   --text2:#7FA99A;
   --text3:#658A7C;
@@ -1083,7 +1083,7 @@ select option{background:var(--surface)}
   --primary-glow:rgba(139,92,246,0.12);
   --primary-rgb:139,92,246;
   --primary-grad:linear-gradient(135deg,#A78BFA,#7C3AED);
-  --success:#34D399; --warning:#FBBF24; --error:#F87171; --purple:#C4B5FD;
+  --success:#4CC39A; --warning:#E7BA53; --error:#ED7A74; --purple:#BCAAE9;
   --text:#ECE6FB;
   --text2:#9A8CC0;
   --text3:#8678AA;
@@ -1199,14 +1199,14 @@ select option{background:var(--surface)}
    ================================================================ */
 
 /* ---- Tipografia de cabeçalho ---- */
-.page-header h1{font-size:var(--fs-xl);letter-spacing:-.5px;font-weight:800}
+.page-header h1{font-size:var(--fs-xl);letter-spacing:-.5px;font-weight:700}
 .page-header{position:relative}
 
 /* ---- Sidebar: marca com brilho ---- */
 .sb-brand-name{font-size:var(--fs-base)}
 .sb-brand-name span{
-  background:var(--primary-grad);-webkit-background-clip:text;background-clip:text;
-  -webkit-text-fill-color:transparent;
+  
+  color:var(--primary);
 }
 
 /* ---- Hero do dashboard ---- */
@@ -1220,7 +1220,7 @@ select option{background:var(--surface)}
   background:radial-gradient(440px 200px at 100% -20%, rgba(var(--primary-rgb),0.20), transparent 70%);
 }
 .dash-action-card > *{position:relative;z-index:1}
-.dash-action-left .dash-num{font-size:var(--fs-3xl);font-weight:800}
+.dash-action-left .dash-num{font-size:var(--fs-3xl);font-weight:700}
 
 /* ---- Painéis com profundidade ---- */
 .word-card,.review-sidebar,.review-empty-main,.srs-card-face,.srs-deck-table-wrap,
@@ -1362,7 +1362,7 @@ select option{background:var(--surface)}
   margin-bottom:26px;padding-bottom:16px;border-bottom:1px solid var(--border);
 }
 .ph-left{min-width:0}
-.page-header h1{display:flex;align-items:center;gap:11px;font-size:var(--fs-xl);font-weight:800;letter-spacing:-.5px}
+.page-header h1{display:flex;align-items:center;gap:11px;font-size:var(--fs-xl);font-weight:700;letter-spacing:-.5px}
 .page-header h1 .ic{width:24px;height:24px;color:var(--primary)}
 .ph-left p,.page-header > p{color:var(--text2);margin-top:5px;font-size:var(--fs-md)}
 .ph-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -1389,7 +1389,7 @@ select option{background:var(--surface)}
   background:var(--surface2);color:var(--text2);
 }
 .metric-body{min-width:0}
-.metric-body .mc-val{font-size:var(--fs-xl);font-weight:800;line-height:1.1}
+.metric-body .mc-val{font-size:var(--fs-xl);font-weight:700;line-height:1.1}
 .metric-body .mc-lbl{font-size:var(--fs-xs);color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-top:2px}
 
 /* ---- Títulos dos cards de configuração com ícone ---- */
@@ -1943,7 +1943,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   justify-content:flex-start;
   gap:28px;
 }
-.dash-action-card::after{opacity:.45}
+.dash-action-card::after{opacity:.22}
 .dash-action-card:not([style]) .dash-action-left .dash-num{color:var(--primary)}
 .dash-action-card:not([style]) .dash-action-left .dash-sub{color:var(--text2)}
 /* Empurra o botão para a direita SEM abrir um vão de 663px no meio do nada:
@@ -2267,7 +2267,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
     align-items: center;
     gap: 10px;
     font-size: var(--fs-lg);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--text);
     letter-spacing: -0.3px;
   }
@@ -2276,14 +2276,13 @@ body.sb-collapsed #fb-user-photo{margin:0}
     width: 22px;
     height: 22px;
     color: var(--accent-bright);
-    filter: drop-shadow(0 0 4px rgba(var(--primary-rgb), 0.3));
   }
   
   .mob-logo-brand span span {
-    background: var(--primary-grad);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    
+    
+    
+    color:var(--primary);
   }
   
   .mob-header-actions {
@@ -2385,7 +2384,6 @@ body.sb-collapsed #fb-user-photo{margin:0}
   
   .mobile-bottom-nav .nav-item.active svg {
     transform: translateY(-2px);
-    filter: drop-shadow(0 2px 8px rgba(var(--primary-rgb), 0.4));
     stroke-width: 2.1;
   }
   
@@ -2475,7 +2473,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   }
   .metric-body .mc-val {
     font-size: var(--fs-xl);
-    font-weight: 800;
+    font-weight: 700;
   }
 
   /* Home Dashboard Card */
@@ -2494,7 +2492,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   .dash-action-left .dash-num {
     font-size: var(--fs-3xl);
     letter-spacing: -1px;
-    font-weight: 800;
+    font-weight: 700;
   }
   .dash-action-card .btn {
     width: 100%;
@@ -2515,7 +2513,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   }
   .srs-card-front-word {
     font-size: var(--fs-2xl);
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: -0.5px;
     line-height: 1.25;
   }
@@ -2700,7 +2698,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
 .pl-status.is-recall  { background: rgba(251, 191, 36, 0.12);      color: var(--warning) }
 .pl-status.is-reveal  { background: rgba(52, 211, 153, 0.12);      color: var(--success) }
 .pl-word {
-  font-size: var(--fs-2xl); font-weight: 800; color: var(--text);
+  font-size: var(--fs-2xl); font-weight: 700; color: var(--text);
   margin-bottom: 8px; font-family: var(--font-display);
 }
 .pl-sentence {
@@ -2788,8 +2786,8 @@ body.sb-collapsed #fb-user-photo{margin:0}
 .login-mark svg{width:19px;height:19px;fill:none;stroke:#fff;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .login-wordmark{font-size:var(--fs-base);font-weight:700;letter-spacing:-.2px;color:var(--text)}
 .login-wordmark span{
-  background:var(--primary-grad);-webkit-background-clip:text;background-clip:text;
-  -webkit-text-fill-color:transparent;
+  
+  color:var(--primary);
 }
 
 /* ---- O flashcard em ciclo (o herói da tela) ---- */
@@ -2962,3 +2960,21 @@ body.sb-collapsed #fb-user-photo{margin:0}
   .seg-tab{flex:1;justify-content:center;padding:9px 8px;font-size:var(--fs-xs)}
   .seg-tab .ic{display:none}
 }
+
+/* ================================================================
+   SELETOR DE ACENTO (Configurações → Aparência)
+   ================================================================ */
+.accent-picker{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.accent-dot{
+  width:34px;height:34px;border-radius:50%;cursor:pointer;
+  border:2px solid var(--border);
+  display:grid;place-items:center;color:var(--text3);
+  background:var(--surface2);
+  transition:transform .14s ease, border-color .14s ease, box-shadow .14s ease;
+}
+.accent-dot:hover{transform:scale(1.1)}
+.accent-dot.active{
+  border-color:var(--text);
+  box-shadow:0 0 0 3px var(--surface), 0 0 0 5px var(--text2);
+}
+.accent-dot .ic{width:14px;height:14px}
