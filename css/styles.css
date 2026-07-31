@@ -2978,3 +2978,30 @@ body.sb-collapsed #fb-user-photo{margin:0}
   box-shadow:0 0 0 3px var(--surface), 0 0 0 5px var(--text2);
 }
 .accent-dot .ic{width:14px;height:14px}
+
+/* ================================================================
+   ABA MÍDIA — dois passos agrupados (1·Fonte, 2·Material)
+   ================================================================ */
+.midia-group{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px 18px;
+  margin-bottom:14px;
+}
+.midia-eyebrow{
+  font-size:var(--fs-3xs);font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text2);margin-bottom:12px;
+}
+.midia-src-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.midia-src-grid label{
+  display:block;font-size:var(--fs-xs);font-weight:600;color:var(--text2);margin-bottom:5px;
+}
+.midia-src-grid input{width:100%}
+.midia-input-grid{display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:stretch}
+.midia-drop-compact{margin:0;display:flex;flex-direction:column;justify-content:center;padding:18px 12px}
+.midia-drop-compact p{margin:2px 0;font-size:var(--fs-xs)}
+.midia-smart-row{display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
+@media(max-width:768px){
+  .midia-src-grid,.midia-input-grid{grid-template-columns:1fr}
+}

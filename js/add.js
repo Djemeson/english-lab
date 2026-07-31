@@ -124,6 +124,11 @@ function loadKindleQueue() {
   try {
     const saved = JSON.parse(localStorage.getItem(SK.kindleQueue) || '[]')
     if (saved.length > 0) {
+      // Migração leve: decodifica itens salvos antes da correção de entidades
+      saved.forEach(it => {
+        if (it.context) it.context = decodeEntities(it.context)
+        if (it.source_title) it.source_title = cleanSourceTitle(it.source_title)
+      })
       const seen = loadKindleSeen()
       kindleItems = saved.filter(item => !seen.has(kindleHighlightHash(item.context || item.word)))
       if (kindleItems.length < saved.length) localStorage.setItem(SK.kindleQueue, JSON.stringify(kindleItems))
@@ -139,10 +144,23 @@ function clearKindleQueue() {
   autoSyncAfterChange()
 }
 
+// O export do Kindle é HTML: o texto vem com entidades (&quot; &amp; &#39;…)
+// que o parser antigo deixava vazar cruas para a tela e para os prompts.
+function decodeEntities(t) {
+  if (!t || t.indexOf('&') === -1) return t || ''
+  const ta = document.createElement('textarea')
+  ta.innerHTML = t
+  return ta.value
+}
+// Títulos de export vêm como nome de arquivo: 'Emperor_ The Gates of Rome_ A N'
+function cleanSourceTitle(t) {
+  return decodeEntities(t || '').replace(/_+/g, ' ').replace(/[\s]+/g, ' ').trim()
+}
+
 function parseKindleHTML(html) {
   // Extrai book title
   const titleMatch = html.match(/class='bookTitle'>([^<]+)/)
-  const bookTitle = titleMatch ? titleMatch[1].replace(/\n/g,' ').trim() : 'Kindle'
+  const bookTitle = titleMatch ? cleanSourceTitle(titleMatch[1]) : 'Kindle'
 
   // Extrai chapters e highlights em ordem de posição no documento
   const events = []
@@ -159,8 +177,8 @@ function parseKindleHTML(html) {
   const items = []
   let chapter = ''
   events.forEach(ev => {
-    if (ev.t === 'ch') { chapter = ev.text }
-    else { items.push({ word:'', context: ev.text, source_type:'kindle', source_title: bookTitle, chapter }) }
+    if (ev.t === 'ch') { chapter = decodeEntities(ev.text) }
+    else { items.push({ word:'', context: decodeEntities(ev.text), source_type:'kindle', source_title: bookTitle, chapter }) }
   })
   return items
 }
@@ -314,6 +332,8 @@ Return ONLY valid JSON:
 
   for (let start = 0; start < kindleItems.length; start += BATCH) {
     const batch = kindleItems.slice(start, start + BATCH)
+    const cEl = el('kindle-count')
+    if (cEl) cEl.textContent = `Traduzindo ${Math.min(start + BATCH, kindleItems.length)}/${kindleItems.length} destaques...`
 
     // Separa itens com frase de itens com só palavra
     const lines = batch.map((item, j) => {
@@ -359,6 +379,8 @@ Return JSON for ALL ${batch.length} items.` }
       console.warn(`[Kindle] Lote ${start}-${start+BATCH} falhou:`, e.message)
     }
   }
+  const cFim = el('kindle-count')
+  if (cFim) cFim.textContent = `${kindleItems.length} destaque${kindleItems.length!==1?'s':''} · tradução concluída`
 }
 
 function buildPicker(text, idx) {
@@ -1196,3 +1218,73 @@ function handleSentenceMouseUp(event, idx, type) {
 // SRS por resposta com anti-duplicado. Nada de consulta vive mais aqui.
 // ================================================================
 
+
+
+// ── Contador vivo de selecionados no botão principal ──
+function updateKindleSelCount() {
+  const n = document.querySelectorAll('.kindle-check:checked').length
+  const btn = el('kindle-add-btn')
+  if (btn) btn.innerHTML = ic('plus','ic-sm') + ` Adicionar selecionados (${n})`
+}
+document.addEventListener('change', e => {
+  if (e.target.classList && e.target.classList.contains('kindle-check')) updateKindleSelCount()
+})
+
+// ── Detecção de alvos em LOTE: para cada destaque selecionado ainda sem
+// palavra, a IA aponta o melhor item de estudo (reusa detectKindleWord). ──
+async function detectKindleTargetsAll() {
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  const alvo = [...document.querySelectorAll('.kindle-check:checked')]
+    .map(c => +c.dataset.i)
+    .filter(i => kindleItems[i] && !getItemWords(kindleItems[i]).length && (kindleItems[i].context || '').trim())
+  if (!alvo.length) { toast('Todos os destaques selecionados já têm palavra-alvo', 'info'); return }
+  if (!aiConfirmBatch('chat', alvo.length, 'Sugerir alvos de estudo (IA)')) return
+  toast(`Sugerindo alvos para ${alvo.length} destaque${alvo.length !== 1 ? 's' : ''}...`, 'info')
+  const tasks = alvo.map(i => () => detectKindleWord(i))
+  await runPool(tasks, 4)
+  updateKindleSelCount()
+  toast('Sugestões concluídas — revise clicando nas frases para ajustar', 'success')
+}
+
+// ================================================================
+// MÍDIA — botão único inteligente.
+// Antes havia dois botões ("Extrair material colado" × "Analisar linha a
+// linha") e o usuário tinha que saber a diferença. Agora o modo é
+// detectado pelo formato do texto e anunciado ANTES de rodar; o rótulo
+// do botão muda junto, então nunca é surpresa.
+// ================================================================
+function midiaDetectMode() {
+  const texto = (el('midia-text-new')?.value || '').trim()
+  if (!texto) return { mode: null }
+  const linhas = texto.split('\n').map(l => l.trim()).filter(Boolean)
+  const palavrasPorLinha = linhas.map(l => l.split(/\s+/).length)
+  const mediana = palavrasPorLinha.sort((a, b) => a - b)[Math.floor(palavrasPorLinha.length / 2)]
+  // Lista = várias linhas curtas (palavras/frases soltas). Artigo = prosa.
+  const ehLista = linhas.length >= 2 ? mediana <= 8 : palavrasPorLinha[0] <= 8
+  return ehLista
+    ? { mode: 'lines', n: linhas.length, rotulo: `Analisar ${linhas.length} linha${linhas.length !== 1 ? 's' : ''}` }
+    : { mode: 'doc', n: linhas.length, rotulo: 'Extrair material completo' }
+}
+
+function midiaUpdateModeHint() {
+  const d = midiaDetectMode()
+  const hint = el('midia-mode-hint')
+  const btn = el('midia-smart-btn')
+  if (!hint || !btn) return
+  if (!d.mode) {
+    hint.textContent = ''
+    btn.innerHTML = ic('sparkles','ic-sm') + ' Analisar material'
+    return
+  }
+  hint.textContent = d.mode === 'lines'
+    ? 'Detectado: lista — cada linha vira um item'
+    : 'Detectado: artigo/material completo — a IA extrai só o que vira card'
+  btn.innerHTML = ic('sparkles','ic-sm') + ' ' + d.rotulo
+}
+
+function midiaSmartRun() {
+  const d = midiaDetectMode()
+  if (!d.mode) { toast('Cole ou digite o material primeiro', 'warning'); return }
+  if (d.mode === 'lines') analyzeMidiaText()
+  else extractMidiaPasted()
+}
