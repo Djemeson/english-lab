@@ -804,7 +804,8 @@ function buildSrsVerso(card, imgData, imageBelow) {
       </div>
     </div>`
   }
-  return text
+  // Sem imagem: o card pode ser largo, mas o texto fica centrado em medida legível
+  return `<div class="srs-back-text-solo">${text}</div>`
 }
 
 // ---- SRS Config Modal ----
