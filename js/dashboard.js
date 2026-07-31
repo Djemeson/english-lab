@@ -82,22 +82,10 @@ function renderDashboard() {
       </div>`
   }
 
-  // ── Recentes (chips) ──
-  const recentArea = el('dash-recent-area')
-  if (recentArea && words.length > 0) {
-    const recent = [...words].sort((a,b) => new Date(b.created_at)-new Date(a.created_at)).slice(0,20)
-    recentArea.innerHTML = `
-      <div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:8px">Adicionadas recentemente</div>
-      <div class="dash-recent-chips">
-        ${recent.map(w => `<span class="dash-recent-chip" onclick="showSection('revisar')" style="cursor:pointer" title="${esc(w.context||'')}">${esc(w.word||'(frase)')}</span>`).join('')}
-        <span class="dash-recent-chip" style="color:var(--text3);cursor:pointer" onclick="showSection('adicionar')">+ adicionar</span>
-      </div>`
-  } else if (recentArea) {
-    recentArea.innerHTML = `<div class="empty-state" style="margin-top:20px">${ic('bookOpen','ic-xl')}<p>Nenhuma palavra ainda.</p><button class="btn btn-primary mt-4" onclick="showSection('adicionar')" style="margin-top:12px">${ic('plus')}Adicionar palavras</button></div>`
-  }
+  // Os chips de recentes viraram um cartão do painel "Vocabulário" (dashRecentCard).
 
-  renderDashboardGrid()
-  renderDashboardAchievements()
+  updateDashTabSignals()
+  setDashTab(_dashTab)
 }
 
 // ================================================================
@@ -227,8 +215,8 @@ function dashAchievements() {
 }
 
 function renderDashboardGrid() {
-  const area = el('dash-grid-area')
-  if (!area) return
+  // Os painéis substituíram o antigo #dash-grid-area (ver setDashTab).
+  if (!el('dpanel-progresso')) return
 
   const heatCells = dashHeatCells()
   const totalMonthReviews = srsLog.filter(l => {
@@ -490,20 +478,115 @@ function renderDashboardGrid() {
       `).join('')}</div>` : `<p style="color:var(--text3);font-size:var(--fs-md)">Nenhuma palavra capturada ainda.</p>`}
     </div>`
 
-  area.innerHTML = `
-    <div class="dash-grid">
-      <div class="dash-col">${heatmapCard}${weeklyReviewsCard}${trendCard}${langsCard}${leechCard}</div>
-      <div class="dash-col">${wodCard}${sourcesCard}</div>
+  // Os blocos são agrupados pela PERGUNTA que respondem, não por tipo de gráfico:
+  //   Progresso   = "como estou indo ao longo do tempo?"
+  //   Vocabulário = "o que eu tenho e de onde veio?"
+  if (_dashTab === 'progresso') {
+    el('dpanel-progresso').innerHTML = `
+      <div class="dash-grid">
+        <div class="dash-col">${heatmapCard}${weeklyReviewsCard}</div>
+        <div class="dash-col">${trendCard}</div>
+      </div>`
+  } else if (_dashTab === 'vocabulario') {
+    el('dpanel-vocabulario').innerHTML = `
+      <div class="dash-grid">
+        <div class="dash-col">${langsCard}${sourcesCard}${leechCard}</div>
+        <div class="dash-col">${wodCard}${dashRecentCard()}</div>
+      </div>`
+  }
+}
+
+// Chips de palavras recentes — vira um cartão do painel de Vocabulário,
+// em vez de uma faixa solta no fim da página.
+function dashRecentCard() {
+  if (!words.length) {
+    return `<div class="dash-card">
+      <div class="dash-card-h"><div><div class="dash-eyebrow">Entradas</div><h3>Adicionadas recentemente</h3></div></div>
+      <p style="color:var(--text3);font-size:var(--fs-md);margin:0">Nenhuma palavra capturada ainda.</p>
     </div>`
+  }
+  const recent = [...words].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 24)
+  return `<div class="dash-card">
+    <div class="dash-card-h">
+      <div><div class="dash-eyebrow">Entradas</div><h3>Adicionadas recentemente</h3></div>
+      <span class="dash-metaval">${words.length} no total</span>
+    </div>
+    <div class="dash-recent-chips">
+      ${recent.map(w => `<span class="dash-recent-chip" onclick="showSection('revisar')" style="cursor:pointer"
+        title="${escA(w.context || '')}">${esc(w.word || '(frase)')}</span>`).join('')}
+      <span class="dash-recent-chip" style="color:var(--text3);cursor:pointer" onclick="showSection('adicionar')">+ adicionar</span>
+    </div>
+  </div>`
+}
+
+// ================================================================
+// ABAS DO DASHBOARD
+// Só o painel ativo é renderizado — os gráficos são SVG montado em string,
+// não vale construir três telas para esconder duas. A aba escolhida
+// persiste em el-ui-prefs, então voltar ao painel devolve onde você estava.
+// ================================================================
+let _dashTab = (typeof loadUiPrefs === 'function' && loadUiPrefs().dashTab) || 'progresso'
+const DASH_TABS = ['progresso', 'vocabulario', 'conquistas']
+
+function setDashTab(tab, foco) {
+  if (!DASH_TABS.includes(tab)) tab = 'progresso'
+  _dashTab = tab
+  if (typeof saveUiPref === 'function') saveUiPref('dashTab', tab)
+
+  DASH_TABS.forEach(t => {
+    const btn = el('dtab-' + (t === 'vocabulario' ? 'vocabulario' : t))
+    const painel = el('dpanel-' + t)
+    const ativo = t === tab
+    if (btn) {
+      btn.classList.toggle('active', ativo)
+      btn.setAttribute('aria-selected', ativo ? 'true' : 'false')
+      btn.tabIndex = ativo ? 0 : -1
+      if (ativo && foco) btn.focus()
+    }
+    if (painel) painel.hidden = !ativo
+  })
+
+  if (tab === 'conquistas') renderDashboardAchievements()
+  else renderDashboardGrid()
+}
+
+// Setas ←/→ percorrem as abas (padrão de tablist acessível)
+function _dashTabKeys(e) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
+  const i = DASH_TABS.indexOf(_dashTab)
+  let novo = i
+  if (e.key === 'ArrowLeft')  novo = (i - 1 + DASH_TABS.length) % DASH_TABS.length
+  if (e.key === 'ArrowRight') novo = (i + 1) % DASH_TABS.length
+  if (e.key === 'Home') novo = 0
+  if (e.key === 'End')  novo = DASH_TABS.length - 1
+  if (novo === i) return
+  e.preventDefault()
+  setDashTab(DASH_TABS[novo], true)
+}
+
+// Sinais nas próprias abas: a aba avisa se tem algo esperando lá dentro.
+function updateDashTabSignals() {
+  const conq = el('dtab-conq-count')
+  if (conq) {
+    const a = dashAchievements()
+    conq.textContent = `${a.filter(x => x.unlocked).length}/${a.length}`
+  }
+  const flag = el('dtab-vocab-flag')
+  if (flag) {
+    const leeches = srsCards.filter(c => c.leech).length
+    flag.textContent = leeches
+    flag.title = `${leeches} card${leeches !== 1 ? 's' : ''} travando na memória`
+    flag.classList.toggle('hidden', leeches === 0)
+  }
 }
 
 function renderDashboardAchievements() {
-  const area = el('dash-achv-area')
+  const area = el('dpanel-conquistas')
   if (!area) return
   const achievements = dashAchievements()
   const unlockedCount = achievements.filter(a => a.unlocked).length
   area.innerHTML = `
-    <div class="dash-card" style="margin-top:20px">
+    <div class="dash-card">
       <div class="dash-card-h"><div><div class="dash-eyebrow">Conquistas</div><h3>${unlockedCount} de ${achievements.length} marcos desbloqueados</h3></div></div>
       <div class="dash-badge-grid">${achievements.map(a => `
         <div class="dash-badge ${a.unlocked ? '' : 'locked'}">

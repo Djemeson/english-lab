@@ -2913,3 +2913,52 @@ body.sb-collapsed #fb-user-photo{margin:0}
   .lg-meaning{animation:none;opacity:1;transform:none}
   .login-google{transition:none}
 }
+
+/* ================================================================
+   ABAS DO DASHBOARD
+   O painel tinha 13 blocos empilhados (2,2 telas de rolagem). As abas
+   agrupam por PERGUNTA — progresso no tempo, acervo, marcos — deixando
+   ação e resumo sempre visíveis acima delas.
+   ================================================================ */
+.dash-tabs{
+  display:flex;gap:4px;align-items:center;
+  margin:22px 0 18px;padding:4px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  width:fit-content;max-width:100%;overflow-x:auto;
+}
+.dash-tab{
+  display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+  padding:8px 15px;border:none;border-radius:var(--radius-xs);
+  background:transparent;color:var(--text2);
+  font-family:inherit;font-size:var(--fs-sm);font-weight:600;
+  cursor:pointer;transition:background .15s ease,color .15s ease;
+}
+.dash-tab .ic{width:15px;height:15px;flex-shrink:0}
+.dash-tab:hover{color:var(--text);background:var(--surface3)}
+.dash-tab.active{
+  background:var(--surface);color:var(--text);
+  box-shadow:var(--shadow-sm);
+}
+.dash-tab.active .ic{color:var(--primary)}
+.dash-tab:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+
+/* Contadores na propria aba: ela avisa o que tem la dentro sem abrir */
+.dash-tab-count,.dash-tab-flag{
+  font-size:var(--fs-3xs);font-weight:700;line-height:1;
+  padding:3px 6px;border-radius:var(--radius-pill);
+  font-variant-numeric:tabular-nums;
+}
+.dash-tab-count{background:var(--surface3);color:var(--text2)}
+.dash-tab.active .dash-tab-count{background:color-mix(in srgb, var(--primary) 16%, transparent);color:var(--primary)}
+.dash-tab-flag{
+  background:color-mix(in srgb, var(--warning) 20%, transparent);
+  color:color-mix(in srgb, var(--warning) 62%, var(--text));
+}
+.dash-tab-flag.hidden{display:none}
+
+@media(max-width:768px){
+  .dash-tabs{width:100%;justify-content:space-between}
+  .dash-tab{flex:1;justify-content:center;padding:9px 8px;font-size:var(--fs-xs)}
+  .dash-tab .ic{display:none}
+}

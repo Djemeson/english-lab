@@ -209,11 +209,35 @@
       <p>Visão geral do seu progresso</p>
     </div>
   </div>
+  <!-- Ação e resumo ficam SEMPRE visíveis: esconder a ação principal atrás de
+       uma aba seria trocar bagunça por fricção. As abas organizam só o
+       conteúdo de leitura, que era o que se acumulava (13 blocos, 2,2 telas). -->
   <div id="dash-main-action"></div>
   <div id="dash-stats-area"></div>
-  <div id="dash-grid-area"></div>
-  <div id="dash-achv-area"></div>
-  <div id="dash-recent-area"></div>
+
+  <div class="dash-tabs" role="tablist" aria-label="Seções do painel" id="dash-tablist">
+    <button class="dash-tab active" role="tab" id="dtab-progresso" aria-controls="dpanel-progresso"
+      aria-selected="true" onclick="setDashTab('progresso')">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+      Progresso
+    </button>
+    <button class="dash-tab" role="tab" id="dtab-vocabulario" aria-controls="dpanel-vocabulario"
+      aria-selected="false" tabindex="-1" onclick="setDashTab('vocabulario')">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Vocabulário
+      <span class="dash-tab-flag hidden" id="dtab-vocab-flag"></span>
+    </button>
+    <button class="dash-tab" role="tab" id="dtab-conquistas" aria-controls="dpanel-conquistas"
+      aria-selected="false" tabindex="-1" onclick="setDashTab('conquistas')">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="m8.5 14-1.5 7 5-3 5 3-1.5-7"/></svg>
+      Conquistas
+      <span class="dash-tab-count" id="dtab-conq-count"></span>
+    </button>
+  </div>
+
+  <div id="dpanel-progresso"   role="tabpanel" aria-labelledby="dtab-progresso"></div>
+  <div id="dpanel-vocabulario" role="tabpanel" aria-labelledby="dtab-vocabulario" hidden></div>
+  <div id="dpanel-conquistas"  role="tabpanel" aria-labelledby="dtab-conquistas" hidden></div>
 </section>
 
 <!-- =========== ASSISTENTE (Consulta com IA) =========== -->

@@ -15,6 +15,9 @@ async function initApp() {
   mountLangSelector('lang-selector-asst') // seletor de idioma ativo (Assistente)
   renderDashboard()
   updateSrsBadge()
+  // Setas ←/→ percorrem as abas do painel (padrão de tablist acessível)
+  const tl = document.getElementById('dash-tablist')
+  if (tl) tl.addEventListener('keydown', _dashTabKeys)
   initFirebase()
 }
 // Kick off when DOM is ready
