@@ -924,19 +924,7 @@ Rules:
   - Exactly ONE bold span per side. Do not bold anything else.
 - Return ONLY valid JSON (no markdown): {"en": "${_gL.nameEn} sentence with <b>word</b>.", "pt": "Tradução com a <b>palavra</b> em negrito."}`
 
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: cfg.aiModel || 'gpt-4o-mini',
-        max_tokens: 200,
-        response_format: { type: 'json_object' },
-        messages: [{ role: 'user', content: prompt }]
-      })
-    })
-    if (!res.ok) throw new Error(`OpenAI ${res.status}`)
-    const data = await res.json()
-    const result = JSON.parse(data.choices?.[0]?.message?.content || '{}')
+    const result = await aiJSON(prompt, { maxTokens: 200 })
     if (!result.en) throw new Error('Resposta inválida da IA')
 
     // Update card snapshot

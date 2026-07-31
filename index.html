@@ -557,6 +557,14 @@
           </button>
         </div>
         <p style="font-size: var(--fs-xs); color: var(--text3); margin-top: 6px; line-height: 1.4;">Sua chave é mantida segura localmente em seu navegador e nunca é enviada a servidores de terceiros (com exceção direta à API oficial da OpenAI).</p>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:14px">
+          <div style="min-width:230px">
+            <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Modelo de análise</label>
+            <select id="cfg-ai-model" style="width:100%;height:38px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="testOpenAIKeyUI(this)" style="height:38px">Testar chave</button>
+          <span id="cfg-key-status" style="font-size:var(--fs-sm);color:var(--text2)"></span>
+        </div>
       </div>
     </div>
 <!-- Manutenção de Áudio -->
@@ -774,6 +782,7 @@
 
 <script src="js/core.js"></script>
 <script src="js/lang.js"></script>
+<script src="js/ai.js"></script>
 <script src="js/firebase.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/srs.js"></script>

@@ -208,20 +208,7 @@ Return ONLY this JSON (no markdown, no explanation):
 }`
 
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: cfg.aiModel || 'gpt-4o',
-        max_tokens: 2800,
-        response_format: { type: 'json_object' },
-        messages: [{ role: 'user', content: PROMPT }]
-      })
-    })
-    if (!res.ok) throw new Error(`OpenAI ${res.status}`)
-    const data = await res.json()
-    const raw = (data.choices?.[0]?.message?.content || '{}').trim()
-    const result = JSON.parse(raw)
+    const result = await aiJSON(PROMPT, { maxTokens: 2800 })
     applyAiResult(w, result)
     w.ai_provider = 'openai'
     saveWords()

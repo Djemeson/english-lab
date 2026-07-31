@@ -99,15 +99,7 @@ async function ensureSrsAudio(text) {
   if (cached) return cached
   // Gera via OpenAI TTS
   try {
-    const voice = randomVoice()
-    const res = await fetch('https://api.openai.com/v1/audio/speech', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'tts-1', input: text, voice, speed: 0.9 })
-    })
-    if (!res.ok) throw new Error(`TTS ${res.status}`)
-    const blob = await res.blob()
-    const b64 = await blobToBase64(blob)
+    const b64 = await aiTTS(text)
     await AudioDB.set(key, b64)
     return b64
   } catch(e) {
@@ -293,29 +285,7 @@ async function playSrsTTS(text) {
   }
 }
 
-// Busca áudio diretamente da OpenAI TTS
-async function fetchAudioBase64(word) {
-  const key = cfg.openaiKey || ''
-  if (!key || !word) return null
-  try {
-    const voice = randomVoice()
-    const res = await fetch('https://api.openai.com/v1/audio/speech', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'tts-1', input: word, voice })
-    })
-    if (!res.ok) { console.warn('[TTS Direto] Erro HTTP', res.status); return null }
-    const buffer = await res.arrayBuffer()
-    // Converte ArrayBuffer para base64
-    const bytes = new Uint8Array(buffer)
-    let binary = ''
-    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
-    return btoa(binary)
-  } catch(e) {
-    console.warn('[TTS Direto] Falha:', e.message)
-    return null
-  }
-}
+// fetchAudioBase64 removida (2026-07-31): nenhum chamador — código morto.
 
 
 // ================================================================
@@ -385,12 +355,15 @@ async function refreshImageKeyCache() {
 
 // Gera imagem via DALL-E 3 para o significado do card
 // Propaga automaticamente para todos os cards que compartilham o mesmo significado
-async function generateCardImage(cardId, callerEl) {
+// force=true (botão individual) regenera por cima; force=false (lote) pula
+// quem já tem imagem — antes o lote re-gerava e re-PAGAVA imagens existentes.
+async function generateCardImage(cardId, callerEl, force = true) {
   if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
   const card = srsCards.find(c => c.id === cardId)
   if (!card) return
 
   const key = imageKey(card)
+  if (!force && await ImageDB.get(key)) return 'skip'
 
   // Spinner no botão chamador
   if (callerEl) { callerEl.disabled = true; callerEl.innerHTML = '<span class="gen-spinner"></span> Gerando...' }
@@ -398,26 +371,13 @@ async function generateCardImage(cardId, callerEl) {
   const word   = card.word || ''
   const meaning = card.meaning_pt || card.definition_pt || ''
   const context = card.example_en  || ''
-  const prompt  = `Digital illustration, editorial style. ${promptLangName(cardLang(card))} vocabulary flashcard image for the word "${word}". Meaning: "${meaning}". ${context ? 'Example sentence: "'+context+'".' : ''} No text in the image. Detailed, artistic, vivid colors, clean composition. IMPORTANT: Before finalizing, verify anatomical accuracy — all humans and animals must have the correct number of limbs, fingers, and facial features. Reject and redo if any body part appears duplicated, missing, or malformed.`
+  // Sem "verify before finalizing / reject and redo": modelo de imagem não
+  // itera sobre a própria saída — instrução impossível só gastava prompt.
+  // Restrições anatômicas valem como descrição POSITIVA da cena.
+  const prompt  = `Digital illustration, editorial style. ${promptLangName(cardLang(card))} vocabulary flashcard image for the word "${word}". Meaning: "${meaning}". ${context ? 'Example sentence: "'+context.replace(/<[^>]*>/g,'')+'".' : ''} No text or lettering anywhere in the image. Anatomically correct people and animals. Detailed, artistic, vivid colors, clean composition.`
 
   try {
-    const res = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-image-1', prompt, n: 1, size: '1024x1024', quality: 'medium' })
-    })
-    if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || res.status) }
-    const data = await res.json()
-    // gpt-image-1 retorna b64_json diretamente; fallback para URL em modelos legados
-    let b64
-    if (data.data[0].b64_json) {
-      b64 = 'data:image/png;base64,' + data.data[0].b64_json
-    } else {
-      const imgRes = await fetch(data.data[0].url)
-      const blob = await imgRes.blob()
-      b64 = await blobToBase64(blob)
-    }
-
+    const b64 = await aiImage(prompt)
     await ImageDB.set(key, b64)
     if (!_imageKeyCache) _imageKeyCache = new Set()
     _imageKeyCache.add(key)
@@ -450,7 +410,12 @@ async function browserGenerateImagesSelected() {
   const seen = new Set()
   const toGenerate = cards.filter(c => { const k = imageKey(c); if (seen.has(k)) return false; seen.add(k); return true })
   toast(`Gerando imagens para ${toGenerate.length} significado(s)...`, 'info')
-  for (const card of toGenerate) await generateCardImage(card.id, null)
+  let feitos = 0, pulados = 0
+  for (const card of toGenerate) {
+    const r = await generateCardImage(card.id, null, false)
+    if (r === 'skip') pulados++; else feitos++
+  }
+  if (pulados) toast(`${feitos} gerada${feitos!==1?'s':''} · ${pulados} já existia${pulados!==1?'m':''} (não re-cobradas)`, 'info')
   await refreshImageKeyCache()
   if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value||'')
 }
@@ -831,19 +796,7 @@ ${varietyRules}
 Always fill BOTH for every item. Match each result to the item "id".
 Return: {"results":[{"id":0,"variety":"general","register":"neutral"}]}
 Items: ${JSON.stringify(items)}`
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: 2200,
-      response_format: { type: 'json_object' },
-      messages: [{ role: 'user', content: PROMPT }]
-    })
-  })
-  if (!res.ok) throw new Error('OpenAI ' + res.status)
-  const data = await res.json()
-  const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}')
+  const parsed = await aiJSON(PROMPT, { model: AI_DEFAULT_MODEL, maxTokens: 2200 })
   return Array.isArray(parsed.results) ? parsed.results : []
 }
 
@@ -890,18 +843,7 @@ Rules — follow exactly:
   - If the target appears more than once in a sentence, bold ONLY the main occurrence.
   - Exactly ONE bold span per side. Do not bold anything else.
 - Translate the Portuguese naturally (not word-for-word).`
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini', max_tokens: 900,
-      response_format: { type: 'json_object' },
-      messages: [{ role: 'user', content: PROMPT }]
-    })
-  })
-  if (!res.ok) throw new Error('OpenAI ' + res.status)
-  const data = await res.json()
-  return JSON.parse(data.choices?.[0]?.message?.content || '{}')
+  return aiJSON(PROMPT, { model: AI_DEFAULT_MODEL, maxTokens: 900 })
 }
 
 // Botão universal da Biblioteca: corrige frases (que não batiam com o significado)
@@ -1036,18 +978,7 @@ Return ONLY this JSON:
   "origin_pt": "1-2 sentences in PT-BR on the ORIGIN/history behind this expression — the image, metaphor or etymology. Fill ONLY for idioms, multi-word verbal expressions, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. 'sitting duck', 'on the chopping block', 'flagship'). Empty string for ordinary words with no notable story. NEVER invent folk etymology — if unsure, return empty."
 }`
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini', max_tokens: 260,
-          response_format: { type: 'json_object' },
-          messages: [{ role: 'user', content: PROMPT }]
-        })
-      })
-      if (!res.ok) throw new Error('OpenAI ' + res.status)
-      const data = await res.json()
-      const r = JSON.parse(data.choices?.[0]?.message?.content || '{}')
+      const r = await aiJSON(PROMPT, { model: AI_DEFAULT_MODEL, maxTokens: 260 })
 
       // Monta o "patch" só com os campos que estavam VAZIOS — nunca sobrescreve o
       // que já existia (mesmo que a IA tenha devolvido algo diferente pra esse campo).
@@ -1120,18 +1051,7 @@ Return the SAME two sentences, byte-for-byte identical EXCEPT that the study tar
 - If the Portuguese sentence is empty, return "pt":"".
 
 Return: {"en":"...","pt":"..."}`
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini', max_tokens: 400,
-      response_format: { type: 'json_object' },
-      messages: [{ role: 'user', content: PROMPT }]
-    })
-  })
-  if (!res.ok) throw new Error('OpenAI ' + res.status)
-  const data = await res.json()
-  return JSON.parse(data.choices?.[0]?.message?.content || '{}')
+  return aiJSON(PROMPT, { model: AI_DEFAULT_MODEL, maxTokens: 400 })
 }
 
 async function markBoldAll() {

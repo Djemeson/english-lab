@@ -328,24 +328,12 @@ Return ONLY valid JSON:
     }).join('\n')
 
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          max_tokens: Math.max(800, batch.length * 60),
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: `${lines}\n\nReturn JSON for ALL ${batch.length} items.` }
-          ]
-        })
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      let raw = (data.choices?.[0]?.message?.content || '{}')
-        .replace(/```(?:json)?\n?|\n?```/g, '').trim()
-      const result = JSON.parse(raw)
+      const result = await aiJSON([
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `${lines}
+
+Return JSON for ALL ${batch.length} items.` }
+      ], { maxTokens: Math.max(800, batch.length * 60) })
       if (Array.isArray(result.items)) {
         result.items.forEach(({ i, item, trans }) => {
           const idx = Number(i)
@@ -479,21 +467,9 @@ function attachPicker(idx) {
     this.classList.add('wp-loading')
     try {
       const context = kindleItems[i]?.context || ''
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          max_tokens: 15,
-          messages: [{
-            role: 'user',
-            content: `Sentence (${promptLangName(activeLang())}): "${context}"\nThe user clicked on the word: "${clickedWord}"\n\nIs "${clickedWord}" part of a multi-word verbal expression (phrasal/pronominal/separable verb), idiom, or fixed multi-word expression in this sentence? If yes, return the complete expression as it appears in the sentence. If no, return just "${clickedWord}". Return ONLY the word or expression, lowercase, no punctuation, no explanation.`
-          }]
-        })
-      })
-      if (!res.ok) return
-      const data = await res.json()
-      const detected = (data.choices?.[0]?.message?.content || '').trim().toLowerCase().replace(/[.,!?;:"""''()\n]/g, '').trim()
+      const resposta = await aiText(`Sentence (${promptLangName(activeLang())}): "${context}"\nThe user clicked on the word: "${clickedWord}"\n\nIs "${clickedWord}" part of a multi-word verbal expression (phrasal/pronominal/separable verb), idiom, or fixed multi-word expression in this sentence? If yes, return the complete expression as it appears in the sentence. If no, return just "${clickedWord}". Return ONLY the word or expression, lowercase, no punctuation, no explanation.`,
+        { model: AI_DEFAULT_MODEL, maxTokens: 15, retries: 0, timeoutMs: 20000 })
+      const detected = resposta.toLowerCase().replace(/[^a-zà-ü' -]/g, '').trim()
       if (detected && detected !== clickedWord) {
         setKindleWord(i, detected)
       }
@@ -549,21 +525,9 @@ async function detectKindleWord(i) {
   const btn = el(`kb-${i}`)
   if (btn) { btn.disabled = true; btn.textContent = '...' }
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 30,
-        messages: [{
-          role: 'user',
-          content: `Context (${promptLangName(activeLang())}): "${item.context}"\n\nIdentify the single most interesting vocabulary item to study from this sentence. It can be a word, a multi-word verbal expression (phrasal/pronominal/separable verb), an idiom, or another multi-word expression. Return ONLY the vocabulary item itself, nothing else, no punctuation, no explanation.`
-        }]
-      })
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    const detected = (data.choices?.[0]?.message?.content || '').trim().toLowerCase().replace(/[.,!?;:"""''()]/g, '')
+    const resposta = await aiText(`Context (${promptLangName(activeLang())}): "${item.context}"\n\nIdentify the single most interesting vocabulary item to study from this sentence. It can be a word, a multi-word verbal expression (phrasal/pronominal/separable verb), an idiom, or another multi-word expression. Return ONLY the vocabulary item itself, nothing else, no punctuation, no explanation.`,
+      { model: AI_DEFAULT_MODEL, maxTokens: 30, retries: 0, timeoutMs: 20000 })
+    const detected = resposta.toLowerCase().replace(/[^a-zà-ü' -]/g, '').trim()
     if (detected) {
       setKindleWord(i, detected)
       // Tenta selecionar o token correspondente no picker
@@ -670,19 +634,12 @@ Return ONLY valid JSON:
 
   const numbered = lines.map((l, i) => `${i}. ${l}`).join('\n')
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        max_tokens: Math.max(800, lines.length * 80),
-        response_format: { type: 'json_object' },
-        messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `${numbered}\n\nReturn JSON for ALL ${lines.length} items.` }]
-      })
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    const result = JSON.parse((data.choices?.[0]?.message?.content || '{}').trim())
+    const result = await aiJSON([
+      { role: 'system', content: SYSTEM },
+      { role: 'user', content: `${numbered}
+
+Return JSON for ALL ${lines.length} items.` }
+    ], { maxTokens: Math.max(800, lines.length * 80) })
     midiaProcessed = lines.map((line, i) => {
       const ai = result.items?.find(x => Number(x.i) === i)
       const isShort = line.trim().split(/\s+/).length <= 3
@@ -991,20 +948,11 @@ async function extractMidiaPasted() {
 }
 
 // Helper: chamada à OpenAI que retorna JSON já parseado
+// Delegado ao gateway (js/ai.js): timeout, retry em 429/5xx e mensagem de
+// erro real da OpenAI. De quebra corrige o default antigo, que aqui era
+// gpt-4o (caro) enquanto o resto do app usava gpt-4o-mini.
 async function _openaiJSON(messages, maxTokens) {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: cfg.aiModel || 'gpt-4o',
-      max_tokens: maxTokens,
-      response_format: { type: 'json_object' },
-      messages
-    })
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const data = await res.json()
-  return JSON.parse((data.choices?.[0]?.message?.content || '{}').trim())
+  return aiJSON(messages, { maxTokens })
 }
 
 // Extração de documento em DUAS FASES (resolve o teto de tokens que cortava itens):

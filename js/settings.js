@@ -12,75 +12,47 @@ let _settingsTab = (typeof loadUiPrefs === 'function' && loadUiPrefs().settingsT
 // SETTINGS
 // ================================================================
 // Modelos de IA por provider (usado por fillSettings — fica aqui, arquivo não-lazy)
-const AI_MODELS = {
-  anthropic: [
-    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — rápido, barato (padrão)' },
-    { value: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6 — equilibrado' },
-    { value: 'claude-opus-4-6',           label: 'Claude Opus 4.6 — mais capaz' }
-  ],
-  openai: [
-    { value: 'gpt-4o-mini',   label: 'GPT-4o-mini — rápido, barato (padrão)' },
-    { value: 'gpt-4o',        label: 'GPT-4o — equilibrado' },
-    { value: 'gpt-5',         label: 'GPT-5 — mais capaz (verifique disponibilidade)' }
-  ],
-  google: [
-    { value: 'gemini-2.5-flash-lite',  label: 'Gemini 2.5 Flash-Lite — rápido, barato (padrão)' },
-    { value: 'gemini-2.5-flash',       label: 'Gemini 2.5 Flash — equilibrado' },
-    { value: 'gemini-2.5-pro',         label: 'Gemini 2.5 Pro — mais capaz (verifique disponibilidade)' }
-  ]
-}
-function updateModelOptions(keepCurrent = false) {
-  const providerEl = el('cfg-ai-provider')
-  if (!providerEl) return
-  const provider = providerEl.value
-  const models = AI_MODELS[provider] || []
-  const current = keepCurrent ? el('cfg-ai-model').value : null
-  el('cfg-ai-model').innerHTML = models.map(m =>
-    `<option value="${m.value}" ${m.value === current ? 'selected' : ''}>${m.label}</option>`
-  ).join('')
-  if (!keepCurrent) el('cfg-ai-model').value = models[0]?.value || ''
+// Catálogo de modelos. SÓ OpenAI de propósito: todas as chamadas do app vão
+// para api.openai.com — as entradas antigas de Anthropic/Google eram uma
+// armadilha (selecionar uma mandaria "claude-*" para a API errada e
+// quebraria TODA a IA do app).
+const AI_MODELS = [
+  { value: 'gpt-4o-mini',  label: 'GPT-4o mini — rápido e barato (padrão)' },
+  { value: 'gpt-4.1-mini', label: 'GPT-4.1 mini — melhor texto, preço próximo' },
+  { value: 'gpt-4o',       label: 'GPT-4o — equilibrado' },
+  { value: 'gpt-5-mini',   label: 'GPT-5 mini — nova geração' },
+  { value: 'gpt-5',        label: 'GPT-5 — mais capaz (mais caro)' },
+]
+
+function updateModelOptions() {
+  const sel = el('cfg-ai-model'); if (!sel) return
+  const atual = aiModel()
+  sel.innerHTML = AI_MODELS.map(m =>
+    `<option value="${m.value}"${m.value === atual ? ' selected' : ''}>${m.label}</option>`).join('')
 }
 
+
 function fillSettings() {
-  const providerEl = el('cfg-ai-provider')
-  if (providerEl) {
-    providerEl.value = cfg.aiProvider || 'openai'
-    updateModelOptions(false)
-    const modelEl = el('cfg-ai-model')
-    if (modelEl) modelEl.value = cfg.aiModel || AI_MODELS[cfg.aiProvider || 'openai'][0]?.value || ''
-  }
-  const ttsEl = el('cfg-tts-provider')
-  if (ttsEl) {
-    ttsEl.value = cfg.ttsProvider || 'openai'
-  }
   el('cfg-openai-key').value = cfg.openaiKey || ''
+  updateModelOptions()
   setSettingsTab(_settingsTab)
   renderThemePicker()
   // Atualiza UI Firebase com estado atual
   if (_fbUser !== undefined) updateFirebaseUI(_fbUser)
 }
 
+
 function saveSettings() {
-  const providerEl = el('cfg-ai-provider')
-  if (providerEl) {
-    cfg.aiProvider = providerEl.value
-    cfg.aiModel = el('cfg-ai-model')?.value || 'gpt-4o-mini'
-  } else {
-    cfg.aiProvider = 'openai'
-    cfg.aiModel = 'gpt-4o-mini'
-  }
-  const ttsEl = el('cfg-tts-provider')
-  if (ttsEl) {
-    cfg.ttsProvider = ttsEl.value
-  } else {
-    cfg.ttsProvider = 'openai'
-  }
+  cfg.aiProvider = 'openai'
+  cfg.aiModel = el('cfg-ai-model')?.value || AI_DEFAULT_MODEL
+  cfg.ttsProvider = 'openai'
   cfg.openaiKey = el('cfg-openai-key').value.trim()
   saveCfg()
   // Envia para a nuvem (se logado) para sobreviver a refresh e sincronizar entre dispositivos
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   toast('Configurações salvas!', 'success')
 }
+
 
 // ================================================================
 // THEMES — seletor visual nas configurações
@@ -259,4 +231,18 @@ function _settingsTabKeys(e) {
   if (novo === i) return
   e.preventDefault()
   setSettingsTab(SETTINGS_TABS[novo], true)
+}
+
+// Botão "Testar chave" — GET /v1/models não consome nenhum token.
+async function testOpenAIKeyUI(btn) {
+  const st = el('cfg-key-status')
+  const key = el('cfg-openai-key').value.trim()
+  if (!key) { if (st) st.textContent = 'Cole a chave primeiro.'; return }
+  btn.disabled = true
+  if (st) { st.style.color = 'var(--text2)'; st.textContent = 'Testando...' }
+  const r = await aiTestKey(key)
+  btn.disabled = false
+  if (!st) return
+  if (r.ok) { st.style.color = 'var(--success)'; st.textContent = 'Chave válida.' }
+  else { st.style.color = 'var(--error)'; st.textContent = 'Falhou: ' + r.msg }
 }

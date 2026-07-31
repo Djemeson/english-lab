@@ -256,15 +256,11 @@ Regras de negrito — CRÍTICO, nos dois lados de cada exemplo:
 Retorne JSON: {"items":[ ... ]}`
 }
 
+// Delegado ao gateway (js/ai.js). O chat STREAMING logo abaixo fica fora do
+// gateway de propósito: SSE tem ciclo de vida próprio e um retry automático
+// no meio do stream duplicaria a resposta na tela.
 async function _consultaOpenAIJSON(messages, maxTokens) {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: cfg.aiModel || 'gpt-4o-mini', max_tokens: maxTokens, response_format: { type: 'json_object' }, messages })
-  })
-  if (!res.ok) throw new Error('HTTP ' + res.status)
-  const data = await res.json()
-  return JSON.parse((data.choices?.[0]?.message?.content || '{}').trim())
+  return aiJSON(messages, { maxTokens })
 }
 
 async function extractSrsItems(question, answer) {
