@@ -264,6 +264,25 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+### Sessão 2026-07-31 (10ª rodada) — Sessão de estudo usa a tela inteira + mobile
+61. **Pedido**: "muita margem nas laterais, sem aproveitamento — a imagem podia ser bem maior;
+    ajuste para o mobile também". Causas: `.srs-session-wrap` preso em **800px** e a coluna de
+    imagem **fixa em 220px**.
+    - **Sessão: 800 → 1240px.** Quem protege a leitura é o limite de MEDIDA do texto (72ch no
+      verso, 70ch na frase da frente) — a largura extra vai para a **imagem**, que agora cresce
+      com `clamp(280px, 34%, 460px)`. Medido a 1720px com sidebar recolhida: sessão 1180px,
+      imagem **389px** (era 220), texto em 564px.
+    - **Verso sem imagem**: wrapper `.srs-back-text-solo` — card largo, texto centrado em
+      medida legível (não vira linha de 120 caracteres).
+    - **MOBILE — bug real prevenido**: a navegação inferior fixa (68px, z-index 999) ficaria
+      POR CIMA da barra de notas sticky (z-index 60). Em ≤768px a barra ancora acima da nav
+      (`bottom:76px`, fundo sólido; a 1ª medição a 68px ainda deixava 6px de sobreposição —
+      afinado). Medido: barra em y=714, nav em y=744, sem sobreposição, botões com 63px de
+      altura (alvo de toque ok).
+    - `CACHE`: `v35` → **`v36`**.
+
+
+
 ### Sessão 2026-07-31 (9ª rodada) — Verso do card de estudo (print da sessão real)
 60. **Pedido**: "algo que podemos fazer, melhorar, corrigir ou construir aqui?" com um print do
     verso do card em sessão. Quatro achados, quatro correções:
