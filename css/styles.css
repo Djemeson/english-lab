@@ -1537,10 +1537,13 @@ select option{background:var(--surface)}
   border-radius:var(--radius-sm);border-bottom:1px solid var(--border);transition:all .12s;white-space:nowrap;
 }
 .rsb-filter:hover{color:var(--text);border-color:var(--border-strong)}
+/* Idioma unificado dos controles segmentados (mesmo dos .seg-tab do painel):
+   ativo = cartao claro + sombra, nunca pilula de acento gritante. */
 .rsb-filter.active{
-  color:#fff;background:var(--primary-grad);border-color:transparent;
-  box-shadow:0 3px 10px rgba(var(--primary-rgb),.35);
+  color:var(--text);background:var(--surface);border-color:var(--border);
+  box-shadow:var(--shadow-sm);
 }
+.rsb-filter.active .rsb-filter-count{background:color-mix(in srgb, var(--primary) 16%, transparent);color:var(--primary)}
 .rsb-filter-count{
   display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;
   border-radius:var(--radius-xs);font-size:var(--fs-3xs);font-weight:700;
@@ -1796,8 +1799,8 @@ body.sb-collapsed #fb-user-photo{margin:0}
 .lmt-btn .ic{width:15px;height:15px}
 .lmt-btn:hover{color:var(--text)}
 .lmt-btn.active{
-  background:var(--primary-grad);color:#fff;
-  box-shadow:0 3px 10px rgba(var(--primary-rgb),.35);
+  background:var(--surface);color:var(--text);
+  box-shadow:var(--shadow-sm);
 }
 
 /* Chip "sentido X de Y" nos cards — discreto e sofisticado */
@@ -3221,3 +3224,30 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .settings-card select, .midia-src-grid input{
   height:var(--control-h);
 }
+
+
+/* ================================================================
+   BIBLIOTECA — menu de manutenção (IA)
+   O cabeçalho carregava 6 controles misturando trocar-de-visão com
+   operações pesadas de IA que rodam raramente. As 3 operações foram
+   para um menu próprio: cabeçalho limpo, ações raras a um clique.
+   ================================================================ */
+.lib-maint-wrap{position:relative}
+.lib-maint-menu{
+  position:absolute;right:0;top:calc(100% + 6px);z-index:500;
+  width:330px;max-width:90vw;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:6px;
+}
+.lib-maint-menu.hidden{display:none}
+.lib-maint-item{
+  display:flex;gap:11px;align-items:flex-start;width:100%;text-align:left;
+  background:none;border:none;cursor:pointer;font-family:inherit;
+  padding:10px 12px;border-radius:var(--radius-sm);
+  transition:background .12s ease;
+}
+.lib-maint-item:hover{background:var(--surface2)}
+.lib-maint-item .ic{width:16px;height:16px;flex-shrink:0;margin-top:2px;color:var(--primary)}
+.lib-maint-item b{display:block;font-size:var(--fs-sm);font-weight:600;color:var(--text);margin-bottom:2px}
+.lib-maint-item span{display:block;font-size:var(--fs-2xs);line-height:1.45;color:var(--text3)}

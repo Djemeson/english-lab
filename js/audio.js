@@ -568,9 +568,9 @@ function _applyLibModeUI() {
     b.classList.toggle('active', b.dataset.mode === _libMode))
   const wordsMode = _libMode === 'words'
   // Botões só fazem sentido no modo Cards — sumem no glossário e voltam nos Cards
-  ;['lib-reprocess-btn', 'lib-fill-origin-btn', 'lib-bold-btn'].forEach(id => {
-    const b = el(id); if (b) b.style.display = wordsMode ? 'none' : ''
-  })
+  // As operações de manutenção vivem num menu — esconde o gatilho inteiro
+  const mb = el('lib-maint-btn'); if (mb) mb.style.display = wordsMode ? 'none' : ''
+  toggleLibMaint(null, true)
   // O "Limpar filtro" tem lógica própria; no glossário fica sempre oculto
   if (wordsMode) { const fc = el('lib-filter-clear'); if (fc) fc.style.display = 'none' }
 }
@@ -1876,3 +1876,18 @@ document.addEventListener('keydown', e => {
   }
 });
 
+
+
+// Menu "Manutenção IA" da Biblioteca — abre/fecha; clique fora fecha.
+function toggleLibMaint(ev, forceClose) {
+  const menu = el('lib-maint-menu'); if (!menu) return
+  const btn = el('lib-maint-btn')
+  const fechar = forceClose || !menu.classList.contains('hidden')
+  menu.classList.toggle('hidden', fechar)
+  if (btn) btn.setAttribute('aria-expanded', fechar ? 'false' : 'true')
+  if (ev) ev.stopPropagation()
+}
+document.addEventListener('click', e => {
+  const menu = el('lib-maint-menu')
+  if (menu && !menu.classList.contains('hidden') && !e.target.closest('.lib-maint-wrap')) toggleLibMaint(null, true)
+})
