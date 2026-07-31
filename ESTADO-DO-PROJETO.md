@@ -264,6 +264,34 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+### Sessão 2026-07-31 (7ª rodada) — O padrão da Mídia vira a linguagem do app + escala de tamanhos
+58. **Pedido**: o Djemeson apontou a aba Mídia como referência ("organização e estrutura bem
+    montada") e pediu o mesmo para todos os painéis, mais uma análise de TAMANHOS.
+    - **Componente compartilhado**: `.midia-group`/`.midia-eyebrow` viraram
+      **`.panel-group`/`.panel-eyebrow`** (os nomes antigos seguem como alias). O padrão:
+      moldura de cartão + rótulo numerado em caixa alta + agrupamento por passo.
+    - **Aplicado em**: Adicionar→Manual ("1 · Item de estudo" com palavra/frase/aviso de
+      duplicata; "2 · Fonte" com chips e título; botão de ação fora das molduras);
+      Adicionar→Kindle ("1 · Arquivo do Kindle" emoldurando a dropzone; "2 · Destaques
+      importados" nos resultados); Estudar (cartões do dia + CTA "Começar sessão" agrupados
+      sob **"Hoje"**; a tabela de baralhos virou grupo próprio com rótulo no padrão — o `<h3>`
+      avulso saiu).
+    - **TAMANHOS — medido ao vivo antes**: CINCO alturas de botão visíveis ao mesmo tempo
+      (26, 28, 35, 36, 38px) e controles em 38/42px — o tipo de ruído que ninguém aponta mas
+      tira a sofisticação. Agora:
+      - **Escala oficial de botões: 44 (`.btn-lg`, ações-herói) / 38 (padrão) / 30 (`.btn-sm`)
+        / 24 (`.btn-xs`)** via min-height. O CTA "Começar sessão" estava em 43px por acidente
+        de padding e passou a ser grande DE DIREITO (`.btn-lg`); o enviar do chat alinhou em
+        44; **exceção documentada**: "Testar chave" fica em 40px de propósito, alinhado aos
+        controles de 40px ao lado.
+      - **Controles de formulário numa altura única**: token `--control-h` (40px) substituindo
+        os 38/42px hardcoded (medido depois: chave, modelo e qualidade todos em 40px).
+    - **Validado ao vivo** (Vercel, v32): grupos e rótulos presentes nas três telas, CTA dentro
+      do grupo "Hoje", ids críticos preservados (m-word, chips, kindle-drop), 0 erros nas 7
+      telas. `CACHE`: `v30` → **`v32`**.
+
+
+
 ### Sessão 2026-07-31 (7ª rodada) — Sidebar: o vazio vira informação
 58. **Pedido**: "essa barra lateral realmente está boa? ela deve ser aqui mesmo? podemos
     melhorar? deixar mais sofisticado?" — a partir de um print. Cada mudança saiu de uma
