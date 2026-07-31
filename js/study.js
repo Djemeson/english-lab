@@ -732,7 +732,7 @@ function buildSrsVerso(card, imgData, imageBelow) {
     text += `<div style="display:flex;align-items:center;gap:6px;margin:4px 0 10px">
       <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">${ic('volume','ic-sm')} Repetir frase</button>
       <button class="btn btn-ghost btn-sm" title="Gerar nova frase que reflita melhor a definição" style="opacity:0.45;padding:4px 7px;font-size:var(--fs-sm)"
-        onclick="event.stopPropagation();regenerateCardExample('${card.id}',this)">↻</button>
+        onclick="event.stopPropagation();regenerateCardExample('${card.id}',this)">${ic('refresh','ic-sm')}</button>
     </div>`
   }
   // 2. Tradução PT da frase logo abaixo (preserva o <b> do termo, se houver)
@@ -740,7 +740,7 @@ function buildSrsVerso(card, imgData, imageBelow) {
   // 3. Palavra + IPA + áudio + tipo
   text += `<div class="srs-back-word" style="margin-top:${card.example_en||card.example_pt?'14px':'0'}">${esc(card.word)}</div>`
   if (card.ipa) text += `<div class="srs-back-ipa">${esc(card.ipa)}</div>`
-  text += `<button class="btn btn-ghost btn-sm" style="margin:4px 0 10px" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.word||'')">${ic('volume','ic-sm')} ${esc(card.word)}</button>`
+  text += `<button class="btn btn-ghost btn-sm" style="margin:4px 0 10px" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.word||'')">${ic('volume','ic-sm')} Pronúncia</button>`
   // Type + variety + register chips na mesma linha
   let metaRow = ''
   if (card.type && TYPE[card.type]) metaRow += `<span class="srs-back-type-chip">${TYPE[card.type]}</span>`
@@ -757,7 +757,7 @@ function buildSrsVerso(card, imgData, imageBelow) {
   const deckLabel = card.deckId ? getSrsDeckPath(card.deckId) : ''
   text += `<div class="srs-back-footer">${esc(SRC[card.source_type]||card.source_type||'')}${deckLabel ? ' · ' + esc(deckLabel) : ''}</div>`
   text += `<details class="srs-card-settings" onclick="event.stopPropagation()">
-    <summary>configurações</summary>
+    <summary>${ic('pencil','ic-sm')} Editar card</summary>
     <div class="srs-card-settings-body" style="flex-direction:column;gap:10px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <label style="font-size:var(--fs-xs);color:var(--text3);min-width:70px">Variedade</label>

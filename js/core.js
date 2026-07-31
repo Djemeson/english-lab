@@ -514,7 +514,7 @@ function getDeckById(id) { return srsDecks.find(d => d.id === id) }
 function getSrsDeckPath(id) {
   const deck = getDeckById(id); if (!deck) return ''
   if (!deck.parentId) return deck.name
-  return getSrsDeckPath(deck.parentId) + '::' + deck.name
+  return getSrsDeckPath(deck.parentId) + ' › ' + deck.name
 }
 function getDeckChildren(parentId) { return srsDecks.filter(d => d.parentId === parentId) }
 function getRootDecks() { return srsDecks.filter(d => !d.parentId) }

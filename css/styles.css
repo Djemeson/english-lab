@@ -899,7 +899,15 @@ select option{background:var(--surface)}
   letter-spacing:.07em;color:var(--text3);margin:0 0 4px}
 
 /* Rating buttons */
-.srs-rate-buttons{display:flex;gap:10px;justify-content:center}
+/* Fixos no rodapé da viewport: com Origem + imagem o verso fica alto e os
+   botões caíam abaixo da dobra — avaliar exigia rolar, o pior atrito
+   possível no meio de uma sessão. O gradiente evita texto vazando por baixo. */
+.srs-rate-buttons{
+  display:flex;gap:10px;justify-content:center;
+  position:sticky;bottom:0;z-index:60;
+  padding:14px 0 16px;margin-top:4px;
+  background:linear-gradient(to top, var(--bg) 72%, transparent);
+}
 .srs-rate-btn{
   flex:1;max-width:140px;display:flex;flex-direction:column;align-items:center;
   padding:12px 8px;border:1px solid var(--border);border-radius:var(--radius);
