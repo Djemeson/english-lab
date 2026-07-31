@@ -1675,7 +1675,7 @@ select option{background:var(--surface)}
 }
 .consulta-input-row textarea:focus{border-color:var(--primary)}
 .asst-send{
-  align-self:flex-end;width:42px;height:42px;padding:0;border-radius:var(--radius-sm);
+  align-self:flex-end;width:44px;height:44px;padding:0;border-radius:var(--radius-sm);
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
 }
 .asst-send .ic{width:18px;height:18px}
