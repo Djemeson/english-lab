@@ -447,5 +447,41 @@ function updateSrsBadge() {
     badgeMob.textContent = due
     badgeMob.classList.toggle('hidden', due === 0)
   }
+  renderSbToday(due)
+}
+
+// ---- Bloco "Hoje" da sidebar ----
+// Fica ancorado no fim do menu. Roda junto com o badge (mesmos call sites),
+// então acompanha a sessão de estudo em tempo real. Fora de study.js de
+// propósito: study.js é lazy e a sidebar existe em todas as telas.
+function renderSbToday(due) {
+  const box = el('sb-today')
+  if (!box) return
+  const todayLog = srsLog.find(l => l.date === todayStr())
+  // Durante a sessão o log ainda não foi gravado — soma o que já foi feito nela.
+  const feitas = (todayLog?.reviewed || 0) + (srsSession ? srsSession.done : 0)
+  const restantes = due
+  const total = feitas + restantes
+  if (!total) { box.classList.add('hidden'); return }
+  box.classList.remove('hidden')
+
+  const pct = Math.round(feitas / total * 100)
+  const concluido = restantes === 0
+  const streak = srsStreak()
+  box.classList.toggle('sbt-done', concluido)
+  box.dataset.tip = concluido
+    ? `Dia concluído — ${feitas} revis${feitas === 1 ? 'ão' : 'ões'}`
+    : `${feitas} feita${feitas === 1 ? '' : 's'} · ${restantes} restante${restantes === 1 ? '' : 's'}`
+  box.innerHTML = `
+    <div class="sbt-head">
+      <span class="sbt-title">Hoje</span>
+      ${streak > 0 ? `<span class="sbt-streak">${ic('flame')}${streak}</span>` : ''}
+    </div>
+    <div class="sbt-bar"><i style="width:${pct}%"></i></div>
+    <div class="sbt-meta">
+      ${concluido
+        ? `<span class="sbt-ok">${ic('check')}Dia concluído</span>`
+        : `<span><b>${feitas}</b> feita${feitas === 1 ? '' : 's'}</span><span><b>${restantes}</b> restante${restantes === 1 ? '' : 's'}</span>`}
+    </div>`
 }
 

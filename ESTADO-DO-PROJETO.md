@@ -3,7 +3,14 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-07-30 — **Sessão de infraestrutura + correções + melhorias na cópia
+> Última atualização: 2026-07-31 — **Sidebar reformada (7ª rodada)**: os 254px de vazio (35% da
+> altura) viraram um bloco **"Hoje"** ancorado no fim do menu (progresso do dia + sequência),
+> o rótulo "MENU" virou dois grupos ("Geral" e "Vocabulário"), o item ativo trocou gradiente +
+> anel por tinta chapada + marca de 3px no vinco da barra, os contadores viraram pílulas tintas
+> e o cartão de conta (3 linhas com moldura) virou uma linha só com o ponto de nuvem no avatar.
+> Ver seção 8 (sessão 2026-07-31, 7ª rodada).
+>
+> Última atualização anterior: 2026-07-30 — **Sessão de infraestrutura + correções + melhorias na cópia
 > `english-lab-2.0`**: repositório git configurado apontando para `Djemeson/english-lab`,
 > service worker consertado para GitHub Pages, PWA instalável, variáveis CSS que não existiam,
 > corrida de cards no player de playlist, viewport que bloqueava zoom, emojis residuais e
@@ -211,7 +218,8 @@ maxInterval (36500), leechThreshold (50)
   ganha tooltip premium (flutuante, não cortado por overflow).
 - **Modais:** use `inputModal({...})` (core.js) em vez de `prompt()`. Overlay `.srs-modal-overlay`.
 - **Layout:** conteúdo centralizado (`.section` com max-width; Biblioteca é full-width),
-  sidebar com logo + nav em pílulas + cartão de conta, page-headers com ícone + ação à direita.
+  sidebar com logo + nav em pílulas agrupada ("Geral"/"Vocabulário") + bloco "Hoje" ancorado no
+  fim do menu + linha de conta no rodapé, page-headers com ícone + ação à direita.
 
 ---
 
@@ -255,6 +263,50 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-07-31 (7ª rodada) — Sidebar: o vazio vira informação
+58. **Pedido**: "essa barra lateral realmente está boa? ela deve ser aqui mesmo? podemos
+    melhorar? deixar mais sofisticado?" — a partir de um print. Cada mudança saiu de uma
+    medição, não de gosto:
+    - **254px de vazio (35% da altura a 1280×720)** entre "Biblioteca" e "Configurações". Espaço
+      morto no FIM de uma lista lê como menu inacabado; entre dois blocos ancorados, lê como
+      respiro. Novo bloco **"Hoje"** (`#sb-today`) com `margin-top:auto` ancora o fim do menu:
+      barra de progresso do dia, "N feitas / N restantes", chama + sequência quando streak > 0,
+      estado **"Dia concluído"** (barra verde + check) e clique levando a Estudar.
+      Renderizado por **`renderSbToday()` em `js/srs.js`** (não-lazy), chamado dentro do
+      `updateSrsBadge()` — herda os 8 call sites que já existiam, então acompanha a sessão de
+      estudo em tempo real (usa `srsSession.done`, porque o `srsLog` só é gravado no fim).
+      Sem dado nenhum (total 0) o bloco some em vez de mostrar zeros.
+    - **"MENU" virou dois grupos**: "Geral" (Dashboard, Assistente) e "Vocabulário" (Adicionar,
+      Revisar, Estudar, Biblioteca). Um rótulo que só diz "menu" não informa nada; a ordem dos
+      itens **não mudou** (nada de muscle memory quebrada).
+    - **Item ativo**: gradiente de 135° + anel interno (o mesmo desenho de template dos
+      gradientes já removidos no item 54) → **tinta chapada + marca de 3px encostada na borda
+      da barra** (`::before` em `left:-12px`, `-8px` no rail). Escopado em `.sidebar` para não
+      vazar para a barra inferior do celular, que usa as mesmas classes `.nav-item`.
+    - ⚠️ **Contraste medido derrubou a primeira escolha**: acento como cor do rótulo ativo dava
+      **3,28:1 no sepia** e 4,33:1 no violet — reprova AA. O rótulo passou para `--text`
+      (8,52–15,32:1) e a cor ficou com o **ícone e a marca**, que são gráfico (alvo 3:1;
+      medidos 3,28–7,84). Mesmo problema no contador (acento puro reprovava com 3,12:1 no
+      sepia): o texto virou `color-mix(--primary 62%, --text)` → **4,53–8,58:1**. E no número
+      da sequência (`--warning` sobre superfície clara = 3,19:1): número em `--text2`
+      (5,82–7,58:1), chama em `--warning` como gráfico.
+    - **Contadores**: pílula tinta com números tabulares no lugar do sólido com brilho — o
+      "183" verde chapado gritava mais alto que o próprio item de menu.
+    - **Conta**: o cartão com moldura, sombra e 3 linhas (indicador "Nuvem" + avatar/nome +
+      botão "sair" sempre visível) virou **uma linha de 40px sem moldura** — o ponto de
+      sincronização mudou para o canto do avatar (mesmo sinal, sem linha própria) e "sair"
+      aparece no hover/foco. O avatar ganhou círculo de fundo, então conta sem foto não quebra.
+    - **Rail recolhido**: o bloco "Hoje" some inteiro (reduzido a uma barra sem rótulo, virava
+      enfeite ambíguo); o badge de Estudar continua dando o sinal do dia.
+    - **A barra continua à esquerda**, e essa é a resposta certa: 7 destinos, dois deles com
+      contador permanente, e paridade com a barra inferior do celular. Topo custaria os
+      contadores e o bloco ambiente.
+    - **Validado ao vivo** (servidor local, 6 temas com transições desligadas — a medição de
+      cor durante transição é inválida): contraste AA em todos os itens acima, 7 seções sem
+      erro de console, estados vazio/normal/concluído, deslogado, rail recolhido (74px, sem
+      overflow) e mobile 375px (sidebar oculta, barra inferior intacta, sem scroll horizontal).
+      `CACHE`: `englab-v29` → **`englab-v30`**.
 
 ### Sessão 2026-07-31 (6ª rodada) — Assistente auditado pelo print + fim dos confirm() nativos
 57. **Pedido**: migrar os `confirm()` restantes e auditar o print do Assistente (melhorias,
@@ -1153,6 +1205,12 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 9. Pendências / a verificar
+
+- [ ] **Olhar a sidebar nova com dados reais** (7ª rodada, 2026-07-31): o bloco "Hoje" foi
+      validado com `srsLog` sintético (12 feitas / 183 restantes / 5 dias). Com uso real,
+      conferir se a proporção da barra faz sentido durante uma sessão (o número de "feitas"
+      conta cada nota dada, inclusive repetições das etapas de aprendizagem — então pode passar
+      do que parecia o total do dia) e se "Dia concluído" aparece na hora certa.
 
 - [x] **Publicado no GitHub** em 2026-07-30 (`main` = `5e4a32f`, Actions verde, service worker
       confirmado ao vivo em `/english-lab/` com o cache `englab-v5` e 14 arquivos).
