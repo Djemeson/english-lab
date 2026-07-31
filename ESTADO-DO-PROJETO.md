@@ -264,6 +264,27 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+### Sessão 2026-07-31 (9ª rodada) — Verso do card de estudo (print da sessão real)
+60. **Pedido**: "algo que podemos fazer, melhorar, corrigir ou construir aqui?" com um print do
+    verso do card em sessão. Quatro achados, quatro correções:
+    1. **Os botões de avaliar caíam abaixo da dobra** — com o box de Origem + imagem o verso
+       fica alto e o print mostrava as notas cortadas no rodapé; avaliar exigia rolar, o pior
+       atrito possível no meio de uma sessão. A barra de notas agora é **sticky** no rodapé da
+       viewport (z-index 60, gradiente para o conteúdo não vazar por baixo). Vale também para
+       o modo histórico.
+    2. **`série · Inglês::Vocabulary`** — o separador `::` (jargão de caminho do Anki) vazava
+       na interface. `getSrsDeckPath` agora usa ` › ` (vale também para o painel de foco do
+       baralho no Estudar).
+    3. **O 2º botão de áudio tinha como rótulo a própria palavra** ("🔊 tally" logo abaixo da
+       palavra gigante) — virou **"Pronúncia"**.
+    4. **`configurações`** (minúsculo, vago) virou **"Editar card"** com ícone de lápis; o
+       botão de regenerar frase trocou o glifo cru `↻` por `ic('refresh')`.
+    - **Validado ao vivo** (Vercel, v34): caminho "Inglês › Vocabulary", botões "Repetir frase
+      | Pronúncia | Gerar imagem", summary "Editar card", barra de notas `position:sticky`
+      visível na viewport mesmo com verso alto (origem longa), 0 erros de console.
+
+
+
 ### Sessão 2026-07-31 (8ª rodada) — Revisar e Biblioteca: o que a estrutura deles pedia
 59. **Pedido**: "estude o que a estrutura deles pede" — as duas telas que ficaram fora do
     padrão de grupos numerados. Conclusão do estudo: são **ferramentas de trabalho contínuo**
