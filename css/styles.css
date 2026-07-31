@@ -3279,7 +3279,7 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 @media(max-width:768px){
   /* A navegação inferior é fixa (68px, z-index 999): sem este offset a
      barra de notas sticky (z-index 60) ficava ESCONDIDA atrás dela. */
-  .srs-rate-buttons{bottom:68px;background:var(--bg);padding:10px 0 12px}
+  .srs-rate-buttons{bottom:76px;background:var(--bg);padding:10px 0 12px;border-bottom:1px solid var(--border)}
   /* Imagem empilhada abaixo do texto pode ser generosa */
   .srs-back-image-col img{max-width:340px}
 }
