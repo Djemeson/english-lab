@@ -43,7 +43,7 @@ function renderSrsSection() {
         ${due > 0 && newRem > 0 ? ' · ' : ''}
         ${newRem > 0 ? `<strong style="color:var(--primary)">${newRem}</strong> novos` : ''}
       </p>
-      <button class="btn btn-primary" style="padding:12px 36px;font-size:var(--fs-base)" onclick="startSrsSession()">
+      <button class="btn btn-primary btn-lg" onclick="startSrsSession()">
         ${ic('play')}Começar sessão
       </button>
     </div>`
