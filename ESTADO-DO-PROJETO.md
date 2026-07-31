@@ -256,6 +256,50 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
+### Sessão 2026-07-31 (3ª rodada) — Reforma visual "profissional + personalizável" + 4 propostas de IA
+54. **Pedido**: "visualmente parece brincadeira de criança — deixe profissional, comercial e
+    personalizável" + aplicar as 4 propostas de IA do item 53. O que fazia parecer amador tinha
+    nome e contagem:
+    - **Acentos néon crus do Tailwind** nos 3 temas escuros (`#34D399`, `#FBBF24`, `#F87171`,
+      `#A78BFA` — a assinatura de template) → versões refinadas de **mesma luminância**
+      (`#4CC39A`, `#E7BA53`, `#ED7A74`, `#A896E4`; violet `#C4B5FD`→`#BCAAE9`), preservando o
+      contraste AA medido nas sessões anteriores (spot-check: warning novo 10.87:1 no fundo).
+      Temas claros não mudaram (já usavam tons próprios).
+    - **3 gradientes EM TEXTO** (wordmark da sidebar, do header mobile e do login) — o marcador
+      nº 1 de template — viraram cor sólida (`Language` em `--text`, `Lab` em `--primary`).
+    - **3 glows** (`drop-shadow` atrás de ícones) removidos; glow radial do hero `.45`→`.22`.
+    - **`font-weight` 800 → 700** nos 9 pontos (Newsreader em 800 lê como panfleto).
+    - **PERSONALIZÁVEL — seletor de cor de destaque** (Configurações → Aparência): 8 acentos
+      (padrão do tema, Índigo, Petróleo, Esmeralda, Terracota, Framboesa, Ametista, Dourado)
+      aplicáveis por cima de QUALQUER tema. `applyAccent()` em `core.js` sobrepõe só
+      `--primary`/`--primary-rgb`/`--primary-d`/`--accent-bright`/`--primary-grad`/
+      `--primary-glow` via style do `<html>` — success/warning/error são semânticos e ficam
+      com o tema. `cfg.accent` persiste, **sincroniza via Firebase** (push + 2 pontos de pull;
+      string vazia é valor legítimo = "padrão") e restaura do backup IDB. Verificado: acento
+      sobrevive à troca de tema e o "padrão do tema" limpa as propriedades inline.
+    - **As 4 propostas de IA aplicadas**:
+      1. **Custo antes de lotes** — `aiConfirmBatch(tipo, n, rótulo)` em Reanalisar tudo,
+         Completar dados, Negrito perfeito, Gerar imagens em lote e Gerar áudio ausente.
+         Lotes abaixo de ~US$ 0,02 não interrompem (confirmar centavos é atrito).
+         `aiEstimate` documenta ordens de grandeza (chat US$0,001/item; TTS US$0,008/frase;
+         imagem low/medium/high US$0,011/0,042/0,167).
+      2. **TTS `gpt-4o-mini-tts`** com instrução de estilo ("ritmo de aprendiz") e **fallback
+         automático para `tts-1`** na mesma chamada (validado com stub: 400 no novo → tts-1 →
+         áudio ok). Cache por texto no AudioDB limita o custo do fallback a 1 tentativa extra
+         por frase nova.
+      3. **Timeout de conexão no streaming** do Assistente: 45s **só até o primeiro byte** —
+         aberto o stream, o timer desliga (retry automático em SSE duplicaria a resposta,
+         continua sendo o que NÃO fazemos). O streaming também passou a usar `aiModel()`.
+      4. **Qualidade de imagem configurável** (aba IA: Econômica/Padrão/Alta) em
+         `cfg.imgQuality`, sincronizada, consumida por `aiImage()`.
+    - **Validado ao vivo (Vercel, cache v26)**: cores novas aplicadas, 0 gradientes-em-texto
+      no DOM, 8 bolinhas de acento funcionando (Terracota → `--primary` muda, grad recalculado,
+      sobrevive à troca de tema, padrão limpa), select de qualidade com os 3 níveis, estimador
+      coerente (30 imagens: US$1,26 medium / US$0,33 low), fallback de TTS comprovado, 7 telas
+      sem erro de console.
+
+
+
 ### Sessão 2026-07-31 (2ª rodada) — Reestruturação da camada de IA (gateway único)
 53. **Pedido**: auditar tudo que a IA faz (análise, TTS, imagens, cards, lotes) e aplicar
     melhorias/correções/reestruturação. Inventário: **16 pontos de chamada em 6 arquivos**,
