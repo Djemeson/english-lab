@@ -3325,7 +3325,6 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
    largura disponivel, seja ela qual for. Quantas semanas cabem quem
    decide e o JS (dashHmSemanas), para a celula nao ficar menor que ~11px.
    ================================================================ */
-.dash-card-wide{margin-top:20px}
 .dash-hm-wrap{overflow:visible;padding-bottom:0}
 .dash-hm-months-row{min-width:0;overflow:hidden}
 .dash-hm-grid{
@@ -3337,14 +3336,21 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .dash-hm-cell{width:auto;height:auto;min-width:0;aspect-ratio:1}
 /* A legenda continua com celulas de tamanho fixo. */
 .dash-hm-legend .dash-hm-cell{width:9px;height:9px;aspect-ratio:auto}
-/* Seg/Qua/Sex: as linhas precisam acompanhar a altura VARIAVEL da celula.
-   A coluna estica junto com a grade e divide a altura em 7 partes iguais
-   com o mesmo gap -- entao os rotulos ficam sempre na linha certa, em
-   qualquer largura de tela. */
+/* Seg/Qua/Sex: as linhas tem de acompanhar a altura VARIAVEL da celula.
+   Tentativa 1 (esticar a coluna como item flex) falhou por um motivo que
+   so a medicao mostrou: a altura MINIMA do texto (7 x 10,4px) inflava a
+   linha flex para 113px enquanto a grade tinha 84px, e cada rotulo descia
+   ~0,9px em relacao a sua linha -- 5px acumulados no "Sex" a 375px.
+   min-height:0 nao resolve: o que conta para a altura da linha e o tamanho
+   de CONTEUDO do item, nao o seu minimo.
+   Solucao: tirar a coluna do fluxo. Fora do fluxo ela nao opina sobre a
+   altura da linha, e `top:23px; bottom:0` a amarra exatamente a area da
+   grade -- 7 linhas de 1fr = a celula, em qualquer largura. */
+.dash-hm-days-and-grid{position:relative;padding-left:38px}
 .dash-hm-days{
-  grid-template-rows:repeat(7,1fr);
-  margin-top:23px;          /* faixa de meses: 18px + 5px de margem */
-  align-self:stretch;
+  position:absolute;left:0;top:23px;bottom:0;width:30px;  /* 23px = faixa de meses (18) + margem (5) */
+  margin-top:0;
+  grid-template-rows:repeat(7,minmax(0,1fr));
   line-height:1;
 }
-.dash-hm-days > div{display:flex;align-items:center;justify-content:flex-end}
+.dash-hm-days > div{display:flex;align-items:center;justify-content:flex-end;min-height:0;overflow:hidden}

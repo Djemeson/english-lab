@@ -117,15 +117,25 @@ const DASH_HM_MAX_SEM = 53   // teto: um ano de passado
 let _hmSemanasAtual = null
 let _hmResizeTimer = null
 
-// Nº de semanas de passado que cabem. Mede o painel; se ele estiver oculto
-// (largura 0, aba inativa), cai na largura da janela — o cartão é full-width.
-function dashHmSemanas() {
+// Largura real disponível para a grade. A fonte boa é o próprio container da
+// renderização anterior; na PRIMEIRA vez ele ainda não existe, então estima a
+// coluna 1.7fr do `.dash-grid` (que vira 1fr abaixo de 1040px — ver o media
+// query do CSS) e desconta padding do cartão (44), coluna Seg/Qua/Sex (34) e
+// o gap (8).
+function dashHmLarguraUtil() {
+  const cont = document.querySelector('#dpanel-progresso .dash-hm-container')
+  if (cont && cont.clientWidth > 40) return cont.clientWidth
   const painel = el('dpanel-progresso')
   const base = (painel && painel.clientWidth) || window.innerWidth || 1000
-  // desconta padding do cartão (44), coluna Seg/Qua/Sex (34) e o gap (8)
-  const util = Math.max(160, base - 86)
+  const coluna = window.innerWidth <= 1040 ? base : (base - 18) * 1.7 / 2.7
+  return Math.max(150, coluna - 86)
+}
+
+// Nº de semanas de PASSADO que cabem. É aqui que o histórico encolhe para a
+// grade caber: quem manda é o espaço, não um número fixo de meses.
+function dashHmSemanas() {
   const passo = window.innerWidth < 600 ? 12 : 14      // célula mínima + gap
-  const colunas = Math.floor(util / passo)
+  const colunas = Math.floor(dashHmLarguraUtil() / passo)
   return Math.min(DASH_HM_MAX_SEM, Math.max(8, colunas - DASH_HM_FUT / 7))
 }
 
@@ -277,14 +287,77 @@ function dashAchievements() {
   ]
 }
 
+// Monta o interior do `.dash-hm-wrap` (faixa de meses + grade) para um dado
+// número de semanas de passado. Isolado porque roda DUAS vezes: na montagem do
+// painel e no ajuste que acontece depois de medir o container de verdade.
+function dashHmWrapHTML(semanas) {
+  const diasPassado = semanas * 7
+  const heatCells = dashHeatCells(diasPassado)
+
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const totalDays = diasPassado + DASH_HM_FUT
+  const start = new Date(today); start.setDate(start.getDate() - (diasPassado - 1))
+  const padOffset = start.getDay()
+
+  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+  // Nº real de colunas: as células de padding do começo empurram a grade, então
+  // fixar 53 deixava a última coluna sem rótulo em parte do ano.
+  const totalCols = Math.ceil((padOffset + totalDays) / 7)
+  const monthLabels = []
+  let lastMonth = -1
+  for (let col = 0; col < totalCols; col++) {
+    const colDate = new Date(start)
+    colDate.setDate(start.getDate() + (col * 7 - padOffset))
+    const m = colDate.getMonth()
+    if (m !== lastMonth) { monthLabels.push({ col, name: monthNames[m] }); lastMonth = m }
+  }
+
+  // Filter labels to prevent overlaps (must be at least 3 columns apart)
+  const finalMonthLabels = []
+  let lastCol = -9
+  monthLabels.forEach(lbl => {
+    if (lbl.col - lastCol >= 3) { finalMonthLabels.push(lbl); lastCol = lbl.col }
+  })
+
+  // Teto de tamanho: célula fluida sem limite viraria um quadrado de 35px
+  // numa tela larga. Passo máximo de 16px = célula de 13px, densidade de
+  // calendário. Sobrando espaço, a grade para de crescer em vez de inchar.
+  const hmMaxPx = totalCols * 16 - DASH_HM_GAP
+
+  // Com célula fluida o rótulo não pode ser posicionado em px. Posição exata
+  // da coluna i numa grade de N colunas 1fr com gap g:
+  //   i * (célula + g), com célula = (100% - (N-1)g)/N  →  i/N*100% + i*g/N
+  const monthLabelsHTML = finalMonthLabels.map(lbl => {
+    const pct = (lbl.col / totalCols * 100).toFixed(3)
+    const px = (lbl.col * DASH_HM_GAP / totalCols).toFixed(1)
+    return `<span class="dash-hm-month-lbl" style="left:calc(${pct}% + ${px}px)">${lbl.name}</span>`
+  }).join('')
+
+  return `
+    <div class="dash-hm-months-row" style="max-width:${hmMaxPx}px">${monthLabelsHTML}</div>
+    <div class="dash-hm-grid" style="grid-template-columns:repeat(${totalCols},1fr);max-width:${hmMaxPx}px">${
+      heatCells.map(c => `<div class="dash-hm-cell ${c.cls}" ${c.tip ? `title="${escA(c.tip)}"` : ''}></div>`).join('')
+    }</div>`
+}
+
+// Depois de inserido, o container tem largura REAL — a estimativa da primeira
+// renderização erra por natureza. Se a medida pedir outro número de semanas,
+// reconstrói só a grade, não o painel inteiro.
+function dashHmAjustar() {
+  const wrap = document.querySelector('#dpanel-progresso .dash-hm-wrap')
+  if (!wrap) return
+  const ideal = dashHmSemanas()
+  if (ideal === _hmSemanasAtual) return
+  _hmSemanasAtual = ideal
+  wrap.innerHTML = dashHmWrapHTML(ideal)
+}
+
 function renderDashboardGrid() {
   // Os painéis substituíram o antigo #dash-grid-area (ver setDashTab).
   if (!el('dpanel-progresso')) return
 
   const hmSemanas = dashHmSemanas()
   _hmSemanasAtual = hmSemanas
-  const hmDiasPassado = hmSemanas * 7
-  const heatCells = dashHeatCells(hmDiasPassado)
   const totalMonthReviews = srsLog.filter(l => {
     const d = new Date(l.date); const now = new Date()
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
@@ -307,56 +380,8 @@ function renderDashboardGrid() {
   // não dá (as células mostram a distribuição, não o total).
   const prev7 = Object.values(dashForecast(7)).reduce((s, n) => s + n, 0)
 
-  // Month labels calculation based on column dates
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const totalDays = hmDiasPassado + DASH_HM_FUT
-  const start = new Date(today); start.setDate(start.getDate() - (hmDiasPassado - 1))
-  const padOffset = start.getDay()
-
-  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-  // Nº real de colunas: as células de padding do começo empurram a grade, então
-  // fixar 53 deixava a última coluna sem rótulo em parte do ano.
-  const totalCols = Math.ceil((padOffset + totalDays) / 7)
-  const monthLabels = []
-  let lastMonth = -1
-  for (let col = 0; col < totalCols; col++) {
-    const cellIdx = col * 7
-    const dayIndex = cellIdx - padOffset
-    const colDate = new Date(start)
-    colDate.setDate(start.getDate() + dayIndex)
-    const m = colDate.getMonth()
-    if (m !== lastMonth) {
-      monthLabels.push({ col, name: monthNames[m] })
-      lastMonth = m
-    }
-  }
-
-  // Filter labels to prevent overlaps (must be at least 3 columns apart)
-  const finalMonthLabels = []
-  let lastCol = -9
-  monthLabels.forEach(lbl => {
-    if (lbl.col - lastCol >= 3) {
-      finalMonthLabels.push(lbl)
-      lastCol = lbl.col
-    }
-  })
-
-  // Teto de tamanho: célula fluida sem limite viraria um quadrado de 35px
-  // numa tela larga (o que acontecia entre o resize e o re-render). Passo
-  // máximo de 16px = célula de 13px, que é a densidade de um calendário.
-  const hmMaxPx = totalCols * 16 - DASH_HM_GAP
-
-  // A célula agora é fluida, então o rótulo não pode ser posicionado em px.
-  // Posição exata da coluna i numa grade de N colunas 1fr com gap g:
-  //   i * (célula + g), com célula = (100% - (N-1)g)/N  →  i/N*100% + i*g/N
-  const monthLabelsHTML = finalMonthLabels.map(lbl => {
-    const pct = (lbl.col / totalCols * 100).toFixed(3)
-    const px = (lbl.col * DASH_HM_GAP / totalCols).toFixed(1)
-    return `<span class="dash-hm-month-lbl" style="left:calc(${pct}% + ${px}px)">${lbl.name}</span>`
-  }).join('')
-
   const heatmapCard = `
-    <div class="dash-card dash-card-wide">
+    <div class="dash-card">
       <div class="dash-card-h">
         <div>
           <div class="dash-eyebrow">Atividade</div>
@@ -376,10 +401,7 @@ function renderDashboardGrid() {
           <div></div>
         </div>
         <div class="dash-hm-container">
-          <div class="dash-hm-wrap">
-            <div class="dash-hm-months-row" style="max-width:${hmMaxPx}px">${monthLabelsHTML}</div>
-            <div class="dash-hm-grid" style="grid-template-columns:repeat(${totalCols},1fr);max-width:${hmMaxPx}px">${heatCells.map(c => `<div class="dash-hm-cell ${c.cls}" ${c.tip ? `title="${escA(c.tip)}"` : ''}></div>`).join('')}</div>
-          </div>
+          <div class="dash-hm-wrap">${dashHmWrapHTML(hmSemanas)}</div>
         </div>
       </div>
       
@@ -567,15 +589,14 @@ function renderDashboardGrid() {
   //   Progresso   = "como estou indo ao longo do tempo?"
   //   Vocabulário = "o que eu tenho e de onde veio?"
   if (_dashTab === 'progresso') {
-    // O calendário saiu da coluna de 1.7fr e ocupa a largura toda: um ano de
-    // dias em 57 colunas nunca ia caber em 412px, e era daí que vinha a barra
-    // de rolagem. Os outros dois cartões continuam lado a lado embaixo.
     el('dpanel-progresso').innerHTML = `
-      ${heatmapCard}
       <div class="dash-grid">
-        <div class="dash-col">${weeklyReviewsCard}</div>
+        <div class="dash-col">${heatmapCard}${weeklyReviewsCard}</div>
         <div class="dash-col">${trendCard}</div>
       </div>`
+    // Só agora o container tem largura de verdade: confere se o histórico
+    // renderizado é mesmo o que cabe (ver dashHmAjustar).
+    dashHmAjustar()
   } else if (_dashTab === 'vocabulario') {
     el('dpanel-vocabulario').innerHTML = `
       <div class="dash-grid">

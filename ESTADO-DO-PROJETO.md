@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-01 — **Heatmap fluido (13ª rodada)**: a grade tinha largura fixa
+> Última atualização: 2026-08-01 — **Heatmap na coluna de sempre (14ª rodada)**: o alargamento
+> da 13ª rodada foi revertido a pedido. A barra de rolagem some encolhendo o HISTÓRICO (39
+> semanas a 1440px, 17 a 375px), não o layout. De quebra, o alinhamento dos rótulos
+> Seg/Qua/Sex, que acumulava 5px no celular, foi para 0,01px.
+> Ver seção 8 (sessão 2026-08-01, 14ª rodada).
+>
+> Última atualização anterior: 2026-08-01 — **Heatmap fluido (13ª rodada)**: a grade tinha largura fixa
 > (795px) dentro de uma coluna de 412px e a diferença virava barra de rolagem. O cartão passou a
 > ocupar a largura toda, a célula virou fluida (colunas `1fr` + `aspect-ratio`) e o número de
 > semanas de histórico é escolhido pelo espaço disponível — overflow deixou de ser possível.
@@ -282,6 +288,36 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-01 (14ª rodada) — Heatmap volta para a coluna; quem encolhe é o histórico
+65. **Correção do rumo da 13ª rodada**: eu tinha resolvido a barra de rolagem alargando o cartão
+    para a seção inteira. O Djemeson recusou — *"vc ocupou toda a seção em que ele está. não
+    quero isso. deixa como era antes. vc pode resolver o problema inicial removendo meses pra
+    trás."* Correto: a barra era o problema, o layout não.
+    - **Layout revertido**: o cartão voltou para a coluna `1.7fr` do `.dash-grid`, junto com
+      "Volume de Estudos", e "Taxa de acerto" na coluna da direita — exatamente como era.
+    - **O que resolve agora é o histórico**: a célula fluida e o `dashHmSemanas()` continuam,
+      mas medindo a COLUNA (não a seção). Resultado medido: **39 semanas a 1440px, 40 a 1024px,
+      17 a 375px** — em vez das 53 fixas. Perde-se de 3 a 8 meses de passado; ganha-se um
+      calendário que cabe inteiro na tela, que era o pedido.
+    - **`dashHmLarguraUtil()`**: mede o `.dash-hm-container` da renderização anterior (fonte
+      exata); só na PRIMEIRA vez estima a coluna (`(painel-18)*1.7/2.7`, ou o painel inteiro
+      abaixo de 1040px, onde o `.dash-grid` vira uma coluna só).
+    - **`dashHmWrapHTML(semanas)` + `dashHmAjustar()`**: a grade foi extraída para uma função
+      porque agora é montada DUAS vezes — uma com a estimativa e, se a medida real pedir outro
+      número de semanas, reconstrói só o miolo da grade (não o painel).
+    - ⚠️ **Bug de alinhamento que só a medição pegou**: com célula fluida, os rótulos
+      Seg/Qua/Sex desciam ~0,9px por linha (**5,25px acumulados no "Sex" a 375px**). Causa: a
+      coluna de rótulos era item flex e a altura MÍNIMA do texto (7 × 10,4px) inflava a linha
+      para 113px enquanto a grade tinha 84px. `min-height:0` **não** resolve — o que conta para
+      a altura da linha flex é o tamanho de CONTEÚDO do item, não o seu mínimo. Solução: tirar
+      a coluna do fluxo (`position:absolute; top:23px; bottom:0`), onde ela não opina sobre a
+      altura e fica amarrada exatamente à área da grade. Desalinhamento final: **0,01px** em
+      1440/1024/375px.
+    - **Validado ao vivo**: barra de rolagem = 0 nas três larguras, layout de 3 cartões idêntico
+      ao original (699 + 699 + 411px a 1440), 28 células de previsão preservadas, ajuste
+      sobrevivendo à troca de aba, 0 erros de console.
+      `CACHE`: `englab-v39` → **`englab-v40`**.
 
 ### Sessão 2026-08-01 (13ª rodada) — Heatmap fluido: fim da barra de rolagem
 64. **Pedido**: "existe uma barra pra poder arrastar pro lado e ver o restante. não quero que
