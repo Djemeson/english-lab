@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-07-31 — **Imagem do card ilustra o SENTIDO (11ª rodada)**: o prompt
+> Última atualização: 2026-07-31 — **Heatmap com previsão (12ª rodada)**: o calendário de
+> atividade passou a mostrar 28 dias à frente com os cards já agendados (célula vazada, para
+> não confundir carga prevista com esforço feito), ganhou a estatística "Próx. 7 dias" e agora
+> nasce rolado até o fim — antes hoje ficava fora da tela.
+> Ver seção 8 (sessão 2026-07-31, 12ª rodada).
+>
+> Última atualização anterior: 2026-07-31 — **Imagem do card ilustra o SENTIDO (11ª rodada)**: o prompt
 > mandava a palavra estrangeira + o significado em português para o modelo de imagem, que
 > ancorava no sentido mais comum ("tally" 2/2 = concordar saía como marcas de contagem). Agora
 > `buildImageScene()` traduz o sentido numa cena em inglês, com os outros sentidos da palavra
@@ -270,6 +276,36 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-07-31 (12ª rodada) — O heatmap passa a mostrar o que vem pela frente
+63. **Pedido**: "no heatmap mostrar as previsões de cards a estudar nos dias à frente de hoje".
+    O calendário terminava em hoje — era um retrovisor, e o SRS é justamente a promessa de que
+    a carga de amanhã já está decidida.
+    - **Janela**: 371 dias para trás + **28 dias (4 semanas) para a frente**
+      (`DASH_HM_PAST` / `DASH_HM_FUT` em `js/dashboard.js`).
+    - **`dashForecast(dias)`**: conta os cards já agendados por dia de vencimento.
+      **Cards `new` ficam de fora de propósito** — não têm data marcada, entram pelo limite
+      diário (`srsCfg.newPerDay`) no dia em que a sessão for aberta; contá-los inventaria carga
+      num dia que o calendário não sabe qual é. Atrasados e o próprio hoje também não entram
+      (hoje continua sendo o que foi REVISADO, e o bloco "Hoje" da sidebar já mostra o restante).
+    - **Passado cheio, futuro vazado**: as células do futuro usam a mesma escala de volume
+      (≤5 / ≤15 / ≤30 / +30), mas com anel em vez de preenchimento — carga prevista não pode
+      ser lida como esforço já feito. Dia sem nada agendado continua na textura neutra, igual
+      a um dia passado sem estudo. Medido nos 6 temas: o anel do nível 1 (1,50–1,82:1 contra o
+      cartão) é **mais visível** que o preenchimento do nível 1 do passado (1,29–1,47:1), e o
+      nível 4 bate exatamente com o passado (4,36–7,15:1) — as duas rampas têm o mesmo alcance.
+    - **Hoje ganhou anel** (`--text2`): sem ele, a fronteira cheio|vazado sumia quando os
+      últimos dias não tinham nem estudo nem previsão.
+    - **Legenda** ganhou separador + "Previsto", e a linha de estatísticas ganhou a 6ª:
+      **"Próx. 7 dias"** — o total que as células distribuem mas não somam.
+    - ⚠️ **A grade abria pela coluna mais ANTIGA**: com ~57 colunas, hoje e a previsão nasciam
+      fora da tela até alguém arrastar. Agora o painel nasce com `scrollLeft` no fim.
+    - **Validado ao vivo** com `srsLog`/`srsCards` sintéticos: 399 células (371+28), previsão
+      por dia batendo item a item (4→f1, 14→f2, 22→f3, 41→f4, dia vazio sem nível), os 50 cards
+      `new` ignorados, atrasados e hoje fora da previsão, "Próx. 7 dias" = 81 conferido na mão,
+      rótulo de mês futuro aparecendo, scroll no fim depois de trocar de aba, sem cards nenhum
+      não quebra, 0 erros de console e mobile 375px (estatísticas em 3×2, sem scroll horizontal
+      na página). `CACHE`: `englab-v37` → **`englab-v38`**.
 
 ### Sessão 2026-07-31 (11ª rodada) — A imagem do card passa a ilustrar O SENTIDO, não a palavra
 62. **Pedido**: um print do card de "tally" no sentido **2/2** ("bater, concordar com") com uma

@@ -2149,7 +2149,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
 }
 .dash-hm-stats {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 12px;
   margin-top: 18px;
   padding-top: 16px;
@@ -3282,4 +3282,36 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   .srs-rate-buttons{bottom:76px;background:var(--bg);padding:10px 0 12px;border-bottom:1px solid var(--border)}
   /* Imagem empilhada abaixo do texto pode ser generosa */
   .srs-back-image-col img{max-width:340px}
+}
+
+/* ================================================================
+   HEATMAP — dias a frente: o que esta AGENDADO (previsao)
+   O calendario so olhava para tras. As celulas do futuro usam a mesma
+   escala de volume do passado, mas VAZADAS: carga prevista nao pode ser
+   lida como esforco ja feito. Dia sem nada agendado fica na textura
+   neutra, igual a um dia passado sem estudo.
+   ================================================================ */
+.dash-hm-cell.fut{background:transparent}
+.dash-hm-cell.fut.f1{
+  background:color-mix(in srgb, var(--primary) 6%, transparent);
+  outline:1px solid color-mix(in srgb, var(--primary) 32%, transparent);outline-offset:-1px;
+}
+.dash-hm-cell.fut.f2{
+  background:color-mix(in srgb, var(--primary) 11%, transparent);
+  outline:1px solid color-mix(in srgb, var(--primary) 52%, transparent);outline-offset:-1px;
+}
+.dash-hm-cell.fut.f3{
+  background:color-mix(in srgb, var(--primary) 17%, transparent);
+  outline:1px solid color-mix(in srgb, var(--primary) 72%, transparent);outline-offset:-1px;
+}
+.dash-hm-cell.fut.f4{
+  background:color-mix(in srgb, var(--primary) 24%, transparent);
+  outline:1.5px solid var(--primary);outline-offset:-1.5px;
+}
+/* Marca o hoje: sem isso a fronteira cheio|vazado some quando os ultimos
+   dias nao tem estudo nem previsao. */
+.dash-hm-cell.hoje{outline:1px solid var(--text2);outline-offset:1px}
+.dash-hm-legend-sep{
+  width:1px;height:11px;margin:0 4px;
+  background:var(--border-strong);
 }

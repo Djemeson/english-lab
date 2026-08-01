@@ -101,21 +101,54 @@ function renderDashboard() {
 
 function _dateStr(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
 
-// Grade de atividade (estilo GitHub): últimos 371 dias, alinhados p/ começar num domingo.
+// Janela do heatmap: 53 semanas para trás + 4 semanas para a frente.
+const DASH_HM_PAST = 371
+const DASH_HM_FUT  = 28
+
+// Quantos cards JÁ AGENDADOS caem em cada dia à frente.
+// Cards `new` ficam de fora de propósito: eles não têm data marcada — entram
+// pelo limite diário (`srsCfg.newPerDay`) no dia em que você abrir a sessão.
+// Contá-los inventaria uma carga que o calendário não sabe onde colocar.
+function dashForecast(days = DASH_HM_FUT) {
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+  const limite = new Date(hoje); limite.setDate(limite.getDate() + days)
+  const map = {}
+  srsCards.forEach(c => {
+    if (!c.due || c.state === 'new') return
+    const d = new Date(c.due); d.setHours(0, 0, 0, 0)
+    if (d <= hoje || d > limite) return          // atrasados e hoje não são previsão
+    const ds = _dateStr(d)
+    map[ds] = (map[ds] || 0) + 1
+  })
+  return map
+}
+
+// Grade de atividade (estilo GitHub), alinhada p/ começar num domingo:
+// passado = o que foi estudado (célula cheia), futuro = o que está agendado
+// (célula vazada). A distinção é o ponto — carga prevista não pode se
+// confundir com esforço já feito.
 function dashHeatCells() {
   const byDate = {}
   srsLog.forEach(l => { byDate[l.date] = l.reviewed || 0 })
+  const prev = dashForecast(DASH_HM_FUT)
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const totalDays = 371
-  const start = new Date(today); start.setDate(start.getDate() - (totalDays - 1))
+  const hojeStr = _dateStr(today)
+  const start = new Date(today); start.setDate(start.getDate() - (DASH_HM_PAST - 1))
   const cells = []
   for (let i = 0; i < start.getDay(); i++) cells.push({ cls: 'dash-hm-pad' })
-  for (let i = 0; i < totalDays; i++) {
+  for (let i = 0; i < DASH_HM_PAST + DASH_HM_FUT; i++) {
     const d = new Date(start); d.setDate(d.getDate() + i)
     const ds = _dateStr(d)
-    const n = byDate[ds] || 0
-    const cls = n === 0 ? '' : n <= 5 ? 'l1' : n <= 15 ? 'l2' : n <= 30 ? 'l3' : 'l4'
-    cells.push({ cls, tip: `${d.toLocaleDateString('pt-BR')} — ${n} revis${n===1?'ão':'ões'}` })
+    const data = d.toLocaleDateString('pt-BR')
+    if (i >= DASH_HM_PAST) {
+      const n = prev[ds] || 0
+      const nivel = n === 0 ? '' : n <= 5 ? ' f1' : n <= 15 ? ' f2' : n <= 30 ? ' f3' : ' f4'
+      cells.push({ cls: 'fut' + nivel, tip: n ? `${data} — ${n} card${n===1?'':'s'} previsto${n===1?'':'s'}` : `${data} — nada previsto` })
+    } else {
+      const n = byDate[ds] || 0
+      const nivel = n === 0 ? '' : n <= 5 ? 'l1' : n <= 15 ? 'l2' : n <= 30 ? 'l3' : 'l4'
+      cells.push({ cls: nivel + (ds === hojeStr ? ' hoje' : ''), tip: `${data} — ${n} revis${n===1?'ão':'ões'}` })
+    }
   }
   return cells
 }
@@ -242,10 +275,14 @@ function renderDashboardGrid() {
   const dailyAverage = activeDays > 0 ? (totalReviews / activeDays).toFixed(1) : '0'
   const streak = srsStreak()
 
+  // Carga prevista da próxima semana — o número que o calendário sozinho
+  // não dá (as células mostram a distribuição, não o total).
+  const prev7 = Object.values(dashForecast(7)).reduce((s, n) => s + n, 0)
+
   // Month labels calculation based on column dates
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const totalDays = 371
-  const start = new Date(today); start.setDate(start.getDate() - (totalDays - 1))
+  const totalDays = DASH_HM_PAST + DASH_HM_FUT
+  const start = new Date(today); start.setDate(start.getDate() - (DASH_HM_PAST - 1))
   const padOffset = start.getDay()
 
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
@@ -318,6 +355,9 @@ function renderDashboardGrid() {
         <div class="dash-hm-cell l3"></div>
         <div class="dash-hm-cell l4"></div>
         <span>Mais</span>
+        <span class="dash-hm-legend-sep"></span>
+        <div class="dash-hm-cell fut f3"></div>
+        <span>Previsto</span>
       </div>
 
       <div class="dash-hm-stats">
@@ -340,6 +380,10 @@ function renderDashboardGrid() {
         <div class="hm-stat">
           <div class="hm-stat-num" style="color:var(--warning); display:flex; align-items:center; gap:4px">${streak}${ic('flame','ic-sm')}</div>
           <div class="hm-stat-lbl">Sequência</div>
+        </div>
+        <div class="hm-stat">
+          <div class="hm-stat-num">${prev7}</div>
+          <div class="hm-stat-lbl">Próx. 7 dias</div>
         </div>
       </div>
     </div>`
@@ -492,6 +536,10 @@ function renderDashboardGrid() {
         <div class="dash-col">${heatmapCard}${weeklyReviewsCard}</div>
         <div class="dash-col">${trendCard}</div>
       </div>`
+    // A grade tem ~57 colunas e abre pela mais ANTIGA — hoje e a previsão
+    // ficavam fora da tela até alguém arrastar. Nasce mostrando o fim.
+    const wrap = el('dpanel-progresso').querySelector('.dash-hm-wrap')
+    if (wrap) wrap.scrollLeft = wrap.scrollWidth
   } else if (_dashTab === 'vocabulario') {
     el('dpanel-vocabulario').innerHTML = `
       <div class="dash-grid">
