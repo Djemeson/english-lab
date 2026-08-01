@@ -101,9 +101,33 @@ function renderDashboard() {
 
 function _dateStr(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
 
-// Janela do heatmap: 53 semanas para trás + 4 semanas para a frente.
-const DASH_HM_PAST = 371
-const DASH_HM_FUT  = 28
+// Janela do heatmap: 4 semanas para a frente + quantas semanas de passado
+// COUBEREM na largura disponível. A grade tinha largura fixa (57 colunas ×
+// 14px = 795px) dentro de uma coluna de 412px, e a diferença virava barra de
+// rolagem — metade do ano ficava escondida atrás de um arrasto que ninguém dá.
+// Agora a célula é fluida (colunas 1fr) e o número de semanas é escolhido para
+// a célula não ficar menor que ~11px. Overflow deixa de ser possível.
+const DASH_HM_FUT = 28
+const DASH_HM_GAP = 3
+const DASH_HM_MAX_SEM = 53   // teto: um ano de passado
+
+// Declarados AQUI, no topo, e não no fim do arquivo: `renderDashboardGrid`
+// roda no boot e um `let` declarado depois cairia na zona morta temporal
+// (a lição do item 52 — o hoisting salva a função, não a variável).
+let _hmSemanasAtual = null
+let _hmResizeTimer = null
+
+// Nº de semanas de passado que cabem. Mede o painel; se ele estiver oculto
+// (largura 0, aba inativa), cai na largura da janela — o cartão é full-width.
+function dashHmSemanas() {
+  const painel = el('dpanel-progresso')
+  const base = (painel && painel.clientWidth) || window.innerWidth || 1000
+  // desconta padding do cartão (44), coluna Seg/Qua/Sex (34) e o gap (8)
+  const util = Math.max(160, base - 86)
+  const passo = window.innerWidth < 600 ? 12 : 14      // célula mínima + gap
+  const colunas = Math.floor(util / passo)
+  return Math.min(DASH_HM_MAX_SEM, Math.max(8, colunas - DASH_HM_FUT / 7))
+}
 
 // Quantos cards JÁ AGENDADOS caem em cada dia à frente.
 // Cards `new` ficam de fora de propósito: eles não têm data marcada — entram
@@ -127,7 +151,8 @@ function dashForecast(days = DASH_HM_FUT) {
 // passado = o que foi estudado (célula cheia), futuro = o que está agendado
 // (célula vazada). A distinção é o ponto — carga prevista não pode se
 // confundir com esforço já feito.
-function dashHeatCells() {
+function dashHeatCells(diasPassado) {
+  const DASH_HM_PAST = diasPassado
   const byDate = {}
   srsLog.forEach(l => { byDate[l.date] = l.reviewed || 0 })
   const prev = dashForecast(DASH_HM_FUT)
@@ -256,7 +281,10 @@ function renderDashboardGrid() {
   // Os painéis substituíram o antigo #dash-grid-area (ver setDashTab).
   if (!el('dpanel-progresso')) return
 
-  const heatCells = dashHeatCells()
+  const hmSemanas = dashHmSemanas()
+  _hmSemanasAtual = hmSemanas
+  const hmDiasPassado = hmSemanas * 7
+  const heatCells = dashHeatCells(hmDiasPassado)
   const totalMonthReviews = srsLog.filter(l => {
     const d = new Date(l.date); const now = new Date()
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
@@ -281,8 +309,8 @@ function renderDashboardGrid() {
 
   // Month labels calculation based on column dates
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const totalDays = DASH_HM_PAST + DASH_HM_FUT
-  const start = new Date(today); start.setDate(start.getDate() - (DASH_HM_PAST - 1))
+  const totalDays = hmDiasPassado + DASH_HM_FUT
+  const start = new Date(today); start.setDate(start.getDate() - (hmDiasPassado - 1))
   const padOffset = start.getDay()
 
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
@@ -313,14 +341,22 @@ function renderDashboardGrid() {
     }
   })
 
-  const gridWidthPx = totalCols * 14 - 3 // 11px de célula + 3px de gap, sem o gap final
+  // Teto de tamanho: célula fluida sem limite viraria um quadrado de 35px
+  // numa tela larga (o que acontecia entre o resize e o re-render). Passo
+  // máximo de 16px = célula de 13px, que é a densidade de um calendário.
+  const hmMaxPx = totalCols * 16 - DASH_HM_GAP
+
+  // A célula agora é fluida, então o rótulo não pode ser posicionado em px.
+  // Posição exata da coluna i numa grade de N colunas 1fr com gap g:
+  //   i * (célula + g), com célula = (100% - (N-1)g)/N  →  i/N*100% + i*g/N
   const monthLabelsHTML = finalMonthLabels.map(lbl => {
-    const leftPx = lbl.col * 14
-    return `<span class="dash-hm-month-lbl" style="left:${leftPx}px">${lbl.name}</span>`
+    const pct = (lbl.col / totalCols * 100).toFixed(3)
+    const px = (lbl.col * DASH_HM_GAP / totalCols).toFixed(1)
+    return `<span class="dash-hm-month-lbl" style="left:calc(${pct}% + ${px}px)">${lbl.name}</span>`
   }).join('')
 
   const heatmapCard = `
-    <div class="dash-card">
+    <div class="dash-card dash-card-wide">
       <div class="dash-card-h">
         <div>
           <div class="dash-eyebrow">Atividade</div>
@@ -341,8 +377,8 @@ function renderDashboardGrid() {
         </div>
         <div class="dash-hm-container">
           <div class="dash-hm-wrap">
-            <div class="dash-hm-months-row" style="min-width:${gridWidthPx}px">${monthLabelsHTML}</div>
-            <div class="dash-hm-grid">${heatCells.map(c => `<div class="dash-hm-cell ${c.cls}" ${c.tip ? `title="${escA(c.tip)}"` : ''}></div>`).join('')}</div>
+            <div class="dash-hm-months-row" style="max-width:${hmMaxPx}px">${monthLabelsHTML}</div>
+            <div class="dash-hm-grid" style="grid-template-columns:repeat(${totalCols},1fr);max-width:${hmMaxPx}px">${heatCells.map(c => `<div class="dash-hm-cell ${c.cls}" ${c.tip ? `title="${escA(c.tip)}"` : ''}></div>`).join('')}</div>
           </div>
         </div>
       </div>
@@ -531,15 +567,15 @@ function renderDashboardGrid() {
   //   Progresso   = "como estou indo ao longo do tempo?"
   //   Vocabulário = "o que eu tenho e de onde veio?"
   if (_dashTab === 'progresso') {
+    // O calendário saiu da coluna de 1.7fr e ocupa a largura toda: um ano de
+    // dias em 57 colunas nunca ia caber em 412px, e era daí que vinha a barra
+    // de rolagem. Os outros dois cartões continuam lado a lado embaixo.
     el('dpanel-progresso').innerHTML = `
+      ${heatmapCard}
       <div class="dash-grid">
-        <div class="dash-col">${heatmapCard}${weeklyReviewsCard}</div>
+        <div class="dash-col">${weeklyReviewsCard}</div>
         <div class="dash-col">${trendCard}</div>
       </div>`
-    // A grade tem ~57 colunas e abre pela mais ANTIGA — hoje e a previsão
-    // ficavam fora da tela até alguém arrastar. Nasce mostrando o fim.
-    const wrap = el('dpanel-progresso').querySelector('.dash-hm-wrap')
-    if (wrap) wrap.scrollLeft = wrap.scrollWidth
   } else if (_dashTab === 'vocabulario') {
     el('dpanel-vocabulario').innerHTML = `
       <div class="dash-grid">
@@ -548,6 +584,19 @@ function renderDashboardGrid() {
       </div>`
   }
 }
+
+// A grade se adapta à largura. Se o número de semanas que cabe mudou (janela
+// redimensionada, celular girado), redesenha — sem isso a densidade fica
+// errada, ainda que a barra de rolagem não volte.
+window.addEventListener('resize', () => {
+  clearTimeout(_hmResizeTimer)
+  _hmResizeTimer = setTimeout(() => {
+    const painel = el('dpanel-progresso')
+    if (!painel || painel.hidden || _dashTab !== 'progresso') return
+    if (dashHmSemanas() === _hmSemanasAtual) return
+    renderDashboardGrid()
+  }, 220)
+})
 
 // Chips de palavras recentes — vira um cartão do painel de Vocabulário,
 // em vez de uma faixa solta no fim da página.

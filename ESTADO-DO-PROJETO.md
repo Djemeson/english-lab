@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-07-31 — **Heatmap com previsão (12ª rodada)**: o calendário de
+> Última atualização: 2026-08-01 — **Heatmap fluido (13ª rodada)**: a grade tinha largura fixa
+> (795px) dentro de uma coluna de 412px e a diferença virava barra de rolagem. O cartão passou a
+> ocupar a largura toda, a célula virou fluida (colunas `1fr` + `aspect-ratio`) e o número de
+> semanas de histórico é escolhido pelo espaço disponível — overflow deixou de ser possível.
+> Ver seção 8 (sessão 2026-08-01, 13ª rodada).
+>
+> Última atualização anterior: 2026-07-31 — **Heatmap com previsão (12ª rodada)**: o calendário de
 > atividade passou a mostrar 28 dias à frente com os cards já agendados (célula vazada, para
 > não confundir carga prevista com esforço feito), ganhou a estatística "Próx. 7 dias" e agora
 > nasce rolado até o fim — antes hoje ficava fora da tela.
@@ -276,6 +282,39 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-01 (13ª rodada) — Heatmap fluido: fim da barra de rolagem
+64. **Pedido**: "existe uma barra pra poder arrastar pro lado e ver o restante. não quero que
+    tenha a barra. analise como deixar mais funcional."
+    - **Causa medida**: a grade tinha largura FIXA — 57 colunas × 14px = **795px** — dentro de
+      uma coluna de **412px** (o cartão vivia no `1.7fr` do `.dash-grid`). Os 383px de diferença
+      viravam barra de rolagem: metade do ano ficava atrás de um arrasto que ninguém dá. A
+      previsão da 12ª rodada tinha sido remendada com `scrollLeft` no fim — remendo no sintoma.
+    - **Três mudanças, nesta ordem**:
+      1. **O cartão saiu da coluna e ocupa a largura toda** do painel (`dash-card-wide`);
+         "Volume de Estudos" e "Taxa de acerto" continuam lado a lado embaixo. Um ano de dias
+         nunca ia caber em 412px — a coluna estreita era o erro de origem.
+      2. **Célula fluida**: `grid-template-columns: repeat(N, 1fr)` + `aspect-ratio: 1`.
+         A grade passa a ocupar exatamente a largura disponível, qualquer que seja —
+         **overflow deixa de ser possível por construção**, não por ajuste.
+      3. **`dashHmSemanas()` decide quantas semanas cabem** (mede o painel, desconta padding/
+         coluna de dias/gap, divide por um passo de 12–14px e limita a 53). A célula nunca
+         fica menor que ~10px; o que varia é o tamanho da janela de histórico.
+    - **Teto de 16px por coluna**: sem ele, poucas colunas numa tela larga viravam quadrados de
+      35px (visto ao medir a 1440px antes do re-render).
+    - **Rótulos de mês em `calc(% + px)`**: com célula fluida, `left` em px mentiria. A fórmula
+      exata da posição da coluna i numa grade de N colunas `1fr` com gap g é
+      `i/N*100% + i*g/N`.
+    - **Seg/Qua/Sex acompanham a altura variável**: a coluna estica junto (`align-self:stretch`)
+      e divide a altura em 7 partes iguais com o mesmo gap. Medido: **0px de desalinhamento**
+      em 1440/1024/800px e 1–2px a 375px (arredondamento de subpixel).
+    - **Listener de resize** (debounce 220ms) redesenha só quando o número de semanas que cabe
+      muda — os `let` de estado ficam no TOPO do arquivo, pela lição do item 52 (zona morta).
+    - **Validado ao vivo** em 1440 / 1024 / 800 / 375px: **barra de rolagem = 0 em todos**,
+      célula 13 / 11,5 / 11,8 / 10px, janela de 53 / 40 / 24 / 17 semanas de passado + as 4 de
+      previsão, última coluna dentro do container, sem scroll horizontal na página, previsão
+      preservada (as últimas células continuam `fut`) e 0 erros de console.
+      `CACHE`: `englab-v38` → **`englab-v39`**.
 
 ### Sessão 2026-07-31 (12ª rodada) — O heatmap passa a mostrar o que vem pela frente
 63. **Pedido**: "no heatmap mostrar as previsões de cards a estudar nos dias à frente de hoje".
