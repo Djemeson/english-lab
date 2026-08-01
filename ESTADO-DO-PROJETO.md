@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-01 — **Dashboard mais denso (15ª rodada)**: 443px de moldura antes
+> Última atualização: 2026-08-01 — **Estudar no celular (16ª rodada)**: a página rolava 63px
+> para o lado a 375px. Causas: `repeat(3,1fr)` que não encolhe (`1fr` = `minmax(auto,1fr)`) e a
+> tabela de baralhos empurrando a página em vez de rolar dentro do cartão. Agora: 0 de scroll
+> horizontal nas 7 telas a 320px e 375px. Ver seção 8 (16ª rodada).
+>
+> Última atualização anterior: 2026-08-01 — **Dashboard mais denso (15ª rodada)**: 443px de moldura antes
 > do primeiro dado viraram 347px, a seção passou de 1180 para 1336px de largura (e o heatmap
 > voltou a mostrar o ano inteiro), o hero parou de espalhar os números pelas pontas e as colunas
 > do painel foram reorganizadas por altura medida (vão de 653px → ~220px).
@@ -294,6 +299,27 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-01 (16ª rodada) — Estudar parava de transbordar no celular
+67. **Pedido**: corrigir o transbordo horizontal que eu tinha achado (e confirmado na versão
+    publicada) na tela Estudar a 375px — a página rolava **63px** para o lado.
+    Duas causas, as duas do tipo "grid/tabela que não encolhe":
+    1. **`.srs-dashboard` era `repeat(3,1fr)`** — e `1fr` é `minmax(AUTO,1fr)`: os rótulos
+       ("PARA REVISAR HOJE", "NOVOS DISPONÍVEIS") seguravam cada coluna acima de 1/3 e as três
+       somavam **373px num container de 310px**. Existia uma regra de 2 colunas no bloco mobile,
+       mas era **letra morta**: a declaração de 3 colunas vem DEPOIS no arquivo com a mesma
+       especificidade e vencia mesmo no celular. Agora é `minmax(0,1fr)` (o track pode encolher)
+       e, abaixo de 700px, o cartão perde 24px de padding e o rótulo usa `--fs-3xs`.
+       Resultado: 3 cartões de 98px a 375px e de 79px a 320px, com o texto legível.
+    2. **`.srs-deck-table` tem 393px de largura mínima** (cinco colunas de números) dentro de um
+       cartão de 347px, e o wrap estava com `overflow` visível — quem rolava era a **página**.
+       Agora `.srs-deck-table-wrap{overflow-x:auto}`: a tabela rola dentro do próprio cartão.
+    > Lição: `1fr` não é "um terço" — é "no mínimo o conteúdo". Em grade de cartão com rótulo
+    > por extenso, `minmax(0,1fr)` é o que realmente divide a largura.
+    - **Validado ao vivo**: **0 de scroll horizontal nas 7 telas a 320px e a 375px** (era 63px),
+      tabela rolando dentro do cartão (83px de scroll interno), desktop intacto (padding 20px,
+      número 40px, 3 colunas de 355px, tabela sem barra) e 0 erros de console.
+      `CACHE`: `englab-v41` → **`englab-v42`**.
 
 ### Sessão 2026-08-01 (15ª rodada) — Dashboard: 443px de moldura antes do primeiro dado
 66. **Pedido**: "ao entrar na dashboard tenho a impressão de que o espaço não está sendo bem
@@ -1486,13 +1512,7 @@ maxInterval (36500), leechThreshold (50)
 
 ## 9. Pendências / a verificar
 
-- [ ] **Estudar transborda a tela no celular** (achado em 2026-08-01, 15ª rodada, e
-      **confirmado na versão publicada** — é anterior a esta sessão, não foi causado por ela):
-      a 375px a página rola 64px para o lado. Os culpados medidos são o 4º cartão de números
-      (`.srs-dash-card.streak`, que não quebra linha) e a `.srs-deck-table` (393px de largura
-      mínima num container de 347px). Correção provável: deixar a fila de cartões quebrar em
-      2×2 e dar rolagem própria à tabela de baralhos (`overflow-x` no `.srs-deck-table-wrap`),
-      em vez de deixar a PÁGINA rolar.
+- [x] **Estudar transbordava a tela no celular** — corrigido em 2026-08-01 (16ª rodada, item 67).
 
 - [ ] **Olhar a sidebar nova com dados reais** (7ª rodada, 2026-07-31): o bloco "Hoje" foi
       validado com `srsLog` sintético (12 feitas / 183 restantes / 5 dias). Com uso real,
