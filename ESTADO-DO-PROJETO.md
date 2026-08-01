@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-01 — **Heatmap na coluna de sempre (14ª rodada)**: o alargamento
+> Última atualização: 2026-08-01 — **Dashboard mais denso (15ª rodada)**: 443px de moldura antes
+> do primeiro dado viraram 347px, a seção passou de 1180 para 1336px de largura (e o heatmap
+> voltou a mostrar o ano inteiro), o hero parou de espalhar os números pelas pontas e as colunas
+> do painel foram reorganizadas por altura medida (vão de 653px → ~220px).
+> Ver seção 8 (sessão 2026-08-01, 15ª rodada).
+>
+> Última atualização anterior: 2026-08-01 — **Heatmap na coluna de sempre (14ª rodada)**: o alargamento
 > da 13ª rodada foi revertido a pedido. A barra de rolagem some encolhendo o HISTÓRICO (39
 > semanas a 1440px, 17 a 375px), não o layout. De quebra, o alinhamento dos rótulos
 > Seg/Qua/Sex, que acumulava 5px no celular, foi para 0,01px.
@@ -288,6 +294,41 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-01 (15ª rodada) — Dashboard: 443px de moldura antes do primeiro dado
+66. **Pedido**: "ao entrar na dashboard tenho a impressão de que o espaço não está sendo bem
+    aproveitado... informação sendo cortada, botões muito grandes e cabeçalhos grandes
+    empurrando outras informações pra baixo."
+    - **Medido a 1640×900**: **443px** (49% da tela) de cabeçalho + hero + métricas + abas antes
+      do primeiro dado — por isso a linha de estatísticas do calendário aparecia cortada na
+      dobra. E a seção parava em **1180px** com **1336px** de área útil disponível.
+    - **Vertical (443 → 347px, −22%)**:
+      · cabeçalho 80 → 65px (título `--fs-xl` → `--fs-lg`, margens 26/16 → 18/12);
+      · hero 117 → 81px (padding 24 → 16, número `--fs-3xl` → `--fs-2xl`);
+      · métricas 80 → 64px (padding 16 → 12, ícone 42 → 36, valor `--fs-xl` → `--fs-lg`);
+      · abas e respiros 22/18/20 → 16/14/14.
+    - **Horizontal**: `#section-dashboard` vai a **1336px** e, acima de 1280px, o `.dash-grid`
+      vira **2fr 1fr** — a coluna do calendário é a que converte largura em informação. Efeito
+      colateral bom: com 873px de coluna o heatmap volta a mostrar **52 semanas** (o ano
+      inteiro), sem barra de rolagem, o que a 14ª rodada tinha reduzido a 39.
+    - **O hero agrupava mal**: `justify-content:space-evenly` jogava "123 revisões" e "50 novos"
+      para as pontas — o vazio tinha saído do meio do cartão e ido parar ENTRE os números.
+      Agora os dados andam juntos e só o botão vai para a direita.
+    - **Botão principal**: a sombra de 18px a 40% (brilho de template) virou 8px a 22%.
+    - **Colunas do painel Progresso reorganizadas por ALTURA medida**: com [calendário + volume]
+      à esquerda e só a taxa de acerto à direita, a coluna da direita terminava **653px** antes
+      da outra. Trocando a taxa de acerto (cartão baixo) para junto do calendário, a diferença
+      cai para ~220px.
+    - **Cabeçalho de cartão em coluna estreita**: o `space-between` espremia o título contra o
+      valor da direita e "Volume de Estudos" quebrava em duas linhas, empurrando o gráfico para
+      baixo. Com `flex-wrap`, quem desce uma linha é o valor — o dado secundário.
+    - ⚠️ **O cabeçalho compacto vale para as 7 telas**, não só para o Dashboard: um título que
+      encolhe ao entrar numa aba e cresce na outra seria uma inconsistência visível a cada
+      clique. As outras seis ganham os mesmos ~40px.
+    - **Validado ao vivo** em 1640×900 e 1280×860: painel inteiro cabendo na tela (879px de
+      página para 860px de viewport, contra 1225px antes), 0 erros de console, 0 scroll
+      horizontal, heatmap sem barra, e as 6 outras telas mantendo largura e layout próprios.
+      `CACHE`: `englab-v40` → **`englab-v41`**.
 
 ### Sessão 2026-08-01 (14ª rodada) — Heatmap volta para a coluna; quem encolhe é o histórico
 65. **Correção do rumo da 13ª rodada**: eu tinha resolvido a barra de rolagem alargando o cartão
@@ -1444,6 +1485,14 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 9. Pendências / a verificar
+
+- [ ] **Estudar transborda a tela no celular** (achado em 2026-08-01, 15ª rodada, e
+      **confirmado na versão publicada** — é anterior a esta sessão, não foi causado por ela):
+      a 375px a página rola 64px para o lado. Os culpados medidos são o 4º cartão de números
+      (`.srs-dash-card.streak`, que não quebra linha) e a `.srs-deck-table` (393px de largura
+      mínima num container de 347px). Correção provável: deixar a fila de cartões quebrar em
+      2×2 e dar rolagem própria à tabela de baralhos (`overflow-x` no `.srs-deck-table-wrap`),
+      em vez de deixar a PÁGINA rolar.
 
 - [ ] **Olhar a sidebar nova com dados reais** (7ª rodada, 2026-07-31): o bloco "Hoje" foi
       validado com `srsLog` sintético (12 feitas / 183 restantes / 5 dias). Com uso real,

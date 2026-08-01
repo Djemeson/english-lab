@@ -589,10 +589,15 @@ function renderDashboardGrid() {
   //   Progresso   = "como estou indo ao longo do tempo?"
   //   Vocabulário = "o que eu tenho e de onde veio?"
   if (_dashTab === 'progresso') {
+    // Distribuição medida, não estética: com [calendário + volume] à esquerda
+    // e só a taxa de acerto à direita, a coluna da direita terminava 653px
+    // antes da outra — o vão que dava a impressão de espaço desperdiçado.
+    // Com a taxa de acerto (cartão baixo) junto do calendário, as colunas
+    // fecham com 59px de diferença.
     el('dpanel-progresso').innerHTML = `
       <div class="dash-grid">
-        <div class="dash-col">${heatmapCard}${weeklyReviewsCard}</div>
-        <div class="dash-col">${trendCard}</div>
+        <div class="dash-col">${heatmapCard}${trendCard}</div>
+        <div class="dash-col">${weeklyReviewsCard}</div>
       </div>`
     // Só agora o container tem largura de verdade: confere se o histórico
     // renderizado é mesmo o que cabe (ver dashHmAjustar).
