@@ -325,8 +325,10 @@ maxInterval (36500), leechThreshold (50)
       · Whisper de episódio inteiro é o único ponto pesado no browser (ffmpeg.wasm);
         é o argumento real para um futuro app desktop (Tauri com o MESMO código web,
         sync de graça) — decisão adiada, navegador primeiro.
-    - **Aguardando as respostas da seção 9 do plano** (fontes de vídeo, aparelhos, serverless
-      sim/não, ordem do MVP) antes de escrever qualquer código.
+    - **Decisões tomadas na mesma sessão** (todas na recomendação): vídeos = arquivos locais;
+      aparelho do vídeo = notebook; função serverless na Vercel = aceita (fase 3); MVP =
+      player + importar .srt + transcript clicável + cortes A–B + card com áudio real da cena
+      + "Preparar para assistir". Próximo passo: implementar a fase 1 do plano.
 
 ### Sessão 2026-08-01 (16ª rodada) — Estudar parava de transbordar no celular
 67. **Pedido**: corrigir o transbordo horizontal que eu tinha achado (e confirmado na versão

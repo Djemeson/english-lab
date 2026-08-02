@@ -11,7 +11,10 @@
 
 | Decisão | Escolha |
 |---|---|
-| (demais — aguardando respostas, ver seção 9) | |
+| Fonte dos vídeos | **Arquivos locais** (episódios/filmes baixados). YouTube fora do escopo. |
+| Aparelho do vídeo | **Notebook** (Chrome/Edge — File System Access pleno). Cards continuam em todos. |
+| Função serverless | **Aceita**: `api/subs.js` na própria Vercel para busca automática + moviehash (fase 3). |
+| MVP (fase 1) | **Player + cards com áudio real**: abrir vídeo + importar .srt + transcript clicável + cortes A–B + card com áudio da cena + "Preparar para assistir". |
 | Desktop | O Djemeson topa um app desktop **se o navegador não der conta**, desde que a sincronização continue. Análise na seção 7: o navegador dá conta do núcleo; desktop fica como fase opcional. |
 | Vídeo é descartável | Confirmado pelo Djemeson (2026-08-01): o vídeo pode ser apagado depois de extrair o que importa. Casa com a arquitetura: o vídeo **nunca** vai para o Firebase — o app extrai legenda + cortes + áudios (KBs) e o arquivo grande pode sumir. Único efeito de apagar: o botão "rever a cena" deixa de funcionar; cards, áudios reais e legenda continuam íntegros e sincronizados. A UI deve dizer isso ("já extraí tudo — pode apagar o arquivo"). |
 
@@ -215,8 +218,6 @@ sincronização vem de graça porque o código é o mesmo.
 - **OneDrive**: vídeos na pasta sincronizada do OneDrive podem estar "na nuvem" (placeholder)
   — o handle abre, mas a leitura dispara download. Avisar na UI quando a leitura for lenta.
 
-## 9. Perguntas em aberto (aguardando o Djemeson)
-1. De onde vêm os vídeos — só arquivos locais, ou YouTube também importa?
-2. Em qual aparelho isso vai rodar de verdade (notebook? celular também?)
-3. Busca de legenda: vale UMA função serverless na Vercel (zero manutenção) ou 100% sem servidor?
-4. Por onde começar o MVP?
+## 9. Perguntas em aberto
+Nenhuma — as 4 perguntas de escopo foram respondidas em 2026-08-01 e viraram as decisões da
+seção 1. Próximo passo: implementar a fase 1 da seção 6.
