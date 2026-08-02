@@ -215,6 +215,10 @@ async function fbPushData() {
       batch.set(base.collection('data').doc('kindleQueue'), { list: kindleItems, updatedAt: Date.now() })
     }
     batch.set(base.collection('data').doc('conversas'), { list: conversas, updatedAt: Date.now() })
+    // Vídeo: só METADADOS (títulos, marcadores, cortes) — o arquivo de vídeo
+    // nunca sobe (300MB–2GB × limite de 1MB/doc). Legendas ficam locais (IDB).
+    batch.set(base.collection('data').doc('videos'), { list: videos, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('clips'),  { list: clips,  updatedAt: Date.now() })
     await batch.commit()
     updateSyncNav('ok')
     return true
@@ -451,6 +455,8 @@ function applyCloudDocs(docs) {
   if (docs.srsCfg)   { srsCfg = { ...SRS_DEF_CFG, ...docs.srsCfg }; persistSrsCfg() }
   if (docs.srsLog)   { srsLog = docs.srsLog.list || []; saveSrsLog() }
   if (docs.srsDecks) { srsDecks = docs.srsDecks.list || []; saveSrsDecks() }
+  if (docs.videos)   { videos = docs.videos.list || []; saveVideos() }
+  if (docs.clips)    { clips  = docs.clips.list  || []; saveClips() }
   if (docs.kindleQueue) {
     const seen = (typeof loadKindleSeen === 'function') ? loadKindleSeen() : new Set()
     kindleItems = (docs.kindleQueue.list || []).filter(it =>
@@ -504,6 +510,7 @@ function _refreshActiveViews() {
     if (active('section-estudar')  && typeof renderSrsSection === 'function' && !srsSession) renderSrsSection()
     if (active('section-biblioteca') && typeof openBiblioteca === 'function') openBiblioteca()
     if (active('section-configuracoes') && typeof fillSettings === 'function') fillSettings()
+    if (active('section-video') && typeof renderVideoSection === 'function') renderVideoSection()
   } catch(e) { console.warn('[refreshViews]', e.message) }
 }
 

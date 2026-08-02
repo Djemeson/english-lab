@@ -4,7 +4,7 @@
 // Firebase e OpenAI ficam sempre na rede.
 // ================================================================
 
-const CACHE = 'englab-v42'
+const CACHE = 'englab-v43'
 
 // Assets que nunca mudam entre visitas (shell da app).
 // RELATIVOS de propósito: resolvidos contra o scope do SW, então funcionam tanto
@@ -67,8 +67,8 @@ self.addEventListener('fetch', e => {
   // Apenas GET é cacheado
   if (e.request.method !== 'GET') return
 
-  // add.js e study.js: network-first (lazy, pode mudar mais)
-  if (url.includes('/js/add.js') || url.includes('/js/study.js')) {
+  // Módulos lazy: network-first (mudam mais e não estão no shell)
+  if (url.includes('/js/add.js') || url.includes('/js/study.js') || url.includes('/js/video.js')) {
     e.respondWith(
       fetch(e.request)
         .then(r => { caches.open(CACHE).then(c => c.put(e.request, r.clone())); return r })

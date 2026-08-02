@@ -733,6 +733,8 @@ function buildSrsVerso(card, imgData, imageBelow) {
       <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">${ic('volume','ic-sm')} Repetir frase</button>
       <button class="btn btn-ghost btn-sm" title="Gerar nova frase que reflita melhor a definição" style="opacity:0.45;padding:4px 7px;font-size:var(--fs-sm)"
         onclick="event.stopPropagation();regenerateCardExample('${card.id}',this)">${ic('refresh','ic-sm')}</button>
+      ${card.clipId ? `<button class="btn btn-ghost btn-sm" title="Rever a cena de origem (no aparelho que tem o vídeo)"
+        onclick="event.stopPropagation();reverCena('${card.clipId}')">${ic('film','ic-sm')} Rever a cena</button>` : ''}
     </div>`
   }
   // 2. Tradução PT da frase logo abaixo (preserva o <b> do termo, se houver)

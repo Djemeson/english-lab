@@ -107,10 +107,20 @@ async // ================================================================
 // DATA MANAGEMENT
 // ================================================================
 function exportData() {
-  const blob = new Blob([JSON.stringify({ words, cfg, exported_at: new Date().toISOString() }, null, 2)], { type:'application/json' })
+  // Backup COMPLETO (2026-08-01): antes só words+cfg saíam — nem o agendamento
+  // SRS entrava, então "restaurar do backup" perdia todo o progresso de estudo.
+  // Áudio/imagens ficam de fora (são MBs e regeneráveis via TTS/IA).
+  const payload = {
+    words, cfg, srsCards, srsLog, srsDecks, srsCfg,
+    conversas: (typeof conversas !== 'undefined') ? conversas : [],
+    videos:    (typeof videos    !== 'undefined') ? videos    : [],
+    clips:     (typeof clips     !== 'undefined') ? clips     : [],
+    exported_at: new Date().toISOString()
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' })
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
   a.download = `english-lab-${new Date().toISOString().slice(0,10)}.json`
-  a.click(); toast('Backup exportado!', 'success')
+  a.click(); toast('Backup completo exportado (palavras, cards, progresso, config)', 'success')
 }
 
 function importData(input) {

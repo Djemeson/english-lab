@@ -171,7 +171,7 @@
 
 | Fase | Entrega | Peças | Esforço |
 |---|---|---|---|
-| **1 (MVP)** | Nova seção "Vídeo": abrir vídeo local + importar .srt/.vtt + transcript clicável + cortes virtuais com A–B + card com áudio REAL da cena + "Preparar para assistir" | `video.js` lazy, parser SRT, captureStream, cruzamento com `words[]` | ~1 sessão longa |
+| **1 (MVP)** ✅ **FEITA em 2026-08-01** | Nova seção "Vídeo": abrir vídeo local + importar .srt/.vtt + transcript clicável (karaokê) + cortes virtuais com A–B + card com áudio REAL da cena + "Preparar para assistir" + marcadores (tecla M) + tradução por fala com recall + "rever a cena" no estudo + cobertura por vídeo | `video.js` lazy, parser SRT, captureStream, cruzamento com `words[]` | feita |
 | **2** | Editor/ajuste de legenda (offset ±, editar cue, "marcar agora") + dupla legenda PT com recall + marcadores durante a exibição | editor de cues, tradução em lote cacheada | ~1 sessão |
 | **3** | Transcrição Whisper de episódio inteiro (ffmpeg.wasm) + busca automática de legenda (função Vercel + moviehash) | ffmpeg.wasm, `api/subs.js` | ~1 sessão |
 | **4 (opcional)** | Ditado, shadowing, cloze da cena, exportar corte físico | Whisper por tentativa, ffmpeg | conforme uso |

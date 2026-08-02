@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-01 — **Estudo de escopo VÍDEO (17ª rodada)**: análise completa da
+> Última atualização: 2026-08-01 — **FASE 1 DO VÍDEO NO AR (18ª rodada)**: nova seção "Vídeo"
+> (lazy) com player + transcript karaokê + cortes A–B + card com o ÁUDIO REAL da cena +
+> "Preparar para assistir" + marcadores + tradução com recall + "rever a cena" no estudo.
+> Backup: tag git `pre-video-fase1` e Exportar JSON virou backup completo.
+> Ver seção 8 (18ª rodada) e `PLANO-VIDEO.md`.
+>
+> Última atualização anterior: 2026-08-01 — **Estudo de escopo VÍDEO (17ª rodada)**: análise completa da
 > funcionalidade de estudar com vídeo + legenda está em [`PLANO-VIDEO.md`](./PLANO-VIDEO.md)
 > (viabilidade das 4 ideias do Djemeson, arquitetura, custos, fases, ideias extras). SEM código
 > ainda — aguardando as decisões da seção 9 do plano. Ver seção 8 (17ª rodada).
@@ -304,6 +310,47 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-01 (18ª rodada) — FASE 1 DO VÍDEO implementada (seção nova + 6 ideias)
+69. **Pedido**: "faça você um backup e logo depois execute a fase 1" + "implemente as ideias
+    que você deu — o que couber na fase 1". Entregue e validado ao vivo com vídeo sintético
+    (canvas + oscilador via MediaRecorder) e fetch stubado — zero dólar gasto no teste.
+    - **Backup**: a extensão do Chrome não estava conectada, então os DADOS reais (browser
+      logado + Firestore) ficaram fora de alcance — o que coube foi (a) tag git
+      **`pre-video-fase1`** (rollback de código instantâneo) e (b) **`exportData()` virou
+      backup completo**: antes só words+cfg; agora inclui srsCards/srsLog/srsDecks/srsCfg/
+      conversas/videos/clips. ⚠️ Djemeson: um clique em Configurações → Exportar agora vale
+      como backup de verdade.
+    - **Nova seção "Vídeo"** (`js/video.js`, LAZY): biblioteca de vídeos → player + transcript.
+      O ESTADO `videos[]`/`clips[]` vive em **core.js** (não-lazy) porque firebase.js os
+      sincroniza (docs `data/videos` e `data/clips`) — armadilha nº 1 respeitada. Legendas
+      ficam LOCAIS (IndexedDB `el-video-db`, stores `handles`+`subs`); o arquivo de vídeo
+      nunca sobe e o handle (File System Access) é lembrado entre sessões no Chrome/Edge.
+    - **O que funciona** (tudo verificado ao vivo):
+      · abrir vídeo local (picker com handle persistido + fallback `<input type=file>`);
+      · importar `.srt`/`.vtt` (parser tolerante: CRLF/BOM, tags `<i>`/`{\\an8}` removidas);
+      · transcript karaokê (fala corrente destacada + rolagem automática com toggle);
+      · fala clicável = seleção; estender ±fala, ajuste fino ±0,5s, loop A–B;
+      · **card com o áudio REAL da cena**: captureStream+MediaRecorder grava o trecho (toca
+        em tempo real), 1 chamada de chat analisa o sentido NA CENA, o exemplo do card É a
+        fala com `<b>`, e o áudio entra sob `audioKey(example_en CRU — com as tags <b>)`.
+        ⚠️ Descoberta da rodada: o pipeline INTEIRO (playSrsTTS/preGenerateAudio) chaveia o
+        áudio pelo texto COM tags — a chave "limpa" nunca seria encontrada.
+      · **"Preparar para assistir"**: cruza a legenda com words[] (stoplist EN + flexões
+        triviais), lista as desconhecidas por frequência, manda as marcadas para Revisar e
+        grava a **cobertura** (% conhecido) no vídeo — aparece na biblioteca;
+      · **marcadores** (tecla M ou botão) → lista com a fala da legenda → vira seleção;
+      · **tradução por fala** cacheada no cue, exibida BORRADA até o hover (recall);
+      · **"Rever a cena"** no verso do card de estudo (`card.clipId` → `reverCena()` no core
+        → video.js consome `_pendingClipPlay`); toca só o trecho e para no fim.
+    - **Bugs pegos na validação**: duração `Infinity` de webm do MediaRecorder persistida
+      (guard `isFinite`); "rever a cena" pedindo o arquivo mesmo com o File na memória
+      (vinha da view Preparar); hot-reload de módulo lazy com `let` top-level não re-executa
+      (limitação de teste, não do app).
+    - **Integrações mínimas fora do módulo**: `study.js` só ganhou o botão "Rever a cena";
+      sync ganhou 2 docs aditivos; `sw.js` serve video.js network-first como os outros lazy.
+    - Vídeo NÃO está na barra inferior do celular (decisão: notebook); 0 overflow nas 8 telas.
+      `CACHE`: `englab-v42` → **`englab-v43`**.
 
 ### Sessão 2026-08-01 (17ª rodada) — Estudo de escopo: vídeo + legendas (SEM código ainda)
 68. **Pedido**: analisar uma funcionalidade nova — adicionar vídeo (série/filme) com legenda,

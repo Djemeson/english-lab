@@ -1,7 +1,23 @@
 // ================================================================
 // STATE & STORAGE
 // ================================================================
-const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue', deletedWords: 'el-deleted-words', conversas: 'el-consulta-conversas' }
+const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue', deletedWords: 'el-deleted-words', conversas: 'el-consulta-conversas', videos: 'el-videos', clips: 'el-clips' }
+
+// ── VÍDEO (estado em core, como conversas): firebase.js sincroniza videos/
+//    clips e por isso eles NÃO podem morar no lazy video.js (armadilha nº 1).
+//    O arquivo de vídeo em si NUNCA entra aqui — só metadados (KBs).
+let videos = []   // [{id,title,source_type,lang,duration,coverage,markers[],created_at,updated_at}]
+let clips  = []   // [{id,videoId,start,end,text,wordId,created_at}]
+function loadVideos() { try { videos = JSON.parse(localStorage.getItem(SK.videos) || '[]') } catch { videos = [] } }
+function saveVideos() { localStorage.setItem(SK.videos, JSON.stringify(videos)) }
+function loadClips()  { try { clips = JSON.parse(localStorage.getItem(SK.clips) || '[]') } catch { clips = [] } }
+function saveClips()  { localStorage.setItem(SK.clips, JSON.stringify(clips)) }
+
+// "Rever a cena" a partir do estudo: study.js (lazy) não pode chamar funções
+// de video.js (lazy) — este handoff vive no core: guarda o clipe pedido e
+// navega; video.js consome _pendingClipPlay ao ativar a seção.
+let _pendingClipPlay = null
+function reverCena(clipId) { _pendingClipPlay = clipId; showSection('video') }
 
 function loadDeletedIds() { try { return new Set(JSON.parse(localStorage.getItem(SK.deletedWords) || '[]')) } catch { return new Set() } }
 function saveDeletedIds(ids) { localStorage.setItem(SK.deletedWords, JSON.stringify([...ids])) }
@@ -257,12 +273,12 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 // ================================================================
 // NAVIGATION
 // ================================================================
-const SECTIONS = ['dashboard','assistente','adicionar','revisar','estudar','biblioteca','configuracoes']
+const SECTIONS = ['dashboard','assistente','adicionar','revisar','estudar','biblioteca','video','configuracoes']
 // Lazy-load map: section → arquivo JS carregado só na 1ª visita
 // biblioteca usa funções de study.js (buildSrsFrente/Verso/MetaChips/fmtDays)
 // (assistente NÃO é lazy — js/consulta.js é carregado sempre, pois firebase.js
 //  precisa de `conversas`/render no sync.)
-const _LAZY = { adicionar: 'js/add.js', estudar: 'js/study.js', biblioteca: 'js/study.js' }
+const _LAZY = { adicionar: 'js/add.js', estudar: 'js/study.js', biblioteca: 'js/study.js', video: 'js/video.js' }
 const _loadedModules = new Set()
 
 function _loadScript(src) {
@@ -300,6 +316,7 @@ function _activateSection(name) {
   if (name === 'configuracoes') fillSettings()
   if (name === 'estudar') renderSrsSection()
   if (name === 'biblioteca') openBiblioteca()
+  if (name === 'video') { if (typeof renderVideoSection === 'function') renderVideoSection() }
 }
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))

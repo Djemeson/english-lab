@@ -8,6 +8,8 @@ async function initApp() {
   applyTheme(cfg.theme)   // aplica o tema (já restaurado, se preciso)
   loadWords()
   loadConversas()    // conversas do Assistente
+  loadVideos()       // metadados de vídeo (seção Vídeo — o módulo é lazy, o estado não)
+  loadClips()        // cortes de cena
   loadSrs()          // loads srsCfg, srsLog, decks
   await loadSrsAsync() // loads srsCards from IDB (migrates if needed)
   migrateLangFields()  // multi-idioma: words/cards antigos ganham lang:'en' (aditivo)
