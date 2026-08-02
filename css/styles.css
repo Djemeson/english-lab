@@ -3623,3 +3623,50 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .vid-sub-addons summary{font-size:var(--fs-xs);color:var(--text3);cursor:pointer}
 .vid-sub-addons p{font-size:var(--fs-2xs);color:var(--text3);margin:8px 0 6px}
 .vid-sub-addons textarea{width:100%;font-size:var(--fs-xs);margin-bottom:6px}
+
+/* ---- VIDEO: legenda em tempo real sobre o video ---- */
+.vid-stage{position:relative}
+.vid-ov{
+  position:absolute;left:0;right:0;bottom:64px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:0 24px;pointer-events:none;z-index:3;
+}
+.vid-ov-en,.vid-ov-pt{
+  display:inline-block;max-width:92%;
+  background:rgba(0,0,0,.68);color:#fff;
+  padding:4px 12px;border-radius:6px;
+  font-size:clamp(14px, 1.6vw, 21px);line-height:1.35;text-align:center;
+  text-shadow:0 1px 2px rgba(0,0,0,.8);
+}
+.vid-ov-pt{
+  font-size:clamp(12px, 1.25vw, 17px);
+  color:#ffd98a;background:rgba(0,0,0,.55);
+}
+
+/* Botao pt de cada fala do transcript (aparece no hover da linha) */
+.vid-cue-ptbtn{
+  border:1px solid var(--border);background:var(--surface2);color:var(--text3);
+  border-radius:var(--radius-xs);font-size:var(--fs-3xs);font-weight:700;
+  padding:1px 6px;cursor:pointer;flex-shrink:0;align-self:flex-start;margin-top:3px;
+  opacity:0;transition:opacity .12s ease;
+}
+.vid-cue:hover .vid-cue-ptbtn{opacity:1}
+.vid-cue-ptbtn:hover{color:var(--primary);border-color:rgba(var(--primary-rgb),.4)}
+
+/* ---- Estudo focado ---- */
+.vid-focus{border-left:3px solid var(--primary)}
+.vid-focus-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.vid-focus-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:var(--fs-3xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--primary);
+}
+.vid-focus-acts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.vid-focus-blind{
+  padding:14px;border:1px dashed var(--border-strong);border-radius:var(--radius-sm);
+  font-size:var(--fs-sm);color:var(--text2);text-align:center;font-style:italic;
+}
+.vid-focus-pt{
+  margin:2px 0 10px;padding:8px 12px;border-radius:var(--radius-sm);
+  background:var(--surface2);font-size:var(--fs-sm);color:var(--text2);font-style:italic;
+}

@@ -21,8 +21,13 @@ let _vidSelWords = new Set()    // índices das palavras marcadas na seleção
 let _vidLoop = false            // loop A–B
 let _vidPlayStop = null         // fim do trecho em reprodução
 let _vidAutoScroll = true
-let _vidShowPT = false          // mostrar traduções cacheadas (modo recall)
+let _vidShowPT = false          // mostrar TODAS as traduções no transcript
 let _vidCapturing = false
+let _vidOverlayOn = true        // legenda em tempo real sobre o vídeo
+let _vidLivePT = false          // tradução simultânea (legenda PT alinhada ou IA)
+let _vidCuesPT = []             // trilha PT-BR baixada dos addons (alinhada por tempo)
+let _vidFocus = null            // estudo focado de um trecho {ci,cj,revEN,revPT}
+let _vidSubsSaveTimer = null
 
 // ---- IndexedDB próprio: handles de arquivo + legendas ----
 const VideoDB = {
@@ -233,6 +238,8 @@ async function videoOpenPlayer(v) {
 
   const stored = await VideoDB.get('subs', v.id)
   _vidCues = (stored && stored.cues) || []
+  _vidCuesPT = (stored && stored.cuesPT) || []
+  _vidFocus = null
 
   if (_vidURL) { URL.revokeObjectURL(_vidURL); _vidURL = null }
   _vidURL = URL.createObjectURL(_vidFile)
@@ -248,13 +255,20 @@ async function videoOpenPlayer(v) {
   area.innerHTML = `
     <div class="vid-layout">
       <div class="vid-main">
-        <video id="vid-player" src="${_vidURL}" controls preload="metadata"></video>
+        <div class="vid-stage">
+          <video id="vid-player" src="${_vidURL}" controls preload="metadata"></video>
+          <div class="vid-ov" id="vid-ov">
+            <span class="vid-ov-en" id="vid-ov-en"></span>
+            <span class="vid-ov-pt" id="vid-ov-pt"></span>
+          </div>
+        </div>
         <div id="vid-audiofix-banner"></div>
         <div class="vid-toolbar">
           <span class="vid-title" data-tip="${escA(v.fileName)}">${esc(v.title)}</span>
           <span style="flex:1"></span>
           <button class="btn btn-ghost btn-sm" onclick="videoAddMarker()" data-tip="Marcar este momento para estudar depois (tecla M)">${ic('flame','ic-sm')}Marcar</button>
-          <button class="btn btn-ghost btn-sm ${_vidShowPT ? 'vid-on' : ''}" id="vid-pt-toggle" onclick="videoTogglePT()" data-tip="Mostrar traduções já geradas (ficam borradas até passar o mouse — recall)">PT</button>
+          <button class="btn btn-ghost btn-sm ${_vidOverlayOn ? 'vid-on' : ''}" id="vid-ov-toggle" onclick="videoToggleOverlay()" data-tip="Legenda sobre o vídeo, em tempo real">${ic('message','ic-sm')}Legenda</button>
+          <button class="btn btn-ghost btn-sm ${_vidLivePT ? 'vid-on' : ''}" id="vid-pt-toggle" onclick="videoToggleLivePT()" data-tip="Tradução SIMULTÂNEA: traduz cada fala enquanto o vídeo toca (IA, centavos por episódio) e mostra sob a legenda">PT ao vivo</button>
           <button class="btn btn-ghost btn-sm ${_vidAutoScroll ? 'vid-on' : ''}" id="vid-scroll-toggle" onclick="videoToggleScroll()" data-tip="Rolagem automática do transcript">${ic('arrowRight','ic-sm')}Seguir</button>
         </div>
         <div id="vid-sel-panel"></div>
@@ -351,17 +365,51 @@ function _vidOnTime() {
       elCue.classList.add('cur')
       if (_vidAutoScroll) elCue.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
+    // Tradução simultânea via IA: garante a fala atual + as 3 próximas
+    if (_vidLivePT) _vidEnsurePT(idx, 4)
   }
+  _vidUpdateOverlay()
 }
+
+// Legenda em tempo real sobre o vídeo (EN + PT quando ligado)
+function _vidUpdateOverlay() {
+  const en = el('vid-ov-en'), pt = el('vid-ov-pt')
+  if (!en || !pt) return
+  const cue = _vidCueIdx >= 0 ? _vidCues[_vidCueIdx] : null
+  const showEN = _vidOverlayOn && cue
+  en.textContent = showEN ? cue.t : ''
+  en.style.display = showEN ? '' : 'none'
+  const ptTxt = (showEN && _vidLivePT) ? _vidPTof(cue) : ''
+  pt.textContent = ptTxt
+  pt.style.display = ptTxt ? '' : 'none'
+}
+
+// Tradução de uma fala, na ordem de preferência:
+// pt (IA, pedida explicitamente) > pts (legenda PT-BR oficial alinhada)
+function _vidPTof(cue) { return (cue && (cue.pt || cue.pts)) || '' }
 
 function videoToggleScroll() {
   _vidAutoScroll = !_vidAutoScroll
   el('vid-scroll-toggle')?.classList.toggle('vid-on', _vidAutoScroll)
 }
-function videoTogglePT() {
-  _vidShowPT = !_vidShowPT
-  el('vid-pt-toggle')?.classList.toggle('vid-on', _vidShowPT)
+function videoToggleOverlay() {
+  _vidOverlayOn = !_vidOverlayOn
+  el('vid-ov-toggle')?.classList.toggle('vid-on', _vidOverlayOn)
+  _vidUpdateOverlay()
+}
+function videoToggleLivePT() {
+  if (!_vidCues.length) { toast('Importe ou busque a legenda primeiro', 'warning'); return }
+  _vidLivePT = !_vidLivePT
+  el('vid-pt-toggle')?.classList.toggle('vid-on', _vidLivePT)
+  if (_vidLivePT) {
+    const temTrilha = _vidCues.some(c => c.pts)
+    if (temTrilha) toast('Tradução simultânea ligada — usando a legenda PT-BR alinhada', 'success')
+    else if (cfg.openaiKey) { toast('Tradução simultânea ligada — traduzindo com IA enquanto toca (centavos por episódio)', 'info'); if (_vidCueIdx >= 0) _vidEnsurePT(_vidCueIdx, 4) }
+    else toast('Sem legenda PT nem chave OpenAI — busque a legenda PT em "Buscar legenda" ou configure a chave', 'warning')
+  }
+  _vidShowPT = _vidLivePT
   renderVidTranscript()
+  _vidUpdateOverlay()
 }
 
 // ================================================================
@@ -432,14 +480,32 @@ function renderVidTranscript() {
       </div>`
     return
   }
-  box.innerHTML = _vidCues.map((c, i) => `
+  box.innerHTML = _vidCues.map((c, i) => {
+    const pt = _vidPTof(c)
+    return `
     <div class="vid-cue${_vidSel && i >= _vidSel.ci && i <= _vidSel.cj ? ' insel' : ''}" data-i="${i}">
       <button class="vid-cue-time" onclick="videoPlayCue(${i})" data-tip="Tocar esta fala">${_vidFmtTime(c.s)}</button>
       <div class="vid-cue-body">
         <div class="vid-cue-text" onclick="videoSelectCue(${i})">${esc(c.t)}</div>
-        ${c.pt ? `<div class="vid-cue-pt${_vidShowPT ? '' : ' hid'}">${esc(c.pt)}</div>` : ''}
+        <div class="vid-cue-pt${_vidShowPT || c._rev ? '' : ' hid'}" id="vid-cue-pt-${i}">${esc(pt)}</div>
       </div>
-    </div>`).join('')
+      <button class="vid-cue-ptbtn" onclick="videoCuePT(${i})" data-tip="Traduzir esta fala">pt</button>
+    </div>`}).join('')
+}
+
+// Tradução de UMA fala do transcript: usa a trilha PT alinhada se houver;
+// senão traduz com IA. Revela só a linha pedida (as outras seguem no recall).
+async function videoCuePT(i) {
+  const c = _vidCues[i]; if (!c) return
+  if (!_vidPTof(c)) {
+    if (!cfg.openaiKey) { toast('Sem legenda PT alinhada nem chave OpenAI', 'warning'); return }
+    const row = el('vid-cue-pt-' + i)
+    if (row) { row.classList.remove('hid'); row.textContent = '…' }
+    try { await _vidEnsurePT(i, 1, true) } catch (e) { toast('Erro ao traduzir: ' + e.message, 'error'); return }
+  }
+  c._rev = true
+  const row = el('vid-cue-pt-' + i)
+  if (row) { row.textContent = _vidPTof(c); row.classList.remove('hid') }
 }
 
 // Toca só o intervalo de uma fala
@@ -454,6 +520,7 @@ function videoPlayCue(i) {
 // Clique na fala = vira a seleção de estudo
 function videoSelectCue(i) {
   const c = _vidCues[i]; if (!c) return
+  _vidFocus = null                    // sai do estudo focado, se estava nele
   _vidSel = { ci: i, cj: i, s: c.s, e: c.e }
   _vidSelWords = new Set()
   renderVidTranscript()
@@ -470,6 +537,7 @@ function _vidSelText() {
 
 function renderVidSelPanel() {
   const panel = el('vid-sel-panel'); if (!panel) return
+  if (_vidFocus) { _vidRenderFocus(panel); return }
   if (!_vidSel) {
     panel.innerHTML = `<div class="vid-sel-hint">Clique numa fala do transcript para escolher o trecho de estudo.</div>`
     return
@@ -495,7 +563,8 @@ function renderVidSelPanel() {
         </div>
         <button class="btn btn-ghost btn-sm" onclick="videoPlaySel()">${ic('play','ic-sm')}Ouvir</button>
         <button class="btn btn-ghost btn-sm ${_vidLoop ? 'vid-on' : ''}" onclick="videoToggleLoop()" data-tip="Repetir o trecho em loop">${ic('refresh','ic-sm')}Loop</button>
-        <button class="btn btn-ghost btn-sm" onclick="videoTranslateSel()" data-tip="Traduzir esta(s) fala(s) — fica no transcript, borrada, para treino de recall">PT</button>
+        <button class="btn btn-ghost btn-sm" onclick="videoTranslateSel()" data-tip="Traduzir esta(s) fala(s) — aparece no transcript">PT</button>
+        <button class="btn btn-secondary btn-sm" onclick="videoFocusStart(_vidSel.ci,_vidSel.cj)" data-tip="Estudo focado: escuta às cegas, revela a fala, revela a tradução, salva palavras">${ic('target','ic-sm')}Estudo focado</button>
       </div>
       <div class="vid-sel-words">${words.map((w, i) =>
         `<span class="vid-word${_vidSelWords.has(i) ? ' on' : ''}" onclick="videoToggleWord(${i})">${esc(w)}</span>`).join(' ')}
@@ -544,22 +613,21 @@ function _vidTargetPhrase() {
     .join(' ').replace(/[^\p{L}\p{N}' -]/gu, '').trim()
 }
 
-// ---- Tradução da fala (idea "dupla legenda com recall") ----
+// ---- Tradução do trecho selecionado (legenda PT alinhada > IA) ----
 async function videoTranslateSel() {
   if (!_vidSel) return
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
   try {
+    let precisouIA = false
     for (let i = _vidSel.ci; i <= _vidSel.cj; i++) {
-      if (_vidCues[i].pt) continue
-      const pt = await aiText([
-        { role: 'system', content: 'Traduza a fala de série/filme para português do Brasil, natural e curta. Responda SÓ a tradução.' },
-        { role: 'user', content: _vidCues[i].t }
-      ], { maxTokens: 200 })
-      _vidCues[i].pt = pt
+      if (!_vidPTof(_vidCues[i])) precisouIA = true
+      _vidCues[i]._rev = true
     }
-    await VideoDB.set('subs', _vidCur.id, { cues: _vidCues })
+    if (precisouIA) {
+      if (!cfg.openaiKey) { toast('Sem legenda PT alinhada — configure a chave OpenAI ou busque a legenda PT', 'warning'); return }
+      await _vidEnsurePT(_vidSel.ci, _vidSel.cj - _vidSel.ci + 1, true)
+    }
     renderVidTranscript()
-    toast('Tradução salva no transcript (borrada — passe o mouse para revelar)', 'success')
+    toast('Tradução no transcript (borrada — passe o mouse para revelar)', 'success')
   } catch (e) { toast('Erro ao traduzir: ' + e.message, 'error') }
 }
 
@@ -685,7 +753,8 @@ Responda:
     saveSrsCards(); autoSyncAfterChange()
 
     toast(`"${alvo}" salvo no estudo com o áudio da cena`, 'success')
-    _vidSel = null; _vidSelWords = new Set()
+    _vidSelWords = new Set()
+    if (!_vidFocus) { _vidSel = null }   // no estudo focado, o trecho continua aberto
     renderVidTranscript(); renderVidSelPanel()
   } catch (e) {
     toast('Erro ao criar o card: ' + e.message, 'error')
@@ -722,6 +791,7 @@ function renderVidMarkers() {
         return `<div class="vid-marker-row">
           <button class="vid-cue-time" onclick="videoSeekMarker(${t})">${_vidFmtTime(t)}</button>
           <span class="vid-marker-text" ${cue ? `onclick="videoSelectCue(${_vidCues.indexOf(cue)})" style="cursor:pointer"` : ''}>${cue ? esc(cue.t) : '(sem fala na legenda neste ponto)'}</span>
+          ${cue ? `<button class="btn btn-ghost btn-sm" onclick="videoFocusFromMarker(${t})" data-tip="Estudo focado deste trecho">${ic('target','ic-sm')}estudar</button>` : ''}
           <button class="vid-marker-del" onclick="videoDelMarker(${i})" aria-label="Remover">${ic('x','ic-sm')}</button>
         </div>`
       }).join('')}
@@ -1045,7 +1115,9 @@ let _vidSubState = null
 function videoSubSearchOpen() {
   if (!_vidCur) return
   const guess = _vidGuessEpisode(_vidCur.fileName)
-  _vidSubState = { passo: 'busca', resultados: [], meta: null, temporada: guess ? guess.s : 1, episodio: guess ? guess.e : 1, subs: [], hash: null }
+  // auto: com título limpo + SxxExx do nome do arquivo, vai DIRETO para a
+  // lista de legendas — sem escolher série, sem confirmar episódio.
+  _vidSubState = { passo: 'busca', resultados: [], meta: null, temporada: guess ? guess.s : 1, episodio: guess ? guess.e : 1, subs: [], hash: null, auto: true, temGuess: !!guess }
   let overlay = el('vid-sub-modal')
   if (!overlay) {
     overlay = document.createElement('div')
@@ -1127,7 +1199,22 @@ async function videoSubSearch(query) {
       .map(m => ({ id: m.imdb_id || m.id, name: m.name, year: (m.releaseInfo || '').slice(0, 4), type: m.type }))
       .filter(m => /^tt/.test(m.id)).slice(0, 8)
   } catch (e) { st.resultados = []; toast('Busca falhou: ' + e.message, 'error') }
-  st.buscando = false; _vidSubRender()
+  st.buscando = false
+
+  // Correspondência automática: se o 1º resultado tem o MESMO nome do que
+  // buscamos (normalizado), não há o que perguntar — segue direto.
+  if (st.auto) {
+    st.auto = false
+    const norm = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+    const alvo = norm(query)
+    const top = st.resultados[0]
+    if (top && norm(top.name) === alvo && (top.type === 'movie' || st.temGuess)) {
+      st.meta = top
+      videoSubListLoad(st.temporada, st.episodio)
+      return
+    }
+  }
+  _vidSubRender()
 }
 
 function videoSubPick(i) {
@@ -1192,6 +1279,9 @@ async function videoSubDownload(i, btnEl) {
     if (!cues.length) throw new Error('arquivo não parece uma legenda válida')
     await _vidApplyCues(cues, `online (${VID_LANGS[sub.lang] || sub.lang})`)
     videoSubSearchClose()
+    // Se a legenda aplicada NÃO é PT, busca a PT-BR do mesmo episódio em
+    // background e alinha — é ela que alimenta o "PT ao vivo" de graça.
+    if (sub.lang !== 'pob' && sub.lang !== 'por') _vidAutoFetchPT()
   } catch (e) {
     toast('Falha ao baixar a legenda: ' + e.message, 'error')
     _vidSubRender()
@@ -1220,10 +1310,178 @@ function _vidFixMojibake(txt) {
 // Caminho único de gravação de legenda (arquivo local e busca online)
 async function _vidApplyCues(cues, origem) {
   _vidCues = cues
-  await VideoDB.set('subs', _vidCur.id, { cues })
+  if (_vidCuesPT.length) _vidAlignPTTrack()   // realinha a trilha PT à legenda nova
+  _vidSaveSubs()
   _vidCur.cueCount = cues.length; _vidCur.updated_at = new Date().toISOString()
   saveVideos(); autoSyncAfterChange()
   renderVidTranscript()
+  _vidUpdateOverlay()
   const cc = el('vid-cue-count'); if (cc) cc.textContent = cues.length + ' falas'
   toast(`Legenda ${origem}: ${cues.length} falas`, 'success')
+}
+
+// ================================================================
+// TRILHA PT ALINHADA + TRADUÇÃO SIMULTÂNEA
+// A tradução "de graça" vem da PRÓPRIA legenda PT-BR do episódio,
+// baixada dos addons e alinhada por tempo (cue.pts). A IA (cue.pt) é a
+// camada adicional: tempo real com a chave OpenAI, só onde faltar.
+// ================================================================
+
+// Alinha a trilha PT às falas EN pelo ponto médio de cada fala.
+function _vidAlignPTTrack() {
+  if (!_vidCues.length || !_vidCuesPT.length) return 0
+  let j = 0, alinhadas = 0
+  for (const c of _vidCues) {
+    const mid = (c.s + c.e) / 2
+    while (j < _vidCuesPT.length - 1 && _vidCuesPT[j].e < mid - 1.2) j++
+    // candidato atual ou o próximo — fica com o que cobrir/estiver mais perto
+    const cand = [_vidCuesPT[j], _vidCuesPT[j + 1]].filter(Boolean)
+    let melhor = null, melhorDist = 1.2
+    for (const p of cand) {
+      const dist = (mid >= p.s && mid <= p.e) ? 0 : Math.min(Math.abs(p.s - mid), Math.abs(p.e - mid))
+      if (dist < melhorDist) { melhor = p; melhorDist = dist }
+    }
+    if (melhor) { c.pts = melhor.t; alinhadas++ }
+  }
+  return alinhadas
+}
+
+// Salva as legendas no IDB (debounced; limpa campos transitórios como _rev)
+function _vidSaveSubs() {
+  clearTimeout(_vidSubsSaveTimer)
+  _vidSubsSaveTimer = setTimeout(() => {
+    if (!_vidCur) return
+    const limpa = c => { const o = { s: c.s, e: c.e, t: c.t }; if (c.pt) o.pt = c.pt; if (c.pts) o.pts = c.pts; return o }
+    VideoDB.set('subs', _vidCur.id, { cues: _vidCues.map(limpa), cuesPT: _vidCuesPT.map(c => ({ s: c.s, e: c.e, t: c.t })) })
+  }, 1500)
+}
+
+// Garante tradução IA das falas [i .. i+n). `sinc` espera terminar.
+async function _vidEnsurePT(i, n, sinc) {
+  if (!cfg.openaiKey) return
+  const tarefas = []
+  for (let k = i; k < Math.min(i + n, _vidCues.length); k++) {
+    const c = _vidCues[k]
+    if (!c || c.pt || c.pts || c._ptReq) continue
+    c._ptReq = true
+    const p = aiText([
+      { role: 'system', content: 'Traduza a fala de série/filme para português do Brasil, natural e curta. Responda SÓ a tradução.' },
+      { role: 'user', content: c.t }
+    ], { maxTokens: 200 }).then(pt => {
+      c.pt = pt; delete c._ptReq
+      // atualiza a linha do transcript e o overlay se for a fala corrente
+      const row = el('vid-cue-pt-' + k)
+      if (row) row.textContent = pt
+      if (k === _vidCueIdx) _vidUpdateOverlay()
+      _vidSaveSubs()
+    }).catch(e => { delete c._ptReq; console.warn('[video] PT:', e.message) })
+    tarefas.push(p)
+  }
+  if (sinc) await Promise.all(tarefas)
+}
+
+// Depois de aplicar uma legenda EN, procura a PT-BR do MESMO episódio na
+// lista já consultada e alinha em background — tradução oficial, custo zero.
+async function _vidAutoFetchPT() {
+  const st = _vidSubState
+  if (!st || !st.subs) return
+  const alvo = st.subs.find(s => s.lang === 'pob') || st.subs.find(s => s.lang === 'por')
+  if (!alvo) return
+  try {
+    const r = await fetch(alvo.url)
+    if (!r.ok) return
+    const buf = await r.arrayBuffer()
+    const u8 = new TextDecoder('utf-8').decode(buf)
+    const w12 = new TextDecoder('windows-1252').decode(buf)
+    const ruimU8 = (u8.match(/�/g) || []).length
+    const ruimW12 = (w12.match(/Ã[©ªµ£§¡³]|â[€™"]|Â./g) || []).length
+    const txt = _vidFixMojibake(ruimU8 <= ruimW12 ? u8 : w12)
+    const cues = parseSubtitle(txt)
+    if (!cues.length) return
+    _vidCuesPT = cues
+    const n = _vidAlignPTTrack()
+    _vidSaveSubs()
+    renderVidTranscript()
+    _vidUpdateOverlay()
+    toast(`Legenda PT-BR alinhada automaticamente (${n} falas) — "PT ao vivo" usa ela de graça`, 'success')
+  } catch (e) { console.warn('[video] auto-PT:', e.message) }
+}
+
+// ================================================================
+// ESTUDO FOCADO — um trecho, quatro passos: ouvir às cegas → revelar a
+// fala → revelar a tradução → salvar palavras (com o áudio real).
+// Entra pela seleção ("Estudo focado") ou por um marcador ("estudar").
+// ================================================================
+function videoFocusStart(ci, cj) {
+  if (ci == null || !_vidCues[ci]) return
+  _vidFocus = { ci, cj: cj != null ? cj : ci, revEN: false, revPT: false }
+  _vidSel = { ci: _vidFocus.ci, cj: _vidFocus.cj, s: _vidCues[_vidFocus.ci].s, e: _vidCues[_vidFocus.cj].e }
+  _vidSelWords = new Set()
+  renderVidTranscript()
+  renderVidSelPanel()
+  videoPlaySel()
+  el('vid-sel-panel')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+}
+function videoFocusFromMarker(t) {
+  const i = _vidCues.findIndex(c => t >= c.s - 1 && t <= c.e + 1)
+  if (i < 0) { toast('Sem fala na legenda neste ponto', 'warning'); return }
+  videoFocusStart(i, i)
+}
+function videoFocusStop() {
+  _vidFocus = null
+  const p = el('vid-player'); if (p) { p.playbackRate = 1; p.pause() }
+  _vidLoop = false
+  renderVidSelPanel()
+}
+function videoFocusSpeed() {
+  const p = el('vid-player'); if (!p) return
+  p.playbackRate = p.playbackRate === 1 ? 0.75 : 1
+  renderVidSelPanel()
+}
+function videoFocusRevealEN() { if (_vidFocus) { _vidFocus.revEN = true; renderVidSelPanel() } }
+async function videoFocusRevealPT() {
+  if (!_vidFocus) return
+  const falta = []
+  for (let i = _vidFocus.ci; i <= _vidFocus.cj; i++) if (!_vidPTof(_vidCues[i])) falta.push(i)
+  if (falta.length) {
+    if (!cfg.openaiKey) { toast('Sem legenda PT alinhada nem chave OpenAI', 'warning'); return }
+    await _vidEnsurePT(_vidFocus.ci, _vidFocus.cj - _vidFocus.ci + 1, true)
+  }
+  _vidFocus.revPT = true
+  renderVidSelPanel()
+}
+
+function _vidRenderFocus(panel) {
+  const f = _vidFocus
+  const p = el('vid-player')
+  const dur = (_vidSel.e - _vidSel.s).toFixed(1)
+  const words = _vidSelText().split(/\s+/)
+  const alvo = _vidTargetPhrase()
+  const ptTexto = _vidCues.slice(f.ci, f.cj + 1).map(c => _vidPTof(c)).filter(Boolean).join(' ')
+  panel.innerHTML = `
+    <div class="vid-sel vid-focus">
+      <div class="vid-focus-head">
+        <span class="vid-focus-badge">${ic('target','ic-sm')}Estudo focado</span>
+        <span class="vid-sel-time">${_vidFmtTime(_vidSel.s)} → ${_vidFmtTime(_vidSel.e)} <i>(${dur}s)</i></span>
+        <span style="flex:1"></span>
+        <button class="vid-fix-close" onclick="videoFocusStop()" aria-label="Sair">${ic('x','ic-sm')}</button>
+      </div>
+      <div class="vid-focus-acts">
+        <button class="btn btn-primary btn-sm" onclick="videoPlaySel()">${ic('play','ic-sm')}Ouvir de novo</button>
+        <button class="btn btn-ghost btn-sm ${p && p.playbackRate !== 1 ? 'vid-on' : ''}" onclick="videoFocusSpeed()" data-tip="Alternar velocidade">${p && p.playbackRate !== 1 ? '0.75×' : '1×'}</button>
+        <button class="btn btn-ghost btn-sm ${_vidLoop ? 'vid-on' : ''}" onclick="videoToggleLoop()">${ic('refresh','ic-sm')}Loop</button>
+        ${!f.revEN ? `<button class="btn btn-secondary btn-sm" onclick="videoFocusRevealEN()">${ic('eye','ic-sm')}Mostrar a fala</button>` : ''}
+        ${f.revEN && !f.revPT ? `<button class="btn btn-secondary btn-sm" onclick="videoFocusRevealPT()">${ic('eye','ic-sm')}Mostrar a tradução</button>` : ''}
+      </div>
+      ${f.revEN ? `
+        <div class="vid-sel-words">${words.map((w, i) =>
+          `<span class="vid-word${_vidSelWords.has(i) ? ' on' : ''}" onclick="videoToggleWord(${i})">${esc(w)}</span>`).join(' ')}</div>
+        ${f.revPT ? `<div class="vid-focus-pt">${esc(ptTexto || '—')}</div>` : ''}
+        <div class="vid-sel-row2">
+          <span class="vid-sel-alvo">${alvo ? `Alvo: <b>${esc(alvo)}</b>` : 'Clique na(s) palavra(s) que quer estudar'}</span>
+          <button class="btn btn-primary btn-sm" id="vid-card-btn" ${alvo && !_vidCapturing ? '' : 'disabled'} onclick="videoCreateCard()">
+            ${ic('zap','ic-sm')}Salvar no estudo com áudio da cena</button>
+        </div>` : `
+        <div class="vid-focus-blind">Ouça sem ler. Entendeu? Tente repetir. Depois revele a fala.</div>`}
+    </div>`
 }

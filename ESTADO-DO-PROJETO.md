@@ -3,7 +3,14 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-02 — **Legendas via addons do Stremio + conserto de áudio Dolby
+> Última atualização: 2026-08-02 — **Player de verdade (20ª rodada)**: legenda em tempo real
+> sobre o vídeo, tradução simultânea em camadas (legenda PT-BR oficial alinhada por tempo —
+> 614/769 falas no teste real — com IA como camada adicional), busca de legenda sem fricção
+> (direto para a lista do episódio) e ESTUDO FOCADO por trecho (escuta às cegas → revelar fala
+> → revelar tradução → salvar card com áudio real), acessível da seleção e dos marcadores.
+> Ver seção 8 (20ª rodada).
+>
+> Última atualização anterior: 2026-08-02 — **Legendas via addons do Stremio + conserto de áudio Dolby
 > (19ª rodada)**: botão "Buscar legenda" (protocolo aberto dos addons, com CORS — a função
 > serverless ficou desnecessária; validado com 40 legendas reais de House of the Dragon S03E02)
 > e "Consertar áudio" para MKV com Dolby/DTS mudo no Chrome (ffmpeg.wasm hospedado no próprio
@@ -317,6 +324,38 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-02 (20ª rodada) — Player de verdade: legenda no vídeo, PT simultâneo e estudo focado
+71. **Feedback do Djemeson em 4 pontos** (+1 mensagem no meio da rodada), tudo construído:
+    - **Busca de legenda SEM fricção**: com título limpo + SxxExx detectados do nome do
+      arquivo, "Buscar legenda" vai DIRETO para a lista do episódio (auto-pick quando o 1º
+      resultado do Cinemeta bate com o nome normalizado) — sem escolher série, sem confirmar
+      episódio. Limite honesto documentado: o protocolo dos addons NÃO devolve o nome do
+      release de cada legenda; a correspondência exata vem do moviehash na consulta.
+    - **Legenda em TEMPO REAL sobre o vídeo** (`.vid-stage` + overlay): a fala corrente
+      aparece sobre o vídeo (toggle "Legenda"), estilo player de verdade.
+    - **Tradução simultânea em camadas** (pedido da mensagem do meio): ao aplicar uma legenda
+      EN, o app busca sozinho a legenda **PT-BR do mesmo episódio** nos addons e alinha por
+      tempo (`cue.pts`, ponto médio ±1,2s) — tradução OFICIAL, custo zero. Validado com dados
+      reais: **614 de 769 falas alinhadas** ("What have you done?" → "O que você fez?").
+      A IA (`cue.pt`) é a camada ADICIONAL: "PT ao vivo" traduz com a chave OpenAI as falas
+      que não têm trilha (lookahead corrente+3), centavos por episódio. Preferência de
+      exibição: pt (IA explícita) > pts (oficial).
+    - **Tradução no transcript e no trecho**: botão `pt` por fala (hover; revela a alinhada ou
+      traduz via IA) e o botão PT do painel de seleção agora usa a trilha alinhada primeiro.
+      O antigo toggle "PT" (que parecia morto quando não havia tradução nenhuma) virou
+      **"PT ao vivo"** com feedback claro em todos os estados.
+    - **ESTUDO FOCADO** (o que o Djemeson esperava do marcador): trecho → escuta às cegas
+      ("Ouça sem ler...") → **Mostrar a fala** (palavras clicáveis) → **Mostrar a tradução**
+      (alinhada ou IA) → salvar card com áudio real — com Ouvir de novo, 0.75×, loop.
+      Entradas: botão "Estudo focado" no painel de seleção e botão "estudar" em cada marcador.
+      Salvar card no modo focado NÃO fecha o trecho.
+    - Persistência: `subs` no IDB agora guarda `{cues (com pt/pts), cuesPT}`, com save
+      debounced e limpeza de campos transitórios. `CACHE`: `v44` → **`v45`**.
+    - Validado ao vivo com o episódio real: 1 clique → 40 legendas de HotD S03E02, EN aplicada,
+      PT-BR alinhada em background, overlay com as duas linhas, foco completo (cego → fala →
+      tradução → 4 palavras clicáveis), botão pt por fala, marcador → foco, persistência
+      conferida no IDB, 0 erros de console.
 
 ### Sessão 2026-08-02 (19ª rodada) — Legenda via addons do Stremio + conserto de áudio Dolby
 70. **Dois pedidos**: "o Stremio tem addons de legendas — não seria possível aceitar esses
