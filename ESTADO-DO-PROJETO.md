@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-01 — **Estudar no celular (16ª rodada)**: a página rolava 63px
+> Última atualização: 2026-08-01 — **Estudo de escopo VÍDEO (17ª rodada)**: análise completa da
+> funcionalidade de estudar com vídeo + legenda está em [`PLANO-VIDEO.md`](./PLANO-VIDEO.md)
+> (viabilidade das 4 ideias do Djemeson, arquitetura, custos, fases, ideias extras). SEM código
+> ainda — aguardando as decisões da seção 9 do plano. Ver seção 8 (17ª rodada).
+>
+> Última atualização anterior: 2026-08-01 — **Estudar no celular (16ª rodada)**: a página rolava 63px
 > para o lado a 375px. Causas: `repeat(3,1fr)` que não encolhe (`1fr` = `minmax(auto,1fr)`) e a
 > tabela de baralhos empurrando a página em vez de rolar dentro do cartão. Agora: 0 de scroll
 > horizontal nas 7 telas a 320px e 375px. Ver seção 8 (16ª rodada).
@@ -299,6 +304,29 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-01 (17ª rodada) — Estudo de escopo: vídeo + legendas (SEM código ainda)
+68. **Pedido**: analisar uma funcionalidade nova — adicionar vídeo (série/filme) com legenda,
+    criar legenda do zero, buscador automático de legenda, quebrar o vídeo em pedaços e levar
+    cortes exatos para o estudo — "vá muito além do que eu disse".
+    - **Entrega: [`PLANO-VIDEO.md`](./PLANO-VIDEO.md)** — análise completa de viabilidade,
+      arquitetura proposta, custos, 4 fases e ideias complementares. Resumo das conclusões:
+      · As 4 coisas pedidas são viáveis NO NAVEGADOR. Princípio estrutural: **o vídeo nunca
+        sobe para o Firebase** (300 MB–2 GB × limite de 1 MB/doc) — sincronizam legenda,
+        clipes `{início,fim}` e áudios pequenos dos cortes (mecanismo de sync de áudio já
+        existe). O Djemeson confirmou: o vídeo é descartável depois da extração.
+      · Cortes = **virtuais** (`currentTime`), sem processar nada; a legenda é o picotador.
+      · Arma secreta: card SRS com o **áudio real da cena** (captureStream + MediaRecorder)
+        no lugar do TTS.
+      · Ideia de maior valor/esforço: **"Preparar para assistir"** — cruza a legenda inteira
+        com `words[]` e apresenta as palavras desconhecidas ANTES do episódio.
+      · Busca automática de legenda exige 1 função serverless na própria Vercel (CORS);
+        alternativa zero-infra é semi-manual.
+      · Whisper de episódio inteiro é o único ponto pesado no browser (ffmpeg.wasm);
+        é o argumento real para um futuro app desktop (Tauri com o MESMO código web,
+        sync de graça) — decisão adiada, navegador primeiro.
+    - **Aguardando as respostas da seção 9 do plano** (fontes de vídeo, aparelhos, serverless
+      sim/não, ordem do MVP) antes de escrever qualquer código.
 
 ### Sessão 2026-08-01 (16ª rodada) — Estudar parava de transbordar no celular
 67. **Pedido**: corrigir o transbordo horizontal que eu tinha achado (e confirmado na versão
