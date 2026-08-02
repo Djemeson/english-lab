@@ -173,7 +173,7 @@
 |---|---|---|---|
 | **1 (MVP)** ✅ **FEITA em 2026-08-01** | Nova seção "Vídeo": abrir vídeo local + importar .srt/.vtt + transcript clicável (karaokê) + cortes virtuais com A–B + card com áudio REAL da cena + "Preparar para assistir" + marcadores (tecla M) + tradução por fala com recall + "rever a cena" no estudo + cobertura por vídeo | `video.js` lazy, parser SRT, captureStream, cruzamento com `words[]` | feita |
 | **2** | Editor/ajuste de legenda (offset ±, editar cue, "marcar agora") + dupla legenda PT com recall + marcadores durante a exibição | editor de cues, tradução em lote cacheada | ~1 sessão |
-| **3** | Transcrição Whisper de episódio inteiro (ffmpeg.wasm) + busca automática de legenda (função Vercel + moviehash) | ffmpeg.wasm, `api/subs.js` | ~1 sessão |
+| **3** | ✅ **Busca de legenda FEITA em 2026-08-01 — e SEM serverless**: o protocolo de addons do Stremio (aberto, com CORS porque o Stremio Web roda em navegador) substituiu a função Vercel. Cinemeta busca o título → addon devolve as legendas → download direto. Addons customizáveis (qualquer addon de legendas do Stremio cola). O moviehash entra na consulta. O ffmpeg.wasm também já está no projeto (hospedado em `js/vendor/ffmpeg/`) — usado pelo "consertar áudio"; Whisper de episódio inteiro (fase futura) já tem a fundação pronta. | addons Stremio, ffmpeg.wasm local | feita |
 | **4 (opcional)** | Ditado, shadowing, cloze da cena, exportar corte físico | Whisper por tentativa, ffmpeg | conforme uso |
 
 ---

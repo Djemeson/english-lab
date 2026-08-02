@@ -3,7 +3,14 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-01 — **FASE 1 DO VÍDEO NO AR (18ª rodada)**: nova seção "Vídeo"
+> Última atualização: 2026-08-02 — **Legendas via addons do Stremio + conserto de áudio Dolby
+> (19ª rodada)**: botão "Buscar legenda" (protocolo aberto dos addons, com CORS — a função
+> serverless ficou desnecessária; validado com 40 legendas reais de House of the Dragon S03E02)
+> e "Consertar áudio" para MKV com Dolby/DTS mudo no Chrome (ffmpeg.wasm hospedado no próprio
+> site, WORKERFS, m4a no IndexedDB + <audio> paralelo sincronizado).
+> Ver seção 8 (19ª rodada).
+>
+> Última atualização anterior: 2026-08-01 — **FASE 1 DO VÍDEO NO AR (18ª rodada)**: nova seção "Vídeo"
 > (lazy) com player + transcript karaokê + cortes A–B + card com o ÁUDIO REAL da cena +
 > "Preparar para assistir" + marcadores + tradução com recall + "rever a cena" no estudo.
 > Backup: tag git `pre-video-fase1` e Exportar JSON virou backup completo.
@@ -310,6 +317,39 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-02 (19ª rodada) — Legenda via addons do Stremio + conserto de áudio Dolby
+70. **Dois pedidos**: "o Stremio tem addons de legendas — não seria possível aceitar esses
+    addons?" e "esse episódio veio sem áudio, faça funcionar:
+    House.of.the.Dragon.S03E02...x265-MeGusta.mkv".
+    - **Addons do Stremio: SIM, e melhor que o plano original.** O protocolo é aberto
+      (`/manifest.json` + `/subtitles/{tipo}/{imdbId}.json`) e **tem CORS** (o Stremio Web roda
+      em navegador) — a função serverless da fase 3 ficou DESNECESSÁRIA. Novo botão
+      **"Buscar legenda"** no player: busca o título no Cinemeta (catálogo público), detecta
+      SxxExx do nome do arquivo, consulta os addons (OpenSubtitles v3 por padrão + campo para
+      colar QUALQUER addon de legendas do Stremio, sincronizado em `cfg.subAddons`), calcula o
+      **moviehash** do arquivo (BigInt, primeiros/últimos 64 KB) para o addon priorizar a
+      legenda certa, baixa e aplica. **Validado com dados reais ao vivo**: "House of the
+      Dragon" achado no Cinemeta, **40 legendas do S03E02**, 769 falas importadas.
+    - **Encoding na base da evidência**: além do UTF-8×1252 (menos lixo vence), as legendas
+      chegam às vezes **duplamente encodadas DA ORIGEM** (bytes UTF-8 soletrando "â™ª") —
+      `_vidFixMojibake()` reverte via tabela windows-1252 e mantém o original se piorar.
+      Selo "sincronia exata" foi REMOVIDO: a resposta do addon não diz quais bateram no hash.
+    - **MKV sem áudio (o caso MeGusta)**: áudio Dolby/DTS (EAC3) toca MUDO no Chrome (codec
+      sem licença). Solução: **ffmpeg.wasm hospedado no PRÓPRIO site** (`js/vendor/ffmpeg/`,
+      ~31 MB — CDN não funciona: o worker do ffmpeg tem imports relativos que quebram
+      cross-origin, TESTADO e travou). Detector automático (`webkitAudioDecodedByteCount === 0`
+      após 1,5s tocando) mostra o banner "Consertar áudio": monta o arquivo via **WORKERFS**
+      (leitura sob demanda — um MKV de 2 GB NÃO passa pela heap do wasm), extrai a faixa
+      (`-vn -c:a aac 128k`), salva o m4a no IndexedDB (store `media`, v2 do `el-video-db`) e
+      toca num `<audio>` paralelo sincronizado ao vídeo mudo (deriva medida: 10–20ms; correção
+      automática acima de 300ms). Feito 1×, fica salvo. `captureClipAudio` captura do áudio
+      consertado quando ele existe — cards com áudio real continuam funcionando.
+    - **sw.js**: cache SEPARADO e permanente `englab-ffmpeg-v1` (31 MB não podem ser reapagados
+      a cada versão do shell) + `strem.io` em NETWORK_ONLY. `CACHE`: `v43` → **`v44`**.
+    - Validado ao vivo: fluxo completo de legenda com episódio real, conversão de áudio
+      integrada (banner → progresso → chip "áudio consertado"), reanexação automática ao
+      reabrir, sincronização, 0 erros nas 8 telas.
 
 ### Sessão 2026-08-01 (18ª rodada) — FASE 1 DO VÍDEO implementada (seção nova + 6 ideias)
 69. **Pedido**: "faça você um backup e logo depois execute a fase 1" + "implemente as ideias

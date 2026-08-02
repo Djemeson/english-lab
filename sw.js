@@ -4,7 +4,10 @@
 // Firebase e OpenAI ficam sempre na rede.
 // ================================================================
 
-const CACHE = 'englab-v43'
+const CACHE = 'englab-v44'
+// Cache separado e PERMANENTE para o ffmpeg.wasm (31 MB): não pode ser
+// apagado a cada versão do shell, senão cada deploy custaria 31 MB de novo.
+const CACHE_FFMPEG = 'englab-ffmpeg-v1'
 
 // Assets que nunca mudam entre visitas (shell da app).
 // RELATIVOS de propósito: resolvidos contra o scope do SW, então funcionam tanto
@@ -35,6 +38,7 @@ const NETWORK_ONLY = [
   'api.openai.com',
   'gistusercontent.com',
   'api.github.com',
+  'strem.io',            // busca de legendas (resultados mudam; não cachear)
 ]
 
 // ── Install: pré-cacheia o shell ────────────────────────────────
@@ -52,7 +56,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE && k !== CACHE_FFMPEG).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   )
 })
@@ -66,6 +70,21 @@ self.addEventListener('fetch', e => {
 
   // Apenas GET é cacheado
   if (e.request.method !== 'GET') return
+
+  // ffmpeg.wasm: cache-first SEM revalidação em background (31 MB imutáveis —
+  // o stale-while-revalidate do shell rebaixaria cada visita a um download).
+  if (url.includes('/js/vendor/ffmpeg/')) {
+    e.respondWith(
+      caches.open(CACHE_FFMPEG).then(async cache => {
+        const hit = await cache.match(e.request)
+        if (hit) return hit
+        const r = await fetch(e.request)
+        if (r.ok) cache.put(e.request, r.clone())
+        return r
+      })
+    )
+    return
+  }
 
   // Módulos lazy: network-first (mudam mais e não estão no shell)
   if (url.includes('/js/add.js') || url.includes('/js/study.js') || url.includes('/js/video.js')) {

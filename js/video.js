@@ -30,11 +30,13 @@ const VideoDB = {
   open() {
     if (this._db) return Promise.resolve(this._db)
     return new Promise((resolve, reject) => {
-      const req = indexedDB.open('el-video-db', 1)
+      // v2: store 'media' — áudio consertado (m4a extraído pelo ffmpeg.wasm)
+      const req = indexedDB.open('el-video-db', 2)
       req.onupgradeneeded = () => {
         const db = req.result
         if (!db.objectStoreNames.contains('handles')) db.createObjectStore('handles')
         if (!db.objectStoreNames.contains('subs'))    db.createObjectStore('subs')
+        if (!db.objectStoreNames.contains('media'))   db.createObjectStore('media')
       }
       req.onsuccess = () => { this._db = req.result; resolve(this._db) }
       req.onerror = () => reject(req.error)
@@ -237,7 +239,8 @@ async function videoOpenPlayer(v) {
 
   const acts = el('video-ph-actions')
   if (acts) acts.innerHTML = `
-    <button class="btn btn-ghost btn-sm" onclick="videoImportSubPick()" data-tip="Importar legenda .srt/.vtt">${ic('upload')}Legenda</button>
+    <button class="btn btn-secondary btn-sm" onclick="videoSubSearchOpen()" data-tip="Buscar legenda online (addons do Stremio — OpenSubtitles e outros)">${ic('search')}Buscar legenda</button>
+    <button class="btn btn-ghost btn-sm" onclick="videoImportSubPick()" data-tip="Importar arquivo .srt/.vtt do computador">${ic('upload')}Importar</button>
     <button class="btn btn-secondary btn-sm" onclick="videoPrepare()" data-tip="Cruza a legenda com seu vocabulário: o que você ainda não conhece neste episódio">${ic('sparkles')}Preparar para assistir</button>
     <button class="btn btn-ghost btn-sm" onclick="videoBackToLib()">${ic('undo')}Biblioteca</button>`
 
@@ -246,6 +249,7 @@ async function videoOpenPlayer(v) {
     <div class="vid-layout">
       <div class="vid-main">
         <video id="vid-player" src="${_vidURL}" controls preload="metadata"></video>
+        <div id="vid-audiofix-banner"></div>
         <div class="vid-toolbar">
           <span class="vid-title" data-tip="${escA(v.fileName)}">${esc(v.title)}</span>
           <span style="flex:1"></span>
@@ -274,6 +278,13 @@ async function videoOpenPlayer(v) {
     }
   })
   player.addEventListener('timeupdate', _vidOnTime)
+
+  // Áudio consertado de sessão anterior? Reanexa. Senão, arma o detector de
+  // áudio mudo (MKV com Dolby/DTS: o Chrome toca o vídeo e cala o áudio).
+  _vidFixAudio = null
+  const fixedBlob = await VideoDB.get('media', v.id)
+  if (fixedBlob) _vidAttachFixedAudio(fixedBlob)
+  else _vidArmSilentDetector(player)
 
   renderVidTranscript()
   renderVidMarkers()
@@ -311,6 +322,11 @@ function _vidFmtTime(sec) {
 function _vidOnTime() {
   const p = el('vid-player'); if (!p) return
   const t = p.currentTime
+
+  // Áudio consertado: corrige deriva além de 300ms
+  if (_vidFixAudio && !p.paused && Math.abs(_vidFixAudio.currentTime - t) > 0.3) {
+    _vidFixAudio.currentTime = t
+  }
 
   // Fim de trecho selecionado: para (ou loopa)
   if (_vidPlayStop != null && t >= _vidPlayStop) {
@@ -556,7 +572,10 @@ function captureClipAudio(start, end) {
   return new Promise((resolve, reject) => {
     const p = el('vid-player')
     if (!p || !p.captureStream) { reject(new Error('captureStream indisponível neste navegador')); return }
-    const full = p.captureStream()
+    // Com áudio consertado, a fonte sonora é o <audio> paralelo (o vídeo está
+    // mudo) — capturamos DELE; a sincronização o mantém colado no vídeo.
+    const srcEl = _vidFixAudio || p
+    const full = srcEl.captureStream()
     const tracks = full.getAudioTracks()
     if (!tracks.length) { reject(new Error('o vídeo não expôs faixa de áudio')); return }
     const stream = new MediaStream(tracks)
@@ -851,4 +870,360 @@ function _vidSeekClip(clip) {
   p.currentTime = Math.max(0, clip.start - 0.3)
   _vidPlayStop = clip.end + 0.3
   p.play()
+}
+
+// ================================================================
+// CONSERTAR ÁUDIO — MKVs com Dolby (AC3/EAC3) ou DTS tocam MUDOS no
+// Chrome (codecs sem licença no navegador). O ffmpeg.wasm (hospedado no
+// próprio site, ~31 MB baixados 1× e cacheados) extrai a faixa e a
+// converte para AAC; o m4a fica no IndexedDB e toca num <audio>
+// paralelo, sincronizado ao vídeo mudo. Caso real que motivou isto:
+// House.of.the.Dragon S03E02 x265-MeGusta (EAC3) — vídeo ok, som nenhum.
+// WORKERFS: o arquivo é LIDO sob demanda, nunca copiado para a heap —
+// sem isso, um MKV de 2 GB estouraria a memória do wasm.
+// ================================================================
+let _vidFixAudio = null      // <audio> paralelo com a faixa consertada
+let _vidFFmpeg = null        // instância carregada (1× por sessão)
+let _vidFixando = false
+
+async function _vidLoadFFmpeg(onProgress) {
+  if (_vidFFmpeg) return _vidFFmpeg
+  const { FFmpeg } = await import('./vendor/ffmpeg/index.js')
+  const ff = new FFmpeg()
+  if (onProgress) ff.on('progress', ({ progress }) => onProgress(Math.min(1, progress)))
+  const base = new URL('js/vendor/ffmpeg/', document.baseURI).href
+  await ff.load({ coreURL: base + 'ffmpeg-core.js', wasmURL: base + 'ffmpeg-core.wasm' })
+  _vidFFmpeg = ff
+  return ff
+}
+
+// Detector: o Chrome expõe webkitAudioDecodedByteCount — se depois de 1,5s
+// tocando nada foi decodificado, a faixa existe mas o codec não é suportado.
+function _vidArmSilentDetector(player) {
+  if (!('webkitAudioDecodedByteCount' in player)) return
+  let checado = false
+  player.addEventListener('playing', () => {
+    if (checado) return
+    checado = true
+    setTimeout(() => {
+      if (!el('vid-player') || _vidFixAudio) return
+      if (player.muted || player.volume === 0) { checado = false; return }
+      if (player.webkitAudioDecodedByteCount === 0 && player.currentTime > 0.8) {
+        _vidShowFixBanner()
+      }
+    }, 1500)
+  })
+}
+
+function _vidShowFixBanner() {
+  const box = el('vid-audiofix-banner'); if (!box || box.innerHTML) return
+  box.innerHTML = `
+    <div class="vid-fix-banner">
+      <div>
+        <b>Este arquivo está sem som?</b>
+        <span>O áudio deve ser Dolby/DTS, que o navegador não decodifica. Dá para converter aqui mesmo —
+        uma vez só, fica salvo neste aparelho (na primeira vez baixa o conversor, ~31&nbsp;MB).</span>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="videoFixAudio()">${ic('volume','ic-sm')}Consertar áudio</button>
+      <button class="vid-fix-close" onclick="el('vid-audiofix-banner').innerHTML=''" aria-label="Fechar">${ic('x','ic-sm')}</button>
+    </div>`
+}
+
+async function videoFixAudio() {
+  if (_vidFixando || !_vidFile || !_vidCur) return
+  _vidFixando = true
+  const box = el('vid-audiofix-banner')
+  const setMsg = (m, pct) => { if (box) box.innerHTML = `
+    <div class="vid-fix-banner"><div><b>${m}</b>${pct != null ? `
+      <span class="vid-fix-bar"><i style="width:${Math.round(pct*100)}%"></i></span>` : ''}</div></div>` }
+  try {
+    const p = el('vid-player'); if (p) p.pause()
+    setMsg('Baixando o conversor (1ª vez)...')
+    const ff = await _vidLoadFFmpeg(prog => setMsg('Convertendo o áudio...', prog))
+    setMsg('Preparando o arquivo...')
+    try { await ff.unmount('/mnt') } catch (e) {}
+    try { await ff.createDir('/mnt') } catch (e) {}
+    await ff.mount('WORKERFS', { files: [_vidFile] }, '/mnt')
+    setMsg('Convertendo o áudio...', 0)
+    // -vn ignora o vídeo (HEVC nem é tocado); AAC nativo do ffmpeg
+    const code = await ff.exec(['-i', '/mnt/' + _vidFile.name, '-vn', '-c:a', 'aac', '-b:a', '128k', 'out.m4a'])
+    if (code !== 0) throw new Error('a conversão retornou código ' + code)
+    const data = await ff.readFile('out.m4a')
+    try { await ff.deleteFile('out.m4a') } catch (e) {}
+    try { await ff.unmount('/mnt') } catch (e) {}
+    const blob = new Blob([data.buffer], { type: 'audio/mp4' })
+    if (blob.size < 10000) throw new Error('saída vazia — o arquivo tem faixa de áudio?')
+    await VideoDB.set('media', _vidCur.id, blob)
+    _vidAttachFixedAudio(blob)
+    if (box) box.innerHTML = ''
+    toast('Áudio consertado — salvo neste aparelho, não precisa repetir', 'success')
+  } catch (e) {
+    console.warn('[video] fixAudio:', e)
+    if (box) box.innerHTML = ''
+    _vidShowFixBanner()
+    toast('Não consegui converter: ' + e.message, 'error')
+  } finally { _vidFixando = false }
+}
+
+// Anexa o m4a num <audio> escondido e cola nele os eventos do vídeo.
+function _vidAttachFixedAudio(blob) {
+  const p = el('vid-player'); if (!p) return
+  if (_vidFixAudio) { try { _vidFixAudio.pause() } catch (e) {}; _vidFixAudio.remove() }
+  const a = document.createElement('audio')
+  a.id = 'vid-fixaudio'
+  a.src = URL.createObjectURL(blob)
+  a.preload = 'auto'
+  document.body.appendChild(a)
+  _vidFixAudio = a
+  p.muted = true
+  const sync = () => { a.currentTime = p.currentTime }
+  p.addEventListener('play',  () => { sync(); a.play().catch(() => {}) })
+  p.addEventListener('pause', () => a.pause())
+  p.addEventListener('seeked', sync)
+  p.addEventListener('ratechange', () => { a.playbackRate = p.playbackRate })
+  // Chip informativo no toolbar
+  const tb = document.querySelector('.vid-toolbar')
+  if (tb && !el('vid-fix-chip')) {
+    const chip = document.createElement('span')
+    chip.id = 'vid-fix-chip'
+    chip.className = 'vid-fix-chip'
+    chip.title = 'A faixa original (Dolby/DTS) foi convertida para AAC e toca em paralelo'
+    chip.innerHTML = `${ic('volume','ic-sm')} áudio consertado`
+    tb.insertBefore(chip, tb.children[1])
+  }
+}
+
+// ================================================================
+// BUSCAR LEGENDA — protocolo de ADDONS do Stremio (aberto, com CORS):
+//   {addon}/manifest.json e {addon}/subtitles/{tipo}/{imdbId}.json
+// A busca de título usa o Cinemeta (catálogo público do Stremio) e o
+// moviehash do OpenSubtitles (tamanho + primeiros/últimos 64 KB) acha a
+// legenda EXATA do arquivo quando ela existe. Tudo direto do navegador.
+// ================================================================
+const VID_SUB_ADDONS_DEF = ['https://opensubtitles-v3.strem.io']
+const VID_LANGS = { eng: 'Inglês', pob: 'Português (BR)', por: 'Português (PT)', spa: 'Espanhol',
+  fre: 'Francês', ger: 'Alemão', ita: 'Italiano', jpn: 'Japonês', kor: 'Coreano', rus: 'Russo',
+  dut: 'Holandês', nld: 'Holandês', tur: 'Turco', pol: 'Polonês', swe: 'Sueco' }
+
+function _vidSubAddons() {
+  const extra = (cfg.subAddons || '').split(/\n+/).map(s => s.trim().replace(/\/+$/, '')).filter(s => /^https?:\/\//.test(s))
+  return [...new Set([...VID_SUB_ADDONS_DEF, ...extra])]
+}
+
+// moviehash do OpenSubtitles: u64 = tamanho + soma dos primeiros e últimos
+// 64 KB lidos como uint64 little-endian. Identifica o ARQUIVO, não o título.
+async function openSubtitlesHash(file) {
+  const KB64 = 65536
+  if (!file || file.size < KB64 * 2) return null
+  const readChunk = async (start) => new DataView(await file.slice(start, start + KB64).arrayBuffer())
+  const somar = (dv, acc) => {
+    for (let i = 0; i + 8 <= dv.byteLength; i += 8) acc = (acc + dv.getBigUint64(i, true)) & 0xFFFFFFFFFFFFFFFFn
+    return acc
+  }
+  let h = BigInt(file.size)
+  h = somar(await readChunk(0), h)
+  h = somar(await readChunk(file.size - KB64), h)
+  return h.toString(16).padStart(16, '0')
+}
+
+// Tenta extrair SxxExx do nome do arquivo
+function _vidGuessEpisode(name) {
+  const m = /s(\d{1,2})[ ._-]*e(\d{1,2})/i.exec(name || '')
+  return m ? { s: +m[1], e: +m[2] } : null
+}
+// Limpa o nome de release para virar busca
+// ("House.of.the.Dragon.S03E02.1080p.HEVC..." vira "House of the Dragon")
+function _vidCleanQuery(name) {
+  let q = String(name || '').replace(/\.[^.]+$/, '').replace(/[._]+/g, ' ')
+  q = q.replace(/\[[^\]]*\]/g, ' ')
+  const corte = q.search(/\b(s\d{1,2}[ ._-]*e\d{1,2}|\d{3,4}p|(19|20)\d\d\b|hevc|x26[45]|h26[45]|web[- ]?dl|webrip|bluray|hdtv|dvdrip)\b/i)
+  if (corte > 2) q = q.slice(0, corte)
+  return q.replace(/\s+/g, ' ').trim()
+}
+
+let _vidSubState = null
+function videoSubSearchOpen() {
+  if (!_vidCur) return
+  const guess = _vidGuessEpisode(_vidCur.fileName)
+  _vidSubState = { passo: 'busca', resultados: [], meta: null, temporada: guess ? guess.s : 1, episodio: guess ? guess.e : 1, subs: [], hash: null }
+  let overlay = el('vid-sub-modal')
+  if (!overlay) {
+    overlay = document.createElement('div')
+    overlay.id = 'vid-sub-modal'
+    overlay.className = 'srs-modal-overlay'
+    overlay.addEventListener('click', ev => { if (ev.target === overlay) videoSubSearchClose() })
+    document.body.appendChild(overlay)
+  }
+  overlay.classList.remove('hidden')
+  _vidSubRender()
+  videoSubSearch(_vidCleanQuery(_vidCur.fileName) || _vidCur.title)
+}
+function videoSubSearchClose() { const m = el('vid-sub-modal'); if (m) m.classList.add('hidden') }
+
+function _vidSubRender() {
+  const ov = el('vid-sub-modal'); if (!ov || !_vidSubState) return
+  const st = _vidSubState
+  let corpo = ''
+  if (st.passo === 'busca') {
+    corpo = `
+      <div class="vid-sub-row">
+        <input type="text" id="vid-sub-q" value="${escA(st.query || '')}" placeholder="Nome da série ou filme"
+          onkeydown="if(event.key==='Enter')videoSubSearch(this.value)">
+        <button class="btn btn-secondary btn-sm" onclick="videoSubSearch(el('vid-sub-q').value)">${ic('search','ic-sm')}Buscar</button>
+      </div>
+      ${st.buscando ? `<div class="vid-sub-info"><span class="gen-spinner"></span> Buscando no catálogo...</div>` :
+        st.resultados.length ? `<div class="vid-sub-list">${st.resultados.map((r, i) => `
+          <button class="vid-sub-item" onclick="videoSubPick(${i})">
+            <span class="vid-sub-name">${esc(r.name)}</span>
+            <span class="vid-sub-meta">${r.type === 'series' ? 'série' : 'filme'}${r.year ? ' · ' + esc(String(r.year)) : ''}</span>
+          </button>`).join('')}</div>` :
+        st.buscou ? `<div class="vid-sub-info">Nada encontrado — tente só o nome, sem números.</div>` : ''}`
+  } else if (st.passo === 'episodio') {
+    corpo = `
+      <div class="vid-sub-picked">${esc(st.meta.name)} <span>série</span></div>
+      <div class="vid-sub-row">
+        <label>Temporada <input type="number" id="vid-sub-s" min="0" max="99" value="${st.temporada}"></label>
+        <label>Episódio <input type="number" id="vid-sub-e" min="0" max="999" value="${st.episodio}"></label>
+        <button class="btn btn-primary btn-sm" onclick="videoSubListLoad(+el('vid-sub-s').value, +el('vid-sub-e').value)">${ic('search','ic-sm')}Buscar legendas</button>
+      </div>`
+  } else if (st.passo === 'legendas') {
+    corpo = `
+      <div class="vid-sub-picked">${esc(st.meta.name)}${st.meta.type === 'series' ? ` <b>S${String(st.temporada).padStart(2,'0')}E${String(st.episodio).padStart(2,'0')}</b>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="_vidSubState.passo='busca';_vidSubRender()" style="margin-left:auto">trocar</button></div>
+      ${st.carregando ? `<div class="vid-sub-info"><span class="gen-spinner"></span> Consultando addons${st.hash ? ' (com a impressão digital do arquivo)' : ''}...</div>` :
+        st.subs.length ? `<div class="vid-sub-list">${st.subs.map((s, i) => `
+          <button class="vid-sub-item" onclick="videoSubDownload(${i}, this)">
+            <span class="vid-sub-name">${esc(VID_LANGS[s.lang] || s.lang)}</span>
+            <span class="vid-sub-meta">${s.exact ? '<b class="vid-sub-exact">sincronia exata</b> · ' : ''}${esc(s.addon)}</span>
+          </button>`).join('')}</div>` :
+        `<div class="vid-sub-info">Nenhuma legenda nos addons configurados.</div>`}`
+  }
+  ov.innerHTML = `
+    <div class="vid-sub-card" onclick="event.stopPropagation()">
+      <div class="vid-sub-head">
+        <h3>${ic('search')}Buscar legenda</h3>
+        <button class="vid-fix-close" onclick="videoSubSearchClose()" aria-label="Fechar">${ic('x','ic-sm')}</button>
+      </div>
+      ${corpo}
+      <details class="vid-sub-addons">
+        <summary>Addons de legenda (${_vidSubAddons().length})</summary>
+        <p>Um por linha — qualquer addon de legendas do Stremio funciona (o protocolo é aberto).</p>
+        <textarea id="vid-sub-addons-ta" rows="3" placeholder="https://opensubtitles-v3.strem.io">${esc((cfg.subAddons || ''))}</textarea>
+        <button class="btn btn-ghost btn-sm" onclick="cfg.subAddons=el('vid-sub-addons-ta').value.trim();saveCfg();autoSyncAfterChange();toast('Addons salvos','success')">Salvar addons</button>
+      </details>
+    </div>`
+  const q = el('vid-sub-q'); if (q && st.passo === 'busca' && !st.buscando) q.focus()
+}
+
+async function videoSubSearch(query) {
+  const st = _vidSubState; if (!st) return
+  st.query = query; st.buscando = true; st.buscou = true; _vidSubRender()
+  try {
+    const enc = encodeURIComponent(query.trim())
+    const [se, mo] = await Promise.all(['series', 'movie'].map(t =>
+      fetch(`https://v3-cinemeta.strem.io/catalog/${t}/top/search=${enc}.json`)
+        .then(r => r.json()).then(j => (j.metas || []).slice(0, 6)).catch(() => [])))
+    st.resultados = [...se.map(m => ({ ...m, type: 'series' })), ...mo.map(m => ({ ...m, type: 'movie' }))]
+      .map(m => ({ id: m.imdb_id || m.id, name: m.name, year: (m.releaseInfo || '').slice(0, 4), type: m.type }))
+      .filter(m => /^tt/.test(m.id)).slice(0, 8)
+  } catch (e) { st.resultados = []; toast('Busca falhou: ' + e.message, 'error') }
+  st.buscando = false; _vidSubRender()
+}
+
+function videoSubPick(i) {
+  const st = _vidSubState; if (!st) return
+  st.meta = st.resultados[i]
+  if (st.meta.type === 'series') { st.passo = 'episodio'; _vidSubRender() }
+  else videoSubListLoad()
+}
+
+async function videoSubListLoad(temporada, episodio) {
+  const st = _vidSubState; if (!st) return
+  if (temporada != null) { st.temporada = temporada; st.episodio = episodio }
+  st.passo = 'legendas'; st.carregando = true
+  st.hash = st.hash || await openSubtitlesHash(_vidFile).catch(() => null)
+  _vidSubRender()
+  const id = st.meta.type === 'series' ? `${st.meta.id}:${st.temporada}:${st.episodio}` : st.meta.id
+  const extra = st.hash && _vidFile ? `/videoHash=${st.hash}&videoSize=${_vidFile.size}` : ''
+  const vistos = new Set(); const subs = []
+  await Promise.all(_vidSubAddons().map(async base => {
+    const nome = base.replace(/^https?:\/\//, '').split('/')[0].split('.')[0]
+    // Com hash primeiro (pode trazer a legenda exata do arquivo); sem hash como reforço
+    for (const ex of extra ? [extra, ''] : ['']) {
+      try {
+        const r = await fetch(`${base}/subtitles/${st.meta.type}/${encodeURIComponent(id)}${ex}.json`)
+        if (!r.ok) continue
+        const j = await r.json()
+        ;(j.subtitles || []).forEach(s => {
+          if (!s.url || vistos.has(s.url)) return
+          vistos.add(s.url)
+          // O hash entra na CONSULTA (o addon prioriza a legenda do arquivo),
+          // mas a resposta não diz quais bateram — não prometemos "exata".
+          subs.push({ lang: s.lang || '?', url: s.url, addon: nome, exact: false })
+        })
+      } catch (e) { console.warn('[subs]', base, e.message) }
+    }
+  }))
+  // Inglês primeiro (é o que se estuda), depois PT-BR, depois o resto
+  const peso = l => l === 'eng' ? 0 : l === 'pob' ? 1 : l === 'por' ? 2 : 3
+  subs.sort((a, b) => (peso(a.lang) - peso(b.lang)) || (b.exact - a.exact))
+  st.subs = subs.slice(0, 40)
+  st.carregando = false; _vidSubRender()
+}
+
+async function videoSubDownload(i, btnEl) {
+  const st = _vidSubState; if (!st) return
+  const sub = st.subs[i]; if (!sub) return
+  if (btnEl) btnEl.innerHTML = '<span class="gen-spinner"></span> baixando...'
+  try {
+    const r = await fetch(sub.url)
+    if (!r.ok) throw new Error('HTTP ' + r.status)
+    const buf = await r.arrayBuffer()
+    // Encoding na base da evidência: arquivos "UTF-8 com um byte podre" são
+    // comuns — o modo estrito rejeitaria o arquivo INTEIRO por causa de um
+    // byte. Decodifica dos dois jeitos e fica com o que tiver menos lixo
+    // (U+FFFD no UTF-8; Â/â típicos de UTF-8 lido como 1252 no outro).
+    const u8 = new TextDecoder('utf-8').decode(buf)
+    const w12 = new TextDecoder('windows-1252').decode(buf)
+    const ruimU8 = (u8.match(/�/g) || []).length
+    const ruimW12 = (w12.match(/Ã[©ªµ£§¡³]|â[€™"]|Â./g) || []).length
+    const txt = _vidFixMojibake(ruimU8 <= ruimW12 ? u8 : w12)
+    const cues = parseSubtitle(txt)
+    if (!cues.length) throw new Error('arquivo não parece uma legenda válida')
+    await _vidApplyCues(cues, `online (${VID_LANGS[sub.lang] || sub.lang})`)
+    videoSubSearchClose()
+  } catch (e) {
+    toast('Falha ao baixar a legenda: ' + e.message, 'error')
+    _vidSubRender()
+  }
+}
+
+// Des-mojibake: legendas chegam DUPLAMENTE encodadas da origem (bytes UTF-8
+// que soletram "â™ª" em vez de ♪ — visto ao vivo no OpenSubtitles). Reverte
+// re-serializando como windows-1252 e relendo como UTF-8; se o resultado
+// piorar (muitos U+FFFD), mantém o original.
+function _vidFixMojibake(txt) {
+  if (!/Ã.|â€.|â„¢|â™ª|Â[ª°º©®´¨]/.test(txt)) return txt
+  // Reverso da windows-1252 para os pontos que não são latin-1 direto
+  const R = { 8364:128, 8218:130, 402:131, 8222:132, 8230:133, 8224:134, 8225:135, 710:136,
+    8240:137, 352:138, 8249:139, 338:140, 381:142, 8216:145, 8217:146, 8220:147, 8221:148,
+    8226:149, 8211:150, 8212:151, 732:152, 8482:153, 353:154, 8250:155, 339:156, 382:158, 376:159 }
+  const bytes = new Uint8Array(txt.length)
+  for (let i = 0; i < txt.length; i++) {
+    const c = txt.charCodeAt(i)
+    bytes[i] = c <= 255 ? c : (R[c] !== undefined ? R[c] : 63)
+  }
+  const out = new TextDecoder('utf-8').decode(bytes)
+  return (out.match(/�/g) || []).length <= 2 ? out : txt
+}
+
+// Caminho único de gravação de legenda (arquivo local e busca online)
+async function _vidApplyCues(cues, origem) {
+  _vidCues = cues
+  await VideoDB.set('subs', _vidCur.id, { cues })
+  _vidCur.cueCount = cues.length; _vidCur.updated_at = new Date().toISOString()
+  saveVideos(); autoSyncAfterChange()
+  renderVidTranscript()
+  const cc = el('vid-cue-count'); if (cc) cc.textContent = cues.length + ' falas'
+  toast(`Legenda ${origem}: ${cues.length} falas`, 'success')
 }

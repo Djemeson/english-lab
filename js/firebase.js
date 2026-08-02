@@ -207,6 +207,7 @@ async function fbPushData() {
       aiProvider:  cfg.aiProvider   || 'openai',
       aiModel:     cfg.aiModel       || '',
       ttsProvider: cfg.ttsProvider   || 'openai',
+      subAddons:   cfg.subAddons     || '',
       updatedAt: Date.now()
     }
     if (cfg.openaiKey) cfgPayload.openaiKey = cfg.openaiKey
@@ -485,6 +486,7 @@ function applyCloudDocs(docs) {
     if (c.aiProvider)  cfg.aiProvider  = c.aiProvider
     if (c.aiModel)     cfg.aiModel     = c.aiModel
     if (c.ttsProvider) cfg.ttsProvider = c.ttsProvider
+    if (c.subAddons != null) cfg.subAddons = c.subAddons
     saveCfg()
     if (typeof applyTheme === 'function') applyTheme(cfg.theme)
   }
