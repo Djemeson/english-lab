@@ -3748,3 +3748,6 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .vid-sh-hint{font-size:var(--fs-xs);color:var(--text3);display:inline-flex;align-items:center;gap:6px}
 .vid-sh-score{font-size:var(--fs-sm);color:var(--text2)}
 .vid-sh-score b{color:var(--primary);font-size:var(--fs-base)}
+
+/* ---- Navegacao por FALA: segundo par de botoes flutuantes ---- */
+.vid-cuebtn{top:34%;font-size:16px;letter-spacing:-1px}

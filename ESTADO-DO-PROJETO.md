@@ -3,7 +3,11 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Modularização + 3 modos novos (30ª rodada)**: video.js
+> Última atualização: 2026-08-03 — **Navegação por fala (31ª rodada)**: R repete a fala que
+> acabou de passar; ←/→ pulam entre falas (com comportamento "faixa anterior"); Shift+←/→
+> mantém os ±5s; segundo par de botões flutuantes no vídeo. Ver seção 8 (31ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Modularização + 3 modos novos (30ª rodada)**: video.js
 > virou 4 módulos por responsabilidade (com retry no loader lazy); nasceram o DITADO (escreva o
 > que ouviu, correção palavra a palavra, custo zero), o SHADOWING (grave a imitação, a IA diz o
 > que saiu claro) e a LEGENDA CRIADA PELA IA (episódio sem legenda em lugar nenhum → Whisper
@@ -383,6 +387,23 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (31ª rodada) — Navegação por FALA ("a frase passou, quero voltar nela")
+82. **Pedido**: "uma frase que me interessou passou; a única forma de voltar é −5s. Quero voltar
+    rapidamente na última fala, e avançar/retroceder rapidamente entre as falas."
+    - **R / botão "Repetir fala"**: volta ao início da fala atual — e, no silêncio entre
+      falas, da ÚLTIMA que passou (o caso exato dele). Aterrissa 0,2s antes, de respiro.
+    - **← / → viraram fala anterior / próxima** (navegação de player de idioma, não de
+      segundos): ← no meio de uma fala volta ao INÍCIO dela; apertando de novo, vai para a
+      anterior — o comportamento "faixa anterior" dos players de música. **Shift+←/→**
+      mantém os ±5s brutos; sem legenda carregada, as setas caem nos ±5s.
+    - **Segundo par de botões flutuantes** no vídeo (‹‹ ››) acima dos de ±5s — valem em tela
+      cheia.
+    - Caso de borda pego na validação: como o pulo aterrissa na "entradinha" (−0,2s), o →
+      seguinte recaía na MESMA fala e parecia travado — o avanço agora reconhece a entradinha
+      e pula para a seguinte. Validado ao vivo: 6 cenários de navegação (meio da fala,
+      silêncio, sequências ←←→→, começo do vídeo) todos exatos.
+      `CACHE`: `v57` → **`v58`**.
 
 ### Sessão 2026-08-03 (30ª rodada) — Modularização + Ditado + Shadowing + Legenda criada pela IA
 81. **Pedido**: "crie todos esses [Whisper de episódio inteiro, ditado, shadowing] seguindo as

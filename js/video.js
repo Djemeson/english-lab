@@ -273,14 +273,17 @@ async function videoOpenPlayer(v) {
             <span class="vid-ov-pt" id="vid-ov-pt"></span>
           </div>
           <div class="vid-ov-pop hidden" id="vid-ov-pop"></div>
-          <button class="vid-skipbtn left" onclick="videoSkip(-5)" data-tip="Voltar 5s (seta ←)">−5s</button>
-          <button class="vid-skipbtn right" onclick="videoSkip(5)" data-tip="Avançar 5s (seta →)">+5s</button>
+          <button class="vid-skipbtn left" onclick="videoSkip(-5)" data-tip="Voltar 5s (Shift+←)">−5s</button>
+          <button class="vid-skipbtn right" onclick="videoSkip(5)" data-tip="Avançar 5s (Shift+→)">+5s</button>
+          <button class="vid-skipbtn vid-cuebtn left" onclick="videoCueNav(-1)" data-tip="Fala anterior (←) — de novo no meio de uma fala volta ao início dela">‹‹</button>
+          <button class="vid-skipbtn vid-cuebtn right" onclick="videoCueNav(1)" data-tip="Próxima fala (→)">››</button>
         </div>
         <div id="vid-audiofix-banner"></div>
         <div id="vid-sync-panel" class="hidden"></div>
         <div class="vid-toolbar">
           <span class="vid-title" data-tip="${escA(v.fileName)}">${esc(v.title)}</span>
           <span style="flex:1"></span>
+          <button class="btn btn-ghost btn-sm" onclick="videoReplayCue()" data-tip="A frase passou? Volta ao início da fala atual/última (tecla R)">${ic('undo','ic-sm')}Repetir fala</button>
           <button class="btn btn-ghost btn-sm" id="vid-mark-btn" onclick="videoAddMarker()" data-tip="Marca o INÍCIO do trecho; o 2º clique (ou tecla M) fecha e abre o estudo focado">${ic('flame','ic-sm')}Marcar</button>
           <button class="btn btn-ghost btn-sm" id="vid-sync-btn" onclick="videoSyncToggle()" data-tip="Legenda fora de sincronia? Ajuste manual ou automático com IA">${ic('clock','ic-sm')}Sync</button>
           <button class="btn btn-ghost btn-sm ${_vidOverlayOn ? 'vid-on' : ''}" id="vid-ov-toggle" onclick="videoToggleOverlay()" data-tip="Legenda sobre o vídeo, em tempo real">${ic('message','ic-sm')}Legenda</button>
@@ -696,15 +699,65 @@ if (!window._vidFlushBound) {
 // onde nenhum overlay entra — então injetamos uma trilha de legenda
 // NATIVA (TextTrack/VTTCue), que o player renderiza em qualquer modo.
 // ================================================================
-// Pular alguns segundos (botões no vídeo + setas do teclado)
+// Pular alguns segundos (botões no vídeo + Shift+setas)
 function videoSkip(d) {
   const p = el('vid-player'); if (!p) return
   p.currentTime = Math.max(0, p.currentTime + d)
 }
+
+// ================================================================
+// NAVEGAÇÃO POR FALA — "a frase passou, quero voltar NELA":
+//   R          → repete a fala atual/última (do início dela)
+//   ← / →      → fala anterior / próxima (← no meio de uma fala volta ao
+//                início dela; apertando de novo, vai para a anterior —
+//                o comportamento de "faixa anterior" dos players)
+//   Shift+←/→  → ±5s (o pulo bruto continua disponível)
+// ================================================================
+// Índice da fala corrente, ou da ÚLTIMA que começou antes de t
+function _vidCueIndexAt(t) {
+  let idx = -1
+  for (let i = 0; i < _vidCues.length; i++) {
+    if (_vidCues[i].s <= t + 0.05) idx = i
+    else break
+  }
+  return idx
+}
+
+function videoReplayCue() {
+  const p = el('vid-player'); if (!p) return
+  if (!_vidCues.length) { videoSkip(-5); return }
+  const i = _vidCueIndexAt(p.currentTime)
+  if (i < 0) { videoSkip(-5); return }
+  p.currentTime = Math.max(0, _vidCues[i].s - 0.2)
+  p.play()
+}
+
+function videoCueNav(dir) {
+  const p = el('vid-player'); if (!p) return
+  if (!_vidCues.length) { videoSkip(dir * 5); return }
+  const t = p.currentTime
+  let i = _vidCueIndexAt(t)
+  if (dir < 0) {
+    if (i < 0) { videoSkip(-5); return }
+    // >0,8s dentro da fala = volta ao início DELA; senão, fala anterior
+    if (t - _vidCues[i].s <= 0.8) i = Math.max(0, i - 1)
+  } else {
+    i = Math.min(_vidCues.length - 1, i + 1)
+    // Aterrissamos 0,2s ANTES da fala (respiro): se o t atual já está nessa
+    // entradinha da fala i, "próxima" tem que ir para a i+1 — senão o botão
+    // parece travado.
+    if (_vidCues[i].s - t <= 0.6 && i < _vidCues.length - 1) i++
+  }
+  p.currentTime = Math.max(0, _vidCues[i].s - 0.2)
+  p.play()
+}
+
 if (!window._vidSkipKeysBound) {
   window._vidSkipKeysBound = true
   document.addEventListener('keydown', e => {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    const ehSeta = e.key === 'ArrowLeft' || e.key === 'ArrowRight'
+    const ehR = e.key === 'r' || e.key === 'R'
+    if (!ehSeta && !ehR) return
     if (e.ctrlKey || e.metaKey || e.altKey) return
     const tag = (document.activeElement?.tagName || '').toLowerCase()
     if (tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable) return
@@ -712,7 +765,9 @@ if (!window._vidSkipKeysBound) {
     if (!el('vid-player')) return
     if (document.activeElement === el('vid-player')) return   // o player nativo já trata
     e.preventDefault()
-    videoSkip(e.key === 'ArrowLeft' ? -5 : 5)
+    if (ehR) videoReplayCue()
+    else if (e.shiftKey) videoSkip(e.key === 'ArrowLeft' ? -5 : 5)
+    else videoCueNav(e.key === 'ArrowLeft' ? -1 : 1)
   })
 }
 
