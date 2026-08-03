@@ -577,40 +577,32 @@
     <div class="settings-grid">
 <!-- IA & Áudio -->
     <div class="settings-card full">
-      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 14l.7 1.8L21.5 16.5l-1.8.7L19 19l-.7-1.8L16.5 16.5l1.8-.7z"/></svg>Inteligência Artificial (OpenAI)</h3>
-      <p class="desc">A chave de API é usada diretamente pelo navegador para traduzir palavras, obter definições, transcrições IPA, gerar pronúncias por voz (TTS) e criar imagens de auxílio visual.</p>
-      
-      <div class="form-group" style="margin: 0; max-width: 580px;">
-        <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: var(--fs-md); color: var(--text2);">OpenAI API Key</label>
-        <div style="position: relative; display: flex; align-items: center;">
-          <input type="password" id="cfg-openai-key" placeholder="sk-proj-..." autocomplete="off" style="width: 100%; padding-right: 46px; height: var(--control-h); border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text); padding-left: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: var(--fs-md);">
-          <button type="button" onclick="togglePasswordVisibility('cfg-openai-key')" style="position: absolute; right: 12px; background: none; border: none; color: var(--text3); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; transition: color 0.15s;" onmouseover="this.style.color='var(--text2)'" onmouseout="this.style.color='var(--text3)'">
-            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </button>
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 14l.7 1.8L21.5 16.5l-1.8.7L19 19l-.7-1.8L16.5 16.5l1.8-.7z"/></svg>Inteligência Artificial</h3>
+      <p class="desc">Escolha quem faz a análise, as traduções e o chat — e guarde as chaves de cada fornecedor.
+      <b>Áudio (TTS), imagens e transcrição usam sempre a OpenAI.</b> As chaves ficam no seu navegador (e na sua conta, se logado) e vão direto para a API oficial de cada fornecedor.</p>
+
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
+        <div style="min-width:200px">
+          <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Fornecedor (análise e chat)</label>
+          <select id="cfg-ai-provider" onchange="providerMudou()" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
         </div>
-        <p style="font-size: var(--fs-xs); color: var(--text3); margin-top: 6px; line-height: 1.4;">Sua chave é mantida segura localmente em seu navegador e nunca é enviada a servidores de terceiros (com exceção direta à API oficial da OpenAI).</p>
-        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:14px">
-          <div style="min-width:230px">
-            <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Modelo de análise</label>
-            <select id="cfg-ai-model" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
-          </div>
-          <div style="min-width:190px">
-            <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Qualidade das imagens</label>
-            <select id="cfg-img-quality" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)">
-              <option value="low">Econômica (~4× mais barata)</option>
-              <option value="medium" selected>Padrão</option>
-              <option value="high">Alta (~4× mais cara)</option>
-            </select>
-          </div>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="testOpenAIKeyUI(this)" style="height:var(--control-h)">Testar chave</button>
-          <span id="cfg-key-status" style="font-size:var(--fs-sm);color:var(--text2)"></span>
+        <div style="min-width:300px;flex:1">
+          <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Modelo</label>
+          <select id="cfg-ai-model" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
+        </div>
+        <div style="min-width:190px">
+          <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Qualidade das imagens (OpenAI)</label>
+          <select id="cfg-img-quality" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)">
+            <option value="low">Econômica (~4× mais barata)</option>
+            <option value="medium" selected>Padrão</option>
+            <option value="high">Alta (~4× mais cara)</option>
+          </select>
         </div>
       </div>
+
+      <div id="cfg-keys"></div>
     </div>
-<!-- Manutenção de Áudio -->
+<!-- Manutenção de Áudio --><!-- Manutenção de Áudio -->
     <div class="settings-card">
       <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>Manutenção de Áudio</h3>
       <p class="desc">Verifique a integridade da sua biblioteca e gere o áudio falado (TTS) para os cards que ainda não o possuem.</p>

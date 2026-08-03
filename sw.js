@@ -4,7 +4,7 @@
 // Firebase e OpenAI ficam sempre na rede.
 // ================================================================
 
-const CACHE = 'englab-v61'
+const CACHE = 'englab-v62'
 // Cache separado e PERMANENTE para o ffmpeg.wasm (31 MB): não pode ser
 // apagado a cada versão do shell, senão cada deploy custaria 31 MB de novo.
 const CACHE_FFMPEG = 'englab-ffmpeg-v1'
@@ -36,6 +36,9 @@ const NETWORK_ONLY = [
   'identitytoolkit.googleapis.com',
   'securetoken.googleapis.com',
   'api.openai.com',
+  'generativelanguage.googleapis.com',   // Gemini
+  'api.deepseek.com',                    // DeepSeek
+  'api.groq.com',                        // Groq
   'gistusercontent.com',
   'api.github.com',
   'strem.io',            // busca de legendas (resultados mudam; não cachear)

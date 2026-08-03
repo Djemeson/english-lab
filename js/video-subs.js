@@ -490,7 +490,7 @@ function _vidSaveSubsNow() {
 
 // Garante tradução IA das falas [i .. i+n). `sinc` espera terminar.
 async function _vidEnsurePT(i, n, sinc, forcaIA) {
-  if (!cfg.openaiKey) return
+  if (!aiChatCfg().key) return
   const tarefas = []
   for (let k = i; k < Math.min(i + n, _vidCues.length); k++) {
     const c = _vidCues[k]

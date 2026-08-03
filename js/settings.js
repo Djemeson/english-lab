@@ -16,42 +16,81 @@ let _settingsTab = (typeof loadUiPrefs === 'function' && loadUiPrefs().settingsT
 // para api.openai.com — as entradas antigas de Anthropic/Google eram uma
 // armadilha (selecionar uma mandaria "claude-*" para a API errada e
 // quebraria TODA a IA do app).
-const AI_MODELS = [
-  { value: 'gpt-4o-mini',  label: 'GPT-4o mini — rápido e barato (padrão)' },
-  { value: 'gpt-4.1-mini', label: 'GPT-4.1 mini — melhor texto, preço próximo' },
-  { value: 'gpt-4o',       label: 'GPT-4o — equilibrado' },
-  { value: 'gpt-5-mini',   label: 'GPT-5 mini — nova geração' },
-  { value: 'gpt-5',        label: 'GPT-5 — mais capaz (mais caro)' },
-]
+function _tierLabel(t) { return t === 'baixo' ? 'custo baixo' : t === 'médio' ? 'custo médio' : 'custo alto' }
 
 function updateModelOptions() {
   const sel = el('cfg-ai-model'); if (!sel) return
-  const atual = aiModel()
-  sel.innerHTML = AI_MODELS.map(m =>
-    `<option value="${m.value}"${m.value === atual ? ' selected' : ''}>${m.label}</option>`).join('')
+  const prov = el('cfg-ai-provider')?.value || aiProviderAtual()
+  const P = AI_PROVIDERS[prov] || AI_PROVIDERS.openai
+  const salvo = ((cfg.aiModelProv || {})[prov]) || (prov === 'openai' ? (cfg.aiModel || '') : '')
+  const atual = P.modelos.some(m => m.id === salvo) ? salvo : P.modelos[0].id
+  sel.innerHTML = P.modelos.map(m =>
+    `<option value="${m.id}"${m.id === atual ? ' selected' : ''}>${m.id} — ${_tierLabel(m.tier)} · ${m.nota}</option>`).join('')
+}
+function providerMudou() { updateModelOptions() }
+
+// Chaves organizadas: uma linha por fornecedor, com teste individual
+function renderKeyRows() {
+  const box = el('cfg-keys'); if (!box) return
+  const olho = `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
+  box.innerHTML = `<div class="cfg-keys-title">Chaves de API — uma por fornecedor (só precisa das que for usar)</div>` +
+    Object.entries(AI_PROVIDERS).map(([id, P]) => `
+      <div class="cfg-key-row">
+        <span class="cfg-key-nome">${P.nome}${id === 'openai' ? ' <i>· também áudio/imagens</i>' : ''}</span>
+        <div class="cfg-key-campo">
+          <input type="password" id="cfg-key-${id}" placeholder="${P.placeholder}" autocomplete="off">
+          <button type="button" class="cfg-key-eye" onclick="togglePasswordVisibility('cfg-key-${id}')" aria-label="Mostrar/ocultar">${olho}</button>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="testarChaveProv('${id}', this)">Testar</button>
+        <span class="cfg-key-status" id="cfg-key-status-${id}"></span>
+      </div>`).join('')
+  for (const [id, P] of Object.entries(AI_PROVIDERS)) {
+    const i = el('cfg-key-' + id); if (i) i.value = cfg[P.keyCfg] || ''
+  }
 }
 
+async function testarChaveProv(prov, btn) {
+  const key = el('cfg-key-' + prov)?.value.trim()
+  const st = el('cfg-key-status-' + prov)
+  if (!key) { if (st) { st.textContent = 'sem chave'; st.style.color = 'var(--text3)' } ; return }
+  btn.disabled = true
+  if (st) { st.textContent = 'testando...'; st.style.color = 'var(--text3)' }
+  const r = await aiTestKeyProv(prov, key)
+  if (st) {
+    st.textContent = r.ok ? 'válida' : (r.msg || 'inválida').slice(0, 60)
+    st.style.color = r.ok ? 'var(--success)' : 'var(--error)'
+  }
+  btn.disabled = false
+}
 
 function fillSettings() {
-  el('cfg-openai-key').value = cfg.openaiKey || ''
+  const provSel = el('cfg-ai-provider')
+  if (provSel) {
+    provSel.innerHTML = Object.entries(AI_PROVIDERS).map(([id, P]) =>
+      `<option value="${id}"${id === aiProviderAtual() ? ' selected' : ''}>${P.nome}</option>`).join('')
+  }
   updateModelOptions()
+  renderKeyRows()
   const q = el('cfg-img-quality'); if (q) q.value = cfg.imgQuality || 'medium'
   setSettingsTab(_settingsTab)
   renderThemePicker()
   renderAccentPicker()
-  // Atualiza UI Firebase com estado atual
   if (_fbUser !== undefined) updateFirebaseUI(_fbUser)
 }
 
-
 function saveSettings() {
-  cfg.aiProvider = 'openai'
-  cfg.aiModel = el('cfg-ai-model')?.value || AI_DEFAULT_MODEL
+  const prov = el('cfg-ai-provider')?.value || 'openai'
+  cfg.aiProvider = AI_PROVIDERS[prov] ? prov : 'openai'
+  const modelo = el('cfg-ai-model')?.value || AI_DEFAULT_MODEL
+  cfg.aiModelProv = { ...(cfg.aiModelProv || {}), [cfg.aiProvider]: modelo }
+  if (cfg.aiProvider === 'openai') cfg.aiModel = modelo   // espelho legado (sync antigo)
   cfg.ttsProvider = 'openai'
-  cfg.openaiKey = el('cfg-openai-key').value.trim()
+  for (const [id, P] of Object.entries(AI_PROVIDERS)) {
+    const i = el('cfg-key-' + id)
+    if (i) cfg[P.keyCfg] = i.value.trim()
+  }
   cfg.imgQuality = el('cfg-img-quality')?.value || 'medium'
   saveCfg()
-  // Envia para a nuvem (se logado) para sobreviver a refresh e sincronizar entre dispositivos
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   toast('Configurações salvas!', 'success')
 }
@@ -274,15 +313,4 @@ function _settingsTabKeys(e) {
 }
 
 // Botão "Testar chave" — GET /v1/models não consome nenhum token.
-async function testOpenAIKeyUI(btn) {
-  const st = el('cfg-key-status')
-  const key = el('cfg-openai-key').value.trim()
-  if (!key) { if (st) st.textContent = 'Cole a chave primeiro.'; return }
-  btn.disabled = true
-  if (st) { st.style.color = 'var(--text2)'; st.textContent = 'Testando...' }
-  const r = await aiTestKey(key)
-  btn.disabled = false
-  if (!st) return
-  if (r.ok) { st.style.color = 'var(--success)'; st.textContent = 'Chave válida.' }
-  else { st.style.color = 'var(--error)'; st.textContent = 'Falhou: ' + r.msg }
-}
+// (testOpenAIKeyUI substituído por testarChaveProv — 35ª rodada)

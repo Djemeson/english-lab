@@ -20,12 +20,85 @@
 
 const AI_DEFAULT_MODEL = 'gpt-4o-mini'
 
+// ================================================================
+// FORNECEDORES DE IA (análise, traduções e chat).
+// Todos falam o "dialeto" OpenAI (chat/completions + Bearer), o que
+// permite trocar de fornecedor sem tocar no resto do app.
+// ÁUDIO (TTS), IMAGENS e TRANSCRIÇÃO (Whisper) usam SEMPRE a OpenAI —
+// os outros não têm equivalente compatível no navegador.
+// Faixas de custo: rótulos curados (ordem de grandeza, não fatura).
+// ================================================================
+const AI_PROVIDERS = {
+  openai: {
+    nome: 'OpenAI',
+    url: 'https://api.openai.com/v1/chat/completions',
+    modelsUrl: 'https://api.openai.com/v1/models',
+    keyCfg: 'openaiKey',
+    placeholder: 'sk-proj-...',
+    modelos: [
+      { id: 'gpt-4o-mini',  tier: 'baixo', nota: 'rápido e barato (padrão do app)' },
+      { id: 'gpt-4.1-mini', tier: 'baixo', nota: 'melhor texto, preço próximo' },
+      { id: 'gpt-4o',       tier: 'médio', nota: 'equilibrado' },
+      { id: 'gpt-5-mini',   tier: 'médio', nota: 'nova geração' },
+      { id: 'gpt-5',        tier: 'alto',  nota: 'mais capaz' },
+    ]
+  },
+  gemini: {
+    nome: 'Google Gemini',
+    url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    modelsUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/models',
+    keyCfg: 'geminiKey',
+    placeholder: 'AIza...',
+    modelos: [
+      { id: 'gemini-2.5-flash-lite', tier: 'baixo', nota: 'o mais barato da casa' },
+      { id: 'gemini-2.5-flash',      tier: 'baixo', nota: 'ótimo custo-benefício' },
+      { id: 'gemini-2.5-pro',        tier: 'alto',  nota: 'mais capaz' },
+    ]
+  },
+  deepseek: {
+    nome: 'DeepSeek',
+    url: 'https://api.deepseek.com/chat/completions',
+    modelsUrl: 'https://api.deepseek.com/models',
+    keyCfg: 'deepseekKey',
+    placeholder: 'sk-...',
+    modelos: [
+      { id: 'deepseek-chat',     tier: 'baixo', nota: 'V3 — muito barato' },
+      { id: 'deepseek-reasoner', tier: 'médio', nota: 'R1 — raciocínio (mais lento)' },
+    ]
+  },
+  groq: {
+    nome: 'Groq',
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    modelsUrl: 'https://api.groq.com/openai/v1/models',
+    keyCfg: 'groqKey',
+    placeholder: 'gsk_...',
+    modelos: [
+      { id: 'llama-3.1-8b-instant',    tier: 'baixo', nota: 'muito rápido, quase grátis' },
+      { id: 'llama-3.3-70b-versatile', tier: 'baixo', nota: 'mais qualidade, ainda barato' },
+      { id: 'openai/gpt-oss-120b',     tier: 'médio', nota: 'modelo aberto grande' },
+    ]
+  }
+}
+
+function aiProviderAtual() {
+  return AI_PROVIDERS[cfg.aiProvider] ? cfg.aiProvider : 'openai'
+}
+// Config completa do chat corrente: fornecedor + chave + modelo
+function aiChatCfg() {
+  const prov = aiProviderAtual()
+  const P = AI_PROVIDERS[prov]
+  return { prov, P, key: (cfg[P.keyCfg] || '').trim(), model: aiModel() }
+}
+
 // Modelo efetivo: o configurado, se for um modelo OpenAI plausível.
 // Protege contra um cfg.aiModel antigo sincronizado da nuvem com um
 // modelo de outro provedor (ex.: claude-*) — iria para a API errada.
 function aiModel() {
-  const m = (cfg.aiModel || '').trim()
-  return /^(gpt-|o\d|chatgpt-)/.test(m) ? m : AI_DEFAULT_MODEL
+  const prov = aiProviderAtual()
+  const lista = AI_PROVIDERS[prov].modelos
+  // por fornecedor (aiModelProv); legado: cfg.aiModel vale para a OpenAI
+  const salvo = ((cfg.aiModelProv || {})[prov]) || (prov === 'openai' ? (cfg.aiModel || '').trim() : '')
+  return lista.some(m => m.id === salvo) ? salvo : lista[0].id
 }
 
 // A família gpt-5/o* rejeita `max_tokens` (exige `max_completion_tokens`).
@@ -40,7 +113,7 @@ function _aiTokenParam(model, maxTokens) {
 // Retenta em 429/5xx/queda de rede (2 vezes, backoff 1s→3s, respeitando
 // Retry-After). NUNCA retenta 4xx de verdade (chave errada não melhora
 // tentando de novo). O corpo do erro da OpenAI vira a mensagem do Error.
-async function _aiFetch(url, body, { timeoutMs = 90000, retries = 2 } = {}) {
+async function _aiFetch(url, body, { timeoutMs = 90000, retries = 2, key } = {}) {
   let lastErr = null
   for (let tent = 0; tent <= retries; tent++) {
     const ctl = new AbortController()
@@ -48,7 +121,7 @@ async function _aiFetch(url, body, { timeoutMs = 90000, retries = 2 } = {}) {
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${key || cfg.openaiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         signal: ctl.signal
       })
@@ -77,15 +150,16 @@ async function _aiFetch(url, body, { timeoutMs = 90000, retries = 2 } = {}) {
 // Chat que retorna JSON (response_format json_object).
 // Aceita string única (vira mensagem de user) ou array de mensagens.
 async function aiJSON(messages, { maxTokens, model, timeoutMs, retries } = {}) {
-  if (!cfg.openaiKey) throw new Error('Chave da OpenAI não configurada')
-  const m = model || aiModel()
+  const chat = aiChatCfg()
+  if (!chat.key) throw new Error('Chave da ' + chat.P.nome + ' não configurada (Configurações → IA)')
+  const m = model || chat.model
   const msgs = typeof messages === 'string' ? [{ role: 'user', content: messages }] : messages
-  const res = await _aiFetch('https://api.openai.com/v1/chat/completions', {
+  const res = await _aiFetch(chat.P.url, {
     model: m,
     response_format: { type: 'json_object' },
     messages: msgs,
     ..._aiTokenParam(m, maxTokens)
-  }, { timeoutMs, retries })
+  }, { timeoutMs, retries, key: chat.key })
   const data = await res.json()
   const raw = (data.choices?.[0]?.message?.content || '{}')
     .replace(/```(?:json)?\n?|\n?```/g, '').trim()
@@ -95,12 +169,13 @@ async function aiJSON(messages, { maxTokens, model, timeoutMs, retries } = {}) {
 
 // Chat de texto puro (respostas curtas, sem JSON).
 async function aiText(messages, { maxTokens, model, timeoutMs, retries } = {}) {
-  if (!cfg.openaiKey) throw new Error('Chave da OpenAI não configurada')
-  const m = model || aiModel()
+  const chat = aiChatCfg()
+  if (!chat.key) throw new Error('Chave da ' + chat.P.nome + ' não configurada (Configurações → IA)')
+  const m = model || chat.model
   const msgs = typeof messages === 'string' ? [{ role: 'user', content: messages }] : messages
-  const res = await _aiFetch('https://api.openai.com/v1/chat/completions', {
+  const res = await _aiFetch(chat.P.url, {
     model: m, messages: msgs, ..._aiTokenParam(m, maxTokens)
-  }, { timeoutMs, retries })
+  }, { timeoutMs, retries, key: chat.key })
   const data = await res.json()
   return (data.choices?.[0]?.message?.content || '').trim()
 }
@@ -141,6 +216,19 @@ async function aiImage(prompt, { size = '1024x1024', quality, timeoutMs = 180000
   // fallback para modelos legados que retornam URL
   const blob = await (await fetch(data.data[0].url)).blob()
   return blobToBase64(blob)
+}
+
+// Teste de chave POR FORNECEDOR: GET /models não consome token nenhum.
+async function aiTestKeyProv(prov, key) {
+  const P = AI_PROVIDERS[prov]
+  if (!P) return { ok: false, msg: 'fornecedor desconhecido' }
+  try {
+    const res = await fetch(P.modelsUrl, { headers: { 'Authorization': `Bearer ${key}` } })
+    if (res.ok) return { ok: true }
+    let msg = 'HTTP ' + res.status
+    try { const e = await res.json(); if (e.error?.message) msg = e.error.message } catch {}
+    return { ok: false, msg }
+  } catch (e) { return { ok: false, msg: e.message } }
 }
 
 // Teste de chave: GET /v1/models não consome token nenhum.

@@ -276,6 +276,11 @@ async function videoOpenPlayer(v) {
           <div class="vid-ov-pop hidden" id="vid-ov-pop"></div>
           <button class="vid-skipbtn left" onclick="videoSkip(-5)" data-tip="Voltar 5s (Shift+←)">−5s</button>
           <button class="vid-skipbtn right" onclick="videoSkip(5)" data-tip="Avançar 5s (Shift+→)">+5s</button>
+          <div class="vid-pt-minis">
+            <button class="vid-pt-mini ${_vidPTmode === 'sub' ? 'on' : ''}" id="vid-mini-sub" onclick="videoSetPT('sub')" data-tip="Tradução da legenda PT-BR"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M10.5 10.3a2.4 2.4 0 1 0 0 3.4M17.2 10.3a2.4 2.4 0 1 0 0 3.4"/></svg></button>
+            <button class="vid-pt-mini ${_vidPTmode === 'ia' ? 'on' : ''}" id="vid-mini-ia" onclick="videoSetPT('ia')" data-tip="Tradução literal pela IA (tempo real)">${ic('sparkles','ic-sm')}</button>
+            <button class="vid-pt-mini ${_vidPTfog ? 'on' : ''}" id="vid-mini-fog" onclick="videoToggleFog()" data-tip="Névoa: borrada até o hover">${ic('eye','ic-sm')}</button>
+          </div>
           <button class="vid-skipbtn vid-cuebtn left" onclick="videoCueNav(-1)" data-tip="Fala anterior (←) — de novo no meio de uma fala volta ao início dela">‹‹</button>
           <button class="vid-skipbtn vid-cuebtn right" onclick="videoCueNav(1)" data-tip="Próxima fala (→)">››</button>
         </div>
@@ -288,7 +293,8 @@ async function videoOpenPlayer(v) {
           <button class="btn btn-ghost btn-sm" id="vid-mark-btn" onclick="videoAddMarker()" data-tip="Marca o INÍCIO do trecho; o 2º clique (ou tecla M) fecha e abre o estudo focado">${ic('flame','ic-sm')}Marcar</button>
           <button class="btn btn-ghost btn-sm" id="vid-sync-btn" onclick="videoSyncToggle()" data-tip="Legenda fora de sincronia? Ajuste manual ou automático com IA">${ic('clock','ic-sm')}Sync</button>
           <button class="btn btn-ghost btn-sm ${_vidOverlayOn ? 'vid-on' : ''}" id="vid-ov-toggle" onclick="videoToggleOverlay()" data-tip="Legenda sobre o vídeo, em tempo real">${ic('message','ic-sm')}Legenda</button>
-          <button class="btn btn-ghost btn-sm ${_vidPTmode !== 'off' ? 'vid-on' : ''}" id="vid-pt-toggle" onclick="videoCyclePT()" data-tip="Tradução sob a legenda — alterna: desligada → legenda PT-BR oficial → IA em tempo real (traduz só o que você está vendo, +5s à frente)">${_vidPTlabel()}</button>
+          <button class="btn btn-ghost btn-sm ${_vidPTmode === 'sub' ? 'vid-on' : ''}" id="vid-pt-sub" onclick="videoSetPT('sub')" data-tip="Tradução da LEGENDA PT-BR oficial, sob a original"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M10.5 10.3a2.4 2.4 0 1 0 0 3.4M17.2 10.3a2.4 2.4 0 1 0 0 3.4"/></svg>PT legenda</button>
+          <button class="btn btn-ghost btn-sm ${_vidPTmode === 'ia' ? 'vid-on' : ''}" id="vid-pt-ia" onclick="videoSetPT('ia')" data-tip="Tradução LITERAL pela IA em tempo real — só o que você está vendo (+5s)">${ic('sparkles','ic-sm')}PT IA</button>
           <button class="btn btn-ghost btn-sm ${_vidPTfog ? 'vid-on' : ''}" id="vid-fog-toggle" onclick="videoToggleFog()" style="${_vidPTmode === 'off' ? 'display:none' : ''}" data-tip="Névoa: a tradução fica borrada até passar o mouse (treino de recall). Clique para mostrar sempre.">${ic('eye','ic-sm')}Névoa</button>
           <button class="btn btn-ghost btn-sm ${_vidAutoScroll ? 'vid-on' : ''}" id="vid-scroll-toggle" onclick="videoToggleScroll()" data-tip="Rolagem automática do transcript">${ic('arrowRight','ic-sm')}Seguir</button>
           <button class="btn btn-ghost btn-sm" onclick="videoToggleFullscreen()" data-tip="Tela cheia COM a legenda interativa (o botão do player usa a legenda nativa)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>Tela cheia</button>
@@ -457,36 +463,46 @@ function _vidPTshow(cue) {
   if (!cue || _vidPTmode === 'off') return ''
   return _vidPTmode === 'sub' ? (cue.pts || '') : (cue.pt || '')
 }
-function _vidPTlabel() {
-  return _vidPTmode === 'sub' ? 'PT · legenda' : _vidPTmode === 'ia' ? 'PT · IA' : 'PT'
-}
-
-function videoCyclePT() {
+function videoSetPT(modo) {
   if (!_vidCues.length) { toast('Importe ou busque a legenda primeiro', 'warning'); return }
-  const temTrilha = _vidCues.some(c => c.pts)
-  if (_vidPTmode === 'off') _vidPTmode = temTrilha ? 'sub' : 'ia'
-  else if (_vidPTmode === 'sub') _vidPTmode = 'ia'
-  else _vidPTmode = 'off'
-  if (_vidPTmode === 'ia' && !cfg.openaiKey) {
-    toast('A tradução em tempo real usa a chave OpenAI — configure em Configurações', 'warning')
+  if (_vidPTmode === modo) {
     _vidPTmode = 'off'
+  } else {
+    if (modo === 'sub' && !_vidCues.some(c => c.pts)) {
+      toast('Sem trilha PT-BR baixada — use "Buscar legenda" (a PT vem junto) ou a tradução por IA', 'warning'); return
+    }
+    if (modo === 'ia' && !aiChatCfg().key) {
+      toast('Configure uma chave de IA em Configurações para a tradução em tempo real', 'warning'); return
+    }
+    _vidPTmode = modo
+    toast(modo === 'sub'
+      ? 'Tradução da legenda PT-BR oficial (pode divergir do literal)'
+      : 'Tradução literal pela IA — só o que você está vendo (+5s)', 'info')
   }
-  if (_vidPTmode === 'sub') toast('Tradução: legenda PT-BR oficial (pode divergir do literal — bom para entender a cena)', 'info')
-  else if (_vidPTmode === 'ia') toast('Tradução: IA em tempo real — traduz o que você está vendo (+5s à frente), fiel ao texto', 'info')
   _vidShowPT = _vidPTmode !== 'off'
-  const btn = el('vid-pt-toggle')
-  if (btn) { btn.classList.toggle('vid-on', _vidPTmode !== 'off'); btn.textContent = _vidPTlabel() }
-  const fog = el('vid-fog-toggle')
-  if (fog) fog.style.display = _vidPTmode === 'off' ? 'none' : ''
+  _vidPTButtons()
   renderVidTranscript()
   _vidUpdateOverlay()
   const p = el('vid-player')
   if (_vidPTmode === 'ia' && p) _vidEnsurePTAhead(p.currentTime)
 }
 
+// Sincroniza o estado visual dos controles de tradução (toolbar + minis
+// flutuantes do vídeo — os minis valem em tela cheia)
+function _vidPTButtons() {
+  el('vid-pt-sub')?.classList.toggle('vid-on', _vidPTmode === 'sub')
+  el('vid-pt-ia')?.classList.toggle('vid-on', _vidPTmode === 'ia')
+  el('vid-mini-sub')?.classList.toggle('on', _vidPTmode === 'sub')
+  el('vid-mini-ia')?.classList.toggle('on', _vidPTmode === 'ia')
+  el('vid-mini-fog')?.classList.toggle('on', _vidPTfog)
+  const fog = el('vid-fog-toggle')
+  if (fog) fog.style.display = _vidPTmode === 'off' ? 'none' : ''
+}
+
 function videoToggleFog() {
   _vidPTfog = !_vidPTfog
   el('vid-fog-toggle')?.classList.toggle('vid-on', _vidPTfog)
+  _vidPTButtons()
   _vidUpdateOverlay()
 }
 

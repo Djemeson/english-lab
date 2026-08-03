@@ -210,7 +210,11 @@ async function fbPushData() {
       subAddons:   cfg.subAddons     || '',
       updatedAt: Date.now()
     }
-    if (cfg.openaiKey) cfgPayload.openaiKey = cfg.openaiKey
+    if (cfg.openaiKey)   cfgPayload.openaiKey   = cfg.openaiKey
+    if (cfg.geminiKey)   cfgPayload.geminiKey   = cfg.geminiKey
+    if (cfg.deepseekKey) cfgPayload.deepseekKey = cfg.deepseekKey
+    if (cfg.groqKey)     cfgPayload.groqKey     = cfg.groqKey
+    cfgPayload.aiModelProv = cfg.aiModelProv || {}
     batch.set(base.collection('data').doc('cfg'), cfgPayload, { merge: true })
     if (kindleItems.length > 0) {
       batch.set(base.collection('data').doc('kindleQueue'), { list: kindleItems, updatedAt: Date.now() })
@@ -351,6 +355,10 @@ async function fbPull() {
     if (cfgDoc2.exists) {
       const c = cfgDoc2.data() || {}
       if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
+    if (c.geminiKey)   cfg.geminiKey   = c.geminiKey
+    if (c.deepseekKey) cfg.deepseekKey = c.deepseekKey
+    if (c.groqKey)     cfg.groqKey     = c.groqKey
+    if (c.aiModelProv) cfg.aiModelProv = c.aiModelProv
       if (c.theme)       cfg.theme       = c.theme
     if (c.accent !== undefined) cfg.accent = c.accent
     if (c.imgQuality) cfg.imgQuality = c.imgQuality
@@ -482,6 +490,10 @@ function applyCloudDocs(docs) {
   if (docs.cfg) {
     const c = docs.cfg
     if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
+    if (c.geminiKey)   cfg.geminiKey   = c.geminiKey
+    if (c.deepseekKey) cfg.deepseekKey = c.deepseekKey
+    if (c.groqKey)     cfg.groqKey     = c.groqKey
+    if (c.aiModelProv) cfg.aiModelProv = c.aiModelProv
     if (c.theme)       cfg.theme       = c.theme
     if (c.aiProvider)  cfg.aiProvider  = c.aiProvider
     if (c.aiModel)     cfg.aiModel     = c.aiModel

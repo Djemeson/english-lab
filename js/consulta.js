@@ -294,7 +294,8 @@ async function sendConsulta() {
   const input = el('consulta-input')
   const question = input?.value.trim()
   if (!question) return
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  const _chat = aiChatCfg()
+  if (!_chat.key) { toast('Configure a chave da ' + _chat.P.nome + ' em Configurações', 'warning'); return }
 
   // Garante uma conversa ativa (cria na 1ª mensagem)
   let c = getActiveConversa()
@@ -336,12 +337,12 @@ async function sendConsulta() {
     // automático em SSE é justamente o que não fazemos.
     const ctl = new AbortController()
     const connTimer = setTimeout(() => ctl.abort(), 45000)
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch(_chat.P.url, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${cfg.openaiKey}`, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': `Bearer ${_chat.key}`, 'Content-Type': 'application/json' },
       signal: ctl.signal,
       body: JSON.stringify({
-        model: aiModel(),
+        model: _chat.model,
         messages: [{ role: 'system', content: consultaSystem() }, ...apiHistory],
         temperature: 0.7,
         stream: true

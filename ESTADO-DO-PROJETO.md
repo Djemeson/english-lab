@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Fix do Explicar (34ª rodada)**: o mousedown do clique
+> Última atualização: 2026-08-03 — **Multi-fornecedor de IA + botões de tradução no vídeo (35ª
+> rodada)**: Gemini, DeepSeek e Groq além da OpenAI (modelos curados por faixa de custo,
+> chaves organizadas com teste individual, sync); TTS/imagens/Whisper seguem na OpenAI. No
+> vídeo, a tradução virou dois botões com ícone (CC = legenda oficial, faíscas = IA literal),
+> flutuando no vídeo e funcionando em tela cheia. Ver seção 8 (35ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Fix do Explicar (34ª rodada)**: o mousedown do clique
 > colapsava a seleção e o próprio listener escondia o popup antes da explicação chegar.
 > Clique dentro do popup não fecha mais + preventDefault preserva a seleção.
 > Ver seção 8 (34ª rodada).
@@ -402,6 +408,32 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (35ª rodada) — Multi-fornecedor de IA + botões de tradução com ícone no vídeo
+86. **Dois pedidos**: dropdown de fornecedores de IA (Gemini, DeepSeek, Groq além da OpenAI)
+    com modelos por faixa de custo e chaves organizadas; e (mensagem do meio) os controles de
+    tradução do vídeo viraram DOIS botões com ícone, presentes no fullscreen.
+    - **Gateway multi-fornecedor** (`ai.js`): `AI_PROVIDERS` (OpenAI, Gemini, DeepSeek,
+      Groq — todos falam o dialeto OpenAI de chat/completions), `aiChatCfg()` decide
+      URL+chave+modelo; `aiJSON`/`aiText`/Assistente (streaming) roteiam pelo fornecedor
+      ativo. **TTS, imagens e Whisper continuam SEMPRE na OpenAI** (sem equivalente
+      compatível) — guard com mensagem clara. Modelos CURADOS por faixa de custo
+      (baixo/médio/alto + nota) e lembrados POR fornecedor (`cfg.aiModelProv`).
+    - **Configurações**: dropdown de fornecedor → dropdown de modelos com faixa de custo →
+      seção "Chaves de API" com 4 linhas organizadas (olho + botão Testar individual via
+      GET /models, que não gasta token). Chaves novas: `geminiKey/deepseekKey/groqKey` —
+      sincronizadas no Firestore (só quando não-vazias, padrão da openaiKey) e protegidas
+      pelo backup pegajoso do IndexedDB. sw: domínios novos em NETWORK_ONLY.
+    - **Validado ao vivo**: 4 fornecedores no dropdown, modelos por faixa, roteamento
+      conferido (Groq URL+Bearer gsk+llama; Gemini URL+Bearer AIza+flash-lite), TTS
+      bloqueando com mensagem certa, teste de chave por fornecedor.
+    - **Tradução no vídeo: DOIS botões com ícone** (pedido: "mais sofisticado que texto"):
+      CC (legenda PT-BR oficial) e faíscas (IA literal em tempo real), exclusivos entre si,
+      no toolbar E como **minis flutuantes no canto do vídeo** (aparecem no hover, valem em
+      tela cheia) + mini de névoa. `videoSetPT(modo)` substituiu o ciclo de 3 posições.
+      A tradução por IA do vídeo agora usa o FORNECEDOR ATIVO (Groq/Gemini/DeepSeek servem).
+      Validado: exclusividade, estados espelhados toolbar↔minis, overlay trocando
+      oficial↔IA, fog. `CACHE`: `v61` → **`v62`**.
 
 ### Sessão 2026-08-03 (34ª rodada) — Conserto do "cliquei em Explicar e nada aconteceu"
 85. **Bug do Djemeson na 33ª**: o menu aparecia, mas Explicar "não fazia nada". Causa: o

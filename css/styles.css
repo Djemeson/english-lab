@@ -3774,3 +3774,41 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   border-top:1px dashed var(--border);padding-top:8px;margin-top:2px;
   max-height:180px;overflow-y:auto;
 }
+
+/* ---- Chaves de API organizadas por fornecedor ---- */
+.cfg-keys-title{
+  font-size:var(--fs-xs);font-weight:600;color:var(--text2);
+  margin:4px 0 10px;padding-top:12px;border-top:1px dashed var(--border);
+}
+.cfg-key-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.cfg-key-nome{
+  width:170px;flex-shrink:0;font-size:var(--fs-sm);font-weight:600;color:var(--text2);
+}
+.cfg-key-nome i{font-style:normal;font-weight:400;font-size:var(--fs-2xs);color:var(--text3)}
+.cfg-key-campo{position:relative;flex:1;min-width:240px;display:flex;align-items:center}
+.cfg-key-campo input{
+  width:100%;height:var(--control-h);border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:var(--surface2);color:var(--text);
+  padding:0 40px 0 12px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:var(--fs-sm);
+}
+.cfg-key-eye{
+  position:absolute;right:10px;background:none;border:none;color:var(--text3);
+  cursor:pointer;display:flex;align-items:center;padding:4px;
+}
+.cfg-key-eye:hover{color:var(--text)}
+.cfg-key-status{font-size:var(--fs-xs);min-width:70px}
+
+/* ---- Minis de traducao flutuando no video (valem em tela cheia) ---- */
+.vid-pt-minis{
+  position:absolute;top:12px;right:12px;z-index:4;display:flex;gap:6px;
+  opacity:0;transition:opacity .15s ease;
+}
+.vid-stage:hover .vid-pt-minis{opacity:1}
+.vid-pt-mini{
+  width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;
+  background:rgba(0,0,0,.55);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+}
+.vid-pt-mini .ic{width:16px;height:16px}
+.vid-pt-mini:hover{background:rgba(0,0,0,.78)}
+.vid-pt-mini.on{background:var(--primary);box-shadow:0 0 0 2px rgba(255,255,255,.35)}
