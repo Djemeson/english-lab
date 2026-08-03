@@ -28,6 +28,8 @@ let _vidLivePT = false          // tradução simultânea (legenda PT alinhada o
 let _vidCuesPT = []             // trilha PT-BR baixada dos addons (alinhada por tempo)
 let _vidFocus = null            // estudo focado de um trecho {ci,cj,revEN,revPT}
 let _vidSubsSaveTimer = null
+let _vidMarkOpen = null         // marcador em ciclo: tempo de início aguardando o fechamento
+let _vidSyncing = false
 
 // ---- IndexedDB próprio: handles de arquivo + legendas ----
 const VideoDB = {
@@ -263,10 +265,12 @@ async function videoOpenPlayer(v) {
           </div>
         </div>
         <div id="vid-audiofix-banner"></div>
+        <div id="vid-sync-panel" class="hidden"></div>
         <div class="vid-toolbar">
           <span class="vid-title" data-tip="${escA(v.fileName)}">${esc(v.title)}</span>
           <span style="flex:1"></span>
-          <button class="btn btn-ghost btn-sm" onclick="videoAddMarker()" data-tip="Marcar este momento para estudar depois (tecla M)">${ic('flame','ic-sm')}Marcar</button>
+          <button class="btn btn-ghost btn-sm" id="vid-mark-btn" onclick="videoAddMarker()" data-tip="Marca o INÍCIO do trecho; o 2º clique (ou tecla M) fecha e abre o estudo focado">${ic('flame','ic-sm')}Marcar</button>
+          <button class="btn btn-ghost btn-sm" id="vid-sync-btn" onclick="videoSyncToggle()" data-tip="Legenda fora de sincronia? Ajuste manual ou automático com IA">${ic('clock','ic-sm')}Sync</button>
           <button class="btn btn-ghost btn-sm ${_vidOverlayOn ? 'vid-on' : ''}" id="vid-ov-toggle" onclick="videoToggleOverlay()" data-tip="Legenda sobre o vídeo, em tempo real">${ic('message','ic-sm')}Legenda</button>
           <button class="btn btn-ghost btn-sm ${_vidLivePT ? 'vid-on' : ''}" id="vid-pt-toggle" onclick="videoToggleLivePT()" data-tip="Tradução SIMULTÂNEA: traduz cada fala enquanto o vídeo toca (IA, centavos por episódio) e mostra sob a legenda">PT ao vivo</button>
           <button class="btn btn-ghost btn-sm ${_vidAutoScroll ? 'vid-on' : ''}" id="vid-scroll-toggle" onclick="videoToggleScroll()" data-tip="Rolagem automática do transcript">${ic('arrowRight','ic-sm')}Seguir</button>
@@ -765,18 +769,58 @@ Responda:
 }
 
 // ================================================================
-// MARCADORES — assiste primeiro, estuda depois (tecla M)
+// MARCADORES EM CICLO — o 1º M abre o trecho, o 2º M fecha e leva
+// DIRETO para o estudo focado. É o fluxo "não entendi essa fala":
+// marca onde começou a confusão, marca onde terminou, vai aprender.
+// (Marcadores antigos, de ponto único, continuam funcionando.)
 // ================================================================
 function videoAddMarker() {
   const p = el('vid-player'); if (!p || !_vidCur) return
   const t = +p.currentTime.toFixed(1)
+
+  if (_vidMarkOpen == null) {
+    _vidMarkOpen = t
+    _vidMarkBtnState(true)
+    toast(`Início do trecho marcado em ${_vidFmtTime(t)} — aperte M de novo para fechar`, 'info')
+    return
+  }
+
+  let a = _vidMarkOpen, b = t
+  _vidMarkOpen = null
+  _vidMarkBtnState(false)
+  if (b < a) { const x = a; a = b; b = x }
+  if (b - a < 0.8) { toast('Trecho curto demais — marcação cancelada', 'info'); return }
+
   _vidCur.markers = _vidCur.markers || []
-  if (_vidCur.markers.some(m => Math.abs(m - t) < 1)) return   // anti-duplo-clique
-  _vidCur.markers.push(t); _vidCur.markers.sort((a, b) => a - b)
+  _vidCur.markers.push({ a: +a.toFixed(1), b: +b.toFixed(1) })
   _vidCur.updated_at = new Date().toISOString()
   saveVideos(); autoSyncAfterChange()
   renderVidMarkers()
-  toast(`Momento ${_vidFmtTime(t)} marcado`, 'info')
+  videoFocusRange(a, b)   // o trecho fechado vai direto para o estudo
+}
+
+// Botão "Marcar" reflete o ciclo aberto
+function _vidMarkBtnState(aberto) {
+  const btn = el('vid-mark-btn'); if (!btn) return
+  btn.classList.toggle('vid-marking', aberto)
+  btn.innerHTML = aberto ? `${ic('flame','ic-sm')}Fechar trecho` : `${ic('flame','ic-sm')}Marcar`
+}
+
+// Estudo focado a partir de um INTERVALO de tempo: acha as falas que o
+// trecho toca e abre o foco nelas (bordas respeitam o que foi marcado).
+function videoFocusRange(a, b) {
+  if (!_vidCues.length) { toast('Importe a legenda primeiro — o estudo focado usa as falas', 'warning'); return }
+  let ci = -1, cj = -1
+  for (let i = 0; i < _vidCues.length; i++) {
+    const c = _vidCues[i]
+    if (c.e >= a && c.s <= b) { if (ci < 0) ci = i; cj = i }
+    if (c.s > b) break
+  }
+  if (ci < 0) { toast('Sem falas na legenda dentro do trecho marcado', 'warning'); return }
+  videoFocusStart(ci, cj)
+  // bordas: o marcado vence quando é mais largo que as falas
+  _vidSel.s = Math.min(_vidSel.s, a); _vidSel.e = Math.max(_vidSel.e, b)
+  renderVidSelPanel()
 }
 
 function renderVidMarkers() {
@@ -785,13 +829,18 @@ function renderVidMarkers() {
   if (!ms.length) { box.innerHTML = ''; return }
   box.innerHTML = `
     <div class="vid-markers">
-      <div class="vid-markers-head">Momentos marcados <span>${ms.length}</span></div>
-      ${ms.map((t, i) => {
-        const cue = _vidCues.find(c => t >= c.s - 1 && t <= c.e + 1)
+      <div class="vid-markers-head">Trechos marcados <span>${ms.length}</span></div>
+      ${ms.map((m, i) => {
+        const range = typeof m === 'number' ? null : m
+        const t0 = range ? range.a : m
+        const cue = _vidCues.find(c => t0 >= c.s - 1 && t0 <= c.e + 1) ||
+                    (range ? _vidCues.find(c => c.e >= range.a && c.s <= range.b) : null)
+        const rotulo = range ? `${_vidFmtTime(range.a)} → ${_vidFmtTime(range.b)} (${(range.b - range.a).toFixed(0)}s)` : _vidFmtTime(m)
+        const estudar = range ? `videoFocusRange(${range.a},${range.b})` : (cue ? `videoFocusFromMarker(${m})` : '')
         return `<div class="vid-marker-row">
-          <button class="vid-cue-time" onclick="videoSeekMarker(${t})">${_vidFmtTime(t)}</button>
-          <span class="vid-marker-text" ${cue ? `onclick="videoSelectCue(${_vidCues.indexOf(cue)})" style="cursor:pointer"` : ''}>${cue ? esc(cue.t) : '(sem fala na legenda neste ponto)'}</span>
-          ${cue ? `<button class="btn btn-ghost btn-sm" onclick="videoFocusFromMarker(${t})" data-tip="Estudo focado deste trecho">${ic('target','ic-sm')}estudar</button>` : ''}
+          <button class="vid-cue-time" onclick="videoSeekMarker(${t0})">${rotulo}</button>
+          <span class="vid-marker-text">${cue ? esc(cue.t) : '(sem fala na legenda neste ponto)'}</span>
+          ${estudar ? `<button class="btn btn-ghost btn-sm" onclick="${estudar}" data-tip="Estudo focado deste trecho">${ic('target','ic-sm')}estudar</button>` : ''}
           <button class="vid-marker-del" onclick="videoDelMarker(${i})" aria-label="Remover">${ic('x','ic-sm')}</button>
         </div>`
       }).join('')}
@@ -1484,4 +1533,135 @@ function _vidRenderFocus(panel) {
         </div>` : `
         <div class="vid-focus-blind">Ouça sem ler. Entendeu? Tente repetir. Depois revele a fala.</div>`}
     </div>`
+}
+
+// ================================================================
+// SINCRONIZAÇÃO DA LEGENDA
+// Manual: desloca a legenda inteira em passos de ±0,1s / ±0,5s.
+// Automática (IA): grava ~45s do áudio REAL, transcreve com Whisper
+// (timestamps por segmento), casa cada segmento transcrito com a fala
+// mais parecida da legenda e aplica a MEDIANA dos desvios. Custo:
+// ~R$ 0,03 por sincronização. É "a IA escuta e alinha".
+// ================================================================
+function videoSyncToggle() {
+  const panel = el('vid-sync-panel'); if (!panel) return
+  if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return }
+  panel.classList.remove('hidden')
+  _vidSyncRender()
+}
+
+function _vidSyncRender(msg) {
+  const panel = el('vid-sync-panel'); if (!panel) return
+  const shift = (_vidCur && _vidCur.subShift) || 0
+  panel.innerHTML = `
+    <div class="vid-sync">
+      <div class="vid-sync-row">
+        <span class="vid-sync-lbl">${ic('clock','ic-sm')}Sincronia da legenda</span>
+        <span class="vid-sync-shift" data-tip="Deslocamento acumulado aplicado à legenda">${shift > 0 ? '+' : ''}${shift.toFixed(1)}s</span>
+        <span style="flex:1"></span>
+        <button class="vid-fix-close" onclick="el('vid-sync-panel').classList.add('hidden')" aria-label="Fechar">${ic('x','ic-sm')}</button>
+      </div>
+      <div class="vid-sync-row">
+        <span class="vid-sync-hint">Legenda ATRASADA (fala vem antes do texto)? Use −. Adiantada? Use +.</span>
+      </div>
+      <div class="vid-sync-row">
+        <button class="btn btn-ghost btn-sm" onclick="videoSubShift(-0.5)">−0,5s</button>
+        <button class="btn btn-ghost btn-sm" onclick="videoSubShift(-0.1)">−0,1s</button>
+        <button class="btn btn-ghost btn-sm" onclick="videoSubShift(0.1)">+0,1s</button>
+        <button class="btn btn-ghost btn-sm" onclick="videoSubShift(0.5)">+0,5s</button>
+        <span style="flex:1"></span>
+        <button class="btn btn-primary btn-sm" ${_vidSyncing ? 'disabled' : ''} onclick="videoSyncAuto()"
+          data-tip="A IA escuta ~45s do episódio, transcreve com timestamps e alinha a legenda sozinha (~R$ 0,03)">
+          ${ic('sparkles','ic-sm')}Sincronizar com IA</button>
+      </div>
+      ${msg ? `<div class="vid-sync-status">${msg}</div>` : ''}
+    </div>`
+}
+
+// Desloca TODAS as falas (EN e trilha PT juntas — o desvio é do arquivo)
+function videoSubShift(delta) {
+  if (!_vidCues.length || !_vidCur) return
+  _vidCues.forEach(c => { c.s = Math.max(0, c.s + delta); c.e = Math.max(0.3, c.e + delta) })
+  _vidCuesPT.forEach(c => { c.s = Math.max(0, c.s + delta); c.e = Math.max(0.3, c.e + delta) })
+  _vidCur.subShift = +(((_vidCur.subShift || 0) + delta).toFixed(2))
+  _vidCur.updated_at = new Date().toISOString()
+  saveVideos(); autoSyncAfterChange()
+  _vidSaveSubs()
+  _vidCueIdx = -1            // força recomputar a fala corrente
+  renderVidTranscript(); _vidUpdateOverlay(); _vidSyncRender()
+}
+
+// ---- Automática: Whisper escuta uma amostra e a legenda se alinha ----
+async function videoSyncAuto(dur) {
+  if (_vidSyncing) return
+  if (!_vidCues.length) { toast('Importe a legenda primeiro', 'warning'); return }
+  if (!cfg.openaiKey) { toast('A sincronização automática usa a IA — configure a chave OpenAI', 'warning'); return }
+  const p = el('vid-player'); if (!p) return
+  _vidSyncing = true
+  dur = dur || 45
+  try {
+    // Amostra num ponto com falas: o meio da 10ª fala em diante, ou 20% do vídeo
+    const base = _vidCues[Math.min(9, _vidCues.length - 1)].s
+    const t0 = Math.max(0, base)
+    _vidSyncRender(`<span class="gen-spinner"></span> Gravando ${dur}s do áudio (você vai ouvir o trecho)...`)
+    const b64 = await captureClipAudio(t0, t0 + dur)
+    _vidSyncRender('<span class="gen-spinner"></span> Transcrevendo com a IA (Whisper)...')
+    const blob = await (await fetch(b64)).blob()
+
+    const fd = new FormData()
+    fd.append('file', blob, 'amostra.webm')
+    fd.append('model', 'whisper-1')
+    fd.append('response_format', 'verbose_json')
+    if ((_vidCur.lang || 'en') === 'en') fd.append('language', 'en')
+    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 120000)
+    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST', headers: { 'Authorization': `Bearer ${cfg.openaiKey}` }, body: fd, signal: ctl.signal
+    })
+    clearTimeout(timer)
+    if (!res.ok) {
+      let msg = 'HTTP ' + res.status
+      try { const e = await res.json(); if (e.error?.message) msg = e.error.message } catch {}
+      throw new Error(msg)
+    }
+    const data = await res.json()
+    const segs = (data.segments || []).map(s => ({ t: s.text, abs: t0 + s.start }))
+      .filter(s => (s.t || '').trim().length > 6)
+    if (segs.length < 3) throw new Error('a amostra tem pouca fala — tente com o vídeo num diálogo')
+
+    _vidSyncRender('<span class="gen-spinner"></span> Casando a transcrição com a legenda...')
+    const norm = t => String(t).toLowerCase().replace(/[^\p{L}\p{N}' ]+/gu, ' ').split(/\s+/).filter(w => w.length > 1)
+    const deltas = []
+    for (const seg of segs) {
+      const tokensSeg = new Set(norm(seg.t))
+      if (tokensSeg.size < 3) continue
+      let melhor = null, melhorScore = 0
+      for (const c of _vidCues) {
+        if (c.s < seg.abs - 60 || c.s > seg.abs + 60) continue
+        const tokensCue = norm(c.t)
+        if (!tokensCue.length) continue
+        let inter = 0
+        for (const w of tokensCue) if (tokensSeg.has(w)) inter++
+        const score = inter / Math.min(tokensSeg.size, tokensCue.length)
+        if (score > melhorScore) { melhorScore = score; melhor = c }
+      }
+      if (melhor && melhorScore >= 0.5) deltas.push(melhor.s - seg.abs)
+    }
+    if (deltas.length < 3) throw new Error(`só ${deltas.length} fala(s) casaram — a legenda pode ser de outra versão do episódio`)
+
+    deltas.sort((a, b) => a - b)
+    const mediana = deltas[Math.floor(deltas.length / 2)]
+    if (Math.abs(mediana) < 0.15) {
+      _vidSyncRender(`${ic('checkCircle','ic-sm')} Já está em sincronia (desvio de ${(mediana * 1000).toFixed(0)}ms em ${deltas.length} falas casadas).`)
+    } else {
+      videoSubShift(+(-mediana).toFixed(2))
+      _vidSyncRender(`${ic('checkCircle','ic-sm')} Sincronizado: a legenda estava ${mediana > 0 ? 'adiantada' : 'atrasada'} ${Math.abs(mediana).toFixed(1)}s (${deltas.length} falas casadas pela IA).`)
+      toast('Legenda sincronizada pela IA', 'success')
+    }
+  } catch (e) {
+    console.warn('[video] syncAuto:', e)
+    _vidSyncRender(`Não consegui sincronizar automaticamente: ${esc(e.message)}. Use os botões manuais.`)
+  } finally {
+    _vidSyncing = false
+    const p2 = el('vid-player'); if (p2) p2.pause()
+  }
 }

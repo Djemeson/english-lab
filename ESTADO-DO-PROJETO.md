@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-02 — **Player de verdade (20ª rodada)**: legenda em tempo real
+> Última atualização: 2026-08-02 — **Marcador em ciclo + sync com IA (21ª rodada)**: M abre o
+> trecho, M fecha e cai direto no estudo focado (marcador virou intervalo); e o painel "Sync"
+> ajusta a legenda na mão (±0,1/±0,5s) ou sozinho — Whisper transcreve ~45s do áudio real com
+> timestamps, casa com a legenda e aplica a mediana dos desvios (teste com dessincronia
+> plantada de +2,0s: detectou e corrigiu exato). Ver seção 8 (21ª rodada).
+>
+> Última atualização anterior: 2026-08-02 — **Player de verdade (20ª rodada)**: legenda em tempo real
 > sobre o vídeo, tradução simultânea em camadas (legenda PT-BR oficial alinhada por tempo —
 > 614/769 falas no teste real — com IA como camada adicional), busca de legenda sem fricção
 > (direto para a lista do episódio) e ESTUDO FOCADO por trecho (escuta às cegas → revelar fala
@@ -324,6 +330,29 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-02 (21ª rodada) — Marcador em ciclo + sincronização com IA
+72. **Dois pedidos do Djemeson**:
+    - **Marcador em CICLO** ("clica marca o começo, clica de novo marca o fim, e é esse trecho
+      que vai pro estudo focado"): o 1º M/clique abre o trecho (botão vira "Fechar trecho" e
+      pulsa em âmbar), o 2º fecha e **abre o estudo focado direto** naquele intervalo. O
+      marcador agora é um INTERVALO `{a,b}` (os antigos, de ponto, seguem funcionando); a
+      lista mostra `12:31 → 12:39 (8s)` com botão "estudar". `videoFocusRange(a,b)` acha as
+      falas que o trecho toca e as bordas marcadas vencem quando são mais largas que as falas.
+      Trecho < 0,8s = marcação cancelada (anti-clique-duplo).
+    - **Sincronização da legenda** (pediu "algo mais poderoso, sincronização automática com
+      IA — faça acontecer"): botão **"Sync"** no toolbar abre o painel com ajuste manual
+      (±0,1s/±0,5s, indicador do deslocamento acumulado em `v.subShift`, desloca EN e trilha
+      PT juntas) e **"Sincronizar com IA"**: grava ~45s do áudio REAL (captureClipAudio — usa
+      o áudio consertado quando existe), transcreve com **Whisper** (`verbose_json`, timestamps
+      por segmento), casa cada segmento com a fala mais parecida da legenda (tokens
+      normalizados, score ≥ 0,5, janela ±60s) e aplica a **mediana** dos desvios (≥3 falas
+      casadas; senão falha com mensagem honesta e aponta para o manual). Desvio < 150ms =
+      "já está em sincronia". Custo ~R$ 0,03 por uso — abaixo do limiar de confirmação.
+    - **Validado ao vivo**: ciclo abre/fecha → foco com 2 falas e bordas do usuário; lista de
+      trechos; shift manual com indicador; auto-sync com dessincronia PLANTADA de +2,0s e
+      Whisper stubado → detectou 2,0s exatos, corrigiu as 4 falas, `subShift = −2`; ciclo
+      aberto sobrevive à troca de seção; 0 erros de console. `CACHE`: `v45` → **`v46`**.
 
 ### Sessão 2026-08-02 (20ª rodada) — Player de verdade: legenda no vídeo, PT simultâneo e estudo focado
 71. **Feedback do Djemeson em 4 pontos** (+1 mensagem no meio da rodada), tudo construído:

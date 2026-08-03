@@ -3670,3 +3670,25 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   margin:2px 0 10px;padding:8px 12px;border-radius:var(--radius-sm);
   background:var(--surface2);font-size:var(--fs-sm);color:var(--text2);font-style:italic;
 }
+
+/* ---- VIDEO: painel de sincronia + botao de marcacao em ciclo ---- */
+.vid-sync{
+  margin-top:10px;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:10px 14px;box-shadow:var(--shadow-sm);
+  display:flex;flex-direction:column;gap:8px;
+}
+.vid-sync-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.vid-sync-lbl{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-sm);font-weight:700}
+.vid-sync-shift{
+  font-size:var(--fs-2xs);font-weight:700;font-variant-numeric:tabular-nums;
+  padding:2px 8px;border-radius:var(--radius-pill);
+  background:color-mix(in srgb, var(--primary) 14%, transparent);color:var(--primary);
+}
+.vid-sync-hint{font-size:var(--fs-2xs);color:var(--text3)}
+.vid-sync-status{font-size:var(--fs-sm);color:var(--text2);display:flex;align-items:center;gap:7px}
+.vid-sync-status .ic{color:var(--success)}
+/* Ciclo de marcacao aberto: o botao pulsa para lembrar que falta fechar */
+.vid-marking{
+  color:var(--warning)!important;border-color:color-mix(in srgb, var(--warning) 45%, transparent)!important;
+  animation:pulse 1.2s ease-in-out infinite;
+}
