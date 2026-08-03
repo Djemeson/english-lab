@@ -129,6 +129,7 @@ function renderVideoLib() {
               <span>${dur}</span>
               <span>${v.cueCount ? v.cueCount + ' falas' : 'sem legenda'}</span>
               ${nClips ? `<span>${nClips} corte${nClips !== 1 ? 's' : ''}</span>` : ''}
+              ${v.position > 15 ? `<span>parou em ${_vidFmtTime(v.position)}</span>` : ''}
               ${v.coverage != null ? `<span class="vid-cov">${v.coverage}% conhecido</span>` : ''}
             </div>
           </div>
@@ -236,6 +237,7 @@ async function videoOpen(id) {
 // PLAYER + TRANSCRIPT
 // ================================================================
 async function videoOpenPlayer(v) {
+  if (_vidSubsSaveTimer) _vidSaveSubsNow()   // flush do vídeo anterior
   _vidCur = v
   _videoView = 'player'
   _vidSel = null; _vidSelWords = new Set(); _vidLoop = false; _vidPlayStop = null; _vidCueIdx = -1
@@ -305,6 +307,19 @@ async function videoOpenPlayer(v) {
   })
   player.addEventListener('timeupdate', _vidOnTime)
 
+  // ---- Retomar de onde parou ----
+  // A posição é salva a cada ~5s de reprodução (e no pause/saída). Na volta,
+  // recua 2s para dar contexto. Perto do fim (<20s) não retoma; 'ended' zera.
+  player.addEventListener('loadedmetadata', () => {
+    const pos = v.position || 0
+    if (pos > 15 && (!isFinite(player.duration) || pos < player.duration - 20)) {
+      player.currentTime = Math.max(0, pos - 2)
+      toast(`Retomando de ${_vidFmtTime(pos)} — de onde você parou`, 'info')
+    }
+  }, { once: true })
+  player.addEventListener('pause', _vidSavePos)
+  player.addEventListener('ended', () => { v.position = 0; saveVideos() })
+
   // Áudio consertado de sessão anterior? Reanexa. Senão, arma o detector de
   // áudio mudo (MKV com Dolby/DTS: o Chrome toca o vídeo e cala o áudio).
   _vidFixAudio = null
@@ -333,6 +348,10 @@ async function videoOpenPlayer(v) {
 }
 
 function videoBackToLib() {
+  _vidSavePos()
+  // Flush ANTES de anular _vidCur: o save debounced (1,5s) aborta sem ele —
+  // sair rápido do player perdia a última mudança de legenda (bug real).
+  if (_vidSubsSaveTimer) _vidSaveSubsNow()
   const p = el('vid-player'); if (p) p.pause()
   if (_vidURL) { URL.revokeObjectURL(_vidURL); _vidURL = null }
   _vidCur = null; _vidFile = null
@@ -350,6 +369,11 @@ function _vidFmtTime(sec) {
 function _vidOnTime() {
   const p = el('vid-player'); if (!p) return
   const t = p.currentTime
+
+  // Posição para o "continuar de onde parou" (grava a cada ~5s de avanço)
+  if (_vidCur && Math.abs(t - (_vidCur.position || 0)) > 5) {
+    _vidCur.position = +t.toFixed(1); saveVideos()
+  }
 
   // Áudio consertado: corrige deriva além de 300ms
   if (_vidFixAudio && !p.paused && Math.abs(_vidFixAudio.currentTime - t) > 0.3) {
@@ -1427,15 +1451,18 @@ function _vidAlignPTTrack() {
     }
     return hits
   }
+  // Desempate por |off| menor: com poucas falas, varios offsets empatam e o
+  // primeiro (-15s) vencia — a traducao ia parar na fala errada.
   let bestOff = 0, bestScore = -1
-  for (let off = -15; off <= 15.01; off += 0.5) {
-    const sc = score(+off.toFixed(1))
-    if (sc > bestScore) { bestScore = sc; bestOff = +off.toFixed(1) }
+  const considera = off => {
+    const sc = score(off)
+    if (sc > bestScore || (sc === bestScore && Math.abs(off) < Math.abs(bestOff))) { bestScore = sc; bestOff = off }
   }
-  for (let off = bestOff - 0.4; off <= bestOff + 0.41; off += 0.1) {
-    const sc = score(+off.toFixed(1))
-    if (sc > bestScore) { bestScore = sc; bestOff = +off.toFixed(1) }
-  }
+  for (let off = -15; off <= 15.01; off += 0.5) considera(+off.toFixed(1))
+  const centro = bestOff
+  for (let off = centro - 0.4; off <= centro + 0.41; off += 0.1) considera(+off.toFixed(1))
+  // Evidencia minima: empate generalizado (legenda minuscula) = nao desloca
+  if (bestScore < Math.min(3, amostraEN.length)) bestOff = 0
 
   // Refino: a varredura fica com o PRIMEIRO offset que empata no máximo
   // (viés para baixo). A mediana dos deltas de início dos pares contidos
@@ -1477,16 +1504,18 @@ function _vidAlignPTTrack() {
 // Salva as legendas no IDB (debounced; limpa campos transitórios como _rev)
 function _vidSaveSubs() {
   clearTimeout(_vidSubsSaveTimer)
-  _vidSubsSaveTimer = setTimeout(() => {
-    if (!_vidCur) return
-    const limpa = c => { const o = { s: c.s, e: c.e, t: c.t }; if (c.pt) o.pt = c.pt; if (c.pts) o.pts = c.pts; return o }
-    VideoDB.set('subs', _vidCur.id, {
-      cues: _vidCues.map(limpa),
-      cuesPT: _vidCuesPT.map(c => ({ s: c.s, e: c.e, t: c.t })),
-      candidates: _vidSubCandidates,
-      appliedUrl: _vidAppliedSubUrl
-    })
-  }, 1500)
+  _vidSubsSaveTimer = setTimeout(_vidSaveSubsNow, 1500)
+}
+function _vidSaveSubsNow() {
+  clearTimeout(_vidSubsSaveTimer); _vidSubsSaveTimer = null
+  if (!_vidCur) return
+  const limpa = c => { const o = { s: c.s, e: c.e, t: c.t }; if (c.pt) o.pt = c.pt; if (c.pts) o.pts = c.pts; return o }
+  VideoDB.set('subs', _vidCur.id, {
+    cues: _vidCues.map(limpa),
+    cuesPT: _vidCuesPT.map(c => ({ s: c.s, e: c.e, t: c.t })),
+    candidates: _vidSubCandidates,
+    appliedUrl: _vidAppliedSubUrl
+  })
 }
 
 // Garante tradução IA das falas [i .. i+n). `sinc` espera terminar.
@@ -1974,4 +2003,25 @@ async function videoOvStudy(comAudio) {
     renderDashboard()
     toast(`"${alvo}" enviado para Revisar`, 'success')
   }
+}
+
+// ================================================================
+// CONTINUAR DE ONDE PAROU — persistência da posição + flush de saída
+// ================================================================
+function _vidSavePos() {
+  const p = el('vid-player')
+  if (!p || !_vidCur) return
+  if (p.currentTime > 5) { _vidCur.position = +p.currentTime.toFixed(1); saveVideos() }
+}
+
+// Fechar a aba / trocar de app não pode perder nem a posição nem uma
+// mudança de legenda que ainda estava no debounce de 1,5s.
+if (!window._vidFlushBound) {
+  window._vidFlushBound = true
+  const _vidFlush = () => {
+    _vidSavePos()
+    if (_vidSubsSaveTimer) _vidSaveSubsNow()
+  }
+  window.addEventListener('beforeunload', _vidFlush)
+  document.addEventListener('visibilitychange', () => { if (document.hidden) _vidFlush() })
 }

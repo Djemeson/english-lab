@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Seleção na legenda do vídeo (25ª rodada)**: arraste (ou
+> Última atualização: 2026-08-03 — **Continuar de onde parou (26ª rodada)**: reabrir o mesmo
+> arquivo volta com a legenda modificada intacta e retoma a posição (com 2s de recuo; "parou
+> em X" na biblioteca). O teste achou e matou um bug de perda de dados (save debounced abortado
+> na saída do player) e um caso degenerado do alinhador PT. Ver seção 8 (26ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Seleção na legenda do vídeo (25ª rodada)**: arraste (ou
 > clique duplo) na legenda SOBRE o vídeo e leve a palavra/trecho para o estudo — com áudio real
 > da cena ou direto para o Revisar. E os botões de traduzir pararam de "não fazer nada":
 > tradução pedida aparece sem blur e o PT do trecho aparece no próprio painel.
@@ -354,6 +359,26 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (26ª rodada) — Continuar de onde parou (+2 bugs achados pelo teste)
+77. **Pedido**: reabrir o mesmo arquivo deve carregar a legenda com as modificações e retomar
+    exatamente de onde parou ("nem sempre vou acabar o vídeo no mesmo dia").
+    - **A legenda já persistia** (IDB por vídeo, casado por nome+tamanho do arquivo) — mas o
+      teste do fluxo achou um **bug de perda de dados real**: o save é debounced (1,5s) e
+      `videoBackToLib`/troca de vídeo anulava `_vidCur` ANTES do timer — o guard abortava o
+      save e a última mudança de legenda EVAPORAVA. Agora há flush (`_vidSaveSubsNow`) na
+      saída do player, na troca de vídeo, no `beforeunload` e no `visibilitychange`.
+    - **Retomar posição**: `v.position` gravada a cada ~5s de reprodução (localStorage; sem
+      spam de sync) + no pause/saída; ao reabrir, retoma com **2s de recuo** para contexto e
+      toast "Retomando de 12:31". Perto do fim (<20s) não retoma; 'ended' zera. A biblioteca
+      mostra "parou em 12:31" em cada vídeo.
+    - **Bug 2 (alinhador PT em caso degenerado)**: com pouquíssimas falas, vários offsets
+      empatavam e a varredura ficava com o PRIMEIRO (−15s) — a tradução ia para a fala errada.
+      Desempate por |off| menor + exigência de evidência mínima (senão off=0).
+    - Validado ao vivo em duas "sessões" com o mesmo arquivo: legenda com shift −0,3s,
+      tradução IA e trilha PT voltaram intactas; retomou em 14,9s (17−2); "parou em 0:17" na
+      biblioteca; saída rápida do player não perde mais nada; 0 erros.
+      `CACHE`: `v50` → **`v51`**.
 
 ### Sessão 2026-08-03 (25ª rodada) — Seleção na legenda do vídeo + botões de traduzir consertados
 76. **Dois pedidos do Djemeson**:
