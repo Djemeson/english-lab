@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Alinhador PT v2 (24ª rodada)**: a tradução PT caía na fala
+> Última atualização: 2026-08-03 — **Seleção na legenda do vídeo (25ª rodada)**: arraste (ou
+> clique duplo) na legenda SOBRE o vídeo e leve a palavra/trecho para o estudo — com áudio real
+> da cena ou direto para o Revisar. E os botões de traduzir pararam de "não fazer nada":
+> tradução pedida aparece sem blur e o PT do trecho aparece no próprio painel.
+> Ver seção 8 (25ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Alinhador PT v2 (24ª rodada)**: a tradução PT caía na fala
 > errada (a trilha PT vem de outra release — agora o alinhador estima o offset entre as trilhas
 > com varredura + mediana) e duplicava no estudo focado (fusões de 2 falas EN num cue PT agora
 > são deduplicadas na exibição). Dados antigos se corrigem sozinhos ao reabrir o vídeo.
@@ -348,6 +354,27 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (25ª rodada) — Seleção na legenda do vídeo + botões de traduzir consertados
+76. **Dois pedidos do Djemeson**:
+    - **Selecionar palavra OU TRECHO na legenda sobre o vídeo**: a linha EN do overlay deixou
+      de ser só exibição (`user-select:text`, clique pausa o vídeo). Arrastou (ou clique
+      duplo) → popup com o trecho e duas saídas: **"Estudar com áudio"** (card completo com o
+      áudio real da cena — `videoCreateCard` ganhou parâmetro de alvo explícito) e
+      **"Revisar"** (`createWord` pending_ai com a fala como contexto, como o garimpo do
+      estudo). Popup fecha quando a fala muda; overlay congela enquanto ele está aberto (a
+      seleção não é destruída pelo re-render).
+    - **"Botões de traduzir não funcionam todos"** — dois defeitos de percepção reais:
+      (1) tradução pedida explicitamente (botão `pt` da fala, PT do trecho) aparecia
+      **BORRADA** (o recall blur valia para tudo) — parecia que nada acontecia; agora pedido
+      explícito = `.show`, sem blur (o blur fica só para o modo recall global);
+      (2) o PT do trecho selecionado só aparecia no transcript — agora aparece **no próprio
+      painel de seleção**, deduplicado.
+    - Validado ao vivo: `pt` da fala visível sem blur; PT do trecho no painel; overlay
+      selecionável; popup com os 2 botões; "Revisar" criou pending_ai com contexto/fonte;
+      "Estudar com áudio" com trecho de 3 palavras ("tribe has spoken") → card in_srs com
+      exemplo em negrito, clipId e áudio webm real; 0 erros nas telas.
+      `CACHE`: `v49` → **`v50`**.
 
 ### Sessão 2026-08-03 (24ª rodada) — Alinhador PT v2: offset entre trilhas + fusões
 75. **Print do Djemeson (Marshals S01E01)**: a tradução PT aparecia na fala ERRADA e duplicada

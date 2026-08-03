@@ -267,9 +267,10 @@ async function videoOpenPlayer(v) {
         <div class="vid-stage">
           <video id="vid-player" src="${_vidURL}" controls preload="metadata"></video>
           <div class="vid-ov" id="vid-ov">
-            <span class="vid-ov-en" id="vid-ov-en"></span>
+            <span class="vid-ov-en" id="vid-ov-en" title="Arraste para selecionar um trecho; clique duplo seleciona a palavra"></span>
             <span class="vid-ov-pt" id="vid-ov-pt"></span>
           </div>
+          <div class="vid-ov-pop hidden" id="vid-ov-pop"></div>
         </div>
         <div id="vid-audiofix-banner"></div>
         <div id="vid-sync-panel" class="hidden"></div>
@@ -314,6 +315,8 @@ async function videoOpenPlayer(v) {
   renderVidTranscript()
   renderVidMarkers()
   renderVidSelPanel()
+  _vidOvBind()          // seleção na legenda sobre o vídeo
+
 
   // Tecla M marca o momento (só com a seção ativa e fora de inputs)
   if (!window._vidKeysBound) {
@@ -370,6 +373,7 @@ function _vidOnTime() {
   const old = document.querySelector('.vid-cue.cur')
   if (old) old.classList.remove('cur')
   _vidCueIdx = idx
+  el('vid-ov-pop')?.classList.add('hidden')
   if (idx >= 0) {
     const elCue = document.querySelector(`.vid-cue[data-i="${idx}"]`)
     if (elCue) {
@@ -386,6 +390,8 @@ function _vidOnTime() {
 function _vidUpdateOverlay() {
   const en = el('vid-ov-en'), pt = el('vid-ov-pt')
   if (!en || !pt) return
+  const pop = el('vid-ov-pop')
+  if (pop && !pop.classList.contains('hidden')) return   // seleção em curso
   const cue = _vidCueIdx >= 0 ? _vidCues[_vidCueIdx] : null
   const showEN = _vidOverlayOn && cue
   en.textContent = showEN ? cue.t : ''
@@ -502,7 +508,7 @@ function renderVidTranscript() {
       <button class="vid-cue-time" onclick="videoPlayCue(${i})" data-tip="Tocar esta fala">${_vidFmtTime(c.s)}</button>
       <div class="vid-cue-body">
         <div class="vid-cue-text" onclick="videoSelectCue(${i})">${esc(c.t)}</div>
-        <div class="vid-cue-pt${_vidShowPT || c._rev ? '' : ' hid'}" id="vid-cue-pt-${i}" title="${escA(fonte)}">${repetida ? '⤷ (mesma tradução da fala acima)' : esc(pt)}</div>
+        <div class="vid-cue-pt${_vidShowPT || c._rev ? '' : ' hid'}${c._rev ? ' show' : ''}" id="vid-cue-pt-${i}" title="${escA(fonte)}">${repetida ? '⤷ (mesma tradução da fala acima)' : esc(pt)}</div>
       </div>
       <button class="vid-cue-ptbtn" onclick="videoCuePT(${i})" data-tip="Traduzir esta fala">pt</button>
     </div>`}).join('')
@@ -520,7 +526,7 @@ async function videoCuePT(i) {
   }
   c._rev = true
   const row = el('vid-cue-pt-' + i)
-  if (row) { row.textContent = _vidPTof(c); row.classList.remove('hid') }
+  if (row) { row.textContent = _vidPTof(c); row.classList.remove('hid'); row.classList.add('show') }
 }
 
 // Toca só o intervalo de uma fala
@@ -584,6 +590,7 @@ function renderVidSelPanel() {
       <div class="vid-sel-words">${words.map((w, i) =>
         `<span class="vid-word${_vidSelWords.has(i) ? ' on' : ''}" onclick="videoToggleWord(${i})">${esc(w)}</span>`).join(' ')}
       </div>
+      ${_vidSel.pt ? `<div class="vid-focus-pt">${esc(_vidSel.pt)}</div>` : ''}
       <div class="vid-sel-row2">
         <span class="vid-sel-alvo">${alvo
           ? `Alvo: <b>${esc(alvo)}</b>`
@@ -641,8 +648,10 @@ async function videoTranslateSel() {
       if (!cfg.openaiKey) { toast('Sem legenda PT alinhada — configure a chave OpenAI ou busque a legenda PT', 'warning'); return }
       await _vidEnsurePT(_vidSel.ci, _vidSel.cj - _vidSel.ci + 1, true)
     }
+    _vidSel.pt = _vidCues.slice(_vidSel.ci, _vidSel.cj + 1).map(c => _vidPTof(c))
+      .filter((t, i, a) => t && t !== a[i - 1]).join(' ')
     renderVidTranscript()
-    toast('Tradução no transcript (borrada — passe o mouse para revelar)', 'success')
+    renderVidSelPanel()
   } catch (e) { toast('Erro ao traduzir: ' + e.message, 'error') }
 }
 
@@ -692,9 +701,9 @@ function captureClipAudio(start, end) {
 // O exemplo do card É a fala da cena — por isso o áudio real casa com
 // o card sem tocar em study.js (mesma chave audioKey do texto).
 // ================================================================
-async function videoCreateCard() {
+async function videoCreateCard(alvoOverride) {
   if (_vidCapturing) return
-  const alvo = _vidTargetPhrase()
+  const alvo = alvoOverride || _vidTargetPhrase()
   if (!alvo || !_vidSel) return
   if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
 
@@ -1908,4 +1917,61 @@ function videoSubExport(qual) {
   a.download = nomeBase + (qual === 'pt' ? '.pt-BR' : '') + '.srt'
   a.click()
   toast('Legenda .srt baixada com a sincronização aplicada — deixe na mesma pasta do vídeo', 'success')
+}
+
+// ================================================================
+// SELEÇÃO NA LEGENDA SOBRE O VÍDEO — arraste para marcar um trecho
+// (ou clique duplo para uma palavra) e leve direto para o estudo.
+// O vídeo pausa sozinho ao começar a seleção.
+// ================================================================
+function _vidOvBind() {
+  const en = el('vid-ov-en'); if (!en || en._bound) return
+  en._bound = true
+  en.addEventListener('mousedown', () => { const p = el('vid-player'); if (p && !p.paused) p.pause() })
+  en.addEventListener('mouseup', () => setTimeout(_vidOvSelCheck, 10))
+  en.addEventListener('dblclick', () => setTimeout(_vidOvSelCheck, 10))
+}
+
+function _vidOvSelCheck() {
+  const pop = el('vid-ov-pop'); const en = el('vid-ov-en')
+  if (!pop || !en) return
+  const sel = window.getSelection()
+  const bruto = (sel && sel.toString()) || ''
+  const txt = bruto.replace(/\s+/g, ' ').trim()
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
+  if (!txt || txt.length < 2 || txt.length > 80 || !sel.anchorNode || !en.contains(sel.anchorNode)) {
+    pop.classList.add('hidden'); return
+  }
+  window._vidOvSelText = txt
+  pop.innerHTML = `
+    <b>"${esc(txt)}"</b>
+    <button class="btn btn-primary btn-sm" onclick="videoOvStudy(true)" data-tip="Cria o card já com o áudio real desta cena">${ic('zap','ic-sm')}Estudar com áudio</button>
+    <button class="btn btn-ghost btn-sm" onclick="videoOvStudy(false)" data-tip="Manda para a fila do Revisar (a IA analisa lá)">${ic('eye','ic-sm')}Revisar</button>`
+  pop.classList.remove('hidden')
+}
+
+// Fala correspondente ao instante t (tolerância de 300ms)
+function _vidCueAt(t) { return _vidCues.findIndex(c => t >= c.s - 0.3 && t <= c.e + 0.3) }
+
+async function videoOvStudy(comAudio) {
+  const alvo = window._vidOvSelText
+  el('vid-ov-pop')?.classList.add('hidden')
+  try { window.getSelection().removeAllRanges() } catch (e) {}
+  if (!alvo || !_vidCur) return
+  const p = el('vid-player')
+  const i = _vidCueIdx >= 0 ? _vidCueIdx : _vidCueAt(p ? p.currentTime : 0)
+  const c = _vidCues[i]
+  if (!c) { toast('Não achei a fala correspondente na legenda', 'warning'); return }
+  if (comAudio) {
+    _vidFocus = null
+    _vidSel = { ci: i, cj: i, s: c.s, e: c.e }
+    _vidSelWords = new Set()
+    renderVidTranscript(); renderVidSelPanel()
+    toast('Gravando o áudio da cena e analisando — alguns segundos...', 'info')
+    await videoCreateCard(alvo)
+  } else {
+    createWord({ word: alvo, context: c.t, source_type: _vidCur.source_type || 'series', source_title: _vidCur.title, lang: _vidCur.lang })
+    renderDashboard()
+    toast(`"${alvo}" enviado para Revisar`, 'success')
+  }
 }

@@ -3692,3 +3692,19 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   color:var(--warning)!important;border-color:color-mix(in srgb, var(--warning) 45%, transparent)!important;
   animation:pulse 1.2s ease-in-out infinite;
 }
+
+/* ---- Selecao na legenda sobre o video ---- */
+.vid-ov-en{pointer-events:auto;user-select:text;cursor:text}
+.vid-ov-en::selection{background:var(--primary);color:#fff}
+.vid-cue-pt.show{filter:none}
+.vid-ov-pop{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:148px;z-index:5;
+  display:flex;align-items:center;gap:8px;padding:8px 12px;max-width:92%;
+  background:var(--surface);border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);box-shadow:var(--shadow);font-size:var(--fs-sm);
+}
+.vid-ov-pop.hidden{display:none}
+.vid-ov-pop b{
+  color:var(--primary);max-width:230px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
