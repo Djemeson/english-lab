@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Sync com IA consertado (22ª rodada)**: a amostra agora cai
+> Última atualização: 2026-08-03 — **.srt sincronizado + IA troca legenda errada (23ª rodada)**:
+> "Baixar .srt" exporta a legenda com a sincronização aplicada e o mesmo nome do vídeo (players
+> externos carregam sozinhos); e a sincronização agora verifica DOIS pontos do episódio — se a
+> legenda deriva (versão diferente), a IA testa as candidatas da busca contra as mesmas
+> transcrições (custo zero extra) e troca sozinha pela que casa. Ver seção 8 (23ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Sync com IA consertado (22ª rodada)**: a amostra agora cai
 > sozinha no trecho MAIS FALADO do episódio (densidade medida pela própria legenda), o botão
 > volta a habilitar após uma falha (re-render movido para depois da trava) e nasceu o último
 > recurso "IA do ponto atual" — pause num diálogo e a IA analisa dali.
@@ -336,6 +342,34 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (23ª rodada) — .srt sincronizado para download + IA troca legenda de versão errada
+74. **Dois pedidos do Djemeson**:
+    - **"Baixar .srt" com a sincronização aplicada** (painel Sync): serializa as falas JÁ
+      DESLOCADAS em SRT válido (CRLF + BOM) com o **mesmo nome do arquivo de vídeo** — na
+      mesma pasta, qualquer player externo carrega sozinho. Botão extra para a trilha PT-BR
+      alinhada (`.pt-BR.srt`). Validado: blob reparseia com 25 falas e tempos sincronizados.
+    - **Legenda de VERSÃO ERRADA (deriva no meio)**: ele diagnosticou certo — offset constante
+      a IA resolvia, deriva não. E pediu para ver o nome do release da legenda; **análise
+      honesta: o protocolo dos addons só devolve `{id, lang, url}` — o nome NÃO existe na
+      resposta** (e a página do OpenSubtitles que o teria bloqueia navegador). Então foi feito
+      o que ele sugeriu como alternativa: **a IA reconhece e troca sozinha**:
+      · `videoSyncAuto` agora amostra **2 pontos** do episódio (1º e 2º terço, janelas de
+        maior densidade de fala em cada metade) quando o vídeo > 4min;
+      · `_vidAvaliaLegenda` mede matched/mediana/**spread** (entre amostras) e **disp**
+        (dispersão INTRA-amostra, aparada — pega deriva até com uma janela só; achado do
+        teste: só o spread deixava passar deriva dentro da mesma janela);
+      · consistente (spread ≤ 0,7s e disp ≤ 1,5s) → aplica a mediana como antes;
+      · **derivou → testa as CANDIDATAS** da última busca (mesma língua, até 5, guardadas no
+        IDB com a URL aplicada) contra as MESMAS transcrições — custo extra ZERO — e adota a
+        primeira que casa de ponta a ponta, substituindo a legenda salva + ajuste fino;
+      · nenhuma casou → ajusta só o COMEÇO (mediana da 1ª metade da 1ª amostra, não a mediana
+        contaminada pela deriva) e avisa que vai dessincronizar adiante.
+    - **Validado ao vivo com deriva plantada** (2 falas a +1s, 2 a +3,3s) e 3 candidatas
+      (a aplicada, uma de outro episódio e uma boa a +0,8s constante): detectou a deriva,
+      rejeitou o lixo, **adotou a boa, aplicou −0,8s** e a 1ª fala caiu exata no áudio;
+      candidatas + URL aplicada persistidas no IDB; 0 erros de console.
+      `CACHE`: `v47` → **`v48`**.
 
 ### Sessão 2026-08-03 (22ª rodada) — Sync com IA: acha sozinho o trecho falado + destrava após falha
 73. **Bug relatado pelo Djemeson**: a IA amostrou um trecho com poucas falas, deu erro pedindo
