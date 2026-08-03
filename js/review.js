@@ -764,9 +764,14 @@ const _revExplainCache = new Map()
 
 if (!window._revSelBound) {
   window._revSelBound = true
-  document.addEventListener('mouseup', () => {
+  document.addEventListener('mouseup', (e) => {
     setTimeout(() => {
       const pop = el('rev-sel-pop')
+      // Clique DENTRO do popup (Explicar/Revisar) não pode fechá-lo: o
+      // mousedown no botão colapsa a seleção e este handler via "seleção
+      // vazia" e escondia o popup ANTES da explicação aparecer — o bug do
+      // "cliquei em Explicar e nada aconteceu".
+      if (pop && !pop.classList.contains('hidden') && e.target && pop.contains(e.target)) return
       const sec = document.getElementById('section-revisar')
       if (!sec || !sec.classList.contains('active')) { pop && pop.classList.add('hidden'); return }
       const card = sec.querySelector('.word-card')
@@ -793,6 +798,9 @@ function _revShowSelPop(txt, sel) {
     pop = document.createElement('div')
     pop.id = 'rev-sel-pop'
     pop.className = 'sel-pop hidden'
+    // preventDefault no mousedown: clicar nos botões NÃO colapsa a seleção
+    // do card (padrão de toolbar-sobre-seleção)
+    pop.addEventListener('mousedown', ev => ev.preventDefault())
     document.body.appendChild(pop)
   }
   window._revSelText = txt

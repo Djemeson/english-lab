@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Explicar/minerar por seleção no Revisar (33ª rodada)**: o
+> Última atualização: 2026-08-03 — **Fix do Explicar (34ª rodada)**: o mousedown do clique
+> colapsava a seleção e o próprio listener escondia o popup antes da explicação chegar.
+> Clique dentro do popup não fecha mais + preventDefault preserva a seleção.
+> Ver seção 8 (34ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Explicar/minerar por seleção no Revisar (33ª rodada)**: o
 > caso "o que é Adderall?" — selecione qualquer palavra no card e escolha "Explicar" (gloss da
 > IA ali mesmo, com cache) ou "Revisar" (vira item novo herdando contexto e fonte). Sem trocar
 > de aba, sem perder o card aberto. Ver seção 8 (33ª rodada).
@@ -397,6 +402,18 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (34ª rodada) — Conserto do "cliquei em Explicar e nada aconteceu"
+85. **Bug do Djemeson na 33ª**: o menu aparecia, mas Explicar "não fazia nada". Causa: o
+    **mousedown no botão colapsa a seleção** do navegador, e 10ms depois o próprio listener
+    de mouseup via "seleção vazia" e ESCONDIA o popup — a explicação chegava num popup
+    invisível. (O teste da 33ª chamou a função direto e por isso passou — lição: validar
+    com a sequência de clique REAL mousedown→colapso→mouseup→click.)
+    Correção dupla: (1) mouseup com alvo DENTRO do popup não fecha; (2) `preventDefault` no
+    mousedown do popup — clicar nos botões nem colapsa mais a seleção (padrão
+    toolbar-sobre-seleção). Revisar verificado junto: cria e fecha como deve.
+    Validado com a sequência real de eventos + latência simulada da API: popup aberto
+    durante e depois da resposta. `CACHE`: `v60` → **`v61`**.
 
 ### Sessão 2026-08-03 (33ª rodada) — Dúvida dentro da dúvida: Explicar/minerar por seleção no Revisar
 84. **Caso real do Djemeson** (card "closet Adderall snorter"): entendeu a análise, mas ficou
