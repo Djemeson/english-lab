@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Multi-fornecedor de IA + botões de tradução no vídeo (35ª
+> Última atualização: 2026-08-03 — **DeepSeek V4 (36ª rodada)**: IDs novos confirmados na doc
+> oficial (v4-flash/v4-pro); os aliases V3 foram descontinuados pelo próprio DeepSeek em
+> 24/07/2026 e saíram da lista — migração automática para quem os tinha salvos.
+> Ver seção 8 (36ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Multi-fornecedor de IA + botões de tradução no vídeo (35ª
 > rodada)**: Gemini, DeepSeek e Groq além da OpenAI (modelos curados por faixa de custo,
 > chaves organizadas com teste individual, sync); TTS/imagens/Whisper seguem na OpenAI. No
 > vídeo, a tradução virou dois botões com ícone (CC = legenda oficial, faíscas = IA literal),
@@ -408,6 +413,18 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (36ª rodada) — DeepSeek V4 (e a remoção da V3, decidida por fato)
+87. **Pedido**: "crie a versão v4 da deepseek, analise se remove a v3". A análise foi feita na
+    FONTE (doc oficial api-docs.deepseek.com via fetch), não em artigo de terceiro:
+    - IDs ativos hoje: **`deepseek-v4-flash`** (US$ 0,14/0,28 por 1M tokens; cache hit a
+      US$ 0,0028 — quase grátis) e **`deepseek-v4-pro`** (US$ 0,435/0,87).
+    - Os aliases antigos `deepseek-chat`/`deepseek-reasoner` foram **DESCONTINUADOS em
+      2026-07-24** (dez dias antes desta rodada) — remover não era opcional, era conserto.
+    - **Migração suave por construção**: `aiModel()` valida o modelo salvo contra a lista
+      curada — quem tinha o alias morto cai automaticamente no `v4-flash` (validado ao
+      vivo). Preço dinâmico do DeepSeek (2× no pico da China) anotado no código.
+    `CACHE`: `v62` → **`v63`**.
 
 ### Sessão 2026-08-03 (35ª rodada) — Multi-fornecedor de IA + botões de tradução com ícone no vídeo
 86. **Dois pedidos**: dropdown de fornecedores de IA (Gemini, DeepSeek, Groq além da OpenAI)

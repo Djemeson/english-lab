@@ -61,9 +61,13 @@ const AI_PROVIDERS = {
     modelsUrl: 'https://api.deepseek.com/models',
     keyCfg: 'deepseekKey',
     placeholder: 'sk-...',
+    // IDs V4 confirmados na doc oficial (2026-08): os aliases antigos
+    // deepseek-chat/reasoner foram DESCONTINUADOS em 2026-07-24 — quem os
+    // tinha salvo cai no primeiro da lista via validação do aiModel().
+    // Atenção ao preço dinâmico: 2× no horário de pico da China.
     modelos: [
-      { id: 'deepseek-chat',     tier: 'baixo', nota: 'V3 — muito barato' },
-      { id: 'deepseek-reasoner', tier: 'médio', nota: 'R1 — raciocínio (mais lento)' },
+      { id: 'deepseek-v4-flash', tier: 'baixo', nota: 'V4 — muito barato, cache quase grátis' },
+      { id: 'deepseek-v4-pro',   tier: 'médio', nota: 'V4 — mais capaz' },
     ]
   },
   groq: {
