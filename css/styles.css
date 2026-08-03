@@ -3751,3 +3751,8 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 
 /* ---- Navegacao por FALA: segundo par de botoes flutuantes ---- */
 .vid-cuebtn{top:34%;font-size:16px;letter-spacing:-1px}
+
+/* ---- Nevoa (fog) da traducao sobre o video: borrada ate o hover ---- */
+.vid-ov-pt{pointer-events:auto}
+.vid-ov-pt.fog{filter:blur(7px);cursor:pointer;transition:filter .15s ease}
+.vid-ov-pt.fog:hover{filter:none}

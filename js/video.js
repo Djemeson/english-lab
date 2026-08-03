@@ -24,7 +24,8 @@ let _vidAutoScroll = true
 let _vidShowPT = false          // mostrar TODAS as traduções no transcript
 let _vidCapturing = false
 let _vidOverlayOn = true        // legenda em tempo real sobre o vídeo
-let _vidLivePT = false          // tradução simultânea (legenda PT alinhada ou IA)
+let _vidPTmode = 'off'          // tradução no vídeo: off | sub (legenda PT) | ia (tempo real)
+let _vidPTfog = true            // névoa: tradução borrada até o hover (recall)
 let _vidCuesPT = []             // trilha PT-BR baixada dos addons (alinhada por tempo)
 let _vidFocus = null            // estudo focado de um trecho {ci,cj,revEN,revPT}
 let _vidSubsSaveTimer = null
@@ -287,7 +288,8 @@ async function videoOpenPlayer(v) {
           <button class="btn btn-ghost btn-sm" id="vid-mark-btn" onclick="videoAddMarker()" data-tip="Marca o INÍCIO do trecho; o 2º clique (ou tecla M) fecha e abre o estudo focado">${ic('flame','ic-sm')}Marcar</button>
           <button class="btn btn-ghost btn-sm" id="vid-sync-btn" onclick="videoSyncToggle()" data-tip="Legenda fora de sincronia? Ajuste manual ou automático com IA">${ic('clock','ic-sm')}Sync</button>
           <button class="btn btn-ghost btn-sm ${_vidOverlayOn ? 'vid-on' : ''}" id="vid-ov-toggle" onclick="videoToggleOverlay()" data-tip="Legenda sobre o vídeo, em tempo real">${ic('message','ic-sm')}Legenda</button>
-          <button class="btn btn-ghost btn-sm ${_vidLivePT ? 'vid-on' : ''}" id="vid-pt-toggle" onclick="videoToggleLivePT()" data-tip="Tradução SIMULTÂNEA: traduz cada fala enquanto o vídeo toca (IA, centavos por episódio) e mostra sob a legenda">PT ao vivo</button>
+          <button class="btn btn-ghost btn-sm ${_vidPTmode !== 'off' ? 'vid-on' : ''}" id="vid-pt-toggle" onclick="videoCyclePT()" data-tip="Tradução sob a legenda — alterna: desligada → legenda PT-BR oficial → IA em tempo real (traduz só o que você está vendo, +5s à frente)">${_vidPTlabel()}</button>
+          <button class="btn btn-ghost btn-sm ${_vidPTfog ? 'vid-on' : ''}" id="vid-fog-toggle" onclick="videoToggleFog()" style="${_vidPTmode === 'off' ? 'display:none' : ''}" data-tip="Névoa: a tradução fica borrada até passar o mouse (treino de recall). Clique para mostrar sempre.">${ic('eye','ic-sm')}Névoa</button>
           <button class="btn btn-ghost btn-sm ${_vidAutoScroll ? 'vid-on' : ''}" id="vid-scroll-toggle" onclick="videoToggleScroll()" data-tip="Rolagem automática do transcript">${ic('arrowRight','ic-sm')}Seguir</button>
           <button class="btn btn-ghost btn-sm" onclick="videoToggleFullscreen()" data-tip="Tela cheia COM a legenda interativa (o botão do player usa a legenda nativa)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>Tela cheia</button>
         </div>
@@ -412,7 +414,7 @@ function _vidOnTime() {
       if (_vidAutoScroll) elCue.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
     // Tradução simultânea via IA: garante a fala atual + as 3 próximas
-    if (_vidLivePT) _vidEnsurePT(idx, 4)
+    if (_vidPTmode === 'ia') _vidEnsurePTAhead(t)
   }
   _vidUpdateOverlay()
 }
@@ -427,7 +429,8 @@ function _vidUpdateOverlay() {
   const showEN = _vidOverlayOn && cue
   en.textContent = showEN ? cue.t : ''
   en.style.display = showEN ? '' : 'none'
-  const ptTxt = (showEN && _vidLivePT) ? _vidPTof(cue) : ''
+  const ptTxt = showEN ? _vidPTshow(cue) : ''
+  pt.className = 'vid-ov-pt' + (_vidPTfog ? ' fog' : '')
   pt.textContent = ptTxt
   pt.style.display = ptTxt ? '' : 'none'
 }
@@ -445,18 +448,45 @@ function videoToggleOverlay() {
   el('vid-ov-toggle')?.classList.toggle('vid-on', _vidOverlayOn)
   _vidUpdateOverlay()
 }
-function videoToggleLivePT() {
+// Fonte da tradução conforme o MODO (o Djemeson pediu os dois canais bem
+// distintos: a legenda PT-BR oficial pode divergir do literal — para estudo,
+// a IA em tempo real traduz fiel, só o trecho que está sendo visto):
+//   'sub' → cue.pts (trilha oficial alinhada) · 'ia' → cue.pt (IA)
+//   'off' → nada (reveladas explicitamente continuam via _vidPTof)
+function _vidPTshow(cue) {
+  if (!cue || _vidPTmode === 'off') return ''
+  return _vidPTmode === 'sub' ? (cue.pts || '') : (cue.pt || '')
+}
+function _vidPTlabel() {
+  return _vidPTmode === 'sub' ? 'PT · legenda' : _vidPTmode === 'ia' ? 'PT · IA' : 'PT'
+}
+
+function videoCyclePT() {
   if (!_vidCues.length) { toast('Importe ou busque a legenda primeiro', 'warning'); return }
-  _vidLivePT = !_vidLivePT
-  el('vid-pt-toggle')?.classList.toggle('vid-on', _vidLivePT)
-  if (_vidLivePT) {
-    const temTrilha = _vidCues.some(c => c.pts)
-    if (temTrilha) toast('Tradução simultânea ligada — usando a legenda PT-BR alinhada', 'success')
-    else if (cfg.openaiKey) { toast('Tradução simultânea ligada — traduzindo com IA enquanto toca (centavos por episódio)', 'info'); if (_vidCueIdx >= 0) _vidEnsurePT(_vidCueIdx, 4) }
-    else toast('Sem legenda PT nem chave OpenAI — busque a legenda PT em "Buscar legenda" ou configure a chave', 'warning')
+  const temTrilha = _vidCues.some(c => c.pts)
+  if (_vidPTmode === 'off') _vidPTmode = temTrilha ? 'sub' : 'ia'
+  else if (_vidPTmode === 'sub') _vidPTmode = 'ia'
+  else _vidPTmode = 'off'
+  if (_vidPTmode === 'ia' && !cfg.openaiKey) {
+    toast('A tradução em tempo real usa a chave OpenAI — configure em Configurações', 'warning')
+    _vidPTmode = 'off'
   }
-  _vidShowPT = _vidLivePT
+  if (_vidPTmode === 'sub') toast('Tradução: legenda PT-BR oficial (pode divergir do literal — bom para entender a cena)', 'info')
+  else if (_vidPTmode === 'ia') toast('Tradução: IA em tempo real — traduz o que você está vendo (+5s à frente), fiel ao texto', 'info')
+  _vidShowPT = _vidPTmode !== 'off'
+  const btn = el('vid-pt-toggle')
+  if (btn) { btn.classList.toggle('vid-on', _vidPTmode !== 'off'); btn.textContent = _vidPTlabel() }
+  const fog = el('vid-fog-toggle')
+  if (fog) fog.style.display = _vidPTmode === 'off' ? 'none' : ''
   renderVidTranscript()
+  _vidUpdateOverlay()
+  const p = el('vid-player')
+  if (_vidPTmode === 'ia' && p) _vidEnsurePTAhead(p.currentTime)
+}
+
+function videoToggleFog() {
+  _vidPTfog = !_vidPTfog
+  el('vid-fog-toggle')?.classList.toggle('vid-on', _vidPTfog)
   _vidUpdateOverlay()
 }
 
@@ -479,7 +509,7 @@ function renderVidTranscript() {
     return
   }
   box.innerHTML = _vidCues.map((c, i) => {
-    const pt = _vidPTof(c)
+    const pt = _vidPTshow(c) || (c._rev ? _vidPTof(c) : '')
     // Fusão PT (um cue PT cobrindo duas falas EN): mostra o texto só na
     // primeira; a seguinte ganha a seta de continuação em vez de repetir.
     const repetida = pt && i > 0 && _vidPTof(_vidCues[i - 1]) === pt
@@ -787,7 +817,7 @@ function _vidFillTrack() {
   const velhos = _vidTrack.cues ? [..._vidTrack.cues] : []
   velhos.forEach(c => { try { _vidTrack.removeCue(c) } catch (e) {} })
   for (const c of _vidCues) {
-    const pt = _vidLivePT ? _vidPTof(c) : ''
+    const pt = _vidPTshow(c)
     try {
       const cue = new VTTCue(c.s, c.e, pt ? c.t + '\n' + pt : c.t)
       cue.line = -3          // um pouco acima da borda, longe dos controles

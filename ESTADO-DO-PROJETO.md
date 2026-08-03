@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Navegação por fala (31ª rodada)**: R repete a fala que
+> Última atualização: 2026-08-03 — **Tradução em 3 posições + névoa (32ª rodada)**: um botão
+> alterna off → legenda PT-BR oficial → IA literal em tempo real (traduz só o ponto atual +5s,
+> economia de tokens validada); névoa borrada por padrão sobre o vídeo com hover revelando,
+> desligável — tudo funcionando em fullscreen. Ver seção 8 (32ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Navegação por fala (31ª rodada)**: R repete a fala que
 > acabou de passar; ←/→ pulam entre falas (com comportamento "faixa anterior"); Shift+←/→
 > mantém os ±5s; segundo par de botões flutuantes no vídeo. Ver seção 8 (31ª rodada).
 >
@@ -387,6 +392,29 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (32ª rodada) — Tradução em 3 posições + névoa (fog) sobre o vídeo
+83. **Pedido**: separar BEM os dois canais de tradução ("a legenda PT-BR pode atrapalhar muito
+    no estudo — é aí que a tradução em tempo real da API entra"), traduzir com IA só o ponto
+    atual +5s ("não gastar tokens se não for assistir tudo"), névoa borrada por padrão com
+    hover revelando (desligável), tudo compatível com fullscreen — "sofisticado, não cheio de
+    elementos".
+    - **Um botão, três posições** (`videoCyclePT`): `PT` (off) → `PT · legenda` (trilha
+      PT-BR oficial alinhada — cue.pts; pula essa posição se não houver trilha) → `PT · IA`
+      (tradução LITERAL em tempo real — cue.pt) → off. Fontes nunca se misturam no modo:
+      `_vidPTshow()` escolhe por modo; `_vidPTmode` substituiu o antigo `_vidLivePT`.
+    - **Economia de tokens**: `_vidEnsurePTAhead(t)` traduz SÓ as falas visíveis e as que
+      começam nos próximos ~5s (janela [t−0,5, t+5,5]), com dedupe — validado: 10 falas no
+      episódio, apenas 2 traduzidas na janela, avanço sem retraduzir. `_vidEnsurePT` ganhou
+      `forcaIA` (o modo IA traduz MESMO onde existe trilha oficial — a divergência entre as
+      duas é justamente o que o estudo quer evitar).
+    - **Névoa (fog)**: a linha PT sobre o vídeo nasce BORRADA (blur 7px), hover revela;
+      botão "Névoa" (só aparece com PT ligado) desliga o efeito. Funciona no fullscreen do
+      stage (hover por CSS). Transcript mantém o recall próprio que já tinha.
+    - Trilha nativa (fullscreen do player) também segue o modo.
+    - Validado ao vivo: ciclo completo com rótulos/toasts, oficial × IA visivelmente
+      distintas no overlay, contagem de chamadas exata, fog on/off, off limpa tudo.
+      `CACHE`: `v58` → **`v59`**.
 
 ### Sessão 2026-08-03 (31ª rodada) — Navegação por FALA ("a frase passou, quero voltar nela")
 82. **Pedido**: "uma frase que me interessou passou; a única forma de voltar é −5s. Quero voltar

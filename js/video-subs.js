@@ -489,12 +489,12 @@ function _vidSaveSubsNow() {
 }
 
 // Garante tradução IA das falas [i .. i+n). `sinc` espera terminar.
-async function _vidEnsurePT(i, n, sinc) {
+async function _vidEnsurePT(i, n, sinc, forcaIA) {
   if (!cfg.openaiKey) return
   const tarefas = []
   for (let k = i; k < Math.min(i + n, _vidCues.length); k++) {
     const c = _vidCues[k]
-    if (!c || c.pt || c.pts || c._ptReq) continue
+    if (!c || c.pt || c._ptReq || (!forcaIA && c.pts)) continue
     c._ptReq = true
     const p = aiText([
       { role: 'system', content: 'Traduza a fala de série/filme para português do Brasil, natural e curta. Responda SÓ a tradução.' },
@@ -510,6 +510,22 @@ async function _vidEnsurePT(i, n, sinc) {
     tarefas.push(p)
   }
   if (sinc) await Promise.all(tarefas)
+}
+
+// Modo IA em tempo real: garante a tradução SÓ do que está na tela e do que
+// começa nos próximos 5s — "vai carregando aos poucos", sem gastar tokens
+// com o resto do episódio que talvez nem seja assistido.
+function _vidEnsurePTAhead(t) {
+  if (!_vidCues.length) return
+  let ini = -1, fim = -1
+  for (let k = 0; k < _vidCues.length; k++) {
+    const c = _vidCues[k]
+    if (c.e < t - 0.5) continue
+    if (c.s > t + 5.5) break
+    if (ini < 0) ini = k
+    fim = k
+  }
+  if (ini >= 0) _vidEnsurePT(ini, fim - ini + 1, false, true)
 }
 
 // Depois de aplicar uma legenda EN, procura a PT-BR do MESMO episódio na
