@@ -1570,12 +1570,41 @@ function _vidSyncRender(msg) {
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(0.1)">+0,1s</button>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(0.5)">+0,5s</button>
         <span style="flex:1"></span>
+        <button class="btn btn-ghost btn-sm" ${_vidSyncing ? 'disabled' : ''} onclick="videoSyncAutoAqui()"
+          data-tip="Último recurso: leva o vídeo até um diálogo, pausa ali e a IA analisa DESSE ponto em diante">
+          ${ic('play','ic-sm')}IA do ponto atual</button>
         <button class="btn btn-primary btn-sm" ${_vidSyncing ? 'disabled' : ''} onclick="videoSyncAuto()"
-          data-tip="A IA escuta ~45s do episódio, transcreve com timestamps e alinha a legenda sozinha (~R$ 0,03)">
+          data-tip="A IA acha sozinha o trecho mais falado do episódio, escuta ~45s, transcreve com timestamps e alinha a legenda (~R$ 0,03)">
           ${ic('sparkles','ic-sm')}Sincronizar com IA</button>
       </div>
       ${msg ? `<div class="vid-sync-status">${msg}</div>` : ''}
     </div>`
+}
+
+// Acha a janela de `dur` segundos com MAIS FALA, medida pela própria
+// legenda (soma da duração das falas na janela). É onde o Whisper tem
+// mais material para casar — a densidade sobrevive a legendas fora de
+// sincronia, porque o desvio típico é de segundos, não de minutos.
+function _vidBestSampleStart(dur) {
+  if (!_vidCues.length) return 60
+  const fimVideo = (isFinite(_vidCur?.duration) && _vidCur.duration > dur) ? _vidCur.duration : Infinity
+  let melhor = _vidCues[0].s, melhorFala = -1
+  for (let i = 0; i < _vidCues.length; i++) {
+    const ini = _vidCues[i].s
+    if (ini + dur > fimVideo) break
+    let fala = 0
+    for (let j = i; j < _vidCues.length && _vidCues[j].s < ini + dur; j++) {
+      fala += Math.min(_vidCues[j].e, ini + dur) - _vidCues[j].s
+    }
+    if (fala > melhorFala) { melhorFala = fala; melhor = ini }
+  }
+  return Math.max(0, melhor - 1)
+}
+
+// Último recurso: o usuário posiciona o vídeo num diálogo e a IA parte dali
+function videoSyncAutoAqui() {
+  const p = el('vid-player'); if (!p) return
+  videoSyncAuto(45, p.currentTime)
 }
 
 // Desloca TODAS as falas (EN e trilha PT juntas — o desvio é do arquivo)
@@ -1592,18 +1621,19 @@ function videoSubShift(delta) {
 }
 
 // ---- Automática: Whisper escuta uma amostra e a legenda se alinha ----
-async function videoSyncAuto(dur) {
+// t0Manual (opcional) = "IA do ponto atual": o usuário escolhe onde analisar.
+async function videoSyncAuto(dur, t0Manual) {
   if (_vidSyncing) return
   if (!_vidCues.length) { toast('Importe a legenda primeiro', 'warning'); return }
   if (!cfg.openaiKey) { toast('A sincronização automática usa a IA — configure a chave OpenAI', 'warning'); return }
   const p = el('vid-player'); if (!p) return
   _vidSyncing = true
   dur = dur || 45
+  let msgFinal = ''
   try {
-    // Amostra num ponto com falas: o meio da 10ª fala em diante, ou 20% do vídeo
-    const base = _vidCues[Math.min(9, _vidCues.length - 1)].s
-    const t0 = Math.max(0, base)
-    _vidSyncRender(`<span class="gen-spinner"></span> Gravando ${dur}s do áudio (você vai ouvir o trecho)...`)
+    // A IA escolhe o trecho: a janela com MAIS FALA segundo a própria legenda
+    const t0 = t0Manual != null ? Math.max(0, t0Manual) : _vidBestSampleStart(dur)
+    _vidSyncRender(`<span class="gen-spinner"></span> Gravando ${dur}s a partir de ${_vidFmtTime(t0)}${t0Manual != null ? ' (ponto escolhido por você)' : ' — o trecho mais falado'} (você vai ouvi-lo)...`)
     const b64 = await captureClipAudio(t0, t0 + dur)
     _vidSyncRender('<span class="gen-spinner"></span> Transcrevendo com a IA (Whisper)...')
     const blob = await (await fetch(b64)).blob()
@@ -1651,17 +1681,20 @@ async function videoSyncAuto(dur) {
     deltas.sort((a, b) => a - b)
     const mediana = deltas[Math.floor(deltas.length / 2)]
     if (Math.abs(mediana) < 0.15) {
-      _vidSyncRender(`${ic('checkCircle','ic-sm')} Já está em sincronia (desvio de ${(mediana * 1000).toFixed(0)}ms em ${deltas.length} falas casadas).`)
+      msgFinal = `${ic('checkCircle','ic-sm')} Já está em sincronia (desvio de ${(mediana * 1000).toFixed(0)}ms em ${deltas.length} falas casadas).`
     } else {
       videoSubShift(+(-mediana).toFixed(2))
-      _vidSyncRender(`${ic('checkCircle','ic-sm')} Sincronizado: a legenda estava ${mediana > 0 ? 'adiantada' : 'atrasada'} ${Math.abs(mediana).toFixed(1)}s (${deltas.length} falas casadas pela IA).`)
+      msgFinal = `${ic('checkCircle','ic-sm')} Sincronizado: a legenda estava ${mediana > 0 ? 'adiantada' : 'atrasada'} ${Math.abs(mediana).toFixed(1)}s (${deltas.length} falas casadas pela IA).`
       toast('Legenda sincronizada pela IA', 'success')
     }
   } catch (e) {
     console.warn('[video] syncAuto:', e)
-    _vidSyncRender(`Não consegui sincronizar automaticamente: ${esc(e.message)}. Use os botões manuais.`)
+    msgFinal = `Não deu: ${esc(e.message)}. Tente "IA do ponto atual" — pause o vídeo num diálogo e clique — ou os botões manuais.`
   } finally {
+    // A trava SÓ libera aqui — e o painel é re-renderizado DEPOIS dela, senão
+    // o botão nasce desabilitado e assim fica (o bug relatado pelo Djemeson).
     _vidSyncing = false
     const p2 = el('vid-player'); if (p2) p2.pause()
+    _vidSyncRender(msgFinal)
   }
 }

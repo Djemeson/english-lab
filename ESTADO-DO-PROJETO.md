@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-02 — **Marcador em ciclo + sync com IA (21ª rodada)**: M abre o
+> Última atualização: 2026-08-03 — **Sync com IA consertado (22ª rodada)**: a amostra agora cai
+> sozinha no trecho MAIS FALADO do episódio (densidade medida pela própria legenda), o botão
+> volta a habilitar após uma falha (re-render movido para depois da trava) e nasceu o último
+> recurso "IA do ponto atual" — pause num diálogo e a IA analisa dali.
+> Ver seção 8 (22ª rodada).
+>
+> Última atualização anterior: 2026-08-02 — **Marcador em ciclo + sync com IA (21ª rodada)**: M abre o
 > trecho, M fecha e cai direto no estudo focado (marcador virou intervalo); e o painel "Sync"
 > ajusta a legenda na mão (±0,1/±0,5s) ou sozinho — Whisper transcreve ~45s do áudio real com
 > timestamps, casa com a legenda e aplica a mediana dos desvios (teste com dessincronia
@@ -330,6 +336,26 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (22ª rodada) — Sync com IA: acha sozinho o trecho falado + destrava após falha
+73. **Bug relatado pelo Djemeson**: a IA amostrou um trecho com poucas falas, deu erro pedindo
+    um trecho com mais fala, **o botão ficou desativado** e, ao recarregar, amostrava o MESMO
+    trecho. Três causas, três correções:
+    - **Ponto de amostra era fixo** (sempre a 10ª fala). Agora `_vidBestSampleStart(dur)`
+      desliza uma janela pela legenda e escolhe a de **maior densidade de fala** (soma da
+      duração das falas) — a densidade sobrevive a legendas fora de sincronia porque o desvio
+      típico é de segundos. O status mostra onde a amostra foi tirada ("a partir de 12:31 — o
+      trecho mais falado").
+    - **Botão travado após falha**: o painel era re-renderizado DENTRO do catch, quando
+      `_vidSyncing` ainda era true — o botão nascia desabilitado e ficava. O re-render foi
+      para o `finally`, DEPOIS de liberar a trava.
+    - **Último recurso — "IA do ponto atual"**: botão novo; o usuário leva o vídeo até um
+      diálogo, pausa e a IA analisa dali (`videoSyncAuto(45, currentTime)`). A mensagem de
+      falha agora aponta para ele.
+    - **Validado ao vivo** com legenda de densidades desiguais: a janela caiu no bloco denso
+      (não no "Hm." inicial); falha com Whisper stubado vazio → botões HABILITADOS + mensagem
+      honesta; "do ponto atual" com desvio plantado de −1,0s → detectou e corrigiu exato
+      (3 falas casadas). `CACHE`: `v46` → **`v47`**.
 
 ### Sessão 2026-08-02 (21ª rodada) — Marcador em ciclo + sincronização com IA
 72. **Dois pedidos do Djemeson**:
