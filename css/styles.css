@@ -3708,3 +3708,24 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   color:var(--primary);max-width:230px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+
+/* ---- Tela cheia do stage: video centrado, overlay junto ---- */
+.vid-stage:fullscreen{background:#000;display:flex;align-items:center;justify-content:center}
+.vid-stage:fullscreen video{width:100%;height:100%;max-height:none}
+.vid-stage:fullscreen .vid-ov{bottom:88px}
+.vid-stage:fullscreen .vid-ov-en{font-size:clamp(18px,2.2vw,30px)}
+.vid-stage:fullscreen .vid-ov-pt{font-size:clamp(15px,1.7vw,24px)}
+/* Legenda nativa (fullscreen do proprio video): tamanho legivel */
+#vid-player::cue{font-size:1.15em;background:rgba(0,0,0,.65)}
+
+/* ---- Pular 5s: botoes flutuantes sobre o video (valem em tela cheia) ---- */
+.vid-skipbtn{
+  position:absolute;top:50%;transform:translateY(-50%);z-index:4;
+  width:48px;height:48px;border:none;border-radius:50%;cursor:pointer;
+  background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:700;
+  opacity:0;transition:opacity .15s ease;
+}
+.vid-stage:hover .vid-skipbtn{opacity:.85}
+.vid-skipbtn:hover{opacity:1!important;background:rgba(0,0,0,.75)}
+.vid-skipbtn.left{left:14px}
+.vid-skipbtn.right{right:14px}

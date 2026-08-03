@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Continuar de onde parou (26ª rodada)**: reabrir o mesmo
+> Última atualização: 2026-08-03 — **Candidatas sem teto + tela cheia + pular ±5s (27ª
+> rodada)**: o sync com IA testa TODAS as legendas alternativas (a boa estava na posição 7 e o
+> teto de 5 a deixava de fora) e adota a menos derivada quando nenhuma é perfeita; tela cheia
+> com legenda por dois caminhos (botão próprio = overlay interativo; botão nativo = trilha
+> VTT nativa); botões −5s/+5s no vídeo + setas do teclado. Ver seção 8 (27ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Continuar de onde parou (26ª rodada)**: reabrir o mesmo
 > arquivo volta com a legenda modificada intacta e retoma a posição (com 2s de recuo; "parou
 > em X" na biblioteca). O teste achou e matou um bug de perda de dados (save debounced abortado
 > na saída do player) e um caso degenerado do alinhador PT. Ver seção 8 (26ª rodada).
@@ -359,6 +365,32 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (27ª rodada) — Candidatas sem teto, tela cheia com legenda e pular ±5s
+78. **Três pedidos do Djemeson na sequência** (White Lotus S01E01 como caso real):
+    - **"Só 5 alternativas testadas, mas a lista tinha mais"** — certíssimo: o teto de 5 era
+      arbitrário (`.slice(0,5)`) e as candidatas guardadas paravam em 15. Agora TODAS as
+      candidatas da mesma língua são guardadas (até 40) e testadas — cada teste custa 1
+      download + matching local (a transcrição do Whisper é reaproveitada). E nasceu o
+      segundo nível que faltava: se nenhuma casa PERFEITAMENTE, a IA adota a **menos
+      derivada** quando ela é ao menos 1s melhor que a atual (`parcial`, com o começo
+      ajustado e aviso honesto). Validado ao vivo: a candidata boa na POSIÇÃO 7 foi
+      encontrada e adotada (o teto antigo a deixava de fora). Nota: o ramo "menos ruim" usa
+      o mesmo `_vidAdoptSub` do ramo validado, mas seu gatilho não foi exercitado ao vivo.
+      ⚠️ Para o sync usar a lista completa num vídeo antigo, refazer "Buscar legenda" uma vez
+      (atualiza as candidatas guardadas).
+    - **"Em tela cheia a legenda não aparece"** — o botão nativo do player põe só o <video>
+      em fullscreen, onde overlay nenhum entra. Dois caminhos: botão próprio **"Tela cheia"**
+      (fullscreen no `.vid-stage` — o overlay interativo vai junto, dá para SELECIONAR
+      palavra em tela cheia) e, para o botão nativo, uma **trilha de legenda nativa**
+      (TextTrack/VTTCue, EN + PT quando "PT ao vivo" está ligado, `cue.line=-3`) ligada
+      automaticamente no fullscreenchange. Validado: trilha com EN+PT montada; as transições
+      de fullscreen em si exigem gesto do usuário (não automatizável — conferir no uso real).
+    - **"Não tem botão de avançar/voltar segundos"** — botões flutuantes **−5s/+5s** sobre o
+      vídeo (aparecem no hover, valem em tela cheia) + setas **←/→** do teclado (guardas:
+      não em inputs, não quando o player nativo tem foco). Validado ao vivo: pulo por botão
+      e por teclado.
+    - `CACHE`: `v51` → **`v53`** (v52 intermediário na mesma rodada).
 
 ### Sessão 2026-08-03 (26ª rodada) — Continuar de onde parou (+2 bugs achados pelo teste)
 77. **Pedido**: reabrir o mesmo arquivo deve carregar a legenda com as modificações e retomar

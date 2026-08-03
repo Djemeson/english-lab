@@ -273,6 +273,8 @@ async function videoOpenPlayer(v) {
             <span class="vid-ov-pt" id="vid-ov-pt"></span>
           </div>
           <div class="vid-ov-pop hidden" id="vid-ov-pop"></div>
+          <button class="vid-skipbtn left" onclick="videoSkip(-5)" data-tip="Voltar 5s (seta ←)">−5s</button>
+          <button class="vid-skipbtn right" onclick="videoSkip(5)" data-tip="Avançar 5s (seta →)">+5s</button>
         </div>
         <div id="vid-audiofix-banner"></div>
         <div id="vid-sync-panel" class="hidden"></div>
@@ -284,6 +286,7 @@ async function videoOpenPlayer(v) {
           <button class="btn btn-ghost btn-sm ${_vidOverlayOn ? 'vid-on' : ''}" id="vid-ov-toggle" onclick="videoToggleOverlay()" data-tip="Legenda sobre o vídeo, em tempo real">${ic('message','ic-sm')}Legenda</button>
           <button class="btn btn-ghost btn-sm ${_vidLivePT ? 'vid-on' : ''}" id="vid-pt-toggle" onclick="videoToggleLivePT()" data-tip="Tradução SIMULTÂNEA: traduz cada fala enquanto o vídeo toca (IA, centavos por episódio) e mostra sob a legenda">PT ao vivo</button>
           <button class="btn btn-ghost btn-sm ${_vidAutoScroll ? 'vid-on' : ''}" id="vid-scroll-toggle" onclick="videoToggleScroll()" data-tip="Rolagem automática do transcript">${ic('arrowRight','ic-sm')}Seguir</button>
+          <button class="btn btn-ghost btn-sm" onclick="videoToggleFullscreen()" data-tip="Tela cheia COM a legenda interativa (o botão do player usa a legenda nativa)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>Tela cheia</button>
         </div>
         <div id="vid-sel-panel"></div>
         <div id="vid-markers"></div>
@@ -1350,7 +1353,7 @@ async function videoSubListLoad(temporada, episodio) {
   st.subs = subs.slice(0, 40)
   // Guarda as candidatas: é nelas que a sincronização com IA vai buscar uma
   // legenda de OUTRA versão quando a atual derivar no meio do episódio.
-  _vidSubCandidates = st.subs.slice(0, 15).map(s => ({ lang: s.lang, url: s.url, addon: s.addon }))
+  _vidSubCandidates = st.subs.map(s => ({ lang: s.lang, url: s.url, addon: s.addon }))
   _vidSaveSubs()
   st.carregando = false; _vidSubRender()
 }
@@ -1787,12 +1790,16 @@ async function videoSyncAuto(dur, t0Manual) {
         toast('Legenda sincronizada pela IA', 'success')
       }
     } else {
-      // Deriva (versão diferente) ou legenda que não casa: testa as candidatas
+      // Deriva (versão diferente) ou legenda que não casa: testa TODAS as
+      // candidatas da mesma língua (o Djemeson pegou o teto de 5 deixando a
+      // boa de fora). O custo de cada teste é 1 download + matching local —
+      // a transcrição do Whisper é reaproveitada.
+      const LANG3 = { en: 'eng', es: 'spa', fr: 'fre', de: 'ger', it: 'ita', pt: 'por', ja: 'jpn', ko: 'kor', ru: 'rus' }
       const langAtual = (_vidSubCandidates.find(x => x.url === _vidAppliedSubUrl) || {}).lang
-      const candidatas = _vidSubCandidates.filter(c =>
-        c.url !== _vidAppliedSubUrl && (!langAtual || c.lang === langAtual)
-      ).slice(0, 5)
-      let melhor = null
+        || LANG3[_vidCur.lang || 'en'] || 'eng'
+      const candidatas = _vidSubCandidates.filter(c => c.url !== _vidAppliedSubUrl && c.lang === langAtual)
+      const ruindade = av => Math.max(av.spread, av.disp)
+      let melhor = null, parcial = null
       for (let i = 0; i < candidatas.length; i++) {
         _vidSyncRender(`<span class="gen-spinner"></span> Esta legenda ${aval.matched < 3 ? 'não casa com o áudio' : 'deriva no meio (versão diferente)'} — testando alternativa ${i + 1}/${candidatas.length}...`)
         try {
@@ -1801,27 +1808,28 @@ async function videoSyncAuto(dur, t0Manual) {
           const cues2 = parseSubtitle(_vidDecodeSubBuf(await r.arrayBuffer()))
           if (cues2.length < 20) continue
           const a2 = _vidAvaliaLegenda(cues2, amostras)
-          if (a2.matched >= 3 && a2.spread <= 0.7 && a2.disp <= 1.5 && (!melhor || a2.matched > melhor.aval.matched)) {
+          if (a2.matched < 3) continue
+          if (a2.spread <= 0.7 && a2.disp <= 1.5 && (!melhor || a2.matched > melhor.aval.matched)) {
             melhor = { cand: candidatas[i], cues: cues2, aval: a2 }
             if (a2.matched >= 8) break     // casou bem — não precisa testar o resto
           }
+          // menos ruim: guarda a de menor deriva, caso nenhuma seja perfeita
+          if (!parcial || ruindade(a2) < ruindade(parcial.aval)) parcial = { cand: candidatas[i], cues: cues2, aval: a2 }
         } catch (e) { console.warn('[sync] candidata falhou:', e.message) }
       }
+      const derivaAtual = aval.matched >= 3 ? ruindade(aval) : Infinity
       if (melhor) {
-        // Adota a candidata: substitui a legenda salva (o IDB é o "disco"
-        // daqui) e faz o ajuste fino do offset restante
-        _vidCues = melhor.cues
-        _vidAppliedSubUrl = melhor.cand.url
-        _vidCur.subShift = 0
-        if (_vidCuesPT.length) _vidAlignPTTrack()
-        if (Math.abs(melhor.aval.mediana) >= 0.15) videoSubShift(+(-melhor.aval.mediana).toFixed(2))
-        else { _vidSaveSubs(); _vidCueIdx = -1; renderVidTranscript(); _vidUpdateOverlay() }
-        _vidCur.cueCount = _vidCues.length; saveVideos(); autoSyncAfterChange()
-        msgFinal = `${ic('checkCircle','ic-sm')} A legenda anterior era de OUTRA versão do vídeo — troquei por uma que casa de ponta a ponta (${melhor.aval.matched} falas verificadas) e sincronizei.`
+        _vidAdoptSub(melhor.cand, melhor.cues, melhor.aval.mediana)
+        msgFinal = `${ic('checkCircle','ic-sm')} A legenda anterior era de OUTRA versão do vídeo — troquei por uma que casa de ponta a ponta (${melhor.aval.matched} falas verificadas em ${candidatas.length} alternativas) e sincronizei.`
         toast('A IA trocou a legenda por uma da versão certa', 'success')
+      } else if (parcial && ruindade(parcial.aval) < derivaAtual - 1) {
+        // Nenhuma é perfeita, mas há uma CLARAMENTE melhor que a atual
+        _vidAdoptSub(parcial.cand, parcial.cues, parcial.aval.comeco)
+        msgFinal = `Nenhuma das ${candidatas.length} legendas casa de ponta a ponta, mas troquei pela MENOS derivada: ${ruindade(parcial.aval).toFixed(1)}s de deriva contra ${isFinite(derivaAtual) ? derivaAtual.toFixed(1) + 's' : 'uma que nem casava'} da anterior, com o começo ajustado. Ainda pode escorregar adiante.`
+        toast('A IA trocou pela legenda menos derivada', 'info')
       } else if (aval.matched >= 3) {
         videoSubShift(+(-aval.comeco).toFixed(2))
-        msgFinal = `Ajustei o COMEÇO, mas esta legenda deriva ${Math.max(aval.spread, aval.disp).toFixed(1)}s ao longo do episódio (versão com cortes diferentes) e nenhuma das ${candidatas.length} alternativas casou melhor. Vai dessincronizar adiante — tente outra fonte de legenda.`
+        msgFinal = `Ajustei o COMEÇO, mas esta legenda deriva ${ruindade(aval).toFixed(1)}s ao longo do episódio (versão com cortes diferentes) e nenhuma das ${candidatas.length} alternativas testadas casou melhor. Vai dessincronizar adiante — tente outra fonte de legenda.`
       } else {
         throw new Error(`nenhuma legenda casou com o áudio (${candidatas.length} alternativas testadas) — pode ser outro episódio`)
       }
@@ -1836,6 +1844,19 @@ async function videoSyncAuto(dur, t0Manual) {
     const p2 = el('vid-player'); if (p2) p2.pause()
     _vidSyncRender(msgFinal)
   }
+}
+
+// Adota uma legenda candidata: substitui a salva, realinha a trilha PT e
+// aplica o ajuste fino de offset
+function _vidAdoptSub(cand, cues, offset) {
+  _vidCues = cues
+  _vidAppliedSubUrl = cand.url
+  _vidCur.subShift = 0
+  if (_vidCuesPT.length) _vidAlignPTTrack()
+  if (Math.abs(offset) >= 0.15) videoSubShift(+(-offset).toFixed(2))
+  else { _vidSaveSubs(); _vidCueIdx = -1; renderVidTranscript(); _vidUpdateOverlay() }
+  _vidCur.cueCount = _vidCues.length
+  saveVideos(); autoSyncAfterChange()
 }
 
 // Whisper com timestamps: amostra (dataURL) → segmentos em tempo ABSOLUTO
@@ -2024,4 +2045,72 @@ if (!window._vidFlushBound) {
   }
   window.addEventListener('beforeunload', _vidFlush)
   document.addEventListener('visibilitychange', () => { if (document.hidden) _vidFlush() })
+}
+
+// ================================================================
+// TELA CHEIA COM LEGENDA
+// Caminho 1 (botão próprio): fullscreen no .vid-stage — o overlay
+// interativo vai junto (dá para selecionar palavra em tela cheia).
+// Caminho 2 (botão nativo do player): o fullscreen é só do <video>,
+// onde nenhum overlay entra — então injetamos uma trilha de legenda
+// NATIVA (TextTrack/VTTCue), que o player renderiza em qualquer modo.
+// ================================================================
+// Pular alguns segundos (botões no vídeo + setas do teclado)
+function videoSkip(d) {
+  const p = el('vid-player'); if (!p) return
+  p.currentTime = Math.max(0, p.currentTime + d)
+}
+if (!window._vidSkipKeysBound) {
+  window._vidSkipKeysBound = true
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    const tag = (document.activeElement?.tagName || '').toLowerCase()
+    if (tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable) return
+    if (!document.getElementById('section-video')?.classList.contains('active')) return
+    if (!el('vid-player')) return
+    if (document.activeElement === el('vid-player')) return   // o player nativo já trata
+    e.preventDefault()
+    videoSkip(e.key === 'ArrowLeft' ? -5 : 5)
+  })
+}
+
+function videoToggleFullscreen() {
+  const stage = document.querySelector('.vid-stage'); if (!stage) return
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+  else stage.requestFullscreen().catch(e => toast('Tela cheia bloqueada: ' + e.message, 'warning'))
+}
+
+let _vidTrack = null
+function _vidFillTrack() {
+  const p = el('vid-player'); if (!p) return
+  if (!_vidTrack || _vidTrack._for !== p) {
+    _vidTrack = p.addTextTrack('subtitles', 'Estudo', 'en')
+    _vidTrack._for = p
+  }
+  const velhos = _vidTrack.cues ? [..._vidTrack.cues] : []
+  velhos.forEach(c => { try { _vidTrack.removeCue(c) } catch (e) {} })
+  for (const c of _vidCues) {
+    const pt = _vidLivePT ? _vidPTof(c) : ''
+    try {
+      const cue = new VTTCue(c.s, c.e, pt ? c.t + '\n' + pt : c.t)
+      cue.line = -3          // um pouco acima da borda, longe dos controles
+      _vidTrack.addCue(cue)
+    } catch (e) {}
+  }
+}
+
+if (!window._vidFsBound) {
+  window._vidFsBound = true
+  document.addEventListener('fullscreenchange', () => {
+    const p = el('vid-player')
+    if (!p) return
+    if (document.fullscreenElement === p) {
+      // fullscreen NATIVO (só o vídeo): liga a trilha nativa
+      if (_vidOverlayOn && _vidCues.length) { _vidFillTrack(); _vidTrack.mode = 'showing' }
+    } else if (_vidTrack) {
+      // saiu, ou é o fullscreen do stage (overlay rico cuida da legenda)
+      _vidTrack.mode = 'hidden'
+    }
+  })
 }
