@@ -1727,10 +1727,12 @@ function _vidSyncRender(msg) {
         <span class="vid-sync-hint">Legenda ATRASADA (fala vem antes do texto)? Use −. Adiantada? Use +.</span>
       </div>
       <div class="vid-sync-row">
+        <button class="btn btn-ghost btn-sm" onclick="videoSubShift(-5)">−5s</button>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(-0.5)">−0,5s</button>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(-0.1)">−0,1s</button>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(0.1)">+0,1s</button>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(0.5)">+0,5s</button>
+        <button class="btn btn-ghost btn-sm" onclick="videoSubShift(5)">+5s</button>
         <span style="flex:1"></span>
         <button class="btn btn-ghost btn-sm" ${_vidSyncing ? 'disabled' : ''} onclick="videoSyncAutoAqui()"
           data-tip="Último recurso: leva o vídeo até um diálogo, pausa ali e a IA analisa DESSE ponto em diante">
@@ -1807,7 +1809,7 @@ async function videoSyncAuto(dur, t0Manual) {
     const fimLeg = _vidCues[_vidCues.length - 1].e
     let janelas
     if (t0Manual != null) janelas = [Math.max(0, t0Manual)]
-    else if (fimLeg > 240) janelas = [_vidBestSampleStart(dur, 0, fimLeg * 0.45), _vidBestSampleStart(dur, fimLeg * 0.5, fimLeg)]
+    else if (fimLeg > 240) janelas = [_vidBestSampleStart(dur, 0, fimLeg * 0.3), _vidBestSampleStart(dur, fimLeg * 0.55, fimLeg)]
     else janelas = [_vidBestSampleStart(dur, 0, fimLeg)]
 
     const amostras = []
@@ -1820,16 +1822,18 @@ async function videoSyncAuto(dur, t0Manual) {
       amostras.push(segs)
     }
     if (amostras.flat().length < 3) throw new Error('a amostra tem pouca fala — tente "IA do ponto atual" num diálogo')
+    const temposJanela = janelas.map(t => t + dur / 2)
 
     // Avalia a legenda ATUAL nos pontos amostrados
     const aval = _vidAvaliaLegenda(_vidCues, amostras)
     if (aval.matched >= 3 && aval.spread <= 0.7 && aval.disp <= 1.5) {
       // Offset constante: caso bom — aplica e encerra
+      const pontosOk = aval.medianas.length
       if (Math.abs(aval.mediana) < 0.15) {
-        msgFinal = `${ic('checkCircle','ic-sm')} Em sincronia de ponta a ponta (${aval.matched} falas casadas em ${janelas.length} ponto${janelas.length > 1 ? 's' : ''}).`
+        msgFinal = `${ic('checkCircle','ic-sm')} Em sincronia de ponta a ponta (${aval.matched} falas casadas em ${pontosOk} ponto${pontosOk > 1 ? 's' : ''}).`
       } else {
         videoSubShift(+(-aval.mediana).toFixed(2))
-        msgFinal = `${ic('checkCircle','ic-sm')} Sincronizado: legenda ${aval.mediana > 0 ? 'adiantada' : 'atrasada'} ${Math.abs(aval.mediana).toFixed(1)}s — verificado em ${janelas.length} ponto${janelas.length > 1 ? 's' : ''} (${aval.matched} falas).`
+        msgFinal = `${ic('checkCircle','ic-sm')} Sincronizado: legenda ${aval.mediana > 0 ? 'atrasada' : 'adiantada'} ${Math.abs(aval.mediana).toFixed(1)}s — verificado em ${pontosOk} ponto${pontosOk > 1 ? 's' : ''} (${aval.matched} falas)${janelas.length > pontosOk ? ' — a outra amostra não teve fala casável' : ''}.`
         toast('Legenda sincronizada pela IA', 'success')
       }
     } else {
@@ -1842,6 +1846,37 @@ async function videoSyncAuto(dur, t0Manual) {
         || LANG3[_vidCur.lang || 'en'] || 'eng'
       const candidatas = _vidSubCandidates.filter(c => c.url !== _vidAppliedSubUrl && c.lang === langAtual)
       const ruindade = av => Math.max(av.spread, av.disp)
+
+      // Correção PROGRESSIVA (linear): dois pontos medidos → a legenda é
+      // reescrita com o desvio interpolado no tempo. Corrige o início E o
+      // fim de uma vez. Se a reavaliação (grátis) não confirmar, desfaz.
+      if (aval.medianas.length === 2 && aval.matched >= 4) {
+        const [off1, off2] = aval.medianas
+        const [t1, t2] = temposJanela
+        const bLin = (off2 - off1) / (t2 - t1)
+        const aLin = off1 - bLin * t1
+        const backup = _vidCues.map(c => ({ s: c.s, e: c.e }))
+        const backupPT = _vidCuesPT.map(c => ({ s: c.s, e: c.e }))
+        const warp = c => {
+          c.s = Math.max(0, c.s - (aLin + bLin * c.s))
+          c.e = Math.max(c.s + 0.3, c.e - (aLin + bLin * c.e))
+        }
+        _vidCues.forEach(warp); _vidCuesPT.forEach(warp)
+        const pos = _vidAvaliaLegenda(_vidCues, amostras)
+        if (pos.matched >= 3 && ruindade(pos) <= 1.0) {
+          _vidCur.subShift = 0
+          _vidCur.updated_at = new Date().toISOString()
+          saveVideos(); autoSyncAfterChange(); _vidSaveSubs()
+          _vidCueIdx = -1; renderVidTranscript(); _vidUpdateOverlay()
+          msgFinal = `${ic('checkCircle','ic-sm')} Esta legenda DERIVA (desvio de ${off1.toFixed(1)}s no início e ${off2.toFixed(1)}s adiante) — apliquei correção PROGRESSIVA ao longo do episódio inteiro (${aval.matched} falas medidas, ${pos.matched} confirmadas depois).`
+          toast('Legenda corrigida progressivamente pela IA', 'success')
+          return
+        }
+        // não confirmou: desfaz e segue para as candidatas
+        _vidCues.forEach((c, i) => { c.s = backup[i].s; c.e = backup[i].e })
+        _vidCuesPT.forEach((c, i) => { c.s = backupPT[i].s; c.e = backupPT[i].e })
+      }
+
       let melhor = null, parcial = null
       for (let i = 0; i < candidatas.length; i++) {
         _vidSyncRender(`<span class="gen-spinner"></span> Esta legenda ${aval.matched < 3 ? 'não casa com o áudio' : 'deriva no meio (versão diferente)'} — testando alternativa ${i + 1}/${candidatas.length}...`)

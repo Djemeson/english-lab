@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Legenda automática na abertura (28ª rodada)**: abrir um
+> Última atualização: 2026-08-03 — **Correção progressiva de deriva (29ª rodada)**: o caso dos
+> 9s que travou o estudo — rótulo adiantada/atrasada estava invertido, a âncora do "começo"
+> podia ser o minuto 20, e deriva não se conserta com shift constante. Agora a IA mede 2 pontos
+> e reescreve a legenda com desvio interpolado (teste: deriva 3,5s→8,1s ficou a ≤50ms do áudio
+> de ponta a ponta). Ver seção 8 (29ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Legenda automática na abertura (28ª rodada)**: abrir um
 > vídeo sem legenda dispara a cadeia inteira sozinho (título+episódio do nome do arquivo →
 > Cinemeta → addons → melhor da língua → aplica → trilha PT atrás). Validado com rede real:
 > 1020 falas do White Lotus S01E01 aplicadas com zero cliques, PT-BR alinhada em 851.
@@ -371,6 +377,24 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (29ª rodada) — Correção PROGRESSIVA de deriva (o caso dos 9 segundos)
+80. **O Djemeson travou**: a melhor legenda tinha ~9s de atraso; o sync disse "ajustei o
+    começo, vai derivar adiante" mas o começo continuou torto; ele tentou ±9s na mão e piorou.
+    Três causas encontradas:
+    - **Rótulo INVERTIDO**: "adiantada"/"atrasada" trocados na mensagem (mediana>0 = cue
+      depois da fala = ATRASADA) — por isso o ajuste manual dele foi no sentido errado.
+    - **"Ajustei o começo" mentia**: a âncora era o trecho mais falado da 1ª METADE (podia
+      ser o minuto 20). Janelas reancoradas: 1ª nos primeiros 30%, 2ª nos últimos 45%.
+    - **Deriva não se conserta com deslocamento constante** — nasceu a **correção
+      PROGRESSIVA (linear)**: com o desvio medido em 2 pontos, a legenda inteira é reescrita
+      com o desvio interpolado no tempo (framerate/versão = deriva linear na prática);
+      reavaliação grátis contra as mesmas transcrições confirma, senão desfaz e cai para as
+      candidatas. Validado com deriva plantada 3,5s→8,1s: legenda inteira a ≤50ms do áudio
+      (início, meio e fim), 8/8 falas confirmadas.
+    - Extras: botões manuais ±5s no painel Sync; mensagem conta PONTOS MEDIDOS (não janelas
+      abertas — "verificado em 2 pontos" com 1 amostra vazia era desonesto).
+      `CACHE`: `v54` → **`v55`**.
 
 ### Sessão 2026-08-03 (28ª rodada) — Legenda AUTOMÁTICA na abertura (zero cliques)
 79. **Pedido**: "na primeira vez preciso clicar no botão de legenda e selecionar — quero que
