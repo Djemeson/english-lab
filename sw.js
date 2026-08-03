@@ -4,7 +4,7 @@
 // Firebase e OpenAI ficam sempre na rede.
 // ================================================================
 
-const CACHE = 'englab-v55'
+const CACHE = 'englab-v57'
 // Cache separado e PERMANENTE para o ffmpeg.wasm (31 MB): não pode ser
 // apagado a cada versão do shell, senão cada deploy custaria 31 MB de novo.
 const CACHE_FFMPEG = 'englab-ffmpeg-v1'
@@ -87,7 +87,7 @@ self.addEventListener('fetch', e => {
   }
 
   // Módulos lazy: network-first (mudam mais e não estão no shell)
-  if (url.includes('/js/add.js') || url.includes('/js/study.js') || url.includes('/js/video.js')) {
+  if (url.includes('/js/add.js') || url.includes('/js/study.js') || url.includes('/js/video')) {
     e.respondWith(
       fetch(e.request)
         .then(r => { caches.open(CACHE).then(c => c.put(e.request, r.clone())); return r })

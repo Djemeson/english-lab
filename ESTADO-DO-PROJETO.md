@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Correção progressiva de deriva (29ª rodada)**: o caso dos
+> Última atualização: 2026-08-03 — **Modularização + 3 modos novos (30ª rodada)**: video.js
+> virou 4 módulos por responsabilidade (com retry no loader lazy); nasceram o DITADO (escreva o
+> que ouviu, correção palavra a palavra, custo zero), o SHADOWING (grave a imitação, a IA diz o
+> que saiu claro) e a LEGENDA CRIADA PELA IA (episódio sem legenda em lugar nenhum → Whisper
+> escreve uma, ~R,50); fullscreen do vídeo consertado. Ver seção 8 (30ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Correção progressiva de deriva (29ª rodada)**: o caso dos
 > 9s que travou o estudo — rótulo adiantada/atrasada estava invertido, a âncora do "começo"
 > podia ser o minuto 20, e deriva não se conserta com shift constante. Agora a IA mede 2 pontos
 > e reescreve a legenda com desvio interpolado (teste: deriva 3,5s→8,1s ficou a ≤50ms do áudio
@@ -377,6 +383,42 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (30ª rodada) — Modularização + Ditado + Shadowing + Legenda criada pela IA
+81. **Pedido**: "crie todos esses [Whisper de episódio inteiro, ditado, shadowing] seguindo as
+    boas práticas que você mencionou" — ou seja, a faxina ANTES das funcionalidades.
+    - **MODULARIZAÇÃO**: `js/video.js` (2.194 linhas) virou 4 módulos por responsabilidade:
+      `video.js` (núcleo: estado, player, overlay, transcript, retomada, conserto de áudio),
+      `video-subs.js` (parser, busca/addons, trilha PT, traduções, export, TRANSCRIÇÃO IA),
+      `video-sync.js` (painel Sync, Whisper 2 pontos, correção progressiva, candidatas),
+      `video-study.js` (seleção, foco, marcadores, card com áudio real, DITADO, SHADOWING).
+      `_LAZY.video` virou ARRAY (carga sequencial — o estado vive no 1º); `_loadScript`
+      ganhou 1 retry com cache-buster (cobre a janela de troca do service worker num deploy —
+      corrida que sempre existiu para add.js/study.js). sw.js casa `/js/video` por prefixo.
+      Split validado: 4 módulos carregam, todas as funções presentes, byte-total preservado.
+      ⚠️ Falso-bug de dev pego no caminho: o servidor python antigo servia um core.js VELHO
+      (handle do OneDrive) — a MESMA URL devolvia conteúdos diferentes; reiniciar o servidor
+      resolveu. Em produção não existe: todo deploy sobe a versão do cache.
+    - **DITADO** (custo zero): no estudo focado, antes de revelar a fala — "escreva o que
+      ouviu" → correção por alinhamento palavra a palavra (LCS): verdes = pegou, vermelhas =
+      o ouvido perdeu (CLICÁVEIS → Revisar), "escreveu a mais" listado, score %. Corrigiu =
+      fala se revela. Validado: erros plantados ("torch"→"port", "spoken" omitido) foram
+      exatamente os apontados (87%).
+    - **SHADOWING** (centavos): após revelar a fala — grava a imitação pelo microfone,
+      Whisper transcreve a SUA voz, mesmo diff → "X% das palavras saíram claras" + lista do
+      que a IA não reconheceu; Ouvir você / Ouvir a cena / Gravar de novo. Validado o score
+      com gravação falsa + Whisper stubado; o caminho do microfone real fica para o uso.
+    - **LEGENDA CRIADA PELA IA** ("Criar com IA" no transcript vazio, ~R$ 1,50/45min, com
+      confirmação de custo em reais): ffmpeg local extrai o áudio (mono 16kHz 48kbps — 1h
+      cabe numa chamada; acima disso fatia por tempo), Whisper devolve segmentos com tempos,
+      cues aplicadas — nasce sincronizada por construção. Validado com ffmpeg REAL no vídeo
+      sintético + Whisper stubado: 5 falas aplicadas, DOM e IDB corretos (inclusive a trava
+      de sanidade <5 falas disparando no stub pequeno — comportamento certo).
+    - **Fullscreen consertado** (feedback do meio da rodada): o `max-height:56vh` do player
+      (ID) vencia a regra de tela cheia (classe) — vídeo pequeno com vão embaixo. Regra nova
+      com ID: `.vid-stage:fullscreen #vid-player` a 100vw/100vh. Legenda continua sobre o
+      vídeo, como o Djemeson pediu.
+    - 0 erros nas telas. `CACHE`: `v55` → **`v57`** (v56 intermediário).
 
 ### Sessão 2026-08-03 (29ª rodada) — Correção PROGRESSIVA de deriva (o caso dos 9 segundos)
 80. **O Djemeson travou**: a melhor legenda tinha ~9s de atraso; o sync disse "ajustei o

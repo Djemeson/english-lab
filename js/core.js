@@ -278,24 +278,42 @@ const SECTIONS = ['dashboard','assistente','adicionar','revisar','estudar','bibl
 // biblioteca usa funções de study.js (buildSrsFrente/Verso/MetaChips/fmtDays)
 // (assistente NÃO é lazy — js/consulta.js é carregado sempre, pois firebase.js
 //  precisa de `conversas`/render no sync.)
-const _LAZY = { adicionar: 'js/add.js', estudar: 'js/study.js', biblioteca: 'js/study.js', video: 'js/video.js' }
+// video é um PACOTE de módulos (ordem importa: o estado vive no primeiro)
+const _LAZY = {
+  adicionar: 'js/add.js', estudar: 'js/study.js', biblioteca: 'js/study.js',
+  video: ['js/video.js', 'js/video-subs.js', 'js/video-sync.js', 'js/video-study.js']
+}
 const _loadedModules = new Set()
 
-function _loadScript(src) {
+function _loadScript(src, tentativa = 0) {
   return new Promise((resolve, reject) => {
     if (_loadedModules.has(src)) { resolve(); return }
     const s = document.createElement('script')
-    s.src = src
+    s.src = tentativa ? src + '?r=' + Date.now() : src
     s.onload = () => { _loadedModules.add(src); resolve() }
-    s.onerror = () => reject(new Error('Falha ao carregar ' + src))
+    s.onerror = () => {
+      s.remove()
+      if (tentativa >= 1) { reject(new Error('Falha ao carregar ' + src)); return }
+      // 1 retry com cache-buster: cobre a janela de troca do service worker
+      // logo após um deploy — requisições em voo abortam quando o SW novo
+      // assume, e era isso que deixava os módulos lazy pela metade.
+      setTimeout(() => _loadScript(src, tentativa + 1).then(resolve, reject), 400)
+    }
     document.body.appendChild(s)
   })
 }
 
 function showSection(name) {
   const lazy = _LAZY[name]
-  if (lazy && !_loadedModules.has(lazy)) {
-    _loadScript(lazy).then(() => _activateSection(name)).catch(e => { console.error(e); _activateSection(name) })
+  const files = Array.isArray(lazy) ? lazy : (lazy ? [lazy] : [])
+  if (files.some(f => !_loadedModules.has(f))) {
+    // Sequencial de propósito: módulos posteriores usam o estado do primeiro
+    ;(async () => {
+      for (const f of files) {
+        try { await _loadScript(f) } catch (e) { console.error(e) }
+      }
+      _activateSection(name)
+    })()
   } else {
     _activateSection(name)
   }
