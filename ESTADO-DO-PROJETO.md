@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **.srt sincronizado + IA troca legenda errada (23ª rodada)**:
+> Última atualização: 2026-08-03 — **Alinhador PT v2 (24ª rodada)**: a tradução PT caía na fala
+> errada (a trilha PT vem de outra release — agora o alinhador estima o offset entre as trilhas
+> com varredura + mediana) e duplicava no estudo focado (fusões de 2 falas EN num cue PT agora
+> são deduplicadas na exibição). Dados antigos se corrigem sozinhos ao reabrir o vídeo.
+> Ver seção 8 (24ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **.srt sincronizado + IA troca legenda errada (23ª rodada)**:
 > "Baixar .srt" exporta a legenda com a sincronização aplicada e o mesmo nome do vídeo (players
 > externos carregam sozinhos); e a sincronização agora verifica DOIS pontos do episódio — se a
 > legenda deriva (versão diferente), a IA testa as candidatas da busca contra as mesmas
@@ -342,6 +348,26 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (24ª rodada) — Alinhador PT v2: offset entre trilhas + fusões
+75. **Print do Djemeson (Marshals S01E01)**: a tradução PT aparecia na fala ERRADA e duplicada
+    no estudo focado. Ele perguntou se era a legenda PT-BR ou a IA — **era a legenda PT-BR
+    oficial alinhada** (a IA só traduz onde é pedida); os dois defeitos eram do alinhador v1:
+    - **A trilha PT vem de OUTRA release com timing deslocado** — o v1 alinhava pelo ponto
+      médio SEM estimar o deslocamento entre as trilhas, então a tradução caía na vizinha.
+      O v2 (`_vidAlignPTTrack`) estima o offset global em 3 passos: varredura grossa (±15s,
+      passo 0,5s) + fina (0,1s) maximizando falas EN contidas em cues PT, e **refino pela
+      mediana dos deltas de início** (a varredura fica com o primeiro empate — viés para
+      baixo que o teste pegou: a última fala caía no cue vizinho).
+    - **Legendas PT fundem 2 falas EN num cue só** — o mesmo texto vale para as duas. Na
+      exibição: o estudo focado deduplica consecutivos, e o transcript mostra
+      "⤷ (mesma tradução da fala acima)" na segunda em vez de repetir.
+    - **Fonte visível**: a linha PT ganhou `title` dizendo se veio "da legenda PT-BR
+      (alinhada)" ou "traduzido por IA".
+    - **Dados antigos se corrigem sozinhos**: o realinhamento roda a cada abertura do vídeo
+      (<50ms) — o Marshals dele conserta na próxima visita, sem ação manual.
+    - Validado ao vivo com o cenário do print (trilha PT +3s com fusão): **6/6 falas no PT
+      certo**, fusão única no foco, seta no transcript. `CACHE`: `v48` → **`v49`**.
 
 ### Sessão 2026-08-03 (23ª rodada) — .srt sincronizado para download + IA troca legenda de versão errada
 74. **Dois pedidos do Djemeson**:

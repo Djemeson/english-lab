@@ -246,6 +246,9 @@ async function videoOpenPlayer(v) {
   _vidSubCandidates = (stored && stored.candidates) || []
   _vidAppliedSubUrl = (stored && stored.appliedUrl) || null
   _vidFocus = null
+  // Realinha a trilha PT a cada abertura: é barato (<50ms) e corrige dados
+  // salvos por versões antigas do alinhador (sem estimativa de offset).
+  if (_vidCues.length && _vidCuesPT.length) { _vidAlignPTTrack(); _vidSaveSubs() }
 
   if (_vidURL) { URL.revokeObjectURL(_vidURL); _vidURL = null }
   _vidURL = URL.createObjectURL(_vidFile)
@@ -490,12 +493,16 @@ function renderVidTranscript() {
   }
   box.innerHTML = _vidCues.map((c, i) => {
     const pt = _vidPTof(c)
+    // Fusão PT (um cue PT cobrindo duas falas EN): mostra o texto só na
+    // primeira; a seguinte ganha a seta de continuação em vez de repetir.
+    const repetida = pt && i > 0 && _vidPTof(_vidCues[i - 1]) === pt
+    const fonte = c.pt ? 'traduzido por IA' : (c.pts ? 'da legenda PT-BR (alinhada)' : '')
     return `
     <div class="vid-cue${_vidSel && i >= _vidSel.ci && i <= _vidSel.cj ? ' insel' : ''}" data-i="${i}">
       <button class="vid-cue-time" onclick="videoPlayCue(${i})" data-tip="Tocar esta fala">${_vidFmtTime(c.s)}</button>
       <div class="vid-cue-body">
         <div class="vid-cue-text" onclick="videoSelectCue(${i})">${esc(c.t)}</div>
-        <div class="vid-cue-pt${_vidShowPT || c._rev ? '' : ' hid'}" id="vid-cue-pt-${i}">${esc(pt)}</div>
+        <div class="vid-cue-pt${_vidShowPT || c._rev ? '' : ' hid'}" id="vid-cue-pt-${i}" title="${escA(fonte)}">${repetida ? '⤷ (mesma tradução da fala acima)' : esc(pt)}</div>
       </div>
       <button class="vid-cue-ptbtn" onclick="videoCuePT(${i})" data-tip="Traduzir esta fala">pt</button>
     </div>`}).join('')
@@ -1386,15 +1393,67 @@ async function _vidApplyCues(cues, origem) {
 // camada adicional: tempo real com a chave OpenAI, só onde faltar.
 // ================================================================
 
-// Alinha a trilha PT às falas EN pelo ponto médio de cada fala.
+// Alinha a trilha PT às falas EN. Em duas passadas:
+// 1) estima o DESLOCAMENTO GLOBAL entre as trilhas (a legenda PT costuma vir
+//    de outra release — sem isso, a tradução cai na fala vizinha, que foi o
+//    que o Djemeson viu no Marshals S01E01);
+// 2) casa cada fala EN com o cue PT mais próximo do ponto médio deslocado.
+// Legendas PT também FUNDEM duas falas EN numa: o mesmo texto vale para as
+// duas (a deduplicação acontece na exibição do estudo focado).
 function _vidAlignPTTrack() {
   if (!_vidCues.length || !_vidCuesPT.length) return 0
+
+  // Passada 1: varredura de -15s a +15s (grossa 0,5s, fina 0,1s) maximizando
+  // quantas falas EN caem DENTRO de um cue PT com o offset aplicado.
+  const passo = Math.max(1, Math.floor(_vidCues.length / 200))
+  const amostraEN = _vidCues.filter((_, i) => i % passo === 0)
+  const score = off => {
+    let hits = 0, j = 0
+    for (const c of amostraEN) {
+      const mid = (c.s + c.e) / 2 + off
+      while (j < _vidCuesPT.length - 1 && _vidCuesPT[j].e < mid - 1) j++
+      for (const p of [_vidCuesPT[j], _vidCuesPT[j + 1]]) {
+        if (p && mid >= p.s - 0.4 && mid <= p.e + 0.4) { hits++; break }
+      }
+    }
+    return hits
+  }
+  let bestOff = 0, bestScore = -1
+  for (let off = -15; off <= 15.01; off += 0.5) {
+    const sc = score(+off.toFixed(1))
+    if (sc > bestScore) { bestScore = sc; bestOff = +off.toFixed(1) }
+  }
+  for (let off = bestOff - 0.4; off <= bestOff + 0.41; off += 0.1) {
+    const sc = score(+off.toFixed(1))
+    if (sc > bestScore) { bestScore = sc; bestOff = +off.toFixed(1) }
+  }
+
+  // Refino: a varredura fica com o PRIMEIRO offset que empata no máximo
+  // (viés para baixo). A mediana dos deltas de início dos pares contidos
+  // corrige isso — e resiste ao ruído das fusões (2 falas EN → 1 cue PT).
+  {
+    const deltas = []
+    let k = 0
+    for (const c of _vidCues) {
+      const mid = (c.s + c.e) / 2 + bestOff
+      while (k < _vidCuesPT.length - 1 && _vidCuesPT[k].e < mid - 1) k++
+      for (const p of [_vidCuesPT[k], _vidCuesPT[k + 1]]) {
+        if (p && mid >= p.s - 0.4 && mid <= p.e + 0.4) { deltas.push(p.s - c.s); break }
+      }
+    }
+    if (deltas.length >= 3) {
+      deltas.sort((a, b) => a - b)
+      bestOff = +deltas[Math.floor(deltas.length / 2)].toFixed(1)
+    }
+  }
+
+  // Passada 2: atribuição com o offset estimado
   let j = 0, alinhadas = 0
   for (const c of _vidCues) {
-    const mid = (c.s + c.e) / 2
+    delete c.pts
+    const mid = (c.s + c.e) / 2 + bestOff
     while (j < _vidCuesPT.length - 1 && _vidCuesPT[j].e < mid - 1.2) j++
-    // candidato atual ou o próximo — fica com o que cobrir/estiver mais perto
-    const cand = [_vidCuesPT[j], _vidCuesPT[j + 1]].filter(Boolean)
+    const cand = [_vidCuesPT[j - 1], _vidCuesPT[j], _vidCuesPT[j + 1]].filter(Boolean)
     let melhor = null, melhorDist = 1.2
     for (const p of cand) {
       const dist = (mid >= p.s && mid <= p.e) ? 0 : Math.min(Math.abs(p.s - mid), Math.abs(p.e - mid))
@@ -1402,6 +1461,7 @@ function _vidAlignPTTrack() {
     }
     if (melhor) { c.pts = melhor.t; alinhadas++ }
   }
+  console.log(`[video] trilha PT alinhada: offset ${bestOff}s, ${alinhadas}/${_vidCues.length} falas`)
   return alinhadas
 }
 
@@ -1521,7 +1581,10 @@ function _vidRenderFocus(panel) {
   const dur = (_vidSel.e - _vidSel.s).toFixed(1)
   const words = _vidSelText().split(/\s+/)
   const alvo = _vidTargetPhrase()
-  const ptTexto = _vidCues.slice(f.ci, f.cj + 1).map(c => _vidPTof(c)).filter(Boolean).join(' ')
+  // Dedup consecutivo: quando um cue PT cobre DUAS falas EN (fusão comum em
+  // legendas PT), o mesmo texto não pode aparecer duas vezes no trecho.
+  const ptTexto = _vidCues.slice(f.ci, f.cj + 1).map(c => _vidPTof(c))
+    .filter((t, i, a) => t && t !== a[i - 1]).join(' ')
   panel.innerHTML = `
     <div class="vid-sel vid-focus">
       <div class="vid-focus-head">
