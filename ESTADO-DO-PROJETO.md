@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Candidatas sem teto + tela cheia + pular ±5s (27ª
+> Última atualização: 2026-08-03 — **Legenda automática na abertura (28ª rodada)**: abrir um
+> vídeo sem legenda dispara a cadeia inteira sozinho (título+episódio do nome do arquivo →
+> Cinemeta → addons → melhor da língua → aplica → trilha PT atrás). Validado com rede real:
+> 1020 falas do White Lotus S01E01 aplicadas com zero cliques, PT-BR alinhada em 851.
+> Ver seção 8 (28ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Candidatas sem teto + tela cheia + pular ±5s (27ª
 > rodada)**: o sync com IA testa TODAS as legendas alternativas (a boa estava na posição 7 e o
 > teto de 5 a deixava de fora) e adota a menos derivada quando nenhuma é perfeita; tela cheia
 > com legenda por dois caminhos (botão próprio = overlay interativo; botão nativo = trilha
@@ -365,6 +371,28 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (28ª rodada) — Legenda AUTOMÁTICA na abertura (zero cliques)
+79. **Pedido**: "na primeira vez preciso clicar no botão de legenda e selecionar — quero que
+    seja automático, sem eu fazer nada".
+    - **`_vidAutoSub()`**: ao abrir um vídeo SEM legenda salva, roda sozinho: título limpo +
+      SxxExx do nome do arquivo → Cinemeta confirma (nome normalizado tem que bater EXATO,
+      senão para e aponta o botão manual — sem adivinhar) → `_vidFetchSubs` lista nos addons
+      (com moviehash) → melhor legenda da LÍNGUA DO VÍDEO (`VID_LANG3`) → aplica → a trilha
+      PT-BR vem atrás sozinha. Toasts em cada desfecho (achou / título incerto / sem episódio
+      no nome / nada nos addons / falhou).
+    - **Refatoração para reuso sem modal**: o miolo de `videoSubListLoad` virou
+      `_vidFetchSubs(meta, temporada, episodio)` (também atualiza as candidatas persistidas)
+      e o de `videoSubDownload` virou `_vidApplySubUrl(sub)` — modal e automático usam as
+      mesmas peças.
+    - **Vão pego no teste**: `_vidAutoFetchPT` lia a lista DO MODAL (`_vidSubState.subs`) —
+      no fluxo automático o modal não existe e a trilha PT não vinha. Agora cai para as
+      candidatas persistidas.
+    - **Validado com rede REAL, zero stub**: arquivo novo "The.White.Lotus.S01E01...RARBG"
+      aberto sem nenhuma legenda salva → **1020 falas aplicadas sozinhas** ("Hawaiian Flight
+      451 to Honolulu" é a abertura real do episódio), 40 candidatas guardadas para o sync,
+      e a trilha PT-BR (774 cues) alinhada em **851/1020 falas** ("Voo 451 da Hawaiian Air
+      para Honolulu..."). 0 erros nas telas. `CACHE`: `v53` → **`v54`**.
 
 ### Sessão 2026-08-03 (27ª rodada) — Candidatas sem teto, tela cheia com legenda e pular ±5s
 78. **Três pedidos do Djemeson na sequência** (White Lotus S01E01 como caso real):

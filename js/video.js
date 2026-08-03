@@ -334,6 +334,7 @@ async function videoOpenPlayer(v) {
   renderVidMarkers()
   renderVidSelPanel()
   _vidOvBind()          // seleção na legenda sobre o vídeo
+  if (!_vidCues.length) _vidAutoSub()   // 1ª vez: acha e aplica a legenda sozinho
 
 
   // Tecla M marca o momento (só com a seção ativa e fora de inputs)
@@ -1320,42 +1321,56 @@ function videoSubPick(i) {
   else videoSubListLoad()
 }
 
+// Consulta os addons e devolve a lista de legendas de um título/episódio.
+// Também atualiza as CANDIDATAS persistidas (usadas pelo sync com IA).
+async function _vidFetchSubs(meta, temporada, episodio) {
+  const hash = await openSubtitlesHash(_vidFile).catch(() => null)
+  const id = meta.type === 'series' ? `${meta.id}:${temporada}:${episodio}` : meta.id
+  const extra = hash && _vidFile ? `/videoHash=${hash}&videoSize=${_vidFile.size}` : ''
+  const vistos = new Set(); const subs = []
+  await Promise.all(_vidSubAddons().map(async base => {
+    const nome = base.replace(/^https?:\/\//, '').split('/')[0].split('.')[0]
+    for (const ex of extra ? [extra, ''] : ['']) {
+      try {
+        const r = await fetch(`${base}/subtitles/${meta.type}/${encodeURIComponent(id)}${ex}.json`)
+        if (!r.ok) continue
+        const j = await r.json()
+        ;(j.subtitles || []).forEach(sb => {
+          if (!sb.url || vistos.has(sb.url)) return
+          vistos.add(sb.url)
+          subs.push({ lang: sb.lang || '?', url: sb.url, addon: nome, exact: false })
+        })
+      } catch (e) { console.warn('[subs]', base, e.message) }
+    }
+  }))
+  const peso = l => l === 'eng' ? 0 : l === 'pob' ? 1 : l === 'por' ? 2 : 3
+  subs.sort((a, b) => peso(a.lang) - peso(b.lang))
+  const lista = subs.slice(0, 40)
+  _vidSubCandidates = lista.map(sb => ({ lang: sb.lang, url: sb.url, addon: sb.addon }))
+  _vidSaveSubs()
+  return lista
+}
+
 async function videoSubListLoad(temporada, episodio) {
   const st = _vidSubState; if (!st) return
   if (temporada != null) { st.temporada = temporada; st.episodio = episodio }
   st.passo = 'legendas'; st.carregando = true
   st.hash = st.hash || await openSubtitlesHash(_vidFile).catch(() => null)
   _vidSubRender()
-  const id = st.meta.type === 'series' ? `${st.meta.id}:${st.temporada}:${st.episodio}` : st.meta.id
-  const extra = st.hash && _vidFile ? `/videoHash=${st.hash}&videoSize=${_vidFile.size}` : ''
-  const vistos = new Set(); const subs = []
-  await Promise.all(_vidSubAddons().map(async base => {
-    const nome = base.replace(/^https?:\/\//, '').split('/')[0].split('.')[0]
-    // Com hash primeiro (pode trazer a legenda exata do arquivo); sem hash como reforço
-    for (const ex of extra ? [extra, ''] : ['']) {
-      try {
-        const r = await fetch(`${base}/subtitles/${st.meta.type}/${encodeURIComponent(id)}${ex}.json`)
-        if (!r.ok) continue
-        const j = await r.json()
-        ;(j.subtitles || []).forEach(s => {
-          if (!s.url || vistos.has(s.url)) return
-          vistos.add(s.url)
-          // O hash entra na CONSULTA (o addon prioriza a legenda do arquivo),
-          // mas a resposta não diz quais bateram — não prometemos "exata".
-          subs.push({ lang: s.lang || '?', url: s.url, addon: nome, exact: false })
-        })
-      } catch (e) { console.warn('[subs]', base, e.message) }
-    }
-  }))
-  // Inglês primeiro (é o que se estuda), depois PT-BR, depois o resto
-  const peso = l => l === 'eng' ? 0 : l === 'pob' ? 1 : l === 'por' ? 2 : 3
-  subs.sort((a, b) => (peso(a.lang) - peso(b.lang)) || (b.exact - a.exact))
-  st.subs = subs.slice(0, 40)
-  // Guarda as candidatas: é nelas que a sincronização com IA vai buscar uma
-  // legenda de OUTRA versão quando a atual derivar no meio do episódio.
-  _vidSubCandidates = st.subs.map(s => ({ lang: s.lang, url: s.url, addon: s.addon }))
-  _vidSaveSubs()
+  st.subs = await _vidFetchSubs(st.meta, st.temporada, st.episodio)
   st.carregando = false; _vidSubRender()
+}
+
+// Baixa uma legenda (da lista dos addons), aplica e busca a trilha PT.
+async function _vidApplySubUrl(sub) {
+  const r = await fetch(sub.url)
+  if (!r.ok) throw new Error('HTTP ' + r.status)
+  const cues = parseSubtitle(_vidDecodeSubBuf(await r.arrayBuffer()))
+  if (!cues.length) throw new Error('arquivo não parece uma legenda válida')
+  _vidAppliedSubUrl = sub.url
+  _vidCur.subShift = 0
+  await _vidApplyCues(cues, `online (${VID_LANGS[sub.lang] || sub.lang})`)
+  if (sub.lang !== 'pob' && sub.lang !== 'por') _vidAutoFetchPT()
 }
 
 async function videoSubDownload(i, btnEl) {
@@ -1363,30 +1378,55 @@ async function videoSubDownload(i, btnEl) {
   const sub = st.subs[i]; if (!sub) return
   if (btnEl) btnEl.innerHTML = '<span class="gen-spinner"></span> baixando...'
   try {
-    const r = await fetch(sub.url)
-    if (!r.ok) throw new Error('HTTP ' + r.status)
-    const buf = await r.arrayBuffer()
-    // Encoding na base da evidência: arquivos "UTF-8 com um byte podre" são
-    // comuns — o modo estrito rejeitaria o arquivo INTEIRO por causa de um
-    // byte. Decodifica dos dois jeitos e fica com o que tiver menos lixo
-    // (U+FFFD no UTF-8; Â/â típicos de UTF-8 lido como 1252 no outro).
-    const u8 = new TextDecoder('utf-8').decode(buf)
-    const w12 = new TextDecoder('windows-1252').decode(buf)
-    const ruimU8 = (u8.match(/�/g) || []).length
-    const ruimW12 = (w12.match(/Ã[©ªµ£§¡³]|â[€™"]|Â./g) || []).length
-    const txt = _vidFixMojibake(ruimU8 <= ruimW12 ? u8 : w12)
-    const cues = parseSubtitle(txt)
-    if (!cues.length) throw new Error('arquivo não parece uma legenda válida')
-    _vidAppliedSubUrl = sub.url
-    _vidCur.subShift = 0        // legenda nova = deslocamento zerado
-    await _vidApplyCues(cues, `online (${VID_LANGS[sub.lang] || sub.lang})`)
+    await _vidApplySubUrl(sub)
     videoSubSearchClose()
-    // Se a legenda aplicada NÃO é PT, busca a PT-BR do mesmo episódio em
-    // background e alinha — é ela que alimenta o "PT ao vivo" de graça.
-    if (sub.lang !== 'pob' && sub.lang !== 'por') _vidAutoFetchPT()
   } catch (e) {
     toast('Falha ao baixar a legenda: ' + e.message, 'error')
     _vidSubRender()
+  }
+}
+
+// ================================================================
+// LEGENDA AUTOMÁTICA NA ABERTURA — vídeo sem legenda entra, legenda
+// certa sai, zero cliques: título limpo + SxxExx do nome do arquivo →
+// Cinemeta confirma → addons listam → melhor da língua do vídeo →
+// aplica (e a trilha PT vem atrás sozinha, como sempre).
+// Qualquer incerteza = para e aponta o botão manual, sem adivinhar.
+// ================================================================
+const VID_LANG3 = { en: 'eng', es: 'spa', fr: 'fre', de: 'ger', it: 'ita', pt: 'por', ja: 'jpn', ko: 'kor', ru: 'rus' }
+
+async function _vidAutoSub() {
+  if (!_vidCur || _vidCues.length) return
+  const query = _vidCleanQuery(_vidCur.fileName)
+  if (!query || query.length < 3) return
+  const guess = _vidGuessEpisode(_vidCur.fileName)
+  toast('Procurando a legenda deste vídeo...', 'info')
+  try {
+    const enc = encodeURIComponent(query)
+    const [se, mo] = await Promise.all(['series', 'movie'].map(t =>
+      fetch(`https://v3-cinemeta.strem.io/catalog/${t}/top/search=${enc}.json`)
+        .then(r => r.json()).then(j => (j.metas || []).slice(0, 4)).catch(() => [])))
+    const results = [...se.map(m => ({ ...m, type: 'series' })), ...mo.map(m => ({ ...m, type: 'movie' }))]
+      .map(m => ({ id: m.imdb_id || m.id, name: m.name, type: m.type }))
+      .filter(m => /^tt/.test(m.id))
+    const norm = x => String(x || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+    const top = results[0]
+    if (!top || norm(top.name) !== norm(query)) {
+      toast('Não reconheci o título com certeza — use "Buscar legenda"', 'info'); return
+    }
+    if (top.type === 'series' && !guess) {
+      toast('Não deduzi o episódio pelo nome do arquivo — use "Buscar legenda"', 'info'); return
+    }
+    const subs = await _vidFetchSubs(top, guess ? guess.s : 1, guess ? guess.e : 1)
+    if (_vidCues.length) return          // usuário importou algo enquanto buscava
+    const alvoLang = VID_LANG3[_vidCur.lang || 'en'] || 'eng'
+    const sub = subs.find(sb => sb.lang === alvoLang) || subs[0]
+    if (!sub) { toast('Nenhuma legenda nos addons para este episódio', 'info'); return }
+    await _vidApplySubUrl(sub)
+    toast(`Legenda encontrada sozinha: ${top.name}${top.type === 'series' ? ` S${String(guess.s).padStart(2,'0')}E${String(guess.e).padStart(2,'0')}` : ''} — se escorregar, use o Sync`, 'success')
+  } catch (e) {
+    console.warn('[video] autoSub:', e)
+    toast('Busca automática de legenda falhou — use "Buscar legenda"', 'warning')
   }
 }
 
@@ -1548,9 +1588,12 @@ async function _vidEnsurePT(i, n, sinc) {
 // Depois de aplicar uma legenda EN, procura a PT-BR do MESMO episódio na
 // lista já consultada e alinha em background — tradução oficial, custo zero.
 async function _vidAutoFetchPT() {
+  // Fonte: a lista do modal quando aberta; senão as candidatas persistidas —
+  // o fluxo AUTOMÁTICO de legenda não passa pelo modal (vão pego no teste).
   const st = _vidSubState
-  if (!st || !st.subs) return
-  const alvo = st.subs.find(s => s.lang === 'pob') || st.subs.find(s => s.lang === 'por')
+  const fonte = (st && st.subs && st.subs.length) ? st.subs : _vidSubCandidates
+  if (!fonte || !fonte.length) return
+  const alvo = fonte.find(s => s.lang === 'pob') || fonte.find(s => s.lang === 'por')
   if (!alvo) return
   try {
     const r = await fetch(alvo.url)
