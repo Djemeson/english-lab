@@ -751,3 +751,111 @@ async function deleteWord(id) {
   renderReview()
   renderDashboard()
 }
+
+// ================================================================
+// DÚVIDA DENTRO DA DÚVIDA — seleção no card do Revisar.
+// Caso real (closet Adderall snorter): a análise explica a expressão,
+// mas "o que é Adderall?" ficava para outra aba. Agora: selecione
+// qualquer palavra/trecho no card → popup com "Explicar" (mini-gloss
+// da IA ali mesmo, cobrindo referência cultural) e "Revisar" (vira um
+// item novo da fila). Sem sair do flow.
+// ================================================================
+const _revExplainCache = new Map()
+
+if (!window._revSelBound) {
+  window._revSelBound = true
+  document.addEventListener('mouseup', () => {
+    setTimeout(() => {
+      const pop = el('rev-sel-pop')
+      const sec = document.getElementById('section-revisar')
+      if (!sec || !sec.classList.contains('active')) { pop && pop.classList.add('hidden'); return }
+      const card = sec.querySelector('.word-card')
+      const sel = window.getSelection()
+      const bruto = (sel && sel.toString()) || ''
+      const txt = bruto.replace(/\s+/g, ' ').trim()
+        .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
+      if (!txt || txt.length < 2 || txt.length > 80 || !sel.anchorNode || !card || !card.contains(sel.anchorNode)) {
+        pop && pop.classList.add('hidden'); return
+      }
+      _revShowSelPop(txt, sel)
+    }, 10)
+  })
+  // clicar fora fecha
+  document.addEventListener('mousedown', e => {
+    const pop = el('rev-sel-pop')
+    if (pop && !pop.classList.contains('hidden') && !pop.contains(e.target)) pop.classList.add('hidden')
+  })
+}
+
+function _revShowSelPop(txt, sel) {
+  let pop = el('rev-sel-pop')
+  if (!pop) {
+    pop = document.createElement('div')
+    pop.id = 'rev-sel-pop'
+    pop.className = 'sel-pop hidden'
+    document.body.appendChild(pop)
+  }
+  window._revSelText = txt
+  // frase-contexto: o bloco de texto mais próximo de onde a seleção começou
+  const blocoEl = sel.anchorNode.parentElement && sel.anchorNode.parentElement.closest('div, p, blockquote, li, h1, h2, h3, span')
+  window._revSelCtx = (blocoEl ? blocoEl.textContent : '').replace(/\s+/g, ' ').trim().slice(0, 220)
+  pop.innerHTML = `
+    <b>"${esc(txt)}"</b>
+    <button class="btn btn-secondary btn-sm" onclick="revSelExplain()" data-tip="Mini-explicação da IA aqui mesmo — sentido, e o que é se for marca/gíria/referência">${ic('sparkles','ic-sm')}Explicar</button>
+    <button class="btn btn-ghost btn-sm" onclick="revSelMine()" data-tip="Vira um item novo na fila do Revisar">${ic('eye','ic-sm')}Revisar</button>`
+  pop.classList.remove('hidden')
+  const r = sel.getRangeAt(0).getBoundingClientRect()
+  const acima = r.top > 64
+  pop.style.left = Math.max(8, Math.min(window.innerWidth - 360, r.left + r.width / 2 - 170)) + 'px'
+  pop.style.top = (acima ? r.top - 52 : r.bottom + 10) + 'px'
+}
+
+async function revSelExplain() {
+  const txt = window._revSelText
+  const pop = el('rev-sel-pop')
+  if (!txt || !pop) return
+  const w = (typeof activeWordId !== 'undefined' && activeWordId) ? words.find(x => x.id === activeWordId) : null
+  const chave = (w ? w.word : '') + '|' + txt
+  let corpo = pop.querySelector('.sel-pop-exp')
+  if (!corpo) {
+    corpo = document.createElement('div')
+    corpo.className = 'sel-pop-exp'
+    pop.appendChild(corpo)
+  }
+  if (_revExplainCache.has(chave)) { corpo.innerHTML = _revExplainCache.get(chave); return }
+  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  corpo.innerHTML = '<span class="gen-spinner"></span> a IA está explicando...'
+  try {
+    const resp = await aiText([
+      { role: 'system', content: 'Tutor de inglês de um brasileiro. Responda em PT-BR, direto ao ponto, 2 a 4 frases, sem introduções nem rodeios.' },
+      { role: 'user', content:
+`No item de estudo "${w ? w.word : ''}" (contexto: "${window._revSelCtx || (w && w.context) || ''}"), o aluno selecionou: "${txt}".
+Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado nesta expressão, explique a imagem.` }
+    ], { maxTokens: 220 })
+    const html = esc(resp).replace(/\n+/g, '<br>')
+    _revExplainCache.set(chave, html)
+    corpo.innerHTML = html
+  } catch (e) {
+    corpo.innerHTML = ''
+    toast('Erro ao explicar: ' + e.message, 'error')
+  }
+}
+
+function revSelMine() {
+  const txt = window._revSelText
+  if (!txt) return
+  el('rev-sel-pop')?.classList.add('hidden')
+  try { window.getSelection().removeAllRanges() } catch (e) {}
+  const w = (typeof activeWordId !== 'undefined' && activeWordId) ? words.find(x => x.id === activeWordId) : null
+  createWord({
+    word: txt,
+    context: window._revSelCtx || (w && w.context) || '',
+    source_type: (w && w.source_type) || 'manual',
+    source_title: (w && w.source_title) || '',
+    lang: (w && w.lang) || undefined
+  })
+  // Sidebar e badges atualizam; o card aberto NÃO re-renderiza — o flow continua
+  if (typeof renderSidebar === 'function') renderSidebar()
+  renderDashboard()
+  toast(`"${txt}" virou um item novo na fila do Revisar`, 'success')
+}

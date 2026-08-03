@@ -3756,3 +3756,21 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .vid-ov-pt{pointer-events:auto}
 .vid-ov-pt.fog{filter:blur(7px);cursor:pointer;transition:filter .15s ease}
 .vid-ov-pt.fog:hover{filter:none}
+
+/* ---- Popup de selecao no Revisar (Explicar / mandar p/ Revisar) ---- */
+.sel-pop{
+  position:fixed;z-index:620;display:flex;align-items:center;gap:8px;
+  padding:8px 12px;max-width:360px;flex-wrap:wrap;
+  background:var(--surface);border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);box-shadow:var(--shadow);font-size:var(--fs-sm);
+}
+.sel-pop.hidden{display:none}
+.sel-pop > b{
+  color:var(--primary);max-width:150px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sel-pop-exp{
+  flex-basis:100%;font-size:var(--fs-sm);line-height:1.55;color:var(--text2);
+  border-top:1px dashed var(--border);padding-top:8px;margin-top:2px;
+  max-height:180px;overflow-y:auto;
+}

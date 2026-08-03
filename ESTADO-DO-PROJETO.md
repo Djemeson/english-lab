@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Tradução em 3 posições + névoa (32ª rodada)**: um botão
+> Última atualização: 2026-08-03 — **Explicar/minerar por seleção no Revisar (33ª rodada)**: o
+> caso "o que é Adderall?" — selecione qualquer palavra no card e escolha "Explicar" (gloss da
+> IA ali mesmo, com cache) ou "Revisar" (vira item novo herdando contexto e fonte). Sem trocar
+> de aba, sem perder o card aberto. Ver seção 8 (33ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **Tradução em 3 posições + névoa (32ª rodada)**: um botão
 > alterna off → legenda PT-BR oficial → IA literal em tempo real (traduz só o ponto atual +5s,
 > economia de tokens validada); névoa borrada por padrão sobre o vídeo com hover revelando,
 > desligável — tudo funcionando em fullscreen. Ver seção 8 (32ª rodada).
@@ -392,6 +397,25 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (33ª rodada) — Dúvida dentro da dúvida: Explicar/minerar por seleção no Revisar
+84. **Caso real do Djemeson** (card "closet Adderall snorter"): entendeu a análise, mas ficou
+    com "o que é Adderall? o que é closet?" — e não queria perguntar em outra aba, "sem
+    perder o flow". E pediu: selecionar palavras/frases no título e mandar para revisão.
+    - **Seleção em QUALQUER parte do card do Revisar** (título, exemplos, definição) → popup
+      flutuante posicionado na seleção com duas ações:
+      · **"Explicar"**: mini-gloss da IA ALI MESMO (2–4 frases, PT-BR) — o prompt pede o
+        sentido NO contexto e, se for marca/gíria/referência cultural (o caso do Adderall),
+        o que é no mundo real. Com **cache por seleção** (perguntar de novo é grátis).
+      · **"Revisar"**: vira item novo da fila (`createWord` pending_ai) com o contexto da
+        frase onde estava a seleção e **herdando a fonte** do card (série/episódio) — o
+        "Adderall" minerado nasce sabendo que veio do White Lotus.
+    - **O flow não quebra**: o card aberto NÃO re-renderiza (só sidebar + badges); popup
+      fecha ao clicar fora e não vaza para outras seções (guard por seção ativa).
+    - Implementado em `js/review.js` (não-lazy), classes `.sel-pop` genéricas.
+    - Validado ao vivo com o cenário do print: seleção de "Adderall" no título → popup →
+      explicação da IA no lugar → cache confirmado → minerado como pending_ai com fonte
+      herdada → card intacto; 0 erros nas telas. `CACHE`: `v59` → **`v60`**.
 
 ### Sessão 2026-08-03 (32ª rodada) — Tradução em 3 posições + névoa (fog) sobre o vídeo
 83. **Pedido**: separar BEM os dois canais de tradução ("a legenda PT-BR pode atrapalhar muito
