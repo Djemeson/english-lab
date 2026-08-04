@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Explicar na legenda do vídeo (37ª rodada)**: o popup de
+> Última atualização: 2026-08-03 — **Três consertos do uso real (38ª rodada)**: explicação
+> vinha CORTADA (teto de 220 tokens → 600, no vídeo e no Revisar); cabeçalho do popup da
+> legenda agora é linha única (seleção longa não empurra mais botão para baixo); e a
+> tradução IA que pulava falas com DeepSeek virou LOTE (uma chamada por janela) com
+> antecedência de 12s. Ver seção 8 (38ª rodada).
+>
+> Anterior: 2026-08-03 — **Explicar na legenda do vídeo (37ª rodada)**: o popup de
 > seleção da legenda sobre o vídeo ganhou o botão "Explicar" (mini-glosa da IA ali mesmo,
 > com a fala como contexto), com as mesmas proteções anti-colapso da 34ª rodada e cache
 > compartilhado com o Revisar. Ver seção 8 (37ª rodada).
@@ -417,6 +423,28 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (38ª rodada) — Três consertos vindos do uso real (Explicar cortado, popup quebrando, PT IA pulando falas)
+89. **Três reclamações do Djemeson usando de verdade** (com DeepSeek como fornecedor ativo):
+    - **"As informações vêm incompletas"**: o Explicar (vídeo E Revisar) tinha teto de
+      `maxTokens: 220` — cortava a resposta no meio da frase. Subiu para **600** nos dois
+      (`videoOvExplain` e `revSelExplain`). O teto é só segurança: paga-se o que for gerado.
+    - **"Frase longa empurrou o botão para baixo"**: o popup da legenda virou coluna com um
+      cabeçalho `.vid-ov-row` (flex **nowrap**: seleção com reticências + 3 botões SEMPRE
+      numa linha; botões com `flex-shrink:0`) e a explicação ocupa a linha de baixo inteira.
+    - **"Algumas legendas não ganham a tradução da IA em certos trechos"**: o modo PT IA
+      disparava UMA chamada POR fala em paralelo com só 5,5s de antecedência — com a
+      latência do DeepSeek a resposta chegava depois de a fala passar. `_vidEnsurePT` agora
+      traduz a janela em **LOTE** (uma chamada `aiJSON` com as falas numeradas →
+      `{"t":[...]}`; falta na resposta = re-tenta no próximo tick; erro limpa `_ptReq` do
+      lote inteiro) e `_vidEnsurePTAhead` olha **12s** à frente (era 5,5). Mais rápido,
+      mais barato (um prompt) e chega a tempo.
+    - **Validado ao vivo**: 3 falas → 1 chamada `json_object` com as 3 numeradas; a 4ª fala
+      (fora dos 12s) NÃO traduzida; overlay com o PT; explicação com `max_tokens: 600` e
+      texto completo abaixo do cabeçalho; cabeçalho nowrap com botões dentro da linha.
+      Duas pegadinhas de teste registradas: o SW re-registrado no reload serviu CSS de
+      cache (limpar de novo DEPOIS do reload) e o OneDrive serviu o video-subs.js velho
+      (reiniciar o servidor de preview). `CACHE`: `v64` → **`v65`**.
 
 ### Sessão 2026-08-03 (37ª rodada) — Explicar também na legenda do vídeo
 88. **Pedido**: "quero que exista o botão de explicar tambem nas legendas do video". O popup

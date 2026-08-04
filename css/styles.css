@@ -3699,16 +3699,21 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .vid-cue-pt.show{filter:none}
 .vid-ov-pop{
   position:absolute;left:50%;transform:translateX(-50%);bottom:148px;z-index:5;
-  display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;
-  max-width:min(560px,92%);min-width:min(420px,80%);
+  display:flex;flex-direction:column;gap:8px;padding:8px 12px;max-width:92%;
   background:var(--surface);border:1px solid var(--border-strong);
   border-radius:var(--radius-sm);box-shadow:var(--shadow);font-size:var(--fs-sm);
 }
 .vid-ov-pop.hidden{display:none}
+/* Cabeçalho do popup: seleção + botões SEMPRE numa linha só (o título encurta
+   com reticências; os botões nunca quebram nem encolhem) */
+.vid-ov-row{display:flex;align-items:center;gap:8px;min-width:0}
+.vid-ov-row .btn{flex-shrink:0;white-space:nowrap}
 .vid-ov-pop b{
-  color:var(--primary);max-width:230px;
+  color:var(--primary);max-width:260px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+/* No fluxo em coluna do popup, o bloco de explicação ocupa a largura natural */
+.vid-ov-pop .sel-pop-exp{flex-basis:auto;margin-top:0}
 
 /* ---- Tela cheia do stage: video centrado, overlay junto ---- */
 .vid-stage:fullscreen{background:#000;display:flex;align-items:center;justify-content:center}

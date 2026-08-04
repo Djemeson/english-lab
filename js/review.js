@@ -839,7 +839,7 @@ async function revSelExplain() {
       { role: 'user', content:
 `No item de estudo "${w ? w.word : ''}" (contexto: "${window._revSelCtx || (w && w.context) || ''}"), o aluno selecionou: "${txt}".
 Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado nesta expressão, explique a imagem.` }
-    ], { maxTokens: 220 })
+    ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
     const html = esc(resp).replace(/\n+/g, '<br>')
     _revExplainCache.set(chave, html)
     corpo.innerHTML = html

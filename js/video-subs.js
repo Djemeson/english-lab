@@ -489,39 +489,56 @@ function _vidSaveSubsNow() {
 }
 
 // Garante tradução IA das falas [i .. i+n). `sinc` espera terminar.
+// Em LOTE (uma chamada para a janela toda): fornecedores mais lentos que a
+// OpenAI (DeepSeek no pico) não davam conta de N chamadas paralelas antes de
+// a fala passar — falas ficavam sem tradução. Uma chamada só chega a tempo,
+// custa menos (um prompt) e falha/retenta em bloco.
 async function _vidEnsurePT(i, n, sinc, forcaIA) {
   if (!aiChatCfg().key) return
-  const tarefas = []
+  const lote = []
   for (let k = i; k < Math.min(i + n, _vidCues.length); k++) {
     const c = _vidCues[k]
     if (!c || c.pt || c._ptReq || (!forcaIA && c.pts)) continue
     c._ptReq = true
-    const p = aiText([
-      { role: 'system', content: 'Traduza a fala de série/filme para português do Brasil, natural e curta. Responda SÓ a tradução.' },
-      { role: 'user', content: c.t }
-    ], { maxTokens: 200 }).then(pt => {
-      c.pt = pt; delete c._ptReq
+    lote.push(k)
+  }
+  if (!lote.length) return
+  const linhas = lote.map((k, j) => `${j + 1}. ${_vidCues[k].t}`).join('\n')
+  const p = aiJSON([
+    { role: 'system', content: 'Traduza cada fala numerada de série/filme para português do Brasil, natural e curto. Responda APENAS JSON: {"t":["tradução da 1","tradução da 2",...]} — mesma ordem, mesma quantidade.' },
+    { role: 'user', content: linhas }
+  ], { maxTokens: 90 * lote.length + 120 }).then(r => {
+    const arr = Array.isArray(r && r.t) ? r.t : []
+    lote.forEach((k, j) => {
+      const c = _vidCues[k]
+      delete c._ptReq
+      const pt = typeof arr[j] === 'string' ? arr[j].trim() : ''
+      if (!pt) return            // faltou na resposta → tenta de novo no próximo tick
+      c.pt = pt
       // atualiza a linha do transcript e o overlay se for a fala corrente
       const row = el('vid-cue-pt-' + k)
       if (row) row.textContent = pt
       if (k === _vidCueIdx) _vidUpdateOverlay()
-      _vidSaveSubs()
-    }).catch(e => { delete c._ptReq; console.warn('[video] PT:', e.message) })
-    tarefas.push(p)
-  }
-  if (sinc) await Promise.all(tarefas)
+    })
+    _vidSaveSubs()
+  }).catch(e => {
+    lote.forEach(k => { const c = _vidCues[k]; if (c) delete c._ptReq })
+    console.warn('[video] PT:', e.message)
+  })
+  if (sinc) await p
 }
 
 // Modo IA em tempo real: garante a tradução SÓ do que está na tela e do que
-// começa nos próximos 5s — "vai carregando aos poucos", sem gastar tokens
-// com o resto do episódio que talvez nem seja assistido.
+// começa nos próximos 12s — "vai carregando aos poucos", sem gastar tokens
+// com o resto do episódio que talvez nem seja assistido. Os 12s (era 5.5s)
+// dão folga para a latência de fornecedores mais lentos chegar antes da fala.
 function _vidEnsurePTAhead(t) {
   if (!_vidCues.length) return
   let ini = -1, fim = -1
   for (let k = 0; k < _vidCues.length; k++) {
     const c = _vidCues[k]
     if (c.e < t - 0.5) continue
-    if (c.s > t + 5.5) break
+    if (c.s > t + 12) break
     if (ini < 0) ini = k
     fim = k
   }

@@ -668,10 +668,12 @@ function _vidOvSelCheck() {
   }
   window._vidOvSelText = txt
   pop.innerHTML = `
-    <b>"${esc(txt)}"</b>
-    <button class="btn btn-secondary btn-sm" onclick="videoOvExplain()" data-tip="Mini-explicação da IA aqui mesmo — sentido na fala, gíria, referência cultural">${ic('sparkles','ic-sm')}Explicar</button>
-    <button class="btn btn-primary btn-sm" onclick="videoOvStudy(true)" data-tip="Cria o card já com o áudio real desta cena">${ic('zap','ic-sm')}Estudar com áudio</button>
-    <button class="btn btn-ghost btn-sm" onclick="videoOvStudy(false)" data-tip="Manda para a fila do Revisar (a IA analisa lá)">${ic('eye','ic-sm')}Revisar</button>`
+    <div class="vid-ov-row">
+      <b>"${esc(txt)}"</b>
+      <button class="btn btn-secondary btn-sm" onclick="videoOvExplain()" data-tip="Mini-explicação da IA aqui mesmo — sentido na fala, gíria, referência cultural">${ic('sparkles','ic-sm')}Explicar</button>
+      <button class="btn btn-primary btn-sm" onclick="videoOvStudy(true)" data-tip="Cria o card já com o áudio real desta cena">${ic('zap','ic-sm')}Estudar com áudio</button>
+      <button class="btn btn-ghost btn-sm" onclick="videoOvStudy(false)" data-tip="Manda para a fila do Revisar (a IA analisa lá)">${ic('eye','ic-sm')}Revisar</button>
+    </div>`
   pop.classList.remove('hidden')
 }
 
@@ -696,7 +698,7 @@ async function videoOvExplain() {
       { role: 'user', content:
 `Na cena de "${_vidCur ? _vidCur.title : ''}", a fala é: "${contexto}". O aluno selecionou: "${txt}".
 Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado, explique a imagem.` }
-    ], { maxTokens: 220 })
+    ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
     const html = esc(resp).replace(/\n+/g, '<br>')
     if (typeof _revExplainCache !== 'undefined') _revExplainCache.set(chave, html)
     corpo.innerHTML = html
