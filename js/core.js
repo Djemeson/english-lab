@@ -28,6 +28,7 @@ const DEF_CFG = {
   openaiKey: '', geminiKey: '', deepseekKey: '', groqKey: '',
   aiModelProv: {},
   vidPT: '',        // modo de tradução no vídeo, lembrado entre sessões
+  sttProvider: 'auto',  // quem transcreve: auto (Groq se houver chave) | groq | openai
   theme: 'midnight'
 }
 

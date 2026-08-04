@@ -282,9 +282,59 @@ async function aiTestKey(key) {
 // a consulta falhar. Ordens de grandeza, não fatura.
 // ================================================================
 const AI_COST = {
-  tts:   0.008,                                    // por frase (~80 caracteres) — gpt-4o-mini-tts
-  whisper: 0.006,                                  // por MINUTO de áudio — whisper-1
+  // gpt-4o-mini-tts cobra ~US$ 0,015 por MINUTO de áudio gerado; a frase de um
+  // card tem ~5s. O valor antigo (0,008) vinha da tabela por caractere do
+  // tts-1 e superestimava a conta em ~6×.
+  tts:   0.015 * (5 / 60),                          // ≈ US$ 0,00125 por frase falada
   image: { low: 0.011, medium: 0.042, high: 0.167 } // por imagem 1024×1024 — gpt-image-1
+}
+
+// ---- TRANSCRIÇÃO (fala → texto) --------------------------------
+// A Groq roda o MESMO Whisper num endpoint idêntico ao da OpenAI
+// (api.groq.com/openai/v1/audio/transcriptions, verbose_json com
+// timestamps) por US$ 0,04/h contra US$ 0,36/h — 9× mais barato.
+// Por isso o padrão é "auto": usa a Groq quando há chave, senão OpenAI.
+const AI_STT = {
+  groq:   { nome: 'Groq', url: 'https://api.groq.com/openai/v1/audio/transcriptions',
+            model: 'whisper-large-v3-turbo', keyCfg: 'groqKey', usdMin: 0.04 / 60, limiteMB: 25 },
+  openai: { nome: 'OpenAI', url: 'https://api.openai.com/v1/audio/transcriptions',
+            model: 'whisper-1', keyCfg: 'openaiKey', usdMin: 0.006, limiteMB: 25 }
+}
+
+// Qual fornecedor transcreve agora (cfg.sttProvider: 'auto' | 'groq' | 'openai')
+function aiSttCfg() {
+  const pref = cfg.sttProvider || 'auto'
+  const tem = p => !!(cfg[AI_STT[p].keyCfg] || '').trim()
+  const prov = (pref !== 'auto' && tem(pref)) ? pref
+    : tem('groq') ? 'groq'
+    : tem('openai') ? 'openai'
+    : null
+  return prov ? { prov, ...AI_STT[prov], key: cfg[AI_STT[prov].keyCfg].trim() } : null
+}
+
+// Transcrição única para todo o app (legenda inteira, sincronia, shadowing).
+// `granular`: pede os tempos por segmento (verbose_json).
+async function aiTranscribe(blob, { nome = 'audio.webm', lang, granular = true, timeoutMs = 120000 } = {}) {
+  const stt = aiSttCfg()
+  if (!stt) throw new Error('Configure a chave da Groq ou da OpenAI para transcrever (Configurações → IA)')
+  const fd = new FormData()
+  fd.append('file', blob, nome)
+  fd.append('model', stt.model)
+  if (granular) fd.append('response_format', 'verbose_json')
+  if (lang) fd.append('language', lang)
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), timeoutMs)
+  try {
+    const res = await fetch(stt.url, {
+      method: 'POST', headers: { 'Authorization': `Bearer ${stt.key}` }, body: fd, signal: ctl.signal
+    })
+    if (!res.ok) {
+      let m = 'HTTP ' + res.status
+      try { const e = await res.json(); if (e.error?.message) m = e.error.message } catch {}
+      throw new Error(`[${stt.nome}] ${m}`)
+    }
+    return await res.json()
+  } finally { clearTimeout(timer) }
 }
 
 // Tokens médios de UMA análise de item (prompt do card + resposta), medidos
@@ -368,7 +418,7 @@ async function aiConfirmBatch(tipo, n, rotulo, opts = {}) {
   const pm = aiPrecoModelo()
   const base = tipo === 'chat'
     ? `~${AI_TOKENS_ITEM.in} tokens de entrada + ~${AI_TOKENS_ITEM.out} de saída por item, ao preço deste modelo (US$ ${pm.in}/${pm.out} por 1M)`
-    : tipo === 'tts' ? 'US$ 0,008 por frase falada (tabela do gpt-4o-mini-tts)'
+    : tipo === 'tts' ? 'US$ 0,015 por minuto de áudio (gpt-4o-mini-tts) × ~5s por frase'
     : `US$ ${(AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium).toFixed(3)} por imagem 1024×1024 + a chamada de texto que descreve a cena`
   return confirmModal({
     title: rotulo || NOMES[tipo] || 'Operação com IA',

@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Pacote de 4 tarefas do Djemeson (46ª rodada)**:
+> Última atualização: 2026-08-04 — **Transcrição na Groq, 9× mais barata (47ª rodada)**: o
+> "só a OpenAI faz isso" estava errado — a Groq roda o MESMO Whisper num endpoint idêntico
+> por US$ 0,04/h (contra 0,36). Transcrição centralizada em `aiTranscribe()` com escolha de
+> fornecedor. Ver seção 8 (47ª rodada).
+>
+> Anterior: 2026-08-04 — **Pacote de 4 tarefas do Djemeson (46ª rodada)**:
 > progresso do dia agora é gravado card a card (encerrar no "X" zerava tudo); Explicar
 > ganhou rede de segurança (`aiTextSeguro` → OpenAI quando o DeepSeek volta vazio);
 > navegação ‹‹/›› passou a andar por FRASE (legendas encadeadas viram grupo); e o custo
@@ -462,6 +467,47 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (47ª rodada) — "Só a OpenAI faz isso" estava errado: transcrição na Groq
+101. **Contestação do Djemeson** ("o Gemini não gera imagem e áudio? o DeepSeek não
+     transcreve?"). Pesquisa nas fontes atuais (doc oficial da Groq + preços 2026):
+     - **Groq FAZ transcrição** — mesmo Whisper, endpoint `api.groq.com/openai/v1/audio/
+       transcriptions`, formato idêntico ao da OpenAI (verbose_json com timestamps de
+       segmento), **US$ 0,04/h (turbo) contra US$ 0,36/h da OpenAI = 9× mais barato**.
+     - **Gemini** tem TTS (US$ 10/1M tokens de áudio), imagens (US$ 0,045–0,151) e
+       transcrição via multimodal — mas NENHUM desses fala o dialeto OpenAI; exigiriam
+       cliente próprio (TTS devolve PCM cru para empacotar em WAV). Imagem não é mais
+       barata que o gpt-image-1 padrão. Ficam anotados como próximo passo possível.
+     - **DeepSeek** é só texto na API oficial (Janus/VL são modelos abertos, fora da API).
+     - **Implementado**: `AI_STT` + `aiSttCfg()` + **`aiTranscribe()`** em ai.js — um único
+       ponto para as 3 chamadas que existiam soltas (legenda inteira, sincronia, shadowing).
+       Novo `cfg.sttProvider` ('auto' = Groq quando há chave | 'groq' | 'openai'), dropdown
+       em Configurações, sincronizado. Guardas que exigiam `cfg.openaiKey` para OUVIR agora
+       aceitam Groq; o modal de custo mostra fornecedor, modelo e a conta por minuto.
+     - Validado ao vivo: auto→Groq, auto sem chave Groq→OpenAI, forçado nos dois sentidos,
+       URL/modelo/Bearer corretos por rota, erro identificando o fornecedor, custo/hora
+       0,04 vs 0,36. Um episódio de 45min: **R$ 1,50 → R$ 0,17**.
+102. **Análise minuciosa de imagens e áudio** (pedido de aprofundamento) — números das docs
+     oficiais, ago/2026. Conclusão: **só a transcrição valia a troca**.
+     - **TTS**: Gemini 2.5 Flash TTS US$ 10/1M tokens de áudio a 25 tokens/s = US$ 0,90/h =
+       **US$ 0,015/min — o MESMO preço do gpt-4o-mini-tts**. Zero ganho financeiro, e a
+       camada OpenAI-compat do Gemini **não** cobre TTS (exigiria cliente próprio +
+       empacotar PCM 24kHz em WAV). Não implementado, por decisão fundamentada.
+     - **Imagens**: Gemini 2.5 Flash Image US$ 0,039/imagem vs gpt-image-1 padrão US$ 0,042
+       (−7%) e vs nosso modo econômico US$ 0,011 (3,5× MAIS caro). Gemini 3.1 Flash Image
+       (0,067) e 3 Pro (0,134) são mais caros. Imagen 4 (0,02) está DEPRECADO (sunset
+       ago/2026) — não adotar. Também fora da camada compat. Sem ganho: não implementado.
+     - **DeepSeek**: API oficial é só texto (Janus/VL são pesos abertos, não API).
+     - **Correção de honestidade nos números**: `AI_COST.tts` era 0,008/frase (herdado da
+       tabela por caractere do tts-1) — o preço real do gpt-4o-mini-tts é US$ 0,015/**min**,
+       e a frase de um card tem ~5s → **US$ 0,00125**. O app superestimava o TTS em ~6×
+       (100 frases: R$ 4,40 mostrado → R$ 0,69 real).
+103. **Barra do dia subindo 2 por card e caindo ao sair** — efeito colateral do item 97:
+     `renderSbToday` (e o backup de sessão, srs.js) somavam `srsLog.reviewed + srsSession.done`,
+     desenho válido enquanto o log só era gravado no fim. Com o log incremental isso passou a
+     contar DUAS vezes por card e a "perder" a parcela da sessão ao encerrar (voltava ~4–5).
+     Agora ambos leem só o log. Validado: 4→5→6→7→8 (um por card) e o "X" mantém em 8.
+     `CACHE`: `v73` → **`v74`**.
 
 ### Sessão 2026-08-04 (46ª rodada) — Pacote de 4 tarefas exportado do quadro do Djemeson
 97. **Progresso do dia zerava ao encerrar o estudo no "X"**. Causa: só `finishSrsSession()`

@@ -579,7 +579,7 @@
     <div class="settings-card full">
       <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 14l.7 1.8L21.5 16.5l-1.8.7L19 19l-.7-1.8L16.5 16.5l1.8-.7z"/></svg>Inteligência Artificial</h3>
       <p class="desc">Escolha quem faz a análise, as traduções e o chat — e guarde as chaves de cada fornecedor.
-      <b>Áudio (TTS), imagens e transcrição usam sempre a OpenAI.</b> As chaves ficam no seu navegador (e na sua conta, se logado) e vão direto para a API oficial de cada fornecedor.</p>
+      <b>Áudio (TTS) e imagens usam sempre a OpenAI; a transcrição pode usar a Groq</b> (mesmo Whisper, ~9× mais barato). As chaves ficam no seu navegador (e na sua conta, se logado) e vão direto para a API oficial de cada fornecedor.</p>
 
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
         <div style="min-width:200px">
@@ -589,6 +589,14 @@
         <div style="min-width:300px;flex:1">
           <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Modelo</label>
           <select id="cfg-ai-model" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
+        </div>
+        <div style="min-width:210px">
+          <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Transcrição (fala → texto)</label>
+          <select id="cfg-stt-provider" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)">
+            <option value="auto">Automático (Groq se houver chave)</option>
+            <option value="groq">Groq · whisper-large-v3-turbo (US$ 0,04/h)</option>
+            <option value="openai">OpenAI · whisper-1 (US$ 0,36/h)</option>
+          </select>
         </div>
         <div style="min-width:190px">
           <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Qualidade das imagens (OpenAI)</label>

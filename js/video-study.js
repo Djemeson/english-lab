@@ -444,7 +444,7 @@ async function videoFocusRevealPT() {
   const falta = []
   for (let i = _vidFocus.ci; i <= _vidFocus.cj; i++) if (!_vidPTof(_vidCues[i])) falta.push(i)
   if (falta.length) {
-    if (!cfg.openaiKey) { toast('Sem legenda PT alinhada nem chave OpenAI', 'warning'); return }
+    if (!aiChatCfg().key) { toast('Sem legenda PT alinhada nem chave de IA configurada', 'warning'); return }
     await _vidEnsurePT(_vidFocus.ci, _vidFocus.cj - _vidFocus.ci + 1, true)
   }
   _vidFocus.revPT = true
@@ -603,7 +603,7 @@ async function videoShadowToggle() {
       if (f.sh && f.sh.url) URL.revokeObjectURL(f.sh.url)
       f.sh = { url: URL.createObjectURL(blob), blob }
       renderVidSelPanel()
-      if (cfg.openaiKey) videoShadowScore()
+      if (aiSttCfg()) videoShadowScore()
     }
     _vidShRec = rec
     f.sh = { gravando: true }
@@ -615,15 +615,10 @@ async function videoShadowScore() {
   const f = _vidFocus; if (!f || !f.sh || !f.sh.blob) return
   f.sh.transcrevendo = true; renderVidSelPanel()
   try {
-    const fd = new FormData()
-    fd.append('file', f.sh.blob, 'imitacao.webm')
-    fd.append('model', 'whisper-1')
-    if ((_vidCur.lang || 'en') === 'en') fd.append('language', 'en')
-    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST', headers: { 'Authorization': `Bearer ${cfg.openaiKey}` }, body: fd
+    const data = await aiTranscribe(f.sh.blob, {
+      nome: 'imitacao.webm', granular: false,
+      lang: (_vidCur.lang || 'en') === 'en' ? 'en' : undefined
     })
-    if (!res.ok) { let m = 'HTTP ' + res.status; try { const e2 = await res.json(); if (e2.error?.message) m = e2.error.message } catch (x) {} ; throw new Error(m) }
-    const data = await res.json()
     f.sh.res = _vidTokDiff(_vidSelText(), data.text || '')
   } catch (e) { toast('Não consegui avaliar a gravação: ' + e.message, 'error') }
   f.sh.transcrevendo = false

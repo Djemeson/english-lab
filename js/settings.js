@@ -72,6 +72,7 @@ function fillSettings() {
   updateModelOptions()
   renderKeyRows()
   const q = el('cfg-img-quality'); if (q) q.value = cfg.imgQuality || 'medium'
+  const stt = el('cfg-stt-provider'); if (stt) stt.value = cfg.sttProvider || 'auto'
   setSettingsTab(_settingsTab)
   renderThemePicker()
   renderAccentPicker()
@@ -90,6 +91,7 @@ function saveSettings() {
     if (i) cfg[P.keyCfg] = i.value.trim()
   }
   cfg.imgQuality = el('cfg-img-quality')?.value || 'medium'
+  cfg.sttProvider = el('cfg-stt-provider')?.value || 'auto'
   saveCfg()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   toast('Configurações salvas!', 'success')

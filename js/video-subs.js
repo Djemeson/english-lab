@@ -773,22 +773,25 @@ let _vidTranscrevendo = false
 async function videoTranscribeFull() {
   if (_vidTranscrevendo) return
   if (!_vidFile || !_vidCur) { toast('Abra o vídeo primeiro', 'warning'); return }
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  const stt = aiSttCfg()
+  if (!stt) { toast('Configure a chave da Groq ou da OpenAI em Configurações → IA', 'warning'); return }
   const p = el('vid-player')
   const durS = (isFinite(_vidCur.duration) && _vidCur.duration) || (p && isFinite(p.duration) && p.duration) || 0
   const durMin = durS ? Math.ceil(durS / 60) : 45
   const rate = await aiUsdBrl()
   if (!(await confirmModal({ title: 'Criar legenda com IA', icon: 'sparkles',
-    confirmText: `Transcrever — ${_brl(durMin * AI_COST.whisper * rate)}`,
+    confirmText: `Transcrever — ${_brl(durMin * stt.usdMin * rate)}`,
     html: `<p style="font-size:var(--fs-sm);color:var(--text2)">A IA vai OUVIR o episódio (~${durMin} min) e escrever a legenda inteira,
-      com os tempos certos. O áudio é extraído aqui no seu aparelho — só a transcrição vai para a OpenAI.
+      com os tempos certos. O áudio é extraído aqui no seu aparelho — só a transcrição vai para a ${esc(stt.nome)}.
       Leva alguns minutos.</p>
       <div class="cost-rows" style="margin-top:10px">
-        <div class="cost-row"><span>Modelo</span><b>OpenAI · whisper-1</b></div>
-        <div class="cost-row"><span>Base do cálculo</span><b>${durMin} min × US$ ${AI_COST.whisper}/min</b></div>
-        <div class="cost-row total"><span>Custo estimado</span><b>${_brl(durMin * AI_COST.whisper * rate)}</b></div>
+        <div class="cost-row"><span>Modelo</span><b>${esc(stt.nome)} · ${esc(stt.model)}</b></div>
+        <div class="cost-row"><span>Base do cálculo</span><b>${durMin} min × US$ ${stt.usdMin.toFixed(4)}/min</b></div>
+        <div class="cost-row total"><span>Custo estimado</span><b>${_brl(durMin * stt.usdMin * rate)}</b></div>
       </div>
-      <p class="cost-note">Transcrição é sempre OpenAI (Whisper) — não muda com o fornecedor de texto escolhido.
+      <p class="cost-note">${stt.prov === 'groq'
+        ? 'A Groq roda o mesmo Whisper ~9× mais barato que a OpenAI. Dá para trocar em Configurações → IA.'
+        : 'Com uma chave da Groq configurada, esta mesma transcrição sai ~9× mais barata.'}
       Cotação de hoje: US$ 1 ≈ R$ ${rate.toFixed(2).replace('.', ',')}.</p>` }))) return
 
   _vidTranscrevendo = true
@@ -834,16 +837,10 @@ async function videoTranscribeFull() {
     const cues = []
     for (let k = 0; k < partes.length; k++) {
       setMsg(`A IA está escutando e escrevendo (${k + 1}/${partes.length})...`)
-      const fd = new FormData()
-      fd.append('file', partes[k].blob, 'ep.m4a')
-      fd.append('model', 'whisper-1')
-      fd.append('response_format', 'verbose_json')
-      if ((_vidCur.lang || 'en') === 'en') fd.append('language', 'en')
-      const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST', headers: { 'Authorization': `Bearer ${cfg.openaiKey}` }, body: fd
+      const j = await aiTranscribe(partes[k].blob, {
+        nome: 'ep.m4a', timeoutMs: 600000,
+        lang: (_vidCur.lang || 'en') === 'en' ? 'en' : undefined
       })
-      if (!res.ok) { let m = 'HTTP ' + res.status; try { const e2 = await res.json(); if (e2.error?.message) m = e2.error.message } catch (x) {} ; throw new Error(m) }
-      const j = await res.json()
       for (const sg of (j.segments || [])) {
         const t = (sg.text || '').trim()
         if (t) cues.push({ s: +(partes[k].off + sg.start).toFixed(2), e: +(partes[k].off + sg.end).toFixed(2), t })

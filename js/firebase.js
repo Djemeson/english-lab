@@ -216,6 +216,7 @@ async function fbPushData() {
     if (cfg.groqKey)     cfgPayload.groqKey     = cfg.groqKey
     cfgPayload.aiModelProv = cfg.aiModelProv || {}
     cfgPayload.vidPT = cfg.vidPT || ''
+    cfgPayload.sttProvider = cfg.sttProvider || 'auto'
     batch.set(base.collection('data').doc('cfg'), cfgPayload, { merge: true })
     if (kindleItems.length > 0) {
       batch.set(base.collection('data').doc('kindleQueue'), { list: kindleItems, updatedAt: Date.now() })
@@ -361,6 +362,7 @@ async function fbPull() {
     if (c.groqKey)     cfg.groqKey     = c.groqKey
     if (c.aiModelProv) cfg.aiModelProv = c.aiModelProv
     if (c.vidPT !== undefined) cfg.vidPT = c.vidPT
+    if (c.sttProvider) cfg.sttProvider = c.sttProvider
       if (c.theme)       cfg.theme       = c.theme
     if (c.accent !== undefined) cfg.accent = c.accent
     if (c.imgQuality) cfg.imgQuality = c.imgQuality
@@ -497,6 +499,7 @@ function applyCloudDocs(docs) {
     if (c.groqKey)     cfg.groqKey     = c.groqKey
     if (c.aiModelProv) cfg.aiModelProv = c.aiModelProv
     if (c.vidPT !== undefined) cfg.vidPT = c.vidPT
+    if (c.sttProvider) cfg.sttProvider = c.sttProvider
     if (c.theme)       cfg.theme       = c.theme
     if (c.aiProvider)  cfg.aiProvider  = c.aiProvider
     if (c.aiModel)     cfg.aiModel     = c.aiModel

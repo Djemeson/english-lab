@@ -128,11 +128,12 @@ window.addEventListener('beforeunload', () => {
     if (srsSession) {
       const today = todayStr()
       const todayLog = srsLog.find(l => l.date === today)
+      // idem: o log já contabiliza a sessão em andamento
       backup.log = {
         date:     today,
-        reviewed: (todayLog?.reviewed || 0) + srsSession.done,
-        correct:  (todayLog?.correct  || 0) + srsSession.correct,
-        newSeen:  (todayLog?.newSeen  || 0) + srsSession.newSeen
+        reviewed: todayLog?.reviewed || 0,
+        correct:  todayLog?.correct  || 0,
+        newSeen:  todayLog?.newSeen  || 0
       }
     }
     localStorage.setItem(SK_BACKUP, JSON.stringify(backup))
@@ -458,8 +459,10 @@ function renderSbToday(due) {
   const box = el('sb-today')
   if (!box) return
   const todayLog = srsLog.find(l => l.date === todayStr())
-  // Durante a sessão o log ainda não foi gravado — soma o que já foi feito nela.
-  const feitas = (todayLog?.reviewed || 0) + (srsSession ? srsSession.done : 0)
+  // O log do dia é gravado card a card (_logRevisao, em study.js) — já inclui
+  // a sessão em andamento. Somar srsSession.done aqui contava DUAS vezes por
+  // card e "perdia" a parcela da sessão ao encerrar.
+  const feitas = todayLog?.reviewed || 0
   const restantes = due
   const total = feitas + restantes
   if (!total) { box.classList.add('hidden'); return }

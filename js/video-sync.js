@@ -103,7 +103,7 @@ function videoSubShift(delta) {
 async function videoSyncAuto(dur, t0Manual) {
   if (_vidSyncing) return
   if (!_vidCues.length) { toast('Importe a legenda primeiro', 'warning'); return }
-  if (!cfg.openaiKey) { toast('A sincronização automática usa a IA — configure a chave OpenAI', 'warning'); return }
+  if (!aiSttCfg()) { toast('A sincronização automática escuta o áudio — configure a chave da Groq ou da OpenAI', 'warning'); return }
   const p = el('vid-player'); if (!p) return
   _vidSyncing = true
   dur = dur || 40
@@ -245,22 +245,10 @@ function _vidAdoptSub(cand, cues, offset) {
 // Whisper com timestamps: amostra (dataURL) → segmentos em tempo ABSOLUTO
 async function _vidWhisper(b64, t0) {
   const blob = await (await fetch(b64)).blob()
-  const fd = new FormData()
-  fd.append('file', blob, 'amostra.webm')
-  fd.append('model', 'whisper-1')
-  fd.append('response_format', 'verbose_json')
-  if ((_vidCur.lang || 'en') === 'en') fd.append('language', 'en')
-  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 120000)
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST', headers: { 'Authorization': `Bearer ${cfg.openaiKey}` }, body: fd, signal: ctl.signal
+  const data = await aiTranscribe(blob, {
+    nome: 'amostra.webm',
+    lang: (_vidCur.lang || 'en') === 'en' ? 'en' : undefined
   })
-  clearTimeout(timer)
-  if (!res.ok) {
-    let msg = 'HTTP ' + res.status
-    try { const e = await res.json(); if (e.error?.message) msg = e.error.message } catch {}
-    throw new Error(msg)
-  }
-  const data = await res.json()
   return (data.segments || []).map(s => ({ t: s.text, abs: t0 + s.start }))
     .filter(s => (s.t || '').trim().length > 6)
 }
