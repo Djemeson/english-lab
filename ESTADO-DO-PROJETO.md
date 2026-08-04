@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Raio-X da frase (52ª rodada)**: frase capturada é
+> Última atualização: 2026-08-04 — **Lista do Revisar "Marie Kondo" (53ª rodada)**: linhas
+> de 32px (eram ~90), chips "Pendente IA" repetidos viraram ponto âmbar / contador de
+> significados, checkbox só no hover, cabeçalhos de grupo discretos, coluna 320px.
+> Ver seção 8 (53ª rodada).
+>
+> Anterior: 2026-08-04 — **Raio-X da frase (52ª rodada)**: frase capturada é
 > triada AUTOMATICAMENTE pela IA ao entrar na revisão (leve, ~R$ 0,0004) — chips de
 > palavras/phrasals/expressões/estruturas com mini-glosa; o aluno marca o que NÃO conhece
 > e os itens saem criados e ANALISADOS. Ver seção 8 (52ª rodada).
@@ -492,6 +497,26 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (53ª rodada) — Lista do Revisar no espírito Marie Kondo
+109. **Pedido**: "essa aba parece estranha — cards pequenos, fontes grandes; quero algo
+     clean, inspirado na Marie Kondo". Aplicado o princípio: descartar o que não informa,
+     um lugar para cada coisa, silêncio visual.
+     - **Ruído descartado**: o chip "Pendente IA" repetido em TODA linha virou um ponto
+       âmbar de 7px (tooltip explica); palavra pronta mostra só o Nº de significados num
+       contador pequeno. `status-chip` continua existindo nos outros lugares.
+     - **Linha única de 32px** (era ~90): palavra à esquerda (ellipsis), fonte/estado à
+       direita; sem molduras nem cantos de cartão — hover suave, ativa com barra fina.
+       ~3× mais palavras visíveis sem rolar.
+     - **Checkbox invisível em repouso**: aparece no hover e permanece quando marcada
+       (a seleção múltipla continua idêntica).
+     - **Cabeçalhos de grupo silenciosos**: caixa cinza → rótulo pequeno em maiúsculas.
+     - **Coluna 260px → 320px** (títulos de release não truncam tão cedo), tipografia um
+       degrau menor em cabeçalho/filtros/busca.
+     - Markup: `renderSidebar` simplificado (`rw-body/rw-meta` → linha flat + `rw-right`);
+       CSS em bloco de override no fim do styles.css. Validado ao vivo com dados
+       sintéticos nos dois estados e duas fontes: 32px/linha, zero chips na lista, pontos
+       e contadores certos, checkbox oculta em repouso. `CACHE`: `v79` → **`v80`**.
 
 ### Sessão 2026-08-04 (52ª rodada) — Raio-X da frase: triagem automática do que estudar
 108. **Pedido** (card "We'll get you in for that"): "tem vezes que não sei exatamente o que

@@ -3844,3 +3844,69 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .rvb-chip.done{opacity:.55;cursor:default}
 .rvb-chip.done .ic{color:var(--success)}
 .rvb-foot{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+
+/* ================================================================
+   REVISAR — lista "Marie Kondo": cada linha guarda UMA coisa, ruido
+   descartado (chips repetidos viraram pontos), tipografia menor,
+   coluna mais larga, cabecalhos de grupo silenciosos.
+   ================================================================ */
+.review-layout{grid-template-columns:320px 1fr}
+
+/* Cabecalho do painel: menor e mais quieto */
+.review-sidebar-header{padding:10px 14px}
+.review-sidebar-header h3{font-size:var(--fs-sm);font-weight:600}
+
+/* Filtros: compactos */
+.rsb-filters{padding:8px 10px 6px;gap:4px}
+.rsb-filter{padding:5px 6px;font-size:var(--fs-2xs)}
+
+.review-search{padding:8px 10px}
+.review-search input{padding:7px 10px;font-size:var(--fs-xs)}
+
+/* Lista: linhas de UMA linha, sem molduras */
+.review-word-list{padding:2px 6px 6px;max-height:calc(100vh - 264px)}
+.rw-item{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 8px;margin:0;border:none;border-radius:var(--radius-xs);
+}
+.rw-item:last-child{border:none}
+.rw-item:hover{background:var(--surface2);border:none}
+.rw-item.active{
+  background:rgba(var(--primary-rgb),.09);
+  border:none;box-shadow:inset 2px 0 0 var(--primary);
+}
+.rw-item.checked{background:rgba(var(--primary-rgb),.05)}
+.rw-word{
+  flex:1;min-width:0;font-weight:500;font-size:var(--fs-sm);margin:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.rw-item.active .rw-word{font-weight:600}
+
+/* Checkbox so aparece quando importa (hover ou ja marcada) */
+.rw-cb{opacity:0;transition:opacity .12s;margin:0;width:13px;height:13px}
+.rw-item:hover .rw-cb,.rw-item.checked .rw-cb,.rw-cb:checked{opacity:1}
+
+/* Direita da linha: fonte + estado, minimos */
+.rw-right{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.rw-src{display:inline-flex;color:var(--text3);opacity:.7}
+.rw-src .ic{width:12px;height:12px}
+.rw-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.rw-dot.wait{background:var(--warning)}
+.rw-mean{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:17px;height:17px;padding:0 5px;border-radius:var(--radius-lg);
+  font-size:var(--fs-3xs);font-weight:700;
+  background:rgba(var(--primary-rgb),.13);color:var(--primary);
+}
+
+/* Cabecalho de grupo: rotulo discreto, nao caixa */
+.rw-group-header{
+  background:var(--surface);border-bottom:none;
+  padding:10px 8px 3px;
+  font-size:var(--fs-3xs);font-weight:600;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.05em;
+}
+.rw-group-header:hover{background:var(--surface);color:var(--text2)}
+.rw-group-header .ic{width:12px;height:12px;opacity:.7}
+.rw-group-count{background:transparent;color:var(--text3);min-width:0;padding:0;font-size:var(--fs-3xs)}
+.rw-group-toggle{opacity:.6}

@@ -532,18 +532,15 @@ function renderSidebar(filter = '') {
         const isActive  = w.id === activeWordId
         const isChecked = selectedWordIds.has(w.id)
         const nMean = (w.meanings || []).length
+        // Marie Kondo: o chip "Pendente IA" repetido em toda linha era ruído —
+        // virou um ponto discreto (âmbar = aguardando; nº = significados prontos)
         const statusHtml = w.status === 'pending_ai'
-          ? `<span class="status-chip pending_ai">Pendente IA</span>`
-          : `<span class="status-chip pending_review">${nMean} significado${nMean !== 1 ? 's' : ''}</span>`
+          ? `<span class="rw-dot wait" data-tip="Aguardando análise da IA"></span>`
+          : `<span class="rw-mean" data-tip="${nMean} significado${nMean !== 1 ? 's' : ''} prontos">${nMean}</span>`
         html += `<div class="rw-item ${isActive ? 'active' : ''} ${isChecked ? 'checked' : ''}" onclick="selectWord('${w.id}')">
           <input type="checkbox" class="rw-cb" ${isChecked ? 'checked' : ''} onclick="toggleWordSelect(event,'${w.id}')" title="Selecionar esta palavra">
-          <div class="rw-body">
-            <div class="rw-word">${esc(w.word || '(frase)')}</div>
-            <div class="rw-meta">
-              ${statusHtml}
-              ${!showGroups ? `<span class="rw-count" title="Fonte">${icon}</span>` : ''}
-            </div>
-          </div>
+          <div class="rw-word">${esc(w.word || '(frase)')}</div>
+          <div class="rw-right">${!showGroups ? `<span class="rw-src" title="Fonte">${icon}</span>` : ''}${statusHtml}</div>
         </div>`
       }
     }
