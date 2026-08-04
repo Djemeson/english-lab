@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Imagens pelo Gemini (48ª rodada)**: fornecedor de
+> Última atualização: 2026-08-04 — **Varredura anti-DeepSeek (49ª rodada)**: "Analisar com
+> IA" não fazia nada com o DeepSeek — `aiJSON` dependia de `response_format: json_object`.
+> Agora tem 3 camadas + parser tolerante, e TODAS as guardas de chat do projeto deixaram de
+> exigir chave OpenAI. Ver seção 8 (49ª rodada).
+>
+> Anterior: 2026-08-04 — **Imagens pelo Gemini (48ª rodada)**: fornecedor de
 > imagens virou opção (OpenAI ou Gemini) com três níveis cada, modelo e preço reais no
 > dropdown; duas rotas da API do Gemini com plano B automático. Ver seção 8 (48ª rodada).
 >
@@ -471,6 +476,31 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (49ª rodada) — Varredura: o projeto INTEIRO rodando em DeepSeek
+105. **Bug**: "Analisar com IA não aparece nada quando o DeepSeek está ativo" (print da
+     palavra *neocon*). Mesma raiz da 40ª, agora no caminho da ANÁLISE: `aiJSON` mandava
+     sempre `response_format: json_object`, que o DeepSeek atende com vazio/truncado.
+     Pedido complementar: "analise TODO o projeto pra não dar esse tipo de erro".
+     - **`aiJSON` em 3 camadas**: (1) fornecedor ativo com `json_object` — **pulada para o
+       DeepSeek**, que já começa sem; (2) mesmo fornecedor sem `json_object`; (3) OpenAI,
+       se houver chave. Novo **`_aiParseJSON`**: aceita cerca ```json, texto antes/depois
+       (pega do primeiro `{` ao último `}`) e `reasoning_content`.
+     - **Varredura completa do acoplamento à OpenAI** (4 padrões: chat/completions direto,
+       `response_format`, `cfg.openaiKey`, `ai_provider` fixo). Trocadas **23 guardas** de
+       operações de CHAT para `aiChatCfg().key` em review.js, add.js, study.js, audio.js e
+       video-subs.js — incluindo `analyzeWordDirect`, que fazia `return false` MUDO sem
+       chave OpenAI (o "não aparece nada" literal), e `analyzeWord`/`analyzeAll`.
+       `w.ai_provider` agora grava o fornecedor real, não 'openai' fixo.
+     - **Imagens**: as duas guardas de geração passaram a olhar a chave do fornecedor de
+       IMAGENS (`aiImgKey()`, 48ª rodada), não a da OpenAI.
+     - **Mantidas em OpenAI de propósito** (verificado uma a uma): TTS (audio.js, o teste em
+       settings.js, criar card com áudio) e o fallback deliberado de traduções recusadas.
+     - Validado ao vivo: DeepSeek respondendo JSON puro, com cerca markdown + texto em
+       volta, vazio (→ cai na OpenAI, rota `deepseek` → `openai+fmt`), tudo falhando (erro
+       "[DeepSeek] …"), OpenAI seguindo com `json_object`; e o fluxo REAL de "Analisar com
+       IA" da palavra *neocon* rodando 100% no DeepSeek (status `pending_review`,
+       significado e exemplos preenchidos). `CACHE`: `v75` → **`v76`**.
 
 ### Sessão 2026-08-04 (48ª rodada) — Imagens pelo Gemini (Nano Banana), três níveis
 104. **Pedido**: "construa o gemini pra imagem, com modelo baixo, médio e alto igual o do

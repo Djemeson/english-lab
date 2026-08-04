@@ -92,7 +92,7 @@ function applyAiResult(w, result) {
 
 async function analyzeWordDirect(wordId) {
   const w = words.find(x => x.id === wordId)
-  if (!w || !cfg.openaiKey) return false
+  if (!w || !aiChatCfg().key) return false
 
   const main = el('review-main')
   if (activeWordId === wordId) {
@@ -210,7 +210,7 @@ Return ONLY this JSON (no markdown, no explanation):
   try {
     const result = await aiJSON(PROMPT, { maxTokens: 2800 })
     applyAiResult(w, result)
-    w.ai_provider = 'openai'
+    w.ai_provider = aiChatCfg().prov
     saveWords()
     renderSidebar()
     if (activeWordId === wordId) renderWordCard(wordId)
@@ -229,8 +229,8 @@ Return ONLY this JSON (no markdown, no explanation):
 async function analyzeWord(wordId) {
   const w = words.find(x => x.id === wordId)
   if (!w) return
-  if (!cfg.openaiKey) {
-    toast('Configure a chave OpenAI em Configurações', 'error')
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error')
     showSection('configuracoes')
     return
   }
@@ -238,8 +238,8 @@ async function analyzeWord(wordId) {
 }
 
 async function analyzeAll() {
-  if (!cfg.openaiKey) {
-    toast('Configure a chave OpenAI em Configurações', 'error')
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error')
     showSection('configuracoes')
     return
   }
@@ -518,7 +518,7 @@ function selectWord(id) {
 async function analyzeSelected() {
   const ids = [...selectedWordIds]
   if (!ids.length) return
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return }
   toast(`Analisando ${ids.length} palavra${ids.length!==1?'s':''}...`)
   for (const id of ids) {
     await analyzeWord(id)
@@ -831,7 +831,7 @@ async function revSelExplain() {
     pop.appendChild(corpo)
   }
   if (_revExplainCache.has(chave)) { corpo.innerHTML = _revExplainCache.get(chave); return }
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
   corpo.innerHTML = '<span class="gen-spinner"></span> a IA está explicando...'
   try {
     const resp = await aiTextSeguro([

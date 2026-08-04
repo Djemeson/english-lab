@@ -405,7 +405,7 @@ Responda: {"scene": "..."}` }
 // force=true (botão individual) regenera por cima; force=false (lote) pula
 // quem já tem imagem — antes o lote re-gerava e re-PAGAVA imagens existentes.
 async function generateCardImage(cardId, callerEl, force = true) {
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  if (!aiImgKey()) { toast(`Configure a chave da ${AI_IMG[aiImgProvider()].nome} para gerar imagens (Configurações → IA)`, 'warning'); return }
   const card = srsCards.find(c => c.id === cardId)
   if (!card) return
 
@@ -466,7 +466,7 @@ async function generateCardImage(cardId, callerEl, force = true) {
 // Gera imagens para os cards selecionados na biblioteca (respeita a regra de significado compartilhado)
 async function browserGenerateImagesSelected() {
   if (!_browserSelected.size) return
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  if (!aiImgKey()) { toast(`Configure a chave da ${AI_IMG[aiImgProvider()].nome} para gerar imagens (Configurações → IA)`, 'warning'); return }
   const ids = [..._browserSelected]
   const cards = srsCards.filter(c => ids.includes(c.id))
   // Deduplica por chave de imagem (evita gerar a mesma imagem duas vezes)
@@ -913,7 +913,7 @@ Rules — follow exactly:
 // Botão universal da Biblioteca: corrige frases (que não batiam com o significado)
 // + preenche variedade/registro de TODOS os cards. Preserva o agendamento SRS.
 async function reanalyzeAll() {
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return }
   if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }
 
   const groups = new Map()
@@ -988,7 +988,7 @@ async function reanalyzeAll() {
 // documento) sem risco de perder as frases curadas daquela fonte. Pula significados
 // que já têm tudo preenchido. (Generaliza o antigo "Preencher origem" — mesmo botão.)
 async function fillMissingAll() {
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return }
   if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }
 
   // Agrupa por significado (wordId|meaningIdx); junta o que já está preenchido
@@ -1119,7 +1119,7 @@ Return: {"en":"...","pt":"..."}`
 }
 
 async function markBoldAll() {
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return }
   if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }
 
   // Frases que precisam de negrito: EN ou PT (quando existente) sem span <b> preciso
@@ -1187,7 +1187,7 @@ async function markBoldAll() {
 }
 
 async function reprocessMetaBulk() {
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'error'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return }
   if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }
 
   // Agrupa por significado (wordId|meaningIdx) — todos os cards do mesmo significado

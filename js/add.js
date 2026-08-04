@@ -278,7 +278,7 @@ function renderKindleList(skipped, total) {
     const iwords = getItemWords(item)
     const chipContent = iwords.length
       ? `<div id="ke-wrap-${i}" style="display:flex;gap:5px;flex-wrap:wrap">${iwords.map((w,wi)=>`<span class="kindle-expr-chip" style="display:inline-flex;align-items:center;gap:4px">${esc(w)}<span onclick="removeKindleWord(${i},${wi})" style="cursor:pointer;opacity:.55;margin-left:2px;font-size:var(--fs-base);line-height:1">×</span></span>`).join('')}</div>`
-      : (cfg.openaiKey
+      : (aiChatCfg().key
           ? `<div id="ke-wrap-${i}"><span style="font-size:var(--fs-xs);color:var(--text3);font-style:italic">analisando...</span></div>`
           : `<div id="ke-wrap-${i}"><span style="font-size:var(--fs-xs);color:var(--text3);font-style:italic">selecione com o mouse</span></div>`)
     const sentenceHTML = hasContext ? esc(item.context) : esc(item.word || '')
@@ -307,7 +307,7 @@ function renderKindleList(skipped, total) {
 }
 
 async function analyzeKindleItems() {
-  if (!cfg.openaiKey || !kindleItems.length) return
+  if (!aiChatCfg().key || !kindleItems.length) return
 
   const BATCH = 20  // menor para mais precisão e menos falhas
 
@@ -483,7 +483,7 @@ function attachPicker(idx) {
     setKindleWord(i, clickedWord)
 
     // Sem API key: usa apenas a palavra clicada
-    if (!cfg.openaiKey) return
+    if (!aiChatCfg().key) return
 
     // Detecta se é phrasal verb / idiom / expressão multi-palavra
     this.classList.add('wp-loading')
@@ -541,7 +541,7 @@ function updateKindleWordsDisplay(i) {
 }
 
 async function detectKindleWord(i) {
-  if (!cfg.openaiKey) { toast('Configure a OpenAI API Key nas configurações para usar a detecção automática', 'warning'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
   const item = kindleItems[i]
   if (!item.context) { toast('Sem contexto para analisar', 'warning'); return }
   const btn = el(`kb-${i}`)
@@ -627,7 +627,7 @@ function setMidiaType(el_) {
 async function analyzeMidiaText() {
   const text = (el('midia-text-new')?.value || '').trim()
   if (!text) { toast('Digite ao menos uma palavra ou frase', 'warning'); return }
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); showSection('configuracoes'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); showSection('configuracoes'); return }
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
   if (!lines.length) return
   const srcType = document.querySelector('.midia-type-chip.active')?.dataset.val || 'series'
@@ -932,7 +932,7 @@ async function readPdfTextMidia(file) {
 async function handleMidiaFile(input) {
   const file = (input && input.files) ? input.files[0] : null
   if (!file) return
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); showSection('configuracoes'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); showSection('configuracoes'); return }
   const name = (file.name || '').toLowerCase()
   const drop = el('midia-drop')
   let text = ''
@@ -961,7 +961,7 @@ async function handleMidiaFile(input) {
 async function extractMidiaPasted() {
   const text = (el('midia-text-new')?.value || '').trim()
   if (!text) { toast('Cole o material no campo de texto primeiro', 'warning'); return }
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); showSection('configuracoes'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); showSection('configuracoes'); return }
   if (text.split(/\s+/).filter(Boolean).length < 8) {
     toast('Texto curto demais para "material" — use "Analisar linha a linha"', 'warning'); return
   }
@@ -982,7 +982,7 @@ async function _openaiJSON(messages, maxTokens) {
 //  2) Enriquecimento em LOTES — IPA, nível, registro, definição e 3 exemplos por termo.
 // Se um lote falhar, o item permanece com o significado/exemplo do doc (nada se perde).
 async function extractMidiaDoc(text, fileName) {
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
   const srcType = document.querySelector('.midia-type-chip.active')?.dataset.val || 'series'
   const srcTitle = (el('midia-title-new')?.value || '').trim() || (fileName || '').replace(/\.[^.]+$/, '')
   const srcContext = (el('midia-context-new')?.value || '').trim()
@@ -1233,7 +1233,7 @@ document.addEventListener('change', e => {
 // ── Detecção de alvos em LOTE: para cada destaque selecionado ainda sem
 // palavra, a IA aponta o melhor item de estudo (reusa detectKindleWord). ──
 async function detectKindleTargetsAll() {
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
   const alvo = [...document.querySelectorAll('.kindle-check:checked')]
     .map(c => +c.dataset.i)
     .filter(i => kindleItems[i] && !getItemWords(kindleItems[i]).length && (kindleItems[i].context || '').trim())

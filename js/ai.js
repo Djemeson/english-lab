@@ -153,24 +153,56 @@ async function _aiFetch(url, body, { timeoutMs = 90000, retries = 2, key } = {})
   throw lastErr
 }
 
-// Chat que retorna JSON (response_format json_object).
-// Aceita string única (vira mensagem de user) ou array de mensagens.
+// Extrai o objeto JSON de uma resposta: tolera cerca de ```json, texto antes
+// ou depois, e o content vindo em reasoning_content.
+function _aiParseJSON(data) {
+  const msg = data.choices?.[0]?.message || {}
+  let raw = String(msg.content || msg.reasoning_content || '')
+    .replace(/```(?:json)?\n?|\n?```/g, '').trim()
+  if (!raw) return null
+  try { return JSON.parse(raw) } catch {}
+  const i = raw.indexOf('{'), f = raw.lastIndexOf('}')
+  if (i >= 0 && f > i) { try { return JSON.parse(raw.slice(i, f + 1)) } catch {} }
+  return null
+}
+
+// Chat que retorna JSON. Aceita string única ou array de mensagens.
+// Três camadas, porque o DeepSeek com `response_format: json_object`
+// costuma devolver vazio/truncado (era o "Analisar com IA não faz nada"):
+//   1) fornecedor ativo COM json_object (quando ele se dá bem com isso)
+//   2) mesmo fornecedor SEM json_object, extraindo o JSON do texto
+//   3) OpenAI, se houver chave — nunca deixa a análise no vácuo
 async function aiJSON(messages, { maxTokens, model, timeoutMs, retries } = {}) {
   const chat = aiChatCfg()
   if (!chat.key) throw new Error('Chave da ' + chat.P.nome + ' não configurada (Configurações → IA)')
   const m = model || chat.model
   const msgs = typeof messages === 'string' ? [{ role: 'user', content: messages }] : messages
-  const res = await _aiFetch(chat.P.url, {
-    model: m,
-    response_format: { type: 'json_object' },
+  const corpo = (mod, comFormato) => ({
+    model: mod,
+    ...(comFormato ? { response_format: { type: 'json_object' } } : {}),
     messages: msgs,
-    ..._aiTokenParam(m, maxTokens)
-  }, { timeoutMs, retries, key: chat.key })
-  const data = await res.json()
-  const raw = (data.choices?.[0]?.message?.content || '{}')
-    .replace(/```(?:json)?\n?|\n?```/g, '').trim()
-  try { return JSON.parse(raw) }
-  catch { throw new Error('A IA retornou um JSON inválido') }
+    ..._aiTokenParam(mod, maxTokens)
+  })
+  // O DeepSeek já começa sem json_object: com ele, falha na maioria das vezes.
+  const tentativas = chat.prov === 'deepseek' ? [false] : [true, false]
+  let erro = null
+  for (const comFormato of tentativas) {
+    try {
+      const res = await _aiFetch(chat.P.url, corpo(m, comFormato), { timeoutMs, retries, key: chat.key })
+      const j = _aiParseJSON(await res.json())
+      if (j) return j
+      erro = new Error('a IA devolveu uma resposta vazia ou fora do formato')
+    } catch (e) { erro = e }
+  }
+  if (chat.prov !== 'openai' && cfg.openaiKey) {
+    try {
+      const res = await _aiFetch('https://api.openai.com/v1/chat/completions',
+        corpo(AI_DEFAULT_MODEL, true), { timeoutMs, retries: 1, key: cfg.openaiKey })
+      const j = _aiParseJSON(await res.json())
+      if (j) { console.warn('[ai] JSON pelo fallback OpenAI —', chat.P.nome, 'não respondeu'); return j }
+    } catch (e) { erro = erro || e }
+  }
+  throw new Error(`[${chat.P.nome}] ${erro ? erro.message : 'não retornou um JSON válido'}`)
 }
 
 // Chat de texto puro (respostas curtas, sem JSON).
@@ -260,6 +292,8 @@ const AI_IMG = {
 }
 
 function aiImgProvider() { return AI_IMG[cfg.imgProvider] ? cfg.imgProvider : 'openai' }
+// Chave do fornecedor de IMAGENS ativo (vazia = não dá para gerar)
+function aiImgKey() { return (cfg[AI_IMG[aiImgProvider()].keyCfg] || '').trim() }
 function aiImgNivel(quality) {
   const P = AI_IMG[aiImgProvider()]
   const q = quality || cfg.imgQuality || 'medium'

@@ -911,7 +911,7 @@ document.addEventListener('keydown', e => {
 // REGENERATE EXAMPLE SENTENCE via AI
 // ================================================================
 async function regenerateCardExample(cardId, btnEl) {
-  if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
   const card = srsCards.find(c => c.id === cardId)
   if (!card) return
 

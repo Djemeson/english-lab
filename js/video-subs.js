@@ -73,7 +73,7 @@ function parseSubtitle(text) {
 async function videoCuePT(i) {
   const c = _vidCues[i]; if (!c) return
   if (!_vidPTof(c)) {
-    if (!cfg.openaiKey) { toast('Sem legenda PT alinhada nem chave OpenAI', 'warning'); return }
+    if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
     const row = el('vid-cue-pt-' + i)
     if (row) { row.classList.remove('hid'); row.textContent = '…' }
     try { await _vidEnsurePT(i, 1, true) } catch (e) { toast('Erro ao traduzir: ' + e.message, 'error'); return }
@@ -93,7 +93,7 @@ async function videoTranslateSel() {
       _vidCues[i]._rev = true
     }
     if (precisouIA) {
-      if (!cfg.openaiKey) { toast('Sem legenda PT alinhada — configure a chave OpenAI ou busque a legenda PT', 'warning'); return }
+      if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
       await _vidEnsurePT(_vidSel.ci, _vidSel.cj - _vidSel.ci + 1, true)
     }
     _vidSel.pt = _vidCues.slice(_vidSel.ci, _vidSel.cj + 1).map(c => _vidPTof(c))
