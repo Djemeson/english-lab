@@ -412,7 +412,10 @@ function _vidOnTime() {
   const old = document.querySelector('.vid-cue.cur')
   if (old) old.classList.remove('cur')
   _vidCueIdx = idx
-  el('vid-ov-pop')?.classList.add('hidden')
+  // Troca de fala fecha o popup de seleção — EXCETO com uma explicação da IA
+  // ainda carregando (senão a resposta chegava com o popup já escondido)
+  const _pop = el('vid-ov-pop')
+  if (_pop && !_pop.querySelector('.gen-spinner')) _pop.classList.add('hidden')
   if (idx >= 0) {
     const elCue = document.querySelector(`.vid-cue[data-i="${idx}"]`)
     if (elCue) {

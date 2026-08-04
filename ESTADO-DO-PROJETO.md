@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Três consertos do uso real (38ª rodada)**: explicação
+> Última atualização: 2026-08-03 — **Explicar "não vai" com o vídeo tocando (39ª rodada)**:
+> a troca de fala escondia o popup antes de a resposta da IA chegar. Agora Explicar PAUSA
+> o vídeo, a troca de fala não fecha o popup com explicação carregando, e erro aparece
+> dentro do popup. Ver seção 8 (39ª rodada).
+>
+> Anterior: 2026-08-03 — **Três consertos do uso real (38ª rodada)**: explicação
 > vinha CORTADA (teto de 220 tokens → 600, no vídeo e no Revisar); cabeçalho do popup da
 > legenda agora é linha única (seleção longa não empurra mais botão para baixo); e a
 > tradução IA que pulava falas com DeepSeek virou LOTE (uma chamada por janela) com
@@ -423,6 +428,24 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (39ª rodada) — Explicar "não vai" quando o vídeo está tocando
+90. **Reclamação**: "pedi pra explicar essa frase, e só reiki, mas não vai. e essa não foi a
+    primeira vez". Causa raiz: `_vidOnTime` esconde o popup em TODA troca de fala
+    (video.js:415) — com o vídeo TOCANDO, a fala trocava segundos após o clique e o popup
+    sumia antes de a resposta da IA (DeepSeek, mais lento) chegar. Três mudanças:
+    - **Explicar agora PAUSA o vídeo** ao clicar (vai-se ler; a cena congela e a fala não
+      troca por baixo). Retomar o play é do aluno.
+    - **Troca de fala não fecha o popup enquanto a explicação carrega** (guard: só esconde
+      se não houver `.gen-spinner` no popup). Depois de carregada, a próxima troca fecha
+      normalmente (quem retomou o play terminou de ler).
+    - **Erro visível DENTRO do popup** (cor `--error`; "clique em Explicar para tentar de
+      novo") — antes era `corpo=''` + toast, que some e parece "não fez nada".
+    - Validado no cenário exato: vídeo tocando → Explicar pausa → troca de fala forçada
+      durante o carregamento não fecha → resposta aparece → troca seguinte (pós-leitura)
+      fecha → falha da API mostra o erro no popup. `CACHE`: `v65` → **`v66`**.
+    - Obs.: a captura do Djemeson ainda mostrava o layout antigo (Revisar na 2ª linha) —
+      o conserto da 38ª estava publicado mas o SW precisa de duas recargas para trocar.
 
 ### Sessão 2026-08-03 (38ª rodada) — Três consertos vindos do uso real (Explicar cortado, popup quebrando, PT IA pulando falas)
 89. **Três reclamações do Djemeson usando de verdade** (com DeepSeek como fornecedor ativo):

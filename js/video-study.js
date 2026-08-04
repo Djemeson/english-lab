@@ -684,6 +684,7 @@ async function videoOvExplain() {
   const pop = el('vid-ov-pop')
   if (!txt || !pop) return
   const p = el('vid-player')
+  if (p && !p.paused) p.pause()   // vai ler a explicação: congela a cena (e a fala não troca por baixo)
   const i = _vidCueIdx >= 0 ? _vidCueIdx : _vidCueAt(p ? p.currentTime : 0)
   const contexto = (_vidCues[i] && _vidCues[i].t) || ''
   let corpo = pop.querySelector('.sel-pop-exp')
@@ -703,8 +704,8 @@ Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultur
     if (typeof _revExplainCache !== 'undefined') _revExplainCache.set(chave, html)
     corpo.innerHTML = html
   } catch (e) {
-    corpo.innerHTML = ''
-    toast('Erro ao explicar: ' + e.message, 'error')
+    // erro DENTRO do popup (um toast some antes de o aluno entender o que houve)
+    corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)} — clique em Explicar para tentar de novo.</span>`
   }
 }
 
