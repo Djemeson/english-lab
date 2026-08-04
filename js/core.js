@@ -27,6 +27,7 @@ const DEF_CFG = {
   aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
   openaiKey: '', geminiKey: '', deepseekKey: '', groqKey: '',
   aiModelProv: {},
+  vidPT: '',        // modo de tradução no vídeo, lembrado entre sessões
   theme: 'midnight'
 }
 

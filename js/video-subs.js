@@ -19,8 +19,22 @@ function _vidReadSubFile(file) {
   reader.onload = async e => {
     const cues = parseSubtitle(String(e.target.result || ''))
     if (!cues.length) { toast('Não reconheci falas nesse arquivo — é um .srt/.vtt válido?', 'error'); return }
+    // Arquivo de TRADUÇÃO (o .pt-BR.ia.srt que o próprio app exporta, ou
+    // qualquer legenda PT) entra como trilha de tradução — não substitui a
+    // legenda em inglês nem apaga o que a IA já traduziu.
+    const ehPT = /\.(pt|pt-?br|por|ptbr)\b|\bportugu/i.test(file.name)
+    if (ehPT && _vidCues.length) {
+      _vidCuesPT = cues
+      _vidAlignPTTrack()
+      _vidSaveSubsNow()
+      _vidPTmode = 'sub'; _vidShowPT = true
+      cfg.vidPT = 'sub'; saveCfg()
+      _vidPTButtons(); renderVidTranscript(); _vidUpdateOverlay()
+      toast(`Tradução importada: ${cues.length} falas — já ligada sob a legenda`, 'success')
+      return
+    }
     _vidCues = cues
-    await VideoDB.set('subs', _vidCur.id, { cues })
+    _vidSaveSubsNow()          // preserva trilha PT/candidatas já salvas
     _vidCur.cueCount = cues.length; _vidCur.updated_at = new Date().toISOString()
     saveVideos(); autoSyncAfterChange()
     renderVidTranscript()
@@ -652,7 +666,10 @@ async function videoTranslateFull() {
     const faltam = pend.filter(k => !_vidCues[k].pt).length
     _vidSaveSubsNow()
     // liga a exibição da tradução IA se estava desligada — foi para isso que se traduziu
-    if (_vidPTmode === 'off') { _vidPTmode = 'ia'; _vidShowPT = true; _vidPTButtons() }
+    if (_vidPTmode === 'off') {
+      _vidPTmode = 'ia'; _vidShowPT = true; _vidPTButtons()
+      cfg.vidPT = 'ia'; saveCfg()      // e volta ligada nas próximas aberturas
+    }
     renderVidTranscript()
     _vidUpdateOverlay()
     toast(faltam ? `Tradução concluída — ${faltam} fala(s) ficaram pendentes` : 'Legenda inteira traduzida para PT-BR', 'success')

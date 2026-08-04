@@ -252,6 +252,7 @@ async function videoOpenPlayer(v) {
   // Realinha a trilha PT a cada abertura: é barato (<50ms) e corrige dados
   // salvos por versões antigas do alinhador (sem estimativa de offset).
   if (_vidCues.length && _vidCuesPT.length) { _vidAlignPTTrack(); _vidSaveSubs() }
+  _vidRestaurarPT()
 
   if (_vidURL) { URL.revokeObjectURL(_vidURL); _vidURL = null }
   _vidURL = URL.createObjectURL(_vidFile)
@@ -474,7 +475,8 @@ function videoSetPT(modo) {
     if (modo === 'sub' && !_vidCues.some(c => c.pts)) {
       toast('Sem trilha PT-BR baixada — use "Buscar legenda" (a PT vem junto) ou a tradução por IA', 'warning'); return
     }
-    if (modo === 'ia' && !aiChatCfg().key) {
+    // já traduzida por inteiro? então não precisa de chave para exibir
+    if (modo === 'ia' && !aiChatCfg().key && !_vidCues.some(c => c.pt)) {
       toast('Configure uma chave de IA em Configurações para a tradução em tempo real', 'warning'); return
     }
     _vidPTmode = modo
@@ -482,12 +484,32 @@ function videoSetPT(modo) {
       ? 'Tradução da legenda PT-BR oficial (pode divergir do literal)'
       : 'Tradução literal pela IA — só o que você está vendo (+5s)', 'info')
   }
+  cfg.vidPT = _vidPTmode; saveCfg()   // o modo volta sozinho no próximo vídeo
   _vidShowPT = _vidPTmode !== 'off'
   _vidPTButtons()
   renderVidTranscript()
   _vidUpdateOverlay()
   const p = el('vid-player')
   if (_vidPTmode === 'ia' && p) _vidEnsurePTAhead(p.currentTime)
+}
+
+// Ao abrir um vídeo: a tradução volta LIGADA sozinha, no modo de antes.
+// As traduções da IA já ficam salvas por fala (VideoDB) — não faria sentido
+// obrigar a religar o botão a cada sessão. Sem preferência salva, um vídeo
+// que JÁ tem tradução da IA abre com ela ligada (foi pedida e paga).
+function _vidRestaurarPT() {
+  const temIA = _vidCues.some(c => c.pt)
+  const temSub = _vidCues.some(c => c.pts)
+  const pref = cfg.vidPT || (temIA ? 'ia' : '')
+  _vidPTmode = (pref === 'ia' && (temIA || aiChatCfg().key)) ? 'ia'
+    : (pref === 'sub' && temSub) ? 'sub'
+    : (pref === 'sub' && temIA) ? 'ia'      // sem trilha oficial, a da IA serve
+    : 'off'
+  _vidShowPT = _vidPTmode !== 'off'
+  if (_vidPTmode === 'ia' && temIA) {
+    const n = _vidCues.filter(c => c.pt).length
+    toast(`Tradução da IA carregada (${n} falas) — já ligada sob a legenda`, 'info')
+  }
 }
 
 // Sincroniza o estado visual dos controles de tradução (toolbar + minis

@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **130 falas de fora no Traduzir legenda inteira (44ª
+> Última atualização: 2026-08-03 — **Tradução da IA volta ligada sozinha (45ª rodada)**: ao
+> reabrir um vídeo já traduzido, o modo PT volta no estado de antes (preferência `cfg.vidPT`
+> + auto-ligar quando há tradução salva), com aviso de quantas falas; importar um .srt PT
+> passou a entrar como TRADUÇÃO, sem substituir a legenda EN. Ver seção 8 (45ª rodada).
+>
+> Anterior: 2026-08-03 — **130 falas de fora no Traduzir legenda inteira (44ª
 > rodada)**: a passada única deixava para trás o que o modelo pulava/truncava. Agora são
 > até 3 passadas automáticas (blocos 10 → 5), teto de tokens folgado (140/fala), parser
 > aceita markdown, e o total espera os fallbacks antes de contar. Ver seção 8 (44ª rodada).
@@ -451,6 +456,28 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (45ª rodada) — A tradução da IA volta ligada sozinha ao reabrir o vídeo
+96. **Perguntas do Djemeson**: "como faço pra ver as legendas da IA? ao abrir o vídeo de
+    novo ela sobe automaticamente? quero que abra junto. e pra usar, como faz?". As
+    traduções JÁ eram persistidas (`cue.pt` no VideoDB), mas `_vidPTmode` nascia sempre
+    `'off'` — a cada sessão era preciso religar o botão de faíscas. Corrigido:
+    - **`cfg.vidPT`** (novo em DEF_CFG, sincronizado no Firestore): guarda o modo escolhido
+      (`off`/`sub`/`ia`); `videoSetPT` e `videoTranslateFull` gravam.
+    - **`_vidRestaurarPT()`** em `videoOpenPlayer`: restaura o modo se os dados existirem
+      (pref `sub` sem trilha oficial mas com IA → cai para `ia`); **sem preferência salva,
+      um vídeo que já tem tradução da IA abre com ela LIGADA** — foi pedida e paga. Toast
+      "Tradução da IA carregada (N falas)" responde o "como vejo".
+    - `videoSetPT('ia')` não exige mais chave de IA quando a legenda já está traduzida
+      (exibir o que está salvo não consome nada).
+    - **Importar .srt PT deixou de ser destrutivo**: nome com `.pt`/`.pt-BR`/`por` entra
+      como TRILHA DE TRADUÇÃO (alinhada, modo `sub` ligado) em vez de substituir a legenda
+      EN; e o import de legenda EN passou a usar `_vidSaveSubsNow()` — antes um
+      `VideoDB.set({cues})` cru **apagava trilha PT e traduções da IA**.
+    - Validado ao vivo com persistência real: traduzir → sair → reabrir = 3/3 traduções,
+      modo `ia` sozinho, botão aceso, overlay e transcript com PT; `off` explícito é
+      respeitado; import do `.pt-BR.srt` preservou legenda EN + traduções da IA.
+      `CACHE`: `v71` → **`v72`**.
 
 ### Sessão 2026-08-03 (44ª rodada) — 130 falas de fora no "Traduzir legenda inteira"
 95. **Reclamação**: "traduziu mas disse que 130 falas ficaram de fora". Duas causas:
