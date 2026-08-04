@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **PT IA a tempo + legenda inteira (42ª/43ª rodadas)**:
+> Última atualização: 2026-08-03 — **130 falas de fora no Traduzir legenda inteira (44ª
+> rodada)**: a passada única deixava para trás o que o modelo pulava/truncava. Agora são
+> até 3 passadas automáticas (blocos 10 → 5), teto de tokens folgado (140/fala), parser
+> aceita markdown, e o total espera os fallbacks antes de contar. Ver seção 8 (44ª rodada).
+>
+> Anterior: 2026-08-03 — **PT IA a tempo + legenda inteira (42ª/43ª rodadas)**:
 > tradução em tempo real virou blocos de 4 falas em PARALELO com janela de 30s (lote
 > grande demorava e a fala passava sem tradução); Explicar com resposta vazia não é mais
 > cacheado mudo; e o painel de sincronia ganhou "Traduzir legenda inteira" (IA traduz
@@ -446,6 +451,21 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (44ª rodada) — 130 falas de fora no "Traduzir legenda inteira"
+95. **Reclamação**: "traduziu mas disse que 130 falas ficaram de fora". Duas causas:
+    blocos de 20 falas estouravam o teto de tokens (as últimas linhas do bloco eram
+    ENGOLIDAS pelo truncamento) e o fluxo rodava UMA passada — o que faltou, faltava.
+    - **Até 3 passadas automáticas**: a 1ª (blocos de 10) cobre quase tudo; as seguintes
+      varrem só o que faltou com blocos de 5. Pela contagem `_ptTent`, recusas caem no
+      fallback OpenAI já na 2ª passada. Status mostra "(2ª passada)" no progresso.
+    - **Teto folgado**: `140 tokens/fala + 200` (era 90/+120) — truncar bloco engole falas.
+    - **Parser tolerante a markdown**: aceita `**1.**` etc. e limpa asteriscos da tradução.
+    - **Contagem honesta**: espera os fallbacks em segundo plano terminarem (`_ptReq`
+      zerado, até 35s) antes de anunciar quantas faltaram.
+    - Validado ao vivo: 60 falas com truncamento simulado (3 engolidas por bloco) → 1ª
+      passada deixou 18 buracos, 2ª varreu todos — zero faltantes, markdown limpo.
+      `CACHE`: `v70` → **`v71`**.
 
 ### Sessão 2026-08-03 (43ª rodada) — "Traduzir legenda inteira" (legenda PT-BR criada por IA)
 94. **Pedido**: "adicione uma opção de criar a legenda em portugues com IA baseado na

@@ -502,8 +502,9 @@ const _VID_PT_SIS = 'Você traduz legendas de séries/filmes para estudo de ingl
 function _vidPTparse(resp) {
   const mapa = {}
   for (const ln of String(resp).split('\n')) {
-    const m = ln.match(/^\s*(\d+)\s*[.):\-]\s*(.+)$/)
-    if (m) mapa[+m[1]] = m[2].trim()
+    // aceita "1. x", "1) x", "1: x", "1 - x" e enfeites markdown ("**1.** x")
+    const m = ln.match(/^\s*\**\s*(\d+)\s*[.):\-]+\**\s*(.+)$/)
+    if (m) mapa[+m[1]] = m[2].trim().replace(/^\*+|\*+$/g, '')
   }
   return mapa
 }
@@ -548,7 +549,7 @@ async function _vidPTlote(lote) {
     const resp = await aiText([
       { role: 'system', content: _VID_PT_SIS },
       { role: 'user', content: linhas }
-    ], { maxTokens: 90 * lote.length + 120, timeoutMs: 30000, retries: 1 })
+    ], { maxTokens: 140 * lote.length + 200, timeoutMs: 30000, retries: 1 })   // teto folgado: truncar o bloco engole as últimas falas
     const mapa = _vidPTparse(resp)
     const semPT = []
     lote.forEach((k, j) => {
@@ -619,20 +620,34 @@ async function videoTranslateFull() {
   _vidPTfullRodando = true
   _vidSyncRender(`Traduzindo a legenda inteira… 0/${pend.length} falas`)
   try {
-    const blocos = []
-    for (let j = 0; j < pend.length; j += 20) blocos.push(pend.slice(j, j + 20))
-    for (let g = 0; g < blocos.length; g += 3) {
-      // re-filtra na hora: o tempo real pode ter traduzido algumas enquanto isso
-      const grupo = blocos.slice(g, g + 3)
-        .map(b => b.filter(k => { const c = _vidCues[k]; return c && !c.pt && !c._ptReq }))
-        .filter(b => b.length)
-      grupo.forEach(b => b.forEach(k => {
-        _vidCues[k]._ptReq = true
-        _vidCues[k]._ptTent = (_vidCues[k]._ptTent || 0) + 1
-      }))
-      await Promise.all(grupo.map(b => _vidPTlote(b)))
-      const feitas = pend.filter(k => _vidCues[k].pt).length
-      _vidSyncRender(`Traduzindo a legenda inteira… ${feitas}/${pend.length} falas`)
+    // Até 3 PASSADAS: uma só deixava para trás o que o modelo pulou ou o
+    // truncamento engoliu (caso real: 130 falas de fora). A 1ª cobre quase
+    // tudo; as seguintes varrem SÓ o que faltou, com blocos menores — e pela
+    // contagem `_ptTent` as falas recusadas caem no fallback OpenAI na 2ª.
+    for (let passada = 1; passada <= 3; passada++) {
+      const resto = pend.filter(k => { const c = _vidCues[k]; return c && !c.pt && !c._ptReq })
+      if (!resto.length) break
+      const tam = passada === 1 ? 10 : 5
+      const blocos = []
+      for (let j = 0; j < resto.length; j += tam) blocos.push(resto.slice(j, j + tam))
+      for (let g = 0; g < blocos.length; g += 3) {
+        // re-filtra na hora: o tempo real pode ter traduzido algumas enquanto isso
+        const grupo = blocos.slice(g, g + 3)
+          .map(b => b.filter(k => { const c = _vidCues[k]; return c && !c.pt && !c._ptReq }))
+          .filter(b => b.length)
+        grupo.forEach(b => b.forEach(k => {
+          _vidCues[k]._ptReq = true
+          _vidCues[k]._ptTent = (_vidCues[k]._ptTent || 0) + 1
+        }))
+        await Promise.all(grupo.map(b => _vidPTlote(b)))
+        const feitas = pend.filter(k => _vidCues[k].pt).length
+        _vidSyncRender(`Traduzindo a legenda inteira${passada > 1 ? ` (${passada}ª passada)` : ''}… ${feitas}/${pend.length} falas`)
+      }
+    }
+    // os fallbacks das recusadas rodam em segundo plano — espera terminarem
+    // antes de contar o que faltou (senão o número sai errado)
+    for (let w = 0; w < 70 && pend.some(k => _vidCues[k] && _vidCues[k]._ptReq); w++) {
+      await new Promise(r => setTimeout(r, 500))
     }
     const faltam = pend.filter(k => !_vidCues[k].pt).length
     _vidSaveSubsNow()
