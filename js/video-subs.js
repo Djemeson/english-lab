@@ -504,15 +504,23 @@ async function _vidEnsurePT(i, n, sinc, forcaIA) {
   }
   if (!lote.length) return
   const linhas = lote.map((k, j) => `${j + 1}. ${_vidCues[k].t}`).join('\n')
-  const p = aiJSON([
-    { role: 'system', content: 'Traduza cada fala numerada de série/filme para português do Brasil, natural e curto. Responda APENAS JSON: {"t":["tradução da 1","tradução da 2",...]} — mesma ordem, mesma quantidade.' },
+  // Texto puro numerado, NÃO json_object: o DeepSeek com response_format JSON
+  // às vezes devolve vazio/truncado (limitação documentada) e o lote inteiro
+  // falhava — "sessões grandes sem tradução". Linha numerada funciona em
+  // qualquer fornecedor. Timeout curto: travada não pode segurar a janela.
+  const p = aiText([
+    { role: 'system', content: 'Traduza cada fala numerada de série/filme para português do Brasil, natural e curto. Responda SÓ as traduções, uma por linha, mantendo o número: "1. tradução". Nada além disso.' },
     { role: 'user', content: linhas }
-  ], { maxTokens: 90 * lote.length + 120 }).then(r => {
-    const arr = Array.isArray(r && r.t) ? r.t : []
+  ], { maxTokens: 90 * lote.length + 120, timeoutMs: 30000, retries: 1 }).then(resp => {
+    const mapa = {}
+    for (const ln of String(resp).split('\n')) {
+      const m = ln.match(/^\s*(\d+)\s*[.):\-]\s*(.+)$/)
+      if (m) mapa[+m[1]] = m[2].trim()
+    }
     lote.forEach((k, j) => {
       const c = _vidCues[k]
       delete c._ptReq
-      const pt = typeof arr[j] === 'string' ? arr[j].trim() : ''
+      const pt = mapa[j + 1] || ''
       if (!pt) return            // faltou na resposta → tenta de novo no próximo tick
       c.pt = pt
       // atualiza a linha do transcript e o overlay se for a fala corrente

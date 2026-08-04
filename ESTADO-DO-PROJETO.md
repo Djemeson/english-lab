@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Explicar "não vai" com o vídeo tocando (39ª rodada)**:
+> Última atualização: 2026-08-03 — **PT IA falhando SÓ no DeepSeek (40ª rodada)**: o lote de
+> tradução usava `response_format: json_object`, que no DeepSeek às vezes volta
+> vazio/truncado (limitação documentada) — trechos grandes ficavam sem tradução. O lote
+> agora é texto puro com linhas numeradas (funciona em qualquer fornecedor) + timeout de
+> 30s. Ver seção 8 (40ª rodada).
+>
+> Anterior: 2026-08-03 — **Explicar "não vai" com o vídeo tocando (39ª rodada)**:
 > a troca de fala escondia o popup antes de a resposta da IA chegar. Agora Explicar PAUSA
 > o vídeo, a troca de fala não fecha o popup com explicação carregando, e erro aparece
 > dentro do popup. Ver seção 8 (39ª rodada).
@@ -428,6 +434,24 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (40ª rodada) — PT IA falhando só no DeepSeek (o json_object era o vilão)
+91. **Pista decisiva do Djemeson**: "fiz o teste com a openai no mesmo trecho e funcionou
+    perfeitamente" — a falha era específica do DeepSeek. O lote da 38ª usava `aiJSON`
+    (`response_format: json_object`); o DeepSeek nesse modo às vezes devolve **conteúdo
+    vazio ou truncado** (limitação admitida na doc deles) → `JSON.parse` falhava → o lote
+    INTEIRO caía → retentava → caía de novo = "sessões muito grandes sem tradução, às
+    vezes aparece e depois para". (O Explicar funcionava no DeepSeek porque é texto puro.)
+    - `_vidEnsurePT` agora pede **texto puro com linhas numeradas** ("1. tradução") e
+      parseia com regex tolerante (`1.`/`1)`/`1:`/`1-`); linha de conversa fiada do modelo
+      é ignorada; número faltante = só aquela fala re-tenta no próximo tick.
+    - `timeoutMs: 30000, retries: 1` no lote: uma travada não segura mais a janela por
+      minutos (antes: 90s × 3 tentativas ≈ o "para de aparecer" que o Djemeson viu).
+    - Validado ao vivo: resposta bagunçada de propósito (pula a 2ª, formatos mistos, lixo
+      no fim) → 1ª e 3ª aplicadas, 2ª re-tentada sozinha no lote seguinte; nenhuma chamada
+      com `response_format`. `CACHE`: `v66` → **`v67`**.
+    - Lição de arquitetura: **`json_object` só onde a estrutura importa de verdade**; para
+      listas simples, linha numerada é mais robusta entre fornecedores.
 
 ### Sessão 2026-08-03 (39ª rodada) — Explicar "não vai" quando o vídeo está tocando
 90. **Reclamação**: "pedi pra explicar essa frase, e só reiki, mas não vai. e essa não foi a
