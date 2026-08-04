@@ -703,8 +703,11 @@ async function _vidAutoFetchPT() {
 // Entra pela seleção ("Estudo focado") ou por um marcador ("estudar").
 // ================================================================
 function videoSubExport(qual) {
-  const cues = qual === 'pt' ? _vidCuesPT : _vidCues
-  if (!cues.length) { toast('Sem legenda para baixar', 'warning'); return }
+  // 'ia': a tradução criada pela IA (cue.pt), nos MESMOS tempos da legenda EN
+  const cues = qual === 'ia'
+    ? _vidCues.filter(c => c.pt).map(c => ({ s: c.s, e: c.e, t: c.pt }))
+    : (qual === 'pt' ? _vidCuesPT : _vidCues)
+  if (!cues.length) { toast(qual === 'ia' ? 'Ainda não há tradução da IA — use "Traduzir legenda inteira"' : 'Sem legenda para baixar', 'warning'); return }
   const fmt = t => {
     t = Math.max(0, t)
     const h = String(Math.floor(t / 3600)).padStart(2, '0')
@@ -717,7 +720,7 @@ function videoSubExport(qual) {
   const nomeBase = (_vidCur.fileName || _vidCur.title).replace(/\.[^.]+$/, '')
   const a = document.createElement('a')
   a.href = URL.createObjectURL(new Blob(['\ufeff' + srt], { type: 'application/x-subrip' }))
-  a.download = nomeBase + (qual === 'pt' ? '.pt-BR' : '') + '.srt'
+  a.download = nomeBase + (qual === 'pt' ? '.pt-BR' : (qual === 'ia' ? '.pt-BR.ia' : '')) + '.srt'
   a.click()
   toast('Legenda .srt baixada com a sincronização aplicada — deixe na mesma pasta do vídeo', 'success')
 }

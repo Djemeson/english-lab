@@ -49,6 +49,7 @@ function _vidSyncRender(msg) {
         <span class="vid-sync-hint">Leve a sincronização com você:</span>
         <button class="btn btn-ghost btn-sm" onclick="videoSubExport()" data-tip="Baixa o .srt COM a sincronização aplicada, com o mesmo nome do vídeo — na mesma pasta, qualquer player carrega sozinho">${ic('download','ic-sm')}Baixar .srt</button>
         ${_vidCuesPT.length ? `<button class="btn btn-ghost btn-sm" onclick="videoSubExport('pt')" data-tip="Baixa a trilha PT-BR alinhada">${ic('download','ic-sm')}.srt PT-BR</button>` : ''}
+        ${_vidCues.some(c => c.pt) ? `<button class="btn btn-ghost btn-sm" onclick="videoSubExport('ia')" data-tip="Baixa a tradução criada pela IA como .srt, nos mesmos tempos da legenda em inglês — funciona em qualquer player">${ic('download','ic-sm')}.srt PT-BR (IA)</button>` : ''}
       </div>
       ${msg ? `<div class="vid-sync-status">${msg}</div>` : ''}
     </div>`

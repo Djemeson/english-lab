@@ -457,6 +457,12 @@ maxInterval (36500), leechThreshold (50)
       estava desligado. Custo: centavos no DeepSeek (~90 tokens/fala).
     - Validado ao vivo: 50 falas → tempo real cobriu ~10 (janela 30s), o botão traduziu o
       resto em blocos 20/19, modo ligou sozinho, status no painel, todas com `pt`.
+    - **Complemento (mesmo dia)**: "tem que ser possível baixar" — `videoSubExport('ia')`
+      exporta a tradução da IA como .srt (`nome-do-vídeo.pt-BR.ia.srt`), nos MESMOS tempos
+      da legenda EN (com a sincronização aplicada); falas sem `pt` ficam de fora sem furar
+      a numeração. Botão "**.srt PT-BR (IA)**" no painel de sincronia, visível quando há
+      tradução da IA. Validado: conteúdo, tempos, numeração, aviso quando não há tradução.
+      `CACHE`: `v69` → **`v70`**.
 
 ### Sessão 2026-08-03 (42ª rodada) — Tradução chegando DEPOIS da fala + Explicar mudo por cache vazio
 93. **Duas reclamações**: "demora muito pra carregar algumas legendas em tempo real — se
