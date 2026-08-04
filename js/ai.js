@@ -236,11 +236,47 @@ async function aiTTS(text, { voice, speed = 0.9, timeoutMs = 60000 } = {}) {
   }
 }
 
-// Imagem — retorna data URL base64.
+// ---- IMAGENS ---------------------------------------------------
+// Dois fornecedores, três níveis cada (cfg.imgProvider + cfg.imgQuality).
+// Preços por imagem 1024×1024, tabela de ago/2026. O Gemini NÃO entra pela
+// camada compatível com a OpenAI — tem endpoint e formato próprios.
+const AI_IMG = {
+  openai: {
+    nome: 'OpenAI', keyCfg: 'openaiKey',
+    niveis: {
+      low:    { model: 'gpt-image-1', quality: 'low',    usd: 0.011, rotulo: 'Econômica' },
+      medium: { model: 'gpt-image-1', quality: 'medium', usd: 0.042, rotulo: 'Padrão' },
+      high:   { model: 'gpt-image-1', quality: 'high',   usd: 0.167, rotulo: 'Alta' }
+    }
+  },
+  gemini: {
+    nome: 'Google Gemini', keyCfg: 'geminiKey',
+    niveis: {
+      low:    { model: 'gemini-2.5-flash-image', usd: 0.039, rotulo: 'Nano Banana (2.5 Flash)' },
+      medium: { model: 'gemini-3.1-flash-image', usd: 0.067, rotulo: 'Nano Banana 2 (3.1 Flash)' },
+      high:   { model: 'gemini-3-pro-image',     usd: 0.134, rotulo: 'Nano Banana Pro (3 Pro)' }
+    }
+  }
+}
+
+function aiImgProvider() { return AI_IMG[cfg.imgProvider] ? cfg.imgProvider : 'openai' }
+function aiImgNivel(quality) {
+  const P = AI_IMG[aiImgProvider()]
+  const q = quality || cfg.imgQuality || 'medium'
+  return { prov: aiImgProvider(), P, q, ...(P.niveis[q] || P.niveis.medium) }
+}
+
+// Imagem — retorna data URL base64 (contrato usado por audio.js/study).
 async function aiImage(prompt, { size = '1024x1024', quality, timeoutMs = 180000 } = {}) {
-  // Qualidade configurável (Configurações → IA): low ≈ 1/4 do custo de medium.
-  quality = quality || cfg.imgQuality || 'medium'
-  if (!cfg.openaiKey) throw new Error('Chave da OpenAI não configurada')
+  const n = aiImgNivel(quality)
+  const key = (cfg[n.P.keyCfg] || '').trim()
+  if (!key) throw new Error(`Chave da ${n.P.nome} não configurada (Configurações → IA)`)
+  return n.prov === 'gemini'
+    ? _aiImageGemini(prompt, n.model, key, timeoutMs)
+    : _aiImageOpenAI(prompt, n.quality, size, timeoutMs)
+}
+
+async function _aiImageOpenAI(prompt, quality, size, timeoutMs) {
   const res = await _aiFetch('https://api.openai.com/v1/images/generations', {
     model: 'gpt-image-1', prompt, n: 1, size, quality
   }, { timeoutMs, retries: 1 })
@@ -249,6 +285,64 @@ async function aiImage(prompt, { size = '1024x1024', quality, timeoutMs = 180000
   // fallback para modelos legados que retornam URL
   const blob = await (await fetch(data.data[0].url)).blob()
   return blobToBase64(blob)
+}
+
+// O Gemini tem DUAS rotas para gerar imagem: a clássica `:generateContent` e
+// a nova `/interactions`. Tenta a clássica e cai na nova se o modelo só
+// existir lá — assim um modelo novo não quebra a geração.
+async function _aiImageGemini(prompt, model, key, timeoutMs) {
+  const tentativas = [
+    {
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      body: { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['Image'] } }
+    },
+    {
+      url: 'https://generativelanguage.googleapis.com/v1beta/interactions',
+      body: { model, input: [{ type: 'text', text: prompt }], response_format: { type: 'image', mime_type: 'image/png' } }
+    }
+  ]
+  let ultimoErro = null
+  for (const t of tentativas) {
+    const ctl = new AbortController()
+    const timer = setTimeout(() => ctl.abort(), timeoutMs)
+    try {
+      const res = await fetch(t.url, {
+        method: 'POST',
+        headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify(t.body), signal: ctl.signal
+      })
+      if (!res.ok) {
+        let m = 'HTTP ' + res.status
+        try { const e = await res.json(); if (e.error?.message) m = e.error.message } catch {}
+        ultimoErro = new Error(`[Gemini] ${m}`)
+        if (res.status === 404 || res.status === 400) continue   // rota/modelo não existe aqui: tenta a outra
+        throw ultimoErro
+      }
+      const img = _aiGeminiImgDaResposta(await res.json())
+      if (img) return img
+      ultimoErro = new Error('[Gemini] a resposta não trouxe imagem (o prompt pode ter sido recusado)')
+    } catch (e) {
+      ultimoErro = e.name === 'AbortError' ? new Error('[Gemini] tempo esgotado ao gerar a imagem') : e
+    } finally { clearTimeout(timer) }
+  }
+  throw ultimoErro || new Error('[Gemini] falha ao gerar a imagem')
+}
+
+// Aceita os dois formatos de resposta (parts[].inlineData e output_image)
+function _aiGeminiImgDaResposta(j) {
+  const parts = j?.candidates?.[0]?.content?.parts || []
+  for (const p of parts) {
+    const inline = p.inlineData || p.inline_data
+    if (inline?.data) return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,` + inline.data
+  }
+  const oi = j?.output_image || j?.outputImage
+  if (oi?.data) return `data:${oi.mime_type || oi.mimeType || 'image/png'};base64,` + oi.data
+  for (const o of (j?.output || [])) {
+    if (o?.data && (o.type === 'image' || o.mime_type?.startsWith('image/'))) {
+      return `data:${o.mime_type || 'image/png'};base64,` + o.data
+    }
+  }
+  return null
 }
 
 // Teste de chave POR FORNECEDOR: GET /models não consome token nenhum.
@@ -285,8 +379,8 @@ const AI_COST = {
   // gpt-4o-mini-tts cobra ~US$ 0,015 por MINUTO de áudio gerado; a frase de um
   // card tem ~5s. O valor antigo (0,008) vinha da tabela por caractere do
   // tts-1 e superestimava a conta em ~6×.
-  tts:   0.015 * (5 / 60),                          // ≈ US$ 0,00125 por frase falada
-  image: { low: 0.011, medium: 0.042, high: 0.167 } // por imagem 1024×1024 — gpt-image-1
+  tts:   0.015 * (5 / 60)                           // ≈ US$ 0,00125 por frase falada
+  // imagens: preço por nível vive em AI_IMG (varia com o fornecedor escolhido)
 }
 
 // ---- TRANSCRIÇÃO (fala → texto) --------------------------------
@@ -388,7 +482,7 @@ async function aiUsdBrl() {
 function _aiUnitUsd(tipo) {
   // Cada imagem custa também a chamada de texto que descreve a cena
   // (buildImageScene, em audio.js) — ~2% do total, mas entra na conta.
-  if (tipo === 'image') return (AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium) + aiCustoChatUsd(1)
+  if (tipo === 'image') return aiImgNivel().usd + aiCustoChatUsd(1)
   if (tipo === 'chat') return aiCustoChatUsd(1)
   return AI_COST[tipo] || 0.001
 }
@@ -411,15 +505,16 @@ async function aiConfirmBatch(tipo, n, rotulo, opts = {}) {
   const rate = await aiUsdBrl()
   const total = usd * rate
   const NOMES = { chat: 'Análise com IA', tts: 'Geração de áudio (TTS)', image: 'Geração de imagens' }
+  const ni = aiImgNivel()
   const detalheModelo = tipo === 'chat' ? `${aiChatCfg().P.nome} · ${aiModel()}`
     : tipo === 'tts' ? `OpenAI · ${AI_TTS_MODEL}`
-    : `OpenAI · gpt-image-1 · qualidade ${({low:'econômica',medium:'padrão',high:'alta'})[cfg.imgQuality || 'medium']}`
+    : `${ni.P.nome} · ${ni.model}${ni.quality ? ' · ' + ni.rotulo.toLowerCase() : ''}`
   // De onde sai a conta — o Djemeson pediu para entender a origem do número
   const pm = aiPrecoModelo()
   const base = tipo === 'chat'
     ? `~${AI_TOKENS_ITEM.in} tokens de entrada + ~${AI_TOKENS_ITEM.out} de saída por item, ao preço deste modelo (US$ ${pm.in}/${pm.out} por 1M)`
     : tipo === 'tts' ? 'US$ 0,015 por minuto de áudio (gpt-4o-mini-tts) × ~5s por frase'
-    : `US$ ${(AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium).toFixed(3)} por imagem 1024×1024 + a chamada de texto que descreve a cena`
+    : `US$ ${ni.usd.toFixed(3)} por imagem 1024×1024 + a chamada de texto que descreve a cena`
   return confirmModal({
     title: rotulo || NOMES[tipo] || 'Operação com IA',
     icon: 'sparkles',

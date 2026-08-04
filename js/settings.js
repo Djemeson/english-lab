@@ -63,6 +63,28 @@ async function testarChaveProv(prov, btn) {
   btn.disabled = false
 }
 
+// Os três níveis de imagem mudam de nome e de preço conforme o fornecedor —
+// o dropdown mostra o modelo real e o custo por imagem, não rótulos vagos.
+function updateImgQualityOptions() {
+  const sel = el('cfg-img-quality'); if (!sel) return
+  const prov = el('cfg-img-provider')?.value || aiImgProvider()
+  const P = AI_IMG[prov] || AI_IMG.openai
+  const atual = cfg.imgQuality || 'medium'
+  sel.innerHTML = ['low', 'medium', 'high'].map(q => {
+    const n = P.niveis[q]
+    return `<option value="${q}"${q === atual ? ' selected' : ''}>${esc(n.rotulo)} — US$ ${n.usd.toFixed(3)}/imagem</option>`
+  }).join('')
+}
+
+function imgProviderMudou() {
+  updateImgQualityOptions()
+  const prov = el('cfg-img-provider')?.value
+  const P = AI_IMG[prov]
+  if (P && !(cfg[P.keyCfg] || '').trim()) {
+    toast(`Configure a chave da ${P.nome} abaixo para gerar imagens por lá`, 'warning')
+  }
+}
+
 function fillSettings() {
   const provSel = el('cfg-ai-provider')
   if (provSel) {
@@ -71,7 +93,8 @@ function fillSettings() {
   }
   updateModelOptions()
   renderKeyRows()
-  const q = el('cfg-img-quality'); if (q) q.value = cfg.imgQuality || 'medium'
+  const ip = el('cfg-img-provider'); if (ip) ip.value = aiImgProvider()
+  updateImgQualityOptions()
   const stt = el('cfg-stt-provider'); if (stt) stt.value = cfg.sttProvider || 'auto'
   setSettingsTab(_settingsTab)
   renderThemePicker()
@@ -90,6 +113,7 @@ function saveSettings() {
     const i = el('cfg-key-' + id)
     if (i) cfg[P.keyCfg] = i.value.trim()
   }
+  cfg.imgProvider = AI_IMG[el('cfg-img-provider')?.value] ? el('cfg-img-provider').value : 'openai'
   cfg.imgQuality = el('cfg-img-quality')?.value || 'medium'
   cfg.sttProvider = el('cfg-stt-provider')?.value || 'auto'
   saveCfg()

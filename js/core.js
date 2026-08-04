@@ -29,6 +29,7 @@ const DEF_CFG = {
   aiModelProv: {},
   vidPT: '',        // modo de tradução no vídeo, lembrado entre sessões
   sttProvider: 'auto',  // quem transcreve: auto (Groq se houver chave) | groq | openai
+  imgProvider: 'openai',// quem gera as imagens: openai | gemini
   theme: 'midnight'
 }
 

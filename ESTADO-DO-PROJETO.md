@@ -3,7 +3,11 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Transcrição na Groq, 9× mais barata (47ª rodada)**: o
+> Última atualização: 2026-08-04 — **Imagens pelo Gemini (48ª rodada)**: fornecedor de
+> imagens virou opção (OpenAI ou Gemini) com três níveis cada, modelo e preço reais no
+> dropdown; duas rotas da API do Gemini com plano B automático. Ver seção 8 (48ª rodada).
+>
+> Anterior: 2026-08-04 — **Transcrição na Groq, 9× mais barata (47ª rodada)**: o
 > "só a OpenAI faz isso" estava errado — a Groq roda o MESMO Whisper num endpoint idêntico
 > por US$ 0,04/h (contra 0,36). Transcrição centralizada em `aiTranscribe()` com escolha de
 > fornecedor. Ver seção 8 (47ª rodada).
@@ -467,6 +471,29 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (48ª rodada) — Imagens pelo Gemini (Nano Banana), três níveis
+104. **Pedido**: "construa o gemini pra imagem, com modelo baixo, médio e alto igual o do
+     openai — talvez a qualidade compense" (decisão consciente por QUALIDADE, não preço:
+     a análise da 47ª mostrou que o Gemini não é mais barato aqui).
+     - **`AI_IMG`** em ai.js: dois fornecedores × três níveis, cada um com modelo e preço
+       reais. OpenAI: gpt-image-1 low/medium/high (0,011/0,042/0,167). Gemini:
+       `gemini-2.5-flash-image` 0,039 · `gemini-3.1-flash-image` 0,067 · `gemini-3-pro-image`
+       0,134. `cfg.imgProvider` (sincronizado) escolhe; `aiImgNivel()` resolve tudo.
+     - **`_aiImageGemini`**: o Gemini NÃO passa pela camada compatível — usa
+       `POST /v1beta/models/{model}:generateContent` com header `x-goog-api-key` e
+       `responseModalities:['Image']`, lendo `candidates[0].content.parts[].inlineData`.
+       Como a doc de ago/2026 já mostra a rota nova `/v1beta/interactions`, há **plano B
+       automático**: 404/400 na clássica → tenta a nova; o leitor aceita os dois formatos
+       de resposta (`inlineData` e `output_image`). Contrato de saída inalterado (data URL).
+     - **Configurações**: dropdown "Imagens (fornecedor)" + o de qualidade agora listando
+       **modelo real e US$/imagem** ("Nano Banana Pro (3 Pro) — US$ 0,134/imagem"); trocar
+       de fornecedor preserva o nível e avisa se falta a chave.
+     - Validado ao vivo (chamadas stubadas): tabela dos 6 níveis, rota+headers+modalidade
+       corretos por fornecedor, data URL montada dos dois formatos, plano B disparando na
+       ordem certa (generateContent → interactions), erro claro sem chave, custo do lote
+       acompanhando o fornecedor. **Não validado com chave Gemini real** — na primeira
+       geração de verdade, conferir. `CACHE`: `v74` → **`v75`**.
 
 ### Sessão 2026-08-04 (47ª rodada) — "Só a OpenAI faz isso" estava errado: transcrição na Groq
 101. **Contestação do Djemeson** ("o Gemini não gera imagem e áudio? o DeepSeek não
