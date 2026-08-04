@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **PT IA falhando SÓ no DeepSeek (40ª rodada)**: o lote de
+> Última atualização: 2026-08-03 — **DeepSeek recusa conteúdo adulto (41ª rodada)**: falas
+> explícitas eram omitidas/recusadas silenciosamente pelo DeepSeek (comportamento
+> documentado) e trechos ficavam sem tradução. Agora: prompt de tradução fiel, fallback
+> automático para a OpenAI SÓ nas falas recusadas, e desistência controlada (sem loop de
+> chamadas). Ver seção 8 (41ª rodada).
+>
+> Anterior: 2026-08-03 — **PT IA falhando SÓ no DeepSeek (40ª rodada)**: o lote de
 > tradução usava `response_format: json_object`, que no DeepSeek às vezes volta
 > vazio/truncado (limitação documentada) — trechos grandes ficavam sem tradução. O lote
 > agora é texto puro com linhas numeradas (funciona em qualquer fornecedor) + timeout de
@@ -434,6 +440,26 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (41ª rodada) — DeepSeek recusa/omite falas de conteúdo adulto
+92. **Pedido**: "verifique se o deepseek tem proibição de certas falas". Tem — e pesquisa
+    confirmou: o DeepSeek aplica moderação a conteúdo sexual explícito e, em TRADUÇÃO,
+    costuma **omitir/alterar silenciosamente** em vez de avisar. Nas cenas adultas do
+    White Lotus, trechos inteiros ficavam sem PT. Três camadas de defesa em video-subs.js:
+    - **Prompt de fidelidade** (`_VID_PT_SIS`): deixa explícito que é tradução fiel de
+      legenda de obra existente para estudo — "sem censurar, suavizar nem omitir". Reduz
+      a taxa de recusa (mas não zera).
+    - **Fallback automático para a OpenAI** (`_vidPTRecusadas`): fala que voltar sem
+      tradução 2× no fornecedor ativo vai SOZINHA para a OpenAI (`gpt-4o-mini`, direto
+      via `_aiFetch` com `cfg.openaiKey`) — o resto do lote nem percebe. Contador
+      `_ptTent` por fala (transitório, o `limpa` do save já o descarta).
+    - **Desistência controlada** (`_ptDesisti`): sem chave OpenAI, ou se ela também não
+      der, a fala para de ser re-tentada a cada tick (senão viraria loop de chamadas);
+      pedido manual (`sinc`) ignora a desistência e tenta de novo.
+    - Helpers extraídos: `_vidPTparse` (linhas numeradas → mapa) e `_vidPTaplica`.
+    - **Validado ao vivo** (DS + OA stubados): DS omite a fala explícita → 2ª tentativa
+      recusada → fallback OA recebeu SÓ ela e traduziu; depois de resolvido, zero
+      chamadas extras. `CACHE`: `v67` → **`v68`**.
 
 ### Sessão 2026-08-03 (40ª rodada) — PT IA falhando só no DeepSeek (o json_object era o vilão)
 91. **Pista decisiva do Djemeson**: "fiz o teste com a openai no mesmo trecho e funcionou

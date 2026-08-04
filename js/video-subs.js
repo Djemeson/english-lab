@@ -493,13 +493,39 @@ function _vidSaveSubsNow() {
 // OpenAI (DeepSeek no pico) não davam conta de N chamadas paralelas antes de
 // a fala passar — falas ficavam sem tradução. Uma chamada só chega a tempo,
 // custa menos (um prompt) e falha/retenta em bloco.
+// A instrução deixa claro que é tradução FIEL de obra existente: sem isso o
+// DeepSeek omite/recusa falas com conteúdo adulto (comportamento documentado)
+// e "sessões inteiras" ficavam sem tradução perto dessas cenas.
+const _VID_PT_SIS = 'Você traduz legendas de séries/filmes para estudo de inglês. Traduza cada fala numerada para português do Brasil, natural e curto. Palavrões e conteúdo adulto fazem parte do diálogo original: traduza fielmente, sem censurar, suavizar nem omitir. Responda SÓ as traduções, uma por linha, mantendo o número: "1. tradução". Nada além disso.'
+
+// "1. texto" / "1) texto" / "1: texto" → { 1: 'texto', ... }
+function _vidPTparse(resp) {
+  const mapa = {}
+  for (const ln of String(resp).split('\n')) {
+    const m = ln.match(/^\s*(\d+)\s*[.):\-]\s*(.+)$/)
+    if (m) mapa[+m[1]] = m[2].trim()
+  }
+  return mapa
+}
+
+function _vidPTaplica(k, pt) {
+  const c = _vidCues[k]
+  c.pt = pt
+  const row = el('vid-cue-pt-' + k)
+  if (row) row.textContent = pt
+  if (k === _vidCueIdx) _vidUpdateOverlay()
+}
+
 async function _vidEnsurePT(i, n, sinc, forcaIA) {
   if (!aiChatCfg().key) return
   const lote = []
   for (let k = i; k < Math.min(i + n, _vidCues.length); k++) {
     const c = _vidCues[k]
-    if (!c || c.pt || c._ptReq || (!forcaIA && c.pts)) continue
+    // `_ptDesisti`: fala que o fornecedor recusou repetidamente — não re-tentar
+    // a cada tick (viraria loop de chamadas). Pedido manual (sinc) re-tenta.
+    if (!c || c.pt || c._ptReq || (c._ptDesisti && !sinc) || (!forcaIA && c.pts)) continue
     c._ptReq = true
+    c._ptTent = (c._ptTent || 0) + 1
     lote.push(k)
   }
   if (!lote.length) return
@@ -509,31 +535,63 @@ async function _vidEnsurePT(i, n, sinc, forcaIA) {
   // falhava — "sessões grandes sem tradução". Linha numerada funciona em
   // qualquer fornecedor. Timeout curto: travada não pode segurar a janela.
   const p = aiText([
-    { role: 'system', content: 'Traduza cada fala numerada de série/filme para português do Brasil, natural e curto. Responda SÓ as traduções, uma por linha, mantendo o número: "1. tradução". Nada além disso.' },
+    { role: 'system', content: _VID_PT_SIS },
     { role: 'user', content: linhas }
   ], { maxTokens: 90 * lote.length + 120, timeoutMs: 30000, retries: 1 }).then(resp => {
-    const mapa = {}
-    for (const ln of String(resp).split('\n')) {
-      const m = ln.match(/^\s*(\d+)\s*[.):\-]\s*(.+)$/)
-      if (m) mapa[+m[1]] = m[2].trim()
-    }
+    const mapa = _vidPTparse(resp)
+    const semPT = []
     lote.forEach((k, j) => {
       const c = _vidCues[k]
       delete c._ptReq
       const pt = mapa[j + 1] || ''
-      if (!pt) return            // faltou na resposta → tenta de novo no próximo tick
-      c.pt = pt
-      // atualiza a linha do transcript e o overlay se for a fala corrente
-      const row = el('vid-cue-pt-' + k)
-      if (row) row.textContent = pt
-      if (k === _vidCueIdx) _vidUpdateOverlay()
+      if (pt) _vidPTaplica(k, pt)
+      else semPT.push(k)           // recusada/omitida → o tratamento decide
     })
     _vidSaveSubs()
+    if (semPT.length) _vidPTRecusadas(semPT)
   }).catch(e => {
     lote.forEach(k => { const c = _vidCues[k]; if (c) delete c._ptReq })
     console.warn('[video] PT:', e.message)
   })
   if (sinc) await p
+}
+
+// Falas que voltaram SEM tradução no lote (recusa/omissão silenciosa do
+// fornecedor — DeepSeek faz isso com conteúdo adulto). 1ª vez: deixa o fluxo
+// normal re-tentar. Da 2ª em diante: manda SÓ essas falas para a OpenAI
+// (fallback), que traduz legendas fielmente; sem chave OpenAI (ou se ela
+// também não der), marca a fala como desistida para não virar loop.
+async function _vidPTRecusadas(pend) {
+  const teimosas = pend.filter(k => _vidCues[k] && (_vidCues[k]._ptTent || 0) >= 2 && !_vidCues[k]._ptReq)
+  if (!teimosas.length) return
+  if (aiProviderAtual() === 'openai' || !cfg.openaiKey) {
+    teimosas.forEach(k => { _vidCues[k]._ptDesisti = true })
+    console.warn('[video] PT: fornecedor recusou', teimosas.length, 'fala(s); sem fallback disponível')
+    return
+  }
+  teimosas.forEach(k => { _vidCues[k]._ptReq = true })
+  const linhas = teimosas.map((k, j) => `${j + 1}. ${_vidCues[k].t}`).join('\n')
+  try {
+    const res = await _aiFetch('https://api.openai.com/v1/chat/completions', {
+      model: AI_DEFAULT_MODEL,
+      messages: [{ role: 'system', content: _VID_PT_SIS }, { role: 'user', content: linhas }],
+      max_tokens: 90 * teimosas.length + 120
+    }, { timeoutMs: 30000, retries: 1, key: cfg.openaiKey })
+    const data = await res.json()
+    const mapa = _vidPTparse(data.choices?.[0]?.message?.content || '')
+    teimosas.forEach((k, j) => {
+      const c = _vidCues[k]
+      delete c._ptReq
+      const pt = mapa[j + 1] || ''
+      if (pt) _vidPTaplica(k, pt)
+      else c._ptDesisti = true
+    })
+    _vidSaveSubs()
+    console.log('[video] PT: fallback OpenAI cobriu fala(s) recusada(s) pelo fornecedor ativo')
+  } catch (e) {
+    teimosas.forEach(k => { const c = _vidCues[k]; if (c) { delete c._ptReq; c._ptDesisti = true } })
+    console.warn('[video] PT fallback:', e.message)
+  }
 }
 
 // Modo IA em tempo real: garante a tradução SÓ do que está na tela e do que
