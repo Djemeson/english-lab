@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Varredura anti-DeepSeek (49ª rodada)**: "Analisar com
+> Última atualização: 2026-08-04 — **Sentido vs sinônimo (50ª rodada)**: cards vinham com 1
+> significado só, empacotando sentidos distintos como se fossem sinônimos ("desvirilizador,
+> castrador, debilitante"). O prompt ganhou três testes lexicográficos, checagem de
+> coerência, auditoria de sentidos e teto de tokens maior. Ver seção 8 (50ª rodada).
+>
+> Anterior: 2026-08-04 — **Varredura anti-DeepSeek (49ª rodada)**: "Analisar com
 > IA" não fazia nada com o DeepSeek — `aiJSON` dependia de `response_format: json_object`.
 > Agora tem 3 camadas + parser tolerante, e TODAS as guardas de chat do projeto deixaram de
 > exigir chave OpenAI. Ver seção 8 (49ª rodada).
@@ -476,6 +481,37 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (50ª rodada) — Sentido distinto vs sinônimo de tradução (estudo + prompt)
+106. **Observação do Djemeson** (card de *emasculating*): "todos vêm com 1 significado só, mas
+     aqui dava uns dois — tem caso em que varia a tradução e o sentido é o mesmo, e caso em
+     que é outro significado, como 'debilitante'". Estudo e correção:
+     - **Diagnóstico**: o prompt já pedia vários sentidos, mas tinha duas instruções em
+       CONFLITO: (a) "use sinônimos DIFERENTES nas 3 traduções" (busca de riqueza lexical) e
+       (b) meaning_pt "liste 2–3 sinônimos separados por vírgula" — **sem nenhum teste de
+       intercambialidade**. O modelo então varia a tradução até atravessar a fronteira do
+       sentido e empacota o resultado como sinônimo: "desvirilizador, castrador,
+       **debilitante**" (os dois primeiros são o mesmo sentido; o terceiro é outro).
+     - **Três testes lexicográficos** agora explícitos no prompt: (1) SUBSTITUIÇÃO — trocar
+       as traduções na mesma frase; se muda o que se afirma, são sentidos distintos;
+       (2) COMBINAÇÃO — sentido que se aplica a pessoa ≠ sentido que se aplica a lei/objeto,
+       ainda que ambos figurados; (3) ANTÔNIMO — se o oposto natural muda, o sentido mudou.
+       Com o caso *emasculating* resolvido por extenso dentro do prompt como exemplo.
+     - **CHECAGEM DE COERÊNCIA**: o negrito em PT de cada exemplo tem de ser intercambiável
+       com o meaning_pt daquele sentido; se não for, **isso é prova de que falta um sentido**
+       → criar o objeto. E a variação de sinônimos ganhou limite explícito ("variar dentro
+       do sentido; sair dele não é variedade, é sentido faltando").
+     - **`sense_audit`**: campo novo colocado ANTES de `meanings` no template (a ordem
+       importa em modelo autoregressivo) — obriga a listar os sentidos candidatos com
+       SPLIT/MERGED e o teste que decidiu. Não aparece na UI; sai no console para depurar
+       quando um card voltar com menos sentidos do que deveria.
+     - **`maxTokens` 2800 → 5000**: 2–3 sentidos × 3 exemplos (en+pt) truncavam a resposta —
+       e resposta truncada volta como um sentido só, reforçando o sintoma.
+     - Validado ao vivo: prompt carrega os 3 testes + exemplo + coerência + auditoria;
+       resposta com 2 sentidos aceita inteira (2 objetos, 3 exemplos cada, o do contexto
+       primeiro), `sense_audit` não vaza para o card. **Cards antigos não se corrigem
+       sozinhos**: "Reanalisar tudo" só conserta exemplos do sentido existente — para ganhar
+       sentidos novos é o botão "Analisar com IA" da palavra. `CACHE`: `v76` → **`v77`**.
 
 ### Sessão 2026-08-04 (49ª rodada) — Varredura: o projeto INTEIRO rodando em DeepSeek
 105. **Bug**: "Analisar com IA não aparece nada quando o DeepSeek está ativo" (print da

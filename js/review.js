@@ -151,17 +151,32 @@ Rules for bold — CRITICAL, follow exactly on BOTH sides of every example:
 
 For Portuguese translations of examples:
 - Translate naturally — don't translate word-for-word
-- Use DIFFERENT Portuguese words/synonyms across the 3 examples when the target word has synonyms (e.g. for "thunderstruck": use "atordoado", "estarrecido", "pasmado" — not "atordoado" × 3)
+- Vary the Portuguese synonyms across the 3 examples (e.g. for "thunderstruck": "atordoado", "estarrecido", "pasmado" — not "atordoado" × 3)
+- HARD LIMIT on that variation: every synonym you use must still belong to THAT meaning's sense (see the substitution test below). Reaching for a word that expresses a DIFFERENT idea is not variety — it is a missing sense.
 - Each Portuguese translation should read like natural Brazilian Portuguese, not like a translation
+
+SENSE SPLITTING vs TRANSLATION SYNONYMS — the single most important decision:
+A learner needs ONE meaning object per SENSE, not per Portuguese word. Two Portuguese words for the SAME idea belong to the SAME object; two different ideas MUST become separate objects. Run these three tests before deciding:
+- TEST 1 (SUBSTITUTION): put the candidate translations into the same sentence. If they can be swapped without changing what is being said, they are synonyms of ONE sense → list them together in "meaning_pt". If swapping changes the claim, narrows it, or sounds wrong, they are DIFFERENT senses → split into separate objects.
+- TEST 2 (WHAT IT COMBINES WITH): different senses take different subjects/objects/domains. A sense that applies to people is not the same as one that applies to laws, objects or abstractions — even when both are figurative.
+- TEST 3 (OPPOSITE): if the natural antonym changes, the sense changed.
+
+WORKED EXAMPLE — "emasculating":
+- "desvirilizador" and "castrador" survive Test 1 (interchangeable when talking about a man's pride) → SAME object.
+- "que esvazia / enfraquece" (an emasculated bill, emasculating the regulations) fails Test 2 — it applies to laws and rules, not to a man's masculinity → SEPARATE object.
+- the literal veterinary sense "castrar (remover os testículos)" is another domain → SEPARATE object.
+So "emasculating" must return 2–3 meaning objects. Returning ONE object whose meaning_pt reads "desvirilizador, castrador, debilitante" is WRONG: "debilitante" is a different sense smuggled in as if it were a synonym.
 
 Rules for meanings — CRITICAL:
 - The context sentence is ONLY used to identify the word correctly and to mark which sense appeared there. It does NOT limit which meanings you return.
 - ALWAYS return ALL distinct senses the word has in common ${L.nameEn} usage — not just the one from the context.
 - Think of yourself as a dictionary: if the word has 3 senses, return 3 meaning objects. If it has 2, return 2. Never collapse them into one.
-- NEVER merge two different senses into one meaning using semicolons (e.g. "decolar; ter sucesso" is WRONG — those must be two separate objects)
+- NEVER merge two different senses into one meaning — not with semicolons ("decolar; ter sucesso" is WRONG) and not with commas pretending they are synonyms.
 - NEVER omit a common sense just because it doesn't appear in the context sentence
 - Each meaning MUST have its own 3 examples that illustrate that specific sense
 - CRITICAL: every example placed under a meaning MUST unambiguously illustrate THAT meaning's sense — never another sense of the word. If "${target}" has multiple senses, an example for sense A must NOT make sense if read with sense B. Double-check each example matches its meaning before returning.
+- COHERENCE CHECK (do this for every meaning before returning): the bolded Portuguese in each of its 3 examples must be interchangeable with the translations listed in that meaning's "meaning_pt". If one example needed a Portuguese word that is NOT interchangeable with them, that is proof a sense is missing — create the extra meaning object for it.
+- BEFORE RETURNING A SINGLE MEANING: run tests 1–3 once more. One sense is a legitimate answer for concrete words ("spoon"), but most C1/C2 adjectives, phrasal verbs and idioms carry 2 or more.
 - Set "context_match": true ONLY for the meaning that matches the context sentence; all others get false
 - Put the context-matching meaning FIRST in the array (so the learner sees their original context first)
 
@@ -187,9 +202,10 @@ Return ONLY this JSON (no markdown, no explanation):
   "type_label": "precise local category in Brazilian Portuguese, or empty string",
   "ipa": ${promptIpaRule(wordLang(w))},
   "level": "A2|B1|B2|C1|C2",
+  "sense_audit": ["FILL THIS FIRST, before writing meanings. One short line per candidate sense you considered, each ending with SPLIT or MERGED and the test that decided it. Max 12 words per line. Example for 'emasculating': ['pessoa: desvirilizador/castrador — MERGED, test 1 ok', 'lei/regra: esvazia, enfraquece — SPLIT, test 2', 'veterinária: castrar literal — SPLIT, domain']"],
   "meanings": [
     {
-      "meaning_pt": "Portuguese translation preserving word class (noun→noun, verb→infinitive, adj→adjective). List 2–3 natural synonyms/variants separated by commas when they exist (e.g. 'séquito, comitiva, cortejo' for 'retinue'; 'enganar, iludir, ludibriar' for 'deceive'). Max 8 words total. ONE sense only — no semicolons.",
+      "meaning_pt": "Portuguese translation preserving word class (noun→noun, verb→infinitive, adj→adjective). List 2–3 natural synonyms/variants separated by commas ONLY when they pass the SUBSTITUTION test with each other (e.g. 'séquito, comitiva, cortejo' for 'retinue'; 'enganar, iludir, ludibriar' for 'deceive'). If a candidate word does not survive that test, it belongs to another meaning object — do not list it here. Max 8 words total. ONE sense only — no semicolons.",
       "definition_pt": "Full definition in Portuguese for THIS specific sense (1-2 sentences)",
       "origin_pt": "Brazilian-Portuguese note (1-2 sentences) explaining the ORIGIN / why this expression came to mean this — the image or history behind it. Fill ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. 'sitting duck' = a duck floating still is an easy target for a hunter; 'on the chopping block' = the block where animals/heads were cut; 'flagship' = the ship that carried the fleet commander's flag; 'throw under the bus' = sacrifice someone for your own safety). Leave it as an EMPTY STRING \"\" for ordinary words with no notable story. NEVER invent folk etymology — if you are not reasonably sure, leave it empty.",
       "variety": "${promptVarietyEnum(wordLang(w))}",
@@ -208,7 +224,14 @@ Return ONLY this JSON (no markdown, no explanation):
 }`
 
   try {
-    const result = await aiJSON(PROMPT, { maxTokens: 2800 })
+    // Teto maior: com 2–3 sentidos × 3 exemplos, 2800 truncava a resposta
+    // (e resposta truncada volta como 1 sentido só — o bug que o Djemeson viu)
+    const result = await aiJSON(PROMPT, { maxTokens: 5000 })
+    // A auditoria de sentidos não vai para a tela — serve para conferir a
+    // decisão da IA quando um card volta com menos sentidos do que devia.
+    if (Array.isArray(result.sense_audit) && result.sense_audit.length) {
+      console.log(`[ia] sentidos de "${target}":`, result.sense_audit)
+    }
     applyAiResult(w, result)
     w.ai_provider = aiChatCfg().prov
     saveWords()
