@@ -529,15 +529,26 @@ async function _vidEnsurePT(i, n, sinc, forcaIA) {
     lote.push(k)
   }
   if (!lote.length) return
+  // BLOCOS de até 4 falas, em PARALELO: a resposta é gerada token a token,
+  // então o tempo cresce com o tamanho do lote — um lote grande demorava
+  // tanto que as primeiras falas passavam sem tradução ("tenho que voltar").
+  // Bloco pequeno fica pronto em poucos segundos; o paralelo cobre o resto.
+  const blocos = []
+  for (let j = 0; j < lote.length; j += 4) blocos.push(lote.slice(j, j + 4))
+  const ps = blocos.map(b => _vidPTlote(b))
+  if (sinc) await Promise.all(ps)
+}
+
+// Um bloco de tradução: chamada única em texto puro numerado (NÃO json_object:
+// o DeepSeek nesse modo às vezes devolve vazio/truncado — limitação
+// documentada). Timeout curto: travada não pode segurar a janela.
+async function _vidPTlote(lote) {
   const linhas = lote.map((k, j) => `${j + 1}. ${_vidCues[k].t}`).join('\n')
-  // Texto puro numerado, NÃO json_object: o DeepSeek com response_format JSON
-  // às vezes devolve vazio/truncado (limitação documentada) e o lote inteiro
-  // falhava — "sessões grandes sem tradução". Linha numerada funciona em
-  // qualquer fornecedor. Timeout curto: travada não pode segurar a janela.
-  const p = aiText([
-    { role: 'system', content: _VID_PT_SIS },
-    { role: 'user', content: linhas }
-  ], { maxTokens: 90 * lote.length + 120, timeoutMs: 30000, retries: 1 }).then(resp => {
+  try {
+    const resp = await aiText([
+      { role: 'system', content: _VID_PT_SIS },
+      { role: 'user', content: linhas }
+    ], { maxTokens: 90 * lote.length + 120, timeoutMs: 30000, retries: 1 })
     const mapa = _vidPTparse(resp)
     const semPT = []
     lote.forEach((k, j) => {
@@ -549,11 +560,10 @@ async function _vidEnsurePT(i, n, sinc, forcaIA) {
     })
     _vidSaveSubs()
     if (semPT.length) _vidPTRecusadas(semPT)
-  }).catch(e => {
+  } catch (e) {
     lote.forEach(k => { const c = _vidCues[k]; if (c) delete c._ptReq })
     console.warn('[video] PT:', e.message)
-  })
-  if (sinc) await p
+  }
 }
 
 // Falas que voltaram SEM tradução no lote (recusa/omissão silenciosa do
@@ -594,17 +604,63 @@ async function _vidPTRecusadas(pend) {
   }
 }
 
+// ================================================================
+// LEGENDA PT-BR INTEIRA POR IA — traduz todas as falas de uma vez
+// (blocos de 20, até 3 em voo), reusando o mesmo lote/parse/fallback
+// do tempo real. Depois disso o modo "PT IA" mostra tudo na hora.
+// ================================================================
+let _vidPTfullRodando = false
+async function videoTranslateFull() {
+  if (_vidPTfullRodando) return
+  if (!_vidCues.length) { toast('Sem legenda para traduzir', 'warning'); return }
+  if (!aiChatCfg().key) { toast('Configure uma chave de IA em Configurações → IA', 'warning'); return }
+  const pend = _vidCues.map((c, k) => (!c.pt ? k : -1)).filter(k => k >= 0)
+  if (!pend.length) { toast('A legenda já está toda traduzida', 'info'); return }
+  _vidPTfullRodando = true
+  _vidSyncRender(`Traduzindo a legenda inteira… 0/${pend.length} falas`)
+  try {
+    const blocos = []
+    for (let j = 0; j < pend.length; j += 20) blocos.push(pend.slice(j, j + 20))
+    for (let g = 0; g < blocos.length; g += 3) {
+      // re-filtra na hora: o tempo real pode ter traduzido algumas enquanto isso
+      const grupo = blocos.slice(g, g + 3)
+        .map(b => b.filter(k => { const c = _vidCues[k]; return c && !c.pt && !c._ptReq }))
+        .filter(b => b.length)
+      grupo.forEach(b => b.forEach(k => {
+        _vidCues[k]._ptReq = true
+        _vidCues[k]._ptTent = (_vidCues[k]._ptTent || 0) + 1
+      }))
+      await Promise.all(grupo.map(b => _vidPTlote(b)))
+      const feitas = pend.filter(k => _vidCues[k].pt).length
+      _vidSyncRender(`Traduzindo a legenda inteira… ${feitas}/${pend.length} falas`)
+    }
+    const faltam = pend.filter(k => !_vidCues[k].pt).length
+    _vidSaveSubsNow()
+    // liga a exibição da tradução IA se estava desligada — foi para isso que se traduziu
+    if (_vidPTmode === 'off') { _vidPTmode = 'ia'; _vidShowPT = true; _vidPTButtons() }
+    renderVidTranscript()
+    _vidUpdateOverlay()
+    toast(faltam ? `Tradução concluída — ${faltam} fala(s) ficaram pendentes` : 'Legenda inteira traduzida para PT-BR', 'success')
+  } finally {
+    _vidPTfullRodando = false
+    _vidSyncRender(pend.some(k => !_vidCues[k].pt)
+      ? 'Tradução concluída com pendências — falas recusadas tentam de novo durante a exibição.'
+      : 'Legenda inteira traduzida. O modo "PT IA" agora mostra tudo na hora.')
+  }
+}
+
 // Modo IA em tempo real: garante a tradução SÓ do que está na tela e do que
-// começa nos próximos 12s — "vai carregando aos poucos", sem gastar tokens
-// com o resto do episódio que talvez nem seja assistido. Os 12s (era 5.5s)
-// dão folga para a latência de fornecedores mais lentos chegar antes da fala.
+// começa nos próximos 30s — "vai carregando aos poucos", sem gastar tokens
+// com o resto do episódio que talvez nem seja assistido. Os 30s (era 12) são
+// a folga para a latência real de fornecedores lentos: a tradução do bloco
+// fica pronta ANTES de a fala chegar, não depois.
 function _vidEnsurePTAhead(t) {
   if (!_vidCues.length) return
   let ini = -1, fim = -1
   for (let k = 0; k < _vidCues.length; k++) {
     const c = _vidCues[k]
     if (c.e < t - 0.5) continue
-    if (c.s > t + 12) break
+    if (c.s > t + 30) break
     if (ini < 0) ini = k
     fim = k
   }

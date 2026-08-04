@@ -700,6 +700,9 @@ async function videoOvExplain() {
 `Na cena de "${_vidCur ? _vidCur.title : ''}", a fala é: "${contexto}". O aluno selecionou: "${txt}".
 Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado, explique a imagem.` }
     ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
+    // resposta vazia (DeepSeek faz isso às vezes) NÃO pode virar cache — senão
+    // a seleção fica muda para sempre; trata como erro e oferece re-tentar
+    if (!resp || !resp.trim()) throw new Error('a IA devolveu uma resposta vazia')
     const html = esc(resp).replace(/\n+/g, '<br>')
     if (typeof _revExplainCache !== 'undefined') _revExplainCache.set(chave, html)
     corpo.innerHTML = html

@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **DeepSeek recusa conteúdo adulto (41ª rodada)**: falas
+> Última atualização: 2026-08-03 — **PT IA a tempo + legenda inteira (42ª/43ª rodadas)**:
+> tradução em tempo real virou blocos de 4 falas em PARALELO com janela de 30s (lote
+> grande demorava e a fala passava sem tradução); Explicar com resposta vazia não é mais
+> cacheado mudo; e o painel de sincronia ganhou "Traduzir legenda inteira" (IA traduz
+> todas as falas de uma vez, blocos de 20). Ver seção 8.
+>
+> Anterior: 2026-08-03 — **DeepSeek recusa conteúdo adulto (41ª rodada)**: falas
 > explícitas eram omitidas/recusadas silenciosamente pelo DeepSeek (comportamento
 > documentado) e trechos ficavam sem tradução. Agora: prompt de tradução fiel, fallback
 > automático para a OpenAI SÓ nas falas recusadas, e desistência controlada (sem loop de
@@ -440,6 +446,33 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (43ª rodada) — "Traduzir legenda inteira" (legenda PT-BR criada por IA)
+94. **Pedido**: "adicione uma opção de criar a legenda em portugues com IA baseado na
+    legenda em ingles". Botão **"Traduzir legenda inteira"** no painel de sincronia:
+    - `videoTranslateFull()` (video-subs.js): traduz TODAS as falas sem `pt` em blocos de
+      20 (até 3 em voo), reusando `_vidPTlote`/`_vidPTparse`/fallback de recusas da 41ª.
+      Progresso no painel ("N/M falas"); re-filtra a cada grupo (o tempo real pode ter
+      traduzido algumas); `_vidSaveSubsNow()` no fim; liga o modo "PT IA" sozinho se
+      estava desligado. Custo: centavos no DeepSeek (~90 tokens/fala).
+    - Validado ao vivo: 50 falas → tempo real cobriu ~10 (janela 30s), o botão traduziu o
+      resto em blocos 20/19, modo ligou sozinho, status no painel, todas com `pt`.
+
+### Sessão 2026-08-03 (42ª rodada) — Tradução chegando DEPOIS da fala + Explicar mudo por cache vazio
+93. **Duas reclamações**: "demora muito pra carregar algumas legendas em tempo real — se
+    eu voltar a frase a informação já está lá" e "algumas palavras ainda não vêm a
+    explicação".
+    - **Causa da demora**: a resposta da IA é gerada token a token — o tempo cresce com o
+      tamanho do lote. Um lote de 8–10 falas levava 10–15s; as primeiras falas passavam
+      antes de o lote ficar pronto. `_vidEnsurePT` agora fatia em **blocos de até 4 falas
+      em PARALELO** (`_vidPTlote` extraído) e a janela do `_vidEnsurePTAhead` foi de 12s
+      para **30s** — o bloco fica pronto ANTES de a fala chegar.
+    - **Causa do Explicar mudo**: resposta VAZIA da IA (o DeepSeek faz isso às vezes) era
+      renderizada como nada e **cacheada como ''** — a seleção ficava muda para sempre.
+      Agora vazio vira erro visível ("resposta vazia… clique para tentar de novo") e NÃO
+      entra no cache.
+    - Validado ao vivo: 50 falas, janela pegou ~10 em blocos ≤4 paralelos; resposta vazia
+      mostrou o erro no popup e o cache ficou limpo. `CACHE`: `v68` → **`v69`**.
 
 ### Sessão 2026-08-03 (41ª rodada) — DeepSeek recusa/omite falas de conteúdo adulto
 92. **Pedido**: "verifique se o deepseek tem proibição de certas falas". Tem — e pesquisa

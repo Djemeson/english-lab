@@ -40,6 +40,12 @@ function _vidSyncRender(msg) {
           ${ic('sparkles','ic-sm')}Sincronizar com IA</button>
       </div>
       <div class="vid-sync-row">
+        <span class="vid-sync-hint">Tradução:</span>
+        <button class="btn btn-secondary btn-sm" ${_vidPTfullRodando ? 'disabled' : ''} onclick="videoTranslateFull()"
+          data-tip="A IA traduz a legenda INTEIRA para PT-BR de uma vez (centavos no DeepSeek/Gemini). Depois disso a tradução aparece na hora, sem esperar o tempo real">
+          ${ic('sparkles','ic-sm')}Traduzir legenda inteira</button>
+      </div>
+      <div class="vid-sync-row">
         <span class="vid-sync-hint">Leve a sincronização com você:</span>
         <button class="btn btn-ghost btn-sm" onclick="videoSubExport()" data-tip="Baixa o .srt COM a sincronização aplicada, com o mesmo nome do vídeo — na mesma pasta, qualquer player carrega sozinho">${ic('download','ic-sm')}Baixar .srt</button>
         ${_vidCuesPT.length ? `<button class="btn btn-ghost btn-sm" onclick="videoSubExport('pt')" data-tip="Baixa a trilha PT-BR alinhada">${ic('download','ic-sm')}.srt PT-BR</button>` : ''}
