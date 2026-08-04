@@ -641,6 +641,14 @@ function videoShadowPlay() { const f = _vidFocus; if (f && f.sh && f.sh.url) new
 // ~R$ 0,03 por sincronização. É "a IA escuta e alinha".
 // ================================================================
 function _vidOvBind() {
+  const pop = el('vid-ov-pop')
+  if (pop && !pop._bound) {
+    pop._bound = true
+    pop.addEventListener('mousedown', ev => ev.preventDefault())   // não colapsa a seleção
+    document.addEventListener('mousedown', ev => {
+      if (!pop.classList.contains('hidden') && !pop.contains(ev.target) && ev.target !== el('vid-ov-en')) pop.classList.add('hidden')
+    })
+  }
   const en = el('vid-ov-en'); if (!en || en._bound) return
   en._bound = true
   en.addEventListener('mousedown', () => { const p = el('vid-player'); if (p && !p.paused) p.pause() })
@@ -661,9 +669,41 @@ function _vidOvSelCheck() {
   window._vidOvSelText = txt
   pop.innerHTML = `
     <b>"${esc(txt)}"</b>
+    <button class="btn btn-secondary btn-sm" onclick="videoOvExplain()" data-tip="Mini-explicação da IA aqui mesmo — sentido na fala, gíria, referência cultural">${ic('sparkles','ic-sm')}Explicar</button>
     <button class="btn btn-primary btn-sm" onclick="videoOvStudy(true)" data-tip="Cria o card já com o áudio real desta cena">${ic('zap','ic-sm')}Estudar com áudio</button>
     <button class="btn btn-ghost btn-sm" onclick="videoOvStudy(false)" data-tip="Manda para a fila do Revisar (a IA analisa lá)">${ic('eye','ic-sm')}Revisar</button>`
   pop.classList.remove('hidden')
+}
+
+// Explicar ALI MESMO, sobre o vídeo — mesma mecânica do Revisar (34ª rodada):
+// clique no popup não colapsa a seleção nem o fecha; cache compartilhado.
+async function videoOvExplain() {
+  const txt = window._vidOvSelText
+  const pop = el('vid-ov-pop')
+  if (!txt || !pop) return
+  const p = el('vid-player')
+  const i = _vidCueIdx >= 0 ? _vidCueIdx : _vidCueAt(p ? p.currentTime : 0)
+  const contexto = (_vidCues[i] && _vidCues[i].t) || ''
+  let corpo = pop.querySelector('.sel-pop-exp')
+  if (!corpo) { corpo = document.createElement('div'); corpo.className = 'sel-pop-exp'; pop.appendChild(corpo) }
+  const chave = 'vid|' + contexto + '|' + txt
+  if (typeof _revExplainCache !== 'undefined' && _revExplainCache.has(chave)) { corpo.innerHTML = _revExplainCache.get(chave); return }
+  if (!aiChatCfg().key) { toast('Configure uma chave de IA em Configurações', 'warning'); return }
+  corpo.innerHTML = '<span class="gen-spinner"></span> a IA está explicando...'
+  try {
+    const resp = await aiText([
+      { role: 'system', content: 'Tutor de inglês de um brasileiro. Responda em PT-BR, direto ao ponto, 2 a 4 frases, sem introduções.' },
+      { role: 'user', content:
+`Na cena de "${_vidCur ? _vidCur.title : ''}", a fala é: "${contexto}". O aluno selecionou: "${txt}".
+Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado, explique a imagem.` }
+    ], { maxTokens: 220 })
+    const html = esc(resp).replace(/\n+/g, '<br>')
+    if (typeof _revExplainCache !== 'undefined') _revExplainCache.set(chave, html)
+    corpo.innerHTML = html
+  } catch (e) {
+    corpo.innerHTML = ''
+    toast('Erro ao explicar: ' + e.message, 'error')
+  }
 }
 
 // Fala correspondente ao instante t (tolerância de 300ms)

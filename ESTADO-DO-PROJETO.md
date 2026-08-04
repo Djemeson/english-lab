@@ -3,12 +3,16 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **DeepSeek V4 (36ª rodada)**: IDs novos confirmados na doc
+> Última atualização: 2026-08-03 — **Explicar na legenda do vídeo (37ª rodada)**: o popup de
+> seleção da legenda sobre o vídeo ganhou o botão "Explicar" (mini-glosa da IA ali mesmo,
+> com a fala como contexto), com as mesmas proteções anti-colapso da 34ª rodada e cache
+> compartilhado com o Revisar. Ver seção 8 (37ª rodada).
+>
+> Última atualização anterior: 2026-08-03 — **DeepSeek V4 (36ª rodada)**: IDs novos confirmados na doc
 > oficial (v4-flash/v4-pro); os aliases V3 foram descontinuados pelo próprio DeepSeek em
 > 24/07/2026 e saíram da lista — migração automática para quem os tinha salvos.
-> Ver seção 8 (36ª rodada).
 >
-> Última atualização anterior: 2026-08-03 — **Multi-fornecedor de IA + botões de tradução no vídeo (35ª
+> Anterior a essa: 2026-08-03 — **Multi-fornecedor de IA + botões de tradução no vídeo (35ª
 > rodada)**: Gemini, DeepSeek e Groq além da OpenAI (modelos curados por faixa de custo,
 > chaves organizadas com teste individual, sync); TTS/imagens/Whisper seguem na OpenAI. No
 > vídeo, a tradução virou dois botões com ícone (CC = legenda oficial, faíscas = IA literal),
@@ -413,6 +417,26 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-03 (37ª rodada) — Explicar também na legenda do vídeo
+88. **Pedido**: "quero que exista o botão de explicar tambem nas legendas do video". O popup
+    de seleção da legenda sobre o vídeo (`_vidOvSelCheck`, video-study.js) — que tinha só
+    "Estudar com áudio" e "Revisar" — ganhou o **Explicar**, espelhando o do Revisar (33ª):
+    - `videoOvExplain()`: mini-glosa da IA (2–4 frases PT-BR — sentido NAQUELA fala, gíria/
+      marca/referência cultural, sentido figurado) renderizada dentro do próprio popup, num
+      bloco `.sel-pop-exp` (classe reutilizada). O contexto enviado é a fala inteira
+      (`_vidCues[_vidCueIdx]`) + título do vídeo. Usa `aiText` → fornecedor ativo (35ª).
+    - **Cache compartilhado** com o Revisar (`_revExplainCache`, chave `vid|fala|seleção`) —
+      review.js é não-lazy, então o Map já existe quando o módulo de vídeo carrega (sem
+      violar a armadilha nº 1: o lado lazy é quem referencia o não-lazy, nunca o contrário).
+    - **Proteções da 34ª aplicadas de saída**: `preventDefault` no mousedown do popup (a
+      seleção não colapsa e o clique não o fecha) + fechar só em clique FORA (novo handler
+      em `_vidOvBind`). CSS: `.vid-ov-pop` virou `flex-wrap:wrap` com largura mínima — a
+      explicação quebra para baixo dos botões e rola a partir de 180px.
+    - **Validado com a sequência REAL de eventos** (lição da 34ª): seleção → popup com 3
+      botões → mousedown no Explicar com `defaultPrevented` conferido → explicação aparece
+      e o popup PERMANECE aberto → 2º clique instantâneo pelo cache (1 chamada só) →
+      clique fora fecha → "Estudar com áudio"/"Revisar" intactos. `CACHE`: `v63` → **`v64`**.
 
 ### Sessão 2026-08-03 (36ª rodada) — DeepSeek V4 (e a remoção da V3, decidida por fato)
 87. **Pedido**: "crie a versão v4 da deepseek, analise se remove a v3". A análise foi feita na

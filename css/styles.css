@@ -3699,7 +3699,8 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .vid-cue-pt.show{filter:none}
 .vid-ov-pop{
   position:absolute;left:50%;transform:translateX(-50%);bottom:148px;z-index:5;
-  display:flex;align-items:center;gap:8px;padding:8px 12px;max-width:92%;
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;
+  max-width:min(560px,92%);min-width:min(420px,80%);
   background:var(--surface);border:1px solid var(--border-strong);
   border-radius:var(--radius-sm);box-shadow:var(--shadow);font-size:var(--fs-sm);
 }
