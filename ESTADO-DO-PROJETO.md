@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Lista do Revisar "Marie Kondo" (53ª rodada)**: linhas
+> Última atualização: 2026-08-04 — **Faxina do Raio-X (54ª rodada)**: a área de triagem não
+> tinha passado pela lente KonMari — saíram o aviso redundante, o botão que repetia ação já
+> feita, o rodapé duplicado e o botão desabilitado; chips ficaram leves e a análise recuou a
+> ação secundária quando há triagem. Ver seção 8 (54ª rodada).
+>
+> Anterior: 2026-08-04 — **Lista do Revisar "Marie Kondo" (53ª rodada)**: linhas
 > de 32px (eram ~90), chips "Pendente IA" repetidos viraram ponto âmbar / contador de
 > significados, checkbox só no hover, cabeçalhos de grupo discretos, coluna 320px.
 > Ver seção 8 (53ª rodada).
@@ -497,6 +502,30 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (54ª rodada) — A faxina KonMari alcança o Raio-X da frase
+110. **Pergunta do Djemeson**: "ficou muito bom, mas essa parte você analisou sob a ótica da
+     Marie Kondo?" — não tinha: o Raio-X (52ª) nasceu antes do pedido de faxina (53ª).
+     Auditado e arrumado com o mesmo critério:
+     - **Descartado**: "Esta palavra ainda não foi analisada pela IA" (o layout já diz);
+       o botão "O que tem aqui? Separar em partes" quando a triagem JÁ rodou (repetia uma
+       ação feita — só re-renderizava o cache); o parágrafo-rodapé que explicava de novo o
+       que a instrução do topo já dizia; e o botão "Estudar selecionadas" **desabilitado**
+       ocupando espaço à espera de seleção.
+     - **Hierarquia por estado** (cada momento mostra só o que serve): COM triagem, os chips
+       são protagonistas e "Analisar a frase inteira" recua para ghost/sm num rodapé
+       separado por linha fina; SEM triagem (palavra simples), o botão primário grande
+       continua centralizado. `renderWordCard` é re-chamado quando a triagem chega, para o
+       layout assumir o novo estado inteiro.
+     - **Chips leves**: fundo cinza → transparente com borda de 1px (acento só quando
+       escolhido); glosa menor; feitos ficam tracejados e esmaecidos.
+     - **Um alinhamento só**: bloco de 520px alinhado à esquerda, ações na mesma coluna —
+       antes misturava chips à esquerda com botões centralizados.
+     - **Instrução enxuta**: "Marque o que você não conhece" (era duas frases).
+     - Validado ao vivo nos dois estados: frase (sem aviso/rodapé/botão redundante, chips
+       transparentes, rodapé aparecendo só ao marcar — "Estudar 1" — e sumindo ao
+       desmarcar) e palavra simples (botão primário grande, centralizado, sem chips).
+       `CACHE`: `v80` → **`v81`**.
 
 ### Sessão 2026-08-04 (53ª rodada) — Lista do Revisar no espírito Marie Kondo
 109. **Pedido**: "essa aba parece estranha — cards pequenos, fontes grandes; quero algo

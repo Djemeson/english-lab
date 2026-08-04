@@ -642,23 +642,24 @@ function renderWordCard(wordId) {
     // que não entendi").
     const alvoBrk = (w.word || w.context || '').trim()
     const ehFrase = alvoBrk.split(/\s+/).length >= 3
+    // KonMari: cada estado mostra SÓ o que serve àquele momento.
+    // Com a triagem pronta, ela é a protagonista e "analisar tudo" recua a
+    // ação secundária; sem triagem, o botão de análise é o destaque.
+    const temTriagem = _revBreakCache.has(w.id)
     bodyHtml = `
     <div class="wc-pending-ai">
-      <p>Esta palavra ainda não foi analisada pela IA.</p>
-      <button class="btn btn-primary big-btn" onclick="analyzeWord('${w.id}')">
-        ${ic('sparkles')}Analisar com IA agora
-      </button>
-      ${ehFrase ? `
-      <button class="btn btn-secondary" style="margin-top:10px" onclick="revBreakdown('${w.id}')"
-        data-tip="A IA separa a frase em palavras, phrasal verbs, expressões e estruturas — você marca o que NÃO conhece e manda só isso para estudo">
-        ${ic('layers')}O que tem aqui? Separar em partes
-      </button>` : ''}
       <div id="rev-break-area"></div>
-      <p style="margin-top:12px;font-size:var(--fs-sm);color:var(--text3)">
-        ${ehFrase
-          ? 'Não sabe o que exatamente não entendeu? A triagem mostra cada pedaço da frase com uma mini-tradução — marque o que for novo e ele já sai analisado.'
-          : 'A IA vai identificar todos os significados, exemplos, nível e registro automaticamente.'}
-      </p>
+      <div class="wc-pend-acts">
+        <button class="btn ${temTriagem ? 'btn-ghost btn-sm' : 'btn-primary big-btn'}" onclick="analyzeWord('${w.id}')"
+          data-tip="Analisa o item inteiro: significados, exemplos, nível e registro">
+          ${ic('sparkles', temTriagem ? 'ic-sm' : '')}Analisar ${ehFrase ? 'a frase inteira' : 'com IA'}
+        </button>
+        ${ehFrase && !temTriagem ? `
+        <button class="btn btn-secondary" onclick="revBreakdown('${w.id}')"
+          data-tip="A IA separa a frase em palavras, phrasal verbs, expressões e estruturas — você marca o que NÃO conhece">
+          ${ic('layers')}Separar em partes
+        </button>` : ''}
+      </div>
     </div>`
     // Triagem automática: se já rodou em segundo plano, mostra os chips ao
     // abrir; se está rodando, mostra o aviso; se nem começou, dispara agora.
@@ -666,8 +667,8 @@ function renderWordCard(wordId) {
       if (activeWordId !== w.id) return
       const area = el('rev-break-area'); if (!area) return
       if (_revBreakCache.has(w.id)) _revBreakRender(w.id)
-      else if (_revBreakBusy.has(w.id)) area.innerHTML = `<div style="margin-top:14px"><span class="gen-spinner"></span> a IA está separando a frase...</div>`
-      else _revBreakPrefetch(w).then(() => { if (activeWordId === w.id && _revBreakCache.has(w.id)) _revBreakRender(w.id) })
+      else if (_revBreakBusy.has(w.id)) area.innerHTML = `<div class="rvb-loading"><span class="gen-spinner"></span> separando a frase...</div>`
+      else _revBreakPrefetch(w)   // ele mesmo re-renderiza o card ao terminar
     }, 0)
   } else {
     bodyHtml = `
@@ -856,7 +857,9 @@ async function _revBreakPrefetch(w) {
   try {
     const items = await _revBreakFetch(w)
     _revBreakCache.set(w.id, { items, sel: new Set(), done: new Set() })
-    if (activeWordId === w.id) _revBreakRender(w.id)   // card aberto: mostra na hora
+    // card aberto: re-renderiza inteiro para o layout assumir o estado
+    // "com triagem" (a triagem vira protagonista, o resto recua)
+    if (activeWordId === w.id) renderWordCard(w.id)
   } catch (e) { console.warn('[raio-x] triagem em segundo plano:', e.message) }
   finally { _revBreakBusy.delete(w.id) }
 }
@@ -870,7 +873,7 @@ async function revBreakdown(wordId) {
   try {
     const items = await _revBreakFetch(w)
     _revBreakCache.set(wordId, { items, sel: new Set(), done: new Set() })
-    _revBreakRender(wordId)
+    renderWordCard(wordId)
   } catch (e) {
     area.innerHTML = `<div style="margin-top:14px;color:var(--error);font-size:var(--fs-sm)">Não deu: ${esc(e.message)} — clique de novo para tentar.</div>`
   }
@@ -910,9 +913,18 @@ function _revBreakRender(wordId) {
   const grupos = _RVB_CATS
     .map(([tipo, rotulo]) => ({ rotulo, idxs: st.items.map((it, i) => it.type === tipo ? i : -1).filter(i => i >= 0) }))
     .filter(g => g.idxs.length)
+  // Rodapé só existe quando há o que fazer: nada de botão desabilitado
+  // ocupando espaço à espera de uma seleção.
+  const rodape = (st.sel.size || st.done.size) ? `
+      <div class="rvb-foot">
+        ${st.sel.size ? `<button class="btn btn-primary btn-sm" onclick="revBreakStudy('${wordId}')">
+          ${ic('arrowRight','ic-sm')}Estudar ${st.sel.size}</button>` : ''}
+        ${st.done.size ? `<button class="btn btn-ghost btn-sm" onclick="deleteWord('${wordId}')"
+          data-tip="As partes escolhidas já viraram itens próprios — a frase original pode sair da fila">${ic('trash','ic-sm')}Dispensar a frase</button>` : ''}
+      </div>` : ''
   area.innerHTML = `
     <div class="rvb">
-      <p class="rvb-hint">Toque no que você <b>não conhece</b> — o resto você já sabe:</p>
+      <p class="rvb-hint">Marque o que você não conhece</p>
       ${grupos.map(g => `
         <div class="rvb-cat">${esc(g.rotulo)}</div>
         <div class="rvb-row">${g.idxs.map(i => {
@@ -923,12 +935,7 @@ function _revBreakRender(wordId) {
             <b>${esc(it.expr)}</b><span>${esc(it.gloss)}${it.nivel ? ' · ' + esc(it.nivel) : ''}</span>
             ${done ? ic('checkCircle','ic-sm') : ''}</button>`
         }).join('')}</div>`).join('')}
-      <div class="rvb-foot">
-        <button class="btn btn-primary btn-sm" ${st.sel.size ? '' : 'disabled'} onclick="revBreakStudy('${wordId}')">
-          ${ic('arrowRight','ic-sm')}Estudar ${st.sel.size || ''} selecionada${st.sel.size === 1 ? '' : 's'}</button>
-        ${st.done.size ? `<button class="btn btn-ghost btn-sm" onclick="deleteWord('${wordId}')"
-          data-tip="As partes escolhidas já viraram itens próprios — a frase original pode sair da fila">${ic('trash','ic-sm')}Remover a frase da fila</button>` : ''}
-      </div>
+      ${rodape}
     </div>`
 }
 
