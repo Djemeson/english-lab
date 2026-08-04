@@ -900,7 +900,9 @@ Return ONLY this JSON:
 Rules — follow exactly:
 - Return EXACTLY ${n} example object(s).
 - Every example MUST match the meaning "${it.meaning_pt}". If "${it.word}" has other senses, IGNORE them — an example must not make sense under a different meaning.
-- Each example: a different tense/construction, a different subject, a different real-world situation; natural like a novel/news/conversation, never formulaic.
+- The Portuguese bold in every example MUST be interchangeable with "${it.meaning_pt}" in that sentence — never a word from a different sense.
+- Each example: a different subject and a different real-world situation; natural like a novel/news/conversation, never formulaic.
+- Tense order when generating 3 or more: #1 PRESENT, #2 PAST, #3 a construction where the word CHANGES FORM the most (continuous/future/conditional/passive) — the learner must see the word inflected differently in each.
 - Rules for bold — CRITICAL, on BOTH sides of every example:
   - ${_rL.nameEn}: wrap the target in <b></b> exactly as it appears conjugated/inflected in that sentence (e.g. "ran" for "run"). For a multi-word or separable expression wrap ALL its parts even when another word sits between them; for an idiom wrap the whole expression.
   - Portuguese: wrap the word or short phrase that is the Portuguese equivalent of the target IN THAT SENTENCE in <b></b>.

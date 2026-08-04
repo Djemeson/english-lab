@@ -67,14 +67,35 @@ function applyAiResult(w, result) {
     if (!match && nm.context_match) match = curated.find(om => !usedOld.has(om.id) && om.context_match)
     if (!match) return nm
     usedOld.add(match.id)
+    // --- Resolução de contradição entre sentidos ---
+    // Caso real (emasculating): o título preservado dizia "desvirilizador,
+    // castrador, debilitante", mas a nova análise moveu "debilitante" para
+    // OUTRO sentido ("que esvazia"). Manter os dois deixaria o MESMO termo em
+    // dois sentidos — erro objetivo, não curadoria. O termo conflitante sai
+    // do título preservado e os exemplos que o usavam no negrito PT são
+    // trocados pelos novos da IA. Todo o resto da curadoria permanece.
+    const radical = s => { s = norm(s); s = s.replace(/s$/, ''); return s.replace(/[aoe]$/, '') }
+    const termosOutros = freshMeanings.filter(x => x !== nm)
+      .flatMap(x => String(x.meaning_pt || '').split(',')).map(radical).filter(Boolean)
+    const termosPres = String(match.meaning_pt || '').split(',').map(t => t.trim()).filter(Boolean)
+    const conflitantes = termosPres.filter(t => termosOutros.includes(radical(t)))
+    let tituloFinal = match.meaning_pt, exemplosFinais = match.examples
+    if (conflitantes.length && conflitantes.length < termosPres.length) {
+      tituloFinal = termosPres.filter(t => !conflitantes.includes(t)).join(', ')
+      const confRad = conflitantes.map(radical)
+      exemplosFinais = (match.examples || []).map((ex, j) => {
+        const b = /<b>([^<]+)<\/b>/.exec(String(ex.pt || ''))
+        return (b && confRad.includes(radical(b[1])) && nm.examples[j]) ? nm.examples[j] : ex
+      })
+    }
     return {
       ...nm,
       id: match.id,
-      meaning_pt:    match.meaning_pt,
+      meaning_pt:    tituloFinal,
       definition_pt: match.definition_pt || nm.definition_pt,
-      examples:      match.examples,
-      example_en:    match.example_en,
-      example_pt:    match.example_pt,
+      examples:      exemplosFinais,
+      example_en:    (exemplosFinais[0] && exemplosFinais[0].en) || match.example_en,
+      example_pt:    (exemplosFinais[0] && exemplosFinais[0].pt) || match.example_pt,
       origin_pt:     (match.origin_pt && match.origin_pt.trim()) ? match.origin_pt : nm.origin_pt,
       type_label:    match.type_label || nm.type_label,
       variety:       (match.variety  && match.variety  !== 'general') ? match.variety  : nm.variety,
@@ -135,8 +156,11 @@ ${ctx ? `Context sentence: "${ctx}"` : ''}
 ${sourceBlock}
 
 Rules for examples — CRITICAL, follow exactly:
-- Write EXACTLY 3 examples per meaning
-- Each example MUST use a completely different grammatical tense or construction. Do NOT repeat the same tense. Good variety: #1 present simple, #2 past simple or past perfect, #3 present continuous or future or conditional or imperative or passive
+- Write EXACTLY 3 examples per meaning, in this FIXED order of tenses (so the learner sees the word morph):
+  - #1 PRESENT (simple present)
+  - #2 PAST (simple past or present perfect)
+  - #3 a construction where the target word CHANGES FORM the most: continuous (-ing), future, conditional, passive or imperative — pick the one that inflects "${target}" differently from #1 and #2. If the word is invariable (an adverb, a fixed idiom), pick any third construction, still different from #1 and #2.
+- The target word must appear INFLECTED accordingly in each example (e.g. run → runs / ran / running) — that morphological variation is the point.
 - Each example MUST have a different subject (mix: he/she/they/I/we/you/a proper name/a noun phrase)
 - Each example MUST describe a genuinely different real-world situation or context (work, relationships, sports, travel, news, etc.)
 - NEVER use formulaic sentence patterns — sentences should feel natural, like they come from a novel, news article, or real conversation
@@ -205,7 +229,7 @@ Return ONLY this JSON (no markdown, no explanation):
   "sense_audit": ["FILL THIS FIRST, before writing meanings. One short line per candidate sense you considered, each ending with SPLIT or MERGED and the test that decided it. Max 12 words per line. Example for 'emasculating': ['pessoa: desvirilizador/castrador — MERGED, test 1 ok', 'lei/regra: esvazia, enfraquece — SPLIT, test 2', 'veterinária: castrar literal — SPLIT, domain']"],
   "meanings": [
     {
-      "meaning_pt": "Portuguese translation preserving word class (noun→noun, verb→infinitive, adj→adjective). List 2–3 natural synonyms/variants separated by commas ONLY when they pass the SUBSTITUTION test with each other (e.g. 'séquito, comitiva, cortejo' for 'retinue'; 'enganar, iludir, ludibriar' for 'deceive'). If a candidate word does not survive that test, it belongs to another meaning object — do not list it here. Max 8 words total. ONE sense only — no semicolons.",
+      "meaning_pt": "Portuguese translation in NEUTRAL CITATION FORM (lemma), preserving word class: verbs in the INFINITIVE ('esvaziar', never 'esvazia'), adjectives in the MASCULINE SINGULAR ('castrador', never 'castradora'), nouns in the singular. NEVER a conjugated or inflected form here. Use only Portuguese words that actually exist and sound natural — if the derived adjective would sound invented (e.g. 'esvaziador'), use a natural periphrase with the same class function: 'que esvazia, que enfraquece'. List 2–3 variants separated by commas ONLY when they pass the SUBSTITUTION test with each other (e.g. 'séquito, comitiva, cortejo' for 'retinue'). If a candidate word does not survive that test, it belongs to another meaning object — do not list it here. Max 8 words total. ONE sense only — no semicolons.",
       "definition_pt": "Full definition in Portuguese for THIS specific sense (1-2 sentences)",
       "origin_pt": "Brazilian-Portuguese note (1-2 sentences) explaining the ORIGIN / why this expression came to mean this — the image or history behind it. Fill ONLY for idioms, phrasal verbs, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. 'sitting duck' = a duck floating still is an easy target for a hunter; 'on the chopping block' = the block where animals/heads were cut; 'flagship' = the ship that carried the fleet commander's flag; 'throw under the bus' = sacrifice someone for your own safety). Leave it as an EMPTY STRING \"\" for ordinary words with no notable story. NEVER invent folk etymology — if you are not reasonably sure, leave it empty.",
       "variety": "${promptVarietyEnum(wordLang(w))}",

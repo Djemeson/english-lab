@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Sentido vs sinônimo (50ª rodada)**: cards vinham com 1
+> Última atualização: 2026-08-04 — **Forma neutra, tempos fixos e o merge que fossilizava
+> (51ª rodada)**: o "debilitante" preso vinha do merge de preservação (agora resolve
+> contradições); títulos em forma de citação (lema, sem "esvazia" conjugado nem
+> "esvaziadora" inventado); exemplos em ordem fixa presente→passado→forma que mais flexiona;
+> trava de coerência replicada em TODOS os prompts geradores. Ver seção 8 (51ª rodada).
+>
+> Anterior: 2026-08-04 — **Sentido vs sinônimo (50ª rodada)**: cards vinham com 1
 > significado só, empacotando sentidos distintos como se fossem sinônimos ("desvirilizador,
 > castrador, debilitante"). O prompt ganhou três testes lexicográficos, checagem de
 > coerência, auditoria de sentidos e teto de tokens maior. Ver seção 8 (50ª rodada).
@@ -481,6 +487,36 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (51ª rodada) — Forma neutra, tempos fixos e o merge que fossilizava termos
+107. **Feedback sobre a reanálise de *emasculating*** (agora com 2 sentidos): "debilitante
+     ainda tá junto com castrador; 'esvaziadora' nem faz sentido; e o objeto de estudo deve
+     vir no sentido neutro, com exemplos presente/passado/tempo com variação". Três causas,
+     três correções — e varredura em todos os prompts geradores:
+     - **"debilitante" preso era o MERGE, não a IA**: a regra de preservação (item da
+       curadoria) mantinha título e exemplos antigos do sentido casado — a IA nova devolveu
+       limpo, mas o fóssil venceu. `applyAiResult` agora RESOLVE CONTRADIÇÃO: termo do
+       título preservado que a nova análise moveu para OUTRO sentido é removido (comparação
+       por radical: castrador/castradora, debilitante/debilitantes), e o exemplo preservado
+       cujo negrito PT usava esse termo é trocado pelo exemplo novo da IA. Todo o resto da
+       curadoria permanece (id, definição, exemplos bons, sinônimos).
+     - **Forma neutra de citação (lema)** no meaning_pt: verbos no INFINITIVO ("esvaziar",
+       nunca "esvazia"), adjetivos no masculino singular, substantivos no singular; e SÓ
+       palavras que existem — se o derivado soa inventado ("esvaziadora"), usar perífrase
+       natural "que esvazia, que enfraquece".
+     - **Ordem FIXA dos exemplos**: #1 presente, #2 passado, #3 a construção em que a
+       palavra MAIS muda de forma (contínuo/futuro/condicional/passiva) — a variação
+       morfológica (run/ran/running) é o objetivo didático. Aplicada também ao prompt de
+       "Reanalisar" (audio.js).
+     - **Varredura**: trava de coerência ("o negrito PT deve ser intercambiável com o
+       meaning_pt — nunca palavra de outro sentido") replicada nos 3 prompts que geram
+       exemplos: análise (review.js), reanálise em lote (audio.js) e regenerar exemplo
+       único (study.js). Os lotes do add.js (Kindle/mídia) só extraem vocabulário e
+       traduzem frase — não geram significados; conferido e deixado como está.
+     - Validado ao vivo com o card real do print: título preservado perdeu só o
+       "debilitante", exemplos 1–2 curados intactos, o 3º (contaminado) trocado pelo novo,
+       sentido novo entrou, prompt carrega forma neutra + tempos fixos.
+       `CACHE`: `v77` → **`v78`**.
 
 ### Sessão 2026-08-04 (50ª rodada) — Sentido distinto vs sinônimo de tradução (estudo + prompt)
 106. **Observação do Djemeson** (card de *emasculating*): "todos vêm com 1 significado só, mas
