@@ -930,6 +930,7 @@ Definition (Portuguese): "${card.definition_pt || card.meaning_pt}"
 Rules:
 - The sentence MUST clearly and naturally illustrate the specific meaning above
 - The Portuguese bold MUST be interchangeable with "${card.meaning_pt}" in that sentence — never a word that belongs to a DIFFERENT sense of "${card.word}"
+- Translate what the sentence DOES, the way a Brazilian would say it — never word-by-word ("we'll get you in" → "a gente te encaixa", not "colocar você dentro")
 - Write like a native speaker — feel free to use a novel, news article or real conversation style
 - Keep it 10-20 words long
 - Rules for bold — CRITICAL, on BOTH sides:

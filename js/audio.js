@@ -908,7 +908,7 @@ Rules — follow exactly:
   - Portuguese: wrap the word or short phrase that is the Portuguese equivalent of the target IN THAT SENTENCE in <b></b>.
   - If the target appears more than once in a sentence, bold ONLY the main occurrence.
   - Exactly ONE bold span per side. Do not bold anything else.
-- Translate the Portuguese naturally (not word-for-word).`
+- Translate the Portuguese naturally (not word-for-word). LITERAL-TRANSLATION TRAP — avoid it explicitly: translate what the sentence DOES, the way a Brazilian would say it ("we'll get you in" → "a gente te encaixa", never "colocar você dentro"). If a translation reads like word-by-word substitution, redo it.`
   return aiJSON(PROMPT, { model: AI_DEFAULT_MODEL, maxTokens: 900 })
 }
 

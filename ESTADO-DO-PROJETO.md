@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Faxina do Raio-X (54ª rodada)**: a área de triagem não
+> Última atualização: 2026-08-04 — **Anti-literal em todo o projeto (55ª rodada)**: a
+> armadilha da tradução literal ("get you in" → "colocar você dentro") agora é combatida
+> explicitamente nos 7 prompts que produzem português, com exemplo contrastivo e ordem de
+> operação ("entenda a função na cena, depois traduza a função") — técnica calibrada para
+> modelos baratos. Ver seção 8 (55ª rodada).
+>
+> Anterior: 2026-08-04 — **Faxina do Raio-X (54ª rodada)**: a área de triagem não
 > tinha passado pela lente KonMari — saíram o aviso redundante, o botão que repetia ação já
 > feita, o rodapé duplicado e o botão desabilitado; chips ficaram leves e a análise recuou a
 > ação secundária quando há triagem. Ver seção 8 (54ª rodada).
@@ -502,6 +508,25 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (55ª rodada) — Armadilha da tradução literal combatida em TODO o projeto
+111. **Pedido**: "reforce a instrução em todo o projeto, levando em consideração modelos
+     baratos" (gatilho: a triagem glosou "get you in" como "colocar você dentro" — literal
+     — em vez de "a gente te encaixa"). Técnica calibrada para modelo econômico: nomear a
+     armadilha ("LITERAL-TRANSLATION TRAP"), dar a ORDEM DE OPERAÇÃO ("primeiro entenda o
+     que a expressão FAZ na cena, depois traduza essa função") e um EXEMPLO CONTRASTIVO
+     (errado vs certo) — regra abstrata sozinha não segura modelo barato.
+     - **7 prompts reforçados**: triagem do Raio-X (review.js), traduções de exemplos da
+       análise (review.js) + o sentido do contexto ("nunca a leitura mais literal do
+       dicionário"), reanálise em lote (audio.js), regenerar exemplo único (study.js),
+       tradução de legendas do vídeo (`_VID_PT_SIS`, video-subs.js — "traduza o SENTIDO na
+       cena, nunca palavra por palavra") e os dois lotes do add.js (Kindle e mídia).
+     - Âncora comum em todos: "we'll get you in" → "a gente te encaixa", NUNCA "colocar
+       você dentro" (o caso real do Djemeson vira o exemplo canônico do projeto).
+     - Validado ao vivo: os prompts efetivamente ENVIADOS nos três fluxos principais
+       (triagem, análise completa, lote de legenda) carregam o reforço; duas passadas de
+       verificação porque o OneDrive serviu audio.js/review.js velhos na primeira.
+       `CACHE`: `v81` → **`v82`**.
 
 ### Sessão 2026-08-04 (54ª rodada) — A faxina KonMari alcança o Raio-X da frase
 110. **Pergunta do Djemeson**: "ficou muito bom, mas essa parte você analisou sob a ótica da

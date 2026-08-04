@@ -175,6 +175,7 @@ Rules for bold — CRITICAL, follow exactly on BOTH sides of every example:
 
 For Portuguese translations of examples:
 - Translate naturally — don't translate word-for-word
+- LITERAL-TRANSLATION TRAP — avoid it explicitly: FIRST work out what the sentence DOES (the speech act, the scene), THEN translate that function into how a Brazilian would actually say it. "We'll get you in for that" (scheduling) → "a gente te encaixa", NEVER "colocar você dentro"; "How are you holding up?" → "como você está se segurando?" is WRONG, use "como você está aguentando?". If a translation reads like word-by-word substitution, redo it before returning.
 - Vary the Portuguese synonyms across the 3 examples (e.g. for "thunderstruck": "atordoado", "estarrecido", "pasmado" — not "atordoado" × 3)
 - HARD LIMIT on that variation: every synonym you use must still belong to THAT meaning's sense (see the substitution test below). Reaching for a word that expresses a DIFFERENT idea is not variety — it is a missing sense.
 - Each Portuguese translation should read like natural Brazilian Portuguese, not like a translation
@@ -202,6 +203,7 @@ Rules for meanings — CRITICAL:
 - COHERENCE CHECK (do this for every meaning before returning): the bolded Portuguese in each of its 3 examples must be interchangeable with the translations listed in that meaning's "meaning_pt". If one example needed a Portuguese word that is NOT interchangeable with them, that is proof a sense is missing — create the extra meaning object for it.
 - BEFORE RETURNING A SINGLE MEANING: run tests 1–3 once more. One sense is a legitimate answer for concrete words ("spoon"), but most C1/C2 adjectives, phrasal verbs and idioms carry 2 or more.
 - Set "context_match": true ONLY for the meaning that matches the context sentence; all others get false
+- The context_match meaning must reflect how the expression is USED in that scene — its function there — never its most literal dictionary reading (cheap-model trap: for "get you in" at a hotel desk, the context sense is "encaixar (na agenda)", not "colocar dentro")
 - Put the context-matching meaning FIRST in the array (so the learner sees their original context first)
 
 Example of CORRECT behavior for "take off" with context "his startup took off overnight":
@@ -897,6 +899,7 @@ Rules:
 - THEN list the remaining notable single words NOT already inside a unit.
 - SKIP trivial function words (articles, pronouns, auxiliaries, basic prepositions) unless they belong to a unit.
 - "gloss" is the meaning HERE, not a dictionary list.
+- LITERAL-TRANSLATION TRAP — avoid it explicitly: FIRST work out what the unit DOES in this scene, THEN write the gloss for that function. "We'll get you in for that" said at a hotel desk → gloss "a gente te encaixa (na agenda)", NEVER "colocar você dentro". If a gloss reads like word-by-word substitution, redo it before returning.
 - "nivel" is the CEFR difficulty of that unit for a learner.
 - Typically 1–8 items. Cover everything a learner might not know.`, { maxTokens: 700 })
   const items = (Array.isArray(r.items) ? r.items : [])

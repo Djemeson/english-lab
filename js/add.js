@@ -325,6 +325,7 @@ Do NOT include plain difficult words (e.g. "ephemeral", "gorget"). Only multi-wo
 If none found, return empty vocab [].
 
 2. Translate the full sentence naturally to Brazilian Portuguese.
+LITERAL-TRANSLATION TRAP — avoid it explicitly: translate what the sentence DOES, the way a Brazilian would say it; idioms and verbal expressions get their Portuguese EQUIVALENT, never word-by-word ("we'll get you in" → "a gente te encaixa", not "colocar você dentro").
 For short inputs (1-3 words), return vocab [] and word meaning as trans.
 
 Return ONLY valid JSON:
@@ -648,6 +649,7 @@ Categories (English examples for illustration — apply the equivalent ${_mL.nam
 - slang: informal/colloquial expression, e.g. "like crazy", "bail", "freak out"
 
 Also translate the full sentence to Brazilian Portuguese.
+LITERAL-TRANSLATION TRAP — avoid it explicitly: translate what the sentence DOES, the way a Brazilian would say it; idioms and verbal expressions get their Portuguese EQUIVALENT, never word-by-word ("we'll get you in" → "a gente te encaixa", not "colocar você dentro").
 
 For short inputs (1-3 words), return that input in vocab with its type and its meaning as trans.
 
