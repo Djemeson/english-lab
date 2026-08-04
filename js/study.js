@@ -466,6 +466,7 @@ function rateSrsCardAndNext(cardId, rating) {
     if (wasNew) srsSession.newSeen++
     if (rating >= 3) srsSession.correct++
     srsSession.current++
+    _logRevisao(+1, wasNew, rating >= 3)   // grava JÁ no dia (ver comentário em _logRevisao)
 
     // Requeue: se o card ficou em 'learning'/'relearning', adiciona no final da fila
     // para reaparecer ainda nesta sessão (como o Anki faz)
@@ -618,6 +619,7 @@ async function undoLastCard() {
   if (last.wasNew) srsSession.newSeen = Math.max(0, srsSession.newSeen - 1)
   if (last.rating >= 3) srsSession.correct = Math.max(0, srsSession.correct - 1)
   srsSession.current = Math.max(0, srsSession.current - 1)
+  _logRevisao(-1, last.wasNew, last.rating >= 3)   // desfazer também desconta do dia
 
   saveSrsCards()
   updateSrsBadge()
@@ -632,16 +634,21 @@ async function undoLastCard() {
   }
 }
 
-function finishSrsSession() {
+// Progresso do dia gravado A CADA CARD, não no fim da sessão. Antes só o
+// término natural registrava: encerrar no "X" (ou fechar a aba) jogava fora
+// tudo o que já tinha sido revisado — a barra do dia voltava a zero.
+// `dir` é +1 ao avaliar e −1 ao desfazer.
+function _logRevisao(dir, wasNew, acertou) {
   const today = todayStr()
   let log = srsLog.find(l => l.date === today)
-  if (!log) { log = {date: today, reviewed: 0, correct: 0, newSeen: 0}; srsLog.push(log) }
-  if (srsSession) {
-    log.reviewed += srsSession.done
-    log.correct  += srsSession.correct
-    log.newSeen  = (log.newSeen || 0) + srsSession.newSeen
-  }
+  if (!log) { log = { date: today, reviewed: 0, correct: 0, newSeen: 0 }; srsLog.push(log) }
+  log.reviewed = Math.max(0, (log.reviewed || 0) + dir)
+  if (acertou) log.correct = Math.max(0, (log.correct || 0) + dir)
+  if (wasNew)  log.newSeen = Math.max(0, (log.newSeen || 0) + dir)
   saveSrsLog()
+}
+
+function finishSrsSession() {
   _clearSessionBackup()  // sessão finalizada normalmente — remove o backup
   autoSyncAfterChange()
 
@@ -676,6 +683,9 @@ function finishSrsSession() {
 }
 
 function endSrsSession() {
+  // Encerrar no meio não é "perder a sessão": o que já foi revisado está no
+  // log do dia (gravado card a card) — só limpa o backup e sincroniza.
+  if (srsSession && srsSession.done) { _clearSessionBackup(); autoSyncAfterChange() }
   srsSession = null
   // Aplica cards que chegaram da nuvem (sync em tempo real) durante a sessão
   if (typeof flushPendingCloudCards === 'function') flushPendingCloudCards()

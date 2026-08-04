@@ -834,18 +834,17 @@ async function revSelExplain() {
   if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
   corpo.innerHTML = '<span class="gen-spinner"></span> a IA está explicando...'
   try {
-    const resp = await aiText([
+    const resp = await aiTextSeguro([
       { role: 'system', content: 'Tutor de inglês de um brasileiro. Responda em PT-BR, direto ao ponto, 2 a 4 frases, sem introduções nem rodeios.' },
       { role: 'user', content:
 `No item de estudo "${w ? w.word : ''}" (contexto: "${window._revSelCtx || (w && w.context) || ''}"), o aluno selecionou: "${txt}".
 Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado nesta expressão, explique a imagem.` }
     ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
     const html = esc(resp).replace(/\n+/g, '<br>')
-    _revExplainCache.set(chave, html)
+    _revExplainCache.set(chave, html)   // aiTextSeguro nunca devolve vazio: não cacheia silêncio
     corpo.innerHTML = html
   } catch (e) {
-    corpo.innerHTML = ''
-    toast('Erro ao explicar: ' + e.message, 'error')
+    corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)} — clique em Explicar para tentar de novo.</span>`
   }
 }
 

@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-03 — **Tradução da IA volta ligada sozinha (45ª rodada)**: ao
+> Última atualização: 2026-08-04 — **Pacote de 4 tarefas do Djemeson (46ª rodada)**:
+> progresso do dia agora é gravado card a card (encerrar no "X" zerava tudo); Explicar
+> ganhou rede de segurança (`aiTextSeguro` → OpenAI quando o DeepSeek volta vazio);
+> navegação ‹‹/›› passou a andar por FRASE (legendas encadeadas viram grupo); e o custo
+> estimado passou a sair do preço real do modelo ativo. Ver seção 8 (46ª rodada).
+>
+> Anterior: 2026-08-03 — **Tradução da IA volta ligada sozinha (45ª rodada)**: ao
 > reabrir um vídeo já traduzido, o modo PT volta no estado de antes (preferência `cfg.vidPT`
 > + auto-ligar quando há tradução salva), com aviso de quantas falas; importar um .srt PT
 > passou a entrar como TRADUÇÃO, sem substituir a legenda EN. Ver seção 8 (45ª rodada).
@@ -456,6 +462,34 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (46ª rodada) — Pacote de 4 tarefas exportado do quadro do Djemeson
+97. **Progresso do dia zerava ao encerrar o estudo no "X"**. Causa: só `finishSrsSession()`
+    (fim natural) gravava `srsLog` — `endSrsSession()` fazia `srsSession = null` e o que já
+    tinha sido revisado sumia do dia (o agendamento dos cards nunca se perdeu; o CONTADOR
+    do dia é que voltava a zero). Agora `_logRevisao(±1)` grava **card a card** dentro de
+    `rateSrsCardAndNext` (e desconta no `undoLastCard`) — cobre também fechar a aba no
+    meio. `finishSrsSession` não soma mais nada (evita contagem dupla).
+98. **Explicar mudo em certas frases (DeepSeek)**. Duas causas somadas: resposta com
+    `content` vazio, e modelos que gastam o orçamento em `reasoning_content`. Novo
+    **`aiTextSeguro()`** em ai.js: usa `reasoning_content` quando o `content` vem vazio e,
+    se ainda assim não houver texto (ou a chamada falhar), **repete a pergunta na OpenAI**
+    (gpt-4o-mini) quando há chave. Usado no Explicar do vídeo E do Revisar; o erro agora
+    aparece dentro do popup nos dois.
+99. **‹‹/›› caíam no meio/fim da frase**. Uma frase falada quase nunca cabe numa legenda só
+    — navegar por LEGENDA fazia o salto parar no meio. `_vidCueContinua/_vidGrupoIni/
+    _vidGrupoFim` agrupam legendas encadeadas (sem pontuação final, sem travessão de outro
+    falante, pausa < 1,5s) e a navegação passou a andar **por frase**, sempre ao início.
+    Validado: grupos `[0,0,0,3,4,4]`, ‹‹ do meio da 3ª legenda volta ao início da frase,
+    sequência 24s → 20,8 → 16,8 → 9,8 (uma frase por clique) e o mesmo no sentido inverso.
+100. **"Os valores da OpenAI se atualizam conforme o modelo?"** — NÃO se atualizavam:
+    `AI_COST.chat` era um número fixo (US$ 0,001/item) calibrado no gpt-4o-mini, igual para
+    qualquer fornecedor. Agora cada modelo tem `preco: {in, out}` (US$/1M tokens, tabela de
+    ago/2026) e `aiCustoChatUsd()` calcula `tokens médios × preço do modelo ATIVO`. Medido:
+    100 itens = R$ 0,09 (Groq 8B), R$ 0,28 (DeepSeek V4-flash), R$ 0,45 (gpt-4o-mini),
+    R$ 7,43 (gpt-4o). O modal agora mostra fornecedor·modelo e a linha **"Base do cálculo"**;
+    o modal do Whisper explica que é `whisper-1 · US$ 0,006/min` e NÃO muda com o
+    fornecedor de texto. `CACHE`: `v72` → **`v73`**.
 
 ### Sessão 2026-08-03 (45ª rodada) — A tradução da IA volta ligada sozinha ao reabrir o vídeo
 96. **Perguntas do Djemeson**: "como faço pra ver as legendas da IA? ao abrir o vídeo de

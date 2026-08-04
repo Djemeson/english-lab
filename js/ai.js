@@ -35,12 +35,14 @@ const AI_PROVIDERS = {
     modelsUrl: 'https://api.openai.com/v1/models',
     keyCfg: 'openaiKey',
     placeholder: 'sk-proj-...',
+    // `preco`: US$ por 1 MILHÃO de tokens (entrada/saída), preço de tabela do
+    // fornecedor (conferido em ago/2026). É daqui que sai a estimativa em reais.
     modelos: [
-      { id: 'gpt-4o-mini',  tier: 'baixo', nota: 'rápido e barato (padrão do app)' },
-      { id: 'gpt-4.1-mini', tier: 'baixo', nota: 'melhor texto, preço próximo' },
-      { id: 'gpt-4o',       tier: 'médio', nota: 'equilibrado' },
-      { id: 'gpt-5-mini',   tier: 'médio', nota: 'nova geração' },
-      { id: 'gpt-5',        tier: 'alto',  nota: 'mais capaz' },
+      { id: 'gpt-4o-mini',  tier: 'baixo', nota: 'rápido e barato (padrão do app)', preco: { in: 0.15, out: 0.60 } },
+      { id: 'gpt-4.1-mini', tier: 'baixo', nota: 'melhor texto, preço próximo',     preco: { in: 0.40, out: 1.60 } },
+      { id: 'gpt-4o',       tier: 'médio', nota: 'equilibrado',                     preco: { in: 2.50, out: 10.00 } },
+      { id: 'gpt-5-mini',   tier: 'médio', nota: 'nova geração',                    preco: { in: 0.25, out: 2.00 } },
+      { id: 'gpt-5',        tier: 'alto',  nota: 'mais capaz',                      preco: { in: 1.25, out: 10.00 } },
     ]
   },
   gemini: {
@@ -50,9 +52,9 @@ const AI_PROVIDERS = {
     keyCfg: 'geminiKey',
     placeholder: 'AIza...',
     modelos: [
-      { id: 'gemini-2.5-flash-lite', tier: 'baixo', nota: 'o mais barato da casa' },
-      { id: 'gemini-2.5-flash',      tier: 'baixo', nota: 'ótimo custo-benefício' },
-      { id: 'gemini-2.5-pro',        tier: 'alto',  nota: 'mais capaz' },
+      { id: 'gemini-2.5-flash-lite', tier: 'baixo', nota: 'o mais barato da casa',  preco: { in: 0.10, out: 0.40 } },
+      { id: 'gemini-2.5-flash',      tier: 'baixo', nota: 'ótimo custo-benefício',  preco: { in: 0.30, out: 2.50 } },
+      { id: 'gemini-2.5-pro',        tier: 'alto',  nota: 'mais capaz',             preco: { in: 1.25, out: 10.00 } },
     ]
   },
   deepseek: {
@@ -66,8 +68,8 @@ const AI_PROVIDERS = {
     // tinha salvo cai no primeiro da lista via validação do aiModel().
     // Atenção ao preço dinâmico: 2× no horário de pico da China.
     modelos: [
-      { id: 'deepseek-v4-flash', tier: 'baixo', nota: 'V4 — muito barato, cache quase grátis' },
-      { id: 'deepseek-v4-pro',   tier: 'médio', nota: 'V4 — mais capaz' },
+      { id: 'deepseek-v4-flash', tier: 'baixo', nota: 'V4 — muito barato, cache quase grátis', preco: { in: 0.14,  out: 0.28 } },
+      { id: 'deepseek-v4-pro',   tier: 'médio', nota: 'V4 — mais capaz',                       preco: { in: 0.435, out: 0.87 } },
     ]
   },
   groq: {
@@ -77,9 +79,9 @@ const AI_PROVIDERS = {
     keyCfg: 'groqKey',
     placeholder: 'gsk_...',
     modelos: [
-      { id: 'llama-3.1-8b-instant',    tier: 'baixo', nota: 'muito rápido, quase grátis' },
-      { id: 'llama-3.3-70b-versatile', tier: 'baixo', nota: 'mais qualidade, ainda barato' },
-      { id: 'openai/gpt-oss-120b',     tier: 'médio', nota: 'modelo aberto grande' },
+      { id: 'llama-3.1-8b-instant',    tier: 'baixo', nota: 'muito rápido, quase grátis',    preco: { in: 0.05, out: 0.08 } },
+      { id: 'llama-3.3-70b-versatile', tier: 'baixo', nota: 'mais qualidade, ainda barato',  preco: { in: 0.59, out: 0.79 } },
+      { id: 'openai/gpt-oss-120b',     tier: 'médio', nota: 'modelo aberto grande',          preco: { in: 0.15, out: 0.75 } },
     ]
   }
 }
@@ -181,7 +183,34 @@ async function aiText(messages, { maxTokens, model, timeoutMs, retries } = {}) {
     model: m, messages: msgs, ..._aiTokenParam(m, maxTokens)
   }, { timeoutMs, retries, key: chat.key })
   const data = await res.json()
-  return (data.choices?.[0]?.message?.content || '').trim()
+  const msg = data.choices?.[0]?.message || {}
+  // `reasoning_content`: modelos que "pensam" às vezes gastam todo o orçamento
+  // no raciocínio e devolvem content vazio — melhor mostrar o que veio.
+  return String(msg.content || msg.reasoning_content || '').trim()
+}
+
+// Texto com REDE DE SEGURANÇA: se o fornecedor ativo devolver vazio (o
+// DeepSeek faz isso em certas frases) ou falhar, repete na OpenAI quando há
+// chave. É o que garante que "Explicar" nunca fique mudo.
+async function aiTextSeguro(messages, opts = {}) {
+  let erro = null
+  try {
+    const r = await aiText(messages, opts)
+    if (r) return r
+  } catch (e) { erro = e }
+  if (aiProviderAtual() !== 'openai' && cfg.openaiKey) {
+    try {
+      const res = await _aiFetch('https://api.openai.com/v1/chat/completions', {
+        model: AI_DEFAULT_MODEL,
+        messages: typeof messages === 'string' ? [{ role: 'user', content: messages }] : messages,
+        ..._aiTokenParam(AI_DEFAULT_MODEL, opts.maxTokens)
+      }, { timeoutMs: opts.timeoutMs, retries: 1, key: cfg.openaiKey })
+      const data = await res.json()
+      const t = String(data.choices?.[0]?.message?.content || '').trim()
+      if (t) return t
+    } catch (e) { erro = erro || e }
+  }
+  throw erro || new Error('a IA devolveu uma resposta vazia')
 }
 
 // TTS — tenta o gpt-4o-mini-tts (mais barato, aceita instrução de estilo);
@@ -253,9 +282,31 @@ async function aiTestKey(key) {
 // a consulta falhar. Ordens de grandeza, não fatura.
 // ================================================================
 const AI_COST = {
-  chat:  0.001,                                    // por item analisado (mini)
-  tts:   0.008,                                    // por frase (~80 caracteres)
-  image: { low: 0.011, medium: 0.042, high: 0.167 } // por imagem 1024×1024
+  tts:   0.008,                                    // por frase (~80 caracteres) — gpt-4o-mini-tts
+  whisper: 0.006,                                  // por MINUTO de áudio — whisper-1
+  image: { low: 0.011, medium: 0.042, high: 0.167 } // por imagem 1024×1024 — gpt-image-1
+}
+
+// Tokens médios de UMA análise de item (prompt do card + resposta), medidos
+// nos lotes reais do app. Multiplicados pelo preço do MODELO ATIVO — é isso
+// que faz a estimativa acompanhar a troca de modelo/fornecedor (antes o custo
+// de chat era um número fixo calibrado no gpt-4o-mini).
+const AI_TOKENS_ITEM = { in: 1800, out: 900 }
+
+// Preço (US$/1M tokens) do modelo indicado, procurado em todos os fornecedores.
+function aiPrecoModelo(id) {
+  const alvo = id || aiModel()
+  for (const P of Object.values(AI_PROVIDERS)) {
+    const m = (P.modelos || []).find(x => x.id === alvo)
+    if (m && m.preco) return m.preco
+  }
+  return { in: 0.15, out: 0.60 }        // desconhecido: assume o preço do mini
+}
+
+// Custo em dólar de `n` análises no modelo ativo.
+function aiCustoChatUsd(n = 1) {
+  const p = aiPrecoModelo()
+  return n * (AI_TOKENS_ITEM.in * p.in + AI_TOKENS_ITEM.out * p.out) / 1e6
 }
 const AI_USD_BRL_FALLBACK = 5.5
 const SK_USD_BRL = 'el-usd-brl'
@@ -287,9 +338,9 @@ async function aiUsdBrl() {
 function _aiUnitUsd(tipo) {
   // Cada imagem custa também a chamada de texto que descreve a cena
   // (buildImageScene, em audio.js) — ~2% do total, mas entra na conta.
-  return tipo === 'image'
-    ? (AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium) + AI_COST.chat
-    : (AI_COST[tipo] || 0.001)
+  if (tipo === 'image') return (AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium) + aiCustoChatUsd(1)
+  if (tipo === 'chat') return aiCustoChatUsd(1)
+  return AI_COST[tipo] || 0.001
 }
 
 function _brl(v) { return 'R$ ' + (v < 0.01 ? '0,01' : v.toFixed(2).replace('.', ',')) }
@@ -310,9 +361,15 @@ async function aiConfirmBatch(tipo, n, rotulo, opts = {}) {
   const rate = await aiUsdBrl()
   const total = usd * rate
   const NOMES = { chat: 'Análise com IA', tts: 'Geração de áudio (TTS)', image: 'Geração de imagens' }
-  const detalheModelo = tipo === 'chat' ? aiModel()
-    : tipo === 'tts' ? AI_TTS_MODEL
-    : `gpt-image-1 · qualidade ${({low:'econômica',medium:'padrão',high:'alta'})[cfg.imgQuality || 'medium']}`
+  const detalheModelo = tipo === 'chat' ? `${aiChatCfg().P.nome} · ${aiModel()}`
+    : tipo === 'tts' ? `OpenAI · ${AI_TTS_MODEL}`
+    : `OpenAI · gpt-image-1 · qualidade ${({low:'econômica',medium:'padrão',high:'alta'})[cfg.imgQuality || 'medium']}`
+  // De onde sai a conta — o Djemeson pediu para entender a origem do número
+  const pm = aiPrecoModelo()
+  const base = tipo === 'chat'
+    ? `~${AI_TOKENS_ITEM.in} tokens de entrada + ~${AI_TOKENS_ITEM.out} de saída por item, ao preço deste modelo (US$ ${pm.in}/${pm.out} por 1M)`
+    : tipo === 'tts' ? 'US$ 0,008 por frase falada (tabela do gpt-4o-mini-tts)'
+    : `US$ ${(AI_COST.image[cfg.imgQuality || 'medium'] || AI_COST.image.medium).toFixed(3)} por imagem 1024×1024 + a chamada de texto que descreve a cena`
   return confirmModal({
     title: rotulo || NOMES[tipo] || 'Operação com IA',
     icon: 'sparkles',
@@ -320,11 +377,12 @@ async function aiConfirmBatch(tipo, n, rotulo, opts = {}) {
     html: `
       <div class="cost-rows">
         <div class="cost-row"><span>Operação</span><b>${esc(NOMES[tipo] || tipo)}</b></div>
-        <div class="cost-row"><span>Chamadas à OpenAI</span><b>${n}</b></div>
+        <div class="cost-row"><span>Chamadas</span><b>${n}</b></div>
         <div class="cost-row"><span>Modelo</span><b>${esc(detalheModelo)}</b></div>
+        <div class="cost-row"><span>Base do cálculo</span><b>${esc(base)}</b></div>
         <div class="cost-row total"><span>Custo estimado</span><b>${_brl(total)}</b></div>
       </div>
       ${opts.detalhe ? `<ul class="cost-bullets">${opts.detalhe.map(d => `<li>${esc(d)}</li>`).join('')}</ul>` : ''}
-      <p class="cost-note">Estimativa pela cotação de hoje (US$ 1 ≈ R$ ${rate.toFixed(2).replace('.', ',')}). A cobrança real é feita pela OpenAI, em dólar, na sua conta.</p>`
+      <p class="cost-note">Estimativa pela cotação de hoje (US$ 1 ≈ R$ ${rate.toFixed(2).replace('.', ',')}) — muda junto com o modelo escolhido. A cobrança real é feita pelo fornecedor, em dólar, na sua conta.</p>`
   })
 }

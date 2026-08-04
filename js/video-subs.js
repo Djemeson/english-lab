@@ -779,10 +779,17 @@ async function videoTranscribeFull() {
   const durMin = durS ? Math.ceil(durS / 60) : 45
   const rate = await aiUsdBrl()
   if (!(await confirmModal({ title: 'Criar legenda com IA', icon: 'sparkles',
-    confirmText: `Transcrever — ${_brl(durMin * 0.006 * rate)}`,
+    confirmText: `Transcrever — ${_brl(durMin * AI_COST.whisper * rate)}`,
     html: `<p style="font-size:var(--fs-sm);color:var(--text2)">A IA vai OUVIR o episódio (~${durMin} min) e escrever a legenda inteira,
       com os tempos certos. O áudio é extraído aqui no seu aparelho — só a transcrição vai para a OpenAI.
-      Leva alguns minutos.</p>` }))) return
+      Leva alguns minutos.</p>
+      <div class="cost-rows" style="margin-top:10px">
+        <div class="cost-row"><span>Modelo</span><b>OpenAI · whisper-1</b></div>
+        <div class="cost-row"><span>Base do cálculo</span><b>${durMin} min × US$ ${AI_COST.whisper}/min</b></div>
+        <div class="cost-row total"><span>Custo estimado</span><b>${_brl(durMin * AI_COST.whisper * rate)}</b></div>
+      </div>
+      <p class="cost-note">Transcrição é sempre OpenAI (Whisper) — não muda com o fornecedor de texto escolhido.
+      Cotação de hoje: US$ 1 ≈ R$ ${rate.toFixed(2).replace('.', ',')}.</p>` }))) return
 
   _vidTranscrevendo = true
   const box = el('vid-audiofix-banner')

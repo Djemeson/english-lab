@@ -794,12 +794,37 @@ function _vidCueIndexAt(t) {
   return idx
 }
 
+// Uma FRASE falada quase nunca cabe em uma legenda só: ela continua na
+// legenda seguinte. Navegando por legenda, o ‹‹ caía no meio (ou no fim) da
+// frase — a queixa do Djemeson. Legendas encadeadas viram um GRUPO e o salto
+// vai sempre ao INÍCIO do grupo.
+function _vidCueContinua(i) {
+  const a = _vidCues[i - 1], b = _vidCues[i]
+  if (!a || !b) return false
+  if (b.s - a.e > 1.5) return false                    // pausa longa = frase nova
+  const tb = String(b.t || '').trim()
+  const ta = String(a.t || '').trim()
+  if (/^[-–—]/.test(tb)) return false                  // travessão = outro falante
+  if (/^[A-ZÀ-Þ"'(¿¡]/.test(tb) && /[.!?…]["')\]]*$/.test(ta)) return false
+  return !/[.!?…]["')\]]*$/.test(ta)                   // a anterior não fechou a frase
+}
+function _vidGrupoIni(i) {
+  let g = 0                                            // trava de segurança
+  while (i > 0 && _vidCueContinua(i) && g++ < 12) i--
+  return Math.max(0, i)
+}
+function _vidGrupoFim(i) {
+  let g = 0
+  while (i + 1 < _vidCues.length && _vidCueContinua(i + 1) && g++ < 12) i++
+  return i
+}
+
 function videoReplayCue() {
   const p = el('vid-player'); if (!p) return
   if (!_vidCues.length) { videoSkip(-5); return }
   const i = _vidCueIndexAt(p.currentTime)
   if (i < 0) { videoSkip(-5); return }
-  p.currentTime = Math.max(0, _vidCues[i].s - 0.2)
+  p.currentTime = Math.max(0, _vidCues[_vidGrupoIni(i)].s - 0.2)
   p.play()
 }
 
@@ -807,19 +832,24 @@ function videoCueNav(dir) {
   const p = el('vid-player'); if (!p) return
   if (!_vidCues.length) { videoSkip(dir * 5); return }
   const t = p.currentTime
-  let i = _vidCueIndexAt(t)
+  const i = _vidCueIndexAt(t)
+  let alvo
   if (dir < 0) {
     if (i < 0) { videoSkip(-5); return }
-    // >0,8s dentro da fala = volta ao início DELA; senão, fala anterior
-    if (t - _vidCues[i].s <= 0.8) i = Math.max(0, i - 1)
+    alvo = _vidGrupoIni(i)
+    // já no comecinho da frase? então o ‹‹ vai para a frase ANTERIOR inteira
+    if (t - _vidCues[alvo].s <= 0.8) alvo = _vidGrupoIni(Math.max(0, alvo - 1))
   } else {
-    i = Math.min(_vidCues.length - 1, i + 1)
-    // Aterrissamos 0,2s ANTES da fala (respiro): se o t atual já está nessa
-    // entradinha da fala i, "próxima" tem que ir para a i+1 — senão o botão
-    // parece travado.
-    if (_vidCues[i].s - t <= 0.6 && i < _vidCues.length - 1) i++
+    alvo = i < 0 ? 0 : _vidGrupoFim(_vidGrupoIni(i)) + 1
+    if (alvo >= _vidCues.length) alvo = _vidCues.length - 1
+    // Aterrissamos 0,2s ANTES da frase (respiro): se o t atual já está nessa
+    // entradinha, "próxima" tem que pular o grupo — senão o botão trava.
+    if (_vidCues[alvo].s - t <= 0.6) {
+      const seg = _vidGrupoFim(alvo) + 1
+      if (seg < _vidCues.length) alvo = seg
+    }
   }
-  p.currentTime = Math.max(0, _vidCues[i].s - 0.2)
+  p.currentTime = Math.max(0, _vidCues[alvo].s - 0.2)
   p.play()
 }
 
