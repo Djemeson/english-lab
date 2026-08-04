@@ -643,7 +643,7 @@ function renderWordCard(wordId) {
     // sabe do que precisa estudar (pedido do Djemeson: "não sei exatamente o
     // que não entendi").
     const alvoBrk = (w.word || w.context || '').trim()
-    const ehFrase = alvoBrk.split(/\s+/).length >= 3
+    const ehFrase = !w.no_break && alvoBrk.split(/\s+/).length >= 3
     // KonMari: cada estado mostra SÓ o que serve àquele momento.
     // Com a triagem pronta, ela é a protagonista e "analisar tudo" recua a
     // ação secundária; sem triagem, o botão de análise é o destaque.
@@ -851,7 +851,7 @@ const _revBreakBusy = new Set()
 // entra na revisão (chamado por createWord) — leve de propósito (mini-glosas,
 // sem levantamento profundo). Quando o aluno abrir o card, os chips já estão lá.
 async function _revBreakPrefetch(w) {
-  if (!w || !w.id) return
+  if (!w || !w.id || w.no_break) return
   const alvo = (w.word || w.context || '').trim()
   if (alvo.split(/\s+/).length < 3) return
   if (!aiChatCfg().key || _revBreakCache.has(w.id) || _revBreakBusy.has(w.id)) return
@@ -890,22 +890,29 @@ async function _revBreakFetch(w) {
   const L = getLangDef(wordLang(w))
   const r = await aiJSON(`Break down this ${L.nameEn} snippet for a Brazilian learner who is deciding WHAT to study in it. This is a quick TRIAGE, not a deep analysis. Return ONLY JSON.
 
-Snippet: "${alvo}"${ctx && ctx !== alvo ? `\nFull sentence: "${ctx}"` : ''}${w.source_title ? `\nSource: "${w.source_title}"` : ''}
+Snippet to break down (ONLY this): "${alvo}"${ctx && ctx !== alvo ? `\nSurrounding sentence (context to understand the MEANING only — NEVER take units from it): "${ctx}"` : ''}${w.source_title ? `\nSource: "${w.source_title}"` : ''}
 
 {"items":[{"expr":"exact text as it appears in the snippet","type":"word|phrasal_verb|idiom|collocation|chunk","gloss":"what it means IN THIS context, Brazilian Portuguese, max 6 words","nivel":"A1|A2|B1|B2|C1|C2"}]}
 
 Rules:
 - FIRST identify multi-word units: phrasal verbs (e.g. "get you in" in "we'll get you in for that"), idioms, collocations and fixed conversational chunks worth learning as a block ("chunk").
 - THEN list the remaining notable single words NOT already inside a unit.
+- Every "expr" MUST be text that appears INSIDE the snippet — never from the surrounding sentence. Units that are not part of the snippet are discarded.
 - SKIP trivial function words (articles, pronouns, auxiliaries, basic prepositions) unless they belong to a unit.
 - "gloss" is the meaning HERE, not a dictionary list.
 - LITERAL-TRANSLATION TRAP — avoid it explicitly: FIRST work out what the unit DOES in this scene, THEN write the gloss for that function. "We'll get you in for that" said at a hotel desk → gloss "a gente te encaixa (na agenda)", NEVER "colocar você dentro". If a gloss reads like word-by-word substitution, redo it before returning.
 - "nivel" is the CEFR difficulty of that unit for a learner.
 - Typically 1–8 items. Cover everything a learner might not know.`, { maxTokens: 700 })
+  // Cinto e suspensório: modelo barato ignora a regra e devolve pedaços da
+  // frase de CONTEXTO ("Okay.", "Great.") — só passa o que está literalmente
+  // dentro do objeto de estudo (comparação sem caixa/pontuação).
+  const normB = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[.,!?;:"""''()\[\]…]/g, ' ').replace(/\s+/g, ' ').trim()
+  const alvoNorm = ' ' + normB(alvo) + ' '
   const items = (Array.isArray(r.items) ? r.items : [])
     .map(it => ({ expr: String(it.expr || '').trim(), type: _RVB_CATS.some(c => c[0] === it.type) ? it.type : 'word',
                   gloss: String(it.gloss || '').trim(), nivel: String(it.nivel || '').trim() }))
-    .filter(it => it.expr)
+    .filter(it => it.expr && alvoNorm.includes(' ' + normB(it.expr) + ' '))
   if (!items.length) throw new Error('a IA não encontrou unidades de estudo')
   return items
 }
@@ -955,13 +962,17 @@ function revBreakStudy(wordId) {
   const criadas = []
   for (const i of st.sel) {
     const it = st.items[i]
+    // no_break vai NA criação: o createWord dispara a triagem em segundo
+    // plano na hora — marcar depois chegava tarde (corrida real, vista no
+    // teste). A unidade já é o recorte escolhido; nunca re-triar.
     const nova = createWord({
       word: it.expr,
       context: w.context || '',
       source_type: w.source_type || 'manual',
       source_title: w.source_title || '',
       source_context: w.source_context || '',
-      lang: wordLang(w)
+      lang: wordLang(w),
+      no_break: true
     })
     if (it.type !== 'word') nova.type = it.type === 'chunk' ? 'collocation' : it.type
     criadas.push(nova)

@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Anti-literal em todo o projeto (55ª rodada)**: a
+> Última atualização: 2026-08-04 — **Triagem fiel ao objeto de estudo (56ª rodada)**: a
+> triagem devolvia pedaços da frase de CONTEXTO ("Okay.", "Great.") e re-triava itens que
+> ela mesma criou. Agora: filtro no código (unidade fora do objeto é descartada) + marca
+> `no_break` nascendo JUNTO com o item (corrida corrigida). Ver seção 8 (56ª rodada).
+>
+> Anterior: 2026-08-04 — **Anti-literal em todo o projeto (55ª rodada)**: a
 > armadilha da tradução literal ("get you in" → "colocar você dentro") agora é combatida
 > explicitamente nos 7 prompts que produzem português, com exemplo contrastivo e ordem de
 > operação ("entenda a função na cena, depois traduza a função") — técnica calibrada para
@@ -508,6 +513,24 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (56ª rodada) — Triagem fiel ao objeto de estudo (dois bugs dos prints)
+112. **Prints do Djemeson**: (a) itens criados PELA triagem ("I have yet to do", "All of
+     which") eram triados de novo e decompunham o CONTEXTO — mostrando unidades que nem
+     pertencem ao objeto de estudo; (b) "We'll get you in for that" trazia chips "Okay." e
+     "Great.", que só existem na frase de contexto. Duas correções:
+     - **Cinto e suspensório contra o contexto**: prompt reescrito ("Snippet to break down
+       (ONLY this)" + "a frase em volta é só para entender o SENTIDO — nunca tire unidades
+       dela") E filtro no código: `expr` normalizada (sem caixa/acento/pontuação) precisa
+       estar contida no objeto de estudo com fronteira de palavra — modelo barato
+       desobedece instrução, o filtro não. Validado com resposta suja de propósito
+       ("Okay.", "Great.", "all of which") → só "get you in"/"for that" sobraram.
+     - **`no_break` nasce COM o item** (campo do createWord, persistido): item criado pela
+       triagem é um recorte já escolhido — nunca re-triar. A 1ª tentativa marcava a flag
+       DEPOIS do createWord e perdia a corrida contra o prefetch (pego no teste ao vivo);
+       agora vai no payload. Card desses itens também não mostra área de triagem.
+     - Validado ponta a ponta: frase → chips filtrados → item criado com `no_break`, zero
+       triagens extras, card do novo item limpo. `CACHE`: `v82` → **`v83`**.
 
 ### Sessão 2026-08-04 (55ª rodada) — Armadilha da tradução literal combatida em TODO o projeto
 111. **Pedido**: "reforce a instrução em todo o projeto, levando em consideração modelos
