@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Forma neutra, tempos fixos e o merge que fossilizava
+> Última atualização: 2026-08-04 — **Raio-X da frase (52ª rodada)**: frase capturada é
+> triada AUTOMATICAMENTE pela IA ao entrar na revisão (leve, ~R$ 0,0004) — chips de
+> palavras/phrasals/expressões/estruturas com mini-glosa; o aluno marca o que NÃO conhece
+> e os itens saem criados e ANALISADOS. Ver seção 8 (52ª rodada).
+>
+> Anterior: 2026-08-04 — **Forma neutra, tempos fixos e o merge que fossilizava
 > (51ª rodada)**: o "debilitante" preso vinha do merge de preservação (agora resolve
 > contradições); títulos em forma de citação (lema, sem "esvazia" conjugado nem
 > "esvaziadora" inventado); exemplos em ordem fixa presente→passado→forma que mais flexiona;
@@ -487,6 +492,30 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (52ª rodada) — Raio-X da frase: triagem automática do que estudar
+108. **Pedido** (card "We'll get you in for that"): "tem vezes que não sei exatamente o que
+     não entendi — se é palavra, phrasal, idiom… quero separar o que já sei do que não, e
+     aí mandar pra IA analisar". Refinos durante a rodada: a triagem deve ser LEVE (sem
+     levantamento profundo), rodar SOZINHA assim que o item entra na revisão, e com
+     análise de custo-benefício antes (feita: ~R$ 0,0004/frase no DeepSeek — 100 frases =
+     R$ 0,04/mês; benefício = card abre com os chips prontos; aprovada).
+     - **`_revBreakPrefetch`** disparado pelo `createWord` (dashboard.js) para itens com
+       3+ palavras: UMA chamada `aiJSON` curta (glosa de até 6 palavras por unidade,
+       maxTokens 700) → cache em memória (`_revBreakCache`, não persiste — recarregar a
+       página re-tria só quando o card for aberto).
+     - **UI no card pendente** (review.js): chips agrupados por categoria (Phrasal verbs /
+       Expressões idiomáticas / Colocações / Estruturas / Palavras), cada um com
+       mini-glosa e nível CEFR. "Toque no que você NÃO conhece" → botão "Estudar N
+       selecionadas" cria os itens (herdam contexto/fonte/idioma; tipo preservado —
+       phrasal vira phrasal) **e já roda a análise completa em sequência** (o "de fato
+       mandar pra IA analisar" do pedido). Chips criados ficam marcados; aparece "Remover
+       a frase da fila" (a frase-mãe vira descartável). Botão manual continua para quem
+       abriu antes de a triagem terminar.
+     - Validado ao vivo (fluxo completo com stubs): frase criada → triagem automática (1
+       chamada só) → chips prontos AO ABRIR o card → 2 marcadas → 2 itens criados com
+       fonte herdada e tipo certo → 2 análises completas automáticas → chips "feitos" +
+       botão de remover a frase. `CACHE`: `v78` → **`v79`**.
 
 ### Sessão 2026-08-04 (51ª rodada) — Forma neutra, tempos fixos e o merge que fossilizava termos
 107. **Feedback sobre a reanálise de *emasculating*** (agora com 2 sentidos): "debilitante

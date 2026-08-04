@@ -639,16 +639,39 @@ function renderWordCard(wordId) {
   let bodyHtml
 
   if (w.status === 'pending_ai') {
+    // Frase com 3+ palavras: oferece o RAIO-X antes da análise — decompõe em
+    // palavras/phrasals/expressões/estruturas para o aluno separar o que já
+    // sabe do que precisa estudar (pedido do Djemeson: "não sei exatamente o
+    // que não entendi").
+    const alvoBrk = (w.word || w.context || '').trim()
+    const ehFrase = alvoBrk.split(/\s+/).length >= 3
     bodyHtml = `
     <div class="wc-pending-ai">
       <p>Esta palavra ainda não foi analisada pela IA.</p>
       <button class="btn btn-primary big-btn" onclick="analyzeWord('${w.id}')">
         ${ic('sparkles')}Analisar com IA agora
       </button>
+      ${ehFrase ? `
+      <button class="btn btn-secondary" style="margin-top:10px" onclick="revBreakdown('${w.id}')"
+        data-tip="A IA separa a frase em palavras, phrasal verbs, expressões e estruturas — você marca o que NÃO conhece e manda só isso para estudo">
+        ${ic('layers')}O que tem aqui? Separar em partes
+      </button>` : ''}
+      <div id="rev-break-area"></div>
       <p style="margin-top:12px;font-size:var(--fs-sm);color:var(--text3)">
-        A IA vai identificar todos os significados, exemplos, nível e registro automaticamente.
+        ${ehFrase
+          ? 'Não sabe o que exatamente não entendeu? A triagem mostra cada pedaço da frase com uma mini-tradução — marque o que for novo e ele já sai analisado.'
+          : 'A IA vai identificar todos os significados, exemplos, nível e registro automaticamente.'}
       </p>
     </div>`
+    // Triagem automática: se já rodou em segundo plano, mostra os chips ao
+    // abrir; se está rodando, mostra o aviso; se nem começou, dispara agora.
+    if (ehFrase) setTimeout(() => {
+      if (activeWordId !== w.id) return
+      const area = el('rev-break-area'); if (!area) return
+      if (_revBreakCache.has(w.id)) _revBreakRender(w.id)
+      else if (_revBreakBusy.has(w.id)) area.innerHTML = `<div style="margin-top:14px"><span class="gen-spinner"></span> a IA está separando a frase...</div>`
+      else _revBreakPrefetch(w).then(() => { if (activeWordId === w.id && _revBreakCache.has(w.id)) _revBreakRender(w.id) })
+    }, 0)
   } else {
     bodyHtml = `
     <div class="wc-meanings">
@@ -807,6 +830,151 @@ async function deleteWord(id) {
 // da IA ali mesmo, cobrindo referência cultural) e "Revisar" (vira um
 // item novo da fila). Sem sair do flow.
 // ================================================================
+// ================================================================
+// RAIO-X DA FRASE — decompõe um item multi-palavra em unidades de
+// estudo (palavras / phrasal verbs / expressões / estruturas) para o
+// aluno marcar o que NÃO conhece e mandar SÓ isso para a análise.
+// ================================================================
+const _revBreakCache = new Map()   // wordId → { items, sel:Set, done:Set }
+
+const _RVB_CATS = [
+  ['phrasal_verb', 'Phrasal verbs'],
+  ['idiom',        'Expressões idiomáticas'],
+  ['collocation',  'Colocações'],
+  ['chunk',        'Estruturas / blocos fixos'],
+  ['word',         'Palavras']
+]
+
+const _revBreakBusy = new Set()
+
+// Triagem AUTOMÁTICA: dispara em segundo plano assim que um item multi-palavra
+// entra na revisão (chamado por createWord) — leve de propósito (mini-glosas,
+// sem levantamento profundo). Quando o aluno abrir o card, os chips já estão lá.
+async function _revBreakPrefetch(w) {
+  if (!w || !w.id) return
+  const alvo = (w.word || w.context || '').trim()
+  if (alvo.split(/\s+/).length < 3) return
+  if (!aiChatCfg().key || _revBreakCache.has(w.id) || _revBreakBusy.has(w.id)) return
+  _revBreakBusy.add(w.id)
+  try {
+    const items = await _revBreakFetch(w)
+    _revBreakCache.set(w.id, { items, sel: new Set(), done: new Set() })
+    if (activeWordId === w.id) _revBreakRender(w.id)   // card aberto: mostra na hora
+  } catch (e) { console.warn('[raio-x] triagem em segundo plano:', e.message) }
+  finally { _revBreakBusy.delete(w.id) }
+}
+
+async function revBreakdown(wordId) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const area = el('rev-break-area'); if (!area) return
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
+  if (_revBreakCache.has(wordId)) { _revBreakRender(wordId); return }
+  area.innerHTML = `<div style="margin-top:14px"><span class="gen-spinner"></span> a IA está separando a frase...</div>`
+  try {
+    const items = await _revBreakFetch(w)
+    _revBreakCache.set(wordId, { items, sel: new Set(), done: new Set() })
+    _revBreakRender(wordId)
+  } catch (e) {
+    area.innerHTML = `<div style="margin-top:14px;color:var(--error);font-size:var(--fs-sm)">Não deu: ${esc(e.message)} — clique de novo para tentar.</div>`
+  }
+}
+
+// A chamada em si — UMA, curta (triagem, não análise): glosas de até 6
+// palavras por unidade. O levantamento profundo só acontece depois, para as
+// unidades que o aluno marcar.
+async function _revBreakFetch(w) {
+  const alvo = (w.word || w.context || '').trim()
+  const ctx = (w.context || '').trim()
+  const L = getLangDef(wordLang(w))
+  const r = await aiJSON(`Break down this ${L.nameEn} snippet for a Brazilian learner who is deciding WHAT to study in it. This is a quick TRIAGE, not a deep analysis. Return ONLY JSON.
+
+Snippet: "${alvo}"${ctx && ctx !== alvo ? `\nFull sentence: "${ctx}"` : ''}${w.source_title ? `\nSource: "${w.source_title}"` : ''}
+
+{"items":[{"expr":"exact text as it appears in the snippet","type":"word|phrasal_verb|idiom|collocation|chunk","gloss":"what it means IN THIS context, Brazilian Portuguese, max 6 words","nivel":"A1|A2|B1|B2|C1|C2"}]}
+
+Rules:
+- FIRST identify multi-word units: phrasal verbs (e.g. "get you in" in "we'll get you in for that"), idioms, collocations and fixed conversational chunks worth learning as a block ("chunk").
+- THEN list the remaining notable single words NOT already inside a unit.
+- SKIP trivial function words (articles, pronouns, auxiliaries, basic prepositions) unless they belong to a unit.
+- "gloss" is the meaning HERE, not a dictionary list.
+- "nivel" is the CEFR difficulty of that unit for a learner.
+- Typically 1–8 items. Cover everything a learner might not know.`, { maxTokens: 700 })
+  const items = (Array.isArray(r.items) ? r.items : [])
+    .map(it => ({ expr: String(it.expr || '').trim(), type: _RVB_CATS.some(c => c[0] === it.type) ? it.type : 'word',
+                  gloss: String(it.gloss || '').trim(), nivel: String(it.nivel || '').trim() }))
+    .filter(it => it.expr)
+  if (!items.length) throw new Error('a IA não encontrou unidades de estudo')
+  return items
+}
+
+function _revBreakRender(wordId) {
+  const area = el('rev-break-area'); if (!area) return
+  const st = _revBreakCache.get(wordId); if (!st) return
+  const grupos = _RVB_CATS
+    .map(([tipo, rotulo]) => ({ rotulo, idxs: st.items.map((it, i) => it.type === tipo ? i : -1).filter(i => i >= 0) }))
+    .filter(g => g.idxs.length)
+  area.innerHTML = `
+    <div class="rvb">
+      <p class="rvb-hint">Toque no que você <b>não conhece</b> — o resto você já sabe:</p>
+      ${grupos.map(g => `
+        <div class="rvb-cat">${esc(g.rotulo)}</div>
+        <div class="rvb-row">${g.idxs.map(i => {
+          const it = st.items[i]
+          const done = st.done.has(i)
+          return `<button class="rvb-chip${st.sel.has(i) ? ' on' : ''}${done ? ' done' : ''}"
+            ${done ? 'disabled' : `onclick="revBreakToggle('${wordId}',${i})"`}>
+            <b>${esc(it.expr)}</b><span>${esc(it.gloss)}${it.nivel ? ' · ' + esc(it.nivel) : ''}</span>
+            ${done ? ic('checkCircle','ic-sm') : ''}</button>`
+        }).join('')}</div>`).join('')}
+      <div class="rvb-foot">
+        <button class="btn btn-primary btn-sm" ${st.sel.size ? '' : 'disabled'} onclick="revBreakStudy('${wordId}')">
+          ${ic('arrowRight','ic-sm')}Estudar ${st.sel.size || ''} selecionada${st.sel.size === 1 ? '' : 's'}</button>
+        ${st.done.size ? `<button class="btn btn-ghost btn-sm" onclick="deleteWord('${wordId}')"
+          data-tip="As partes escolhidas já viraram itens próprios — a frase original pode sair da fila">${ic('trash','ic-sm')}Remover a frase da fila</button>` : ''}
+      </div>
+    </div>`
+}
+
+function revBreakToggle(wordId, i) {
+  const st = _revBreakCache.get(wordId); if (!st) return
+  st.sel.has(i) ? st.sel.delete(i) : st.sel.add(i)
+  _revBreakRender(wordId)
+}
+
+function revBreakStudy(wordId) {
+  const w = words.find(x => x.id === wordId)
+  const st = _revBreakCache.get(wordId)
+  if (!w || !st || !st.sel.size) return
+  const criadas = []
+  for (const i of st.sel) {
+    const it = st.items[i]
+    const nova = createWord({
+      word: it.expr,
+      context: w.context || '',
+      source_type: w.source_type || 'manual',
+      source_title: w.source_title || '',
+      source_context: w.source_context || '',
+      lang: wordLang(w)
+    })
+    if (it.type !== 'word') nova.type = it.type === 'chunk' ? 'collocation' : it.type
+    criadas.push(nova)
+    st.done.add(i)
+  }
+  st.sel.clear()
+  saveWords()
+  renderSidebar(); renderDashboard()
+  toast(criadas.length > 1 ? `${criadas.length} itens criados — analisando com IA...` : `"${criadas[0].word}" criado — analisando com IA...`, 'success')
+  _revBreakRender(wordId)
+  // Da triagem direto para a ANÁLISE COMPLETA (pedido: "mas analise") — em
+  // sequência para não estourar o fornecedor; cada item avisa quando termina.
+  ;(async () => {
+    for (const nw of criadas) {
+      try { await analyzeWordDirect(nw.id) } catch (e) { console.warn('[raio-x] análise:', e.message) }
+    }
+    renderSidebar()
+  })()
+}
+
 const _revExplainCache = new Map()
 
 if (!window._revSelBound) {

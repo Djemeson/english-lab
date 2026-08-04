@@ -748,6 +748,9 @@ function createWord(data) {
   }
   words.unshift(w)
   saveWords()
+  // Frase multi-palavra entrando na revisão: a triagem leve (raio-X) roda em
+  // segundo plano JÁ — quando o card for aberto, os chips estão prontos.
+  if (typeof _revBreakPrefetch === 'function') _revBreakPrefetch(w)
   return w
 }
 

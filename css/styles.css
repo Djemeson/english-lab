@@ -3818,3 +3818,29 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .vid-pt-mini .ic{width:16px;height:16px}
 .vid-pt-mini:hover{background:rgba(0,0,0,.78)}
 .vid-pt-mini.on{background:var(--primary);box-shadow:0 0 0 2px rgba(255,255,255,.35)}
+
+/* ---- Raio-X da frase (Revisar): unidades de estudo selecionaveis ---- */
+.rvb{margin-top:16px;text-align:left;max-width:640px;margin-left:auto;margin-right:auto}
+.rvb-hint{font-size:var(--fs-sm);color:var(--text2);margin-bottom:6px}
+.rvb-cat{
+  font-size:var(--fs-xs);font-weight:600;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px;
+}
+.rvb-row{display:flex;flex-wrap:wrap;gap:8px}
+.rvb-chip{
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+  padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;
+  border:1px solid var(--border);background:var(--surface2);color:var(--text);
+  font-size:var(--fs-sm);text-align:left;transition:border-color .12s,background .12s;
+}
+.rvb-chip b{font-weight:600}
+.rvb-chip span{font-size:var(--fs-xs);color:var(--text3)}
+.rvb-chip:hover{border-color:var(--border-strong)}
+.rvb-chip.on{
+  border-color:var(--primary);
+  background:rgba(var(--primary-rgb),.10);
+  box-shadow:0 0 0 1px var(--primary) inset;
+}
+.rvb-chip.done{opacity:.55;cursor:default}
+.rvb-chip.done .ic{color:var(--success)}
+.rvb-foot{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
