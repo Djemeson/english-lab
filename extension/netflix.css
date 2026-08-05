@@ -244,10 +244,9 @@ html.englab-dock [data-uia="video-canvas"] {
   max-height: calc(100vh - var(--ll-dock)) !important;
   object-fit: contain !important;
 }
-/* os controles do player acompanham o encolhimento */
-html.englab-dock .watch-video--bottom-controls-container {
-  bottom: var(--ll-dock) !important;
-}
+/* NAO deslocar os controles: eles sao filhos do player, que ja encolheu.
+   Empurrar de novo com bottom:var(--ll-dock) somava os dois recuos e jogava
+   a barra de progresso para o MEIO da cena. */
 
 html.englab-dock #englab-bar {
   left: 0; right: 0; bottom: 0; transform: none;
@@ -264,14 +263,19 @@ html.englab-dock #englab-bar {
 /* na doca o texto respira: é o protagonista da seção */
 html.englab-dock .englab-line {
   font-size: clamp(20px, 2.1vw, 32px); font-weight: 600;
-  color: #63eab4; min-height: 2.5em; max-height: 2.6em;
+  color: var(--ll-txt); min-height: 2.5em; max-height: 2.6em;
   text-shadow: none;
 }
-html.englab-dock .englab-w:hover { background: rgba(99,234,180,.22); color: #fff; }
-html.englab-dock .englab-w.englab-ok { background: #63eab4; color: #06231f; }
+/* O teal e reservado a palavra CONHECIDA/capturada — nao pode ser tambem a
+   cor do texto corrido, senao o sinal perde o significado. */
 html.englab-dock .englab-pt,
 html.englab-dock.englab-x #englab-bar.englab-tem-pt .englab-pt {
-  color: #e8eef4; font-size: clamp(15px, 1.35vw, 21px); text-shadow: none;
+  color: var(--ll-pt); font-size: clamp(15px, 1.35vw, 21px); text-shadow: none;
+}
+/* fio discreto separando a fala da traducao */
+html.englab-dock #englab-bar.englab-tem-pt .englab-pt {
+  border-top: 1px solid var(--ll-line); padding-top: 9px;
+  width: min(560px, 60%); margin-left: auto; margin-right: auto;
 }
 html.englab-dock .englab-rule {
   position: absolute; left: 22px; right: 22px; bottom: 8px;
@@ -279,7 +283,7 @@ html.englab-dock .englab-rule {
 }
 html.englab-dock #englab-bar button { color: #7c8b99; }
 html.englab-dock #englab-bar button:hover { background: rgba(255,255,255,.08); color: #fff; }
-html.englab-dock #englab-bar button.on { background: #63eab4; color: #06231f; }
+html.englab-dock #englab-bar button.on { background: var(--ll-acc); color: #06231f; }
 html.englab-dock #englab-pop { bottom: calc(var(--ll-dock) + 16px); }
 
 /* ---- MODO FLUTUANTE (minimizado): só a legenda volta à cena ---- */
@@ -289,8 +293,8 @@ html.englab-dock #englab-pop { bottom: calc(var(--ll-dock) + 16px); }
   display: inline-block; padding: 6px 16px; border-radius: 10px;
   background: rgba(10, 14, 20, .72); backdrop-filter: blur(6px);
 }
-#englab-bar.englab-flut .englab-line { color: #63eab4; font-weight: 700; }
-#englab-bar.englab-flut .englab-pt { color: #fff; margin-top: 8px; }
+#englab-bar.englab-flut .englab-line { color: var(--ll-txt); font-weight: 600; }
+#englab-bar.englab-flut .englab-pt { color: var(--ll-pt); margin-top: 8px; }
 #englab-bar.englab-flut .englab-nav,
 #englab-bar.englab-flut .englab-tools {
   background: rgba(10, 14, 20, .72); border-radius: 10px; padding: 4px 8px;
@@ -300,3 +304,18 @@ html.englab-dock #englab-pop { bottom: calc(var(--ll-dock) + 16px); }
 #englab-bar.englab-flut:hover .englab-tools { opacity: 1; }
 #englab-bar.englab-flut .englab-rule { opacity: 0; transition: opacity .18s; }
 #englab-bar.englab-flut:hover .englab-rule { opacity: 1; }
+
+/* ---- silencio x SEM LEGENDA ----------------------------------------
+   Silencio entre falas: area limpa, nenhuma caixa boiando.
+   Sem legenda alguma: a secao explica o que fazer, em vez de ficar muda. */
+#englab-bar.englab-mudo .englab-line,
+#englab-bar.englab-mudo .englab-pt {
+  background: transparent !important; backdrop-filter: none !important;
+}
+#englab-bar.englab-sem-leg .englab-line::before {
+  content: attr(data-dica);
+  display: block; color: var(--ll-txt-2); font-weight: 400;
+  font-size: clamp(13px, 1.05vw, 16px); line-height: 1.5;
+  letter-spacing: 0; text-shadow: none;
+  max-width: 62ch; margin: 0 auto; white-space: pre-line;
+}

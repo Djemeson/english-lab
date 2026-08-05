@@ -33,6 +33,7 @@ let _vidMarkOpen = null         // marcador em ciclo: tempo de início aguardand
 let _vidSyncing = false
 let _vidSubCandidates = []      // legendas da última busca (para a IA testar alternativas)
 let _vidAppliedSubUrl = null    // URL da legenda aplicada (para não retestar a mesma)
+let _vidStream = false          // podcast tocando direto da internet (sem arquivo local)
 
 // ---- IndexedDB próprio: handles de arquivo + legendas ----
 const VideoDB = {
@@ -41,12 +42,14 @@ const VideoDB = {
     if (this._db) return Promise.resolve(this._db)
     return new Promise((resolve, reject) => {
       // v2: store 'media' — áudio consertado (m4a extraído pelo ffmpeg.wasm)
-      const req = indexedDB.open('el-video-db', 2)
+      // v3: store 'files' — o arquivo do episódio de PODCAST baixado
+      const req = indexedDB.open('el-video-db', 3)
       req.onupgradeneeded = () => {
         const db = req.result
         if (!db.objectStoreNames.contains('handles')) db.createObjectStore('handles')
         if (!db.objectStoreNames.contains('subs'))    db.createObjectStore('subs')
         if (!db.objectStoreNames.contains('media'))   db.createObjectStore('media')
+        if (!db.objectStoreNames.contains('files'))   db.createObjectStore('files')
       }
       req.onsuccess = () => { this._db = req.result; resolve(this._db) }
       req.onerror = () => reject(req.error)
@@ -99,19 +102,23 @@ function renderVideoLib() {
   _videoView = 'lib'
   const acts = el('video-ph-actions')
   if (acts) acts.innerHTML = `
-    <button class="btn btn-primary btn-sm" onclick="videoPickFile()">${ic('plus')}Abrir vídeo</button>`
+    <button class="btn btn-secondary btn-sm" onclick="podcastOpen()" data-tip="Buscar um podcast e escolher o episódio — ele é baixado e estudado como qualquer vídeo">${ic('mic')}Buscar podcast</button>
+    <button class="btn btn-primary btn-sm" onclick="videoPickFile()">${ic('plus')}Abrir arquivo</button>`
   const area = el('video-area'); if (!area) return
 
   if (!videos.length) {
     area.innerHTML = `
       <div class="srs-empty">
         ${ic('film','ic-xl')}
-        <p style="font-size:var(--fs-base);font-weight:600;margin-bottom:8px">Nenhum vídeo ainda</p>
-        <p style="font-size:var(--fs-md);margin-bottom:6px">Abra um episódio ou filme do seu computador, importe a legenda (.srt)
-        e transforme as cenas em cards — com o áudio real dos atores.</p>
-        <p style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:20px">O arquivo nunca sai do seu aparelho e pode ser apagado depois:
-        o app guarda só a legenda, os cortes e os áudios extraídos.</p>
-        <button class="btn btn-primary" onclick="videoPickFile()">${ic('plus')}Abrir vídeo</button>
+        <p style="font-size:var(--fs-base);font-weight:600;margin-bottom:8px">Nada aqui ainda</p>
+        <p style="font-size:var(--fs-md);margin-bottom:6px">Busque um <b>podcast</b> e escolha o episódio, ou abra um episódio/filme
+        do seu computador. Importe a legenda (.srt) e transforme as falas em cards — com o áudio real.</p>
+        <p style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:20px">O arquivo fica só no seu aparelho e pode ser apagado depois:
+        o app guarda a legenda, os cortes e os áudios extraídos.</p>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="podcastOpen()">${ic('mic')}Buscar podcast</button>
+          <button class="btn btn-secondary" onclick="videoPickFile()">${ic('plus')}Abrir arquivo</button>
+        </div>
       </div>`
     return
   }
@@ -123,10 +130,13 @@ function renderVideoLib() {
         const dur = v.duration ? _vidFmtTime(v.duration) : '—'
         return `
         <div class="vid-lib-row" onclick="videoOpen('${v.id}')">
-          <div class="vid-lib-icon">${srcIcon(v.source_type || 'series')}</div>
+          <div class="vid-lib-icon">${v.podcast && v.podcast.artwork
+            ? `<img class="vid-lib-art" src="${escA(v.podcast.artwork)}" alt="" loading="lazy">`
+            : srcIcon(v.source_type || 'series')}</div>
           <div class="vid-lib-body">
             <div class="vid-lib-title">${esc(v.title)}</div>
             <div class="vid-lib-meta">
+              ${v.podcast && v.podcast.showTitle ? `<span class="vid-lib-show">${esc(v.podcast.showTitle)}</span>` : ''}
               <span>${dur}</span>
               <span>${v.cueCount ? v.cueCount + ' falas' : 'sem legenda'}</span>
               ${nClips ? `<span>${nClips} corte${nClips !== 1 ? 's' : ''}</span>` : ''}
@@ -147,6 +157,8 @@ async function videoDelete(id) {
       <b>Nada de estudo é apagado</b>: cards, cortes e áudios extraídos continuam.</p>` }))) return
   videos = videos.filter(x => x.id !== id); saveVideos()
   VideoDB.del('handles', id); VideoDB.del('subs', id)
+  // podcast baixado ocupa dezenas de MB: sai junto (nada de órfão no disco)
+  VideoDB.del('files', id); VideoDB.del('media', id)
   autoSyncAfterChange()
   renderVideoLib()
 }
@@ -198,6 +210,14 @@ async function videoAcceptFile(file, handle) {
 // Reabre um vídeo da biblioteca (tenta o handle persistido primeiro)
 async function videoOpen(id) {
   const v = videos.find(x => x.id === id); if (!v) return
+  // Podcast: o "arquivo" é o episódio baixado (ou baixável de novo pela URL
+  // do feed). Nunca pede arquivo ao usuário — nem em outro aparelho.
+  if (v.podcast && typeof podcastEnsureFile === 'function') {
+    const ok = await podcastEnsureFile(v)
+    if (!ok && !v.podcast.audioUrl) { toast('Não consegui recuperar o áudio deste episódio', 'error'); return }
+    await videoOpenPlayer(v)
+    return
+  }
   const handle = await VideoDB.get('handles', id)
   if (handle) {
     try {
@@ -258,21 +278,33 @@ async function videoOpenPlayer(v) {
   _vidRuleIni = null; _vidRuleTrack = null; _vidRuleCur = null
 
   if (_vidURL) { URL.revokeObjectURL(_vidURL); _vidURL = null }
-  _vidURL = URL.createObjectURL(_vidFile)
+  // Origem do áudio/vídeo: o arquivo local sempre que existir. Podcast sem
+  // arquivo (CORS do CDN bloqueou o download) toca por STREAMING — com
+  // crossorigin para o captureStream do áudio da cena continuar valendo
+  // quando o servidor permite.
+  const ehPod = !!v.podcast
+  _vidStream = false
+  let src = ''
+  if (_vidFile) { _vidURL = URL.createObjectURL(_vidFile); src = _vidURL }
+  else if (ehPod && v.podcast.audioUrl) { src = v.podcast.audioUrl; _vidStream = true }
 
   const acts = el('video-ph-actions')
   if (acts) acts.innerHTML = `
-    <button class="btn btn-secondary btn-sm" onclick="videoSubSearchOpen()" data-tip="Buscar legenda online (addons do Stremio — OpenSubtitles e outros)">${ic('search')}Buscar legenda</button>
+    ${ehPod
+      ? `<button class="btn btn-secondary btn-sm" onclick="videoTranscribeFull()" data-tip="Podcast não tem legenda pronta: a IA escuta o episódio e escreve uma, já sincronizada">${ic('sparkles')}Criar legenda com IA</button>`
+      : `<button class="btn btn-secondary btn-sm" onclick="videoSubSearchOpen()" data-tip="Buscar legenda online (addons do Stremio — OpenSubtitles e outros)">${ic('search')}Buscar legenda</button>`}
     <button class="btn btn-ghost btn-sm" onclick="videoImportSubPick()" data-tip="Importar arquivo .srt/.vtt do computador">${ic('upload')}Importar</button>
     <button class="btn btn-secondary btn-sm" onclick="videoPrepare()" data-tip="Cruza a legenda com seu vocabulário: o que você ainda não conhece neste episódio">${ic('sparkles')}Preparar para assistir</button>
+    ${ehPod && !_vidStream ? `<button class="btn btn-ghost btn-sm" onclick="podcastFreeSpace()" data-tip="Apaga só o áudio baixado; legenda, cortes e cards continuam">${ic('trash')}Liberar espaço</button>` : ''}
     <button class="btn btn-ghost btn-sm" onclick="videoBackToLib()">${ic('undo')}Biblioteca</button>`
 
   const area = el('video-area'); if (!area) return
   area.innerHTML = `
     <div class="vid-layout">
       <div class="vid-main">
-        <div class="vid-stage${/\.(mp3|m4a|aac|ogg|opus|wav|flac)$/i.test(_vidCur.fileName || '') ? ' vid-audio' : ''}">
-          <video id="vid-player" src="${_vidURL}" controls preload="metadata"></video>
+        <div class="vid-stage${ehPod || /\.(mp3|m4a|aac|ogg|opus|wav|flac)$/i.test(_vidCur.fileName || '') ? ' vid-audio' : ''}">
+          ${ehPod && v.podcast.artwork ? `<img class="vid-pod-art" src="${escA(v.podcast.artwork)}" alt="">` : ''}
+          <video id="vid-player" src="${src}" controls preload="metadata"${_vidStream ? ' crossorigin="anonymous"' : ''}></video>
           <div class="vid-ov" id="vid-ov">
             <span class="vid-ov-en" id="vid-ov-en" title="Arraste para selecionar um trecho; clique duplo seleciona a palavra"></span>
             <span class="vid-ov-pt" id="vid-ov-pt"></span>
@@ -293,7 +325,7 @@ async function videoOpenPlayer(v) {
         <div id="vid-audiofix-banner"></div>
         <div id="vid-sync-panel" class="hidden"></div>
         <div class="vid-toolbar">
-          <span class="vid-title" data-tip="${escA(v.fileName)}">${esc(v.title)}</span>
+          <span class="vid-title" data-tip="${escA(ehPod ? (v.podcast.showTitle || v.fileName) : v.fileName)}">${esc(v.title)}</span>
           <span style="flex:1"></span>
           <button class="btn btn-ghost btn-sm" onclick="videoReplayCue()" data-tip="A frase passou? Volta ao início da fala atual/última (tecla R)">${ic('undo','ic-sm')}Repetir fala</button>
           <button class="btn btn-ghost btn-sm" id="vid-mark-btn" onclick="videoAddMarker()" data-tip="Marca o INÍCIO do trecho; o 2º clique (ou tecla M) fecha e abre o estudo focado">${ic('flame','ic-sm')}Marcar</button>
@@ -340,18 +372,36 @@ async function videoOpenPlayer(v) {
   player.addEventListener('pause', _vidSavePos)
   player.addEventListener('ended', () => { v.position = 0; saveVideos() })
 
+  // Streaming com crossorigin: se o servidor NÃO manda CORS, o elemento nem
+  // carrega. Recarrega sem o atributo (toca, mas sem captureStream) em vez de
+  // deixar o player mudo e sem explicação.
+  if (_vidStream) {
+    player.addEventListener('error', () => {
+      if (!player.crossOrigin) return
+      player.crossOrigin = null
+      player.src = src
+      player.load()
+      toast('Este servidor não libera a leitura do áudio: dá para ouvir, mas não para gravar a fala em card', 'warning')
+    }, { once: true })
+  }
+
   // Áudio consertado de sessão anterior? Reanexa. Senão, arma o detector de
   // áudio mudo (MKV com Dolby/DTS: o Chrome toca o vídeo e cala o áudio).
+  // Podcast é mp3/m4a: nada disso se aplica (e o ffmpeg não teria arquivo).
   _vidFixAudio = null
-  const fixedBlob = await VideoDB.get('media', v.id)
-  if (fixedBlob) _vidAttachFixedAudio(fixedBlob)
-  else _vidArmSilentDetector(player)
+  if (!ehPod) {
+    const fixedBlob = await VideoDB.get('media', v.id)
+    if (fixedBlob) _vidAttachFixedAudio(fixedBlob)
+    else _vidArmSilentDetector(player)
+  }
 
   renderVidTranscript()
   renderVidMarkers()
   renderVidSelPanel()
   _vidOvBind()          // seleção na legenda sobre o vídeo
-  if (!_vidCues.length) _vidAutoSub()   // 1ª vez: acha e aplica a legenda sozinho
+  // Busca automática nos addons só faz sentido para série/filme — para
+  // podcast ela procuraria um título de episódio no OpenSubtitles à toa.
+  if (!_vidCues.length && !ehPod) _vidAutoSub()
 
 
   // Tecla M marca o momento (só com a seção ativa e fora de inputs)

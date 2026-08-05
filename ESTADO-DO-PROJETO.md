@@ -3,7 +3,11 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Seção abaixo do vídeo (74ª rodada)**: em vez de flutuar
+> Última atualização: 2026-08-05 — **Acertos da seção (75ª rodada)**: controles do player
+> voltaram ao rodapé do vídeo, cores originais de volta (o teal é só de palavra conhecida) e
+> a área da legenda passou a explicar por que está vazia. Ver seção 8 (75ª rodada).
+>
+> Anterior: 2026-08-04 — **Seção abaixo do vídeo (74ª rodada)**: em vez de flutuar
 > sobre a cena e brigar com os controles, a extensão passou a ter uma SEÇÃO própria abaixo do
 > player (que encolhe na medida exata), com um modo minimizado em que só as legendas voltam a
 > flutuar, com fundo próprio. Ver seção 8 (74ª rodada).
@@ -600,6 +604,27 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-05 (75ª rodada) — Os três acertos da seção
+136. Djemeson mandou três prints (dois do nosso estado falho, um do Language Reactor como
+     referência de organização). Três causas distintas:
+     - **Controles do player no MEIO da cena**: `.watch-video--bottom-controls-container` é
+       filho do player, que já tinha encolhido — a regra `bottom: var(--ll-dock)` somava o
+       recuo DUAS vezes. Removida: agora os controles terminam exatamente no rodapé do vídeo.
+     - **Cores**: a legenda verde-menta copiada do print do Language Reactor colidia com o
+       significado que o teal já tem aqui (palavra conhecida/capturada). Voltaram as cores de
+       sempre — fala em branco (`--ll-txt`), tradução em dourado (`--ll-pt`) — e o teal ficou
+       reservado ao seu papel. De graça: um fio discreto separando fala e tradução, como na
+       referência.
+     - **Área da legenda vazia**: silêncio entre falas e "não há legenda nenhuma" pareciam a
+       mesma coisa. Agora, após 5s sem cue e sem legenda no DOM, a seção explica o que fazer —
+       e detecta o **Language Reactor ativo na aba**, que também intercepta a legenda da
+       Netflix, citando-o como causa provável. No modo flutuante, a pílula de fundo some
+       quando não há texto (antes ficava um retângulo escuro boiando na cena).
+137. **Achado de passagem**: ao LIGAR o PT, `pintarPT()` só era chamado no ramo do desligar —
+     o espaço da tradução só era reservado quando a IA respondia, e o painel crescia. Agora
+     pinta antes de pedir a tradução. Altura medida: 175px com e sem PT.
+     `manifest`: 2.9.0 → **2.9.1**.
 
 ### Sessão 2026-08-04 (74ª rodada) — A extensão ganha uma SEÇÃO abaixo do vídeo (modo doca)
 135. **Diagnóstico do Djemeson** (com dois prints de referência): "o painel fica sobre o

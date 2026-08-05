@@ -308,7 +308,10 @@ function garantirBarra() {
     if (a === 'prev') falaAnterior()
     else if (a === 'rep') repetirFala()
     else if (a === 'next') proximaFala()
-    else if (a === 'pt') { cfgUI.pt = !cfgUI.pt; salvarUI(); sincronizarBotoes(); if (cfgUI.pt) { const v = vid(); cues.length ? traduzirJanela(v ? v.currentTime : 0) : traduzirAvulsa(ultimoTexto) } else pintarPT() }
+    // pintarPT() ANTES de pedir a traducao: e ele quem reserva o espaco da
+    // linha PT. Chamando so no "else", ligar o PT deixava o painel crescer
+    // quando a IA respondia.
+    else if (a === 'pt') { cfgUI.pt = !cfgUI.pt; salvarUI(); sincronizarBotoes(); pintarPT(); if (cfgUI.pt) { const v = vid(); cues.length ? traduzirJanela(v ? v.currentTime : 0) : traduzirAvulsa(ultimoTexto) } }
     else if (a === 'fog') { cfgUI.fog = !cfgUI.fog; salvarUI(); sincronizarBotoes(); pintarPT() }
     else if (a === 'line') { if (ultimoTexto) { salvarCaptura('', ultimoTexto); piscar(b) } }
     else if (a === 'tr') { cfgUI.transcript = !cfgUI.transcript; salvarUI(); sincronizarBotoes(); renderTranscript() }
@@ -422,6 +425,7 @@ function renderFala(texto) {
   // pagina inicial) ela nao tem o que fazer.
   b.style.display = (idDoTitulo() && vid()) ? 'flex' : 'none'
   b.classList.toggle('englab-mudo', !texto)
+  if (texto) b.classList.remove('englab-sem-leg')
   pintarPT()
 }
 
@@ -569,6 +573,28 @@ const escapar = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').repl
 // Regra de ouro: o DOM e a verdade do que esta na tela (nunca perde uma
 // fala, mesmo que o arquivo de legenda venha incompleto ou atrasado). O
 // arquivo serve para navegar, traduzir na frente e montar o transcript.
+// ---- por que a area da legenda esta vazia? ----------------------------
+// Silencio entre falas e uma coisa; nao ter legenda NENHUMA e outra, e o
+// usuario merece saber a diferenca em vez de encarar uma faixa muda.
+let semLegDesde = 0
+function outroLeitorDeLegenda() {
+  // O Language Reactor (prefixo "lln"/"lr-") tambem intercepta a legenda da
+  // Netflix; com os dois ligados, um pode consumir o que o outro esperava.
+  return !!document.querySelector('[id^="lln"], [class^="lln"], [id^="lr-app"], [class*="language-reactor"]')
+}
+function conferirSemLegenda() {
+  if (!barra) return
+  const temAlgo = cues.length > 0 || !!textoDOM()
+  if (temAlgo) { semLegDesde = 0; barra.classList.remove('englab-sem-leg'); return }
+  if (!semLegDesde) { semLegDesde = Date.now(); return }
+  if (Date.now() - semLegDesde < 5000) return          // pode ser so um silencio longo
+  const linha = barra.querySelector('#englab-line')
+  if (linha) linha.dataset.dica = outroLeitorDeLegenda()
+    ? 'Nenhuma legenda chegou até aqui. O Language Reactor está ativo nesta aba e também intercepta a legenda da Netflix — desative-o e recarregue a página.'
+    : 'Nenhuma legenda chegou até aqui. Ligue a legenda em inglês no player da Netflix; se já estiver ligada, troque de idioma e volte para o inglês (isso faz a Netflix baixar o arquivo de novo).'
+  barra.classList.add('englab-sem-leg')
+}
+
 function renderAtual() {
   const v = vid()
   // A barra nasce assim que estamos num player — mesmo em silencio. Antes
@@ -618,6 +644,7 @@ setInterval(() => {
     if (ruleIni == null) montarRegua(v.currentTime)
   }
   renderAtual()
+  conferirSemLegenda()
 }, 120)
 
 // ---- fallback: observa o DOM (sempre ativo; manda quando não há arquivo) ----
