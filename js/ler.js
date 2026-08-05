@@ -168,7 +168,7 @@ async function _lerImportarUm(file) {
     totalWords: meta.chapters.reduce((s, c) => s + (c.words || 0), 0),
     totalChars: meta.chapters.reduce((s, c) => s + (c.chars || 0), 0),
     pos: { cap: 0, frac: 0 }, progress: 0, notes: [],
-    minutos: 0, addedAt: Date.now(), lastOpen: 0
+    minutos: 0, addedAt: Date.now(), updatedAt: Date.now(), lastOpen: 0
   })
   toast(`"${meta.title}" entrou na estante`, 'success')
 }
@@ -256,11 +256,21 @@ function lerFechar() {
   document.body.classList.remove('lendo')
   document.removeEventListener('keydown', _lerTeclas)
   document.removeEventListener('selectionchange', _lerSelecaoMudou)
+  document.removeEventListener('visibilitychange', _lerAoEsconder)
   window.removeEventListener('resize', _lerAoRedimensionar)
   clearTimeout(_lerSelTimer); clearTimeout(_lerResizeTimer)
   _lerFecharPopup()
   try { speechSynthesis.cancel() } catch (e) {}
   renderLerSection()
+}
+
+// Fechar a aba / trocar de app não dispara `lerFechar`. No celular é a saída
+// mais comum de todas — sem isto, os últimos minutos de leitura e a última
+// página viravam pó (a gravação é debounced em 1,5s).
+function _lerAoEsconder() {
+  if (document.visibilityState !== 'hidden' || !_lerLivro) return
+  _lerRegistrarTempo()
+  _lerSalvarPos(true)
 }
 
 function _lerRegistrarTempo() {
@@ -332,6 +342,7 @@ function renderLeitor() {
   window.removeEventListener('resize', _lerAoRedimensionar)
   document.addEventListener('selectionchange', _lerSelecaoMudou)
   document.addEventListener('keydown', _lerTeclas)
+  document.addEventListener('visibilitychange', _lerAoEsconder)
   window.addEventListener('resize', _lerAoRedimensionar)
   _lerDicaDeToque()
 }
@@ -569,13 +580,49 @@ async function _lerSanitizar(html, capHref) {
   return doc.body.innerHTML
 }
 
+// Enquanto o capítulo está sendo montado e posicionado, NADA grava posição.
+// Sem esta trava o bug era autodestrutivo: a restauração caía na página 0
+// (layout ainda não pronto), o evento de scroll disparava, e o zero era salvo
+// POR CIMA do marcador de verdade — uma reabertura apagava o lugar para sempre.
+let _lerRestaurando = false
+let _lerFracAlvo = 0
+let _lerAlvoAte = 0
+
+// Espera o texto realmente ter a forma final. Duas coisas mudam a paginação
+// DEPOIS do innerHTML e eram a causa raiz de "não voltou onde eu parei":
+// a fonte serifada (baixada do Google Fonts) e as imagens do próprio livro,
+// que só ganham altura quando carregam.
+async function _lerEsperarLayout(cont) {
+  const teto = ms => new Promise(res => setTimeout(res, ms))
+  try { await Promise.race([document.fonts.ready, teto(1200)]) } catch (e) {}
+  const imgs = [...cont.querySelectorAll('img')].filter(im => !im.complete)
+  if (imgs.length) {
+    await Promise.race([
+      Promise.all(imgs.map(im => new Promise(res => {
+        im.addEventListener('load', res, { once: true })
+        im.addEventListener('error', res, { once: true })
+      }))),
+      teto(1500)
+    ])
+  }
+  // dois quadros para o navegador refazer as colunas (com teto: aba oculta
+  // não roda requestAnimationFrame e travaria aqui para sempre)
+  await Promise.race([
+    new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res))),
+    teto(300)
+  ])
+}
+
 async function lerIrParaCapitulo(i, frac = 0) {
   if (!_lerLivro) return
   i = Math.max(0, Math.min(i, _lerLivro.chapters.length - 1))
   _lerCap = i
   const cont = el('ler-conteudo'); if (!cont) return
+  _lerRestaurando = true
+  _lerFracAlvo = frac
   cont.innerHTML = '<p class="ler-carregando">carregando…</p>'
   const html = await _lerHtmlDoCapitulo(i)
+  if (!_lerLivro || _lerCap !== i) { _lerRestaurando = false; return }   // trocou de capítulo no meio
   cont.innerHTML = html || '<p class="ler-carregando">(capítulo vazio)</p>'
   cont.querySelectorAll('.ler-link-int').forEach(a => {
     a.onclick = () => lerIrParaCapitulo(+a.dataset.cap, 0)
@@ -584,7 +631,30 @@ async function lerIrParaCapitulo(i, frac = 0) {
   if (nome) nome.textContent = _lerLivro.chapters[i].titulo || `Parte ${i + 1}`
   _lerRepintar()
   _lerMedirPaginas()
-  requestAnimationFrame(() => { _lerIrParaFrac(frac); _lerAtualizarProgresso() })
+
+  await _lerEsperarLayout(cont)
+  if (!_lerLivro || _lerCap !== i) { _lerRestaurando = false; return }
+  _lerMedirPaginas()          // remede já com a forma final
+  _lerIrParaFrac(frac)
+
+  // Confere o pouso. Se o alvo não pegou (colunas ainda não existiam), tenta
+  // de novo — é barato e cobre livro grande em máquina lenta.
+  if (frac > 0.02 && _lerFracAtual() < frac * 0.6) {
+    await new Promise(res => setTimeout(res, 250))
+    if (_lerCap === i) { _lerMedirPaginas(); _lerIrParaFrac(frac) }
+  }
+  _lerAtualizarProgresso()
+  // Imagem preguiçosa que carrega depois ainda empurra o texto: por alguns
+  // segundos, qualquer chegada dessas devolve o leitor ao ponto certo.
+  _lerAlvoAte = Date.now() + 4000
+  cont.querySelectorAll('img').forEach(im => {
+    if (im.complete) return
+    im.addEventListener('load', () => {
+      if (Date.now() > _lerAlvoAte || _lerCap !== i) return
+      _lerMedirPaginas(); _lerIrParaFrac(_lerFracAlvo)
+    }, { once: true })
+  })
+  _lerRestaurando = false
   const p = el('ler-sumario'); if (p) p.classList.add('hidden')
 }
 
@@ -714,6 +784,9 @@ function _lerTempo(min) {
 
 function _lerSalvarPos(agora = false) {
   if (!_lerLivro) return
+  // Trava do parágrafo acima: durante a restauração, a posição na tela ainda
+  // não é a posição do leitor — gravá-la apagaria o marcador.
+  if (_lerRestaurando) return
   clearTimeout(_lerSalvarTimer)
   const gravar = () => {
     if (!_lerLivro) return
@@ -893,6 +966,7 @@ function _lerAoSelecionar() {
     </div>
     <div class="ler-pop-extras">
       <button data-p="ouv" data-tip="Ouvir em voz alta (voz do navegador, custo zero)">${ic('volume','ic-sm')} Ouvir</button>
+      <button data-p="img" data-tip="Ver imagens do que está escrito — para objeto, planta, roupa, arma, bicho: a foto ensina o que a definição não ensina">${ic('image','ic-sm')} Imagens</button>
       <button data-p="wiki" data-tip="Abrir na Wikipédia em outra aba — o caminho para nome próprio, lugar, guerra, marca">${ic('bookOpen','ic-sm')} Wikipédia</button>
       <button data-p="web" data-tip="Pesquisar na web em outra aba">${ic('globe','ic-sm')} Web</button>
     </div>
@@ -911,6 +985,7 @@ function _lerAoSelecionar() {
     _lerFecharPopup(); try { window.getSelection().removeAllRanges() } catch (e) {}
   }
   pop.querySelector('[data-p="ouv"]').onclick = () => lerFalar(_lerPopAlvo)
+  pop.querySelector('[data-p="img"]').onclick = () => lerAbrirBusca('img')
   pop.querySelector('[data-p="wiki"]').onclick = () => lerAbrirBusca('wiki')
   pop.querySelector('[data-p="web"]').onclick = () => lerAbrirBusca('web')
   pop.querySelector('[data-p="exp"]').onclick = async () => {
@@ -933,12 +1008,20 @@ function _lerAoSelecionar() {
 function lerAbrirBusca(onde) {
   const termo = String(_lerPopAlvo || '').trim()
   if (!termo) return
-  // A Wikipédia é buscada no idioma do LIVRO: quem lê em inglês procura
-  // "Minie ball", não "bala Minié" — e o verbete de lá é o que casa com o texto.
+  // A busca sai no idioma do LIVRO: quem lê em inglês procura "Minie ball",
+  // não "bala Minié" — e o resultado de lá é o que casa com o texto na tela.
   const idioma = (_lerLivro && _lerLivro.lang) || 'en'
-  const url = onde === 'wiki'
-    ? `https://${idioma}.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(termo)}`
-    : `https://www.google.com/search?q=${encodeURIComponent(termo)}`
+  const q = encodeURIComponent(termo)
+  let url
+  if (onde === 'wiki') {
+    url = `https://${idioma}.wikipedia.org/wiki/Special:Search?search=${q}`
+  } else if (onde === 'img') {
+    // `tbm=isch` abre direto na aba de imagens; `hl` mantém a interface no
+    // idioma do livro para não misturar resultado traduzido no meio.
+    url = `https://www.google.com/search?tbm=isch&hl=${encodeURIComponent(idioma)}&q=${q}`
+  } else {
+    url = `https://www.google.com/search?q=${q}`
+  }
   window.open(url, '_blank', 'noopener,noreferrer')
   _lerFecharPopup()
 }

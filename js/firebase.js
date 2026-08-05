@@ -491,17 +491,31 @@ function applyCloudDocs(docs) {
   if (docs.srsLog)   { srsLog = docs.srsLog.list || []; saveSrsLog() }
   if (docs.srsDecks) { srsDecks = docs.srsDecks.list || []; saveSrsDecks() }
   if (docs.videos)   { videos = docs.videos.list || []; saveVideos() }
-  // Livro aberto AGORA não pode ser trocado embaixo do leitor: a posição que
-  // este aparelho está gravando é mais nova que o snapshot que acabou de
-  // chegar. Adotamos a nuvem e devolvemos a posição local por cima.
+  // Livros: merge POR LIVRO, pelo `updatedAt` — exceção consciente à regra
+  // "a nuvem substitui". O que está em jogo é ONDE VOCÊ PAROU: um snapshot
+  // atrasado (o outro aparelho empurrou antes deste) apagaria a leitura de
+  // hoje e o livro reabriria no capítulo de ontem. Exclusão continua
+  // propagando: livro que sumiu da nuvem sai daqui também.
   if (docs.livros) {
+    const nuvem = docs.livros.list || []
+    const carimbo = docs.livros.updatedAt || 0
+    const locais = new Map(livros.map(l => [l.id, l]))
     const abertoId = (typeof _lerLivro !== 'undefined' && _lerLivro) ? _lerLivro.id : null
-    const aberto = abertoId ? livros.find(l => l.id === abertoId) : null
-    livros = docs.livros.list || []
-    if (aberto) {
-      const i = livros.findIndex(l => l.id === abertoId)
-      if (i >= 0) livros[i] = aberto; else livros.push(aberto)
-      if (typeof _lerLivro !== 'undefined') _lerLivro = livros.find(l => l.id === abertoId) || aberto
+    const juntos = nuvem.map(remoto => {
+      const local = locais.get(remoto.id)
+      if (!local) return remoto
+      // Livro aberto agora: este aparelho é a fonte da verdade, ponto.
+      if (local.id === abertoId) return local
+      return (local.updatedAt || 0) > (remoto.updatedAt || 0) ? local : remoto
+    })
+    // Livro importado aqui e ainda não empurrado não pode sumir da estante.
+    for (const l of livros) {
+      if (nuvem.some(r => r.id === l.id)) continue
+      if ((l.addedAt || 0) > carimbo || l.id === abertoId) juntos.push(l)
+    }
+    livros = juntos
+    if (abertoId && typeof _lerLivro !== 'undefined') {
+      _lerLivro = livros.find(l => l.id === abertoId) || _lerLivro
     }
     saveLivros()
   }

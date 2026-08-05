@@ -4538,7 +4538,8 @@ mark.ler-w{
 #ler-pop .ler-pop-extras svg{width:13px;height:13px;flex-shrink:0}
 
 @media (max-width:768px){
-  .ler-pop-extras{gap:8px;margin-top:8px;padding-top:8px}
+  .ler-pop-extras{gap:8px;margin-top:8px;padding-top:8px;flex-wrap:wrap}
+  #ler-pop .ler-pop-extras button{flex:1 1 44%}
   #ler-pop .ler-pop-extras button{
     min-height:40px;font-size:var(--fs-xs);
     background:var(--surface2);border-color:var(--border);

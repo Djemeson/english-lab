@@ -816,6 +816,37 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        `lexaPrompt()`, com texto de reserva. Vale a regra para o futuro: **símbolo novo num
        arquivo do shell usado por outro arquivo = bump obrigatório do CACHE**.
 
+156. **"Quando volto ao livro não está na posição onde deixei" — e por que era pior do que
+     parecia**. Reproduzido com um EPUB de 3 capítulos e imagens: a posição era **gravada
+     certa** (`frac: 0,6`) e a reabertura caía na página 0.
+     - **Causa**: `lerIrParaCapitulo` posicionava depois de UM `requestAnimationFrame`, mas
+       nesse instante as colunas ainda não existiam (`scrollWidth − clientWidth` = 0), então
+       `_lerIrParaFrac` calculava um alvo de zero. Duas coisas mudam a paginação DEPOIS do
+       `innerHTML`: a fonte serifada (baixada do Google Fonts) e as imagens do livro, que só
+       ganham altura quando carregam.
+     - **Por que era autodestrutivo**: ao pousar na página 0, o evento de `scroll` disparava e
+       gravava o zero POR CIMA do marcador. Uma reabertura apagava o lugar para sempre — não
+       dava nem para "voltar na mão". É o tipo de defeito que precisa de trava, não de ajuste.
+     - **Correção**: trava `_lerRestaurando` (nada grava posição enquanto o capítulo se monta),
+       `_lerEsperarLayout()` esperando `document.fonts.ready` + as imagens (com teto de tempo)
+       + dois quadros, remedição com a forma final, uma segunda tentativa se o alvo não pegou,
+       e re-posicionamento por até 4 s quando uma imagem preguiçosa chega atrasada e empurra o
+       texto. Testado: capítulo 2 / página 7 sobreviveu a fechar, reabrir e recarregar a página.
+     - **A outra metade do mesmo problema, no sync**: `applyCloudDocs` adotava a lista da nuvem
+       inteira. Um snapshot atrasado (o outro aparelho empurrou antes deste) apagava a leitura
+       de hoje. Agora o merge é **por livro, pelo `updatedAt`** — exceção consciente à regra "a
+       nuvem substitui", porque o que está em jogo é onde você parou. Exclusão continua
+       propagando, e livro importado aqui e ainda não empurrado não some mais da estante.
+     - **`visibilitychange`**: fechar a aba ou trocar de app não dispara `lerFechar` — no
+       celular é a saída mais comum de todas. Agora a posição e os minutos lidos são gravados
+       na hora em que a tela some.
+
+157. **Busca de imagem no menu de seleção** (pedido junto): quarto botão da fileira de baixo,
+     abrindo a aba de imagens do Google no idioma do livro (`tbm=isch&hl=…`). É o complemento
+     natural da Wikipédia: para objeto, planta, roupa, arma ou bicho, a foto ensina o que a
+     definição não ensina — e custa zero token. No celular os quatro botões quebram em duas
+     linhas de dois (44% cada), com 40px de altura.
+
 ### Sessão 2026-08-05 (77ª rodada) — A PONTE COM O KINDLE
 
 **Pedido do Djemeson**: "é possível fazer uma ponte entre o Kindle e o nosso projeto? a cada
