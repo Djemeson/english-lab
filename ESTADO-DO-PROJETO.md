@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Extensão v2.1.1: ponte à prova de recarga (63ª
+> Última atualização: 2026-08-04 — **Extensão v2.1.2: o erro estava no CALLBACK (64ª
+> rodada)**: proteger a chamada não bastava — o callback roda depois e ali até LER
+> `chrome.runtime.lastError` lança. Todos os callbacks embrulhados + rede de segurança.
+> Ver seção 8 (64ª rodada).
+>
+> Anterior: 2026-08-04 — **Extensão v2.1.1: ponte à prova de recarga (63ª
 > rodada)**: o erro em bridge.js era "Extension context invalidated" (aba viva + extensão
 > recarregada); os 3 content scripts foram blindados e o popup passou a abrir a URL real
 > do app (Vercel). Ver seção 8 (63ª rodada).
@@ -549,6 +554,24 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (64ª rodada) — O erro persistiu: a lição estava no CALLBACK
+124. **O mesmo erro voltou** depois da 63ª (o print mostrava o arquivo NOVO — linha 9 já era
+     o comentário da blindagem). Diagnóstico correto desta vez:
+     - `seguro()` protegia a CHAMADA (`chrome.storage.local.get(...)`), mas o **callback é
+       assíncrono e roda fora daquele try/catch**. Dentro dele eu fazia
+       `if (chrome.runtime.lastError)` — e **ler essa propriedade com o contexto morto já
+       lança**. O throw acontecia num callback do Chrome, sem ninguém para pegar → "Uncaught
+       Error: Extension context invalidated".
+     - Correção: helpers **`cb()`/`cbExt()`** que embrulham TODO callback do `chrome.*`
+       (try/catch em volta, inclusive na leitura do `lastError`), aplicados em bridge.js,
+       netflix.js e popup.js. Mais duas **redes de segurança** (`window.onerror` e
+       `unhandledrejection`) que engolem especificamente esse erro para ele não poluir a
+       lista de Erros da extensão.
+     - **Validado com um chrome falso mais cruel** que o da 63ª: `lastError` que EXPLODE ao
+       ser lido e callbacks assíncronos (30ms), matando a extensão **entre a chamada e o
+       callback** — zero erros, e o vínculo bom continua espelhando config e URL.
+     `manifest`: 2.1.1 → **2.1.2**.
 
 ### Sessão 2026-08-04 (63ª rodada) — "Erros" na extensão: contexto invalidado + URL do app
 123. **Print do Djemeson**: erro apontando `bridge.js` na aba

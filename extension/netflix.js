@@ -13,13 +13,25 @@
 // que fala com a extensao passa por aqui.
 let extMorta = false
 const extViva = () => { try { return !!(chrome.runtime && chrome.runtime.id) } catch (e) { return false } }
+function morrer() {
+  if (extMorta) return
+  extMorta = true
+  avisar('extensão atualizada — recarregue a página (F5)')
+}
 function comExt(fn) {
   if (extMorta) return
-  if (!extViva()) { extMorta = true; avisar('extensão atualizada — recarregue a página (F5)'); return }
-  try { fn() } catch (e) {
-    if (String(e && e.message).includes('Extension context invalidated')) {
-      extMorta = true; avisar('extensão atualizada — recarregue a página (F5)')
-    }
+  if (!extViva()) { morrer(); return }
+  try { fn() } catch (e) { morrer() }
+}
+// Embrulha CALLBACKS do chrome.*: eles rodam depois da chamada, fora do
+// try/catch acima, e ali ate ler chrome.runtime.lastError pode lançar.
+function cbExt(fn) {
+  return function (...args) {
+    if (extMorta) return
+    try {
+      if (chrome.runtime.lastError) { morrer(); return }
+      fn(...args)
+    } catch (e) { morrer() }
   }
 }
 
@@ -34,10 +46,10 @@ let barra = null, painel = null
 let cfgUI = { ligada: true, ocultaNativa: true, pausaHover: true, pt: false, fog: true, transcript: false }
 let pausadoPorNos = false
 
-comExt(() => chrome.storage.local.get({ llui: null }, ({ llui }) => {
-  if (!chrome.runtime.lastError && llui) { cfgUI = { ...cfgUI, ...llui }; sincronizarBotoes(); aplicarNativa() }
-}))
-const salvarUI = () => comExt(() => chrome.storage.local.set({ llui: cfgUI }))
+comExt(() => chrome.storage.local.get({ llui: null }, cbExt(({ llui }) => {
+  if (llui) { cfgUI = { ...cfgUI, ...llui }; sincronizarBotoes(); aplicarNativa() }
+})))
+const salvarUI = () => comExt(() => chrome.storage.local.set({ llui: cfgUI }, cbExt(() => {})))
 
 const vid = () => document.querySelector('video')
 const titulo = () => {
@@ -48,11 +60,10 @@ const titulo = () => {
 
 // ---- captura para o app ----
 function salvarCaptura(word, context) {
-  comExt(() => chrome.storage.local.get({ pend: [] }, ({ pend }) => {
-    if (chrome.runtime.lastError) return
+  comExt(() => chrome.storage.local.get({ pend: [] }, cbExt(({ pend }) => {
     pend.push({ word, context, title: titulo(), ts: Date.now() })
-    comExt(() => chrome.storage.local.set({ pend }))
-  }))
+    comExt(() => chrome.storage.local.set({ pend }, cbExt(() => {})))
+  })))
 }
 function piscar(el) { el.classList.add('englab-ok'); setTimeout(() => el.classList.remove('englab-ok'), 600) }
 
@@ -147,14 +158,13 @@ function traduzirJanela(t) {
   if (!alvos.length) return
   for (const bloco of fatiar(alvos, 4)) {
     bloco.forEach(x => ptPend.add(x))
-    comExt(() => chrome.runtime.sendMessage({ type: 'ai-traduzir', falas: bloco }, resp => {
+    comExt(() => chrome.runtime.sendMessage({ type: 'ai-traduzir', falas: bloco }, cbExt(resp => {
       bloco.forEach(x => ptPend.delete(x))
-      if (chrome.runtime.lastError) return
       if (!resp || !resp.ok) { if (resp && resp.erro) avisar(resp.erro); return }
       bloco.forEach((x, i) => { if (resp.pt[i]) ptCache.set(x, resp.pt[i]) })
       pintarPT()
       if (cfgUI.transcript) renderTranscript()
-    }))
+    })))
   }
 }
 const fatiar = (a, n) => { const o = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
@@ -162,12 +172,11 @@ const fatiar = (a, n) => { const o = []; for (let i = 0; i < a.length; i += n) o
 function traduzirAvulsa(texto) {   // modo DOM (sem arquivo de legenda)
   if (!cfgUI.pt || ptCache.has(texto) || ptPend.has(texto)) return
   ptPend.add(texto)
-  comExt(() => chrome.runtime.sendMessage({ type: 'ai-traduzir', falas: [texto] }, resp => {
+  comExt(() => chrome.runtime.sendMessage({ type: 'ai-traduzir', falas: [texto] }, cbExt(resp => {
     ptPend.delete(texto)
-    if (chrome.runtime.lastError) return
     if (resp && resp.ok && resp.pt[0]) { ptCache.set(texto, resp.pt[0]); pintarPT() }
     else if (resp && resp.erro) avisar(resp.erro)
-  }))
+  })))
 }
 
 function pintarPT() {
@@ -304,10 +313,9 @@ function mostrarPopupSel() {
     const v = vid(); if (v && !v.paused) pausar()
     const body = pop.querySelector('#englab-pop-body')
     body.textContent = 'a IA está explicando…'
-    comExt(() => chrome.runtime.sendMessage({ type: 'ai-explicar', alvo: sel, contexto: ultimoTexto, titulo: titulo() }, resp => {
-      if (chrome.runtime.lastError) { body.textContent = 'Extensão atualizada — recarregue a página (F5).'; return }
+    comExt(() => chrome.runtime.sendMessage({ type: 'ai-explicar', alvo: sel, contexto: ultimoTexto, titulo: titulo() }, cbExt(resp => {
       body.textContent = (resp && resp.ok) ? resp.texto : ('Não deu: ' + ((resp && resp.erro) || 'sem resposta'))
-    }))
+    })))
   }
 }
 document.addEventListener('mousedown', e => {
@@ -423,3 +431,13 @@ comExt(() => chrome.runtime.onMessage.addListener(msg => {
     aplicarNativa()
   }
 }))
+
+// Rede de segurança: engole o erro de contexto invalidado para ele não
+// poluir a lista de Erros da extensão (acontece ao atualizar a extensão
+// com a aba da Netflix aberta).
+window.addEventListener('error', ev => {
+  const m = String((ev && ev.message) || '')
+  if (m.includes('Extension context invalidated') || m.includes('Receiving end does not exist')) {
+    morrer(); ev.preventDefault(); ev.stopImmediatePropagation()
+  }
+}, true)
