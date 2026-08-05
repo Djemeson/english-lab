@@ -230,6 +230,9 @@ async function fbPushData() {
     // Vídeo: só METADADOS (títulos, marcadores, cortes) — o arquivo de vídeo
     // nunca sobe (300MB–2GB × limite de 1MB/doc). Legendas ficam locais (IDB).
     batch.set(base.collection('data').doc('videos'), { list: videos, updatedAt: Date.now() })
+    // Ebooks: metadados, sumário, ONDE VOCÊ PAROU e os destaques. O arquivo
+    // (MBs) fica no IndexedDB de cada aparelho — mesma regra do vídeo.
+    batch.set(base.collection('data').doc('livros'), { list: livros, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('known'), { map: knownWords || {}, ignored: ignoredWords || {}, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('clips'),  { list: clips,  updatedAt: Date.now() })
     // Podcasts: só a lista de programas visitados (ponteiros). O episódio em si
@@ -488,6 +491,20 @@ function applyCloudDocs(docs) {
   if (docs.srsLog)   { srsLog = docs.srsLog.list || []; saveSrsLog() }
   if (docs.srsDecks) { srsDecks = docs.srsDecks.list || []; saveSrsDecks() }
   if (docs.videos)   { videos = docs.videos.list || []; saveVideos() }
+  // Livro aberto AGORA não pode ser trocado embaixo do leitor: a posição que
+  // este aparelho está gravando é mais nova que o snapshot que acabou de
+  // chegar. Adotamos a nuvem e devolvemos a posição local por cima.
+  if (docs.livros) {
+    const abertoId = (typeof _lerLivro !== 'undefined' && _lerLivro) ? _lerLivro.id : null
+    const aberto = abertoId ? livros.find(l => l.id === abertoId) : null
+    livros = docs.livros.list || []
+    if (aberto) {
+      const i = livros.findIndex(l => l.id === abertoId)
+      if (i >= 0) livros[i] = aberto; else livros.push(aberto)
+      if (typeof _lerLivro !== 'undefined') _lerLivro = livros.find(l => l.id === abertoId) || aberto
+    }
+    saveLivros()
+  }
   if (docs.known)    { knownWords = { ...knownWords, ...(docs.known.map || {}) }; saveKnownLocal()
                        ignoredWords = { ...ignoredWords, ...(docs.known.ignored || {}) }; saveIgnoredLocal() }
   if (docs.clips)    { clips  = docs.clips.list  || []; saveClips() }

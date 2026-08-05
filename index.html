@@ -171,6 +171,9 @@
     <button class="nav-item" id="nav-video" onclick="showSection('video')" data-tip="Estudar com séries, filmes e podcasts: legenda, cortes e cards com o áudio real da fala">
       <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><span>Vídeo</span>
     </button>
+    <button class="nav-item" id="nav-ler" onclick="showSection('ler')" data-tip="Ler ebooks aqui dentro: clique numa palavra e ela vira card, com a frase do livro">
+      <svg viewBox="0 0 24 24"><path d="M2 4h6a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2z"/><path d="M22 4h-6a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg><span>Ler</span>
+    </button>
     <!-- Bloco "Hoje": ancora o fim da lista (o vazio deixa de parecer menu
          inacabado) e transforma espaço morto no sinal que importa todo dia.
          Renderizado por renderSbToday() em js/srs.js — não-lazy. -->
@@ -791,6 +794,19 @@
   </div>
   <!-- Todo o conteúdo é renderizado por js/video.js (biblioteca | player | preparar) -->
   <div id="video-area"></div>
+</section>
+
+<!-- =========== LER (ebooks) =========== -->
+<section id="section-ler" class="section">
+  <div class="page-header" id="ler-header">
+    <div class="ph-left">
+      <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 4h6a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2z"/><path d="M22 4h-6a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg>Ler</h1>
+      <p>Seus ebooks aqui dentro — clique numa palavra e ela vira card com a frase do livro</p>
+    </div>
+    <div class="ph-actions" id="ler-ph-actions"></div>
+  </div>
+  <!-- Estante e leitor são renderizados por js/ler.js -->
+  <div id="ler-area"></div>
 </section>
 
 <!-- SRS Config Modal -->

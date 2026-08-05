@@ -1,7 +1,7 @@
 // ================================================================
 // STATE & STORAGE
 // ================================================================
-const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue', deletedWords: 'el-deleted-words', conversas: 'el-consulta-conversas', videos: 'el-videos', clips: 'el-clips', podShows: 'el-podcasts' }
+const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue', deletedWords: 'el-deleted-words', conversas: 'el-consulta-conversas', videos: 'el-videos', clips: 'el-clips', podShows: 'el-podcasts', livros: 'el-livros' }
 
 // ── VÍDEO (estado em core, como conversas): firebase.js sincroniza videos/
 //    clips e por isso eles NÃO podem morar no lazy video.js (armadilha nº 1).
@@ -12,6 +12,70 @@ function loadVideos() { try { videos = JSON.parse(localStorage.getItem(SK.videos
 function saveVideos() { localStorage.setItem(SK.videos, JSON.stringify(videos)) }
 function loadClips()  { try { clips = JSON.parse(localStorage.getItem(SK.clips) || '[]') } catch { clips = [] } }
 function saveClips()  { localStorage.setItem(SK.clips, JSON.stringify(clips)) }
+
+// ── LEITOR DE EBOOKS: metadados dos livros da estante.
+//    Mesma regra de videos/clips: o ARQUIVO do livro nunca entra aqui (fica
+//    no IndexedDB, em BookDB) — só o que é leve e precisa viajar entre
+//    aparelhos: título, autor, sumário, ONDE VOCÊ PAROU e os destaques.
+//    Mora no core porque firebase.js sincroniza (armadilha nº 1).
+let livros = []   // [{id,title,author,lang,format,cover,chapters[],pos,notes[],stats,...}]
+function loadLivros() { try { livros = JSON.parse(localStorage.getItem(SK.livros) || '[]') } catch { livros = [] } }
+function saveLivros() {
+  try { localStorage.setItem(SK.livros, JSON.stringify(livros)) }
+  catch (e) { console.warn('[livros] save falhou:', e.message) }
+}
+function livroPorId(id) { return livros.find(l => l.id === id) || null }
+
+// Arquivo do livro (epub/txt): IndexedDB, nunca localStorage (são MBs) e
+// nunca a nuvem (o Firestore tem teto de 1 MB por documento).
+const BookDB = {
+  _db: null,
+  async open() {
+    if (this._db) return this._db
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('english-lab-books', 1)
+      req.onupgradeneeded = e => e.target.result.createObjectStore('files')
+      req.onsuccess = e => { this._db = e.target.result; resolve(this._db) }
+      req.onerror = () => reject(req.error)
+    })
+  },
+  async get(id) {
+    try {
+      const db = await this.open()
+      return await new Promise(res => {
+        const r = db.transaction('files', 'readonly').objectStore('files').get(id)
+        r.onsuccess = () => res(r.result || null); r.onerror = () => res(null)
+      })
+    } catch { return null }
+  },
+  async set(id, blob) {
+    const db = await this.open()
+    return new Promise((res, rej) => {
+      const tx = db.transaction('files', 'readwrite')
+      tx.objectStore('files').put(blob, id)
+      tx.oncomplete = () => res(true); tx.onerror = () => rej(tx.error)
+    })
+  },
+  async del(id) {
+    try {
+      const db = await this.open()
+      return await new Promise(res => {
+        const tx = db.transaction('files', 'readwrite')
+        tx.objectStore('files').delete(id)
+        tx.oncomplete = () => res(true); tx.onerror = () => res(false)
+      })
+    } catch { return false }
+  },
+  async keys() {
+    try {
+      const db = await this.open()
+      return await new Promise(res => {
+        const r = db.transaction('files', 'readonly').objectStore('files').getAllKeys()
+        r.onsuccess = () => res(r.result || []); r.onerror = () => res([])
+      })
+    } catch { return [] }
+  }
+}
 
 // ── PODCASTS: programas já visitados ("Seus podcasts" no buscador).
 //    Mora aqui pelo mesmo motivo de videos/clips: firebase.js sincroniza e
@@ -423,6 +487,9 @@ const ICONS = {
   google:'<path d="M21 12.2c0-.6-.05-1.2-.15-1.7H12v3.4h5.1a4.4 4.4 0 0 1-1.9 2.9v2.4h3.1c1.8-1.7 2.7-4.1 2.7-7z"/><path d="M12 21c2.4 0 4.5-.8 6-2.2l-3.1-2.4c-.8.6-2 .9-2.9.9-2.3 0-4.2-1.5-4.9-3.6H3.9v2.4A9 9 0 0 0 12 21z"/><path d="M7.1 13.7a5.4 5.4 0 0 1 0-3.4V7.9H3.9a9 9 0 0 0 0 8.2z"/><path d="M12 6.6c1.3 0 2.5.5 3.4 1.3l2.6-2.6A9 9 0 0 0 3.9 7.9l3.2 2.4C7.8 8.1 9.7 6.6 12 6.6z"/>',
   lock:'<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
   heart:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/>',
+  chevronLeft:'<path d="m15 18-6-6 6-6"/>',
+  chevronRight:'<path d="m9 18 6-6-6-6"/>',
+  chevronDown:'<path d="m6 9 6 6 6-6"/>',
 }
 function ic(name, extra) {
   const inner = ICONS[name]; if (!inner) return ''
@@ -443,7 +510,7 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 // ================================================================
 // NAVIGATION
 // ================================================================
-const SECTIONS = ['dashboard','assistente','adicionar','revisar','estudar','biblioteca','video','configuracoes']
+const SECTIONS = ['dashboard','assistente','adicionar','revisar','estudar','biblioteca','video','ler','configuracoes']
 // Lazy-load map: section → arquivo JS carregado só na 1ª visita
 // biblioteca usa funções de study.js (buildSrsFrente/Verso/MetaChips/fmtDays)
 // (assistente NÃO é lazy — js/consulta.js é carregado sempre, pois firebase.js
@@ -453,6 +520,8 @@ const _LAZY = {
   // adicionar = PACOTE: o leitor de SQLite vem antes porque add.js usa
   // sqliteAbrir() para ler o vocab.db do Kindle.
   adicionar: ['js/kindle-db.js', 'js/add.js'],
+  // ler = PACOTE: epub.js (formato, sem DOM da página) antes de ler.js (tela)
+  ler: ['js/epub.js', 'js/ler.js'],
   estudar: 'js/study.js', biblioteca: 'js/study.js',
   palavras: 'js/known.js',
   video: ['js/video.js', 'js/video-subs.js', 'js/video-sync.js', 'js/video-study.js', 'js/video-podcast.js']
@@ -509,6 +578,11 @@ function _activateSection(name) {
   if (name === 'estudar') renderSrsSection()
   if (name === 'biblioteca') openBiblioteca()
   if (name === 'video') { if (typeof renderVideoSection === 'function') renderVideoSection() }
+  // O modo de leitura esconde o cabeçalho e a barra de baixo no celular:
+  // sair da seção por qualquer outro caminho precisa devolvê-los, senão o
+  // app fica sem navegação.
+  if (name !== 'ler') document.body.classList.remove('lendo')
+  if (name === 'ler') { if (typeof renderLerSection === 'function') renderLerSection() }
   if (name === 'palavras') { if (typeof renderKnownSection === 'function') renderKnownSection() }
 }
 function showTab(name) {

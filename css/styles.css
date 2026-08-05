@@ -4203,3 +4203,319 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   background:rgba(var(--primary-rgb),.10);color:var(--text);
   padding:1px 5px;border-radius:var(--radius-xs);font-size:var(--fs-xs);
 }
+
+/* ================================================================
+   SEÇÃO LER — estante e leitor de ebooks
+   O leitor NÃO usa as cores do tema do app de propósito: o fundo do
+   texto é escolhido por quem lê (papel, sépia, noite…) e precisa ser
+   estável, porque é ele que decide se a vista cansa ou não.
+   ================================================================ */
+
+/* ---- estante ---- */
+.ler-estante{
+  display:grid;gap:22px;
+  grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+}
+.ler-card{position:relative;cursor:pointer;text-align:left}
+.ler-capa{
+  position:relative;aspect-ratio:2/3;border-radius:var(--radius-sm);overflow:hidden;
+  background:var(--surface2);border:1px solid var(--border);
+  box-shadow:var(--shadow);transition:transform .16s,box-shadow .16s;
+}
+.ler-card:hover .ler-capa{transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,.28)}
+.ler-capa-img{width:100%;height:100%;object-fit:cover;display:block}
+.ler-capa-fake{
+  width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  padding:14px;text-align:center;
+  background:linear-gradient(150deg,rgba(var(--primary-rgb),.22),rgba(var(--primary-rgb),.06));
+}
+.ler-capa-fake span{font-family:Georgia,serif;font-size:var(--fs-sm);color:var(--text);line-height:1.35}
+.ler-capa-pct{
+  position:absolute;right:6px;bottom:6px;
+  background:rgba(0,0,0,.66);color:#fff;font-size:var(--fs-3xs);
+  padding:2px 6px;border-radius:20px;letter-spacing:.02em;
+}
+.ler-card-nome{margin-top:8px;font-size:var(--fs-sm);font-weight:600;color:var(--text);line-height:1.3}
+.ler-card-autor{font-size:var(--fs-xs);color:var(--text3);margin-top:1px}
+.ler-card-barra{margin-top:6px;height:3px;border-radius:2px;background:var(--surface2);overflow:hidden}
+.ler-card-barra i{display:block;height:100%;background:var(--primary)}
+.ler-card-x{
+  position:absolute;top:6px;right:6px;opacity:0;transition:opacity .15s;
+  background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:6px;
+  width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.ler-card:hover .ler-card-x{opacity:1}
+.ler-card-x:hover{background:var(--error)}
+.ler-drop{min-height:220px}
+.ler-vazio-dica{
+  margin-top:18px;font-size:var(--fs-sm);color:var(--text2);line-height:1.65;
+  border-left:2px solid rgba(var(--primary-rgb),.4);padding-left:14px;
+}
+
+/* ---- leitor: a moldura ocupa a tela toda ---- */
+body.lendo .sb-nav,body.lendo .sb-foot{opacity:.35;transition:opacity .2s}
+body.lendo .sb-nav:hover,body.lendo .sb-foot:hover{opacity:1}
+.ler-leitor{
+  --ler-bg:#f7f3ea;--ler-fg:#2b2721;--ler-fg2:#6b6357;--ler-mark:rgba(220,150,40,.30);
+  position:relative;display:flex;flex-direction:column;
+  height:calc(100vh - 48px);min-height:520px;
+  background:var(--ler-bg);color:var(--ler-fg);
+  border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;
+}
+.ler-leitor[data-tema="sepia"]{--ler-bg:#e8dcc4;--ler-fg:#3a3125;--ler-fg2:#7a6c56;--ler-mark:rgba(160,90,20,.26)}
+.ler-leitor[data-tema="cinza"]{--ler-bg:#d8d8d4;--ler-fg:#26262a;--ler-fg2:#5f6066;--ler-mark:rgba(60,90,190,.22)}
+.ler-leitor[data-tema="noite"]{--ler-bg:#15181d;--ler-fg:#c8ccd2;--ler-fg2:#7b838f;--ler-mark:rgba(230,180,80,.26)}
+.ler-leitor[data-tema="preto"]{--ler-bg:#000;--ler-fg:#a8adb4;--ler-fg2:#6a6f77;--ler-mark:rgba(230,180,80,.24)}
+
+.ler-barra{
+  display:flex;align-items:center;gap:8px;padding:8px 12px;flex-shrink:0;
+  border-bottom:1px solid rgba(128,128,128,.18);
+}
+.ler-barra-dir{margin-left:auto;display:flex;gap:4px}
+.ler-btn{
+  background:transparent;border:0;color:var(--ler-fg2);cursor:pointer;
+  padding:6px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;
+  font-family:inherit;font-size:var(--fs-sm);line-height:1;
+}
+.ler-btn:hover{background:rgba(128,128,128,.14);color:var(--ler-fg)}
+.ler-btn-txt{font-size:var(--fs-xs)}
+.ler-titulo{
+  font-weight:600;color:var(--ler-fg);max-width:min(50vw,520px);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.ler-pill{border:1px solid rgba(128,128,128,.3);padding:5px 11px;border-radius:20px}
+.ler-pill.on{background:var(--ler-fg);color:var(--ler-bg);border-color:var(--ler-fg)}
+
+/* ---- painéis (sumário, tipografia, ferramentas) ---- */
+.ler-painel{
+  flex-shrink:0;max-height:46vh;overflow-y:auto;padding:14px 18px;
+  border-bottom:1px solid rgba(128,128,128,.18);background:rgba(128,128,128,.07);
+  font-size:var(--fs-sm);
+}
+.ler-sumario-lista{display:flex;flex-direction:column;gap:1px}
+.ler-sum-item{
+  display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+  background:transparent;border:0;cursor:pointer;text-align:left;
+  padding:8px 10px;border-radius:6px;color:var(--ler-fg);font-family:inherit;font-size:var(--fs-sm);
+}
+.ler-sum-item:hover{background:rgba(128,128,128,.16)}
+.ler-sum-item.on{background:rgba(128,128,128,.2);font-weight:600}
+.ler-sum-item i{font-style:normal;font-size:var(--fs-3xs);color:var(--ler-fg2);flex-shrink:0}
+
+.ler-tip-linha{display:flex;align-items:center;gap:12px;padding:6px 0}
+.ler-tip-linha>span{width:88px;flex-shrink:0;color:var(--ler-fg2);font-size:var(--fs-xs)}
+.ler-tip-linha>div{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ler-val{min-width:52px;text-align:center;color:var(--ler-fg);font-size:var(--fs-xs)}
+.ler-tema{
+  width:34px;height:30px;border-radius:6px;cursor:pointer;
+  border:2px solid transparent;font-family:Georgia,serif;font-size:13px;line-height:1;
+}
+.ler-tema.on{border-color:var(--primary)}
+.ler-tip-nota,.ler-fer-nota{
+  margin-top:10px;font-size:var(--fs-xs);color:var(--ler-fg2);line-height:1.6;
+}
+
+.ler-fer-abas{display:flex;gap:6px;margin-bottom:12px}
+.ler-fer-num{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.ler-fer-num>div{
+  background:rgba(128,128,128,.12);border-radius:var(--radius-sm);padding:10px 12px;
+  display:flex;flex-direction:column;gap:2px;
+}
+.ler-fer-num b{font-size:var(--fs-lg);color:var(--ler-fg);font-family:Georgia,serif}
+.ler-fer-num span{font-size:var(--fs-3xs);color:var(--ler-fg2)}
+.ler-fer-acoes{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.ler-fer-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ler-chip{
+  background:rgba(128,128,128,.14);border:1px solid rgba(128,128,128,.22);
+  color:var(--ler-fg);border-radius:20px;padding:4px 11px;cursor:pointer;
+  font-family:inherit;font-size:var(--fs-xs);display:inline-flex;align-items:center;gap:5px;
+}
+.ler-chip:hover{background:var(--primary);border-color:var(--primary);color:#fff}
+.ler-chip i{font-style:normal;font-size:var(--fs-3xs);opacity:.6}
+
+/* ---- palco: onde o texto vive ---- */
+.ler-palco{flex:1;display:flex;align-items:stretch;min-height:0;position:relative}
+.ler-seta{
+  flex-shrink:0;width:46px;background:transparent;border:0;cursor:pointer;
+  color:var(--ler-fg2);opacity:.35;transition:opacity .15s;
+}
+.ler-seta:hover{opacity:1;background:rgba(128,128,128,.08)}
+.ler-viewport{flex:1;min-width:0;overflow:hidden;scroll-behavior:smooth}
+.ler-leitor[data-modo="rolagem"] .ler-viewport{overflow-y:auto}
+
+.ler-conteudo{
+  font-family:var(--ler-ff,Georgia,serif);
+  font-size:var(--ler-fs,19px);
+  line-height:var(--ler-lh,1.7);
+  color:var(--ler-fg);
+  max-width:var(--ler-col-px,646px);
+  margin:0 auto;padding:26px 30px 40px;
+  /* Hifenizacao evita o rio de espacos que cansa a vista em coluna estreita */
+  hyphens:auto;text-align:left;
+}
+/* Paginado: quem carrega a MEDIDA e a area de rolagem — assim uma coluna
+   ocupa exatamente uma tela e virar a pagina e somar clientWidth. O texto
+   respira nas laterais pelo espaco vazio do palco, nao por padding (padding
+   em multicol so afeta a primeira e a ultima coluna). */
+.ler-leitor[data-modo="pag"] .ler-viewport{
+  max-width:var(--ler-col-px,646px);margin:0 auto;scroll-behavior:auto;
+}
+.ler-leitor[data-modo="pag"] .ler-conteudo{
+  max-width:none;padding-left:0;padding-right:0;
+}
+
+.ler-conteudo p{margin:0 0 .85em;orphans:2;widows:2}
+.ler-conteudo h1,.ler-conteudo h2,.ler-conteudo h3,.ler-conteudo h4{
+  font-family:inherit;font-weight:700;line-height:1.25;
+  margin:1.6em 0 .7em;color:var(--ler-fg);break-after:avoid;
+}
+.ler-conteudo h1{font-size:1.5em}
+.ler-conteudo h2{font-size:1.28em}
+.ler-conteudo h3{font-size:1.12em}
+.ler-conteudo img{max-width:100%;height:auto;display:block;margin:1.2em auto;border-radius:4px}
+.ler-conteudo blockquote{
+  margin:1.2em 0;padding-left:1em;border-left:2px solid rgba(128,128,128,.35);color:var(--ler-fg2);
+}
+.ler-conteudo a{color:inherit;text-decoration:underline;text-decoration-color:rgba(128,128,128,.5)}
+.ler-conteudo .ler-link-int{cursor:pointer}
+.ler-conteudo hr{border:0;border-top:1px solid rgba(128,128,128,.3);margin:2em auto;width:40%}
+.ler-conteudo ul,.ler-conteudo ol{margin:0 0 .9em 1.3em}
+.ler-conteudo table{max-width:100%;display:block;overflow-x:auto}
+.ler-carregando{color:var(--ler-fg2);font-style:italic}
+/* selecionar e a acao principal aqui - nada de user-select:none */
+.ler-conteudo::selection,.ler-conteudo *::selection{background:rgba(var(--primary-rgb),.28)}
+
+/* palavra que voce ja esta estudando: marca discreta, nao caneta marca-texto */
+mark.ler-w{
+  background:transparent;color:inherit;
+  border-bottom:2px solid var(--ler-mark);border-radius:0;padding:0;
+}
+
+.ler-rodape{
+  display:flex;align-items:center;gap:12px;padding:8px 14px;flex-shrink:0;
+  border-top:1px solid rgba(128,128,128,.18);font-size:var(--fs-xs);color:var(--ler-fg2);
+}
+.ler-progresso{flex:1;height:3px;border-radius:2px;background:rgba(128,128,128,.22);overflow:hidden}
+.ler-progresso i{display:block;height:100%;background:var(--primary);transition:width .2s}
+.ler-prog-txt{flex-shrink:0;white-space:nowrap}
+
+/* ---- popup de selecao ---- */
+#ler-pop{
+  position:fixed;z-index:400;max-width:min(420px,92vw);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+  box-shadow:0 10px 30px rgba(0,0,0,.4);padding:6px;
+  font-size:var(--fs-sm);color:var(--text);
+}
+.ler-pop-linha{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.ler-pop-linha b{
+  max-width:180px;overflow:hidden;text-overflow:ellipsis;
+  color:var(--text2);font-weight:500;padding:0 6px;
+}
+#ler-pop button{
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:6px;padding:5px 10px;cursor:pointer;font-family:inherit;font-size:var(--fs-xs);
+  display:inline-flex;align-items:center;gap:5px;
+}
+#ler-pop button:hover{background:var(--primary);border-color:var(--primary);color:#fff}
+.ler-pop-corpo{
+  margin-top:6px;padding:8px 10px;background:var(--surface2);border-radius:6px;
+  font-size:var(--fs-xs);line-height:1.6;color:var(--text2);white-space:pre-wrap;
+}
+
+
+/* ================================================================
+   LER no celular — o modo de leitura toma a tela inteira.
+   Cabecalho e barra de baixo somem enquanto se le (a saida e o
+   botao "voltar" do proprio leitor, como em qualquer e-reader):
+   sao 126px de altura que viram TEXTO.
+   ================================================================ */
+
+/* dvh: a barra de endereco do celular encolhe/cresce e 100vh mente.
+   Fallback em vh primeiro para quem nao entende dvh. */
+.ler-leitor{height:calc(100vh - 48px);height:calc(100dvh - 48px)}
+
+/* Horizontal e nosso (virar pagina); vertical continua do navegador.
+   overscroll-behavior mata o "puxar para recarregar" no meio da leitura. */
+.ler-leitor[data-modo="pag"] .ler-viewport{touch-action:pan-y;overscroll-behavior:contain}
+.ler-leitor[data-modo="rolagem"] .ler-viewport{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+
+@media (max-width:768px){
+  body.lendo .mobile-header,
+  body.lendo .mobile-bottom-nav{display:none}
+  body.lendo .main{padding:0}
+  body.lendo .page-header{display:none}
+  /* A entrada em fade desloca a secao alguns pixels; num leitor que ocupa a
+     tela inteira isso vira uma fresta embaixo (e um repaint de tela cheia). */
+  body.lendo .section{animation:none;transform:none}
+
+  .ler-leitor{
+    height:100vh;height:100dvh;
+    min-height:0;border:0;border-radius:0;
+    /* iPhone com entalhe: o texto nao encosta no vidro */
+    padding-bottom:env(safe-area-inset-bottom,0);
+  }
+  .ler-palco{touch-action:pan-y}
+
+  /* Alvos de toque de 44px: barra fina demais e loteria de dedo */
+  .ler-barra{padding:6px 6px;padding-top:calc(6px + env(safe-area-inset-top,0))}
+  .ler-btn{padding:10px 12px;min-height:44px;min-width:44px;justify-content:center}
+  .ler-btn-txt{min-width:0;padding:10px}
+  .ler-titulo{font-size:var(--fs-xs);max-width:52vw}
+
+  /* Setas nao existem no toque: quem vira a pagina e o dedo (arrastar) e a
+     borda. Mas o texto ganha as laterais que elas ocupavam. */
+  .ler-seta{display:none}
+  .ler-conteudo{padding:16px 20px 26px}
+  .ler-leitor[data-modo="pag"] .ler-conteudo{padding-left:0;padding-right:0}
+  .ler-leitor[data-modo="pag"] .ler-viewport{max-width:min(var(--ler-col-px,646px),calc(100vw - 40px))}
+
+  /* Paineis viram folha de baixo: nascem do rodape, sobem ate 62% da tela e
+     rolam por dentro — mais perto do polegar do que do topo. */
+  .ler-painel{
+    position:absolute;left:0;right:0;bottom:0;z-index:20;
+    max-height:62vh;max-height:62dvh;
+    border-top:1px solid rgba(128,128,128,.28);border-bottom:0;
+    border-radius:14px 14px 0 0;
+    background:var(--ler-bg);
+    box-shadow:0 -12px 34px rgba(0,0,0,.28);
+    padding:16px 18px calc(20px + env(safe-area-inset-bottom,0));
+    animation:lerSobe .18s ease-out;
+  }
+  @keyframes lerSobe{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+  .ler-painel::before{
+    content:'';display:block;width:38px;height:4px;border-radius:3px;
+    background:rgba(128,128,128,.45);margin:-6px auto 12px;
+  }
+  .ler-tip-linha{flex-wrap:wrap;gap:8px;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.12)}
+  .ler-tip-linha:last-of-type{border-bottom:0}
+  .ler-tip-linha>span{width:100%;margin-bottom:2px}
+  .ler-tip-linha>div{width:100%}
+  .ler-tema{width:44px;height:40px}
+  .ler-pill{padding:9px 14px;min-height:40px}
+  .ler-sum-item{padding:12px 10px;min-height:46px}
+  .ler-chip{padding:8px 13px;min-height:38px}
+  .ler-fer-num{grid-template-columns:repeat(2,1fr)}
+
+  .ler-rodape{
+    padding:8px 12px calc(8px + env(safe-area-inset-bottom,0));
+    gap:8px;
+  }
+  .ler-prog-txt{font-size:var(--fs-3xs)}
+
+  /* Popup de selecao: dedo grosso, botao grande, e nunca colado na borda */
+  #ler-pop{max-width:94vw;padding:8px}
+  .ler-pop-linha{flex-wrap:wrap;white-space:normal;gap:8px}
+  .ler-pop-linha b{max-width:100%;flex:1 0 100%;padding:2px 4px}
+  #ler-pop button{padding:11px 16px;min-height:44px;font-size:var(--fs-sm);flex:1}
+
+  /* Estante: capa maior e a lixeira aparece sozinha (nao existe hover) */
+  .ler-estante{grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:16px}
+  .ler-card-x{opacity:.85;width:32px;height:32px}
+  .ler-card:hover .ler-capa{transform:none}
+}
+
+/* Tela sem mouse (celular/tablet), independente da largura */
+@media (hover:none){
+  .ler-seta{display:none}
+  mark.ler-w{border-bottom-width:2px}
+}

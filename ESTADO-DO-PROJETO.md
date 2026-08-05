@@ -3,7 +3,18 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-05 — **Fechando o que a 76ª deixou aberto (78ª rodada)**:
+> Última atualização: 2026-08-05 — **SEÇÃO LER: o leitor de ebooks nativo (79ª rodada)**:
+> a ponte com o Kindle sempre terminava numa exportação manual, e o único ganho real do
+> aparelho era a tela. Então o livro passou a morar AQUI: nova seção **Ler** com estante,
+> leitor de `.epub`/`.txt`/`.html` (ZIP + EPUB lidos sem nenhuma dependência), tipografia de
+> descanso (5 temas, tamanho, entrelinha, medida, virar página ou rolagem), posição salva e
+> sincronizada — e, em cima disso, **duplo-clique numa palavra vira card com a frase do
+> livro**, cobertura de vocabulário por capítulo e a lista das palavras novas mais frequentes.
+> **No celular** o leitor toma a tela inteira, vira página no arrasto do dedo ou no toque das
+> bordas, e o toque longo numa palavra abre Explicar/Estudar.
+> Ver seção 8 (79ª rodada, itens 146–153) e o roteiro na seção 9.
+>
+> Anterior: 2026-08-05 — **Fechando o que a 76ª deixou aberto (78ª rodada)**:
 > "Seus podcasts" passou a sincronizar (`podShows` em core.js + doc `data/podShows`), nasceu o
 > painel de **espaço em disco** em Configurações → Dados locais, e caiu um bug antigo do
 > "Apagar todos os dados" — que re-enviava vídeos/cortes/conversas para a nuvem logo depois de
@@ -455,6 +466,8 @@ js/settings.js    — Configurações (cfg, temas, AI_MODELS, limpar dados)
 js/init.js        — bootstrap (initApp) + service worker
 js/add.js         — aba Adicionar (manual/Kindle/Mídia/Website)  (CARREGADO LAZY)
 js/kindle-db.js   — leitor SQLite só-leitura (vocab.db do Kindle), sem WASM  (LAZY, antes de add.js)
+js/epub.js        — leitor de ZIP (DecompressionStream nativo) + parser EPUB  (LAZY, antes de ler.js)
+js/ler.js         — seção LER: estante, leitor, tipografia, captura, cobertura  (LAZY)
 js/consulta.js    — seção Assistente (chat IA, histórico, streaming, SRS múltiplo)  (NÃO-lazy)
 js/study.js       — UI/sessão do SRS          (CARREGADO LAZY)
 js/known.js       — seção Palavras (gerenciador de vocabulário)  (LAZY)
@@ -654,6 +667,105 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-05 (79ª rodada) — SEÇÃO LER: o leitor de ebooks nativo
+
+**A observação do Djemeson que virou o projeto do avesso**: "o que percebi é que no fim o que
+já faço, que é enviar a exportação das marcações, vai continuar tendo que acontecer. Então, ao
+invés de tudo isso, eu quero uma seção nativa pra ebooks. Porque o meu ganho no Kindle é ler
+sem cansar a vista; já que não tenho isso, faz mais sentido construir um leitor no projeto com
+todas as funcionalidades das ferramentas poderosas que estamos criando."
+
+Está certo, e é uma inversão importante de registrar: **a ponte com o Kindle continua útil para
+o acervo que já existe lá, mas ela é sempre retroativa**. O leitor nativo é o único jeito de a
+palavra virar card no mesmo segundo em que você tropeça nela.
+
+146. **Ler `.epub` sem nenhuma dependência — `js/epub.js` (novo)**. Um EPUB é um ZIP com XHTML
+     dentro. As duas peças foram escritas à mão pelo mesmo motivo do `kindle-db.js` (projeto
+     sem build não deve baixar 1 MB de JS para abrir um arquivo):
+     - **ZIP**: o navegador já descomprime DEFLATE nativamente
+       (`DecompressionStream('deflate-raw')`, confirmado no Chrome 148 do Djemeson). Sobrou ler
+       o diretório central — ~120 linhas, cobrindo entradas STORED e DEFLATE.
+     - **EPUB**: `container.xml` → `.opf` → metadados, manifesto e **spine** (a ordem real de
+       leitura). Sumário do `nav` (EPUB 3) **e** do `.ncx` (EPUB 2) — os dois existem no mundo
+       real. Capa por `properties="cover-image"`, por `<meta name="cover">` ou por heurística.
+     - `.txt`/`.html` entram pelo mesmo trilho: são fatiados em capítulos por cabeçalho
+       (`CHAPTER I`, `Capítulo 3`) ou, na falta deles, por tamanho — um `.txt` de 400 KB numa
+       página só travaria o navegador na hora de paginar.
+
+147. **Estante e leitor — `js/ler.js` (novo) + seção `Ler` no menu**. O arquivo do livro vai
+     para o **IndexedDB** (`BookDB`, em core.js); o que sincroniza é só o que é leve: título,
+     autor, sumário, contagem por capítulo, **onde você parou** e os destaques.
+
+148. **Tipografia de descanso — é o motivo de o módulo existir**. 5 temas de papel
+     (Papel, Sépia, Cinza, Noite, Preto), tamanho, entrelinha, **medida** (largura da linha) e
+     fonte serifada/sem serifa. O HTML do livro entra **sem a folha de estilo do editor**: a
+     tipografia é nossa de propósito, senão cada ebook imporia a sua. Dois modos: **virar
+     página** (colunas CSS, padrão) e rolagem.
+
+149. **A posição é guardada como FRAÇÃO do capítulo**, nunca como página. Mudar o tamanho da
+     letra muda quantas páginas o capítulo tem — guardar "página 12" faria o leitor voltar para
+     o lugar errado toda vez que a fonte mudasse. Testado: fechar na página 7 e reabrir volta
+     ao mesmo ponto (0,2121 → 0,212).
+
+150. **A captura, que é o ponto de tudo**: **duplo-clique numa palavra** → card no Revisar com
+     a **frase inteira do livro**, o título e o capítulo. Selecionar um trecho abre
+     **Explicar** (IA, com o livro como contexto), **Estudar** e **ouvir** (voz do navegador,
+     custo zero). Palavras que você já está estudando ficam **sublinhadas discretamente** no
+     texto — marca de leitura, não caneta marca-texto.
+
+151. **Cobertura e frequência — o que só é possível porque o livro está aqui dentro**. Painel
+     com "quanto deste capítulo/livro você já conhece", quantas palavras são novas, **quantas
+     voltam mais de uma vez** (essas é que valem o estudo) e a lista das mais frequentes, com
+     botão para mandar as 10/25 direto para o Revisar. Cada uma sai com a **primeira frase real
+     do capítulo** em que ela aparece — palavra sem frase não ensina nada. Palavras gramaticais
+     (`the/of/and`…) e o que já está no vocabulário conhecido ficam fora da conta.
+
+152. **Detalhes que só apareceram testando ao vivo (e o que quebravam)**:
+     - **Paginação com largura errada**: a coluna era medida pela viewport e o texto tinha
+       outra largura — dava 259 "páginas" num capítulo de 5 parágrafos. Agora a área de rolagem
+       é que carrega a medida, e uma coluna = exatamente uma tela.
+     - **Deriva de meio pixel**: `clientWidth` é arredondado; somar 646 numa coluna de 646,4
+       escorregava meia linha a cada dezena de páginas. Passo agora vem de
+       `getBoundingClientRect()` e cada virada é snapada. Testado: 20 páginas, desvio 0.
+     - **Corrida no "mandar as 10 mais frequentes"**: ler o texto é assíncrono e o leitor podia
+       ter virado o capítulo no meio — os cards saíam carimbados com o capítulo errado. Livro e
+       capítulo agora são congelados no início da operação.
+     - **Snapshot da nuvem trocando o livro embaixo do leitor**: a posição que este aparelho
+       está gravando é mais nova que a que acabou de chegar. O `applyCloudDocs` adota a nuvem e
+       devolve por cima o livro que está aberto.
+     - Sanitização conferida ao vivo: `<script>`, `<style>`, `onload=` e `id/class` do editor
+       não entram; imagens viram `blob:` do próprio zip; link interno vira salto de capítulo.
+
+153. **O leitor no CELULAR (mesma rodada, a pedido do Djemeson)**. Um leitor que não funciona
+     no telefone não é um leitor — é onde a leitura de verdade acontece.
+     - **Modo imersivo**: o cabeçalho do app e a barra de navegação de baixo somem enquanto se
+       lê (126px que viram TEXTO). A saída é o botão "voltar" do próprio leitor, como em
+       qualquer e-reader. Como a barra de baixo some, `_activateSection` passou a tirar a
+       classe `lendo` ao ir para QUALQUER outra seção — senão bastava um caminho alternativo
+       para o app ficar sem navegação.
+     - **Altura em `dvh`, não `vh`**: no celular a barra de endereço encolhe e cresce, e `100vh`
+       mente — o rodapé do leitor ficava escondido atrás dela.
+     - **Virar página com o dedo**: arrastar move a página JUNTO com o dedo (`scrollLeft` segue
+       o toque) e solta encaixando na página inteira mais próxima; arrastar 20% já vira.
+       Tocar nas bordas (26% de cada lado) também vira. O **miolo fica livre** de propósito:
+       é onde se segura para selecionar uma palavra.
+     - **Seleção por toque longo**: no celular não existe `mouseup` depois do toque longo, então
+       o popup passou a nascer também de `selectionchange` (com debounce), filtrado para
+       seleções dentro do texto.
+     - **`touch-action:pan-y` + `overscroll-behavior:contain`**: o horizontal é nosso, o vertical
+       continua do navegador, e o "puxar para recarregar" para de disparar no meio da leitura.
+     - **`resize` que fazia o texto pular**: esconder a barra de endereço dispara `resize` a cada
+       rolagem; re-paginar ali era ver o texto saltar na mão. Agora só remedimos quando a
+       LARGURA muda (girar a tela) ou a altura muda mais de 120px.
+     - **Painéis viram folha de baixo** (sumário, tipografia, ferramentas): sobem do rodapé até
+       62% da tela, com alça, perto do polegar — não no topo.
+     - **Alvos de toque de 44px** em toda a barra, pílulas e botões do popup; a lixeira da
+       estante aparece sozinha (no toque não existe `hover`).
+     - **Área segura** (`env(safe-area-inset-*)`) no topo e no rodapé, para o entalhe do iPhone.
+     - Validado a 375×812 com toques sintéticos: arrastar curto volta para a mesma página,
+       arrastar longo avança/volta uma, arrastar vertical não vira, borda vira, miolo não vira,
+       e o scroll cai sempre exato na página. Popup 319×94 inteiro dentro da tela.
 
 ### Sessão 2026-08-05 (77ª rodada) — A PONTE COM O KINDLE
 
@@ -3407,6 +3519,75 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
 ---
 
 ## 9. Pendências / a verificar
+
+### LER — buracos conhecidos (79ª rodada)
+
+- [ ] **Nenhum EPUB comercial de verdade passou por aqui.** O parser foi validado com fixtures
+      fiéis (EPUB 3 com `nav`, EPUB 2 com `.ncx`, subpasta, entrada STORED, capa, acentuação,
+      capítulo de 4 mil palavras) e a leitura foi exercitada ao vivo no navegador — mas um livro
+      real tem 300 arquivos, CSS complicado e notas de rodapé. **Primeiro teste a fazer**: um
+      `.epub` do Standard Ebooks (bem diagramado) e um da sua estante.
+- [ ] **EPUB com DRM não abre e não vai abrir.** Livro comprado na Amazon/Kobo com proteção é
+      um arquivo cifrado; o leitor mostra erro de formato. Isso não é bug — é o desenho.
+- [ ] **PDF não é suportado.** Precisaria do pdf.js (~1 MB) e o texto de PDF vem sem estrutura
+      (quebra de linha por posição, não por parágrafo), o que estragaria a captura de frase.
+      Se for necessário, o caminho barato é converter para EPUB antes.
+- [x] ~~Celular: falta o gesto de virar a página.~~ **Feito na mesma rodada**: arrastar, tocar
+      nas bordas, modo imersivo, folhas de baixo e toque longo para selecionar. Falta só
+      **provar num aparelho de verdade** — os gestos foram validados com toques sintéticos a
+      375×812, não com um dedo real (inércia, latência e o menu nativo de seleção do Android
+      podem pedir ajuste fino).
+- [ ] **Pintura em capítulo gigante não foi medida.** `_lerRepintar()` percorre todos os nós de
+      texto do capítulo; testado com 4 mil palavras (instantâneo), não com 20 mil.
+- [ ] **Capa**: a extração foi exercitada, mas com PNG inválido de propósito na fixture (o
+      caminho de erro devolve `''` corretamente). Falta ver uma capa real virando miniatura.
+
+### LER — o que o módulo torna possível (roteiro, em ordem de valor/esforço)
+
+> Escrito na 79ª rodada a pedido do Djemeson ("analise, estude e planeje ferramentas novas que
+> são viáveis com esse novo módulo"). Nada aqui foi implementado ainda.
+
+**Barato e de alto valor — próxima rodada natural:**
+
+1. **Pré-leitura do capítulo.** Antes de abrir o capítulo, estudar as 10–15 palavras novas mais
+    frequentes DELE. É o "Preparar para assistir" do módulo Vídeo aplicado ao livro, e a
+    matemática já está pronta (`lerAnalisar`). Muda a experiência de "travo a cada parágrafo"
+    para "leio corrido". **Provavelmente o item de maior impacto da lista.**
+2. **Cobertura na estante.** Calcular a cobertura de cada livro UMA vez, na importação, e
+    mostrá-la na capa: "97% — leitura fluida", "89% — vai doer". Escolher o livro certo é
+    metade da leitura extensiva. Custo: uma passada de texto no import (já lemos tudo lá).
+3. **Ler ouvindo.** A voz do navegador já está ligada na seleção; falta o modo contínuo com a
+    frase atual destacada e avanço automático de página. Custo zero de API.
+4. **Retomar com resumo.** "Faz 6 dias que você parou" → a IA resume em 3 linhas o que
+    aconteceu até ali (usando o texto dos capítulos lidos). Uma chamada barata, resolve o
+    atrito real de abandonar livro por ter perdido o fio.
+5. **Leitura no Dashboard.** `livro.minutos` e palavras lidas já são gravados; falta plotar no
+    heatmap e virar sequência (streak) — o app já tem a máquina de streak.
+6. **Página de destaques do livro.** Tudo que você capturou naquele livro numa tela só
+    (`livro.notes` já guarda palavra, frase, capítulo e o id do card), com exportação.
+
+**Médio — precisa de investigação antes:**
+
+7. **Catálogo embutido (Project Gutenberg / Standard Ebooks).** Buscar e baixar sem sair do
+    app. A API `gutendex.com` tem CORS liberado para METADADOS; falta confirmar se o download
+    do `.epub` também tem, senão precisaria de uma função serverless (a Vercel já hospeda o
+    app). 70 mil livros de domínio público em inglês, de graça, é acervo de sobra.
+8. **Modo bilíngue por parágrafo.** Tradução da IA sob demanda, com a mesma névoa borrada do
+    módulo Vídeo (32ª rodada) — revela ao passar o mouse. O prompt anti-literal já existe.
+9. **Cloze a partir do livro.** Transformar a frase capturada num card de lacuna ("He ____ with
+    a rage he could not name"). O SRS já aceita variações de card; é mais desenho do que código.
+10. **Meta de leitura extensiva.** Minutos ou páginas por dia, com o streak existente. Combina
+    com o item 5.
+
+**Ambicioso — só se virar prioridade:**
+
+11. **Livro + audiobook sincronizados.** O app já tem Whisper (Groq, barato) para transcrever;
+    alinhar a transcrição ao texto do livro daria leitura acompanhada de narração real, que é o
+    exercício de *listening* mais poderoso que existe. Complexo: alinhamento forçado de horas
+    de áudio contra centenas de milhares de palavras.
+12. **Nível automático do livro (CEFR).** Estimar a faixa pelo perfil de frequência do
+    vocabulário e comparar com o SEU perfil. Vale como número na estante, mas exige uma lista
+    de frequência de referência embutida (~5 mil palavras).
 
 - [ ] **KINDLE — rodar com o `vocab.db` REAL do aparelho** (77ª rodada). O leitor de SQLite foi
       validado com fixtures fiéis ao esquema (WORDS/LOOKUPS/BOOK_INFO, 4096 e 512 bytes/página,

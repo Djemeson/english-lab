@@ -103,7 +103,7 @@ self.addEventListener('fetch', e => {
   }
 
   // Módulos lazy: network-first (mudam mais e não estão no shell)
-  if (url.includes('/js/add.js') || url.includes('/js/study.js') || url.includes('/js/known.js') || url.includes('/js/kindle-db.js') || url.includes('/js/video')) {
+  if (url.includes('/js/add.js') || url.includes('/js/study.js') || url.includes('/js/known.js') || url.includes('/js/kindle-db.js') || url.includes('/js/epub.js') || url.includes('/js/ler.js') || url.includes('/js/video')) {
     e.respondWith(
       fetch(e.request)
         .then(r => { caches.open(CACHE).then(c => c.put(e.request, r.clone())); return r })
