@@ -789,8 +789,37 @@ function _lerFraseEmVolta(sel, alvo) {
   return (frase.length < 8 ? bloco : frase).slice(0, 400)
 }
 
-function _lerCapturar(palavra, frase, alvoDOM) {
-  const limpa = palavra.replace(/^[^A-Za-zÀ-ÿ']+|[^A-Za-zÀ-ÿ']+$/g, '')
+// Quantas palavras ainda são "um objeto de estudo" e não uma frase inteira.
+// Acima disso, o que você marcou É o contexto — não faz sentido virar título
+// de card, e quem quebra em itens é o Raio-X da triagem, no Revisar.
+const LER_MAX_ALVO = 4
+
+function _lerCapturar(selecao, frase, alvoDOM) {
+  const bruto = String(selecao || '').replace(/\s+/g, ' ').trim()
+  if (!bruto) return
+  const nPalavras = bruto.split(' ').filter(Boolean).length
+
+  if (nPalavras > LER_MAX_ALVO) {
+    // Trecho longo: entra como FRASE (sem palavra-alvo). É o mesmo caminho
+    // dos destaques do Kindle — o Raio-X tria os itens dela depois.
+    const jaTem = words.some(w => (w.context || '') === bruto)
+    if (jaTem) { toast('Esse trecho já está na sua fila', 'info'); return }
+    const w = createWord({
+      word: '', context: bruto,
+      source_type: 'kindle',
+      source_title: _lerLivro.title,
+      source_context: _lerLivro.chapters[_lerCap]?.titulo || '',
+      lang: _lerLivro.lang || 'en'
+    })
+    ;(_lerLivro.notes = _lerLivro.notes || []).push({
+      id: uid(), cap: _lerCap, word: '', text: bruto, wordId: w && w.id, created_at: Date.now()
+    })
+    _lerPersistirCaptura()
+    toast('Trecho salvo no Revisar — a triagem quebra em itens lá', 'success')
+    return
+  }
+
+  const limpa = bruto.replace(/^[^A-Za-zÀ-ÿ']+|[^A-Za-zÀ-ÿ']+$/g, '')
   if (!limpa) return
   const jaTem = words.some(w => (w.word || '').toLowerCase() === limpa.toLowerCase())
   if (jaTem) { toast(`"${limpa}" já está na sua fila`, 'info'); return }
@@ -804,12 +833,15 @@ function _lerCapturar(palavra, frase, alvoDOM) {
   ;(_lerLivro.notes = _lerLivro.notes || []).push({
     id: uid(), cap: _lerCap, word: limpa, text: frase, wordId: w && w.id, created_at: Date.now()
   })
+  _lerPersistirCaptura()
+  toast(`"${limpa}" foi para o Revisar`, 'success')
+}
+
+function _lerPersistirCaptura() {
   saveWords(); saveLivros()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   if (typeof renderSidebar === 'function') { try { renderSidebar() } catch (e) {} }
   _lerRepintar()
-  if (alvoDOM && alvoDOM.classList) { /* pisca discreto no ponto do clique */ }
-  toast(`"${limpa}" foi para o Revisar`, 'success')
 }
 
 // ---- popup de seleção: Explicar / Estudar / Ouvir ----
@@ -820,7 +852,17 @@ function _lerAoSelecionar() {
   if (_lerIgnoraSel) return
   const sel = window.getSelection()
   const txt = String(sel || '').replace(/\s+/g, ' ').trim()
-  if (!txt || txt.length < 2 || txt.split(/\s+/).length > 12) { _lerFecharPopup(); return }
+  // Teto GENEROSO de propósito: num livro, marcar a frase inteira (ou o
+  // parágrafo) é o uso normal. O teto antigo era de 12 palavras e engolia a
+  // seleção em silêncio — o pior tipo de falha, porque nada acontecia e não
+  // dava para saber por quê. Aqui ele só existe para o caso extremo
+  // (Ctrl+A, arrastar por páginas), e mesmo assim o usuário é avisado.
+  if (!txt || txt.length < 2) { _lerFecharPopup(); return }
+  if (txt.length > 1200) {
+    _lerFecharPopup()
+    toast('Trecho grande demais para virar item de estudo — marque no máximo um parágrafo', 'warning')
+    return
+  }
   let r
   try { r = sel.getRangeAt(0).getBoundingClientRect() } catch (e) { return }
   if (!r || (!r.width && !r.height)) return
@@ -828,13 +870,18 @@ function _lerAoSelecionar() {
   _lerPopAlvo = txt
   _lerPopCtx = _lerFraseEmVolta(sel, txt)
 
+  // O botão diz o que VAI acontecer: palavra/expressão vira item de estudo;
+  // trecho longo entra como frase, para a triagem quebrar depois.
+  const ehFrase = txt.split(' ').filter(Boolean).length > LER_MAX_ALVO
   const pop = document.createElement('div')
   pop.id = 'ler-pop'
   pop.innerHTML = `
     <div class="ler-pop-linha">
       <b>"${esc(txt.length > 34 ? txt.slice(0, 34) + '…' : txt)}"</b>
       <button data-p="exp">Explicar</button>
-      <button data-p="rev">Estudar</button>
+      <button data-p="rev" data-tip="${ehFrase
+        ? 'Salva a frase no Revisar — a triagem por IA quebra em palavras, phrasals e expressões'
+        : 'Cria o item de estudo com a frase do livro como contexto'}">${ehFrase ? 'Salvar frase' : 'Estudar'}</button>
       <button data-p="ouv" data-tip="Ouvir em voz alta (voz do navegador, custo zero)">${ic('volume','ic-sm')}</button>
     </div>
     <div class="ler-pop-corpo hidden" id="ler-pop-corpo"></div>`

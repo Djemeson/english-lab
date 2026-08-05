@@ -183,13 +183,22 @@ function abrirPilula(sel) {
   pilula.id = 'englab-k-pill'
   pilula.innerHTML = ''
 
+  // Acima de 4 palavras o que você marcou É o contexto: mandar como
+  // palavra-alvo criaria um card com uma frase inteira no título.
+  const ehFrase = PALAVRAS(alvoAtual) > 4
   const bAdd = document.createElement('button')
   bAdd.className = 'englab-k-pri'
-  bAdd.innerHTML = IC_ADD + '<span>Revisar</span>'
-  bAdd.title = 'Manda a palavra + a frase desta página para o Revisar do Language Lab'
+  bAdd.innerHTML = IC_ADD + `<span>${ehFrase ? 'Salvar frase' : 'Revisar'}</span>`
+  bAdd.title = ehFrase
+    ? 'Manda o trecho marcado para o Revisar — a triagem por IA quebra em itens lá'
+    : 'Manda a palavra + a frase desta página para o Revisar do Language Lab'
   bAdd.onclick = () => {
     const p = alvoAtual, c = ctxAtual
-    salvarCaptura(p, c).then(ok => avisar(ok ? `"${p}" vai para o Revisar` : 'recarregue a página (F5)'))
+    const alvo = ehFrase ? '' : p
+    const ctx = ehFrase ? p : c
+    salvarCaptura(alvo, ctx).then(ok => avisar(
+      ok ? (ehFrase ? 'trecho salvo para o Revisar' : `"${p}" vai para o Revisar`)
+         : 'recarregue a página (F5)'))
     fecharPilula()
     try { window.getSelection().removeAllRanges() } catch (e) {}
   }
@@ -243,7 +252,10 @@ function aoSelecionar() {
   const sel = window.getSelection()
   const txt = String(sel || '').replace(/\s+/g, ' ').trim()
   clearTimeout(autoTimer)
-  if (!txt || txt.length < 2 || txt.length > 200 || PALAVRAS(txt) > 8) { fecharPilula(); return }
+  // Teto generoso: marcar a frase inteira de um livro é o uso normal. O teto
+  // antigo (8 palavras / 200 caracteres) engolia a seleção em SILÊNCIO — a
+  // pílula simplesmente não nascia e não havia como saber por quê.
+  if (!txt || txt.length < 2 || txt.length > 1200) { fecharPilula(); return }
 
   // Congela alvo e contexto AGORA: o leitor repagina sozinho (carrega a
   // próxima página enquanto você lê) e a seleção pode virar outra coisa

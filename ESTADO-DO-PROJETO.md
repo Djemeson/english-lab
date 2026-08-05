@@ -767,6 +767,21 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        arrastar longo avança/volta uma, arrastar vertical não vira, borda vira, miolo não vira,
        e o scroll cai sempre exato na página. Popup 319×94 inteiro dentro da tela.
 
+154. **Seleção longa não abria o menu (relatado pelo Djemeson no primeiro uso real)**. Ele
+     marcou "Morning on the Lady of the Lake Plantation can be a grand experience" — 13
+     palavras — e nada aconteceu. Havia um **teto de 12 palavras** no popup, herdado da
+     extensão (onde a captura é de palavra solta). Num livro, marcar a frase inteira é o uso
+     NORMAL, e a falha era do pior tipo: silenciosa.
+     - O teto virou **1200 caracteres** e, quando estoura de verdade (Ctrl+A, arrastar por
+       páginas), agora **avisa** em vez de sumir calado.
+     - Acima de **4 palavras** o botão muda de "Estudar" para **"Salvar frase"** e o item entra
+       como `word:''` + a seleção como contexto — o mesmo formato dos destaques do Kindle, que
+       o Raio-X da triagem quebra em palavras/phrasals/expressões no Revisar. Antes, uma frase
+       de 13 palavras viraria o TÍTULO de um card.
+     - **Onde mais o mesmo defeito existia**: `extension/kindle.js` tinha o teto de 8 palavras /
+       200 caracteres no Kindle Cloud Reader — mesma correção aplicada lá, incluindo o botão
+       que vira "Salvar frase" e manda o trecho como contexto.
+
 ### Sessão 2026-08-05 (77ª rodada) — A PONTE COM O KINDLE
 
 **Pedido do Djemeson**: "é possível fazer uma ponte entre o Kindle e o nosso projeto? a cada
