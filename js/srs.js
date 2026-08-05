@@ -236,6 +236,7 @@ function rateSrsCard(cardId, rating) {
     } else if (rating === 4) {                // Fácil — pula o aprendizado e gradua
       card.state = 'review'
       card.interval = cap(_easyInterval())
+      if (card.interval >= 21 && typeof markKnownWord === 'function') markKnownWord(card.word)
       card.ease = card.ease + 0.15
       card.due = dueDays(card.interval)
     } else {                                  // Bom — avança um passo; gradua só ao concluir
@@ -287,6 +288,7 @@ function rateSrsCard(cardId, rating) {
       }
       card.state = 'review'
       card.interval = cap(ni * mod)
+      if (card.interval >= 21 && typeof markKnownWord === 'function') markKnownWord(card.word)
       card.due = dueDays(card.interval)
     }
   }

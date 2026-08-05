@@ -902,6 +902,8 @@ Rules:
 - THEN list the remaining notable single words NOT already inside a unit.
 - Every "expr" MUST be text that appears INSIDE the snippet — never from the surrounding sentence. Units that are not part of the snippet are discarded.
 - NEVER return the whole snippet itself as one unit — only its PARTS (smaller units inside it).
+- A free adjective+noun combination is NOT a collocation: if the pair is compositional, return the notable WORD alone ("Japanese ethos" → return "ethos" as a word, C1 — NOT the pair). Only return a pair when it is genuinely fixed ("heavy rain", "make a difference").
+- NEVER return trivial contractions or fillers as units ("it's", "I'm", "don't", "you know").
 - SKIP trivial function words (articles, pronouns, auxiliaries, basic prepositions) unless they belong to a unit.
 - "gloss" is the meaning HERE, not a dictionary list.
 - LITERAL-TRANSLATION TRAP — avoid it explicitly: FIRST work out what the unit DOES in this scene, THEN write the gloss for that function. "We'll get you in for that" said at a hotel desk → gloss "a gente te encaixa (na agenda)", NEVER "colocar você dentro". If a gloss reads like word-by-word substitution, redo it before returning.
@@ -982,6 +984,9 @@ function revBreakStudy(wordId) {
     criadas.push(nova)
     st.done.add(i)
   }
+  // O que o aluno NAO marcou ele declarou conhecer — alimenta o modulo de
+  // palavras conhecidas (cobertura de episodios, triagens futuras)
+  st.items.forEach((it, i) => { if (!st.sel.has(i) && !st.done.has(i)) markKnownWord(it.expr) })
   st.sel.clear()
   saveWords()
   renderSidebar(); renderDashboard()

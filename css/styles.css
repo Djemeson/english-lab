@@ -3958,3 +3958,7 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 }
 /* Sem triagem: o botao principal continua sendo o centro da tela */
 .wc-pending-ai:not(:has(.rvb)) .wc-pend-acts{justify-content:center}
+
+/* ---- Podcast no modulo de video: arquivo so-audio ganha palco compacto ---- */
+.vid-stage.vid-audio{background:linear-gradient(160deg, rgba(var(--primary-rgb),.16), var(--surface2))}
+.vid-stage.vid-audio #vid-player{height:110px;max-height:110px;min-height:110px}

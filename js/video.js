@@ -160,7 +160,7 @@ async function videoPickFile() {
   if (window.showOpenFilePicker) {
     try {
       const [handle] = await window.showOpenFilePicker({
-        types: [{ description: 'Vídeo', accept: { 'video/*': ['.mp4', '.mkv', '.webm', '.mov', '.avi'] } }]
+        types: [{ description: 'Vídeo ou podcast', accept: { 'video/*': ['.mp4', '.mkv', '.webm', '.mov', '.avi'], 'audio/*': ['.mp3', '.m4a', '.aac', '.ogg', '.opus', '.wav', '.flac'] } }]
       })
       const file = await handle.getFile()
       await videoAcceptFile(file, handle)
@@ -169,7 +169,7 @@ async function videoPickFile() {
   }
   // Fallback universal
   const inp = document.createElement('input')
-  inp.type = 'file'; inp.accept = 'video/*,.mkv'
+  inp.type = 'file'; inp.accept = 'video/*,audio/*,.mkv,.mp3,.m4a,.aac,.ogg,.opus,.wav,.flac'
   inp.onchange = () => { if (inp.files[0]) videoAcceptFile(inp.files[0], null) }
   inp.click()
 }
@@ -213,7 +213,7 @@ async function videoOpen(id) {
   toast('Escolha o arquivo do vídeo (o navegador não o guarda — só o atalho)', 'info')
   if (window.showOpenFilePicker) {
     try {
-      const [h] = await window.showOpenFilePicker({ types: [{ description: 'Vídeo', accept: { 'video/*': ['.mp4', '.mkv', '.webm', '.mov', '.avi'] } }] })
+      const [h] = await window.showOpenFilePicker({ types: [{ description: 'Vídeo ou podcast', accept: { 'video/*': ['.mp4', '.mkv', '.webm', '.mov', '.avi'], 'audio/*': ['.mp3', '.m4a', '.aac', '.ogg', '.opus', '.wav', '.flac'] } }] })
       const file = await h.getFile()
       // Reaponta o registro existente para o arquivo escolhido
       v.fileName = file.name; v.fileSize = file.size; v.updated_at = new Date().toISOString()
@@ -223,7 +223,7 @@ async function videoOpen(id) {
     } catch (e) { if (e.name !== 'AbortError') console.warn(e) }
   } else {
     const inp = document.createElement('input')
-    inp.type = 'file'; inp.accept = 'video/*,.mkv'
+    inp.type = 'file'; inp.accept = 'video/*,audio/*,.mkv,.mp3,.m4a,.aac,.ogg,.opus,.wav,.flac'
     inp.onchange = async () => {
       if (!inp.files[0]) return
       _vidFile = inp.files[0]
@@ -268,7 +268,7 @@ async function videoOpenPlayer(v) {
   area.innerHTML = `
     <div class="vid-layout">
       <div class="vid-main">
-        <div class="vid-stage">
+        <div class="vid-stage${/\.(mp3|m4a|aac|ogg|opus|wav|flac)$/i.test(_vidCur.fileName || '') ? ' vid-audio' : ''}">
           <video id="vid-player" src="${_vidURL}" controls preload="metadata"></video>
           <div class="vid-ov" id="vid-ov">
             <span class="vid-ov-en" id="vid-ov-en" title="Arraste para selecionar um trecho; clique duplo seleciona a palavra"></span>

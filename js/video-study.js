@@ -320,6 +320,7 @@ function _vidKnownSet() {
 }
 function _vidIsKnown(tok, known) {
   if (known.has(tok)) return true
+  if (typeof isKnownWord === 'function' && isKnownWord(tok)) return true
   // Flexões triviais: plural e passado/gerúndio simples
   for (const suf of ['s', 'es', 'ed', 'd', 'ing']) {
     if (tok.length > suf.length + 2 && tok.endsWith(suf) && known.has(tok.slice(0, -suf.length))) return true

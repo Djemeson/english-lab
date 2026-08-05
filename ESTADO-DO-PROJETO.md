@@ -3,7 +3,13 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Triagem em camadas (57ª rodada)**: recorte criado pela
+> Última atualização: 2026-08-04 — **Pacote de 7 tarefas (58ª rodada)**: chip do "ethos"
+> (adjetivo+substantivo livre não é colocação), persona "Lex" no Assistente, módulo de
+> vídeo aceita PODCAST (áudio), núcleo do módulo PALAVRAS CONHECIDAS (triagem + SRS maduro
+> + cobertura de episódio + sync por união), e análises de clipes de vídeo/addons de
+> stream/Netflix. Ver seção 8 (58ª rodada).
+>
+> Anterior: 2026-08-04 — **Triagem em camadas (57ª rodada)**: recorte criado pela
 > triagem volta a ser triável — um phrasal pode ter palavra desconhecida dentro — mas SÓ
 > sobre ele mesmo: o filtro limita ao conteúdo do objeto e o objeto inteiro nunca vira chip.
 > `no_break` removido. Ver seção 8 (57ª rodada).
@@ -518,6 +524,48 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (58ª rodada) — Pacote de 7 tarefas (4 executadas + 3 análises)
+114. **Chip "ethos"**: triagem devolvia "Japanese ethos" (colocação) + "it's" (lixo A1).
+     Regras novas no prompt: adjetivo+substantivo LIVRE não é colocação → devolver a
+     PALAVRA notável ("ethos", C1); contrações/fillers ("it's", "you know") proibidos.
+115. **Persona do Assistente**: `consultaSystem()` agora é o **Lex** — professor brasileiro
+     que aprendeu com séries; direto, caloroso, humor seco, sem emojis, fecha com UMA
+     provocação curta. Regras de formato/IPA/exemplos preservadas.
+116. **PODCAST no módulo de vídeo**: os 4 pontos de abertura de arquivo aceitam áudio
+     (.mp3/.m4a/.aac/.ogg/.opus/.wav/.flac); arquivo só-áudio ganha palco compacto
+     (`.vid-stage.vid-audio`, player de 110px). TODO o resto já funciona igual: Criar
+     legenda com IA (ffmpeg extrai de áudio também), PT IA, estudo focado, captura de
+     áudio real, SRS.
+117. **PALAVRAS CONHECIDAS (núcleo v1)** — pedido "completo e poderoso"; esta rodada
+     entrega o motor, o gerenciador visual fica para a próxima:
+     - core.js: `knownWords` (mapa palavra→ts em `el-known`), `knownNorm/isKnownWord`
+       (flexões triviais s/es/ed/d/ing) e `markKnownWord`.
+     - Alimentação automática: triagem do Raio-X (o que o aluno NÃO marcou vira conhecido,
+       em `revBreakStudy`) e SRS (card com intervalo ≥ 21 dias marca a palavra, nos dois
+       ramos de `rateSrsCard`).
+     - Consumo: `_vidIsKnown` (cobertura do "Preparar para assistir") considera o módulo.
+     - Sync: doc `data/known` no Firestore, adotado por UNIÃO (nunca perde marcas de outro
+       aparelho). Validado ao vivo: normalização, flexão, persistência, remoção, triagem
+       marcando não-selecionadas, selecionadas ficando de fora.
+118. **Análises entregues (decisões para as próximas rodadas)**:
+     - **Clipes de vídeo na revisão**: o Anki guarda mídia LOCALMENTE (collection.media) e
+       sincroniza pelos servidores próprios (AnkiWeb) — lição: local-first. Firebase
+       Storage exige plano Blaze (cartão) e cobra egress; alternativas com bom
+       custo-benefício: **Cloudflare R2** (10 GB grátis, egress ZERO) > Backblaze B2.
+       Recomendação: clipes no IndexedDB local (como o áudio de cena hoje — grátis,
+       offline), nuvem opcional depois via R2. Implementação: captureStream com trilha de
+       vídeo + <video> no card do SRS — próxima rodada.
+     - **Addons de VÍDEO do Stremio**: os de legenda já estão integrados; os de stream
+       devolvem majoritariamente torrents (infoHash — precisa de motor torrent; navegador
+       não decodifica mkv/HEVC) ou links HTTP de debrid (tocáveis SE o CORS deixar).
+       Viável parcialmente: suportar addons de stream HTTP direto; torrent no navegador
+       não. Próximo passo: testar com um addon real do Djemeson.
+     - **Netflix / Language Reactor**: IMPOSSÍVEL dentro do site (DRM + proibição de
+       embed). O LR é uma EXTENSÃO de Chrome injetada no player. Caminho real: extensão
+       própria reaproveitando conta Firebase + SRS (legendas capturadas do player, mesmo
+       popup/triagem). É um mini-produto separado — a decidir.
+     `CACHE`: `v84` → **`v85`**.
 
 ### Sessão 2026-08-04 (57ª rodada) — Triagem em camadas: o recorte também pode ter partes
 113. **Ajuste do Djemeson sobre a 56ª**: o recorte escolhido PODE gerar novos chips ("um

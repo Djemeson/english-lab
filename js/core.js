@@ -38,6 +38,35 @@ let words = []
 let activeWordId = null
 const collapsedGroups = new Set()
 let kindleItems = [], midiaItems = []
+
+// ---- PALAVRAS CONHECIDAS (estilo Language Reactor) ----
+// Mapa palavra-normalizada -> timestamp. Alimentado por: triagem do Raio-X
+// (o que o aluno NAO marcou ele declarou conhecer), cards maduros do SRS
+// (intervalo >= 21 dias) e edicao futura no gerenciador. Sincronizado por
+// UNIAO (nunca perde o que outro aparelho marcou).
+let knownWords = {}
+try { knownWords = JSON.parse(localStorage.getItem('el-known') || '{}') } catch (e) {}
+function knownNorm(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z' -]/g, '').replace(/\s+/g, ' ').trim()
+}
+function isKnownWord(s) {
+  const k = knownNorm(s); if (!k) return false
+  if (knownWords[k]) return true
+  for (const suf of ['s', 'es', 'ed', 'd', 'ing']) {
+    if (k.length > suf.length + 2 && k.endsWith(suf) && knownWords[k.slice(0, -suf.length)]) return true
+  }
+  return false
+}
+function markKnownWord(s, on = true) {
+  const k = knownNorm(s); if (!k) return
+  if (on) knownWords[k] = Date.now(); else delete knownWords[k]
+  saveKnownLocal()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+}
+function saveKnownLocal() {
+  try { localStorage.setItem('el-known', JSON.stringify(knownWords)) } catch (e) {}
+}
 // Assistente (Consulta) — conversas persistidas e sincronizadas.
 // Estado declarado aqui (arquivo NÃO-lazy) para que firebase.js possa
 // referenciá-lo no sync; a UI vive em js/consulta.js.
