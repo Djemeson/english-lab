@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Gerenciador de Palavras (59ª rodada)**: seção nova com
+> Última atualização: 2026-08-04 — **Extensão para a Netflix (60ª rodada)**: pasta
+> /extension (Manifest V3) com legendas clicáveis no player da Netflix (técnica Language
+> Reactor), capturas em chrome.storage e ponte que as entrega no Revisar quando o app abre
+> — sem chave de API na extensão. Ver seção 8 (60ª rodada).
+>
+> Anterior: 2026-08-04 — **Gerenciador de Palavras (59ª rodada)**: seção nova com
 > inventário montado a partir do SEU material (legendas + contextos + cards), grid de chips
 > por status, filtros com contadores, medidor de domínio, busca/ordenação e varredura em
 > lote. Ver seção 8 (59ª rodada).
@@ -529,6 +534,27 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (60ª rodada) — Extensão do Chrome para a Netflix
+120. **Pedido**: "crie a extensão pra usarmos na minha conta da netflix" (aprovando a
+     análise da 58ª). Pasta **`/extension`** (Manifest V3, sem build):
+     - **netflix.js**: MutationObserver no `.player-timedtext` (as legendas que a Netflix
+       desenha no DOM — a mesma técnica do Language Reactor); re-renderiza a fala numa
+       barra própria com CADA PALAVRA clicável; "+ frase" captura a fala inteira; botões
+       cc (esconde a legenda nativa), ⏸ (pausa com o mouse na barra) e ×. Captura leva
+       palavra + frase + título do episódio para `chrome.storage.local`.
+     - **bridge.js** (roda no Pages/Vercel/localhost): entrega as capturas ao app por
+       postMessage na abertura/foco/na hora (storage.onChanged) e limpa a fila no ack.
+     - **core.js**: listener `englab-ext-captures` cria os itens no Revisar via
+       `createWord` (frase sem palavra vira item-frase → ganha o Raio-X; dedupe por
+       palavra+contexto; ack sempre). **Nenhuma chave de API na extensão.**
+     - **popup**: contagem de pendências, últimas capturas, "Abrir o Language Lab",
+       religar a barra, descartar fila. README com instalação (Carregar sem compactação).
+     - **Validado ao vivo (lado do app)**: 3 capturas simuladas → 2 itens criados
+       (duplicata ignorada), fonte/título corretos, frase virou item-frase, ack `got:3`,
+       reenvio não duplica. **Lado Netflix NÃO testável daqui** (DRM/login) — seletor
+       `.player-timedtext` é o padrão estável usado pelo LR; primeiro teste real é do
+       Djemeson. `CACHE`: `v86` → **`v87`**.
 
 ### Sessão 2026-08-04 (59ª rodada) — Gerenciador visual de Palavras (estilo Language Reactor)
 119. **Pedido**: "faça o gerenciador visual estilo Language Reactor pra deixar poderoso".

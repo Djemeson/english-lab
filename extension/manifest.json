@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Language Lab para Netflix",
+  "version": "1.0.0",
+  "description": "Legendas clicáveis na Netflix: capture palavras e frases direto para o seu Language Lab.",
+  "permissions": ["storage", "tabs"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.netflix.com/*"],
+      "js": ["netflix.js"],
+      "css": ["netflix.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://djemeson.github.io/*",
+        "https://*.vercel.app/*",
+        "http://localhost:8765/*"
+      ],
+      "js": ["bridge.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Language Lab — capturas da Netflix"
+  }
+}

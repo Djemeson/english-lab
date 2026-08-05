@@ -80,6 +80,38 @@ function markIgnoredWord(s, on = true) {
 function saveIgnoredLocal() {
   try { localStorage.setItem('el-ignored', JSON.stringify(ignoredWords)) } catch (e) {}
 }
+
+// ---- PONTE COM A EXTENSÃO DO CHROME (Netflix) ----
+// A extensão (pasta /extension) captura palavras/frases das legendas da
+// Netflix e as guarda no chrome.storage; quando o app abre, o content
+// script bridge.js as entrega por postMessage. Aqui viram itens do
+// Revisar (o Raio-X e a análise seguem o fluxo normal via createWord).
+window.addEventListener('message', ev => {
+  if (ev.source !== window || !ev.data || ev.data.type !== 'englab-ext-captures') return
+  const items = Array.isArray(ev.data.items) ? ev.data.items : []
+  let n = 0
+  for (const it of items.slice(0, 500)) {
+    const word = String(it.word || '').trim()
+    const context = String(it.context || '').trim()
+    const alvo = word || context
+    if (!alvo) continue
+    if (words.some(w => (w.word || '') === alvo && (w.context || '') === context)) continue
+    createWord({
+      word: alvo, context,
+      source_type: 'series',
+      source_title: String(it.title || 'Netflix').slice(0, 120),
+      lang: 'en'
+    })
+    n++
+  }
+  if (n) {
+    if (typeof renderSidebar === 'function') { try { renderSidebar() } catch (e) {} }
+    if (typeof renderDashboard === 'function') { try { renderDashboard() } catch (e) {} }
+    toast(`${n} captura${n > 1 ? 's' : ''} da Netflix ${n > 1 ? 'entraram' : 'entrou'} no Revisar`, 'success')
+  }
+  // ack mesmo com n=0 (duplicatas): a fila da extensão pode ser limpa
+  window.postMessage({ type: 'englab-ext-ack', got: items.length }, location.origin)
+})
 // Assistente (Consulta) — conversas persistidas e sincronizadas.
 // Estado declarado aqui (arquivo NÃO-lazy) para que firebase.js possa
 // referenciá-lo no sync; a UI vive em js/consulta.js.
