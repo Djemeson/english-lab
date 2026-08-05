@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Triagem fiel ao objeto de estudo (56ª rodada)**: a
+> Última atualização: 2026-08-04 — **Triagem em camadas (57ª rodada)**: recorte criado pela
+> triagem volta a ser triável — um phrasal pode ter palavra desconhecida dentro — mas SÓ
+> sobre ele mesmo: o filtro limita ao conteúdo do objeto e o objeto inteiro nunca vira chip.
+> `no_break` removido. Ver seção 8 (57ª rodada).
+>
+> Anterior: 2026-08-04 — **Triagem fiel ao objeto de estudo (56ª rodada)**: a
 > triagem devolvia pedaços da frase de CONTEXTO ("Okay.", "Great.") e re-triava itens que
 > ela mesma criou. Agora: filtro no código (unidade fora do objeto é descartada) + marca
 > `no_break` nascendo JUNTO com o item (corrida corrigida). Ver seção 8 (56ª rodada).
@@ -513,6 +518,23 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (57ª rodada) — Triagem em camadas: o recorte também pode ter partes
+113. **Ajuste do Djemeson sobre a 56ª**: o recorte escolhido PODE gerar novos chips ("um
+     phrasal verb pode ter uma palavra isolada que eu não conheço") — mas só em cima do
+     OBJETO DE ESTUDO, nunca da frase original. O `no_break` (56ª) era conservador demais.
+     - **`no_break` removido** (prefetch, ehFrase, createWord): item criado pela triagem
+       volta a ser triado normalmente. A fidelidade fica por conta de DUAS cercas em
+       `_revBreakFetch`: (1) o filtro da 56ª — unidade tem de estar contida no objeto de
+       estudo (o contexto continua indo no prompt só para o SENTIDO das glosas); (2) nova:
+       o objeto INTEIRO nunca vira chip (`normB(expr) !== normB(alvo)` + regra no prompt
+       "only its PARTS") — sub-triagem só mostra partes menores.
+     - Validado ponta a ponta com stub desobediente: frase → recorte "get you in" criado →
+       sub-triagem rodou SOBRE o recorte → devolveu o recorte inteiro + "for that" (da
+       frase original) + "get" → só **"get"** sobrou como chip. Nota de fluxo: como a
+       análise completa roda automaticamente, os sub-chips aparecem enquanto o item ainda
+       está pendente; depois de analisado, o card mostra os significados (as camadas
+       continuam disponíveis via seleção de texto/minerar). `CACHE`: `v83` → **`v84`**.
 
 ### Sessão 2026-08-04 (56ª rodada) — Triagem fiel ao objeto de estudo (dois bugs dos prints)
 112. **Prints do Djemeson**: (a) itens criados PELA triagem ("I have yet to do", "All of

@@ -741,7 +741,6 @@ function createWord(data) {
     source_title: data.source_title || '',
     source_context: (data.source_context || '').trim(),
     lang: (data.lang || (typeof activeLang === 'function' ? activeLang() : 'en')),
-    no_break: !!data.no_break,   // true = nunca triar (item já é um recorte escolhido)
     status: 'pending_ai',
     meanings: [],
     ai_processed: false,

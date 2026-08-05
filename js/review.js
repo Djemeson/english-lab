@@ -643,7 +643,7 @@ function renderWordCard(wordId) {
     // sabe do que precisa estudar (pedido do Djemeson: "não sei exatamente o
     // que não entendi").
     const alvoBrk = (w.word || w.context || '').trim()
-    const ehFrase = !w.no_break && alvoBrk.split(/\s+/).length >= 3
+    const ehFrase = alvoBrk.split(/\s+/).length >= 3
     // KonMari: cada estado mostra SÓ o que serve àquele momento.
     // Com a triagem pronta, ela é a protagonista e "analisar tudo" recua a
     // ação secundária; sem triagem, o botão de análise é o destaque.
@@ -850,8 +850,11 @@ const _revBreakBusy = new Set()
 // Triagem AUTOMÁTICA: dispara em segundo plano assim que um item multi-palavra
 // entra na revisão (chamado por createWord) — leve de propósito (mini-glosas,
 // sem levantamento profundo). Quando o aluno abrir o card, os chips já estão lá.
+// Vale também para itens criados PELA triagem ("get you in" pode ter uma
+// palavra que o aluno não conhece): o filtro do _revBreakFetch garante que os
+// chips saem SÓ de dentro do objeto de estudo — nunca da frase original.
 async function _revBreakPrefetch(w) {
-  if (!w || !w.id || w.no_break) return
+  if (!w || !w.id) return
   const alvo = (w.word || w.context || '').trim()
   if (alvo.split(/\s+/).length < 3) return
   if (!aiChatCfg().key || _revBreakCache.has(w.id) || _revBreakBusy.has(w.id)) return
@@ -898,6 +901,7 @@ Rules:
 - FIRST identify multi-word units: phrasal verbs (e.g. "get you in" in "we'll get you in for that"), idioms, collocations and fixed conversational chunks worth learning as a block ("chunk").
 - THEN list the remaining notable single words NOT already inside a unit.
 - Every "expr" MUST be text that appears INSIDE the snippet — never from the surrounding sentence. Units that are not part of the snippet are discarded.
+- NEVER return the whole snippet itself as one unit — only its PARTS (smaller units inside it).
 - SKIP trivial function words (articles, pronouns, auxiliaries, basic prepositions) unless they belong to a unit.
 - "gloss" is the meaning HERE, not a dictionary list.
 - LITERAL-TRANSLATION TRAP — avoid it explicitly: FIRST work out what the unit DOES in this scene, THEN write the gloss for that function. "We'll get you in for that" said at a hotel desk → gloss "a gente te encaixa (na agenda)", NEVER "colocar você dentro". If a gloss reads like word-by-word substitution, redo it before returning.
@@ -912,7 +916,8 @@ Rules:
   const items = (Array.isArray(r.items) ? r.items : [])
     .map(it => ({ expr: String(it.expr || '').trim(), type: _RVB_CATS.some(c => c[0] === it.type) ? it.type : 'word',
                   gloss: String(it.gloss || '').trim(), nivel: String(it.nivel || '').trim() }))
-    .filter(it => it.expr && alvoNorm.includes(' ' + normB(it.expr) + ' '))
+    // dentro do objeto de estudo, mas nunca o objeto INTEIRO repetido como chip
+    .filter(it => it.expr && alvoNorm.includes(' ' + normB(it.expr) + ' ') && normB(it.expr) !== normB(alvo))
   if (!items.length) throw new Error('a IA não encontrou unidades de estudo')
   return items
 }
@@ -962,17 +967,16 @@ function revBreakStudy(wordId) {
   const criadas = []
   for (const i of st.sel) {
     const it = st.items[i]
-    // no_break vai NA criação: o createWord dispara a triagem em segundo
-    // plano na hora — marcar depois chegava tarde (corrida real, vista no
-    // teste). A unidade já é o recorte escolhido; nunca re-triar.
+    // O item criado PODE ser triado de novo (um phrasal pode conter uma
+    // palavra desconhecida) — mas o filtro do fetch limita os chips ao que
+    // está DENTRO dele, nunca à frase original.
     const nova = createWord({
       word: it.expr,
       context: w.context || '',
       source_type: w.source_type || 'manual',
       source_title: w.source_title || '',
       source_context: w.source_context || '',
-      lang: wordLang(w),
-      no_break: true
+      lang: wordLang(w)
     })
     if (it.type !== 'word') nova.type = it.type === 'chunk' ? 'collocation' : it.type
     criadas.push(nova)
