@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Pacote de 7 tarefas (58ª rodada)**: chip do "ethos"
+> Última atualização: 2026-08-04 — **Gerenciador de Palavras (59ª rodada)**: seção nova com
+> inventário montado a partir do SEU material (legendas + contextos + cards), grid de chips
+> por status, filtros com contadores, medidor de domínio, busca/ordenação e varredura em
+> lote. Ver seção 8 (59ª rodada).
+>
+> Anterior: 2026-08-04 — **Pacote de 7 tarefas (58ª rodada)**: chip do "ethos"
 > (adjetivo+substantivo livre não é colocação), persona "Lex" no Assistente, módulo de
 > vídeo aceita PODCAST (áudio), núcleo do módulo PALAVRAS CONHECIDAS (triagem + SRS maduro
 > + cobertura de episódio + sync por união), e análises de clipes de vídeo/addons de
@@ -524,6 +529,26 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (59ª rodada) — Gerenciador visual de Palavras (estilo Language Reactor)
+119. **Pedido**: "faça o gerenciador visual estilo Language Reactor pra deixar poderoso".
+     Nova seção **Palavras** (`js/known.js`, lazy; nav próprio):
+     - **Inventário do SEU material**, não lista genérica: `_knLevantar()` varre as legendas
+       de todos os vídeos/podcasts (VideoDB subs), os contextos capturados e as frases dos
+       cards — a frequência exibida é a do que o Djemeson assiste. Stop-words fora.
+     - **4 status por cor**: conhecidas (verde), em estudo (primária), sugestões (neutra),
+       não aprender (apagada/tracejada). Filtros com contador, "não aprender" oculto por
+       padrão.
+     - **Medidor de domínio**: % do material que já é conhecido/em estudo.
+     - **Ações**: clique alterna conhecida; botões no hover mandam para o Revisar (cria a
+       palavra com o contexto real) ou silenciam para sempre; **"marcar as N sugestões
+       visíveis como conhecidas"** com confirmação — a varredura rápida que faz o LR ser
+       eficiente. Busca, ordenação (frequência/alfabética) e paginação de 300 em 300.
+     - **`ignoredWords`** (novo, core.js) + sync no mesmo doc `data/known` por união.
+     - Validado ao vivo com episódio sintético: inventário montado, frequência real
+       (ethos=3), status iniciais certos, contadores, medidor, ignorada oculta, marcar →
+       verde + persistência, estudar → cria word e vira "em estudo", busca e filtros.
+     `CACHE`: `v85` → **`v86`** (known.js entra na regra network-first dos lazy).
 
 ### Sessão 2026-08-04 (58ª rodada) — Pacote de 7 tarefas (4 executadas + 3 análises)
 114. **Chip "ethos"**: triagem devolvia "Japanese ethos" (colocação) + "it's" (lixo A1).

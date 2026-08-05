@@ -67,6 +67,19 @@ function markKnownWord(s, on = true) {
 function saveKnownLocal() {
   try { localStorage.setItem('el-known', JSON.stringify(knownWords)) } catch (e) {}
 }
+
+// "Nunca mais sugerir": nomes proprios, jargao que nao interessa, etc.
+let ignoredWords = {}
+try { ignoredWords = JSON.parse(localStorage.getItem('el-ignored') || '{}') } catch (e) {}
+function markIgnoredWord(s, on = true) {
+  const k = knownNorm(s); if (!k) return
+  if (on) ignoredWords[k] = Date.now(); else delete ignoredWords[k]
+  saveIgnoredLocal()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+}
+function saveIgnoredLocal() {
+  try { localStorage.setItem('el-ignored', JSON.stringify(ignoredWords)) } catch (e) {}
+}
 // Assistente (Consulta) — conversas persistidas e sincronizadas.
 // Estado declarado aqui (arquivo NÃO-lazy) para que firebase.js possa
 // referenciá-lo no sync; a UI vive em js/consulta.js.
@@ -314,6 +327,7 @@ const SECTIONS = ['dashboard','assistente','adicionar','revisar','estudar','bibl
 // video é um PACOTE de módulos (ordem importa: o estado vive no primeiro)
 const _LAZY = {
   adicionar: 'js/add.js', estudar: 'js/study.js', biblioteca: 'js/study.js',
+  palavras: 'js/known.js',
   video: ['js/video.js', 'js/video-subs.js', 'js/video-sync.js', 'js/video-study.js']
 }
 const _loadedModules = new Set()
@@ -368,6 +382,7 @@ function _activateSection(name) {
   if (name === 'estudar') renderSrsSection()
   if (name === 'biblioteca') openBiblioteca()
   if (name === 'video') { if (typeof renderVideoSection === 'function') renderVideoSection() }
+  if (name === 'palavras') { if (typeof renderKnownSection === 'function') renderKnownSection() }
 }
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))

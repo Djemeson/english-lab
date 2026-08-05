@@ -226,7 +226,7 @@ async function fbPushData() {
     // Vídeo: só METADADOS (títulos, marcadores, cortes) — o arquivo de vídeo
     // nunca sobe (300MB–2GB × limite de 1MB/doc). Legendas ficam locais (IDB).
     batch.set(base.collection('data').doc('videos'), { list: videos, updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('known'), { map: knownWords || {}, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('known'), { map: knownWords || {}, ignored: ignoredWords || {}, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('clips'),  { list: clips,  updatedAt: Date.now() })
     await batch.commit()
     updateSyncNav('ok')
@@ -472,7 +472,8 @@ function applyCloudDocs(docs) {
   if (docs.srsLog)   { srsLog = docs.srsLog.list || []; saveSrsLog() }
   if (docs.srsDecks) { srsDecks = docs.srsDecks.list || []; saveSrsDecks() }
   if (docs.videos)   { videos = docs.videos.list || []; saveVideos() }
-  if (docs.known)    { knownWords = { ...knownWords, ...(docs.known.map || {}) }; saveKnownLocal() }
+  if (docs.known)    { knownWords = { ...knownWords, ...(docs.known.map || {}) }; saveKnownLocal()
+                       ignoredWords = { ...ignoredWords, ...(docs.known.ignored || {}) }; saveIgnoredLocal() }
   if (docs.clips)    { clips  = docs.clips.list  || []; saveClips() }
   if (docs.kindleQueue) {
     const seen = (typeof loadKindleSeen === 'function') ? loadKindleSeen() : new Set()
