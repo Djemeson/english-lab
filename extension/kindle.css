@@ -1,0 +1,44 @@
+/* ================================================================
+   Language Lab no Kindle Cloud Reader — pílula de seleção e aviso.
+   Tudo com prefixo englab-k- e position:fixed: o leitor da Amazon
+   repagina o conteúdo o tempo todo e qualquer elemento no fluxo dele
+   seria arrastado junto.
+   ================================================================ */
+#englab-k-pill{
+  position:fixed;z-index:2147483646;
+  display:flex;align-items:stretch;gap:1px;
+  background:#0f1520;border:1px solid #2a3646;border-radius:8px;
+  box-shadow:0 8px 26px rgba(0,0,0,.45);
+  font-family:"Segoe UI",Roboto,Arial,sans-serif;font-size:13px;
+  overflow:hidden;user-select:none;
+}
+#englab-k-pill button{
+  border:0;background:#17202e;color:#e5eaf0;
+  padding:7px 11px;cursor:pointer;font-size:13px;line-height:1;
+  display:inline-flex;align-items:center;gap:6px;font-family:inherit;
+}
+#englab-k-pill button:hover{background:#22304a}
+#englab-k-pill .englab-k-pri{background:#23beaa;color:#06231f;font-weight:600}
+#englab-k-pill .englab-k-pri:hover{background:#2ad3bd}
+#englab-k-pill .englab-k-auto{color:#7c8896;font-size:12px}
+#englab-k-pill .englab-k-auto.on{color:#06231f;background:#e5b45a;font-weight:600}
+#englab-k-pill svg{
+  width:14px;height:14px;fill:none;stroke:currentColor;
+  stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;
+}
+
+#englab-k-toast{
+  position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);
+  z-index:2147483647;
+  display:flex;align-items:center;gap:10px;
+  background:#0f1520;color:#e5eaf0;border:1px solid #2a3646;
+  border-radius:8px;padding:9px 14px;
+  font-family:"Segoe UI",Roboto,Arial,sans-serif;font-size:13px;
+  box-shadow:0 8px 26px rgba(0,0,0,.45);
+  opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;
+}
+#englab-k-toast.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#englab-k-toast button{
+  border:0;background:transparent;color:#23beaa;cursor:pointer;
+  font-family:inherit;font-size:12px;text-decoration:underline;padding:0;
+}

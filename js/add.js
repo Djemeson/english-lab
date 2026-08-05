@@ -41,77 +41,182 @@ function addManual() {
 
 
 // ================================================================
-// KINDLE PARSER — HTML/TXT/CSV
+// KINDLE PARSER — vocab.db / HTML / TXT / CSV
 // ================================================================
-// Hash simples para identificar um highlight (baseado no texto)
-function kindleHighlightHash(text) {
-  let h = 0
-  for (let i = 0; i < Math.min(text.length, 200); i++)
-    h = (Math.imul(31, h) + text.charCodeAt(i)) | 0
-  return Math.abs(h).toString(36)
-}
+// O histórico "isto eu já importei" (kindleHighlightHash, loadKindleSeen,
+// kindleItemVisto…) mora em core.js, NÃO aqui: firebase.js precisa dele no
+// sync e não pode depender de um módulo lazy (armadilha nº 1 do projeto).
 
-function loadKindleSeen() {
-  try { return new Set(JSON.parse(localStorage.getItem(SK.kindleSeen) || '[]')) } catch { return new Set() }
-}
-
-function saveKindleSeen(seen) {
-  localStorage.setItem(SK.kindleSeen, JSON.stringify([...seen]))
-}
-
-function markKindleItemsAsSeen(items) {
-  const seen = loadKindleSeen()
-  items.forEach(item => seen.add(kindleHighlightHash(item.context || item.word)))
-  saveKindleSeen(seen)
-}
-
+// Chamada de onchange/ondrop (que ignoram a promessa): qualquer falha aqui
+// vira "unhandled rejection" no console e a tela fica muda. Uma casca só.
 function handleKindleFile(input) {
-  const file = input.files[0]; if (!file) return
-  const reader = new FileReader()
-  reader.onload = async e => {
-    const text = e.target.result
-    const name = file.name.toLowerCase()
-    let allItems
-    // Detecta formato por conteúdo (mais confiável que extensão)
-    if (name.endsWith('.html') || name.endsWith('.htm') || text.includes("class='noteText'") || text.includes('class="noteText"')) {
-      allItems = parseKindleHTML(text)
-    } else if (name.endsWith('.csv') && text.split('\n')[0]?.match(/word|usage|stem/i)) {
-      allItems = parseKindleCSV(text)
-    } else if (/PÁGINA\s+\d+\s*[•·]\s*(DESTAQUE|MARCAÇÃO)/i.test(text) || /PAGE\s+\d+\s*[•·]\s*HIGHLIGHT/i.test(text)) {
-      allItems = parseKindleAndroidExport(text)
-    } else if (/={5,}/.test(text)) {
-      allItems = parseKindleClippings(text)
-    } else {
-      // Tenta Android export como fallback para .txt não reconhecido
-      allItems = parseKindleAndroidExport(text)
-      if (!allItems.length) allItems = parseKindleClippings(text)
+  return _handleKindleFile(input).catch(e => {
+    console.warn('[Kindle] importação falhou:', e)
+    toast('Não consegui ler esse arquivo: ' + (e && e.message ? e.message : 'erro'), 'error')
+  })
+}
+
+async function _handleKindleFile(input) {
+  const file = input.files && input.files[0]; if (!file) return
+  try { input.value = '' } catch (e) {}
+  // Formato pelo CONTEÚDO, não pela extensão: o vocab.db do Kindle é binário
+  // (SQLite) e lê-lo como texto devolveria lixo silenciosamente.
+  let ehSqlite = false
+  try {
+    const cab = new Uint8Array(await file.slice(0, 16).arrayBuffer())
+    ehSqlite = 'SQLite format 3'.split('').every((c, i) => cab[i] === c.charCodeAt(0))
+  } catch (e) {}
+
+  if (ehSqlite) {
+    let res
+    try {
+      const buf = await file.arrayBuffer()
+      res = parseKindleVocabDb(buf)
+    } catch (e) {
+      toast('Não consegui ler o vocab.db: ' + e.message, 'error')
+      return
     }
-
-    // Filtrar highlights já processados
-    const seen = loadKindleSeen()
-    const newItems = allItems.filter(item => {
-      const hash = kindleHighlightHash(item.context || item.word)
-      return !seen.has(hash)
-    })
-    const skipped = allItems.length - newItems.length
-
-    kindleItems = newItems
-    // Mostra loading enquanto processa em lote
-    el('kindle-drop').classList.add('hidden')
-    el('kindle-result').classList.remove('hidden')
-    el('kindle-count').textContent = `Traduzindo ${kindleItems.length} destaques...`
-    el('kindle-list').innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)">
-      <div style="margin-bottom:12px;color:var(--primary)">${ic('refresh','ic-xl')}</div>
-      <div>Processando todos os destaques com IA...</div>
-      <div style="font-size:var(--fs-sm);margin-top:8px;color:var(--text3)">Isso pode levar alguns segundos</div>
-    </div>`
-    // Processa em lote e depois salva + renderiza
-    await analyzeKindleItems()
-    saveKindleQueue()
-    renderKindleList(skipped, allItems.length)
+    if (!res.items.length) {
+      const motivo = res.skipped || res.known
+        ? `Nada novo: ${res.skipped} já importada(s)${res.known ? ` · ${res.known} marcada(s) como conhecida/ignorada` : ''}.`
+        : 'Nenhuma consulta encontrada. O Vocabulary Builder está ligado no aparelho?'
+      toast(motivo, 'info')
+      return
+    }
+    await _kindleFinalizar(res.items, res.skipped + res.known, res.total)
+    return
   }
-  reader.readAsText(file, 'utf-8')
-  input.value = ''
+
+  const text = await file.text()
+  const name = (file.name || '').toLowerCase()
+  let allItems
+  // Detecta formato por conteúdo (mais confiável que extensão)
+  if (name.endsWith('.html') || name.endsWith('.htm') || text.includes("class='noteText'") || text.includes('class="noteText"')) {
+    allItems = parseKindleHTML(text)
+  } else if (name.endsWith('.csv') && text.split('\n')[0]?.match(/word|usage|stem/i)) {
+    allItems = parseKindleCSV(text)
+  } else if (/PÁGINA\s+\d+\s*[•·]\s*(DESTAQUE|MARCAÇÃO)/i.test(text) || /PAGE\s+\d+\s*[•·]\s*HIGHLIGHT/i.test(text)) {
+    allItems = parseKindleAndroidExport(text)
+  } else if (/={5,}/.test(text)) {
+    allItems = parseKindleClippings(text)
+  } else {
+    // Tenta Android export como fallback para .txt não reconhecido
+    allItems = parseKindleAndroidExport(text)
+    if (!allItems.length) allItems = parseKindleClippings(text)
+  }
+
+  // Filtrar highlights já processados
+  const seen = loadKindleSeen()
+  const newItems = allItems.filter(item => !kindleItemVisto(item, seen))
+  await _kindleFinalizar(newItems, allItems.length - newItems.length, allItems.length)
+}
+
+// Trilho comum das duas entradas (vocab.db e destaques): mostra a fila,
+// traduz em lote e persiste.
+async function _kindleFinalizar(newItems, skipped, total) {
+  // Nada novo: a área de soltar arquivo CONTINUA na tela. Trocá-la por uma
+  // lista vazia deixava o usuário preso numa caixa sem conteúdo e sem saída.
+  if (!newItems.length) {
+    toast(total
+      ? (total === 1 ? 'Nada novo: esse destaque já tinha sido importado.'
+                     : `Nada novo: os ${total} itens desse arquivo já tinham sido importados.`)
+      : 'Não reconheci destaques nesse arquivo. Ele é o vocab.db, o My Clippings.txt ou o HTML de "Notas e Destaques"?',
+      'info')
+    return
+  }
+  kindleItems = newItems
+  el('kindle-drop').classList.add('hidden')
+  el('kindle-result').classList.remove('hidden')
+  el('kindle-count').textContent = `Processando ${kindleItems.length} itens...`
+  el('kindle-list').innerHTML = `<div style="padding:32px;text-align:center;color:var(--text3)">
+    <div style="margin-bottom:12px;color:var(--primary)">${ic('refresh','ic-xl')}</div>
+    <div>Processando com IA...</div>
+    <div style="font-size:var(--fs-sm);margin-top:8px;color:var(--text3)">Isso pode levar alguns segundos</div>
+  </div>`
+  await analyzeKindleItems()
+  saveKindleQueue()
+  renderKindleList(skipped, total)
+}
+
+// ================================================================
+// VOCABULARY BUILDER — vocab.db (o arquivo do próprio aparelho)
+// ================================================================
+// É ESTE o arquivo que responde ao "toda palavra que eu marco no livro".
+// Cada toque numa palavra desconhecida vira uma linha em LOOKUPS com a
+// FRASE INTEIRA em que ela apareceu (coluna `usage`) — contexto de graça,
+// sem IA. Caminho no aparelho ligado por USB:
+//     <Kindle>/system/vocabulary/vocab.db
+// (`system` é pasta oculta: ligue "mostrar itens ocultos" no Explorador.)
+//
+// Limite conhecido do próprio Kindle: o Vocabulary Builder só registra
+// consultas em livros da Amazon. Documento pessoal (Enviar para Kindle,
+// PDF, sideload) NÃO entra aqui — para esses o caminho é o My Clippings.txt
+// (destaque a palavra) ou a captura ao vivo no read.amazon.com.
+function parseKindleVocabDb(buffer) {
+  const db = sqliteAbrir(buffer)
+  if (!db.tabelas.LOOKUPS || !db.tabelas.WORDS) {
+    throw new Error('esse SQLite não parece o vocab.db do Kindle (faltam WORDS/LOOKUPS)')
+  }
+  const livros = new Map(); db.ler('BOOK_INFO').forEach(b => livros.set(b.id, b))
+  const palavras = new Map(); db.ler('WORDS').forEach(w => palavras.set(w.id, w))
+  const lookups = db.ler('LOOKUPS')
+
+  const seen = loadKindleSeen()
+  let skipped = 0, known = 0
+  const porPalavra = new Map()
+
+  for (const l of lookups) {
+    const kid = String(l.id || '')
+    if (!kid) continue
+    // Incremental: o que já entrou uma vez não volta. É isso que faz o
+    // "conectei o Kindle → só o novo cai no Revisar".
+    if (seen.has('L:' + kid)) { skipped++; continue }
+    const w = palavras.get(l.word_key); if (!w) continue
+    // O `stem` é a forma de citação (lema) — é o que o resto do app usa como
+    // título de card. `word` é a forma flexionada que apareceu na página.
+    const lema = String(w.stem || w.word || '').trim().toLowerCase()
+    if (!lema || lema.length > 60) continue
+    // Já sei / não quero: não vira card. (Palavras marcadas no Gerenciador.)
+    if (typeof knownNorm === 'function') {
+      const k = knownNorm(lema)
+      if ((typeof knownWords === 'object' && knownWords[k]) ||
+          (typeof ignoredWords === 'object' && ignoredWords[k])) { known++; continue }
+    }
+    const livro = livros.get(l.book_key) || {}
+    const frase = String(l.usage || '').replace(/\s+/g, ' ').trim()
+    const idioma = String(w.lang || '').toLowerCase().slice(0, 2)
+    const item = {
+      word: lema, words: [lema],
+      context: frase,
+      source_type: 'kindle',
+      source_title: cleanSourceTitle(livro.title || 'Kindle'),
+      chapter: String(livro.authors || '').split(/[;,]/)[0].trim(),
+      lang: (typeof LANGS === 'object' && LANGS[idioma]) ? idioma : 'en',
+      kids: [kid],
+      vezes: 1,
+      ts: Number(l.timestamp) || 0
+    }
+    // Mesma palavra consultada várias vezes: um item só, com a MELHOR frase
+    // (a mais longa costuma ser a mais informativa) e a contagem de consultas
+    // — repetir a consulta é o próprio Kindle dizendo que ela não colou.
+    const chave = item.lang + '|' + lema
+    const anterior = porPalavra.get(chave)
+    if (anterior) {
+      anterior.kids.push(kid)
+      anterior.vezes++
+      if (frase.length > (anterior.context || '').length) {
+        anterior.context = frase
+        anterior.source_title = item.source_title
+        anterior.chapter = item.chapter
+      }
+      if (item.ts > anterior.ts) anterior.ts = item.ts
+    } else {
+      porPalavra.set(chave, item)
+    }
+  }
+
+  const items = [...porPalavra.values()].sort((a, b) => b.ts - a.ts)
+  return { items, skipped, known, total: lookups.length }
 }
 
 // Persistência da fila Kindle
@@ -130,7 +235,7 @@ function loadKindleQueue() {
         if (it.source_title) it.source_title = cleanSourceTitle(it.source_title)
       })
       const seen = loadKindleSeen()
-      kindleItems = saved.filter(item => !seen.has(kindleHighlightHash(item.context || item.word)))
+      kindleItems = saved.filter(item => !kindleItemVisto(item, seen))
       if (kindleItems.length < saved.length) localStorage.setItem(SK.kindleQueue, JSON.stringify(kindleItems))
       return kindleItems.length > 0
     }
@@ -183,17 +288,55 @@ function parseKindleHTML(html) {
   return items
 }
 
+// ---- My Clippings.txt ---------------------------------------------------
+// ESTE é o caminho dos SEUS arquivos. O Vocabulary Builder do Kindle só
+// registra consulta em livro da Amazon; num documento enviado por você
+// (Enviar para Kindle, PDF, sideload) o que sobra é o destaque com o dedo —
+// e todo destaque, em QUALQUER livro, cai aqui.
+//
+// Formato: blocos separados por uma linha de "=". Linha 1 = título (autor),
+// linha 2 = metadados começando por "-", resto = conteúdo.
+const CLIP_NOTA = /\b(note|nota|notiz|anmerkung|remarque)\b/i
+const CLIP_MARCADOR = /\b(bookmark|marcador|marca[- ]p[áa]gina|lesezeichen|signet|marcap[áa]ginas)\b/i
+
 function parseKindleClippings(text) {
-  const bookTitle = 'My Clippings'
-  return text.split(/={10,}/).map(s => s.trim()).filter(Boolean).reduce((acc, entry) => {
+  const vistos = new Set()
+  // BOM: o Kindle grava o arquivo em UTF-8 com marca de ordem de byte, e ela
+  // colava no título do primeiro livro.
+  return String(text || '').replace(/^﻿/, '')
+    .split(/={10,}/).map(s => s.trim()).filter(Boolean).reduce((acc, entry) => {
     const lines = entry.split('\n').map(l => l.trim()).filter(Boolean)
     if (lines.length < 2) return acc
     const meta = lines[1]
     if (!meta.startsWith('-')) return acc
-    if (/bookmark|note/i.test(meta)) return acc
+    // Nota do usuário e marcador não são vocabulário. Antes só o inglês era
+    // reconhecido: num Kindle em português "Sua nota" entrava como destaque.
+    if (CLIP_NOTA.test(meta) || CLIP_MARCADOR.test(meta)) return acc
     const content = lines.slice(2).join(' ').trim()
-    if (content.length >= 2)
-      acc.push({ word:'', context: content, source_type:'kindle', source_title: lines[0].replace(/\(.*?\)$/, '').trim() })
+    if (content.length < 2) return acc
+
+    const cru = lines[0]
+    let autor = (cru.match(/\(([^()]*)\)\s*$/) || [])[1] || ''
+    // Documento pessoal vem com autor "Desconhecido" — não é informação.
+    if (/^(desconhecido|unknown|autor desconhecido|unbekannt)$/i.test(autor.trim())) autor = ''
+    const titulo = cleanSourceTitle(cru.replace(/\s*\([^()]*\)\s*$/, '')) || 'Kindle'
+    // Reajustar um destaque no aparelho grava o bloco DE NOVO: sem isto, o
+    // mesmo trecho aparece duas ou três vezes na lista.
+    const chave = titulo + '|' + content.slice(0, 160)
+    if (vistos.has(chave)) return acc
+    vistos.add(chave)
+
+    // Destaque curto = você marcou a PALAVRA, não a frase. Ela já é o objeto
+    // de estudo: não precisa de IA para descobrir o alvo.
+    const palavras = content.split(/\s+/).filter(Boolean)
+    const soPalavra = palavras.length <= 3 && content.length <= 40
+    acc.push({
+      word: soPalavra ? content.replace(/[.,;:!?"'“”‘’]+$/g, '').toLowerCase() : '',
+      context: soPalavra ? '' : content,
+      source_type: 'kindle',
+      source_title: titulo,
+      chapter: autor.trim()
+    })
     return acc
   }, [])
 }
@@ -270,7 +413,11 @@ function renderKindleList(skipped, total) {
   const list = el('kindle-list')
   const skipInfo = skipped > 0 ? ` · ${skipped} já processados ignorados` : ''
   const totalInfo = total && total !== kindleItems.length ? ` (${total} no arquivo)` : ''
-  el('kindle-count').textContent = `${kindleItems.length} novos destaques${skipInfo}${totalInfo}`
+  const n = kindleItems.length
+  const rotulo = kindleItems.some(it => it.kids)
+    ? (n === 1 ? 'palavra consultada nova' : 'palavras consultadas novas')
+    : (n === 1 ? 'destaque novo' : 'destaques novos')
+  el('kindle-count').textContent = `${n} ${rotulo}${skipInfo}${totalInfo}`
   el('kindle-drop').classList.add('hidden')
   el('kindle-result').classList.remove('hidden')
   list.innerHTML = kindleItems.map((item, i) => {
@@ -299,7 +446,7 @@ function renderKindleList(skipped, total) {
         <div class="kindle-expr-row" style="flex-wrap:wrap;gap:5px;margin-top:6px">
           ${chipContent}
         </div>
-        <div class="parsed-meta">${ic('book','ic-sm')} ${esc(item.source_title)}${item.chapter ? ' · ' + esc(item.chapter) : ''}</div>
+        <div class="parsed-meta">${ic('book','ic-sm')} ${esc(item.source_title)}${item.chapter ? ' · ' + esc(item.chapter) : ''}${item.vezes > 1 ? ` · <b>consultada ${item.vezes}×</b>` : ''}</div>
       </div>
     </div>`
   }).join('')
@@ -339,7 +486,9 @@ Return ONLY valid JSON:
     // Separa itens com frase de itens com só palavra
     const lines = batch.map((item, j) => {
       const idx = start + j
-      const ctx = (item.context || '').replace(/"/g, "'").trim()
+      // Item que só tem a palavra (destaque curto, vocab.db sem frase) manda a
+      // PALAVRA — antes ia uma string vazia e a IA respondia qualquer coisa.
+      const ctx = (item.context || item.word || '').replace(/"/g, "'").trim()
       const hasWord = item.word && item.word !== ctx
       if (ctx.split(/\s+/).length <= 2) {
         // Highlight de palavra única ou dupla — não tem frase
@@ -356,24 +505,31 @@ Return ONLY valid JSON:
 Return JSON for ALL ${batch.length} items.` }
       ], { maxTokens: Math.max(800, batch.length * 60) })
       if (Array.isArray(result.items)) {
-        result.items.forEach(({ i, item, trans }) => {
+        result.items.forEach(({ i, vocab, item, trans }) => {
           const idx = Number(i)
           if (isNaN(idx) || idx < 0 || idx >= kindleItems.length) return
+          const alvo = kindleItems[idx]
+          alvo.analisado = true
           const ptStr = String(trans || '').trim()
           const isInstructionLeak = /global.?index|cada item|utiliza|return|json|vocabulary/i.test(ptStr)
           if (ptStr && !isInstructionLeak) {
-            kindleItems[idx].context_pt = ptStr
+            alvo.context_pt = ptStr
             const ptEl = document.getElementById(`ks-pt-${idx}`)
             if (ptEl) ptEl.textContent = ptStr
           }
-          if (!item) return
-          const clean = String(item).toLowerCase()
-            .replace(/[.,!?;:"""\''()\n\[\]]/g, '').trim()
-          if (clean && clean.length > 0) {
-            if (!Array.isArray(kindleItems[idx].words)) kindleItems[idx].words = []
-            if (!kindleItems[idx].words.includes(clean)) kindleItems[idx].words = [clean]
-            kindleItems[idx].word = clean // compat
+          // O prompt pede `vocab` (lista de expressões). O código lia `item`,
+          // que nunca vinha — os chips ficavam em "analisando..." para sempre.
+          // `item` fica aceito como apelido para não quebrar respostas antigas.
+          const brutos = Array.isArray(vocab) ? vocab : (item ? [item] : [])
+          const achados = brutos
+            .map(v => String(v || '').toLowerCase().replace(/[.,!?;:"""\''()\n\[\]]/g, '').trim())
+            .filter(v => v && v.length > 1)
+          // Item que JÁ nasceu com alvo (vocab.db) não é sobrescrito pela IA.
+          if (achados.length && !getItemWords(alvo).length) {
+            alvo.words = [...new Set(achados)]
+            alvo.word = alvo.words[0]   // compat
           }
+          updateKindleWordsDisplay(idx)
         })
       }
     } catch(e) {
@@ -575,8 +731,8 @@ function discardKindleSelected() {
   // Marca como vistos (não aparecerão em importações futuras)
   markKindleItemsAsSeen(sel)
   // Remove da fila atual
-  const discardedHashes = new Set(sel.map(item => kindleHighlightHash(item.context || item.word)))
-  kindleItems = kindleItems.filter(item => !discardedHashes.has(kindleHighlightHash(item.context || item.word)))
+  const discardedHashes = new Set(sel.map(kindleItemKey))
+  kindleItems = kindleItems.filter(item => !discardedHashes.has(kindleItemKey(item)))
   if (kindleItems.length > 0) {
     saveKindleQueue()
     renderKindleList()
@@ -595,7 +751,7 @@ function addKindleSelected() {
     if (iwords.length <= 1) {
       createWord({ ...item, word: iwords[0] || item.word || item.context })
     } else {
-      iwords.forEach(w => createWord({ word: w, context: item.context, context_pt: item.context_pt, source_type: item.source_type, source_title: item.source_title }))
+      iwords.forEach(w => createWord({ word: w, context: item.context, context_pt: item.context_pt, source_type: item.source_type, source_title: item.source_title, lang: item.lang }))
     }
   })
   saveWords(); renderDashboard()
@@ -603,8 +759,8 @@ function addKindleSelected() {
   markKindleItemsAsSeen(sel)
   toast(`${sel.length} itens adicionados à fila!`, 'success')
   // Remove itens adicionados da queue e salva o restante
-  const addedHashes = new Set(sel.map(item => kindleHighlightHash(item.context || item.word)))
-  kindleItems = kindleItems.filter(item => !addedHashes.has(kindleHighlightHash(item.context || item.word)))
+  const addedHashes = new Set(sel.map(kindleItemKey))
+  kindleItems = kindleItems.filter(item => !addedHashes.has(kindleItemKey(item)))
   if (kindleItems.length > 0) {
     saveKindleQueue()
     renderKindleList()

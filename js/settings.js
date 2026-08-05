@@ -99,6 +99,7 @@ function fillSettings() {
   setSettingsTab(_settingsTab)
   renderThemePicker()
   renderAccentPicker()
+  renderEspacoLocal()      // assíncrono de propósito: não segura a abertura da tela
   if (_fbUser !== undefined) updateFirebaseUI(_fbUser)
 }
 
@@ -174,6 +175,115 @@ function selectTheme(id) {
 // (havia um `async` órfão aqui, sobra de um patch antigo: como estava numa
 //  linha sozinha, o JS o lia como variável e lançava ReferenceError toda vez
 //  que este arquivo era avaliado — abortando qualquer código no fim dele.)
+// ================================================================
+// ESPAÇO EM DISCO — episódios de podcast e áudio consertado ocupam
+// dezenas/centenas de MB no IndexedDB, e até aqui não havia como ver
+// quanto. Abre o `el-video-db` SEM versão (só lê o que já existe) para
+// não depender do lazy js/video.js — armadilha nº 1.
+// O tamanho vem do próprio Blob: em IndexedDB ele é uma referência de
+// arquivo, então ler `.size` NÃO carrega os bytes na memória.
+// ================================================================
+function _mb(b) {
+  if (!b) return '0 MB'
+  return b >= 1073741824 ? (b / 1073741824).toFixed(1) + ' GB' : Math.round(b / 1048576) + ' MB'
+}
+
+function _idbTamanhos(store) {
+  return new Promise(resolve => {
+    let req
+    try { req = indexedDB.open('el-video-db') } catch { return resolve([]) }
+    req.onerror = () => resolve([])
+    req.onsuccess = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains(store)) { db.close(); return resolve([]) }
+      const itens = []
+      const cur = db.transaction(store).objectStore(store).openCursor()
+      cur.onerror = () => { db.close(); resolve(itens) }
+      cur.onsuccess = e => {
+        const c = e.target.result
+        if (!c) { db.close(); return resolve(itens) }
+        itens.push({ key: c.key, size: (c.value && c.value.size) || 0 })
+        c.continue()
+      }
+    }
+  })
+}
+
+async function renderEspacoLocal() {
+  const box = el('set-espaco'); if (!box) return
+  const [eps, fix] = await Promise.all([_idbTamanhos('files'), _idbTamanhos('media')])
+  const bEps = eps.reduce((a, x) => a + x.size, 0)
+  const bFix = fix.reduce((a, x) => a + x.size, 0)
+  let est = null
+  try { if (navigator.storage && navigator.storage.estimate) est = await navigator.storage.estimate() } catch {}
+
+  if (!eps.length && !fix.length && !est) { box.innerHTML = ''; return }
+
+  const linha = (rot, n, bytes, dica) => `
+    <div class="cost-row"><span data-tip="${escA(dica)}">${rot}</span>
+      <b>${n} ${n === 1 ? 'arquivo' : 'arquivos'} · ${_mb(bytes)}</b></div>`
+
+  box.innerHTML = `
+    <div class="set-espaco">
+      <div class="set-espaco-head">${ic('database','ic-sm')}Espaço usado neste aparelho</div>
+      <div class="cost-rows">
+        ${linha('Episódios de podcast baixados', eps.length, bEps, 'O mp3 de cada episódio. Apagar não perde nada do estudo: a legenda, os marcadores, os cortes e os cards continuam, e o episódio volta a ser baixado quando você abrir de novo.')}
+        ${fix.length ? linha('Áudio consertado (MKV com Dolby)', fix.length, bFix, 'Faixa de áudio extraída pelo ffmpeg para vídeos que tocavam mudos no Chrome. Refeita sob demanda.') : ''}
+        ${est && est.usage ? `<div class="cost-row total"><span>Total do Language Lab</span><b>${_mb(est.usage)}${est.quota ? ' de ' + _mb(est.quota) + ' disponíveis' : ''}</b></div>` : ''}
+      </div>
+      ${(eps.length || fix.length) ? `
+        <div class="btn-group" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          ${eps.length ? `<button class="btn btn-secondary btn-sm" onclick="liberarEspacoPodcasts()">${ic('trash','ic-sm')}Liberar ${eps.length === 1 ? 'o episódio' : `os ${eps.length} episódios`} (${_mb(bEps)})</button>` : ''}
+          ${fix.length ? `<button class="btn btn-ghost btn-sm" onclick="liberarEspacoAudioFix()">${ic('trash','ic-sm')}Liberar o áudio consertado (${_mb(bFix)})</button>` : ''}
+        </div>
+        <p class="cost-note">Nada de estudo é perdido: só o arquivo grande sai. Legendas, marcadores,
+        cortes e cards ficam — e o áudio volta sozinho quando você reabrir.</p>` : ''}
+    </div>`
+}
+
+function _idbLimpar(store) {
+  return new Promise(resolve => {
+    let req
+    try { req = indexedDB.open('el-video-db') } catch { return resolve(false) }
+    req.onerror = () => resolve(false)
+    req.onsuccess = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains(store)) { db.close(); return resolve(false) }
+      const tx = db.transaction(store, 'readwrite')
+      tx.objectStore(store).clear()
+      tx.oncomplete = () => { db.close(); resolve(true) }
+      tx.onerror = () => { db.close(); resolve(false) }
+    }
+  })
+}
+
+async function liberarEspacoPodcasts() {
+  const eps = await _idbTamanhos('files')
+  const bytes = eps.reduce((a, x) => a + x.size, 0)
+  if (!eps.length) { toast('Nenhum episódio baixado', 'info'); return }
+  if (!(await confirmModal({ title: 'Liberar espaço', icon: 'trash', confirmText: `Apagar ${_mb(bytes)}`,
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Apaga o áudio de
+      <b>${eps.length} episódio${eps.length !== 1 ? 's' : ''}</b> (${_mb(bytes)}) guardado neste aparelho.
+      <b>Nada do estudo é perdido</b>: legendas, marcadores, cortes e cards continuam, e cada episódio
+      volta a ser baixado do feed quando você abri-lo de novo.</p>` }))) return
+  await _idbLimpar('files')
+  toast(`${_mb(bytes)} liberados — o estudo continua todo aqui`, 'success')
+  renderEspacoLocal()
+}
+
+async function liberarEspacoAudioFix() {
+  const fix = await _idbTamanhos('media')
+  const bytes = fix.reduce((a, x) => a + x.size, 0)
+  if (!fix.length) { toast('Nada para liberar', 'info'); return }
+  if (!(await confirmModal({ title: 'Liberar áudio consertado', icon: 'trash', confirmText: `Apagar ${_mb(bytes)}`,
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Apaga a faixa de áudio que o ffmpeg extraiu
+      para vídeos que tocavam mudos (${_mb(bytes)}). Ela é <b>refeita em minutos</b> pelo botão
+      "Consertar áudio" na próxima vez que você abrir o vídeo.</p>` }))) return
+  await _idbLimpar('media')
+  toast(`${_mb(bytes)} liberados`, 'success')
+  renderEspacoLocal()
+}
+
 function exportData() {
   // Backup COMPLETO (2026-08-01): antes só words+cfg saíam — nem o agendamento
   // SRS entrava, então "restaurar do backup" perdia todo o progresso de estudo.
@@ -183,6 +293,10 @@ function exportData() {
     conversas: (typeof conversas !== 'undefined') ? conversas : [],
     videos:    (typeof videos    !== 'undefined') ? videos    : [],
     clips:     (typeof clips     !== 'undefined') ? clips     : [],
+    podShows:  (typeof podShows  !== 'undefined') ? podShows  : [],
+    // Histórico do Kindle: sem ele, restaurar um backup faria a importação
+    // seguinte ressuscitar todas as palavras já estudadas.
+    kindleSeen: (typeof loadKindleSeen === 'function') ? [...loadKindleSeen()] : [],
     exported_at: new Date().toISOString()
   }
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' })
@@ -205,6 +319,20 @@ function importData(input) {
         saveWords(); renderDashboard()
         toast(`${d.words.length} palavras importadas!`, 'success')
       }
+      // União com o histórico local (nunca substituição): o backup pode ser de
+      // um aparelho que importou menos coisa do que este.
+      if (Array.isArray(d.kindleSeen) && typeof loadKindleSeen === 'function') {
+        const uniao = loadKindleSeen()
+        d.kindleSeen.forEach(h => uniao.add(h))
+        saveKindleSeen(uniao)
+      }
+      // Programas de podcast: união por feedUrl (a lista é atalho, não dado de
+      // estudo — mesclar é sempre melhor que substituir).
+      if (Array.isArray(d.podShows) && typeof podShows !== 'undefined') {
+        const vistos = new Set(podShows.map(s => s.feedUrl))
+        podShows = [...podShows, ...d.podShows.filter(s => s && s.feedUrl && !vistos.has(s.feedUrl))].slice(0, 24)
+        savePodShows()
+      }
     } catch { toast('Arquivo JSON inválido', 'error') }
   }
   reader.readAsText(file); input.value = ''
@@ -212,9 +340,12 @@ function importData(input) {
 
 async function clearKindleSeen() {
   if (!(await confirmModal({ title: 'Resetar histórico do Kindle', icon: 'refresh', confirmText: 'Resetar',
-    html: '<p style="font-size:var(--fs-sm);color:var(--text2)">Os destaques já adicionados <b>voltarão a aparecer</b> na próxima importação. Nenhum card de estudo é afetado.</p>' }))) return
-  localStorage.removeItem(SK.kindleSeen)
-  toast('Histórico Kindle resetado. Próxima importação mostrará todos os destaques.', 'info')
+    html: '<p style="font-size:var(--fs-sm);color:var(--text2)">Tudo o que já foi importado do Kindle (palavras do <b>vocab.db</b> e destaques) <b>volta a aparecer</b> na próxima importação. Nenhum card de estudo é afetado.</p>' }))) return
+  localStorage.setItem(SK.kindleSeen, '[]')
+  // O histórico agora também vive na nuvem, e lá o merge é por UNIÃO: se não
+  // empurrarmos a lista vazia AGORA, o próximo snapshot devolveria tudo.
+  if (typeof fbPushData === 'function') { try { await fbPushData() } catch (e) {} }
+  toast('Histórico Kindle resetado. Próxima importação mostrará tudo de novo.', 'info')
 }
 
 async function checkMissingAudio() {
@@ -270,7 +401,18 @@ async function clearAllData() {
   try { await SettingsDB.set('cfg', {}) } catch {}
 
   // 3) Reset do estado em memória (decks voltam ao padrão)
+  // ⚠️ Tem de zerar TUDO o que o fbPushData do passo 4 envia: ele grava a
+  // memória, não o localStorage. Sem isto, "apagar tudo" limpava o disco e
+  // logo em seguida RE-ENVIAVA vídeos, cortes, conversas e palavras conhecidas
+  // para a nuvem — que voltavam no snapshot seguinte.
   words = []; srsCards = []; srsLog = []
+  if (typeof videos    !== 'undefined') videos    = []
+  if (typeof clips     !== 'undefined') clips     = []
+  if (typeof conversas !== 'undefined') { conversas = []; if (typeof activeConversaId !== 'undefined') activeConversaId = null }
+  if (typeof podShows  !== 'undefined') podShows  = []
+  if (typeof kindleItems !== 'undefined') kindleItems = []
+  if (typeof knownWords  !== 'undefined') knownWords  = {}
+  if (typeof ignoredWords !== 'undefined') ignoredWords = {}
   srsDecks = (typeof DEFAULT_DECKS !== 'undefined') ? JSON.parse(JSON.stringify(DEFAULT_DECKS)) : []
   cfg = { ...DEF_CFG }
   srsCfg = { ...SRS_DEF_CFG }

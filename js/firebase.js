@@ -222,12 +222,19 @@ async function fbPushData() {
     if (kindleItems.length > 0) {
       batch.set(base.collection('data').doc('kindleQueue'), { list: kindleItems, updatedAt: Date.now() })
     }
+    // Histórico do Kindle: sem ele na nuvem, importar o vocab.db no PC e depois
+    // abrir o Lab no celular traria TUDO de novo — o "só o novo entra" só vale
+    // se o "já entrou" for o mesmo em todo aparelho.
+    batch.set(base.collection('data').doc('kindleSeen'), { list: [...loadKindleSeen()], updatedAt: Date.now() })
     batch.set(base.collection('data').doc('conversas'), { list: conversas, updatedAt: Date.now() })
     // Vídeo: só METADADOS (títulos, marcadores, cortes) — o arquivo de vídeo
     // nunca sobe (300MB–2GB × limite de 1MB/doc). Legendas ficam locais (IDB).
     batch.set(base.collection('data').doc('videos'), { list: videos, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('known'), { map: knownWords || {}, ignored: ignoredWords || {}, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('clips'),  { list: clips,  updatedAt: Date.now() })
+    // Podcasts: só a lista de programas visitados (ponteiros). O episódio em si
+    // já viaja em `videos` e o mp3 nunca sobe.
+    batch.set(base.collection('data').doc('podShows'), { list: podShows || [], updatedAt: Date.now() })
     await batch.commit()
     updateSyncNav('ok')
     return true
@@ -383,10 +390,19 @@ async function fbPull() {
       }
     }
 
+    // O histórico vem ANTES da fila: é ele que decide o que ainda é novidade.
+    // União, nunca substituição — cada aparelho importou coisas diferentes.
+    const seenDoc = await base.collection('data').doc('kindleSeen').get()
+    if (seenDoc.exists && Array.isArray(seenDoc.data().list)) {
+      const uniao = loadKindleSeen()
+      seenDoc.data().list.forEach(h => uniao.add(h))
+      saveKindleSeen(uniao)
+    }
+
     const kindleDoc = await base.collection('data').doc('kindleQueue').get()
     if (kindleDoc.exists && kindleDoc.data().list?.length > 0) {
       const seen = loadKindleSeen()
-      kindleItems = (kindleDoc.data().list || []).filter(item => !seen.has(kindleHighlightHash(item.context || item.word)))
+      kindleItems = (kindleDoc.data().list || []).filter(item => !kindleItemVisto(item, seen))
       localStorage.setItem(SK.kindleQueue, JSON.stringify(kindleItems))
     }
 
@@ -475,10 +491,21 @@ function applyCloudDocs(docs) {
   if (docs.known)    { knownWords = { ...knownWords, ...(docs.known.map || {}) }; saveKnownLocal()
                        ignoredWords = { ...ignoredWords, ...(docs.known.ignored || {}) }; saveIgnoredLocal() }
   if (docs.clips)    { clips  = docs.clips.list  || []; saveClips() }
+  // Programas de podcast: adota a nuvem (como videos/clips) para que tirar um
+  // programa da lista num aparelho valha em todos. São só ponteiros (nome,
+  // capa, URL do feed) — nenhum áudio sobe.
+  if (docs.podShows) { podShows = docs.podShows.list || []; savePodShows() }
+  // Histórico do Kindle: UNIÃO (aqui é a exceção à regra do "adota a nuvem").
+  // Marca de "já importei" nunca deve ser desfeita por um aparelho atrasado —
+  // desfazê-la faria a importação seguinte ressuscitar centenas de itens.
+  if (docs.kindleSeen && Array.isArray(docs.kindleSeen.list)) {
+    const uniao = loadKindleSeen()
+    docs.kindleSeen.list.forEach(h => uniao.add(h))
+    saveKindleSeen(uniao)
+  }
   if (docs.kindleQueue) {
-    const seen = (typeof loadKindleSeen === 'function') ? loadKindleSeen() : new Set()
-    kindleItems = (docs.kindleQueue.list || []).filter(it =>
-      typeof kindleHighlightHash !== 'function' || !seen.has(kindleHighlightHash(it.context || it.word)))
+    const seen = loadKindleSeen()
+    kindleItems = (docs.kindleQueue.list || []).filter(it => !kindleItemVisto(it, seen))
     localStorage.setItem(SK.kindleQueue, JSON.stringify(kindleItems))
   }
   if (docs.conversas) {

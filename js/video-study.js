@@ -406,7 +406,7 @@ function videoPrepAdd() {
   showSection('revisar')
 }
 async function videoOpenPlayerBack() {
-  if (_vidFile && _vidCur) await videoOpenPlayer(_vidCur)
+  if ((_vidFile || _vidStream) && _vidCur) await videoOpenPlayer(_vidCur)
   else renderVideoLib()
 }
 

@@ -168,7 +168,7 @@
     <button class="nav-item" id="nav-palavras" onclick="showSection('palavras')" data-tip="Seu vocabulário: o que você já conhece, o que está estudando e o que vale aprender">
       <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h5"/></svg><span>Palavras</span>
     </button>
-    <button class="nav-item" id="nav-video" onclick="showSection('video')" data-tip="Estudar com séries e filmes: legenda, cortes e cards com o áudio real da cena">
+    <button class="nav-item" id="nav-video" onclick="showSection('video')" data-tip="Estudar com séries, filmes e podcasts: legenda, cortes e cards com o áudio real da fala">
       <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><span>Vídeo</span>
     </button>
     <!-- Bloco "Hoje": ancora o fim da lista (o vazio deixa de parecer menu
@@ -356,16 +356,24 @@
   <!-- TAB KINDLE -->
   <div class="tab-panel" id="panel-kindle">
     <div class="info-box">
-      Importe o arquivo HTML exportado pelo Kindle (<strong>Notas e Destaques</strong>). Cada destaque aparece com seu texto — clique na palavra alvo dentro de cada frase para identificá-la, ou digite no campo de texto.
+      O caminho mais direto é o <strong>vocab.db</strong>: toda palavra que você toca no livro vira uma linha ali, <strong>com a frase inteira em que ela apareceu</strong>. Ligue o Kindle no cabo e arraste o arquivo — só o que ainda não entrou vira item novo.
     </div>
     <div class="panel-group">
       <div class="panel-eyebrow">1 · Arquivo do Kindle</div>
       <div class="upload-area" id="kindle-drop" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="this.classList.remove('drag');handleKindleFile({files:event.dataTransfer.files})" onclick="document.getElementById('kindle-file').click()">
-      <input type="file" id="kindle-file" accept=".html,.htm,.txt,.csv" onchange="handleKindleFile(this)">
+      <input type="file" id="kindle-file" accept=".db,.html,.htm,.txt,.csv" onchange="handleKindleFile(this)">
       <div class="upload-icon"><svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--primary)"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
       <p><strong>Clique</strong> ou arraste o arquivo aqui</p>
-      <p>.html (Notas e Destaques) · .txt (My Clippings) · .csv (Vocabulary Builder)</p>
+      <p>vocab.db (palavras consultadas) · My Clippings.txt (destaques) · .html (Notas e Destaques) · .csv</p>
     </div>
+      <details class="kindle-ajuda">
+        <summary>Onde ficam esses arquivos</summary>
+        <ul>
+          <li><b>vocab.db</b> — Kindle no cabo USB → <code>system/vocabulary/vocab.db</code>. A pasta <code>system</code> é oculta: ligue "Itens ocultos" no Explorador. Registra as palavras que você <b>toca para ver o significado</b>, com a frase de contexto. Só funciona em livros comprados na Amazon.</li>
+          <li><b>My Clippings.txt</b> — mesmo cabo → <code>documents/My Clippings.txt</code>. Guarda tudo o que você <b>destaca com o dedo</b> — inclusive em PDF e em documento enviado por você (Enviar para Kindle). É o caminho para os seus próprios arquivos.</li>
+          <li><b>Lendo no navegador</b> — em <code>read.amazon.com</code> a extensão do Language Lab captura a palavra selecionada na hora, sem arquivo nenhum, e vale também para documentos pessoais.</li>
+        </ul>
+      </details>
     </div>
 
     <div id="kindle-result" class="hidden">
@@ -663,6 +671,8 @@
         <button class="btn btn-secondary btn-sm" onclick="clearKindleSeen()" style="display: inline-flex; align-items: center; gap: 6px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Limpar histórico Kindle</button>
         <button class="btn btn-danger btn-sm" onclick="clearAllData()" style="display: inline-flex; align-items: center; gap: 6px; margin-left: auto;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Apagar todos os dados</button>
       </div>
+      <!-- Espaço em disco (renderizado por renderEspacoLocal() em settings.js) -->
+      <div id="set-espaco"></div>
     </div>
     </div>
   </div>
@@ -774,8 +784,8 @@
 <section id="section-video" class="section">
   <div class="page-header">
     <div class="ph-left">
-      <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>Vídeo</h1>
-      <p>Estude com séries e filmes: legenda, cortes e o áudio real da cena</p>
+      <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>Vídeo e podcast</h1>
+      <p>Estude com séries, filmes e podcasts: legenda, cortes e o áudio real da fala</p>
     </div>
     <div class="ph-actions" id="video-ph-actions"></div>
   </div>

@@ -25,7 +25,8 @@
 //               a transcrição entra de GRAÇA, sem gastar Whisper.
 // ================================================================
 
-const POD_SK = 'el-podcasts'          // programas guardados (só local)
+// O ESTADO dos programas (podShows) vive em core.js e é SINCRONIZADO —
+// aqui só a UI. Ver "armadilha nº 1" no ESTADO-DO-PROJETO.md.
 const POD_SUGESTOES = ['All Ears English', 'BBC Learning English', 'ESL Podcast',
   'TED Talks Daily', 'Lex Fridman', 'Freakonomics Radio']
 
@@ -41,16 +42,19 @@ function _podStore() {
   return L[l] || 'US'
 }
 
-function _podLoadShows() {
-  try { return JSON.parse(localStorage.getItem(POD_SK) || '[]') } catch { return [] }
-}
+function _podLoadShows() { return podShows }
 function _podSaveShow(show) {
-  const lista = _podLoadShows().filter(s => s.feedUrl !== show.feedUrl)
-  lista.unshift({ ...show, addedAt: new Date().toISOString() })
-  localStorage.setItem(POD_SK, JSON.stringify(lista.slice(0, 24)))
+  const antigo = podShows.find(s => s.feedUrl === show.feedUrl)
+  podShows = podShows.filter(s => s.feedUrl !== show.feedUrl)
+  // addedAt preservado: é o critério de desempate no merge da nuvem, e revisitar
+  // um programa não pode "envelhecer" o registro do outro aparelho.
+  podShows.unshift({ ...show, addedAt: (antigo && antigo.addedAt) || new Date().toISOString() })
+  podShows = podShows.slice(0, 24)
+  savePodShows(); autoSyncAfterChange()
 }
 function podcastForgetShow(feedUrl) {
-  localStorage.setItem(POD_SK, JSON.stringify(_podLoadShows().filter(s => s.feedUrl !== feedUrl)))
+  podShows = podShows.filter(s => s.feedUrl !== feedUrl)
+  savePodShows(); autoSyncAfterChange()
   _podRender()
 }
 

@@ -3,7 +3,26 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-05 — **Acertos da seção (75ª rodada)**: controles do player
+> Última atualização: 2026-08-05 — **Fechando o que a 76ª deixou aberto (78ª rodada)**:
+> "Seus podcasts" passou a sincronizar (`podShows` em core.js + doc `data/podShows`), nasceu o
+> painel de **espaço em disco** em Configurações → Dados locais, e caiu um bug antigo do
+> "Apagar todos os dados" — que re-enviava vídeos/cortes/conversas para a nuvem logo depois de
+> limpar o disco. Ver seção 8 (78ª rodada).
+>
+> Anterior: 2026-08-05 — **PONTE COM O KINDLE (77ª rodada)**: o `vocab.db` do
+> aparelho (toda palavra que você toca, com a frase de contexto) passou a ser lido direto no
+> navegador por um leitor de SQLite escrito à mão (sem WASM, sem dependência), com importação
+> INCREMENTAL — conectou o cabo, só o que é novo entra. No `read.amazon.com` a extensão
+> captura ao vivo (com modo "auto"), inclusive em documento pessoal. O histórico "já importei"
+> virou estado de core.js e passou a sincronizar. Ver seção 8 (77ª rodada).
+>
+> Anterior: 2026-08-05 — **PODCASTS no módulo Vídeo (76ª rodada)**: busca no
+> catálogo do Apple Podcasts (sem chave), episódios pelo RSS do próprio programa, o mp3 baixa
+> para o aparelho e cai no player de sempre — legenda, régua, PT, ditado, shadowing e card com
+> o áudio real da fala. Transcrição publicada pelo programa (Podcasting 2.0) vira legenda de
+> graça. Ver seção 8 (76ª rodada).
+>
+> Anterior: 2026-08-05 — **Acertos da seção (75ª rodada)**: controles do player
 > voltaram ao rodapé do vídeo, cores originais de volta (o teal é só de palavra conhecida) e
 > a área da legenda passou a explicar por que está vazia. Ver seção 8 (75ª rodada).
 >
@@ -435,8 +454,16 @@ js/review.js      — fila de Revisar + análise de IA (prompt principal)
 js/settings.js    — Configurações (cfg, temas, AI_MODELS, limpar dados)
 js/init.js        — bootstrap (initApp) + service worker
 js/add.js         — aba Adicionar (manual/Kindle/Mídia/Website)  (CARREGADO LAZY)
+js/kindle-db.js   — leitor SQLite só-leitura (vocab.db do Kindle), sem WASM  (LAZY, antes de add.js)
 js/consulta.js    — seção Assistente (chat IA, histórico, streaming, SRS múltiplo)  (NÃO-lazy)
 js/study.js       — UI/sessão do SRS          (CARREGADO LAZY)
+js/known.js       — seção Palavras (gerenciador de vocabulário)  (LAZY)
+js/video*.js      — PACOTE lazy da seção Vídeo, carregado NESTA ordem:
+                    video.js (estado + player + biblioteca)
+                    video-subs.js (parser/busca/aplicação de legenda, tradução, Whisper)
+                    video-sync.js (painel de sincronia + correção de deriva)
+                    video-study.js (seleção, card com áudio real, ditado, shadowing)
+                    video-podcast.js (agregador de podcasts: busca, feed, download)
 ```
 
 > ⚠️ **`consulta.js` é NÃO-lazy** (incluído sempre no index.html). Motivo: o `firebase.js`
@@ -457,6 +484,9 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
 - `srsSession` → srs.js
 - `VARIETY_LABELS` / `REGISTER_LABELS` + `varietyChip`/`registerChip` → **lang.js** (2026-07-30)
 - `buildSrsFrente` → **core.js** (2026-07-30)
+- `kindleHighlightHash` / `loadKindleSeen` / `saveKindleSeen` / `kindleItemKey` /
+  `kindleItemVisto` / `markKindleItemsAsSeen` → **core.js** (2026-08-05) — o `firebase.js`
+  usa o histórico do Kindle no sync e chamava funções que moravam no `add.js` lazy
 **Ao criar algo novo, verifique quem usa antes de decidir onde declarar.**
 
 ---
@@ -483,6 +513,20 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
 - **`srsLog[]`** — `{date, reviewed, correct, newSeen}` por dia.
 - **`srsCfg`** — parâmetros SM-2 (ver seção SRS).
 - **`cfg`** — `{openaiKey, n8nBase, theme, aiProvider, aiModel, ttsProvider}`.
+- **`videos[]`** (core.js, sincronizado) — `{id, title, source_type, lang, fileName, fileSize,
+  duration, cueCount, coverage, markers[], position, subShift, created_at, updated_at}`.
+  Só metadados: o arquivo NUNCA entra aqui.
+  - **`podcast`** (só em episódios de podcast) — `{showTitle, feedUrl, collectionId, artwork,
+    guid, audioUrl, pageUrl, published, sizeBytes, transcriptUrl, transcriptType}`.
+    É a chave de identidade (`guid`) e o caminho para **rebaixar o áudio em qualquer aparelho**.
+- **`videos[]` fora do localStorage:** IndexedDB `el-video-db` (v3) —
+  `handles` (File System Access), `subs` (legendas + trilha PT + candidatas),
+  `media` (áudio consertado pelo ffmpeg) e **`files` (o mp3 do episódio de podcast baixado)**.
+  Nada disso sincroniza: é peso de arquivo, fica no aparelho.
+- **`podShows[]`** (core.js, localStorage `el-podcasts`, **sincronizado** em `data/podShows`) —
+  programas de podcast já visitados, para o atalho "Seus podcasts":
+  `{title, artist, artwork, feedUrl, collectionId, addedAt}` (máx. 24). Só ponteiros — nenhum
+  áudio. A nuvem é adotada como em `videos[]`, então **remover um programa propaga**.
 
 ### Onde cada coisa é persistida
 - **localStorage:** `cfg` (`englab_cfg`), `words`, `srsCfg`, `srsLog`, `srsDecks`, filas Kindle.
@@ -598,12 +642,211 @@ maxInterval (36500), leechThreshold (50)
 - **Biblioteca** — aba própria. Browser de todos os cards por baralho + preview. Botão
   **"Reanalisar tudo (corrigir)"**: regenera exemplos batendo com o significado, preenche
   variedade/registro e gera áudio das novas frases, **preservando o agendamento SRS**.
+- **Vídeo e podcast** — biblioteca → player. Duas portas de entrada: **"Abrir arquivo"**
+  (episódio/filme/áudio do computador) e **"Buscar podcast"** (catálogo do Apple Podcasts →
+  programa → episódio → baixa e abre). Dentro do player, tudo é igual para os dois: legenda,
+  régua de falas, PT legenda/PT IA com névoa, Explicar, marcadores, estudo focado, ditado,
+  shadowing e card com o áudio real. Só o cabeçalho muda: podcast troca "Buscar legenda"
+  (addons, que não indexam podcast) por **"Criar legenda com IA"** e ganha **"Liberar espaço"**.
 - **Configurações** — Aparência (temas), IA (provider/modelo/chave/TTS), n8n, Firebase, Dados
   locais (exportar/importar/limpar), Manutenção de áudio.
 
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-05 (77ª rodada) — A PONTE COM O KINDLE
+
+**Pedido do Djemeson**: "é possível fazer uma ponte entre o Kindle e o nosso projeto? a cada
+nova marcação em uma palavra desconhecida no livro que estou lendo seria enviado pro Revisar…
+verifique também os livros adicionados como documento pelo usuário".
+
+**O que a realidade permite** (pesquisado antes de codar, e vale registrar porque limita o
+desenho): o Kindle de e-ink **não fala com a rede** — a Amazon não publica as consultas do
+Vocabulary Builder por API. Não existe "tempo real" a partir do aparelho, e nenhuma extensão
+muda isso. O que existe são três portas, e o projeto passou a usar as três:
+
+| Porta | O que traz | Documento pessoal? |
+|---|---|---|
+| `system/vocabulary/vocab.db` (USB) | toda palavra **consultada** + a **frase inteira** + livro + data | ❌ o Vocabulary Builder da Amazon só grava em livro comprado |
+| `documents/My Clippings.txt` (USB) | todo **destaque** feito com o dedo | ✅ é o caminho dos arquivos do usuário |
+| `read.amazon.com` (extensão) | palavra **selecionada** + frase da página, na hora | ✅ a captura é nossa, não da Amazon |
+
+139. **Leitor de SQLite escrito à mão — `js/kindle-db.js` (novo)**. O `vocab.db` é um SQLite
+     binário. A saída óbvia seria o `sql.js`, mas são ~1,5 MB de WASM baixados para ler quatro
+     tabelinhas num projeto que é "sem build". Como só precisamos de **varredura completa de
+     tabela** (nada de índice, JOIN, WHERE ou escrita), o formato do arquivo cabe em ~250
+     linhas: cabeçalho de 100 bytes, `sqlite_master`, b-tree de tabela (páginas folha `0x0D` e
+     interiores `0x05`), registros com *serial types* e **cadeia de páginas de overflow** (a
+     frase de uso do Kindle é longa e cai nesse caso com frequência).
+     Validado com fixtures geradas em Python: páginas de **4096 e 512 bytes**, encoding
+     **UTF-8 e UTF-16**, frase de 6,7 KB atravessando páginas de overflow, acentuação, b-tree
+     com nível interior, e conferência de que nenhuma célula é lida duas vezes.
+
+140. **`parseKindleVocabDb()` em `add.js`**. Junta `LOOKUPS × WORDS × BOOK_INFO` e devolve item
+     pronto: **`stem` como objeto de estudo** (é a forma de citação — o mesmo lema que o resto
+     do app usa como título de card), `usage` como contexto, título do livro como fonte, autor
+     como subtítulo, idioma vindo de `WORDS.lang`. Três filtros na entrada:
+     - **incremental**: cada consulta tem id (`LOOKUPS.id`) — o que já entrou uma vez não volta;
+     - **palavra já conhecida/ignorada** (Gerenciador de Palavras) não vira card;
+     - **mesma palavra consultada N vezes** vira **um** item, com a frase mais informativa e o
+       selo "consultada N×" — repetir a consulta é o próprio Kindle dizendo que ela não colou.
+
+141. **Formato detectado pelos BYTES, não pela extensão**. `handleKindleFile` lê os 16 primeiros
+     bytes e procura `SQLite format 3`. Ler um binário como texto devolveria lixo em silêncio.
+
+142. **`My Clippings.txt` reescrito** (é a porta dos documentos pessoais): BOM do Kindle não
+     gruda mais no título do primeiro livro; **nota e marcador em português** (e alemão/francês)
+     passaram a ser descartados — antes só `note`/`bookmark` em inglês eram reconhecidos, então
+     num Kindle em pt-BR "Sua nota" entrava como se fosse vocabulário; destaque repetido
+     (reajustar o destaque no aparelho regrava o bloco) entra uma vez só; e **destaque curto
+     (≤3 palavras) já nasce com a palavra-alvo** — não gasta IA para descobrir o que você marcou.
+
+143. **Captura ao vivo no Kindle Cloud Reader — `extension/kindle.js` + `kindle.css` (novos)**.
+     Content script em `read.amazon.com` com `all_frames: true` (o leitor desenha o livro dentro
+     de um iframe). Selecionou → pílula com **Revisar** / **frase** / **auto**. O modo **auto**
+     é o que entrega o pedido literal: toda palavra selecionada vai sozinha para a fila, com
+     "desfazer" de 4 s. O alvo e o contexto são **congelados no instante da seleção** (o leitor
+     repagina sozinho — mesma lição da 67ª rodada na Netflix). A frase sai do parágrafo
+     reconstruído (o leitor quebra o texto em dezenas de `<span>`, um por linha desenhada).
+
+144. **A ponte deixou de ser só da Netflix (causa raiz)**. `_englabReceber` em `core.js` fixava
+     `source_type:'series'` e título `'Netflix'` — toda captura de livro entraria como "série".
+     Agora o tipo e o idioma vêm de quem capturou, com um registro `_EXT_FONTES` para o rótulo
+     do toast. Extensão **3.0.0**, renomeada para "Language Lab — Netflix e Kindle".
+
+145. **O que a mudança podia quebrar — e foi corrigido junto**:
+     - **`firebase.js` chamava `kindleHighlightHash`/`loadKindleSeen`, que moravam no `add.js`
+       lazy** (armadilha nº 1). Todo o histórico do Kindle mudou para `core.js`.
+     - **O histórico não sincronizava**: importar o `vocab.db` no PC e abrir o Lab no celular
+       traria tudo de novo. Passou a ser o doc `kindleSeen` no Firestore, com merge por
+       **UNIÃO** (exceção consciente à regra "a nuvem substitui": desfazer uma marca de "já
+       importei" ressuscitaria centenas de itens), teto de 30 mil marcas e entrada no
+       Exportar/Importar JSON.
+     - **"Limpar histórico Kindle"** ficaria inútil com a união — agora ele grava lista vazia e
+       **empurra na hora**, antes que o próximo snapshot devolvesse tudo.
+     - **Chave de identidade do item**: o hash antigo era do texto truncado em 200 caracteres —
+       duas palavras consultadas na MESMA frase colidiam e a segunda sumia calada. Item de
+       `vocab.db` usa o id da consulta. Para destaques o hash antigo foi mantido de propósito
+       (mudá-lo faria o histórico existente perder a validade).
+     - **`analyzeKindleItems` pedia `vocab` no prompt e lia `item` na resposta** — o campo nunca
+       chegava, então o chip ficava em "analisando…" para sempre e a triagem automática de
+       expressões nunca acontecia. Corrigido, com a garantia de que a IA **não sobrescreve** um
+       alvo que já veio do `vocab.db`.
+     - Item que só tem palavra (sem frase) mandava string vazia para a IA traduzir.
+     - `sw.js`: `kindle-db.js` entrou na regra *network-first* dos módulos lazy.
+
+### Sessão 2026-08-05 (78ª rodada) — Fechando o que a 76ª deixou aberto
+
+> Nota de numeração: as rodadas 76ª (podcasts) e 77ª (Kindle) foram escritas por sessões
+> **simultâneas** na mesma pasta e acabaram reusando os números 139–141. A partir daqui a
+> contagem segue limpa em 146.
+
+146. **"Seus podcasts" agora sincroniza.** O estado saiu do lazy `video-podcast.js` e virou
+     **`podShows` em `core.js`** (mesmo motivo de `videos`/`clips`/`conversas`: `firebase.js` é
+     não-lazy e não pode depender de módulo lazy — armadilha nº 1). Doc próprio
+     **`data/podShows`** no Firestore, com **adoção da nuvem** (como `videos`), então **tirar um
+     programa num aparelho o tira em todos**. `addedAt` é preservado ao revisitar um programa —
+     revisitar não pode "envelhecer" o registro do outro aparelho. Entrou também no
+     **Exportar/Importar JSON** (na importação o merge é por **união** de `feedUrl`: backup é
+     complemento, não substituição).
+
+147. **Espaço em disco visível** (Configurações → Dados locais → "Espaço usado neste aparelho"):
+     episódios de podcast baixados, áudio consertado pelo ffmpeg e o **total do navegador**
+     (`navigator.storage.estimate()`), com botão para liberar cada grupo. Medido ao vivo:
+     "1 arquivo · 32 MB" e "64 MB de 1,4 GB disponíveis".
+     - O tamanho vem do **próprio Blob no cursor do IndexedDB**: lá o Blob é uma referência de
+       arquivo, então ler `.size` **não carrega os bytes** — `getAll()` traria centenas de MB
+       para a memória só para somar.
+     - `settings.js` é não-lazy: abre o `el-video-db` **sem versão** (só lê o que existe) em vez
+       de usar o `VideoDB` do `video.js`.
+     - Liberar não perde nada do estudo — testado: apaguei os 32 MB e a entrada do episódio,
+       a legenda e os cards continuaram.
+
+148. **Bug achado de passagem em "Apagar todos os dados"** (existia desde antes do podcast): o
+     passo 3 zerava só `words`/`srsCards`/`srsLog`, mas o passo 4 chama `fbPushData()`, que grava
+     **a memória**. Resultado: a função limpava o disco e em seguida **RE-ENVIAVA** vídeos,
+     cortes, conversas e palavras conhecidas para a nuvem — que voltavam no snapshot seguinte.
+     Agora o passo 3 zera tudo o que o push envia (`videos`, `clips`, `conversas`,
+     `kindleItems`, `knownWords`, `ignoredWords` e `podShows`). Validado ao vivo: com estado
+     plantado nas 7 variáveis, todas voltaram vazias.
+
+149. **Sync validado sem servidor**: `applyCloudDocs` chamado à mão — adota a lista da nuvem,
+     lista vazia propaga a exclusão e doc ausente **não** apaga o local. `sw.js` v92 → **v93**.
+     Fica pendente só o teste em 2 aparelhos de verdade.
+
+### Sessão 2026-08-05 (76ª rodada) — PODCASTS: um agregador dentro do módulo Vídeo
+
+138. **Pedido do Djemeson**: "dá para pegar um agregador de podcasts e trazer pro projeto? eu
+     escolheria o episódio e usaríamos todas as ferramentas que já temos". A decisão de projeto
+     foi essa mesma: **nada de pipeline paralelo**. O episódio entra como um arquivo comum e cai
+     no player de sempre — legenda, régua de falas, PT legenda/PT IA, névoa, Explicar, seleção
+     na legenda, marcadores, estudo focado, ditado, shadowing e card com o **áudio real da fala**.
+     Novo arquivo: **`js/video-podcast.js`** (5º módulo do pacote lazy `video`).
+
+139. **Como funciona (100% no navegador — nenhum serviço nosso, nenhuma chave nova)**:
+     - **Busca** → API pública do Apple Podcasts (`itunes.apple.com/search`), sem chave e com
+       `Access-Control-Allow-Origin: *`. A **loja é escolhida pelo idioma ativo** (en→US, es→ES,
+       fr→FR, pt→BR…), porque catálogo de podcast é regional.
+     - **Episódios** → o **RSS do próprio programa**, lido com `DOMParser`. Foi verificado na
+       rede real que os grandes hosts liberam CORS no feed: BBC, Megaphone, Simplecast, Libsyn,
+       Fireside, RedCircle, Blubrry. **Plano B**: se o feed recusar, cai no
+       `itunes.apple.com/lookup?entity=podcastEpisode`, que devolve os últimos ~200 episódios já
+       com o link do áudio (testado forçando a falha do feed: 2779 episódios pelo RSS → 165 pelo
+       plano B, com as mesmas URLs de áudio).
+     - **Importar** → o mp3 é **baixado para o aparelho** com barra de progresso (streaming do
+       `fetch` + `getReader`), guardado no IndexedDB (`el-video-db`, **store nova `files`**,
+       versão 2→3) e entregue ao player como um `File`. A partir daí **nada mais sabe que veio
+       de um podcast**: ffmpeg, Whisper e `captureStream` funcionam como sempre.
+     - **Se o CDN bloquear o download** (CORS), o player toca **por streaming** (`_vidStream`),
+       com `crossorigin="anonymous"` — o que preserva a gravação do áudio da cena quando o
+       servidor permite. Se nem isso for aceito, o elemento recarrega sem o atributo e avisa o
+       que se perde.
+     - **Legenda de graça**: se o feed publicar `<podcast:transcript>` (Podcasting 2.0), a
+       transcrição entra sem gastar IA. Suporta VTT/SRT (pelo `parseSubtitle` que já existia) e
+       o JSON do PodcastIndex — este vem palavra a palavra, então é **agrupado em falas** de até
+       8s quebrando na pontuação (senão o transcript viraria uma lista de palavras soltas).
+
+140. **O que mudou no que já existia** (a varredura do "olhar para o horizonte"):
+     - `videoOpen()` — podcast **nunca pede arquivo ao usuário**: usa o blob guardado ou baixa de
+       novo pela URL do feed. Isso vale inclusive em **outro aparelho**: `videos[]` sincroniza
+       pelo Firebase e o episódio se rebaixa sozinho lá (com vídeo local isso é impossível).
+     - `_vidAutoSub()` — **não roda para podcast**: procurar um título de episódio no
+       OpenSubtitles era chamada garantida ao vácuo.
+     - Detector de áudio mudo / conserto Dolby — **pulado para podcast** (mp3 não tem o problema
+       e o banner só faria ruído).
+     - `videoTranscribeFull()` — em modo streaming não há bytes para mandar ao Whisper; a
+       mensagem agora explica isso em vez do genérico "abra o vídeo primeiro".
+     - `videoOpenPlayerBack()` e `_vidConsumePendingClip()` testavam só `_vidFile`; passaram a
+       aceitar `_vidStream` (senão "rever a cena" caía na biblioteca).
+     - `videoDelete()` — apaga também `files` e `media` (episódio de podcast é dezenas de MB;
+       ficariam órfãos no disco).
+     - **Palco de áudio refeito**: o `<video>` de um mp3 é só a barra de controles, e a legenda
+       (`bottom:64px` do palco) caía **em cima** dos controles no palco de 110px. Agora o palco
+       tem 236px, os controles descem para o rodapé e sobra a faixa de cima para a legenda + a
+       capa do programa.
+     - **`sw.js`**: o cache do shell pegava **qualquer** GET, inclusive de terceiros — o mp3 de
+       33 MB e o RSS entrariam nele. Agora só entra no cache o que é **da mesma origem** (mais as
+       fontes do Google); `itunes.apple.com` foi para `NETWORK_ONLY`. `CACHE` v91 → **v92**.
+     - **"Liberar espaço"** (só para podcast): apaga o áudio baixado e **não perde nada** do
+       estudo — legenda, marcadores, cortes e cards continuam, e o episódio volta quando for
+       preciso. Testado: apaguei o arquivo, reabri, ele rebaixou e as 40 falas da legenda
+       estavam intactas.
+     - Cards criados a partir de um podcast já nascem com `source_type: 'podcast'` (os 4 pontos
+       de `createWord` no `video-study.js` usam `_vidCur.source_type`), então o Dashboard e o
+       ícone de fonte (mic) já os classificam certo — sem nenhuma mudança lá.
+
+141. **Testes ao vivo** (localhost:8766, rede real): busca "All Ears English" → 3 programas;
+     feed do programa → **2779 episódios** com título, data, duração e URL; import → **33,4 MB
+     baixados em 3,7s**, player abre em modo áudio com a capa, duração 1042s batendo com o feed;
+     reabrir da biblioteca → **815ms sem rede**; `captureStream` + `MediaRecorder` no episódio →
+     **19 KB de áudio real gravados** (o card com a voz do apresentador funciona); modo streaming
+     forçado → toca, duração lê, legenda preservada, "Liberar espaço" some do cabeçalho.
+     Parsers validados com feed sintético: `itunes:duration` "1:02:03" → 3723s, `http://` →
+     `https://` (conteúdo misto), `<podcast:transcript>` VTT preferido ao JSON, e o JSON
+     palavra-a-palavra virando "Hello there." / "How are you?".
+     Achado de passagem corrigido: `.pod-show-x` usava `var(--danger)`, que **não existe** no
+     projeto (é `--error`) — exatamente a armadilha documentada na seção 10.
 
 ### Sessão 2026-08-05 (75ª rodada) — Os três acertos da seção
 136. Djemeson mandou três prints (dois do nosso estado falho, um do Language Reactor como
@@ -3164,6 +3407,47 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 9. Pendências / a verificar
+
+- [ ] **KINDLE — rodar com o `vocab.db` REAL do aparelho** (77ª rodada). O leitor de SQLite foi
+      validado com fixtures fiéis ao esquema (WORDS/LOOKUPS/BOOK_INFO, 4096 e 512 bytes/página,
+      UTF-8 e UTF-16, overflow de 6,7 KB) e a importação foi exercitada no navegador de ponta a
+      ponta — mas **nenhum arquivo saído de um Kindle de verdade passou por aqui ainda**.
+      Ao ligar o cabo, conferir três coisas: (a) o Windows 11 monta o Kindle como **MTP**, não
+      como unidade — se o seletor de arquivos não abrir a pasta `system`, copie o `vocab.db`
+      para a Área de Trabalho antes; (b) `system` é **pasta oculta**; (c) o `stem` do Kindle é
+      mesmo o lema esperado (se vier flexionado demais, trocar para `word`).
+- [ ] **KINDLE — testar a extensão em `read.amazon.com` com um livro aberto** (77ª rodada). A
+      lógica pura (recorte da frase, título, fila, dedupe, desfazer) está coberta por teste
+      automatizado, mas os **seletores do leitor da Amazon** não foram vistos ao vivo. Se o
+      contexto vier estranho, o ponto a ajustar é `blocoDaSelecao()` em `extension/kindle.js`.
+      Verificar também se a pílula não briga com o dicionário nativo da Amazon.
+- [ ] **KINDLE — documento pessoal no aparelho não entra pelo `vocab.db`** (limite da Amazon,
+      não nosso). O caminho é destacar a palavra com o dedo → `My Clippings.txt`. Se isso virar
+      atrito no uso diário, a alternativa é ler o documento pelo `read.amazon.com` (Enviar para
+      Kindle) e usar o modo **auto** da extensão.
+- [ ] **Backup JSON ainda não leva `knownWords`/`ignoredWords`** (visto na 77ª rodada ao incluir
+      o histórico do Kindle no Exportar/Importar). Quem restaurar um backup perde a triagem de
+      "palavras que já conheço". Não entrou nesta rodada por precisar de decisão de merge
+      própria (união? substituição? o que fazer com palavra que virou card depois?).
+
+- [ ] **PODCAST — rodar um episódio de verdade de ponta a ponta** (76ª rodada): busque um
+      programa, importe um episódio e rode **"Criar legenda com IA"** com a chave da **Groq**
+      (episódio de 1h ≈ R$ 0,15 na Groq contra ~R$ 1,35 na OpenAI). Depois conferir: a legenda
+      nasce sincronizada? A régua de falas acompanha? O card com o áudio real sai com a voz do
+      apresentador? (A gravação de áudio já foi validada tecnicamente — 19 KB reais capturados
+      do mp3 — mas nenhum card de podcast foi criado ainda de verdade.)
+- [x] **PODCAST — espaço em disco** — feito na 78ª rodada: Configurações → Dados locais mostra
+      "Espaço usado neste aparelho" (episódios baixados, áudio consertado e o total do navegador
+      via `navigator.storage.estimate()`), com botões para liberar cada grupo.
+- [ ] **PODCAST — programa com transcrição publicada**: o caminho `<podcast:transcript>` foi
+      validado com feed sintético (VTT preferido ao JSON, JSON palavra-a-palavra virando falas),
+      mas **nenhum feed real com transcrição foi testado**. Ao achar um, conferir a sincronia.
+- [x] **PODCAST — "Seus podcasts" sincroniza** — feito na 78ª rodada: o estado saiu do lazy
+      `video-podcast.js` e virou `podShows` em `core.js`, com doc próprio (`data/podShows`) no
+      Firestore, adoção da nuvem (exclusão propaga) e entrada no Exportar/Importar JSON.
+- [ ] **PODCAST — testar o sync de programas em 2 aparelhos**: adicionar um programa num,
+      conferir que aparece no outro, e **tirar** num e conferir que some no outro (a adoção da
+      nuvem propaga exclusão). Backup — Exportar JSON — antes.
 
 - [x] **Estudar transbordava a tela no celular** — corrigido em 2026-08-01 (16ª rodada, item 67).
 

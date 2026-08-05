@@ -1,7 +1,7 @@
 // ================================================================
 // STATE & STORAGE
 // ================================================================
-const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue', deletedWords: 'el-deleted-words', conversas: 'el-consulta-conversas', videos: 'el-videos', clips: 'el-clips' }
+const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue', deletedWords: 'el-deleted-words', conversas: 'el-consulta-conversas', videos: 'el-videos', clips: 'el-clips', podShows: 'el-podcasts' }
 
 // ── VÍDEO (estado em core, como conversas): firebase.js sincroniza videos/
 //    clips e por isso eles NÃO podem morar no lazy video.js (armadilha nº 1).
@@ -12,6 +12,14 @@ function loadVideos() { try { videos = JSON.parse(localStorage.getItem(SK.videos
 function saveVideos() { localStorage.setItem(SK.videos, JSON.stringify(videos)) }
 function loadClips()  { try { clips = JSON.parse(localStorage.getItem(SK.clips) || '[]') } catch { clips = [] } }
 function saveClips()  { localStorage.setItem(SK.clips, JSON.stringify(clips)) }
+
+// ── PODCASTS: programas já visitados ("Seus podcasts" no buscador).
+//    Mora aqui pelo mesmo motivo de videos/clips: firebase.js sincroniza e
+//    NÃO pode depender do lazy video-podcast.js (armadilha nº 1).
+//    São só ponteiros (nome, capa, URL do feed) — nenhum áudio.
+let podShows = []   // [{title, artist, artwork, feedUrl, collectionId, addedAt}]
+function loadPodShows() { try { podShows = JSON.parse(localStorage.getItem(SK.podShows) || '[]') } catch { podShows = [] } }
+function savePodShows() { localStorage.setItem(SK.podShows, JSON.stringify(podShows)) }
 
 // "Rever a cena" a partir do estudo: study.js (lazy) não pode chamar funções
 // de video.js (lazy) — este handoff vive no core: guarda o clipe pedido e
@@ -81,7 +89,54 @@ function saveIgnoredLocal() {
   try { localStorage.setItem('el-ignored', JSON.stringify(ignoredWords)) } catch (e) {}
 }
 
-// ---- PONTE COM A EXTENSÃO DO CHROME (Netflix) ----
+// ---- HISTÓRICO DE IMPORTAÇÃO DO KINDLE ----
+// Mora AQUI (arquivo não-lazy) porque firebase.js precisa dele no sync — e a
+// UI que o alimenta (js/add.js) só é carregada quando a seção Adicionar abre.
+// É este conjunto que faz "conectei o Kindle de novo → só o que é novo entra".
+function kindleHighlightHash(text) {
+  let h = 0
+  const t = String(text || '')
+  for (let i = 0; i < Math.min(t.length, 200); i++)
+    h = (Math.imul(31, h) + t.charCodeAt(i)) | 0
+  return Math.abs(h).toString(36)
+}
+// Chave de identidade do item.
+// O vocab.db traz o id do lookup (estável e único por consulta); o destaque só
+// tem o próprio texto. Sem essa distinção, duas palavras consultadas na MESMA
+// frase geram o mesmo hash e a segunda some calada.
+function kindleItemKey(item) {
+  if (Array.isArray(item.kids) && item.kids.length) return 'L:' + item.kids[0]
+  return kindleHighlightHash(item.context || item.word)
+}
+function kindleItemVisto(item, seen) {
+  if (Array.isArray(item.kids) && item.kids.length) return item.kids.some(k => seen.has('L:' + k))
+  return seen.has(kindleHighlightHash(item.context || item.word))
+}
+function loadKindleSeen() {
+  try { return new Set(JSON.parse(localStorage.getItem(SK.kindleSeen) || '[]')) } catch { return new Set() }
+}
+// Teto para o histórico não virar um documento gigante na nuvem: guardamos as
+// últimas 30 mil marcas (ordem de inserção = as mais antigas saem primeiro).
+const KINDLE_SEEN_MAX = 30000
+function saveKindleSeen(seen) {
+  let arr = [...seen]
+  if (arr.length > KINDLE_SEEN_MAX) arr = arr.slice(arr.length - KINDLE_SEEN_MAX)
+  try { localStorage.setItem(SK.kindleSeen, JSON.stringify(arr)) }
+  catch (e) { console.warn('[kindle] histórico não coube no localStorage:', e.message) }
+}
+function markKindleItemsAsSeen(items) {
+  const seen = loadKindleSeen()
+  items.forEach(item => {
+    // Um item do vocab.db pode ter juntado várias consultas da mesma palavra:
+    // TODAS precisam ser marcadas, senão as irmãs voltam na próxima importação.
+    if (Array.isArray(item.kids) && item.kids.length) item.kids.forEach(k => seen.add('L:' + k))
+    else seen.add(kindleHighlightHash(item.context || item.word))
+  })
+  saveKindleSeen(seen)
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+}
+
+// ---- PONTE COM A EXTENSÃO DO CHROME (Netflix, Kindle Cloud Reader) ----
 // A extensão (pasta /extension) captura palavras/frases das legendas da
 // Netflix e as guarda no chrome.storage; quando o app abre, o content
 // script bridge.js as entrega por postMessage. Aqui viram itens do
@@ -108,29 +163,43 @@ window.addEventListener('message', ev => {
   _englabReceber(items)
 })
 
+// Rótulo por origem. A ponte nasceu só para a Netflix e fixava
+// source_type:'series' — quando o Kindle entrou, toda captura de livro viraria
+// "série". O tipo agora vem de quem capturou; 'series' é só o padrão antigo.
+const _EXT_FONTES = {
+  series:  { rotulo: 'da Netflix',  titulo: 'Netflix' },
+  kindle:  { rotulo: 'do Kindle',   titulo: 'Kindle'  },
+  movie:   { rotulo: 'do filme',    titulo: 'Filme'   },
+  website: { rotulo: 'da web',      titulo: 'Web'     }
+}
+
 function _englabReceber(items) {
   let n = 0
+  const tipos = new Set()
   for (const it of items.slice(0, 500)) {
     const word = String(it.word || '').trim()
     const context = String(it.context || '').trim()
     const alvo = word || context
     if (!alvo) continue
     if (words.some(w => (w.word || '') === alvo && (w.context || '') === context)) continue
+    const tipo = _EXT_FONTES[it.source_type] ? it.source_type : 'series'
+    tipos.add(tipo)
     createWord({
       word: alvo, context,
-      source_type: 'series',
-      source_title: String(it.title || 'Netflix').slice(0, 120),
-      lang: 'en'
+      source_type: tipo,
+      source_title: String(it.title || _EXT_FONTES[tipo].titulo).slice(0, 120),
+      lang: (typeof LANGS === 'object' && LANGS[it.lang]) ? it.lang : 'en'
     })
     n++
   }
   if (n) {
+    const fonte = tipos.size === 1 ? _EXT_FONTES[[...tipos][0]].rotulo : ''
     if (typeof renderSidebar === 'function') { try { renderSidebar() } catch (e) {} }
     if (typeof renderDashboard === 'function') { try { renderDashboard() } catch (e) {} }
     // SEM isto as capturas ficavam só no localStorage e o snapshot da nuvem
     // as apagava no recarregamento seguinte (a nuvem é a fonte da verdade).
     if (typeof autoSyncAfterChange === 'function') { try { autoSyncAfterChange() } catch (e) {} }
-    toast(`${n} captura${n > 1 ? 's' : ''} da Netflix ${n > 1 ? 'entraram' : 'entrou'} no Revisar`, 'success')
+    toast(`${n} captura${n > 1 ? 's' : ''} ${fonte} ${n > 1 ? 'entraram' : 'entrou'} no Revisar`.replace(/\s{2,}/g, ' '), 'success')
   }
   // ack mesmo com n=0 (duplicatas): a fila da extensão pode ser limpa
   window.postMessage({ type: 'englab-ext-ack', got: items.length }, location.origin)
@@ -381,9 +450,12 @@ const SECTIONS = ['dashboard','assistente','adicionar','revisar','estudar','bibl
 //  precisa de `conversas`/render no sync.)
 // video é um PACOTE de módulos (ordem importa: o estado vive no primeiro)
 const _LAZY = {
-  adicionar: 'js/add.js', estudar: 'js/study.js', biblioteca: 'js/study.js',
+  // adicionar = PACOTE: o leitor de SQLite vem antes porque add.js usa
+  // sqliteAbrir() para ler o vocab.db do Kindle.
+  adicionar: ['js/kindle-db.js', 'js/add.js'],
+  estudar: 'js/study.js', biblioteca: 'js/study.js',
   palavras: 'js/known.js',
-  video: ['js/video.js', 'js/video-subs.js', 'js/video-sync.js', 'js/video-study.js']
+  video: ['js/video.js', 'js/video-subs.js', 'js/video-sync.js', 'js/video-study.js', 'js/video-podcast.js']
 }
 const _loadedModules = new Set()
 

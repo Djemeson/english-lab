@@ -10,6 +10,7 @@ async function initApp() {
   loadConversas()    // conversas do Assistente
   loadVideos()       // metadados de vídeo (seção Vídeo — o módulo é lazy, o estado não)
   loadClips()        // cortes de cena
+  loadPodShows()     // programas de podcast já visitados (sincronizados)
   loadSrs()          // loads srsCfg, srsLog, decks
   await loadSrsAsync() // loads srsCards from IDB (migrates if needed)
   migrateLangFields()  // multi-idioma: words/cards antigos ganham lang:'en' (aditivo)

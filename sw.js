@@ -4,7 +4,7 @@
 // Firebase e OpenAI ficam sempre na rede.
 // ================================================================
 
-const CACHE = 'englab-v91'
+const CACHE = 'englab-v93'
 // Cache separado e PERMANENTE para o ffmpeg.wasm (31 MB): não pode ser
 // apagado a cada versão do shell, senão cada deploy custaria 31 MB de novo.
 const CACHE_FFMPEG = 'englab-ffmpeg-v1'
@@ -42,7 +42,20 @@ const NETWORK_ONLY = [
   'gistusercontent.com',
   'api.github.com',
   'strem.io',            // busca de legendas (resultados mudam; não cachear)
+  'itunes.apple.com',    // catálogo de podcasts (resultados mudam)
 ]
+
+// O cache do shell é só para o que é NOSSO (mesma origem) e para as fontes.
+// Sem esta trava, qualquer GET de terceiro caía no cache-first — inclusive o
+// mp3 de um episódio de podcast (dezenas de MB) e o RSS, que precisa vir
+// fresco para trazer os episódios novos.
+function _cacheavel(url) {
+  try {
+    const u = new URL(url)
+    if (u.origin === self.location.origin) return true
+    return /(^|\.)(fonts\.googleapis\.com|fonts\.gstatic\.com)$/.test(u.hostname)
+  } catch { return false }
+}
 
 // ── Install: pré-cacheia o shell ────────────────────────────────
 // Cacheia um por um em vez de addAll(): com addAll, UM único 404 rejeita a Promise
@@ -90,7 +103,7 @@ self.addEventListener('fetch', e => {
   }
 
   // Módulos lazy: network-first (mudam mais e não estão no shell)
-  if (url.includes('/js/add.js') || url.includes('/js/study.js') || url.includes('/js/known.js') || url.includes('/js/video')) {
+  if (url.includes('/js/add.js') || url.includes('/js/study.js') || url.includes('/js/known.js') || url.includes('/js/kindle-db.js') || url.includes('/js/video')) {
     e.respondWith(
       fetch(e.request)
         .then(r => { caches.open(CACHE).then(c => c.put(e.request, r.clone())); return r })
@@ -98,6 +111,9 @@ self.addEventListener('fetch', e => {
     )
     return
   }
+
+  // Terceiros (áudio de podcast, capas, feeds RSS): direto para a rede.
+  if (!_cacheavel(url)) return
 
   // Shell: cache-first, atualiza em background (stale-while-revalidate)
   e.respondWith(

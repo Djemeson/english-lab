@@ -338,6 +338,7 @@ const VID_LANG3 = { en: 'eng', es: 'spa', fr: 'fre', de: 'ger', it: 'ita', pt: '
 
 async function _vidAutoSub() {
   if (!_vidCur || _vidCues.length) return
+  if (_vidCur.podcast) return          // addon de legenda não indexa podcast
   const query = _vidCleanQuery(_vidCur.fileName)
   if (!query || query.length < 3) return
   const guess = _vidGuessEpisode(_vidCur.fileName)
@@ -772,7 +773,14 @@ function videoSubExport(qual) {
 let _vidTranscrevendo = false
 async function videoTranscribeFull() {
   if (_vidTranscrevendo) return
-  if (!_vidFile || !_vidCur) { toast('Abra o vídeo primeiro', 'warning'); return }
+  if (!_vidCur) { toast('Abra o vídeo primeiro', 'warning'); return }
+  if (!_vidFile) {
+    // Podcast em streaming: sem os bytes aqui, não há o que mandar ao Whisper.
+    toast(_vidStream
+      ? 'Este episódio está tocando direto da internet (o servidor não liberou o download), então não dá para transcrever. Baixe o arquivo e abra em "Abrir arquivo".'
+      : 'Abra o vídeo primeiro', 'warning')
+    return
+  }
   const stt = aiSttCfg()
   if (!stt) { toast('Configure a chave da Groq ou da OpenAI em Configurações → IA', 'warning'); return }
   const p = el('vid-player')

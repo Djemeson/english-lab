@@ -425,7 +425,7 @@ function videoBackToLib() {
   if (_vidSubsSaveTimer) _vidSaveSubsNow()
   const p = el('vid-player'); if (p) p.pause()
   if (_vidURL) { URL.revokeObjectURL(_vidURL); _vidURL = null }
-  _vidCur = null; _vidFile = null
+  _vidCur = null; _vidFile = null; _vidStream = false
   renderVideoLib()
 }
 
@@ -657,14 +657,18 @@ function videoToggleFog() {
 function renderVidTranscript() {
   const box = el('vid-transcript'); if (!box) return
   if (!_vidCues.length) {
+    const ehPod = !!(_vidCur && _vidCur.podcast)
     box.innerHTML = `
       <div class="vid-transcript-empty">
-        ${ic('upload','ic-lg')}
+        ${ic(ehPod ? 'sparkles' : 'upload','ic-lg')}
         <p><b>Sem legenda ainda.</b></p>
-        <p>Arraste um arquivo <b>.srt</b>/<b>.vtt</b> aqui, ou use o botão "Legenda" acima.</p>
+        <p>${ehPod
+          ? 'Podcast quase nunca tem legenda pronta — a IA escuta o episódio e escreve uma, já sincronizada. Se você tiver a transcrição em <b>.srt</b>/<b>.vtt</b>, arraste aqui.'
+          : 'Arraste um arquivo <b>.srt</b>/<b>.vtt</b> aqui, ou use o botão "Legenda" acima.'}</p>
         <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:6px">
-          <button class="btn btn-secondary btn-sm" onclick="videoSubSearchOpen()">${ic('search','ic-sm')}Buscar legenda</button>
-          <button class="btn btn-ghost btn-sm" onclick="videoTranscribeFull()" data-tip="Não existe legenda? A IA escuta o episódio inteiro e escreve uma, com os tempos certos (~R$ 1,50 por episódio de 45min)">${ic('sparkles','ic-sm')}Criar com IA</button>
+          ${ehPod ? '' : `<button class="btn btn-secondary btn-sm" onclick="videoSubSearchOpen()">${ic('search','ic-sm')}Buscar legenda</button>`}
+          <button class="btn ${ehPod ? 'btn-primary' : 'btn-ghost'} btn-sm" onclick="videoTranscribeFull()" data-tip="A IA escuta o episódio inteiro e escreve a legenda, com os tempos certos (~R$ 1,50 por 45min na OpenAI; ~9× menos na Groq)">${ic('sparkles','ic-sm')}Criar com IA</button>
+          ${ehPod ? `<button class="btn btn-ghost btn-sm" onclick="videoImportSubPick()">${ic('upload','ic-sm')}Importar .srt/.vtt</button>` : ''}
         </div>
       </div>`
     return
@@ -721,7 +725,8 @@ async function _vidConsumePendingClip() {
     _vidSeekClip(clip)
     return
   }
-  if (_vidCur?.id === v.id && _vidFile) await videoOpenPlayer(v)
+  // Podcast em streaming não tem _vidFile, mas o player já sabe tocá-lo.
+  if (_vidCur?.id === v.id && (_vidFile || _vidStream)) await videoOpenPlayer(v)
   else await videoOpen(v.id)
   const p = el('vid-player')
   if (p) {
