@@ -86,10 +86,29 @@ function saveIgnoredLocal() {
 // Netflix e as guarda no chrome.storage; quando o app abre, o content
 // script bridge.js as entrega por postMessage. Aqui viram itens do
 // Revisar (o Raio-X e a análise seguem o fluxo normal via createWord).
-window.__englabReady = true   // a extensão confere isto antes de esvaziar a fila
+// __englabReady NÃO é marcado aqui: este é o primeiro script do app e as
+// palavras só existem depois do loadWords() (no initApp). Marcar cedo fazia
+// a extensão entregar antes da hora — as capturas entravam num `words` vazio
+// e sumiam no recarregamento. Quem liga o sinal é englabAppPronto().
+let _extFila = []          // capturas que chegaram antes de o app ficar pronto
+let _extAppPronto = false
+
+function englabAppPronto() {
+  _extAppPronto = true
+  window.__englabReady = true
+  if (_extFila.length) { const f = _extFila; _extFila = []; _englabReceber(f) }
+}
+
 window.addEventListener('message', ev => {
   if (ev.source !== window || !ev.data || ev.data.type !== 'englab-ext-captures') return
   const items = Array.isArray(ev.data.items) ? ev.data.items : []
+  // App ainda carregando: guarda e NÃO confirma — a extensão só limpa a fila
+  // dela quando o recebimento for de verdade.
+  if (!_extAppPronto) { _extFila.push(...items); return }
+  _englabReceber(items)
+})
+
+function _englabReceber(items) {
   let n = 0
   for (const it of items.slice(0, 500)) {
     const word = String(it.word || '').trim()
@@ -108,11 +127,14 @@ window.addEventListener('message', ev => {
   if (n) {
     if (typeof renderSidebar === 'function') { try { renderSidebar() } catch (e) {} }
     if (typeof renderDashboard === 'function') { try { renderDashboard() } catch (e) {} }
+    // SEM isto as capturas ficavam só no localStorage e o snapshot da nuvem
+    // as apagava no recarregamento seguinte (a nuvem é a fonte da verdade).
+    if (typeof autoSyncAfterChange === 'function') { try { autoSyncAfterChange() } catch (e) {} }
     toast(`${n} captura${n > 1 ? 's' : ''} da Netflix ${n > 1 ? 'entraram' : 'entrou'} no Revisar`, 'success')
   }
   // ack mesmo com n=0 (duplicatas): a fila da extensão pode ser limpa
   window.postMessage({ type: 'englab-ext-ack', got: items.length }, location.origin)
-})
+}
 // Assistente (Consulta) — conversas persistidas e sincronizadas.
 // Estado declarado aqui (arquivo NÃO-lazy) para que firebase.js possa
 // referenciá-lo no sync; a UI vive em js/consulta.js.

@@ -23,6 +23,9 @@ async function initApp() {
   const stl = document.getElementById('settings-tablist')
   if (stl) stl.addEventListener('keydown', _settingsTabKeys)
   initFirebase()
+  // Só agora o app tem palavras/config na memória: libera a entrega das
+  // capturas da extensão (e processa o que já tiver chegado).
+  englabAppPronto()
 }
 // Kick off when DOM is ready
 if (document.readyState === 'loading') {

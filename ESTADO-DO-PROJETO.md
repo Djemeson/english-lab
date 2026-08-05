@@ -3,7 +3,11 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Sessão por título + REGRA DO HORIZONTE (70ª rodada)**:
+> Última atualização: 2026-08-04 — **Capturas que sumiam no reload (71ª rodada)**: duas
+> causas — o app se anunciava pronto ANTES de carregar as palavras, e o listener não
+> sincronizava (a nuvem apagava no carregamento seguinte). Ver seção 8 (71ª rodada).
+>
+> Anterior: 2026-08-04 — **Sessão por título + REGRA DO HORIZONTE (70ª rodada)**:
 > trocar de série/filme deixava a legenda antiga na memória (legenda trocada/dessincronizada);
 > agora há reset por título, detecção de troca de idioma e a barra some fora do player. E
 > ficou valendo para sempre a regra "olhar para o horizonte". Ver seção 8 (70ª rodada).
@@ -583,6 +587,28 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (71ª rodada) — Capturas da extensão sumiam ao recarregar o Lab
+132. **Relato**: as capturas apareciam no Revisar, mas desapareciam ao recarregar a página.
+     Duas causas independentes, ambas corrigidas:
+     - **Corrida na inicialização**: `window.__englabReady = true` estava no TOPO do core.js
+       (primeiro script), mas `words` só é preenchido em `loadWords()`, lá no `initApp`.
+       Se a entrega chegasse nessa janela, `createWord` empilhava num array vazio e o
+       `saveWords()` seguinte gravava **só as capturas** — e o `loadWords()` posterior
+       sobrescrevia tudo. Agora o sinal é ligado por **`englabAppPronto()`** no fim do
+       `initApp`, e capturas que chegam antes ficam numa **fila** (`_extFila`), processadas
+       assim que o app fica pronto. **O ack só sai quando o recebimento é real** — se o app
+       não estiver pronto, a extensão mantém a fila dela e tenta de novo.
+     - **Faltava sincronizar**: o listener criava as palavras e salvava no localStorage, mas
+       NÃO chamava `autoSyncAfterChange()`. Como a nuvem é a fonte da verdade
+       (`applyCloudDocs` faz `words = docs.words.list`), o snapshot seguinte do Firestore
+       **apagava** as capturas. Agora sobe junto.
+     - **Horizonte**: o mesmo padrão (criar palavra sem sincronizar) foi conferido nos
+       outros pontos que criam itens — Raio-X/triagem e gerenciador de Palavras já chamavam
+       o sync; ficou consistente.
+     - Validado com a corrida real: entrega disparada no instante do load (app com 0
+       palavras carregadas) → item enfileirado, processado ao ficar pronto, gravado no
+       localStorage e **sobreviveu ao recarregamento**. `sw`: v90 → **v91**.
 
 ### Sessão 2026-08-04 (70ª rodada) — Sessão por título na Netflix + a REGRA DO HORIZONTE
 130. **Bug**: sair de um título para o menu deixava o painel ativo; ao entrar em outro, a
