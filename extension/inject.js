@@ -75,10 +75,43 @@
     return res
   }
 
-  // O content script pode pedir o tempo/controle do player
+  // ---- CONTROLE DO PLAYER ------------------------------------------
+  // NUNCA mexer em video.currentTime: o player da Netflix alimenta o
+  // <video> por MSE/DRM e um seek por fora derruba o pipeline (o crash
+  // que o Djemeson viu). O caminho legitimo e a API interna do player.
+  function playerNF() {
+    try {
+      const api = window.netflix && window.netflix.appContext &&
+        window.netflix.appContext.state.playerApp.getAPI()
+      const vp = api && api.videoPlayer
+      if (!vp) return null
+      const ids = vp.getAllPlayerSessionIds ? vp.getAllPlayerSessionIds() : []
+      const id = ids.find(x => String(x).indexOf('watch-') === 0) || ids[0]
+      return id ? vp.getVideoPlayerBySessionId(id) : null
+    } catch (e) { return null }
+  }
+
   window.addEventListener('message', ev => {
-    if (ev.source !== window || !ev.data || ev.data.type !== 'englab-nf-seek') return
-    const v = document.querySelector('video')
-    if (v && isFinite(ev.data.t)) { v.currentTime = Math.max(0, ev.data.t); if (ev.data.play) v.play() }
+    if (ev.source !== window || !ev.data) return
+    const d = ev.data
+    if (d.type === 'englab-nf-seek') {
+      if (!isFinite(d.t)) return
+      const p = playerNF()
+      if (p && typeof p.seek === 'function') {
+        try {
+          p.seek(Math.max(0, d.t) * 1000)      // a API fala em milissegundos
+          if (d.play && typeof p.play === 'function') p.play()
+          return
+        } catch (e) {}
+      }
+      // Sem a API: nao arriscamos o pipeline — avisamos e nao movemos nada.
+      window.postMessage({ type: 'englab-nf-sem-api' }, '*')
+    } else if (d.type === 'englab-nf-pause' || d.type === 'englab-nf-play') {
+      const p = playerNF()
+      const acao = d.type === 'englab-nf-pause' ? 'pause' : 'play'
+      if (p && typeof p[acao] === 'function') { try { p[acao](); return } catch (e) {} }
+      const v = document.querySelector('video')      // pause/play direto e inofensivo
+      if (v) { try { v[acao]() } catch (e) {} }
+    }
   })
 })()

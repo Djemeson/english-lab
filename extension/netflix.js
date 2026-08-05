@@ -42,14 +42,26 @@ function piscar(el) { el.classList.add('englab-ok'); setTimeout(() => el.classLi
 window.addEventListener('message', ev => {
   if (ev.source !== window || !ev.data || ev.data.type !== 'englab-nf-cues') return
   const novos = ev.data.cues || []
-  if (novos.length < 5) return
-  cues = novos
-  ptCache = new Map(); idxAtual = -1
-  avisar(`legenda carregada — ${cues.length} falas`)
+  if (!novos.length) return
+  // A Netflix entrega a legenda em SEGMENTOS. Substituir a lista a cada
+  // chegada deixava sumir tudo o que veio antes ("secoes inteiras de fala
+  // que nao aparecem") — agora e UNIAO, com dedupe por tempo+texto.
+  const antes = cues.length
+  const mapa = new Map(cues.map(c => [c.s.toFixed(2) + '|' + c.t, c]))
+  for (const c of novos) mapa.set(c.s.toFixed(2) + '|' + c.t, c)
+  cues = [...mapa.values()].sort((a, b) => a.s - b.s)
+  idxAtual = -1
+  if (cues.length !== antes) avisar(`legenda: ${cues.length} falas`)
   if (cfgUI.transcript) renderTranscript()
 })
 
 const seek = (t, play = true) => window.postMessage({ type: 'englab-nf-seek', t, play }, '*')
+const pausar = () => window.postMessage({ type: 'englab-nf-pause' }, '*')
+const tocar  = () => window.postMessage({ type: 'englab-nf-play' }, '*')
+window.addEventListener('message', ev => {
+  if (ev.source === window && ev.data && ev.data.type === 'englab-nf-sem-api')
+    avisar('não consegui controlar o player nesta tela — recarregue a página (F5)')
+})
 
 // ---- fala corrente ----
 function cueEm(t) {
@@ -152,23 +164,35 @@ function garantirBarra() {
   if (barra && document.body.contains(barra)) return barra
   barra = document.createElement('div')
   barra.id = 'englab-bar'
+  const svg = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+    stroke-linecap="round" stroke-linejoin="round">${d}</svg>`
+  const IC = {
+    prev: svg('<path d="M18 6 10 12l8 6z"/><path d="M6 5v14"/>'),
+    rep:  svg('<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>'),
+    next: svg('<path d="M6 6l8 6-8 6z"/><path d="M18 5v14"/>'),
+    fog:  svg('<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.6"/>'),
+    add:  svg('<path d="M12 5v14M5 12h14"/>'),
+    tr:   svg('<path d="M4 6h16M4 12h16M4 18h10"/>'),
+    cc:   svg('<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10.5 10.3a2.4 2.4 0 1 0 0 3.4M17.2 10.3a2.4 2.4 0 1 0 0 3.4"/>'),
+    hide: svg('<path d="M18 6 6 18M6 6l12 12"/>')
+  }
   barra.innerHTML = `
     <div class="englab-nav">
-      <button data-a="prev" title="Fala anterior (←)">‹‹</button>
-      <button data-a="rep"  title="Repetir esta fala (R)">↺</button>
-      <button data-a="next" title="Próxima fala (→)">››</button>
+      <button data-a="prev" title="Fala anterior (←)">${IC.prev}</button>
+      <button data-a="rep"  title="Repetir esta fala (R)">${IC.rep}</button>
+      <button data-a="next" title="Próxima fala (→)">${IC.next}</button>
     </div>
     <div class="englab-mid">
       <div class="englab-line" id="englab-line"></div>
       <div class="englab-pt" id="englab-pt"></div>
     </div>
     <div class="englab-tools">
-      <button data-a="pt"   title="Tradução PT-BR pela IA (P)">PT</button>
-      <button data-a="fog"  title="Névoa: tradução borrada até passar o mouse">◐</button>
-      <button data-a="line" title="Salvar a frase inteira no Language Lab">+</button>
-      <button data-a="tr"   title="Transcript do episódio (T)">≡</button>
-      <button data-a="cc"   title="Mostrar/esconder a legenda original">cc</button>
-      <button data-a="hide" title="Esconder a barra">×</button>
+      <button data-a="pt"   class="englab-pill" title="Tradução PT-BR pela IA (P)">PT</button>
+      <button data-a="fog"  title="Névoa: tradução borrada até passar o mouse">${IC.fog}</button>
+      <button data-a="line" title="Salvar a frase inteira no Language Lab">${IC.add}</button>
+      <button data-a="tr"   title="Transcript do episódio (T)">${IC.tr}</button>
+      <button data-a="cc"   title="Mostrar/esconder a legenda original">${IC.cc}</button>
+      <button data-a="hide" title="Esconder a barra">${IC.hide}</button>
     </div>`
   document.body.appendChild(barra)
 
@@ -187,10 +211,10 @@ function garantirBarra() {
   })
   barra.addEventListener('mouseenter', () => {
     if (!cfgUI.pausaHover) return
-    const v = vid(); if (v && !v.paused) { v.pause(); pausadoPorNos = true }
+    const v = vid(); if (v && !v.paused) { pausar(); pausadoPorNos = true }
   })
   barra.addEventListener('mouseleave', () => {
-    const v = vid(); if (v && pausadoPorNos) { v.play(); pausadoPorNos = false }
+    if (pausadoPorNos) { tocar(); pausadoPorNos = false }
   })
   // seleção de trecho → Explicar / Estudar (o popup do app)
   barra.querySelector('#englab-line').addEventListener('mouseup', () => setTimeout(mostrarPopupSel, 10))
@@ -257,7 +281,7 @@ function mostrarPopupSel() {
     salvarCaptura(sel.toLowerCase(), ultimoTexto); avisar(`"${sel}" vai para o Revisar`); pop.remove()
   }
   pop.querySelector('[data-p="exp"]').onclick = () => {
-    const v = vid(); if (v && !v.paused) v.pause()
+    const v = vid(); if (v && !v.paused) pausar()
     const body = pop.querySelector('#englab-pop-body')
     body.textContent = 'a IA está explicando…'
     chrome.runtime.sendMessage({ type: 'ai-explicar', alvo: sel, contexto: ultimoTexto, titulo: titulo() }, resp => {
@@ -309,18 +333,39 @@ function renderTranscript() {
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 const escapar = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-// ---- relógio: acompanha o player quando temos o arquivo de legenda ----
-setInterval(() => {
-  const v = vid(); if (!v || !cues.length) return
-  const i = cueEm(v.currentTime)
-  if (i !== idxAtual) {
-    idxAtual = i
-    const t = i >= 0 ? cues[i].t : ''
-    if (t !== ultimoTexto) { ultimoTexto = t; renderFala(t) }
-    if (cfgUI.transcript) renderTranscript()
+// ---- o que mostrar AGORA -------------------------------------------
+// Regra de ouro: o DOM e a verdade do que esta na tela (nunca perde uma
+// fala, mesmo que o arquivo de legenda venha incompleto ou atrasado). O
+// arquivo serve para navegar, traduzir na frente e montar o transcript.
+function renderAtual() {
+  const v = vid()
+  const doDOM = textoDOM()
+  let t = doDOM
+  if (!t && cues.length && v) {
+    const i = cueEm(v.currentTime)
+    t = i >= 0 ? cues[i].t : ''
   }
-  if (cfgUI.pt) traduzirJanela(v.currentTime)
-}, 300)
+  if (t === ultimoTexto) return
+  ultimoTexto = t
+  if (t && v) {
+    histórico.push({ t: v.currentTime, texto: t })
+    if (histórico.length > 600) histórico.shift()
+  }
+  renderFala(t)
+  aplicarNativa()
+  if (cfgUI.pt && t && !ptCache.has(t)) traduzirAvulsa(t)
+  if (cfgUI.transcript) renderTranscript()
+}
+
+setInterval(() => {
+  const v = vid(); if (!v) return
+  if (cues.length) {
+    const i = cueEm(v.currentTime)
+    if (i !== idxAtual) { idxAtual = i; if (cfgUI.transcript) renderTranscript() }
+    if (cfgUI.pt) traduzirJanela(v.currentTime)
+  }
+  renderAtual()
+}, 120)
 
 // ---- fallback: observa o DOM (sempre ativo; manda quando não há arquivo) ----
 function textoDOM() {
@@ -332,21 +377,7 @@ function textoDOM() {
 let deb = null
 new MutationObserver(() => {
   clearTimeout(deb)
-  deb = setTimeout(() => {
-    if (cues.length) return          // o arquivo manda
-    const t = textoDOM()
-    if (t === ultimoTexto) return
-    ultimoTexto = t
-    if (t) {
-      const v = vid()
-      histórico.push({ t: v ? v.currentTime : 0, texto: t })
-      if (histórico.length > 400) histórico.shift()
-    }
-    renderFala(t)
-    aplicarNativa()
-    if (cfgUI.pt && t) traduzirAvulsa(t)
-    if (cfgUI.transcript) renderTranscript()
-  }, 60)
+  deb = setTimeout(renderAtual, 40)   // reage na hora; o relogio e a rede de seguranca
 }).observe(document.body, { childList: true, subtree: true, characterData: true })
 
 // ---- atalhos ----

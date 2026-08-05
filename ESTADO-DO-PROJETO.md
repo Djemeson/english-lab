@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Extensão v2: o módulo Vídeo dentro da Netflix (61ª
+> Última atualização: 2026-08-04 — **Extensão v2.1: fim do crash e acabamento (62ª rodada)**:
+> o seek ia direto no `video.currentTime` e derrubava o pipeline MSE/DRM da Netflix (agora
+> usa a API interna do player); legendas em segmentos eram substituídas em vez de somadas
+> (por isso "seções inteiras sumiam"); e a barra ganhou desenho novo. Ver seção 8.
+>
+> Anterior: 2026-08-04 — **Extensão v2: o módulo Vídeo dentro da Netflix (61ª
 > rodada)**: intercepta o TTML do player (tempos reais) e ganha tradução IA com névoa,
 > navegação por fala, Explicar/Estudar na seleção, transcript clicável e atalhos.
 > Ver seção 8 (61ª rodada).
@@ -539,6 +544,32 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (62ª rodada) — Extensão v2.1: o crash, as falas que sumiam e o acabamento
+122. **Dois defeitos graves + pedido de acabamento**, todos resolvidos:
+     - **CRASH da Netflix ao usar ‹‹ / ↺**: o `seek` fazia `video.currentTime = t`. O player
+       alimenta o `<video>` por MSE/DRM — mexer no tempo por fora derruba o pipeline. Agora
+       o inject.js usa a **API interna do player**
+       (`netflix.appContext.state.playerApp.getAPI().videoPlayer`, seek em ms) e, se ela não
+       existir, **não move nada** e avisa. Pause/play também passaram por lá.
+     - **"Seções inteiras de fala não aparecem"**: a Netflix entrega a legenda em SEGMENTOS
+       e o código fazia `cues = novos` a cada chegada — só o último pedaço sobrevivia. Agora
+       é **união com dedupe** (tempo+texto). Mais: a exibição passou a ter o **DOM como
+       fonte da verdade** (nunca perde uma fala, mesmo com arquivo incompleto/atrasado) e o
+       arquivo serve para navegar, traduzir à frente e montar o transcript. Relógio de
+       300ms → 120ms e observer reagindo em 40ms.
+     - **Acabamento**: ícones SVG no lugar de caracteres (‹‹ ↺ ›› viraram desenhos), barra
+       com vidro fosco de 18px, cantos de 16px, sombra profunda, grupos separados por
+       filetes, botões de 32px com estados hover/active/on, tipografia de sistema, popup e
+       transcript no mesmo idioma visual, animações de entrada, scrollbar estilizada.
+     - **Achado de CSS**: transicionar o shorthand `background` deixava transição órfã
+       travando a cor; trocado por `background-color`.
+     - **Validado num simulador do player** (stub da API interna + detector de
+       `currentTime`): 4 seeks, todos pela API, detector NUNCA disparou; dois segmentos de
+       legenda somaram 4 falas (antes: 2); repetir foi ao início da frase; transcript com 4
+       linhas navegáveis; popup Explicar respondendo; e todos os estados de cor conferidos.
+       Nota do ambiente: a aba do preview não compõe frames, então transições ficam
+       congeladas — as medições finais foram feitas com `transition:none`.
 
 ### Sessão 2026-08-04 (61ª rodada) — Extensão v2: as funções do módulo Vídeo dentro da Netflix
 121. **Pedido**: "quero que a extensão tenha as mesmas funcionalidades do vídeo no site".
