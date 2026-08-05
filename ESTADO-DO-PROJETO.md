@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Extensão v2.1: fim do crash e acabamento (62ª rodada)**:
+> Última atualização: 2026-08-04 — **Extensão v2.1.1: ponte à prova de recarga (63ª
+> rodada)**: o erro em bridge.js era "Extension context invalidated" (aba viva + extensão
+> recarregada); os 3 content scripts foram blindados e o popup passou a abrir a URL real
+> do app (Vercel). Ver seção 8 (63ª rodada).
+>
+> Anterior: 2026-08-04 — **Extensão v2.1: fim do crash e acabamento (62ª rodada)**:
 > o seek ia direto no `video.currentTime` e derrubava o pipeline MSE/DRM da Netflix (agora
 > usa a API interna do player); legendas em segmentos eram substituídas em vez de somadas
 > (por isso "seções inteiras sumiam"); e a barra ganhou desenho novo. Ver seção 8.
@@ -544,6 +549,27 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (63ª rodada) — "Erros" na extensão: contexto invalidado + URL do app
+123. **Print do Djemeson**: erro apontando `bridge.js` na aba
+     `english-lab-seven.vercel.app`. Causa: ao ATUALIZAR a extensão (2.0 → 2.1), os content
+     scripts das abas já abertas ficam órfãos — qualquer `chrome.*` lança
+     **"Extension context invalidated"**. Não é bug de lógica, é ciclo de vida do Chrome,
+     mas aparecia como erro vermelho e deixava a ponte muda sem avisar.
+     - **Blindagem nos 3 content scripts**: helper `vivo()/seguro()` (bridge) e
+       `extViva()/comExt()` (netflix) checam `chrome.runtime.id` antes de cada chamada,
+       capturam a exceção e checam `chrome.runtime.lastError` nos callbacks. Quando o
+       vínculo cai, a ponte **se aposenta** (remove listeners, limpa o timer, loga um
+       aviso) e a barra da Netflix mostra "extensão atualizada — recarregue a página (F5)".
+       `popup.js` idem (o `sendMessage` para aba antiga não gera mais erro).
+     - **Ronda de 20s na ponte**: cobre config alterada com a aba já aberta e serve de
+       sentinela para detectar a recarga da extensão.
+     - **URL do app corrigida**: o popup abria `djemeson.github.io` fixo, mas o Djemeson usa
+       a **Vercel**. Agora a ponte registra a URL real (`llapp`) e o botão foca uma aba já
+       aberta do app; só cai no endereço padrão se não houver nenhuma.
+     - Validado com um chrome falso que "morre" no meio: config espelhada, URL registrada,
+       e **zero erros** após invalidar o contexto e disparar foco/ack/ciclo.
+     `manifest`: 2.1.0 → **2.1.1**.
 
 ### Sessão 2026-08-04 (62ª rodada) — Extensão v2.1: o crash, as falas que sumiam e o acabamento
 122. **Dois defeitos graves + pedido de acabamento**, todos resolvidos:
