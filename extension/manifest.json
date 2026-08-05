@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Language Lab para Netflix",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "O módulo Vídeo do Language Lab dentro da Netflix: legendas clicáveis, tradução por IA, navegação por fala, transcript e captura para estudo.",
   "permissions": ["storage", "tabs"],
   "host_permissions": [

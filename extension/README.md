@@ -52,3 +52,15 @@ Nenhuma chave é digitada aqui, e as chamadas saem do service worker da extensã
 - Funciona no player web da Netflix (chrome/edge). O app de TV/celular não.
 - Se a Netflix mudar o HTML do player, a captura pode parar até ajustarmos o
   seletor (`.player-timedtext`).
+
+## Sobre a lista "Erros" em chrome://extensions
+
+O Chrome **acumula** os erros e só limpa quando você clica na lixeira — e ele
+mostra sempre o *código atual* no trecho, mesmo que o erro tenha sido gerado por
+uma versão anterior. Então, para conferir de verdade:
+
+1. Recarregue a extensão (ícone de reload).
+2. Dê **F5 nas abas já abertas** do Language Lab e da Netflix (as abas antigas
+   ficam órfãs quando a extensão é atualizada — é assim para toda extensão).
+3. Abra "Erros" e **apague com a lixeira**.
+4. Use a extensão normalmente. Se a lista continuar vazia, está tudo certo.

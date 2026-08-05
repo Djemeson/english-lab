@@ -3,7 +3,11 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Extensão v2.1.2: o erro estava no CALLBACK (64ª
+> Última atualização: 2026-08-04 — **Extensão v2.2.0: promessas no lugar de callbacks (65ª
+> rodada)**: a classe inteira do erro "Extension context invalidated" foi eliminada trocando
+> os callbacks do chrome.* por promessas com .catch(). Ver seção 8 (65ª rodada).
+>
+> Anterior: 2026-08-04 — **Extensão v2.1.2: o erro estava no CALLBACK (64ª
 > rodada)**: proteger a chamada não bastava — o callback roda depois e ali até LER
 > `chrome.runtime.lastError` lança. Todos os callbacks embrulhados + rede de segurança.
 > Ver seção 8 (64ª rodada).
@@ -554,6 +558,24 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (65ª rodada) — Fim da classe de erro: promessas no lugar de callbacks
+125. **O erro apareceu pela 3ª vez**, já com o código 2.1.2 no print. Duas conclusões:
+     - **Parte do que ele via era HISTÓRICO**: o Chrome acumula erros em
+       `chrome://extensions` até a lixeira ser clicada, e exibe o **código atual** no
+       trecho — por isso o print mostrava a linha 9 com o comentário novo, embora o erro
+       tivesse sido gerado pela versão anterior numa aba órfã. Documentado no README com o
+       procedimento de verificação (recarregar → F5 nas abas → limpar erros → usar).
+     - **A causa estrutural**: com CALLBACK, a falha de contexto estoura DENTRO do Chrome e
+       não há como capturar. A correção definitiva foi trocar todo `chrome.*` por
+       **promessas** (MV3 suporta) com `.catch()` — falha vira rejeição tratada, nunca
+       "Uncaught". `pedir()` (bridge) e `pedirExt()` (netflix) são os únicos pontos de
+       contato; `cbExt/comExt` foram removidos (0 ocorrências). O listener de
+       `storage.onChanged` agora é removido ao aposentar.
+     - Validado com chrome falso no formato MV3 (storage retornando promessa que REJEITA
+       quando morto), matando a extensão entre a chamada e a resolução: **zero erros**, e
+       com vínculo bom a config e a URL continuam sendo espelhadas.
+     `manifest`: 2.1.2 → **2.2.0**.
 
 ### Sessão 2026-08-04 (64ª rodada) — O erro persistiu: a lição estava no CALLBACK
 124. **O mesmo erro voltou** depois da 63ª (o print mostrava o arquivo NOVO — linha 9 já era

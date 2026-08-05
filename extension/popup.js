@@ -2,8 +2,9 @@
 const APP_FALLBACK = 'https://english-lab-seven.vercel.app/'
 
 function render() {
-  chrome.storage.local.get({ pend: [] }, ({ pend }) => {
-    try { if (chrome.runtime.lastError) return } catch (e) { return }
+  chrome.storage.local.get({ pend: [] }).catch(() => null).then(r => {
+    if (!r) return
+    const pend = r.pend || []
     document.getElementById('qtd').textContent = pend.length
     const ul = document.getElementById('lista')
     ul.innerHTML = ''
