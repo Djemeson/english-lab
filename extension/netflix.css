@@ -23,7 +23,10 @@
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: 8.5%; z-index: 999999;
   display: none; align-items: center; gap: 16px;
-  width: max-content; max-width: min(1100px, 88vw); padding: 12px 16px;
+  /* Largura FIXA: o padrao de legendagem (Netflix inclusive) e 42
+     caracteres por linha, ate 2 linhas — dimensionamos por esse teto para
+     o painel parar de mudar de tamanho a cada fala. */
+  width: min(1040px, 92vw); padding: 12px 16px;
   background: var(--ll-bg);
   border: 1px solid var(--ll-line);
   border-radius: 16px;
@@ -42,6 +45,8 @@
 }
 .englab-line, .englab-line * { cursor: pointer; }
 .englab-line {
+  /* duas linhas reservadas: a barra nao "pula" quando a fala e curta */
+  min-height: 2.8em; display: flex; align-items: center; justify-content: center;
   color: var(--ll-txt);
   font-size: clamp(18px, 2vw, 27px); line-height: 1.4; font-weight: 500;
   letter-spacing: .002em; text-shadow: 0 2px 8px rgba(0,0,0,.6);
@@ -54,7 +59,7 @@
 .englab-w.englab-ok { background: var(--ll-acc); color: #06231f; }
 
 .englab-pt {
-  display: none; margin-top: 6px; color: var(--ll-pt);
+  display: none; margin-top: 6px; min-height: 1.4em; color: var(--ll-pt);
   font-size: clamp(14px, 1.45vw, 19px); line-height: 1.4; font-weight: 400;
   text-shadow: 0 2px 8px rgba(0,0,0,.6);
   transition: filter .2s ease, opacity .2s ease;
@@ -172,16 +177,26 @@
 /* ---------------- régua de falas ---------------- */
 #englab-bar.englab-mudo .englab-line::after { content: '\00a0'; }
 .englab-rule {
-  position: relative; width: 100%; height: 14px; margin-top: 10px;
+  position: relative; width: 100%; height: 22px; margin-top: 10px;
   border-top: 1px solid var(--ll-line); padding-top: 8px; cursor: pointer;
+  overflow: hidden;
+  /* esmaece nas pontas: o trilho parece entrar e sair, nao ser cortado */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.englab-rtrack {
+  position: absolute; left: 0; top: 8px; height: 14px; width: 100%;
+  will-change: transform; backface-visibility: hidden;
 }
 .englab-rb {
-  position: absolute; top: 8px; height: 6px; border-radius: 3px;
-  background: rgba(255,255,255,.26); transition: background-color .12s, height .12s, top .12s;
+  position: absolute; top: 4px; height: 6px; border-radius: 3px;
+  background: rgba(255,255,255,.26);
+  transition: background-color .18s ease, height .18s ease, top .18s ease;
 }
-.englab-rb:hover { background: rgba(255,255,255,.5); height: 8px; top: 7px; }
-.englab-rb.cur { background: var(--ll-acc); height: 9px; top: 6px; }
+.englab-rb:hover { background: rgba(255,255,255,.55); height: 9px; top: 2.5px; }
+.englab-rb.cur { background: var(--ll-acc); height: 10px; top: 2px; }
 .englab-rnow {
-  position: absolute; left: 50%; top: 4px; width: 2px; height: 13px;
-  background: #fff; border-radius: 1px; opacity: .85; pointer-events: none;
+  position: absolute; left: 50%; top: 6px; width: 2px; height: 18px;
+  background: #fff; border-radius: 1px; opacity: .9; pointer-events: none;
+  box-shadow: 0 0 8px rgba(255,255,255,.5);
 }

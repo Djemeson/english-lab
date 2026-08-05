@@ -427,36 +427,67 @@ function _vidOnTime() {
     }
     // Tradução simultânea via IA: garante a fala atual + as 3 próximas
     if (_vidPTmode === 'ia') _vidEnsurePTAhead(t)
-  _vidRenderRule(t)
+  if (_vidRuleIni == null && _vidCues.length) _vidMontarRule(t)
   }
   _vidUpdateOverlay()
 }
 
-// ---- RÉGUA DE FALAS ------------------------------------------------
-// Cada bloco é uma fala; a largura acompanha a duração e os vãos são o
-// silêncio. Janela deslizante centrada no instante atual; clicar leva lá.
-const VID_RULE_JANELA = 60
-let _vidRuleUlt = -1
-function _vidRenderRule(t) {
+// ---- RÉGUA DE FALAS (deslizante) -----------------------------------
+// Cada bloco é uma fala: largura = duração, vão = silêncio. O trilho é
+// montado UMA vez em pixels e depois só DESLIZA (transform por frame),
+// em vez de ser repintado — é o que dá o movimento macio.
+const VID_RULE_PXS = 16      // pixels por segundo de vídeo
+const VID_RULE_BLOCO = 300   // segundos montados de cada vez
+let _vidRuleTrack = null, _vidRuleRaf = null, _vidRuleIni = null, _vidRuleCur = null
+
+function _vidMontarRule(t) {
   const el = el2('vid-rule'); if (!el) return
-  if (!_vidCues.length) { el.classList.add('hidden'); return }
+  if (!_vidCues.length) { el.classList.add('hidden'); _vidRuleIni = null; return }
   el.classList.remove('hidden')
-  if (Math.abs(t - _vidRuleUlt) < 0.25) return      // não repinta a cada tick
-  _vidRuleUlt = t
-  const t0 = t - VID_RULE_JANELA / 2
-  const pct = x => ((x - t0) / VID_RULE_JANELA) * 100
+  _vidRuleIni = Math.max(0, t - VID_RULE_BLOCO / 2)
+  const fim = _vidRuleIni + VID_RULE_BLOCO
   let html = ''
   for (const c of _vidCues) {
-    if (c.e < t0) continue
-    if (c.s > t0 + VID_RULE_JANELA) break
-    const ini = Math.max(pct(c.s), 0), fim = Math.min(pct(c.e), 100)
-    const atual = t >= c.s - 0.25 && t <= c.e + 0.25
-    html += `<i class="vid-rb${atual ? ' cur' : ''}" style="left:${ini}%;width:${Math.max(fim - ini, 0.6)}%"
-      data-t="${c.s}" data-tip="${escA(String(c.t).slice(0, 90))}"></i>`
+    if (c.e < _vidRuleIni) continue
+    if (c.s > fim) break
+    html += `<i class="vid-rb" data-t="${c.s}"
+      style="left:${((c.s - _vidRuleIni) * VID_RULE_PXS).toFixed(1)}px;width:${Math.max((c.e - c.s) * VID_RULE_PXS, 4).toFixed(1)}px"
+      data-tip="${escA(String(c.t).slice(0, 90))}"></i>`
   }
-  html += '<b class="vid-rnow"></b>'
-  el.innerHTML = html
+  let track = el.querySelector('.vid-rtrack')
+  if (!track) {
+    el.innerHTML = '<div class="vid-rtrack"></div><b class="vid-rnow"></b>'
+    track = el.querySelector('.vid-rtrack')
+  }
+  track.innerHTML = html
+  _vidRuleTrack = track
+  _vidRuleCur = null
+  if (!_vidRuleRaf) _vidRuleLoop()
 }
+
+function _vidRuleLoop() {
+  _vidRuleRaf = requestAnimationFrame(_vidRuleLoop)
+  const p = el2('vid-player')
+  if (!p || !_vidRuleTrack || !_vidCues.length || _vidRuleIni == null) return
+  if (!document.body.contains(_vidRuleTrack)) {     // player fechado: encerra o loop
+    cancelAnimationFrame(_vidRuleRaf); _vidRuleRaf = null; _vidRuleTrack = null; _vidRuleIni = null
+    return
+  }
+  const t = p.currentTime
+  if ((t < _vidRuleIni + 20 && _vidRuleIni > 0) || t > _vidRuleIni + VID_RULE_BLOCO - 20) {
+    _vidMontarRule(t); return
+  }
+  const meio = _vidRuleTrack.parentElement.clientWidth / 2
+  _vidRuleTrack.style.transform = `translate3d(${(meio - (t - _vidRuleIni) * VID_RULE_PXS).toFixed(2)}px,0,0)`
+  const i = _vidCueIndexAt(t)
+  const alvo = (i >= 0 && t <= _vidCues[i].e + 0.25) ? String(_vidCues[i].s) : null
+  if (alvo !== _vidRuleCur) {
+    _vidRuleTrack.querySelector('.vid-rb.cur')?.classList.remove('cur')
+    if (alvo) _vidRuleTrack.querySelector(`.vid-rb[data-t="${alvo}"]`)?.classList.add('cur')
+    _vidRuleCur = alvo
+  }
+}
+
 function videoRuleClick(ev) {
   const b = ev.target.closest('.vid-rb'); if (!b) return
   const p = el2('vid-player'); if (!p) return

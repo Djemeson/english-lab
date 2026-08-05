@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Régua de falas + PT em sincronia (68ª rodada)**: barra
+> Última atualização: 2026-08-04 — **Painel de tamanho fixo e régua que desliza (69ª
+> rodada)**: a barra parou de mudar de tamanho a cada fala (dimensionada pelo teto do padrão
+> de legendagem: 42 caracteres × 2 linhas) e a régua virou um trilho que desliza por frame.
+> Ver seção 8 (69ª rodada).
+>
+> Anterior: 2026-08-04 — **Régua de falas + PT em sincronia (68ª rodada)**: barra
 > não some mais no silêncio, a fala exibida passou a vir do MESMO cue que é traduzido (fim
 > do PT atrasado) e nasceu a régua de falas — na extensão E no vídeo do Lab.
 > Ver seção 8 (68ª rodada).
@@ -573,6 +578,28 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (69ª rodada) — Painel de tamanho fixo e régua deslizante
+129. **Dois refinamentos pedidos**:
+     - **Painel mudava de tamanho a cada fala**. Pesquisa do teto real: o padrão de
+       legendagem (Netflix inclusive) é **42 caracteres por linha, no máximo 2 linhas**.
+       A barra passou a ter largura FIXA por esse teto (`min(1040px, 92vw)`), a linha EN
+       reserva **2 linhas** (`min-height: 2.8em`, centralizada) e a PT reserva 1 —
+       nada mais "pula". Medido: 1074×154px tanto com "Ok." quanto com uma legenda no
+       limite.
+     - **Régua suave/macia**: a versão anterior REPINTAVA o HTML a cada 0,25s (movimento
+       aos saltos). Agora o trilho é montado UMA vez em pixels (bloco de 300s) e apenas
+       **desliza** via `translate3d` dentro de um `requestAnimationFrame`, com
+       `will-change: transform`; o destaque da fala corrente só toca no DOM quando muda de
+       bloco, e há remontagem automática ao chegar perto da borda. Máscara em degradê nas
+       pontas para o trilho parecer entrar/sair em vez de ser cortado.
+     - Aplicado nos DOIS: extensão (`.englab-rtrack`) e vídeo do Lab (`.vid-rtrack`, com o
+       loop se encerrando sozinho quando o player sai do DOM).
+     - Validado: deslocamento de **8px a cada 0,5s** (16px/s exatos, sem salto), destaque
+       correto, remontagem ao se aproximar da borda, clique ainda levando ao instante certo
+       (19,85s para a fala de 20s). Nota: `requestAnimationFrame` não avança em aba sem
+       composição, então o loop foi exercitado manualmente no teste.
+     `manifest`: 2.5.0 → **2.6.0**; `sw`: v88 → **v89**.
 
 ### Sessão 2026-08-04 (68ª rodada) — Régua de falas, barra persistente e PT em sincronia
 128. **Três pedidos**, com um diagnóstico fino do Djemeson ("a legenda original está aqui e

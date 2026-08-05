@@ -79,6 +79,8 @@ window.addEventListener('message', ev => {
   cues = [...mapa.values()].sort((a, b) => a.s - b.s)
   idxAtual = -1
   if (cues.length !== antes) avisar(`legenda: ${cues.length} falas`)
+  const vv = vid()
+  montarRegua(vv ? vv.currentTime : 0)
   if (cfgUI.transcript) renderTranscript()
 })
 
@@ -378,32 +380,60 @@ document.addEventListener('mousedown', e => {
   if (pop && !pop.contains(e.target) && !e.target.closest('#englab-line')) fecharPopupSel()
 })
 
-// ---- RÉGUA DE FALAS ------------------------------------------------
-// Cada bloco é uma fala; a largura acompanha a duração e os vãos são o
-// silêncio. Janela deslizante centrada no instante atual; clicar leva lá.
-const RULE_JANELA = 60      // segundos visíveis (30 para trás, 30 para frente)
-let ruleUlt = -1
-function renderRegua(t) {
+// ---- RÉGUA DE FALAS (deslizante) -----------------------------------
+// Cada bloco é uma fala: largura = duração, vão = silêncio. O trilho é
+// montado UMA vez em pixels e depois só DESLIZA (transform a cada frame),
+// em vez de ser repintado — é isso que dá o movimento macio.
+const RULE_PXS = 16          // pixels por segundo de vídeo
+const RULE_BLOCO = 300       // segundos montados de cada vez
+let ruleTrack = null, ruleRaf = null, ruleIni = null, ruleCur = null
+
+function montarRegua(t) {
   const el = barra && barra.querySelector('#englab-rule')
   if (!el) return
   if (!cues.length) { el.style.display = 'none'; return }
   el.style.display = 'block'
-  if (Math.abs(t - ruleUlt) < 0.25) return       // evita repintar a 120ms
-  ruleUlt = t
-  const t0 = t - RULE_JANELA / 2, t1 = t + RULE_JANELA / 2
-  const pct = x => ((x - t0) / RULE_JANELA) * 100
+  ruleIni = Math.max(0, t - RULE_BLOCO / 2)
+  const fim = ruleIni + RULE_BLOCO
   let html = ''
   for (const c of cues) {
-    if (c.e < t0) continue
-    if (c.s > t1) break
-    const ini = Math.max(pct(c.s), 0), fim = Math.min(pct(c.e), 100)
-    const atual = t >= c.s - 0.25 && t <= c.e + 0.25
-    html += `<i class="englab-rb${atual ? ' cur' : ''}" style="left:${ini}%;width:${Math.max(fim - ini, 0.6)}%"
-      data-t="${c.s}" title="${escapar(c.t).slice(0, 90)}"></i>`
+    if (c.e < ruleIni) continue
+    if (c.s > fim) break
+    html += `<i class="englab-rb" data-t="${c.s}"
+      style="left:${((c.s - ruleIni) * RULE_PXS).toFixed(1)}px;width:${Math.max((c.e - c.s) * RULE_PXS, 4).toFixed(1)}px"
+      title="${escapar(c.t).slice(0, 90)}"></i>`
   }
-  html += '<b class="englab-rnow"></b>'
-  el.innerHTML = html
+  let track = el.querySelector('.englab-rtrack')
+  if (!track) {
+    el.innerHTML = '<div class="englab-rtrack"></div><b class="englab-rnow"></b>'
+    track = el.querySelector('.englab-rtrack')
+  }
+  track.innerHTML = html
+  ruleTrack = track
+  ruleCur = null
 }
+
+function loopRegua() {
+  ruleRaf = requestAnimationFrame(loopRegua)
+  const v = vid()
+  if (!v || !ruleTrack || !cues.length || ruleIni == null) return
+  const t = v.currentTime
+  // remonta só quando o tempo se aproxima da borda do bloco montado
+  if (t < ruleIni + 20 && ruleIni > 0) { montarRegua(t); return }
+  if (t > ruleIni + RULE_BLOCO - 20) { montarRegua(t); return }
+  const el = ruleTrack.parentElement
+  const meio = el.clientWidth / 2
+  ruleTrack.style.transform = `translate3d(${(meio - (t - ruleIni) * RULE_PXS).toFixed(2)}px,0,0)`
+  // destaque muda de bloco raramente: só mexe no DOM quando troca
+  const i = cueEm(t)
+  const alvo = i >= 0 ? String(cues[i].s) : null
+  if (alvo !== ruleCur) {
+    ruleTrack.querySelector('.englab-rb.cur')?.classList.remove('cur')
+    if (alvo) ruleTrack.querySelector(`.englab-rb[data-t="${alvo}"]`)?.classList.add('cur')
+    ruleCur = alvo
+  }
+}
+if (!ruleRaf) loopRegua()
 
 // ---- transcript do episódio ----
 function renderTranscript() {
@@ -477,7 +507,7 @@ setInterval(() => {
     const i = cueEm(v.currentTime)
     if (i !== idxAtual) { idxAtual = i; if (cfgUI.transcript) renderTranscript() }
     if (cfgUI.pt) traduzirJanela(v.currentTime)
-    renderRegua(v.currentTime)
+    if (ruleIni == null) montarRegua(v.currentTime)
   }
   renderAtual()
 }, 120)

@@ -4042,18 +4042,26 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
    Mesma linguagem da extensão; clicar leva ao instante da fala.
    ================================================================ */
 .vid-rule{
-  position:relative;width:100%;height:16px;margin:8px 0 4px;cursor:pointer;
-  border-radius:var(--radius-xs);background:var(--surface2);
+  position:relative;width:100%;height:20px;margin:8px 0 4px;cursor:pointer;
+  border-radius:var(--radius-xs);background:var(--surface2);overflow:hidden;
+  /* esmaece nas pontas: o trilho parece entrar e sair, nao ser cortado */
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
+          mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
 }
 .vid-rule.hidden{display:none}
-.vid-rb{
-  position:absolute;top:5px;height:6px;border-radius:3px;
-  background:rgba(var(--primary-rgb),.32);
-  transition:background-color .12s,height .12s,top .12s;
+.vid-rtrack{
+  position:absolute;left:0;top:0;height:100%;width:100%;
+  will-change:transform;backface-visibility:hidden;
 }
-.vid-rb:hover{background:rgba(var(--primary-rgb),.6);height:9px;top:3.5px}
-.vid-rb.cur{background:var(--primary);height:10px;top:3px}
+.vid-rb{
+  position:absolute;top:7px;height:6px;border-radius:3px;
+  background:rgba(var(--primary-rgb),.32);
+  transition:background-color .18s ease,height .18s ease,top .18s ease;
+}
+.vid-rb:hover{background:rgba(var(--primary-rgb),.65);height:10px;top:5px}
+.vid-rb.cur{background:var(--primary);height:12px;top:4px}
 .vid-rnow{
-  position:absolute;left:50%;top:1px;width:2px;height:14px;
-  background:var(--text);border-radius:1px;opacity:.7;pointer-events:none;
+  position:absolute;left:50%;top:2px;width:2px;height:16px;
+  background:var(--text);border-radius:1px;opacity:.75;pointer-events:none;
+  box-shadow:0 0 8px rgba(var(--primary-rgb),.5);
 }
