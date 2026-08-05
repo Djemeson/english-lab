@@ -59,6 +59,7 @@
   transition: filter .2s ease, opacity .2s ease;
 }
 .englab-pt.englab-fog { filter: blur(8px); opacity: .8; }
+.englab-pt.englab-esperando { opacity: .4; letter-spacing: .3em; filter: none; }
 #englab-bar:hover .englab-pt.englab-fog { filter: blur(0); opacity: 1; }
 
 /* ---------------- botões ---------------- */

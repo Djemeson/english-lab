@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Extensão v2.3.0: entrega injetada + seleção de trecho
+> Última atualização: 2026-08-04 — **Extensão v2.4.0: contexto congelado e legenda PT que
+> aparece (67ª rodada)**: a frase de origem vinha errada (o vídeo voltava a rodar enquanto o
+> mouse ia ao botão) e a tradução quase nunca aparecia (o cache era indexado pelo texto CRU,
+> que não bate entre tela e arquivo). Ver seção 8 (67ª rodada).
+>
+> Anterior: 2026-08-04 — **Extensão v2.3.0: entrega injetada + seleção de trecho
 > (66ª rodada)**: as capturas não chegavam ao Lab (a aba tinha ponte órfã e o botão só a
 > focava) e não dava para selecionar trecho (a Netflix bloqueia seleção no player).
 > Ver seção 8 (66ª rodada).
@@ -563,6 +568,25 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (67ª rodada) — Contexto errado na captura e legenda PT que não aparecia
+127. **Dois relatos, ambos com diagnóstico certeiro do Djemeson**:
+     - **Frase de origem errada**: ele selecionava (o vídeo pausava pelo hover), arrastava o
+       mouse até o popup — que fica FORA da barra — o `mouseleave` retomava o vídeo, e ao
+       clicar em "Estudar" o `ultimoTexto` já era outra fala. Correções: o contexto é
+       **congelado no instante da seleção** (`popCtx`), a barra **não retoma o vídeo
+       enquanto o popup estiver aberto**, e o popup pausa ao abrir e retoma ao fechar.
+     - **Tradução quase nunca aparecia (DeepSeek)**: causa estrutural — o cache era indexado
+       pelo **texto cru**, e o texto que o player DESENHA quase nunca é idêntico ao do
+       ARQUIVO TTML (itálico, `…` vs `...`, símbolos, espaços). A tradução era feita e
+       jogada fora. Agora a chave é normalizada (`chavePT`: só letras/números) e há
+       fallback pela fala corrente do arquivo. Além disso: janela de antecedência **30s →
+       90s** e blocos de 4 → 6 (o DeepSeek é mais lento), e um indicador discreto ("...")
+       enquanto a tradução não chega, para não parecer quebrado.
+     - Validado no simulador: arquivo com `…` unicode e tela com `<i>...</i>` → tradução
+       exibida; contexto congelado sobreviveu à fala mudando na tela para outra completamente
+       diferente; pausa ao selecionar, mantida a caminho do popup, retomada ao fechar.
+     `manifest`: 2.3.0 → **2.4.0**.
 
 ### Sessão 2026-08-04 (66ª rodada) — Capturas que não chegavam e seleção de trecho travada
 126. **Dois defeitos relatados**: as palavras marcadas não chegavam ao Lab (nem com ele

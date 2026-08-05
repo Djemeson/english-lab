@@ -36,7 +36,7 @@ let cues = []                 // legenda completa (quando o TTML é capturado)
 let idxAtual = -1
 let ultimoTexto = ''
 let histórico = []            // [{t, texto}] — falas que já passaram (modo DOM)
-let ptCache = new Map()       // texto → tradução
+let ptCache = new Map()       // chavePT(texto) → tradução
 let ptPend = new Set()
 let barra = null, painel = null
 let cfgUI = { ligada: true, ocultaNativa: true, pausaHover: true, pt: false, fog: true, transcript: false }
@@ -81,6 +81,22 @@ window.addEventListener('message', ev => {
   if (cues.length !== antes) avisar(`legenda: ${cues.length} falas`)
   if (cfgUI.transcript) renderTranscript()
 })
+
+// O texto que o player DESENHA e o que vem no ARQUIVO quase nunca sao
+// identicos (italico, simbolos, espacos). Como o cache era indexado pelo
+// texto cru, a traducao existia mas nunca era achada — a legenda PT "nao
+// aparecia". A chave agora compara so letras e numeros.
+const chavePT = t => String(t || '').toLowerCase().replace(/[^0-9a-zA-Zà-ÿÀ-Ÿ]+/g, ' ').trim()
+function ptDe(texto) {
+  if (!texto) return ''
+  const direto = ptCache.get(chavePT(texto))
+  if (direto) return direto
+  if (idxAtual >= 0 && cues[idxAtual]) {
+    const porCue = ptCache.get(chavePT(cues[idxAtual].t))
+    if (porCue) return porCue
+  }
+  return ''
+}
 
 const seek = (t, play = true) => window.postMessage({ type: 'englab-nf-seek', t, play }, '*')
 const pausar = () => window.postMessage({ type: 'englab-nf-pause' }, '*')
@@ -150,16 +166,16 @@ function traduzirJanela(t) {
   const alvos = []
   for (const c of cues) {
     if (c.e < t - 0.5) continue
-    if (c.s > t + 30) break
-    if (!ptCache.has(c.t) && !ptPend.has(c.t)) alvos.push(c.t)
+    if (c.s > t + 90) break   // 90s de antecedencia: fornecedor lento nao atrasa a legenda
+    if (!ptCache.has(chavePT(c.t)) && !ptPend.has(c.t)) alvos.push(c.t)
   }
   if (!alvos.length) return
-  for (const bloco of fatiar(alvos, 4)) {
+  for (const bloco of fatiar(alvos.slice(0, 60), 6)) {
     bloco.forEach(x => ptPend.add(x))
     pedirExt(() => chrome.runtime.sendMessage({ type: 'ai-traduzir', falas: bloco })).then(resp => {
       bloco.forEach(x => ptPend.delete(x))
       if (!resp || !resp.ok) { if (resp && resp.erro) avisar(resp.erro); return }
-      bloco.forEach((x, i) => { if (resp.pt[i]) ptCache.set(x, resp.pt[i]) })
+      bloco.forEach((x, i) => { if (resp.pt[i]) ptCache.set(chavePT(x), resp.pt[i]) })
       pintarPT()
       if (cfgUI.transcript) renderTranscript()
     }).catch(() => { bloco.forEach(x => ptPend.delete(x)) })
@@ -168,11 +184,11 @@ function traduzirJanela(t) {
 const fatiar = (a, n) => { const o = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
 
 function traduzirAvulsa(texto) {   // modo DOM (sem arquivo de legenda)
-  if (!cfgUI.pt || ptCache.has(texto) || ptPend.has(texto)) return
+  if (!cfgUI.pt || ptCache.has(chavePT(texto)) || ptPend.has(texto)) return
   ptPend.add(texto)
   pedirExt(() => chrome.runtime.sendMessage({ type: 'ai-traduzir', falas: [texto] })).then(resp => {
     ptPend.delete(texto)
-    if (resp && resp.ok && resp.pt[0]) { ptCache.set(texto, resp.pt[0]); pintarPT() }
+    if (resp && resp.ok && resp.pt[0]) { ptCache.set(chavePT(texto), resp.pt[0]); pintarPT() }
     else if (resp && resp.erro) avisar(resp.erro)
   }).catch(() => { ptPend.delete(texto) })
 }
@@ -180,10 +196,15 @@ function traduzirAvulsa(texto) {   // modo DOM (sem arquivo de legenda)
 function pintarPT() {
   const el = barra && barra.querySelector('#englab-pt')
   if (!el) return
-  const pt = cfgUI.pt ? (ptCache.get(ultimoTexto) || '') : ''
-  el.textContent = pt
-  el.style.display = pt ? 'block' : 'none'
-  el.classList.toggle('englab-fog', cfgUI.fog)
+  if (!cfgUI.pt) { el.style.display = 'none'; return }
+  const pt = ptDe(ultimoTexto)
+  // Sem traducao ainda: reticencias em vez de nada — da para ver que a IA
+  // esta trabalhando (o DeepSeek leva alguns segundos).
+  const esperando = !pt && !!ultimoTexto
+  el.textContent = pt || '...'
+  el.style.display = (pt || esperando) ? 'block' : 'none'
+  el.classList.toggle('englab-esperando', esperando)
+  el.classList.toggle('englab-fog', cfgUI.fog && !esperando)
 }
 
 // ---- barra ----
@@ -241,6 +262,8 @@ function garantirBarra() {
     const v = vid(); if (v && !v.paused) { pausar(); pausadoPorNos = true }
   })
   barra.addEventListener('mouseleave', () => {
+    // com o popup aberto o aluno esta indo ate ele: manter pausado
+    if (document.getElementById('englab-pop')) return
     if (pausadoPorNos) { tocar(); pausadoPorNos = false }
   })
   // seleção de trecho → Explicar / Estudar (o popup do app)
@@ -301,10 +324,17 @@ function renderFala(texto) {
 }
 
 // ---- popup de seleção: Explicar / Estudar / Revisar ----
+let popCtx = ''          // fala de origem CONGELADA no instante da selecao
+let popPausou = false
 function mostrarPopupSel() {
   const sel = String(window.getSelection() || '').trim()
   const antigo = document.getElementById('englab-pop')
-  if (!sel) { antigo?.remove(); return }
+  if (!sel) { fecharPopupSel(); return }
+  // Congela AQUI: o video pode voltar a rodar enquanto o mouse vai ate o
+  // botao, e ai "ultimoTexto" ja seria outra fala (bug relatado).
+  popCtx = ultimoTexto
+  const vv = vid()
+  if (vv && !vv.paused) { pausar(); popPausou = true }
   const pop = antigo || document.createElement('div')
   pop.id = 'englab-pop'
   pop.innerHTML = `
@@ -317,20 +347,26 @@ function mostrarPopupSel() {
   if (!antigo) document.body.appendChild(pop)
   pop.onmousedown = e => e.preventDefault()   // não colapsa a seleção
   pop.querySelector('[data-p="rev"]').onclick = () => {
-    salvarCaptura(sel.toLowerCase(), ultimoTexto); avisar(`"${sel}" vai para o Revisar`); pop.remove()
+    salvarCaptura(sel.toLowerCase(), popCtx); avisar(`"${sel}" vai para o Revisar`); fecharPopupSel()
   }
   pop.querySelector('[data-p="exp"]').onclick = () => {
-    const v = vid(); if (v && !v.paused) pausar()
+    const v2 = vid(); if (v2 && !v2.paused) { pausar(); popPausou = true }
     const body = pop.querySelector('#englab-pop-body')
     body.textContent = 'a IA está explicando…'
-    pedirExt(() => chrome.runtime.sendMessage({ type: 'ai-explicar', alvo: sel, contexto: ultimoTexto, titulo: titulo() })).then(resp => {
+    pedirExt(() => chrome.runtime.sendMessage({ type: 'ai-explicar', alvo: sel, contexto: popCtx, titulo: titulo() })).then(resp => {
       body.textContent = (resp && resp.ok) ? resp.texto : ('Não deu: ' + ((resp && resp.erro) || 'sem resposta'))
     }).catch(() => { body.textContent = 'Extensão atualizada — recarregue a página (F5).' })
   }
 }
+function fecharPopupSel() {
+  const pop = document.getElementById('englab-pop')
+  if (pop) pop.remove()
+  if (popPausou) { tocar(); popPausou = false }
+  popCtx = ''
+}
 document.addEventListener('mousedown', e => {
   const pop = document.getElementById('englab-pop')
-  if (pop && !pop.contains(e.target) && !e.target.closest('#englab-line')) pop.remove()
+  if (pop && !pop.contains(e.target) && !e.target.closest('#englab-line')) fecharPopupSel()
 })
 
 // ---- transcript do episódio ----
@@ -353,7 +389,7 @@ function renderTranscript() {
         <div class="englab-tr-line${i === idxAtual ? ' cur' : ''}" data-i="${i}" data-t="${c.s}">
           <span class="englab-tr-time">${fmt(c.s)}</span>
           <span class="englab-tr-txt">${escapar(c.t)}</span>
-          ${cfgUI.pt && ptCache.get(c.t) ? `<span class="englab-tr-pt">${escapar(ptCache.get(c.t))}</span>` : ''}
+          ${cfgUI.pt && ptCache.get(chavePT(c.t)) ? `<span class="englab-tr-pt">${escapar(ptCache.get(chavePT(c.t)))}</span>` : ''}
         </div>`).join('')}
     </div>`
   painel.querySelector('#englab-tr-list').onclick = e => {
@@ -392,7 +428,7 @@ function renderAtual() {
   }
   renderFala(t)
   aplicarNativa()
-  if (cfgUI.pt && t && !ptCache.has(t)) traduzirAvulsa(t)
+  if (cfgUI.pt && t && !ptCache.has(chavePT(t))) traduzirAvulsa(t)
   if (cfgUI.transcript) renderTranscript()
 }
 
