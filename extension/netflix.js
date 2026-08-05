@@ -241,13 +241,18 @@ function traduzirAvulsa(texto) {   // modo DOM (sem arquivo de legenda)
 function pintarPT() {
   const el = barra && barra.querySelector('#englab-pt')
   if (!el) return
-  if (!cfgUI.pt) { el.style.display = 'none'; return }
+  // A ALTURA do painel nao pode depender de haver traducao: o espaco fica
+  // reservado enquanto o modo PT estiver ligado (classe no proprio bar) e
+  // so o conteudo aparece/some.
+  barra.classList.toggle('englab-tem-pt', !!cfgUI.pt)
+  el.style.display = ''
+  if (!cfgUI.pt) return
   const pt = ptDe(ultimoTexto)
-  // Sem traducao ainda: reticencias em vez de nada — da para ver que a IA
-  // esta trabalhando (o DeepSeek leva alguns segundos).
+  // Sem traducao ainda: reticencias — da para ver que a IA esta trabalhando
+  // (o DeepSeek leva alguns segundos).
   const esperando = !pt && !!ultimoTexto
-  el.textContent = pt || '...'
-  el.style.display = (pt || esperando) ? 'block' : 'none'
+  el.textContent = pt || (esperando ? '...' : '')
+  el.classList.toggle('englab-vazia', !pt && !esperando)
   el.classList.toggle('englab-esperando', esperando)
   el.classList.toggle('englab-fog', cfgUI.fog && !esperando)
 }
@@ -523,6 +528,10 @@ const escapar = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').repl
 // arquivo serve para navegar, traduzir na frente e montar o transcript.
 function renderAtual() {
   const v = vid()
+  // A barra nasce assim que estamos num player — mesmo em silencio. Antes
+  // ela so era criada quando um texto MUDAVA, entao um video que comecava
+  // calado ficava sem barra (e sem os botoes de navegacao).
+  if (cfgUI.ligada && idDoTitulo() && v) garantirBarra().style.display = 'flex'
   const doDOM = textoDOM()
   let t = ''
   if (cues.length && v) {

@@ -3,7 +3,11 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Layout da barra: espaços, proporção e controles (72ª
+> Última atualização: 2026-08-04 — **Painel com altura constante (73ª rodada)**: a linha de
+> tradução sumia por completo sem texto (o painel "crescia um pouquinho" quando a fala
+> chegava) e a barra não nascia se o vídeo começasse em silêncio. Ver seção 8 (73ª rodada).
+>
+> Anterior: 2026-08-04 — **Layout da barra: espaços, proporção e controles (72ª
 > rodada)**: as palavras saíam coladas porque a linha virou container flex (que descarta os
 > espaços); a barra também cobria a barra de progresso do player. Ver seção 8 (72ª rodada).
 >
@@ -591,6 +595,22 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (73ª rodada) — Painel com altura realmente constante
+134. **"O painel sem legenda é um tamanho e quando a legenda aparece ele cresce um
+     pouquinho"**. Duas causas somadas:
+     - A linha de **tradução usava `display:none`** quando não havia PT: o painel encolhia e
+       voltava a crescer quando a fala chegava. Agora, com o modo PT ligado, ela **sempre
+       ocupa o lugar** (classe `englab-tem-pt` no próprio bar); só o conteúdo fica invisível.
+     - Sobrou 1px de diferença: `min-height` (1,30em vazia) contra a altura real do texto
+       (1,35em). Resolvido com **altura FIXA de 2 linhas** para a tradução — constante em
+       qualquer caso e ainda cabe tradução de duas linhas sem cortar. A linha EN vazia
+       também ganhou um espaço inquebrável (`:empty::before`) para não colapsar.
+     - **Horizonte — bug achado no teste**: a barra só era criada quando um texto MUDAVA,
+       então um vídeo que **começasse em silêncio** ficava sem barra (e sem os botões de
+       navegação). Agora ela nasce assim que há player, mesmo calado.
+     - Medido: **136px** (PT desligado) e **182px** (PT ligado) — idênticos no silêncio, com
+       fala curta e com fala longa. `manifest`: 2.8.0 → **2.8.1**.
 
 ### Sessão 2026-08-04 (72ª rodada) — Layout da barra: espaços colados, proporção e controles
 133. **Cinco sintomas do Djemeson, uma causa central**: "There'sajuvenile.Whitemale" — as

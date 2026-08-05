@@ -48,6 +48,7 @@
   -webkit-user-select: text !important; user-select: text !important; cursor: auto;
 }
 .englab-line, .englab-line * { cursor: pointer; }
+.englab-line:empty::before { content: '\00a0'; }
 .englab-line {
   /* display BLOCK de proposito: com flex, os espacos entre as palavras
      viram "gaps" descartados e o texto sai grudado. */
@@ -65,6 +66,10 @@
 .englab-w:hover { background: var(--ll-acc-soft); color: #fff; }
 .englab-w.englab-ok { background: var(--ll-acc); color: #06231f; }
 
+/* Reservar o espaco da traducao: usando display:none o painel encolhia
+   quando nao havia PT e crescia quando a fala chegava — o "cresce um
+   pouquinho" que o Djemeson viu. Agora o espaco existe sempre que o modo
+   PT esta ligado; so o conteudo fica invisivel. */
 .englab-pt {
   display: none; margin-top: 5px; min-height: 1.3em; color: var(--ll-pt);
   font-size: clamp(13px, 1.2vw, 17px); line-height: 1.35; font-weight: 400;
@@ -213,3 +218,13 @@
    nao cobrir a barra de progresso — sem isso nao da para avancar o video. */
 #englab-bar.englab-up { bottom: 22%; }
 #englab-pop.englab-up { bottom: calc(22% + 104px); }
+
+/* Com o modo PT ligado, a linha de traducao SEMPRE ocupa o lugar dela.
+   ALTURA FIXA (2 linhas, como a do ingles): com min-height, a linha vazia
+   media 1.30em e a preenchida 1.35em — 1px de diferenca que fazia o painel
+   "crescer um pouquinho" quando a fala chegava. Fixando, nao varia nunca e
+   ainda cabe traducao de duas linhas sem cortar. */
+#englab-bar.englab-tem-pt .englab-pt {
+  display: block; height: 2.7em; min-height: 0; max-height: none;
+}
+#englab-bar.englab-tem-pt .englab-pt.englab-vazia { visibility: hidden; }
