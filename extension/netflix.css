@@ -34,6 +34,12 @@
 @keyframes englab-in { from { opacity: 0; transform: translate(-50%, 8px) } to { opacity: 1; transform: translate(-50%, 0) } }
 
 .englab-mid { flex: 1; min-width: 0; text-align: center; padding: 0 2px; }
+/* O player da Netflix aplica user-select:none nos containers — sem isto,
+   arrastar para selecionar um trecho simplesmente nao funciona. */
+#englab-bar, .englab-line, .englab-pt, .englab-line *, #englab-pop, #englab-transcript {
+  -webkit-user-select: text !important; user-select: text !important; cursor: auto;
+}
+.englab-line, .englab-line * { cursor: pointer; }
 .englab-line {
   color: var(--ll-txt);
   font-size: clamp(18px, 2vw, 27px); line-height: 1.4; font-weight: 500;

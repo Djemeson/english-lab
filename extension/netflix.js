@@ -245,6 +245,12 @@ function garantirBarra() {
   })
   // seleção de trecho → Explicar / Estudar (o popup do app)
   barra.querySelector('#englab-line').addEventListener('mouseup', () => setTimeout(mostrarPopupSel, 10))
+  // arraste que termina fora da linha (acontece muito) também conta
+  document.addEventListener('mouseup', ev => {
+    if (!barra || barra.style.display === 'none') return
+    if (ev.target.closest && ev.target.closest('#englab-pop')) return
+    setTimeout(() => { if (String(window.getSelection() || '').trim()) mostrarPopupSel() }, 10)
+  })
   sincronizarBotoes()
   return barra
 }
@@ -276,8 +282,14 @@ function renderFala(texto) {
       const s = document.createElement('span')
       s.className = 'englab-w'
       s.textContent = parte
+      // Clique simples captura a palavra; arrastar (selecionar trecho) não —
+      // por isso medimos o deslocamento entre mousedown e mouseup.
+      s.onmousedown = ev => { s._x = ev.clientX; s._y = ev.clientY }
       s.onclick = ev => {
-        if (window.getSelection().toString().trim()) return   // seleção manda
+        const arrastou = s._x != null &&
+          (Math.abs(ev.clientX - s._x) > 4 || Math.abs(ev.clientY - s._y) > 4)
+        s._x = s._y = null
+        if (arrastou || String(window.getSelection() || '').trim()) return   // seleção manda
         ev.stopPropagation()
         salvarCaptura(parte.toLowerCase(), texto); piscar(s)
       }

@@ -29,6 +29,7 @@ no armazenamento local do Chrome até você abrir o app.
 | Fala anterior / repetir / próxima | **‹‹ ↺ ››** (teclas `←` `R` `→`) |
 | Transcript do episódio, clicável e com busca | botão **≡** (tecla `T`) |
 | Esconder a legenda original | botão **cc** |
+| **Selecionar um trecho** | arraste com o mouse sobre a legenda |
 
 A tradução e o Explicar usam a **sua** chave de IA — espelhada automaticamente
 do Language Lab na primeira vez que você abre o app com a extensão instalada.

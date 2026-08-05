@@ -14,13 +14,15 @@
     border: 1px solid #2a3646; background: #17202e; color: #e5eaf0; font-size: 13px; }
   button:hover { background: #1e2a3c; }
   button.pri { background: #23beaa; border-color: #23beaa; color: #06231f; font-weight: 600; }
+  .st { color: #23beaa; font-size: 12px; margin: 6px 0 0; min-height: 14px; }
   .dica { color: #7c8896; font-size: 11px; margin-top: 10px; line-height: 1.5; }
 </style>
 </head>
 <body>
   <h1>Capturas da Netflix: <span class="n" id="qtd">0</span></h1>
   <ul id="lista"></ul>
-  <button class="pri" id="abrir">Abrir o Language Lab (entrega as capturas)</button>
+  <button class="pri" id="abrir">Entregar no Lab</button>
+  <p class="st" id="status"></p>
   <button id="religar">Religar a barra na Netflix</button>
   <button id="limpar">Descartar capturas pendentes</button>
   <p class="dica">Na Netflix: clique numa palavra da legenda para capturá-la; "+ frase" salva a fala

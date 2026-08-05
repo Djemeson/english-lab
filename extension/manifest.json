@@ -1,27 +1,46 @@
 {
   "manifest_version": 3,
   "name": "Language Lab para Netflix",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "O módulo Vídeo do Language Lab dentro da Netflix: legendas clicáveis, tradução por IA, navegação por fala, transcript e captura para estudo.",
-  "permissions": ["storage", "tabs"],
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting"
+  ],
   "host_permissions": [
     "https://api.openai.com/*",
     "https://api.deepseek.com/*",
     "https://generativelanguage.googleapis.com/*",
-    "https://api.groq.com/*"
+    "https://api.groq.com/*",
+    "https://djemeson.github.io/*",
+    "https://*.vercel.app/*",
+    "http://localhost:8765/*"
   ],
-  "background": { "service_worker": "background.js" },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["https://www.netflix.com/*"],
-      "js": ["inject.js"],
+      "matches": [
+        "https://www.netflix.com/*"
+      ],
+      "js": [
+        "inject.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["https://www.netflix.com/*"],
-      "js": ["netflix.js"],
-      "css": ["netflix.css"],
+      "matches": [
+        "https://www.netflix.com/*"
+      ],
+      "js": [
+        "netflix.js"
+      ],
+      "css": [
+        "netflix.css"
+      ],
       "run_at": "document_idle"
     },
     {
@@ -30,7 +49,9 @@
         "https://*.vercel.app/*",
         "http://localhost:8765/*"
       ],
-      "js": ["bridge.js"],
+      "js": [
+        "bridge.js"
+      ],
       "run_at": "document_idle"
     }
   ],

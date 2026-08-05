@@ -86,6 +86,7 @@ function saveIgnoredLocal() {
 // Netflix e as guarda no chrome.storage; quando o app abre, o content
 // script bridge.js as entrega por postMessage. Aqui viram itens do
 // Revisar (o Raio-X e a análise seguem o fluxo normal via createWord).
+window.__englabReady = true   // a extensão confere isto antes de esvaziar a fila
 window.addEventListener('message', ev => {
   if (ev.source !== window || !ev.data || ev.data.type !== 'englab-ext-captures') return
   const items = Array.isArray(ev.data.items) ? ev.data.items : []

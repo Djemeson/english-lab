@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Extensão v2.2.0: promessas no lugar de callbacks (65ª
+> Última atualização: 2026-08-04 — **Extensão v2.3.0: entrega injetada + seleção de trecho
+> (66ª rodada)**: as capturas não chegavam ao Lab (a aba tinha ponte órfã e o botão só a
+> focava) e não dava para selecionar trecho (a Netflix bloqueia seleção no player).
+> Ver seção 8 (66ª rodada).
+>
+> Anterior: 2026-08-04 — **Extensão v2.2.0: promessas no lugar de callbacks (65ª
 > rodada)**: a classe inteira do erro "Extension context invalidated" foi eliminada trocando
 > os callbacks do chrome.* por promessas com .catch(). Ver seção 8 (65ª rodada).
 >
@@ -558,6 +563,30 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (66ª rodada) — Capturas que não chegavam e seleção de trecho travada
+126. **Dois defeitos relatados**: as palavras marcadas não chegavam ao Lab (nem com ele
+     aberto, nem pelo botão da extensão — "a página é acionada mas as palavras não vêm") e
+     na Netflix "só dá para clicar na palavra, não dá para selecionar um trecho".
+     - **Entrega**: erro de desenho meu. O botão apenas FOCAVA a aba do Lab — e se aquela
+       aba tinha uma **ponte órfã** (extensão recarregada depois de a aba abrir), ninguém
+       entregava nada. Agora o popup **injeta o script de entrega na hora**
+       (`chrome.scripting.executeScript`, permissão `scripting` + host das URLs do app):
+       funciona mesmo em aba órfã. O app marca `window.__englabReady`; o injetado só limpa
+       a fila se esse sinal existir, e se o app não responder o popup **recarrega a aba e
+       tenta de novo**, com status visível ("2 entregues!"). Sem Lab aberto, abre uma aba
+       nova (a ponte entrega no load, como antes).
+     - **Seleção**: o player da Netflix aplica `user-select: none` nos containers — nossa
+       barra herdava e o arraste não selecionava nada. CSS agora libera
+       `user-select: text !important` só na barra/popup/transcript. Além disso, o clique
+       que capturava a palavra atrapalhava o arraste: agora medimos o deslocamento entre
+       mousedown e mouseup (>4px = arraste, não captura) e o `mouseup` fora da linha
+       também abre o popup Explicar/Estudar.
+     - Validado em dois simuladores: (a) player com `user-select:none` — seleção liberada
+       só na barra, arrastar abre Explicar/Estudar sem capturar palavra solta, clique
+       simples captura; (b) popup com aba de ponte órfã — injetou, viu que não respondeu,
+       recarregou, injetou de novo, 2 capturas entregues e fila limpa.
+     `manifest`: 2.2.0 → **2.3.0**; `sw`: v86 → **v87** (o app ganhou `__englabReady`).
 
 ### Sessão 2026-08-04 (65ª rodada) — Fim da classe de erro: promessas no lugar de callbacks
 125. **O erro apareceu pela 3ª vez**, já com o código 2.1.2 no print. Duas conclusões:
