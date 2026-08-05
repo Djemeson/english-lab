@@ -4,7 +4,7 @@
 // Firebase e OpenAI ficam sempre na rede.
 // ================================================================
 
-const CACHE = 'englab-v89'
+const CACHE = 'englab-v90'
 // Cache separado e PERMANENTE para o ffmpeg.wasm (31 MB): não pode ser
 // apagado a cada versão do shell, senão cada deploy custaria 31 MB de novo.
 const CACHE_FFMPEG = 'englab-ffmpeg-v1'

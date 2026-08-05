@@ -41,6 +41,30 @@ let ptPend = new Set()
 let barra = null, painel = null
 let cfgUI = { ligada: true, ocultaNativa: true, pausaHover: true, pt: false, fog: true, transcript: false }
 let pausadoPorNos = false
+let tituloId = null          // id do titulo aberto (/watch/NNNN)
+
+// A Netflix e uma SPA: trocar de episodio nao recarrega a pagina. Sem
+// resetar aqui, a legenda do titulo ANTERIOR continua na memoria, se
+// mistura com a nova (a uniao de segmentos) e o resultado e legenda
+// trocada/dessincronizada — exatamente o que o Djemeson viu.
+function idDoTitulo() {
+  const m = location.pathname.match(/\/watch\/(\d+)/)
+  return m ? m[1] : null
+}
+function resetarSessao() {
+  cues = []; idxAtual = -1; ultimoTexto = ''
+  histórico = []; ptCache = new Map(); ptPend = new Set()
+  ruleIni = null; ruleCur = null
+  pausadoPorNos = false; popPausou = false; popCtx = ''
+  if (barra) {
+    const linha = barra.querySelector('#englab-line'); if (linha) linha.innerHTML = ''
+    const rule = barra.querySelector('#englab-rule')
+    if (rule) { rule.innerHTML = ''; rule.style.display = 'none'; ruleTrack = null }
+    pintarPT()
+  }
+  const pop = document.getElementById('englab-pop'); if (pop) pop.remove()
+  if (cfgUI.transcript) renderTranscript()
+}
 
 pedirExt(() => chrome.storage.local.get({ llui: null })).then(r => {
   if (r && r.llui) { cfgUI = { ...cfgUI, ...r.llui }; sincronizarBotoes(); aplicarNativa() }
@@ -73,6 +97,24 @@ window.addEventListener('message', ev => {
   // A Netflix entrega a legenda em SEGMENTOS. Substituir a lista a cada
   // chegada deixava sumir tudo o que veio antes ("secoes inteiras de fala
   // que nao aparecem") — agora e UNIAO, com dedupe por tempo+texto.
+  // Trocar o IDIOMA da legenda no mesmo titulo tambem traz cues novos: se
+  // eles ocupam os mesmos tempos com textos diferentes, e OUTRA trilha —
+  // unir misturaria dois idiomas na tela.
+  if (cues.length) {
+    let colisoes = 0, iguais = 0
+    for (const c of novos.slice(0, 60)) {
+      const ex = cues.find(x => Math.abs(x.s - c.s) < 0.25)
+      if (!ex) continue
+      colisoes++
+      if (chavePT(ex.t) === chavePT(c.t)) iguais++
+    }
+    // 2 colisões já bastam: no mesmo idioma, tempos iguais trazem texto igual —
+    // divergir aí é sinal de outra trilha (e no começo do episódio há poucas falas).
+    if (colisoes >= 2 && iguais / colisoes < 0.5) {
+      cues = []; ptCache = new Map(); ptPend = new Set(); ruleIni = null; ruleCur = null
+      avisar('legenda trocada — recomeçando')
+    }
+  }
   const antes = cues.length
   const mapa = new Map(cues.map(c => [c.s.toFixed(2) + '|' + c.t, c]))
   for (const c of novos) mapa.set(c.s.toFixed(2) + '|' + c.t, c)
@@ -327,9 +369,10 @@ function renderFala(texto) {
       linha.appendChild(s)
     } else linha.appendChild(document.createTextNode(parte))
   }
-  // A barra NAO some no silencio: sem ela nao daria para clicar em "voltar
-  // a ultima fala" justamente quando mais se precisa. So o texto fica vazio.
-  b.style.display = 'flex'
+  // A barra NAO some no silencio (senao nao daria para clicar em "voltar a
+  // ultima fala" justo quando se precisa) — mas FORA do player (menu, busca,
+  // pagina inicial) ela nao tem o que fazer.
+  b.style.display = (idDoTitulo() && vid()) ? 'flex' : 'none'
   b.classList.toggle('englab-mudo', !texto)
   pintarPT()
 }
@@ -502,6 +545,18 @@ function renderAtual() {
 }
 
 setInterval(() => {
+  // vigia a troca de episodio/filme e a saida para o menu
+  const idAgora = idDoTitulo()
+  if (idAgora !== tituloId) {
+    tituloId = idAgora
+    resetarSessao()
+    if (idAgora) avisar('novo título — legenda zerada')
+  }
+  if (!idAgora) {                       // no menu: some e nao processa nada
+    if (barra) barra.style.display = 'none'
+    document.documentElement.classList.remove('englab-hide-native')
+    return
+  }
   const v = vid(); if (!v) return
   if (cues.length) {
     const i = cueEm(v.currentTime)

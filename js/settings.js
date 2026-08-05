@@ -168,9 +168,12 @@ function selectTheme(id) {
   toast(`Tema "${THEMES.find(t => t.id === id)?.name || id}" aplicado`, 'success')
 }
 
-async // ================================================================
+// ================================================================
 // DATA MANAGEMENT
 // ================================================================
+// (havia um `async` órfão aqui, sobra de um patch antigo: como estava numa
+//  linha sozinha, o JS o lia como variável e lançava ReferenceError toda vez
+//  que este arquivo era avaliado — abortando qualquer código no fim dele.)
 function exportData() {
   // Backup COMPLETO (2026-08-01): antes só words+cfg saíam — nem o agendamento
   // SRS entrava, então "restaurar do backup" perdia todo o progresso de estudo.

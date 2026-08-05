@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Painel de tamanho fixo e régua que desliza (69ª
+> Última atualização: 2026-08-04 — **Sessão por título + REGRA DO HORIZONTE (70ª rodada)**:
+> trocar de série/filme deixava a legenda antiga na memória (legenda trocada/dessincronizada);
+> agora há reset por título, detecção de troca de idioma e a barra some fora do player. E
+> ficou valendo para sempre a regra "olhar para o horizonte". Ver seção 8 (70ª rodada).
+>
+> Anterior: 2026-08-04 — **Painel de tamanho fixo e régua que desliza (69ª
 > rodada)**: a barra parou de mudar de tamanho a cada fala (dimensionada pelo teto do padrão
 > de legendagem: 42 caracteres × 2 linhas) e a régua virou um trilho que desliza por frame.
 > Ver seção 8 (69ª rodada).
@@ -578,6 +583,36 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (70ª rodada) — Sessão por título na Netflix + a REGRA DO HORIZONTE
+130. **Bug**: sair de um título para o menu deixava o painel ativo; ao entrar em outro, a
+     legenda era a do anterior ou vinha dessincronizada. Causa: a Netflix é uma SPA — trocar
+     de episódio **não recarrega a página**, então `cues` (que são unidos por segmento)
+     acumulavam de dois títulos diferentes.
+     - **Sessão por título**: o relógio vigia `/watch/<id>`; ao mudar, `resetarSessao()`
+       limpa cues, cache PT, pendências, histórico, régua, transcript, popup e as flags de
+       pausa. Fora do player (menu/busca), a barra **some** e a legenda nativa é liberada.
+     - **Horizonte 1 — troca de IDIOMA no mesmo título**: também traz cues novos; se ocupam
+       os mesmos tempos com textos diferentes, é OUTRA trilha → substitui em vez de unir
+       (senão dois idiomas se misturam na tela). Limiar de 2 colisões com <50% de textos
+       iguais, para funcionar já no começo do episódio.
+     - **Horizonte 2 — o mesmo defeito no Lab**: trocar de vídeo na biblioteca deixaria a
+       régua deslizando com os tempos do vídeo anterior. `videoOpenPlayer` agora zera o
+       estado da régua.
+     - **Horizonte 3 — bug latente encontrado de passagem**: `js/settings.js` tinha um
+       **`async` órfão** numa linha sozinha (sobra de patch antigo). O JS o lia como
+       variável e lançava `ReferenceError` a cada avaliação do arquivo, abortando qualquer
+       código no fim dele. Removido.
+     - Validado: título 1 → menu (barra some, nativa liberada) → título 2 (zerado, sem
+       mistura); troca de idioma substitui; segmento novo une; reenvio não duplica.
+     `manifest`: 2.6.0 → **2.7.0**; `sw`: v89 → **v90**.
+131. **REGRA PERMANENTE — "olhar para o horizonte"** (pedido do Djemeson): toda
+     implementação, ajuste ou correção deve percorrer causa raiz, onde mais o padrão existe,
+     o que a mudança pode quebrar, casos vizinhos que ainda vão acontecer e o que fica melhor
+     de graça — relatando o que foi verificado além do pedido. Gravada em
+     **`~/.claude/CLAUDE.md`** (vale para todos os projetos, inclusive os que ainda serão
+     criados) e replicada nos CLAUDE.md de `english-lab-2.0` e
+     `claude-gerenciador-de-projetos`. Os projetos sem CLAUDE.md ficam cobertos pelo global.
 
 ### Sessão 2026-08-04 (69ª rodada) — Painel de tamanho fixo e régua deslizante
 129. **Dois refinamentos pedidos**:

@@ -253,6 +253,9 @@ async function videoOpenPlayer(v) {
   // salvos por versões antigas do alinhador (sem estimativa de offset).
   if (_vidCues.length && _vidCuesPT.length) { _vidAlignPTTrack(); _vidSaveSubs() }
   _vidRestaurarPT()
+  // trocar de vídeo tem de zerar a régua (senão ela desliza com os tempos
+  // do vídeo anterior — o mesmo problema que a extensão tinha na Netflix)
+  _vidRuleIni = null; _vidRuleTrack = null; _vidRuleCur = null
 
   if (_vidURL) { URL.revokeObjectURL(_vidURL); _vidURL = null }
   _vidURL = URL.createObjectURL(_vidFile)

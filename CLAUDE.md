@@ -34,3 +34,15 @@ O `ESTADO-DO-PROJETO.md` precisa estar SEMPRE atualizado — é o que garante a 
 - **Mudanças de dados/sync são de alto risco** — recomende backup (Configurações → Exportar JSON)
   antes de testar.
 - **Responda ao Djemeson em português.**
+
+
+## Olhar para o horizonte (regra permanente)
+
+Vale para tudo que for implementado, ajustado ou corrigido aqui: **nunca parar no caso que
+apareceu**. Antes de encerrar, verificar causa raiz, onde mais o mesmo padrão existe no
+projeto, o que a mudança pode quebrar (estado velho, cache, contagem dupla, dado já salvo no
+aparelho) e os casos vizinhos que ainda vão acontecer. Relatar o que foi verificado além do
+pedido e o que ficou de fora — se algo for grande demais para a rodada, vira pendência
+registrada, nunca silêncio.
+
+> A versão completa desta regra está em `~/.claude/CLAUDE.md` e vale para todos os projetos.
