@@ -21,7 +21,8 @@
 #englab-bar {
   flex-wrap: wrap;
   position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: 8.5%; z-index: 999999;
+  bottom: 9%; z-index: 999999;
+  transition: bottom .22s ease;
   display: none; align-items: center; gap: 16px;
   /* Largura FIXA: o padrao de legendagem (Netflix inclusive) e 42
      caracteres por linha, ate 2 linhas — dimensionamos por esse teto para
@@ -37,7 +38,10 @@
 }
 @keyframes englab-in { from { opacity: 0; transform: translate(-50%, 8px) } to { opacity: 1; transform: translate(-50%, 0) } }
 
-.englab-mid { flex: 1; min-width: 0; text-align: center; padding: 0 2px; }
+.englab-mid {
+  flex: 1; min-width: 0; text-align: center; padding: 0 2px;
+  display: flex; flex-direction: column; justify-content: center;
+}
 /* O player da Netflix aplica user-select:none nos containers — sem isto,
    arrastar para selecionar um trecho simplesmente nao funciona. */
 #englab-bar, .englab-line, .englab-pt, .englab-line *, #englab-pop, #englab-transcript {
@@ -45,11 +49,14 @@
 }
 .englab-line, .englab-line * { cursor: pointer; }
 .englab-line {
-  /* duas linhas reservadas: a barra nao "pula" quando a fala e curta */
-  min-height: 2.8em; display: flex; align-items: center; justify-content: center;
+  /* display BLOCK de proposito: com flex, os espacos entre as palavras
+     viram "gaps" descartados e o texto sai grudado. */
+  display: block; min-height: 2.7em;
   color: var(--ll-txt);
-  font-size: clamp(18px, 2vw, 27px); line-height: 1.4; font-weight: 500;
-  letter-spacing: .002em; text-shadow: 0 2px 8px rgba(0,0,0,.6);
+  font-size: clamp(15px, 1.55vw, 23px); line-height: 1.35; font-weight: 500;
+  letter-spacing: 0; text-shadow: 0 2px 8px rgba(0,0,0,.6);
+  overflow-wrap: break-word; word-break: normal; white-space: normal;
+  max-height: 2.8em; overflow: hidden;
 }
 .englab-w {
   cursor: pointer; border-radius: 5px; padding: 1px 2px; margin: 0 -1px;
@@ -59,8 +66,9 @@
 .englab-w.englab-ok { background: var(--ll-acc); color: #06231f; }
 
 .englab-pt {
-  display: none; margin-top: 6px; min-height: 1.4em; color: var(--ll-pt);
-  font-size: clamp(14px, 1.45vw, 19px); line-height: 1.4; font-weight: 400;
+  display: none; margin-top: 5px; min-height: 1.3em; color: var(--ll-pt);
+  font-size: clamp(13px, 1.2vw, 17px); line-height: 1.35; font-weight: 400;
+  overflow-wrap: break-word; max-height: 2.7em; overflow: hidden;
   text-shadow: 0 2px 8px rgba(0,0,0,.6);
   transition: filter .2s ease, opacity .2s ease;
 }
@@ -200,3 +208,8 @@
   background: #fff; border-radius: 1px; opacity: .9; pointer-events: none;
   box-shadow: 0 0 8px rgba(255,255,255,.5);
 }
+
+/* Controles da Netflix a mostra (mouse em movimento): a barra sobe para
+   nao cobrir a barra de progresso — sem isso nao da para avancar o video. */
+#englab-bar.englab-up { bottom: 22%; }
+#englab-pop.englab-up { bottom: calc(22% + 104px); }

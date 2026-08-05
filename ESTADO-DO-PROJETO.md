@@ -3,7 +3,11 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Capturas que sumiam no reload (71ª rodada)**: duas
+> Última atualização: 2026-08-04 — **Layout da barra: espaços, proporção e controles (72ª
+> rodada)**: as palavras saíam coladas porque a linha virou container flex (que descarta os
+> espaços); a barra também cobria a barra de progresso do player. Ver seção 8 (72ª rodada).
+>
+> Anterior: 2026-08-04 — **Capturas que sumiam no reload (71ª rodada)**: duas
 > causas — o app se anunciava pronto ANTES de carregar as palavras, e o listener não
 > sincronizava (a nuvem apagava no carregamento seguinte). Ver seção 8 (71ª rodada).
 >
@@ -587,6 +591,27 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (72ª rodada) — Layout da barra: espaços colados, proporção e controles
+133. **Cinco sintomas do Djemeson, uma causa central**: "There'sajuvenile.Whitemale" — as
+     palavras saíram **coladas**, o texto ficou desproporcional, invadiu os botões e a
+     formatação se desmontou (`8"` e `70` empilhados).
+     - **Causa raiz**: na 69ª rodada, ao reservar 2 linhas, dei `display:flex` à
+       `.englab-line`. Num container flex, cada `<span>` de palavra vira um flex item e os
+       **nós de texto com os espaços são descartados** — daí as palavras grudadas e o
+       empilhamento estranho. A linha voltou a ser `display:block` (o comentário no CSS
+       registra o porquê, para ninguém "consertar" de volta); a reserva de 2 linhas passou
+       para o `.englab-mid` (coluna flex), que não contém texto solto.
+     - **Proporção**: fonte reduzida (clamp 15→23px no EN, 13→17px no PT), `line-height`
+       mais justo, `overflow-wrap` e teto de 2 linhas com `overflow:hidden` — o texto nunca
+       mais empurra os botões.
+     - **Barra cobrindo a barra de progresso**: a extensão agora acompanha o ritmo do
+       player — ao mover o mouse (ou teclar), os controles da Netflix aparecem e a barra
+       **sobe** (9% → 22%), voltando sozinha após 3,6s de quietude. O popup de seleção
+       acompanha. Medido: sobe 94px e libera os controles.
+     - Validado com as legendas EXATAS dos prints: espaços preservados, texto dentro dos
+       limites (não invade nav nem ferramentas), tamanho estável entre falas curtas e
+       longas (1074×136). `manifest`: 2.7.0 → **2.8.0**.
 
 ### Sessão 2026-08-04 (71ª rodada) — Capturas da extensão sumiam ao recarregar o Lab
 132. **Relato**: as capturas apareciam no Revisar, mas desapareciam ao recarregar a página.

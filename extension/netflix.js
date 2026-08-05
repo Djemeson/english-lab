@@ -580,6 +580,23 @@ new MutationObserver(() => {
   deb = setTimeout(renderAtual, 40)   // reage na hora; o relogio e a rede de seguranca
 }).observe(document.body, { childList: true, subtree: true, characterData: true })
 
+// ---- a barra sai da frente dos controles do player -------------------
+// A Netflix mostra os controles ao mover o mouse e os esconde sozinha
+// depois de alguns segundos; seguimos o mesmo ritmo.
+let ctrlTimer = null
+function controlesAmostra() {
+  if (!barra) return
+  barra.classList.add('englab-up')
+  document.getElementById('englab-pop')?.classList.add('englab-up')
+  clearTimeout(ctrlTimer)
+  ctrlTimer = setTimeout(() => {
+    barra && barra.classList.remove('englab-up')
+    document.getElementById('englab-pop')?.classList.remove('englab-up')
+  }, 3600)
+}
+document.addEventListener('mousemove', controlesAmostra, { passive: true })
+document.addEventListener('keydown', controlesAmostra, { passive: true })
+
 // ---- atalhos ----
 document.addEventListener('keydown', e => {
   if (!cfgUI.ligada) return
