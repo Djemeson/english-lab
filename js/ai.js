@@ -65,7 +65,7 @@ async function wikiIlustracao(termo, idioma) {
   if (_wikiCache.has(chave)) return _wikiCache.get(chave)
 
   const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(t)}` +
-    '&redirects=1&prop=pageimages|extracts&piprop=thumbnail&pithumbsize=480' +
+    '&redirects=1&prop=pageimages|extracts&piprop=thumbnail|original&pithumbsize=480' +
     '&exintro=1&explaintext=1&exsentences=2&format=json&origin=*'
   let dados = null
   try {
@@ -87,9 +87,16 @@ async function wikiIlustracao(termo, idioma) {
     // "ducks"→"Duck" passam; "quills"→"Quill (disambiguation)" não.
     const casa = a === b || a.startsWith(b) || b.startsWith(a)
     if (!ehDesambiguacao && casa) {
+      // Versão grande para o zoom. A largura vai embutida na URL de thumb do
+      // Wikimedia, então dá para pedir maior — mas NUNCA além do arquivo
+      // original: pedir 1280 de uma imagem de 620 devolve upscale borrado.
+      // E derivar um thumb em vez de usar o `original` evita baixar os 20 MB
+      // que algumas fotos da Commons têm.
+      const larg = Math.min(1280, (p.original && p.original.width) || 1280)
       out = {
         titulo: p.title,
         img: p.thumbnail.source,
+        zoom: p.thumbnail.source.replace(/\/(\d+)px-/, '/' + larg + 'px-'),
         extrato: ext.slice(0, 300),
         url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(String(p.title).replace(/ /g, '_'))}`
       }
@@ -100,15 +107,71 @@ async function wikiIlustracao(termo, idioma) {
 }
 
 // Markup compartilhado (leitor e Revisar usam o mesmo) — sem estado, só HTML.
+// A MINIATURA abre o zoom (é o que a mão quer fazer ao ver uma foto pequena);
+// o link para o verbete foi para o título, embaixo, que é onde se procura
+// "quero ler mais". Antes a imagem levava para fora do app no primeiro clique.
 function wikiFiguraHTML(info) {
   if (!info) return ''
   return `<figure class="ll-wiki-fig">
-    <a href="${escA(info.url)}" target="_blank" rel="noopener noreferrer" title="Abrir na Wikipédia">
+    <button type="button" class="ll-wiki-zoom" title="Ampliar"
+      data-zoom="${escA(info.zoom || info.img)}" data-mini="${escA(info.img)}"
+      data-titulo="${escA(info.titulo)}" data-fonte="${escA(info.url)}">
       <img src="${escA(info.img)}" alt="${escA(info.titulo)}" decoding="async" referrerpolicy="no-referrer">
-    </a>
-    <figcaption>${esc(info.titulo)}<i>Wikipédia</i></figcaption>
+    </button>
+    <figcaption>
+      <a href="${escA(info.url)}" target="_blank" rel="noopener noreferrer">${esc(info.titulo)}</a>
+      <i>Wikipédia</i>
+    </figcaption>
   </figure>`
 }
+
+// ---------------------------------------------------------------
+// Lupa da figura — vale para qualquer tela que use wikiFiguraHTML
+// ---------------------------------------------------------------
+// Delegação num ouvinte só: o HTML da figura é injetado em popups diferentes
+// (leitor, Revisar) que nascem e morrem o tempo todo; ligar handler em cada
+// um seria ouvinte órfão garantido.
+function llZoomFechar() {
+  const z = document.getElementById('ll-zoom')
+  if (z) z.remove()
+}
+
+function llZoomAbrir(botao) {
+  llZoomFechar()
+  const grande = botao.dataset.zoom
+  const mini = botao.dataset.mini
+  const z = document.createElement('div')
+  z.id = 'll-zoom'
+  z.innerHTML = `
+    <button type="button" class="ll-zoom-x" aria-label="Fechar">${ic('x')}</button>
+    <img src="${escA(grande)}" alt="${escA(botao.dataset.titulo)}" referrerpolicy="no-referrer">
+    <div class="ll-zoom-pe">
+      <b>${esc(botao.dataset.titulo)}</b>
+      <a href="${escA(botao.dataset.fonte)}" target="_blank" rel="noopener noreferrer">ver na Wikipédia</a>
+    </div>`
+  // A versão grande é derivada da URL: se o Wikimedia não servir aquele
+  // tamanho, cai na miniatura em vez de mostrar imagem quebrada.
+  const img = z.querySelector('img')
+  img.onerror = () => { if (img.src !== mini) img.src = mini }
+  // No leitor, o popup morre quando a seleção some. `preventDefault` no
+  // mousedown mantém a seleção viva enquanto a lupa está aberta.
+  z.addEventListener('mousedown', e => e.preventDefault())
+  z.addEventListener('click', e => { if (!e.target.closest('a')) llZoomFechar() })
+  document.body.appendChild(z)
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.ll-wiki-zoom')
+  if (!b) return
+  e.preventDefault(); e.stopPropagation()
+  llZoomAbrir(b)
+})
+// Captura: o Esc precisa fechar a LUPA antes de o leitor fechar o popup dele.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !document.getElementById('ll-zoom')) return
+  e.stopPropagation()
+  llZoomFechar()
+}, true)
 
 // ================================================================
 // GATEWAY DE IA — todas as chamadas à OpenAI passam por aqui.

@@ -865,6 +865,31 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      - `CACHE` do `sw.js` bumpado de novo (v94 → **v95**): `ai.js` é do shell e ganhou símbolos
        que `ler.js` e `review.js` passaram a usar.
 
+159. **Lupa na figura** (pedido logo depois: "quero que ao clicar na imagem seja dado zoom").
+     - **A miniatura virou o gatilho do zoom** e o link do verbete desceu para o título. Antes a
+       imagem levava para fora do app no primeiro clique — mas a mão, ao ver uma foto pequena,
+       quer AMPLIAR; "quero ler mais" é o que se procura no título embaixo.
+     - **Sem upscale**: a largura vai embutida na URL de thumb do Wikimedia, então dá para pedir
+       maior — mas pedir 1280px de uma imagem de 620 devolve borrão esticado. O tamanho é
+       `min(1280, largura do arquivo original)`, obtido com `piprop=thumbnail|original`. E
+       deriva-se um thumb em vez de usar o `original` porque foto da Commons chega a ter 20 MB.
+       Se o Wikimedia não servir aquele tamanho, cai na miniatura (`onerror`), nunca em imagem
+       quebrada.
+     - **Um ouvinte só, delegado no documento**: o HTML da figura é injetado em popups que
+       nascem e morrem o tempo todo (leitor, Revisar) — ligar handler em cada um seria ouvinte
+       órfão garantido.
+     - **Dois detalhes de convivência**: `preventDefault` no `mousedown` da lupa (senão a
+       seleção morria e o popup do leitor fechava atrás dela), e o `Escape` capturado na fase de
+       CAPTURA com `stopPropagation`, para fechar a lupa ANTES de o leitor fechar o próprio
+       popup. Testado: Esc fecha a lupa e o popup continua vivo.
+     - **Armadilha de CSS que apareceu no teste**: `#ler-pop button` tem especificidade de ID
+       (1,0,1) e vencia `.ll-wiki-fig .ll-wiki-zoom` (0,2,0) — a foto voltava a ser um botão em
+       formato de pílula, com padding, fundo e o cursor errado. Corrigido com seletores de
+       mesma força para cada contexto.
+     - Validado no desktop e a 375×812: imagem de 1280px nativos exibida a 503×688 (desktop) e
+       352×482 (celular), sempre dentro da tela; botão de fechar de 40px respeitando a área
+       segura. `CACHE` do `sw.js` → **v96**.
+
 157. **Busca de imagem no menu de seleção** (pedido junto): quarto botão da fileira de baixo,
      abrindo a aba de imagens do Google no idioma do livro (`tbm=isch&hl=…`). É o complemento
      natural da Wikipédia: para objeto, planta, roupa, arma ou bicho, a foto ensina o que a

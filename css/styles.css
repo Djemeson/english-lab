@@ -4577,3 +4577,55 @@ mark.ler-w{
   .ll-wiki-fig{width:84px;margin-right:9px}
   .ll-wiki-fig img{height:64px}
 }
+
+/* ---- miniatura clicavel (a lupa) ---- */
+/* Especificidade de ID de proposito: `#ler-pop button` (id, (1,0,1)) vencia
+   `.ll-wiki-fig .ll-wiki-zoom` ((0,2,0)) e devolvia o botao ao formato de
+   pilula — com padding, fundo e o cursor errado em cima da foto. */
+.ll-wiki-fig .ll-wiki-zoom,
+#ler-pop .ll-wiki-fig .ll-wiki-zoom,
+.sel-pop-exp .ll-wiki-fig .ll-wiki-zoom{
+  display:block;padding:0;line-height:0;cursor:zoom-in;
+  border:1px solid var(--border);border-radius:var(--radius-xs);
+  overflow:hidden;background:var(--surface2);width:100%;min-height:0;
+  font:inherit;color:inherit;
+}
+.ll-wiki-fig .ll-wiki-zoom:hover,
+#ler-pop .ll-wiki-fig .ll-wiki-zoom:hover{border-color:var(--primary);background:var(--surface2)}
+.ll-wiki-fig figcaption a{color:inherit;text-decoration:none}
+.ll-wiki-fig figcaption a:hover{color:var(--primary);text-decoration:underline}
+
+/* ---- lupa em tela cheia ---- */
+#ll-zoom{
+  position:fixed;inset:0;z-index:900;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:rgba(8,10,14,.92);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  padding:32px 20px calc(24px + env(safe-area-inset-bottom,0));
+  cursor:zoom-out;animation:llZoomEntra .16s ease-out;
+}
+@keyframes llZoomEntra{from{opacity:0}to{opacity:1}}
+#ll-zoom img{
+  max-width:min(1100px,94vw);max-height:80vh;max-height:80dvh;
+  object-fit:contain;border-radius:var(--radius-sm);
+  box-shadow:0 24px 60px rgba(0,0,0,.6);background:#fff;
+}
+#ll-zoom .ll-zoom-pe{
+  display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;justify-content:center;
+  color:#e8ecf2;font-size:var(--fs-sm);text-align:center;
+}
+#ll-zoom .ll-zoom-pe b{font-weight:600}
+#ll-zoom .ll-zoom-pe a{color:#7fd8c9;text-decoration:underline;font-size:var(--fs-xs);cursor:pointer}
+#ll-zoom .ll-zoom-x{
+  position:absolute;top:14px;right:16px;
+  width:40px;height:40px;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.12);border:0;color:#fff;
+}
+#ll-zoom .ll-zoom-x:hover{background:rgba(255,255,255,.24)}
+#ll-zoom .ll-zoom-x svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2}
+
+@media (max-width:768px){
+  #ll-zoom{padding:56px 12px calc(20px + env(safe-area-inset-bottom,0))}
+  #ll-zoom img{max-height:72vh;max-height:72dvh}
+  #ll-zoom .ll-zoom-x{top:calc(10px + env(safe-area-inset-top,0));right:10px}
+}
