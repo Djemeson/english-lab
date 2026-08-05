@@ -285,6 +285,8 @@ async function videoOpenPlayer(v) {
           <button class="vid-skipbtn vid-cuebtn left" onclick="videoCueNav(-1)" data-tip="Fala anterior (←) — de novo no meio de uma fala volta ao início dela">‹‹</button>
           <button class="vid-skipbtn vid-cuebtn right" onclick="videoCueNav(1)" data-tip="Próxima fala (→)">››</button>
         </div>
+        <div class="vid-rule hidden" id="vid-rule" onclick="videoRuleClick(event)"
+          data-tip="Régua de falas: cada bloco é uma fala e o vão é silêncio. Clique para ir até lá."></div>
         <div id="vid-audiofix-banner"></div>
         <div id="vid-sync-panel" class="hidden"></div>
         <div class="vid-toolbar">
@@ -425,9 +427,43 @@ function _vidOnTime() {
     }
     // Tradução simultânea via IA: garante a fala atual + as 3 próximas
     if (_vidPTmode === 'ia') _vidEnsurePTAhead(t)
+  _vidRenderRule(t)
   }
   _vidUpdateOverlay()
 }
+
+// ---- RÉGUA DE FALAS ------------------------------------------------
+// Cada bloco é uma fala; a largura acompanha a duração e os vãos são o
+// silêncio. Janela deslizante centrada no instante atual; clicar leva lá.
+const VID_RULE_JANELA = 60
+let _vidRuleUlt = -1
+function _vidRenderRule(t) {
+  const el = el2('vid-rule'); if (!el) return
+  if (!_vidCues.length) { el.classList.add('hidden'); return }
+  el.classList.remove('hidden')
+  if (Math.abs(t - _vidRuleUlt) < 0.25) return      // não repinta a cada tick
+  _vidRuleUlt = t
+  const t0 = t - VID_RULE_JANELA / 2
+  const pct = x => ((x - t0) / VID_RULE_JANELA) * 100
+  let html = ''
+  for (const c of _vidCues) {
+    if (c.e < t0) continue
+    if (c.s > t0 + VID_RULE_JANELA) break
+    const ini = Math.max(pct(c.s), 0), fim = Math.min(pct(c.e), 100)
+    const atual = t >= c.s - 0.25 && t <= c.e + 0.25
+    html += `<i class="vid-rb${atual ? ' cur' : ''}" style="left:${ini}%;width:${Math.max(fim - ini, 0.6)}%"
+      data-t="${c.s}" data-tip="${escA(String(c.t).slice(0, 90))}"></i>`
+  }
+  html += '<b class="vid-rnow"></b>'
+  el.innerHTML = html
+}
+function videoRuleClick(ev) {
+  const b = ev.target.closest('.vid-rb'); if (!b) return
+  const p = el2('vid-player'); if (!p) return
+  p.currentTime = Math.max(0, parseFloat(b.dataset.t) - 0.15)
+  p.play()
+}
+const el2 = id => document.getElementById(id)
 
 // Legenda em tempo real sobre o vídeo (EN + PT quando ligado)
 function _vidUpdateOverlay() {

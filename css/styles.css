@@ -4036,3 +4036,24 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .kn-empty{padding:44px 20px;text-align:center;color:var(--text3)}
 .kn-empty p{margin-top:10px;font-size:var(--fs-sm)}
 .kn-empty-sub{font-size:var(--fs-xs);max-width:440px;margin:6px auto 0}
+
+/* ================================================================
+   RÉGUA DE FALAS (vídeo) — cada bloco é uma fala, o vão é silêncio.
+   Mesma linguagem da extensão; clicar leva ao instante da fala.
+   ================================================================ */
+.vid-rule{
+  position:relative;width:100%;height:16px;margin:8px 0 4px;cursor:pointer;
+  border-radius:var(--radius-xs);background:var(--surface2);
+}
+.vid-rule.hidden{display:none}
+.vid-rb{
+  position:absolute;top:5px;height:6px;border-radius:3px;
+  background:rgba(var(--primary-rgb),.32);
+  transition:background-color .12s,height .12s,top .12s;
+}
+.vid-rb:hover{background:rgba(var(--primary-rgb),.6);height:9px;top:3.5px}
+.vid-rb.cur{background:var(--primary);height:10px;top:3px}
+.vid-rnow{
+  position:absolute;left:50%;top:1px;width:2px;height:14px;
+  background:var(--text);border-radius:1px;opacity:.7;pointer-events:none;
+}

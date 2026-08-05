@@ -19,6 +19,7 @@
 
 /* ---------------- barra ---------------- */
 #englab-bar {
+  flex-wrap: wrap;
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: 8.5%; z-index: 999999;
   display: none; align-items: center; gap: 16px;
@@ -167,3 +168,20 @@
   opacity: 0; pointer-events: none; transition: opacity .22s, transform .22s;
 }
 #englab-toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------------- régua de falas ---------------- */
+#englab-bar.englab-mudo .englab-line::after { content: '\00a0'; }
+.englab-rule {
+  position: relative; width: 100%; height: 14px; margin-top: 10px;
+  border-top: 1px solid var(--ll-line); padding-top: 8px; cursor: pointer;
+}
+.englab-rb {
+  position: absolute; top: 8px; height: 6px; border-radius: 3px;
+  background: rgba(255,255,255,.26); transition: background-color .12s, height .12s, top .12s;
+}
+.englab-rb:hover { background: rgba(255,255,255,.5); height: 8px; top: 7px; }
+.englab-rb.cur { background: var(--ll-acc); height: 9px; top: 6px; }
+.englab-rnow {
+  position: absolute; left: 50%; top: 4px; width: 2px; height: 13px;
+  background: #fff; border-radius: 1px; opacity: .85; pointer-events: none;
+}

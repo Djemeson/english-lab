@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Extensão v2.4.0: contexto congelado e legenda PT que
+> Última atualização: 2026-08-04 — **Régua de falas + PT em sincronia (68ª rodada)**: barra
+> não some mais no silêncio, a fala exibida passou a vir do MESMO cue que é traduzido (fim
+> do PT atrasado) e nasceu a régua de falas — na extensão E no vídeo do Lab.
+> Ver seção 8 (68ª rodada).
+>
+> Anterior: 2026-08-04 — **Extensão v2.4.0: contexto congelado e legenda PT que
 > aparece (67ª rodada)**: a frase de origem vinha errada (o vídeo voltava a rodar enquanto o
 > mouse ia ao botão) e a tradução quase nunca aparecia (o cache era indexado pelo texto CRU,
 > que não bate entre tela e arquivo). Ver seção 8 (67ª rodada).
@@ -568,6 +573,28 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (68ª rodada) — Régua de falas, barra persistente e PT em sincronia
+128. **Três pedidos**, com um diagnóstico fino do Djemeson ("a legenda original está aqui e
+     vai pra acolá, mas a tradução ainda está aqui"):
+     - **Barra some no silêncio**: sem ela não dava para clicar em "voltar a última fala"
+       justamente quando se precisa. Agora a barra fica SEMPRE visível (classe
+       `englab-mudo`); só o texto fica vazio, e a navegação continua acessível.
+     - **PT correndo atrás**: causa real — traduzíamos pelo ARQUIVO e exibíamos pelo DOM;
+       quando os textos divergiam, o fallback mostrava a tradução da fala VIZINHA. Agora,
+       quando o arquivo cobre o instante, a fala exibida vem do MESMO cue que foi traduzido
+       (EN e PT trocam juntos); o DOM só entra no silêncio do arquivo ou quando não há
+       arquivo. O fallback por índice ficou restrito ao caso em que o texto exibido é
+       comprovadamente o do cue corrente.
+     - **RÉGUA DE FALAS** (ideia do Djemeson, com print de referência): faixa onde cada
+       bloco é uma fala, largura proporcional à duração e vão = silêncio; janela deslizante
+       de 60s centrada no agora, fala corrente destacada, marcador do instante e clique que
+       leva ao início daquela fala. Implementada na **extensão** (`.englab-rule`) e no
+       **vídeo do Lab** (`.vid-rule`, sob o player), com a mesma linguagem visual.
+     - Validado no simulador: 4 falas com silêncio → larguras proporcionais (3s→5%,
+       5s→8,33%), bloco atual destacado, marcador presente; no silêncio a barra continua e
+       o "fala anterior" funciona; EN e PT trocam juntos em 11s/15s/27s; clique na régua
+       levou a 30,85s (fala de 31s). `manifest`: 2.4.0 → **2.5.0**; `sw`: v87 → **v88**.
 
 ### Sessão 2026-08-04 (67ª rodada) — Contexto errado na captura e legenda PT que não aparecia
 127. **Dois relatos, ambos com diagnóstico certeiro do Djemeson**:

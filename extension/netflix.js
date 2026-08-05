@@ -91,9 +91,10 @@ function ptDe(texto) {
   if (!texto) return ''
   const direto = ptCache.get(chavePT(texto))
   if (direto) return direto
-  if (idxAtual >= 0 && cues[idxAtual]) {
-    const porCue = ptCache.get(chavePT(cues[idxAtual].t))
-    if (porCue) return porCue
+  // Fallback SO se o texto exibido for mesmo o do cue corrente — senao
+  // mostrariamos a traducao de outra fala (o "PT correndo atras").
+  if (idxAtual >= 0 && cues[idxAtual] && chavePT(cues[idxAtual].t) === chavePT(texto)) {
+    return ptCache.get(chavePT(cues[idxAtual].t)) || ''
   }
   return ''
 }
@@ -241,7 +242,8 @@ function garantirBarra() {
       <button data-a="tr"   title="Transcript do episódio (T)">${IC.tr}</button>
       <button data-a="cc"   title="Mostrar/esconder a legenda original">${IC.cc}</button>
       <button data-a="hide" title="Esconder a barra">${IC.hide}</button>
-    </div>`
+    </div>
+    <div class="englab-rule" id="englab-rule" title="Régua de falas: cada bloco é uma fala, o vão é silêncio. Clique para ir até lá."></div>`
   document.body.appendChild(barra)
 
   barra.addEventListener('click', e => {
@@ -267,6 +269,10 @@ function garantirBarra() {
     if (pausadoPorNos) { tocar(); pausadoPorNos = false }
   })
   // seleção de trecho → Explicar / Estudar (o popup do app)
+  barra.querySelector('#englab-rule').addEventListener('click', ev => {
+    const b = ev.target.closest('.englab-rb')
+    if (b) { ev.stopPropagation(); seek(parseFloat(b.dataset.t) - 0.15) }
+  })
   barra.querySelector('#englab-line').addEventListener('mouseup', () => setTimeout(mostrarPopupSel, 10))
   // arraste que termina fora da linha (acontece muito) também conta
   document.addEventListener('mouseup', ev => {
@@ -319,7 +325,10 @@ function renderFala(texto) {
       linha.appendChild(s)
     } else linha.appendChild(document.createTextNode(parte))
   }
-  b.style.display = texto ? 'flex' : 'none'
+  // A barra NAO some no silencio: sem ela nao daria para clicar em "voltar
+  // a ultima fala" justamente quando mais se precisa. So o texto fica vazio.
+  b.style.display = 'flex'
+  b.classList.toggle('englab-mudo', !texto)
   pintarPT()
 }
 
@@ -369,6 +378,33 @@ document.addEventListener('mousedown', e => {
   if (pop && !pop.contains(e.target) && !e.target.closest('#englab-line')) fecharPopupSel()
 })
 
+// ---- RÉGUA DE FALAS ------------------------------------------------
+// Cada bloco é uma fala; a largura acompanha a duração e os vãos são o
+// silêncio. Janela deslizante centrada no instante atual; clicar leva lá.
+const RULE_JANELA = 60      // segundos visíveis (30 para trás, 30 para frente)
+let ruleUlt = -1
+function renderRegua(t) {
+  const el = barra && barra.querySelector('#englab-rule')
+  if (!el) return
+  if (!cues.length) { el.style.display = 'none'; return }
+  el.style.display = 'block'
+  if (Math.abs(t - ruleUlt) < 0.25) return       // evita repintar a 120ms
+  ruleUlt = t
+  const t0 = t - RULE_JANELA / 2, t1 = t + RULE_JANELA / 2
+  const pct = x => ((x - t0) / RULE_JANELA) * 100
+  let html = ''
+  for (const c of cues) {
+    if (c.e < t0) continue
+    if (c.s > t1) break
+    const ini = Math.max(pct(c.s), 0), fim = Math.min(pct(c.e), 100)
+    const atual = t >= c.s - 0.25 && t <= c.e + 0.25
+    html += `<i class="englab-rb${atual ? ' cur' : ''}" style="left:${ini}%;width:${Math.max(fim - ini, 0.6)}%"
+      data-t="${c.s}" title="${escapar(c.t).slice(0, 90)}"></i>`
+  }
+  html += '<b class="englab-rnow"></b>'
+  el.innerHTML = html
+}
+
 // ---- transcript do episódio ----
 function renderTranscript() {
   if (!cfgUI.transcript) { painel?.remove(); painel = null; return }
@@ -415,11 +451,14 @@ const escapar = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').repl
 function renderAtual() {
   const v = vid()
   const doDOM = textoDOM()
-  let t = doDOM
-  if (!t && cues.length && v) {
+  let t = ''
+  if (cues.length && v) {
+    // O ARQUIVO manda quando cobre o instante: assim a fala exibida e a
+    // traduzida sao a MESMA (fim do descompasso EN x PT).
     const i = cueEm(v.currentTime)
     t = i >= 0 ? cues[i].t : ''
   }
+  if (!t) t = doDOM        // silencio no arquivo (ou sem arquivo): usa a tela
   if (t === ultimoTexto) return
   ultimoTexto = t
   if (t && v) {
@@ -438,6 +477,7 @@ setInterval(() => {
     const i = cueEm(v.currentTime)
     if (i !== idxAtual) { idxAtual = i; if (cfgUI.transcript) renderTranscript() }
     if (cfgUI.pt) traduzirJanela(v.currentTime)
+    renderRegua(v.currentTime)
   }
   renderAtual()
 }, 120)
@@ -473,7 +513,7 @@ document.addEventListener('keydown', e => {
 try { chrome.runtime.onMessage.addListener(msg => {
   if (msg && msg.type === 'englab-religar') {
     cfgUI.ligada = true; salvarUI()
-    if (barra) barra.style.display = ultimoTexto ? 'flex' : 'none'
+    if (barra) barra.style.display = 'flex'
     aplicarNativa()
   }
 }) } catch (e) { morrer() }
