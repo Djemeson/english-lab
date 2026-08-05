@@ -1,15 +1,35 @@
 // ================================================================
 // PONTE — roda DENTRO do Language Lab (Pages/Vercel/localhost).
-// Entrega as capturas pendentes da Netflix ao app via postMessage;
-// o app confirma (ack) e a fila é limpa. Sem chaves, sem rede própria.
+// Dois sentidos:
+//   ← entrega as capturas da Netflix ao app (viram itens do Revisar);
+//   → espelha a config de IA do app para a extensão, para a barra da
+//     Netflix poder traduzir e explicar SEM você digitar chave nenhuma
+//     lá (quem chama a API é o service worker da extensão).
 // ================================================================
 'use strict'
 
-function entregar() {
+function entregarCapturas() {
   chrome.storage.local.get({ pend: [] }, ({ pend }) => {
     if (!pend.length) return
     window.postMessage({ type: 'englab-ext-captures', items: pend }, location.origin)
   })
+}
+
+// A config vive no localStorage do app (mesma origem) — só os campos que
+// a extensão precisa; nada é enviado para fora da máquina.
+function espelharConfig() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('englab_cfg') || '{}')
+    const llcfg = {
+      aiProvider: cfg.aiProvider || 'openai',
+      aiModelProv: cfg.aiModelProv || {},
+      openaiKey: cfg.openaiKey || '',
+      deepseekKey: cfg.deepseekKey || '',
+      geminiKey: cfg.geminiKey || '',
+      groqKey: cfg.groqKey || ''
+    }
+    chrome.storage.local.set({ llcfg })
+  } catch (e) {}
 }
 
 window.addEventListener('message', ev => {
@@ -17,10 +37,9 @@ window.addEventListener('message', ev => {
   chrome.storage.local.set({ pend: [] })
 })
 
-// na abertura, quando a aba volta ao foco, e quando nova captura chega
-// com o app já aberto
-setTimeout(entregar, 1500)
+function ciclo() { entregarCapturas(); espelharConfig() }
+setTimeout(ciclo, 1500)
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') setTimeout(entregar, 500)
+  if (document.visibilityState === 'visible') setTimeout(ciclo, 500)
 })
-chrome.storage.onChanged.addListener(ch => { if (ch.pend) entregar() })
+chrome.storage.onChanged.addListener(ch => { if (ch.pend) entregarCapturas() })

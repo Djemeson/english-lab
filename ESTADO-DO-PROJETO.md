@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Extensão para a Netflix (60ª rodada)**: pasta
+> Última atualização: 2026-08-04 — **Extensão v2: o módulo Vídeo dentro da Netflix (61ª
+> rodada)**: intercepta o TTML do player (tempos reais) e ganha tradução IA com névoa,
+> navegação por fala, Explicar/Estudar na seleção, transcript clicável e atalhos.
+> Ver seção 8 (61ª rodada).
+>
+> Anterior: 2026-08-04 — **Extensão para a Netflix (60ª rodada)**: pasta
 > /extension (Manifest V3) com legendas clicáveis no player da Netflix (técnica Language
 > Reactor), capturas em chrome.storage e ponte que as entrega no Revisar quando o app abre
 > — sem chave de API na extensão. Ver seção 8 (60ª rodada).
@@ -535,7 +540,28 @@ maxInterval (36500), leechThreshold (50)
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
 
-### Sessão 2026-08-04 (60ª rodada) — Extensão do Chrome para a Netflix
+### Sessão 2026-08-04 (61ª rodada) — Extensão v2: as funções do módulo Vídeo dentro da Netflix
+121. **Pedido**: "quero que a extensão tenha as mesmas funcionalidades do vídeo no site".
+     A peça que destravou tudo: **interceptar o arquivo de legendas** (o DOM só entrega a
+     fala do instante; o arquivo entrega o episódio inteiro com tempos).
+     - **inject.js** (`world: MAIN`, document_start): hooka XHR e fetch, pega o TTML/DFXP
+       que o player baixa, converte ticks→segundos (`ttp:tickRate`) e HH:MM:SS.mmm, achata
+       `<span>`, e manda os cues ao content script. Também executa seek a pedido.
+     - **background.js** (service worker): ÚNICO que fala com as APIs de IA — evita CORS da
+       origem netflix.com e mantém chave fora da página. Traduz em lote (mesma âncora
+       anti-literal do app) e explica seleção. Fornecedor/modelo/chave vêm espelhados.
+     - **bridge.js** ganhou o 2º sentido: espelha `englab_cfg` (provedor + chaves) para
+       `chrome.storage` quando o app abre — o Djemeson não digita chave na extensão.
+     - **netflix.js** reescrito: barra com fala clicável + linha PT (com **névoa**),
+       navegação **‹‹ ↺ ››** por GRUPO de falas (mesma regra do app: frase quebrada em
+       várias legendas não parte no meio), popup de seleção com **Explicar** (pausa o
+       vídeo, mesma proteção anti-colapso) e **Estudar**, **transcript** lateral clicável
+       com busca e destaque da fala atual, atalhos `←/→/R/P/T`, e fallback pelo DOM
+       (histórico de falas) quando o TTML não é capturado.
+     - **Validado ao vivo** (lógica pura, sem Netflix): TTML real com namespaces → 5 cues,
+       ticks 100000000t→10s, `<span>` achatado, HH:MM:SS.mmm=12.5s, lixo → null sem
+       quebrar; agrupamento de frase partida `[0,0,2,3,3]`. **O player em si segue não
+       testável daqui** (DRM/login) — teste real é do Djemeson.
 120. **Pedido**: "crie a extensão pra usarmos na minha conta da netflix" (aprovando a
      análise da 58ª). Pasta **`/extension`** (Manifest V3, sem build):
      - **netflix.js**: MutationObserver no `.player-timedtext` (as legendas que a Netflix

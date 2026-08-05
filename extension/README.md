@@ -17,6 +17,24 @@ no armazenamento local do Chrome até você abrir o app.
    `Claude Cowork/Claude Code/english-lab-2.0/extension`
 4. Pronto. Abra um episódio na Netflix com legenda em inglês.
 
+## O que ela faz (o módulo Vídeo do app, dentro da Netflix)
+
+| No player | Como |
+|---|---|
+| Legenda com palavras clicáveis | clique numa palavra → captura |
+| Frase inteira | botão **+** |
+| Explicar / Estudar um trecho | **selecione** com o mouse na legenda |
+| Tradução PT-BR pela IA | botão **PT** (tecla `P`) |
+| Névoa na tradução | botão **◐** (borrada até passar o mouse) |
+| Fala anterior / repetir / próxima | **‹‹ ↺ ››** (teclas `←` `R` `→`) |
+| Transcript do episódio, clicável e com busca | botão **≡** (tecla `T`) |
+| Esconder a legenda original | botão **cc** |
+
+A tradução e o Explicar usam a **sua** chave de IA — espelhada automaticamente
+do Language Lab na primeira vez que você abre o app com a extensão instalada.
+Nenhuma chave é digitada aqui, e as chamadas saem do service worker da extensão
+(nunca da página da Netflix).
+
 ## Usar
 
 - A barra do Language Lab aparece sobre o player, com a fala atual.
