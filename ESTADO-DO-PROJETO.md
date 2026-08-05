@@ -782,6 +782,40 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        200 caracteres no Kindle Cloud Reader — mesma correção aplicada lá, incluindo o botão
        que vira "Salvar frase" e manda o trecho como contexto.
 
+155. **LEXA — a IA ganhou uma pessoa só, e o menu ganhou Wikipédia e web**. Pedido do Djemeson:
+     "quero que a personalidade da IA esteja aqui também; ela deve ser uma figura feminina e
+     deve se chamar Lexa. Jovial, inteligente, paraense, humorada, mas no tom certo, quase
+     imperceptível."
+     - **A persona mora em `js/ai.js`** (`lexaSistema()` / `lexaExplicar()`), arquivo não-lazy,
+       porque quem explica algo ao aluno está espalhado por CINCO lugares: Assistente, Revisar,
+       legenda do vídeo, leitor de ebooks e o service worker da extensão. Havia um **"Lex"**
+       (masculino) escrito à mão só no `consulta.js` e quatro cópias de "Tutor de inglês de um
+       brasileiro" nos outros — personalidade escrita em cinco lugares vira cinco pessoas.
+       Agora é uma função só; o único duplicado inevitável é o da extensão (o service worker
+       não enxerga o código do app), e ele está marcado como cópia no comentário.
+     - **O truque do prompt** está em "quase imperceptível": o texto gasta mais palavras
+       PROIBINDO caricatura do que descrevendo a persona. Se você disser a um modelo barato só
+       "paraense e bem-humorada", ele devolve "égua, maninho!" em toda resposta. Então: ser
+       paraense é JEITO (acolhedora, sem cerimônia, resolve rápido), nunca vocabulário — com
+       lista explícita de expressões proibidas —, humor em "dose homeopática, no máximo uma
+       piscadela por resposta, e só quando cabe sozinha", sem emoji, sem se apresentar, sem
+       "Claro!" nem "Ótima pergunta".
+     - **Só as saídas conversacionais receberam a persona.** Os prompts que produzem JSON
+       (análise de card, triagem, tradução em lote) ficaram intactos de propósito: persona em
+       prompt estruturado é convite a poluir a saída.
+     - **Wikipédia e web no menu de seleção**: segunda fileira do popup, com Ouvir · Wikipédia ·
+       Web. É o que a IA NÃO resolve bem — nome de lugar, batalha, arma, marca ou pessoa real
+       pede FONTE, não paráfrase — e sai de graça, sem gastar token. A Wikipédia é buscada no
+       **idioma do livro** (quem lê em inglês procura "Minie ball", não "bala Minié"). Abre em
+       outra aba com `noopener,noreferrer`; a leitura e a posição ficam intactas.
+     - **Um risco de deploy apareceu no teste e foi corrigido**: `js/ai.js` é do SHELL
+       (cache-first) e `js/ler.js` é lazy (network-first) — numa visita logo depois do deploy o
+       leitor novo pode chegar antes da Lexa e estourar `LEXA_NOME is not defined`. Duas
+       defesas: o `CACHE` do `sw.js` foi bumpado (v93 → **v94**, o que faz o `activate` apagar
+       o cache velho) e o `ler.js` nunca fala direto com o símbolo de lá — usa `lexaNome()` e
+       `lexaPrompt()`, com texto de reserva. Vale a regra para o futuro: **símbolo novo num
+       arquivo do shell usado por outro arquivo = bump obrigatório do CACHE**.
+
 ### Sessão 2026-08-05 (77ª rodada) — A PONTE COM O KINDLE
 
 **Pedido do Djemeson**: "é possível fazer uma ponte entre o Kindle e o nosso projeto? a cada

@@ -4519,3 +4519,28 @@ mark.ler-w{
   .ler-seta{display:none}
   mark.ler-w{border-bottom-width:2px}
 }
+
+/* Segunda fileira do popup de selecao: acoes que NAO custam token nem
+   mudam o vocabulario (ouvir, Wikipedia, web). Ficam visualmente abaixo
+   das duas principais para a decisao continuar sendo "explicar ou estudar". */
+.ler-pop-extras{
+  display:flex;align-items:center;gap:6px;margin-top:6px;
+  padding-top:6px;border-top:1px solid var(--border);
+}
+#ler-pop .ler-pop-extras button{
+  flex:1;justify-content:center;
+  background:transparent;border-color:transparent;color:var(--text3);
+  font-size:var(--fs-3xs);padding:5px 8px;
+}
+#ler-pop .ler-pop-extras button:hover{
+  background:var(--surface2);border-color:var(--border);color:var(--text);
+}
+#ler-pop .ler-pop-extras svg{width:13px;height:13px;flex-shrink:0}
+
+@media (max-width:768px){
+  .ler-pop-extras{gap:8px;margin-top:8px;padding-top:8px}
+  #ler-pop .ler-pop-extras button{
+    min-height:40px;font-size:var(--fs-xs);
+    background:var(--surface2);border-color:var(--border);
+  }
+}

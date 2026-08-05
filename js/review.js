@@ -1077,7 +1077,7 @@ async function revSelExplain() {
   corpo.innerHTML = '<span class="gen-spinner"></span> a IA está explicando...'
   try {
     const resp = await aiTextSeguro([
-      { role: 'system', content: 'Tutor de inglês de um brasileiro. Responda em PT-BR, direto ao ponto, 2 a 4 frases, sem introduções nem rodeios.' },
+      { role: 'system', content: lexaExplicar() },
       { role: 'user', content:
 `No item de estudo "${w ? w.word : ''}" (contexto: "${window._revSelCtx || (w && w.context) || ''}"), o aluno selecionou: "${txt}".
 Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado nesta expressão, explique a imagem.` }

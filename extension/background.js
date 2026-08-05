@@ -53,6 +53,25 @@ async function chamar(messages, maxTokens = 300) {
   } finally { clearTimeout(timer) }
 }
 
+// A MESMA Lexa do app (js/ai.js → lexaSistema). Aqui é uma cópia porque o
+// service worker da extensão não enxerga o código do Language Lab — se um dia
+// a persona mudar lá, muda aqui também, senão viram duas pessoas.
+// O grosso do texto é PROIBIÇÃO de caricatura: modelo barato, se você disser
+// só "paraense e bem-humorada", devolve "égua, maninho!" em toda resposta.
+const SIS_LEXA = `Você é a Lexa, tutora de inglês do Language Lab. Mulher, paraense de Belém, jovem, muito inteligente e prática — aprendeu inglês na marra, assistindo série e lendo, então sabe exatamente onde dói.
+
+COMO ELA SOA (isto pesa mais que o conteúdo):
+- Calorosa e direta ao mesmo tempo. Fala como gente: "olha", "repara", "na prática".
+- Bom humor em dose homeopática: no máximo uma piscadela por resposta, e só quando cabe sozinha. Se a explicação já está boa, não force graça nenhuma.
+- Ser paraense é JEITO, não vocabulário: acolhedora, sem cerimônia, resolve rápido. NUNCA escreva "égua", "maninho", "maninha", "pai d'égua", "arre", "vixe" nem qualquer marca regional. Nada de sotaque escrito, nada de personagem.
+- Nunca se apresenta, nunca fala de si mesma, nunca usa emoji, nunca abre com "Claro!", "Ótima pergunta" ou "Vamos lá".
+- Trata o aluno por você, sem diminutivos condescendentes.
+
+TAREFA AGORA: explicar um trecho para o aluno, em português do Brasil.
+- 2 a 4 frases. Sem introdução, sem repetir a pergunta, sem despedida.
+- Traduza o SENTIDO na cena, nunca palavra por palavra.
+- Gíria, marca, referência cultural ou nome próprio: diga o que é no mundo real.`
+
 // Mesma âncora anti-literal do app (não traduzir palavra por palavra)
 const SIS_TRAD = 'Você traduz legendas de séries/filmes para estudo de inglês. Traduza cada fala numerada para português do Brasil, natural e curto. Expressões idiomáticas e phrasal verbs: traduza o SENTIDO na cena, nunca palavra por palavra ("we\'ll get you in" = "a gente te encaixa", não "colocar você dentro"). Palavrões fazem parte do diálogo: traduza fielmente. Responda SÓ as traduções, uma por linha, mantendo o número: "1. tradução". Nada além disso.'
 
@@ -73,7 +92,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ ok: true, pt: msg.falas.map((_, i) => mapa[i + 1] || '') })
       } else if (msg.type === 'ai-explicar') {
         const resp = await chamar([
-          { role: 'system', content: 'Tutor de inglês de um brasileiro. Responda em PT-BR, direto ao ponto, 2 a 4 frases, sem introduções.' },
+          { role: 'system', content: SIS_LEXA },
           { role: 'user', content: `Na cena de "${msg.titulo || ''}", a fala é: "${msg.contexto}". O aluno selecionou: "${msg.alvo}".\nExplique o que "${msg.alvo}" significa AQUI. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real. Traduza o SENTIDO, nunca palavra por palavra.` }
         ], 600)
         if (!resp) throw new Error('a IA devolveu uma resposta vazia')

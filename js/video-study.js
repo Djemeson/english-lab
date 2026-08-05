@@ -691,7 +691,7 @@ async function videoOvExplain() {
   corpo.innerHTML = '<span class="gen-spinner"></span> a IA está explicando...'
   try {
     const resp = await aiTextSeguro([
-      { role: 'system', content: 'Tutor de inglês de um brasileiro. Responda em PT-BR, direto ao ponto, 2 a 4 frases, sem introduções.' },
+      { role: 'system', content: lexaExplicar() },
       { role: 'user', content:
 `Na cena de "${_vidCur ? _vidCur.title : ''}", a fala é: "${contexto}". O aluno selecionou: "${txt}".
 Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado, explique a imagem.` }

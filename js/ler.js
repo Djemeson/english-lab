@@ -23,6 +23,13 @@ let _lerSalvarTimer = null
 let _lerIgnoraSel = false // suprime o popup logo após um duplo-clique
 let _lerInicioLeitura = 0
 
+// A Lexa mora em js/ai.js, que é do SHELL (cache-first). Este arquivo é lazy
+// (network-first) e pode chegar ANTES dele numa visita logo após o deploy —
+// por isso nunca falamos direto com o símbolo de lá.
+const lexaNome = () => (typeof LEXA_NOME === 'string' ? LEXA_NOME : 'Lexa')
+const lexaPrompt = () => (typeof lexaExplicar === 'function' ? lexaExplicar()
+  : 'Você é a Lexa, tutora de inglês do Language Lab. Responda em PT-BR, 2 a 4 frases, sem introduções, traduzindo o SENTIDO e nunca palavra por palavra.')
+
 const LER_DEF = {
   tema: 'papel', fonte: 'serif', tamanho: 19, entrelinha: 1.7,
   largura: 34, modo: 'pag', pintar: 'minhas'
@@ -474,7 +481,8 @@ function _lerRenderTipografia() {
     ${linha('Destacar', [['nada', 'Nada'], ['minhas', 'O que estou estudando']].map(([v, r]) =>
       `<button class="ler-btn ler-pill${v === c.pintar ? ' on' : ''}" onclick="lerAjustar('pintar','${v}')">${r}</button>`).join(''))}
     <div class="ler-tip-nota">Dica: <b>duplo-clique</b> numa palavra manda ela para o Revisar com a frase.
-      Arraste para selecionar um trecho e escolher Explicar ou Estudar.</div>`
+      Selecione um trecho para a ${lexaNome()} explicar, ouvir em voz alta, salvar para estudo
+      ou procurar na Wikipédia.</div>`
 }
 
 function lerAjustar(chave, valor) {
@@ -882,7 +890,11 @@ function _lerAoSelecionar() {
       <button data-p="rev" data-tip="${ehFrase
         ? 'Salva a frase no Revisar — a triagem por IA quebra em palavras, phrasals e expressões'
         : 'Cria o item de estudo com a frase do livro como contexto'}">${ehFrase ? 'Salvar frase' : 'Estudar'}</button>
-      <button data-p="ouv" data-tip="Ouvir em voz alta (voz do navegador, custo zero)">${ic('volume','ic-sm')}</button>
+    </div>
+    <div class="ler-pop-extras">
+      <button data-p="ouv" data-tip="Ouvir em voz alta (voz do navegador, custo zero)">${ic('volume','ic-sm')} Ouvir</button>
+      <button data-p="wiki" data-tip="Abrir na Wikipédia em outra aba — o caminho para nome próprio, lugar, guerra, marca">${ic('bookOpen','ic-sm')} Wikipédia</button>
+      <button data-p="web" data-tip="Pesquisar na web em outra aba">${ic('globe','ic-sm')} Web</button>
     </div>
     <div class="ler-pop-corpo hidden" id="ler-pop-corpo"></div>`
   pop.onmousedown = e => e.preventDefault()
@@ -899,18 +911,36 @@ function _lerAoSelecionar() {
     _lerFecharPopup(); try { window.getSelection().removeAllRanges() } catch (e) {}
   }
   pop.querySelector('[data-p="ouv"]').onclick = () => lerFalar(_lerPopAlvo)
+  pop.querySelector('[data-p="wiki"]').onclick = () => lerAbrirBusca('wiki')
+  pop.querySelector('[data-p="web"]').onclick = () => lerAbrirBusca('web')
   pop.querySelector('[data-p="exp"]').onclick = async () => {
     const corpo = el('ler-pop-corpo')
     corpo.classList.remove('hidden')
-    corpo.textContent = 'a IA está explicando…'
+    corpo.textContent = `${lexaNome()} está lendo o trecho…`
     try {
       const t = await aiTextSeguro([
-        { role: 'system', content: 'Tutor de inglês de um brasileiro. Responda em PT-BR, direto ao ponto, 2 a 4 frases, sem introduções.' },
-        { role: 'user', content: `No livro "${_lerLivro.title}", a frase é: "${_lerPopCtx}". O aluno selecionou: "${_lerPopAlvo}".\nExplique o que "${_lerPopAlvo}" significa AQUI. Se for gíria, referência cultural ou nome próprio, diga o que é. Traduza o SENTIDO, nunca palavra por palavra.` }
+        { role: 'system', content: lexaPrompt() },
+        { role: 'user', content: `O aluno está lendo "${_lerLivro.title}"${_lerLivro.author ? ', de ' + _lerLivro.author : ''}. A frase é: "${_lerPopCtx}". Ele selecionou: "${_lerPopAlvo}".\nExplique o que "${_lerPopAlvo}" significa AQUI, nesta passagem.` }
       ], { maxTokens: 600 })
-      corpo.textContent = t || 'a IA devolveu uma resposta vazia'
+      corpo.textContent = t || `${lexaNome()} devolveu uma resposta vazia`
     } catch (e) { corpo.textContent = 'Não deu: ' + e.message }
   }
+}
+
+// Wikipédia e web: o que a IA não resolve bem. Nome de lugar, batalha, arma,
+// marca ou pessoa real pede FONTE, não paráfrase — e sai de graça, sem token.
+// Abre em outra aba: a leitura (e a posição) fica intacta aqui.
+function lerAbrirBusca(onde) {
+  const termo = String(_lerPopAlvo || '').trim()
+  if (!termo) return
+  // A Wikipédia é buscada no idioma do LIVRO: quem lê em inglês procura
+  // "Minie ball", não "bala Minié" — e o verbete de lá é o que casa com o texto.
+  const idioma = (_lerLivro && _lerLivro.lang) || 'en'
+  const url = onde === 'wiki'
+    ? `https://${idioma}.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(termo)}`
+    : `https://www.google.com/search?q=${encodeURIComponent(termo)}`
+  window.open(url, '_blank', 'noopener,noreferrer')
+  _lerFecharPopup()
 }
 
 // Voz do navegador: qualidade menor que a do TTS pago, mas custo ZERO e
