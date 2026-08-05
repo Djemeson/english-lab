@@ -228,3 +228,75 @@
   display: block; height: 2.7em; min-height: 0; max-height: none;
 }
 #englab-bar.englab-tem-pt .englab-pt.englab-vazia { visibility: hidden; }
+
+/* ================================================================
+   MODO DOCA — a seção vive ABAIXO do vídeo, não sobre ele.
+   O player é encolhido na mesma medida, então são duas áreas
+   isoladas: nada cobre a cena nem a barra de progresso.
+   ================================================================ */
+:root { --ll-dock: 190px; }
+
+html.englab-dock video,
+html.englab-dock .watch-video,
+html.englab-dock .watch-video--player-view,
+html.englab-dock [data-uia="video-canvas"] {
+  height: calc(100vh - var(--ll-dock)) !important;
+  max-height: calc(100vh - var(--ll-dock)) !important;
+  object-fit: contain !important;
+}
+/* os controles do player acompanham o encolhimento */
+html.englab-dock .watch-video--bottom-controls-container {
+  bottom: var(--ll-dock) !important;
+}
+
+html.englab-dock #englab-bar {
+  left: 0; right: 0; bottom: 0; transform: none;
+  /* altura NATURAL: o JS mede e reserva exatamente isso para o video
+     (com altura fixa, a secao estourava e voltava a cobrir a cena) */
+  width: 100%; max-width: none; height: auto; min-height: 150px;
+  padding: 14px 22px 10px; gap: 20px;
+  border-radius: 0; border-left: none; border-right: none; border-bottom: none;
+  border-top: 1px solid rgba(255,255,255,.08);
+  background: #0a0e13; backdrop-filter: none;
+  box-shadow: none; animation: none;
+  align-items: center;
+}
+/* na doca o texto respira: é o protagonista da seção */
+html.englab-dock .englab-line {
+  font-size: clamp(20px, 2.1vw, 32px); font-weight: 600;
+  color: #63eab4; min-height: 2.5em; max-height: 2.6em;
+  text-shadow: none;
+}
+html.englab-dock .englab-w:hover { background: rgba(99,234,180,.22); color: #fff; }
+html.englab-dock .englab-w.englab-ok { background: #63eab4; color: #06231f; }
+html.englab-dock .englab-pt,
+html.englab-dock.englab-x #englab-bar.englab-tem-pt .englab-pt {
+  color: #e8eef4; font-size: clamp(15px, 1.35vw, 21px); text-shadow: none;
+}
+html.englab-dock .englab-rule {
+  position: absolute; left: 22px; right: 22px; bottom: 8px;
+  width: auto; margin: 0; border-top: none; padding-top: 0; height: 16px;
+}
+html.englab-dock #englab-bar button { color: #7c8b99; }
+html.englab-dock #englab-bar button:hover { background: rgba(255,255,255,.08); color: #fff; }
+html.englab-dock #englab-bar button.on { background: #63eab4; color: #06231f; }
+html.englab-dock #englab-pop { bottom: calc(var(--ll-dock) + 16px); }
+
+/* ---- MODO FLUTUANTE (minimizado): só a legenda volta à cena ---- */
+#englab-bar.englab-flut { background: transparent; border: none; box-shadow: none; backdrop-filter: none; }
+#englab-bar.englab-flut .englab-line,
+#englab-bar.englab-flut .englab-pt {
+  display: inline-block; padding: 6px 16px; border-radius: 10px;
+  background: rgba(10, 14, 20, .72); backdrop-filter: blur(6px);
+}
+#englab-bar.englab-flut .englab-line { color: #63eab4; font-weight: 700; }
+#englab-bar.englab-flut .englab-pt { color: #fff; margin-top: 8px; }
+#englab-bar.englab-flut .englab-nav,
+#englab-bar.englab-flut .englab-tools {
+  background: rgba(10, 14, 20, .72); border-radius: 10px; padding: 4px 8px;
+  backdrop-filter: blur(6px); border: none; opacity: 0; transition: opacity .18s;
+}
+#englab-bar.englab-flut:hover .englab-nav,
+#englab-bar.englab-flut:hover .englab-tools { opacity: 1; }
+#englab-bar.englab-flut .englab-rule { opacity: 0; transition: opacity .18s; }
+#englab-bar.englab-flut:hover .englab-rule { opacity: 1; }

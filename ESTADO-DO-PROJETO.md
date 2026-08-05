@@ -3,7 +3,12 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-04 — **Painel com altura constante (73ª rodada)**: a linha de
+> Última atualização: 2026-08-04 — **Seção abaixo do vídeo (74ª rodada)**: em vez de flutuar
+> sobre a cena e brigar com os controles, a extensão passou a ter uma SEÇÃO própria abaixo do
+> player (que encolhe na medida exata), com um modo minimizado em que só as legendas voltam a
+> flutuar, com fundo próprio. Ver seção 8 (74ª rodada).
+>
+> Anterior: 2026-08-04 — **Painel com altura constante (73ª rodada)**: a linha de
 > tradução sumia por completo sem texto (o painel "crescia um pouquinho" quando a fala
 > chegava) e a barra não nascia se o vídeo começasse em silêncio. Ver seção 8 (73ª rodada).
 >
@@ -595,6 +600,28 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-04 (74ª rodada) — A extensão ganha uma SEÇÃO abaixo do vídeo (modo doca)
+135. **Diagnóstico do Djemeson** (com dois prints de referência): "o painel fica sobre o
+     vídeo; se passo o mouse ele sobe para não cobrir a barra de progresso, mas fica em cima
+     da cena — isso causa confusão". Proposta dele: **duas áreas isoladas**, com a seção
+     abaixo do vídeo, e um modo minimizado em que as legendas voltam a flutuar bonitas.
+     - **Modo DOCA (padrão)**: `html.englab-dock` encolhe o `<video>` e os containers do
+       player (`.watch-video`, `--player-view`, `video-canvas`) e desloca os controles do
+       player para cima da seção. A seção ocupa a faixa inferior inteira, com a legenda EN
+       em verde-menta e destaque maior (é a protagonista ali), a tradução em branco e a
+       régua de falas na base.
+     - **Reserva MEDIDA, não fixa**: com altura fixa a seção estourava e voltava a cobrir a
+       cena (25px de sobreposição no primeiro teste). Agora a seção tem altura natural e um
+       **ResizeObserver** informa a medida real para a reserva do vídeo — acompanha o modo
+       PT, o texto de duas linhas e o redimensionamento da janela. Encaixe medido: exato.
+     - **Modo FLUTUANTE (minimizado)**: só as legendas sobre a cena, cada uma com seu fundo
+       translúcido arredondado (como no print), e os controles/régua aparecendo no hover.
+     - O "subir para fugir dos controles" (72ª) só vale no modo flutuante — na doca não há
+       sobreposição para evitar.
+     - Validado: vídeo encolhe, fundo do vídeo = topo da seção (545=545), controles do
+       player livres acima da seção, alternância nos dois sentidos, cor/tipografia conforme
+       as imagens. `manifest`: 2.8.1 → **2.9.0**.
 
 ### Sessão 2026-08-04 (73ª rodada) — Painel com altura realmente constante
 134. **"O painel sem legenda é um tamanho e quando a legenda aparece ele cresce um

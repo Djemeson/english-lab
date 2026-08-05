@@ -30,6 +30,7 @@ no armazenamento local do Chrome até você abrir o app.
 | Transcript do episódio, clicável e com busca | botão **≡** (tecla `T`) |
 | Esconder a legenda original | botão **cc** |
 | **Selecionar um trecho** | arraste com o mouse sobre a legenda |
+| **Seção abaixo do vídeo / legenda flutuante** | botão de alternar (chevron) — na seção, o vídeo encolhe e nada cobre a cena |
 | **Régua de falas** | cada bloco é uma fala (largura = duração, vão = silêncio); clique para ir até lá |
 
 A tradução e o Explicar usam a **sua** chave de IA — espelhada automaticamente

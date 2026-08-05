@@ -39,7 +39,7 @@ let histórico = []            // [{t, texto}] — falas que já passaram (modo 
 let ptCache = new Map()       // chavePT(texto) → tradução
 let ptPend = new Set()
 let barra = null, painel = null
-let cfgUI = { ligada: true, ocultaNativa: true, pausaHover: true, pt: false, fog: true, transcript: false }
+let cfgUI = { ligada: true, ocultaNativa: true, pausaHover: true, pt: false, fog: true, transcript: false, doca: true }
 let pausadoPorNos = false
 let tituloId = null          // id do titulo aberto (/watch/NNNN)
 
@@ -67,7 +67,7 @@ function resetarSessao() {
 }
 
 pedirExt(() => chrome.storage.local.get({ llui: null })).then(r => {
-  if (r && r.llui) { cfgUI = { ...cfgUI, ...r.llui }; sincronizarBotoes(); aplicarNativa() }
+  if (r && r.llui) { cfgUI = { ...cfgUI, ...r.llui }; sincronizarBotoes(); aplicarNativa(); aplicarDoca() }
 }).catch(() => {})
 const salvarUI = () => pedirExt(() => chrome.storage.local.set({ llui: cfgUI }))
 
@@ -244,7 +244,9 @@ function pintarPT() {
   // A ALTURA do painel nao pode depender de haver traducao: o espaco fica
   // reservado enquanto o modo PT estiver ligado (classe no proprio bar) e
   // so o conteudo aparece/some.
+  const tinhaPT = barra.classList.contains('englab-tem-pt')
   barra.classList.toggle('englab-tem-pt', !!cfgUI.pt)
+  if (tinhaPT !== !!cfgUI.pt) medirDoca()
   el.style.display = ''
   if (!cfgUI.pt) return
   const pt = ptDe(ultimoTexto)
@@ -258,6 +260,7 @@ function pintarPT() {
 }
 
 // ---- barra ----
+let IC_BAIXO = '', IC_CIMA = ''
 function garantirBarra() {
   if (barra && document.body.contains(barra)) return barra
   barra = document.createElement('div')
@@ -272,8 +275,11 @@ function garantirBarra() {
     add:  svg('<path d="M12 5v14M5 12h14"/>'),
     tr:   svg('<path d="M4 6h16M4 12h16M4 18h10"/>'),
     cc:   svg('<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M10.5 10.3a2.4 2.4 0 1 0 0 3.4M17.2 10.3a2.4 2.4 0 1 0 0 3.4"/>'),
-    hide: svg('<path d="M18 6 6 18M6 6l12 12"/>')
+    hide: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
+    baixo: svg('<path d="m6 9 6 6 6-6"/>'),
+    cima: svg('<path d="m6 15 6-6 6 6"/>')
   }
+  IC_BAIXO = IC.baixo; IC_CIMA = IC.cima
   barra.innerHTML = `
     <div class="englab-nav">
       <button data-a="prev" title="Fala anterior (←)">${IC.prev}</button>
@@ -290,6 +296,7 @@ function garantirBarra() {
       <button data-a="line" title="Salvar a frase inteira no Language Lab">${IC.add}</button>
       <button data-a="tr"   title="Transcript do episódio (T)">${IC.tr}</button>
       <button data-a="cc"   title="Mostrar/esconder a legenda original">${IC.cc}</button>
+      <button data-a="doca" title="Alternar entre seção abaixo do vídeo e legenda flutuante">${IC.baixo}</button>
       <button data-a="hide" title="Esconder a barra">${IC.hide}</button>
     </div>
     <div class="englab-rule" id="englab-rule" title="Régua de falas: cada bloco é uma fala, o vão é silêncio. Clique para ir até lá."></div>`
@@ -306,7 +313,8 @@ function garantirBarra() {
     else if (a === 'line') { if (ultimoTexto) { salvarCaptura('', ultimoTexto); piscar(b) } }
     else if (a === 'tr') { cfgUI.transcript = !cfgUI.transcript; salvarUI(); sincronizarBotoes(); renderTranscript() }
     else if (a === 'cc') { cfgUI.ocultaNativa = !cfgUI.ocultaNativa; salvarUI(); sincronizarBotoes(); aplicarNativa() }
-    else if (a === 'hide') { cfgUI.ligada = false; salvarUI(); barra.style.display = 'none'; aplicarNativa() }
+    else if (a === 'doca') { cfgUI.doca = !cfgUI.doca; salvarUI(); aplicarDoca(); sincronizarBotoes() }
+    else if (a === 'hide') { cfgUI.ligada = false; salvarUI(); barra.style.display = 'none'; aplicarNativa(); aplicarDoca() }
   })
   barra.addEventListener('mouseenter', () => {
     if (!cfgUI.pausaHover) return
@@ -330,6 +338,7 @@ function garantirBarra() {
     setTimeout(() => { if (String(window.getSelection() || '').trim()) mostrarPopupSel() }, 10)
   })
   sincronizarBotoes()
+  aplicarDoca()
   return barra
 }
 
@@ -338,6 +347,40 @@ function sincronizarBotoes() {
   const on = (a, v) => barra.querySelector(`button[data-a="${a}"]`)?.classList.toggle('on', !!v)
   on('pt', cfgUI.pt); on('fog', cfgUI.fog); on('tr', cfgUI.transcript); on('cc', !cfgUI.ocultaNativa)
 }
+// A DOCA: em vez de flutuar SOBRE a cena (e brigar com os controles), a
+// seção fica ABAIXO do vídeo — o player é encolhido na mesma medida, então
+// são duas áreas isoladas. O botão alterna para o modo flutuante, em que só
+// as legendas voltam à tela, com fundo próprio.
+// A reserva no video e a altura REAL da secao (que muda com o modo PT).
+// Medir evita tanto sobreposicao quanto faixa preta sobrando.
+function medirDoca() {
+  if (!barra || !cfgUI.doca) return
+  const h = Math.ceil(barra.getBoundingClientRect().height)
+  if (h > 40) document.documentElement.style.setProperty('--ll-dock', h + 'px')
+}
+// ResizeObserver: a secao avisa quando muda de altura (modo PT, janela,
+// texto de duas linhas) e a reserva acompanha sozinha. Melhor que medir por
+// frame — nao depende de animacao e nao fica sondando.
+let docaRO = null
+function observarDoca() {
+  if (docaRO || !barra || typeof ResizeObserver !== 'function') return
+  docaRO = new ResizeObserver(() => medirDoca())
+  docaRO.observe(barra)
+}
+function aplicarDoca() {
+  const on = !!(cfgUI.ligada && cfgUI.doca && idDoTitulo())
+  document.documentElement.classList.toggle('englab-dock', on)
+  if (on) { observarDoca(); medirDoca(); setTimeout(medirDoca, 80) }
+  else document.documentElement.style.removeProperty('--ll-dock')
+  if (barra) barra.classList.toggle('englab-flut', !cfgUI.doca)
+  const btn = barra && barra.querySelector('button[data-a="doca"]')
+  if (btn) {
+    btn.innerHTML = cfgUI.doca ? IC_BAIXO : IC_CIMA
+    btn.title = cfgUI.doca ? 'Minimizar: legenda flutuando sobre o vídeo'
+                           : 'Expandir: seção própria abaixo do vídeo'
+  }
+}
+
 function aplicarNativa() {
   document.documentElement.classList.toggle('englab-hide-native', cfgUI.ligada && cfgUI.ocultaNativa)
 }
@@ -564,6 +607,7 @@ setInterval(() => {
   if (!idAgora) {                       // no menu: some e nao processa nada
     if (barra) barra.style.display = 'none'
     document.documentElement.classList.remove('englab-hide-native')
+    document.documentElement.classList.remove('englab-dock')
     return
   }
   const v = vid(); if (!v) return
@@ -594,7 +638,7 @@ new MutationObserver(() => {
 // depois de alguns segundos; seguimos o mesmo ritmo.
 let ctrlTimer = null
 function controlesAmostra() {
-  if (!barra) return
+  if (!barra || cfgUI.doca) return          // na doca nao ha sobreposicao
   barra.classList.add('englab-up')
   document.getElementById('englab-pop')?.classList.add('englab-up')
   clearTimeout(ctrlTimer)
@@ -638,3 +682,6 @@ window.addEventListener('error', ev => {
     morrer(); ev.preventDefault(); ev.stopImmediatePropagation()
   }
 }, true)
+
+// A altura da secao muda com a largura da janela (o texto reflui)
+window.addEventListener('resize', () => { if (cfgUI.doca) medirDoca() })
