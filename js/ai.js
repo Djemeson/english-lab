@@ -38,6 +38,79 @@ TAREFA AGORA: explicar um trecho para o aluno, em português do Brasil.
 }
 
 // ================================================================
+// ILUSTRAÇÃO DA WIKIPÉDIA — a foto que acompanha a explicação
+// ================================================================
+// De graça, sem chave e sem CORS: a API da Wikipédia responde a qualquer
+// origem com `origin=*`. Uma chamada devolve título, miniatura e resumo.
+//
+// A parte que importa é o PORTÃO. A busca "fuzzy" (generator=search) parece
+// ótima e é uma armadilha: "seethed" devolve a banda Seether — com foto — e
+// "grand experience" devolve Grand Theft Auto V. Uma imagem errada ao lado de
+// uma explicação certa é pior que imagem nenhuma, porque o aluno acredita.
+// Então aqui é busca por TÍTULO EXATO (com redirecionamento) e o resultado
+// ainda precisa passar por três testes. Quando não passa, não vem nada.
+const _wikiCache = new Map()
+
+function _wikiNorm(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim()
+}
+
+async function wikiIlustracao(termo, idioma) {
+  const t = String(termo || '').trim().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})]+$/gu, '')
+  const lang = /^[a-z]{2,3}$/.test(String(idioma || '')) ? idioma : 'en'
+  // Frase não tem verbete: só palavra ou nome próprio de até 4 palavras.
+  if (!t || t.length < 2 || t.length > 60 || t.split(/\s+/).length > 4) return null
+  const chave = lang + '|' + t.toLowerCase()
+  if (_wikiCache.has(chave)) return _wikiCache.get(chave)
+
+  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(t)}` +
+    '&redirects=1&prop=pageimages|extracts&piprop=thumbnail&pithumbsize=480' +
+    '&exintro=1&explaintext=1&exsentences=2&format=json&origin=*'
+  let dados = null
+  try {
+    const ctl = new AbortController()
+    const timer = setTimeout(() => ctl.abort(), 5000)
+    const r = await fetch(url, { signal: ctl.signal })
+    clearTimeout(timer)
+    if (r.ok) dados = await r.json()
+  } catch (e) { /* offline, bloqueio, timeout: segue sem figura */ }
+
+  let out = null
+  const p = dados && dados.query && Object.values(dados.query.pages || {})[0]
+  if (p && p.missing === undefined && p.thumbnail && p.thumbnail.source) {
+    const ext = String(p.extract || '')
+    const ehDesambiguacao = /\bmay refer to\b|\bpode referir-se\b|\bpuede referirse\b/i.test(ext) ||
+      /\(disambiguation\)|\(desambigua/i.test(p.title || '')
+    const a = _wikiNorm(p.title), b = _wikiNorm(t)
+    // Título tem que ser o MESMO assunto: "Minie ball"→"Minié ball" e
+    // "ducks"→"Duck" passam; "quills"→"Quill (disambiguation)" não.
+    const casa = a === b || a.startsWith(b) || b.startsWith(a)
+    if (!ehDesambiguacao && casa) {
+      out = {
+        titulo: p.title,
+        img: p.thumbnail.source,
+        extrato: ext.slice(0, 300),
+        url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(String(p.title).replace(/ /g, '_'))}`
+      }
+    }
+  }
+  _wikiCache.set(chave, out)
+  return out
+}
+
+// Markup compartilhado (leitor e Revisar usam o mesmo) — sem estado, só HTML.
+function wikiFiguraHTML(info) {
+  if (!info) return ''
+  return `<figure class="ll-wiki-fig">
+    <a href="${escA(info.url)}" target="_blank" rel="noopener noreferrer" title="Abrir na Wikipédia">
+      <img src="${escA(info.img)}" alt="${escA(info.titulo)}" decoding="async" referrerpolicy="no-referrer">
+    </a>
+    <figcaption>${esc(info.titulo)}<i>Wikipédia</i></figcaption>
+  </figure>`
+}
+
+// ================================================================
 // GATEWAY DE IA — todas as chamadas à OpenAI passam por aqui.
 //
 // Por que existe (2026-07-31): o projeto tinha 16 pontos de chamada em

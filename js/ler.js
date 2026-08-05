@@ -990,15 +990,32 @@ function _lerAoSelecionar() {
   pop.querySelector('[data-p="web"]').onclick = () => lerAbrirBusca('web')
   pop.querySelector('[data-p="exp"]').onclick = async () => {
     const corpo = el('ler-pop-corpo')
+    const alvo = _lerPopAlvo, ctx = _lerPopCtx
     corpo.classList.remove('hidden')
-    corpo.textContent = `${lexaNome()} está lendo o trecho…`
+    corpo.innerHTML = `<div class="ler-pop-txt">${esc(lexaNome())} está lendo o trecho…</div>`
+
+    // A figura vai em PARALELO com a IA e entra assim que chegar: a Wikipédia
+    // responde em ~0,6s e a explicação leva alguns segundos — fazer o texto
+    // esperar a foto seria trocar o essencial pelo acessório.
+    if (typeof wikiIlustracao === 'function') {
+      wikiIlustracao(alvo, (_lerLivro && _lerLivro.lang) || 'en').then(info => {
+        if (!info || alvo !== _lerPopAlvo) return
+        const c = el('ler-pop-corpo')
+        if (c && !c.querySelector('.ll-wiki-fig')) c.insertAdjacentHTML('afterbegin', wikiFiguraHTML(info))
+      }).catch(() => {})
+    }
+
     try {
       const t = await aiTextSeguro([
         { role: 'system', content: lexaPrompt() },
-        { role: 'user', content: `O aluno está lendo "${_lerLivro.title}"${_lerLivro.author ? ', de ' + _lerLivro.author : ''}. A frase é: "${_lerPopCtx}". Ele selecionou: "${_lerPopAlvo}".\nExplique o que "${_lerPopAlvo}" significa AQUI, nesta passagem.` }
+        { role: 'user', content: `O aluno está lendo "${_lerLivro.title}"${_lerLivro.author ? ', de ' + _lerLivro.author : ''}. A frase é: "${ctx}". Ele selecionou: "${alvo}".\nExplique o que "${alvo}" significa AQUI, nesta passagem.` }
       ], { maxTokens: 600 })
-      corpo.textContent = t || `${lexaNome()} devolveu uma resposta vazia`
-    } catch (e) { corpo.textContent = 'Não deu: ' + e.message }
+      const txtEl = el('ler-pop-corpo') && el('ler-pop-corpo').querySelector('.ler-pop-txt')
+      if (txtEl) txtEl.textContent = t || `${lexaNome()} devolveu uma resposta vazia`
+    } catch (e) {
+      const txtEl = el('ler-pop-corpo') && el('ler-pop-corpo').querySelector('.ler-pop-txt')
+      if (txtEl) txtEl.textContent = 'Não deu: ' + e.message
+    }
   }
 }
 

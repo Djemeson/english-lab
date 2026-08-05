@@ -4545,3 +4545,35 @@ mark.ler-w{
     background:var(--surface2);border-color:var(--border);
   }
 }
+
+/* ================================================================
+   Figura da Wikipedia ao lado da explicacao da Lexa.
+   Usada no leitor (#ler-pop) e no Revisar (.sel-pop-exp) — por isso o
+   nome nao tem prefixo de secao.
+   ================================================================ */
+.ll-wiki-fig{
+  float:left;margin:1px 10px 6px 0;width:104px;
+  display:flex;flex-direction:column;gap:3px;
+}
+.ll-wiki-fig a{display:block;line-height:0;border-radius:var(--radius-xs);overflow:hidden;
+  border:1px solid var(--border);background:var(--surface2)}
+.ll-wiki-fig img{
+  width:100%;height:78px;object-fit:cover;display:block;
+  transition:transform .18s;
+}
+.ll-wiki-fig a:hover img{transform:scale(1.06)}
+.ll-wiki-fig figcaption{
+  font-size:var(--fs-3xs);color:var(--text3);line-height:1.3;
+  display:flex;flex-direction:column;
+}
+.ll-wiki-fig figcaption i{font-style:normal;opacity:.65;font-size:9px;letter-spacing:.03em;text-transform:uppercase}
+
+/* O texto flui em volta da figura; o clearfix impede que a proxima
+   explicacao (cache do Revisar) suba ao lado de uma imagem antiga. */
+.ler-pop-corpo::after,.sel-pop-exp::after{content:'';display:block;clear:both}
+.ler-pop-txt{white-space:pre-wrap}
+
+@media (max-width:768px){
+  .ll-wiki-fig{width:84px;margin-right:9px}
+  .ll-wiki-fig img{height:64px}
+}

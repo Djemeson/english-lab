@@ -1074,7 +1074,13 @@ async function revSelExplain() {
   }
   if (_revExplainCache.has(chave)) { corpo.innerHTML = _revExplainCache.get(chave); return }
   if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
-  corpo.innerHTML = '<span class="gen-spinner"></span> a IA está explicando...'
+  corpo.innerHTML = '<span class="gen-spinner"></span> a Lexa está explicando...'
+  // Mesma ilustração do leitor, mesma regra: só entra quando o verbete da
+  // Wikipédia é REALMENTE do que foi selecionado (ver wikiIlustracao).
+  let figura = ''
+  const pFig = (typeof wikiIlustracao === 'function')
+    ? wikiIlustracao(txt, (w && w.lang) || 'en').then(i => { figura = wikiFiguraHTML(i) }).catch(() => {})
+    : Promise.resolve()
   try {
     const resp = await aiTextSeguro([
       { role: 'system', content: lexaExplicar() },
@@ -1082,7 +1088,8 @@ async function revSelExplain() {
 `No item de estudo "${w ? w.word : ''}" (contexto: "${window._revSelCtx || (w && w.context) || ''}"), o aluno selecionou: "${txt}".
 Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado nesta expressão, explique a imagem.` }
     ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
-    const html = esc(resp).replace(/\n+/g, '<br>')
+    await pFig   // a figura já veio (é mais rápida que a IA); só junta
+    const html = figura + esc(resp).replace(/\n+/g, '<br>')
     _revExplainCache.set(chave, html)   // aiTextSeguro nunca devolve vazio: não cacheia silêncio
     corpo.innerHTML = html
   } catch (e) {

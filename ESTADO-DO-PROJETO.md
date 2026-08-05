@@ -841,6 +841,30 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        celular é a saída mais comum de todas. Agora a posição e os minutos lidos são gravados
        na hora em que a tela some.
 
+158. **Imagem JUNTO com a explicação da Lexa — e o portão que impede a foto errada**. Pergunta
+     do Djemeson: "é possível trazer imagens junto com as explicações da Lexa?". É, e de graça:
+     a API da Wikipédia responde a qualquer origem com `origin=*`, sem chave e sem custo — uma
+     chamada devolve título, miniatura e resumo em ~0,6s.
+     - **A armadilha, encontrada testando antes de construir**: a busca "fuzzy"
+       (`generator=search`) parece perfeita e mente com cara de acerto. `seethed` devolve
+       **Seether** (banda de rock, com foto); `grand experience` devolve **Grand Theft Auto V**;
+       `quills` devolve o filme. Uma imagem errada ao lado de uma explicação certa é PIOR que
+       imagem nenhuma, porque o aluno acredita na foto.
+     - **A solução é o portão** (`wikiIlustracao()` em `js/ai.js`): busca por **título exato**
+       com `redirects=1`, e o resultado ainda precisa passar por três testes — existir, não ser
+       página de desambiguação, e o título ter que casar com o termo depois de normalizado
+       (sem acento, minúsculo, com prefixo aceito). Assim `Minie ball`→**Minié ball** e
+       `ducks`→**Duck** passam, enquanto `seethed`, `quills` e `grand experience` não trazem
+       nada. Só palavra ou nome próprio de até 4 palavras — frase não tem verbete.
+     - **Em paralelo com a IA, nunca em série**: a Wikipédia responde em ~0,6s e a explicação
+       leva alguns segundos. A figura entra assim que chega. No teste (sem chave de IA
+       configurada) a imagem apareceu e o texto mostrou o erro da IA — que é exatamente o
+       comportamento desejado: uma coisa não derruba a outra.
+     - Vale no **leitor** e no **Revisar** (mesma função, mesmo markup `.ll-wiki-fig`, mesmo
+       CSS). Falta no vídeo e no Assistente — ver pendências.
+     - `CACHE` do `sw.js` bumpado de novo (v94 → **v95**): `ai.js` é do shell e ganhou símbolos
+       que `ler.js` e `review.js` passaram a usar.
+
 157. **Busca de imagem no menu de seleção** (pedido junto): quarto botão da fileira de baixo,
      abrindo a aba de imagens do Google no idioma do livro (`tbm=isch&hl=…`). É o complemento
      natural da Wikipédia: para objeto, planta, roupa, arma ou bicho, a foto ensina o que a
@@ -3621,6 +3645,17 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
       texto do capítulo; testado com 4 mil palavras (instantâneo), não com 20 mil.
 - [ ] **Capa**: a extração foi exercitada, mas com PNG inválido de propósito na fixture (o
       caminho de erro devolve `''` corretamente). Falta ver uma capa real virando miniatura.
+
+- [ ] **Ilustração da Wikipédia ainda não está no vídeo nem no Assistente** (79ª rodada, item
+      158). A função é a mesma (`wikiIlustracao` + `wikiFiguraHTML`, em `js/ai.js`, não-lazy) —
+      falta só chamar no `video-study.js` e na resposta do chat. Ficou de fora porque cada tela
+      tem markup próprio de popup e cada uma precisa de teste próprio.
+- [ ] **Imagem para palavra ABSTRATA continua sem resposta.** O portão da Wikipédia
+      (deliberadamente) não devolve nada para "seethed", "faltered", "grand experience". Os dois
+      caminhos possíveis: (a) buscador de imagens com chave (Google CSE/Bing) — resultado real,
+      mas exige chave e tem custo; (b) **gerar** a imagem com a IA, que o app JÁ faz nos cards
+      (`buildImageScene`, 11ª rodada) — funciona para qualquer palavra, mas custa
+      US$ 0,01–0,04 por imagem, então teria de ser sob clique, nunca automático.
 
 ### LER — o que o módulo torna possível (roteiro, em ordem de valor/esforço)
 
