@@ -1187,6 +1187,29 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        o número muda de um dia para o outro.
      - `CACHE` → **v110**; `js/glossario.js` entrou no SHELL (não é lazy: três das telas que o
        chamam carregam sob demanda).
+     - **DOIS DEFEITOS NO USO REAL, corrigidos no mesmo dia** (`c9f0f10`, `CACHE` → **v111**):
+       · *"tem palavras que mandei pra revisão mas aparecem como marquei que conheço"* — era
+         **rótulo, não índice** (o índice estava certo, conferido). Palavra mandada ao Revisar e
+         **ainda não analisada** entra como card sem glosa, e o `else` do `glossLinhaHTML`
+         jogava esse caso na mensagem de "conhecida" — dizendo ao aluno o CONTRÁRIO do que ele
+         fez com ela. **Causa raiz**: eu havia colapsado TRÊS estados num binário (tem glosa /
+         não tem). Agora são três mensagens distintas. Na mesma linha, o painel do toque longo
+         passou a mostrar também os casos sem glosa: "já está no Revisar" evita que ele
+         recapture a mesma palavra pelo botão *Estudar* logo abaixo.
+       · *"quando eu subo o mouse pra cima do card que aparece ele some"* — o balão nasce ACIMA
+         da palavra, então subir o mouse era **sair da palavra**, e o fechamento imediato
+         tornava o "Ver com a Lexa" impossível de clicar: o botão existia e era inalcançável.
+         Sair da palavra agora **agenda** o fechamento (`GLOSS_GRACA`, 280 ms); entrar no balão
+         cancela; sair do balão fecha. O vão caiu de 12px para **6px** — distância grande
+         transforma "ir até o botão" em prova de pontaria. E o CSS deixou de usar
+         `pointer-events:none`, que impedia o balão de receber o ponteiro.
+       · ⚠️ **Efeito colateral que a trégua criou e precisou de conserto**: `_glossMostrar`
+         chamava `glossFechar()` para limpar o balão anterior, e isso cancelava também o
+         fechamento agendado — um balão criado DEPOIS de o mouse já ter saído do texto ficaria
+         preso na tela para sempre. Agora ele só remove o elemento.
+       · Sete casos verificados: aparece; sobrevive ao vão; segura enquanto o mouse está sobre
+         o balão; o clique chega e fecha; a trégua expira quando a mão vai embora de vez;
+         passar por palavra SEM card fecha o balão aberto; sair do container usa a trégua.
 
 174. **CATÁLOGO DE IMAGENS REVISADO NA FONTE — o nível barato ficou mais novo E mais barato
      (2026-08-06)**. O Djemeson trouxe prints do catálogo do Google (abas Images, Audio e
