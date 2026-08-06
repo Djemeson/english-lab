@@ -204,6 +204,7 @@ async function fbPushData() {
       theme:       cfg.theme        || 'midnight',
       accent:      cfg.accent       || '',
       imgQuality:  cfg.imgQuality   || 'low',
+      nivelAluno:  cfg.nivelAluno   || 'B1',
       aiProvider:  cfg.aiProvider   || 'openai',
       aiModel:     cfg.aiModel       || '',
       ttsProvider: cfg.ttsProvider   || 'openai',
@@ -379,6 +380,7 @@ async function fbPull() {
       if (c.theme)       cfg.theme       = c.theme
     if (c.accent !== undefined) cfg.accent = c.accent
     if (c.imgQuality) cfg.imgQuality = c.imgQuality
+    if (c.nivelAluno) cfg.nivelAluno = c.nivelAluno
       if (c.accent !== undefined) cfg.accent = c.accent
       if (c.imgQuality) cfg.imgQuality = c.imgQuality
       if (c.aiProvider)  cfg.aiProvider  = c.aiProvider

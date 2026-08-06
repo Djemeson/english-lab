@@ -3,7 +3,21 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-06 — **O APP PASSOU A MEDIR O QUE GASTA (85ª rodada)**. Diante do
+> Última atualização: 2026-08-06 — **TRIAGEM POR NÍVEL (QECR) + "Estudar" no balão (86ª
+> rodada)**. O Djemeson é intermediário e um capítulo acusava **647 palavras novas** — mas a
+> maioria só é nova para o APP: ele as conhece, e marcá-las uma a uma nunca aconteceria. A
+> cobertura mentia (67% quando o real é ~90%) e a leitura com IA pagava glosa de palavra
+> sabida. Agora a IA **classifica cada palavra no QECR (A1…C2)** numa chamada barata, tudo
+> **abaixo do nível dele já vem marcado** como conhecido e ele só **desmarca a exceção** —
+> marcar 300 vira desmarcar 8. Faixas ACIMA também são marcáveis (chip e "marcar todas"), a
+> pedido dele: ninguém sabe vocabulário em blocos alinhados com a escala. O passo é separado
+> da glosa e vem ANTES, de propósito: classificar é barato e cobre tudo, e depois de marcar
+> sobra bem menos para glosar. Nada é marcado sem confirmação, e há desfazer que **não apaga
+> marcação antiga**. Junto: teto da glosa 120→500, o balão ganhou **Estudar** (manda a
+> expressão com a frase do livro para o Revisar), e a pré-análise passou a pegar **phrasal
+> verbs, idioms e colocações**. Ver seção 8 (86ª rodada).
+>
+> Anterior: 2026-08-06 — **O APP PASSOU A MEDIR O QUE GASTA (85ª rodada)**. Diante do
 > modal de R$ 0,02, o Djemeson perguntou se aquilo condizia com a realidade. O contexto estava
 > contado (a entrada inclui as frases), mas a **saída ignorava os tokens de RACIOCÍNIO**, que o
 > Luna cobra no preço caro — o real ficava entre **1,8× e 6,7×** a estimativa. Em vez de chutar
@@ -1162,6 +1176,39 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        reconhecidas, SAFETY/IMAGE_SAFETY/PROHIBITED_CONTENT viram recusa explicada, `STOP` não
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
+
+179. **TRIAGEM POR NÍVEL (QECR) — `lerClassificar()` (86ª rodada, 2026-08-06)**. Pedido:
+     *"eu já entendo escrita muito bem, pelo nível médio. A cada capítulo você poderia fazer
+     uma classificação de nível, onde todas as de nível menor que o meu já estão marcadas como
+     conhecidas, e as que eu não conhecer eu desmarco."*
+     - **O problema real**: um capítulo acusava **647 palavras novas**, mas a maioria só é nova
+       para o APP. Elas nunca entraram no `knownWords` porque marcá-las uma a uma é trabalho de
+       horas. Efeito duplo e ruim: a cobertura mentia para baixo (67% contra ~90% real) e a
+       leitura com IA gastava dinheiro glosando palavra que ele sabe.
+     - **A inversão**: a IA põe cada palavra numa faixa do QECR, tudo **abaixo** do nível dele
+       já vem marcado, e ele **desmarca a exceção**. Marcar 300 vira desmarcar 8.
+     - **O nível DELE não vem pré-marcado**, e é decisão consciente: "B1" para quem é B1 é
+       exatamente a faixa onde ainda há buracos — marcá-la em massa esconderia o que ele
+       precisa estudar.
+     - **Faixas ACIMA são marcáveis** (pedido complementar dele, no meio da implementação):
+       todo chip é clicável e TODO grupo tem "marcar todas", inclusive C1 e C2. A escala é
+       palpite para poupar clique, não teto — quem é B1 sabe "bayonet" se leu sobre guerra.
+     - **A ORDEM DO FLUXO é o que faz a economia**: (1) classificar, barato, cobre TODAS as
+       palavras sem teto — a saída é de duas letras por palavra; (2) marcar as conhecidas;
+       (3) só então glosar o que sobrou, que é caro. O inverso seria pagar glosa de palavra
+       que ele marcaria como conhecida no minuto seguinte. Por isso o bloco de nível aparece
+       ACIMA do de leitura no painel.
+     - **Nunca marca sozinho.** `knownWords` alimenta cobertura, triagem e o glossário — erro
+       em massa contamina tudo. Tem confirmação com custo na frente e desfazer que guarda
+       **só o que não era conhecido antes**: reverter não pode apagar marcação legítima
+       antiga (testado — `water`, marcada antes, sobreviveu ao desfazer).
+     - Casamento da resposta **pela palavra**, nunca por índice — a lição do bug do "ordered =
+       para". Nível fora de A1…C2 é descartado. `cfg.nivelAluno` (padrão B1) entrou no
+       `DEF_CFG`, nas Configurações e no sync.
+     - Verificado: as 6 faixas renderizam; só as abaixo do nível vêm marcadas; nível inválido
+       sai; o nível dele e os de cima não vêm marcados; marcar C1/C2 individual e por grupo
+       funciona; confirmar marca e esvazia; desfazer reverte sem tocar no que era antigo; a
+       flexão continua valendo; e apóstrofo (`don't`) não quebra o `onclick`. `CACHE` → **v117**.
 
 178. **A ESTIMATIVA DE CUSTO IGNORAVA O RACIOCÍNIO — e agora o app MEDE (85ª rodada,
      2026-08-06)**. Pergunta do Djemeson diante do modal de R$ 0,02: *"analise se isso condiz

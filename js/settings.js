@@ -99,6 +99,11 @@ function fillSettings() {
   renderKeyRows()
   const ip = el('cfg-img-provider'); if (ip) ip.value = aiImgProvider()
   updateImgQualityOptions()
+  const nv = el('cfg-nivel-aluno')
+  if (nv) {
+    nv.innerHTML = CEFR.map(c =>
+      `<option value="${c.id}"${c.id === cefrNivelAluno() ? ' selected' : ''}>${esc(c.nome)} — ${esc(c.dica)}</option>`).join('')
+  }
   const stt = el('cfg-stt-provider'); if (stt) stt.value = cfg.sttProvider || 'auto'
   setSettingsTab(_settingsTab)
   renderThemePicker()
@@ -121,6 +126,8 @@ function saveSettings() {
   cfg.imgProvider = AI_IMG[el('cfg-img-provider')?.value] ? el('cfg-img-provider').value : 'openai'
   cfg.imgQuality = el('cfg-img-quality')?.value || 'low'
   cfg.sttProvider = el('cfg-stt-provider')?.value || 'auto'
+  const nvSel = el('cfg-nivel-aluno')?.value
+  if (cefrIdx(nvSel) >= 0) cfg.nivelAluno = nvSel
   saveCfg()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   toast('Configurações salvas!', 'success')

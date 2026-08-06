@@ -107,8 +107,25 @@ const DEF_CFG = {
   // US$ 0,067 em vez do 2.5 Flash a US$ 0,039, 1,7× mais caro, sem ninguém
   // pedir. Para ilustrar card de vocabulário, o nível econômico basta.
   imgQuality: 'low',
+  // Nível do aluno no QECR/CEFR. É a régua da triagem por nível do leitor:
+  // palavra classificada ABAIXO dele já entra marcada como conhecida, e ele
+  // só desmarca a exceção — em vez de marcar centenas uma a uma.
+  nivelAluno: 'B1',
   theme: 'midnight'
 }
+
+// A escala inteira, em ordem. `i` é o que permite comparar ("é menor que o
+// meu?") sem espalhar if/else pelo código.
+const CEFR = [
+  { id: 'A1', i: 0, nome: 'A1 — iniciante',      dica: 'as 500 palavras mais comuns' },
+  { id: 'A2', i: 1, nome: 'A2 — básico',         dica: 'dia a dia, presente e passado simples' },
+  { id: 'B1', i: 2, nome: 'B1 — intermediário',  dica: 'lê notícia e diálogo comum sem travar' },
+  { id: 'B2', i: 3, nome: 'B2 — intermediário alto', dica: 'lê romance e texto técnico com esforço' },
+  { id: 'C1', i: 4, nome: 'C1 — avançado',       dica: 'literatura, ironia, registro formal' },
+  { id: 'C2', i: 5, nome: 'C2 — proficiente',    dica: 'raro, arcaico, altamente especializado' }
+]
+function cefrIdx(id) { const n = CEFR.find(x => x.id === String(id || '').toUpperCase()); return n ? n.i : -1 }
+function cefrNivelAluno() { return CEFR.find(x => x.id === cfg.nivelAluno) ? cfg.nivelAluno : 'B1' }
 
 let cfg = {}
 let words = []

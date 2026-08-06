@@ -1489,6 +1489,7 @@ function _lerFerCorpoHTML() {
       <button class="btn btn-primary btn-sm" onclick="lerMandarNovas(10)">${ic('plus','ic-sm')} As 10 mais frequentes para o Revisar</button>
       ${_lerDesfazer.length ? `<button class="btn btn-secondary btn-sm" onclick="lerDesfazerTriagem()">${ic('undo','ic-sm')} Desfazer (${_lerDesfazer.length})</button>` : ''}
     </div>
+    ${_lerNivBlocoHTML()}
     ${_lerPreBlocoHTML()}
     <div class="ler-fer-triagem" onclick="_lerCliqueTriagem(event)">
       ${topo.map(x => `
@@ -2046,4 +2047,282 @@ function _lerRacPrevisto(model, nItens, tokensVisiveis) {
   // Sem medição ainda: 4× o texto visível. É deliberadamente generoso — se o
   // valor real vier menor, a surpresa é boa.
   return { tokens: tokensVisiveis * 4, medido: false, raciocina: true }
+}
+
+// ================================================================
+// TRIAGEM POR NÍVEL — "marque o que está abaixo de mim, eu desmarco o resto"
+// ================================================================
+// O problema que isto resolve: um capítulo traz 647 palavras "novas", mas a
+// maioria só é nova para o APP — o aluno já as conhece; elas nunca passaram
+// pelo `knownWords` porque marcá-las uma a uma é trabalho de horas. O efeito
+// era duplo e ruim: a cobertura mentia para baixo (67% quando o real é ~90%) e
+// a leitura com IA gastava dinheiro glosando palavra que ele sabe.
+//
+// A inversão: a IA classifica cada palavra no QECR (A1…C2) numa chamada
+// barata, tudo ABAIXO do nível dele já vem MARCADO como conhecido, e ele só
+// desmarca a exceção. Marcar 300 palavras vira desmarcar 8.
+//
+// POR QUE É UM PASSO SEPARADO DA LEITURA COM IA, e nesta ordem:
+//   1. classificar (barato: ~3 tokens de saída por palavra, cobre TODAS)
+//   2. marcar as conhecidas
+//   3. só então glosar o que sobrou (caro, e agora sobre um conjunto menor)
+// Fazer o contrário seria pagar glosa de palavra que ele ia marcar como
+// conhecida no minuto seguinte.
+//
+// O QUE ELE NUNCA FAZ: marcar sozinho. A tela mostra a proposta, ele confirma,
+// e há desfazer — `knownWords` alimenta a cobertura, a triagem e o próprio
+// glossário, então marcação errada em massa contamina tudo.
+
+const LER_NIV_VER = 1
+const LER_NIV_LOTE = 80        // saída curtíssima (palavra + 2 letras), então
+                               // cabe lote maior que o da glosa
+
+let _lerNiv = null             // { chave, itens:[{w,n,freq}], sel:Set, feitas:Set }
+let _lerNivDesfazer = null     // últimas marcadas, para reverter em um clique
+
+function _lerChaveNiv(cap) { return 'niv:' + (_lerLivro ? _lerLivro.id : '?') + ':' + cap }
+
+async function _lerNivDoCache(cap) {
+  try {
+    const b = await BookDB.get(_lerChaveNiv(cap))
+    if (!b) return null
+    const d = JSON.parse(typeof b.text === 'function' ? await b.text() : String(b))
+    if (!d || !Array.isArray(d.itens) || Number(d.v || 0) < LER_NIV_VER) return null
+    return d
+  } catch (e) { return null }
+}
+
+// Monta o estado a partir do cache, já descartando o que deixou de ser novo
+// (ele pode ter marcado palavras por outro caminho desde a classificação).
+function _lerNivMontar(chave, itens) {
+  const nivel = cefrIdx(cefrNivelAluno())
+  const emEstudo = _lerConjuntoEmEstudo()
+  const vivos = itens.filter(it =>
+    it && it.w && cefrIdx(it.n) >= 0 &&
+    !isKnownWord(it.w) && !emEstudo.has(knownNorm(it.w)) &&
+    !(typeof ignoredWords === 'object' && ignoredWords[knownNorm(it.w)]))
+  // Pré-marcado = está ABAIXO do nível dele. O nível dele mesmo NÃO entra:
+  // "B1" para quem é B1 é exatamente a faixa onde ele ainda tem buracos, e
+  // marcá-la em massa esconderia o que ele precisa estudar.
+  // ⚠️ Isto define só o ESTADO INICIAL. TODA palavra, de qualquer faixa, é
+  // clicável, e todo grupo tem "marcar todas" — inclusive C1 e C2. Ninguém
+  // conhece vocabulário em blocos perfeitamente alinhados com a escala: quem
+  // é B1 sabe "bayonet" se leu sobre guerra. A escala é um palpite útil para
+  // poupar cliques, não um teto.
+  const sel = new Set(vivos.filter(it => cefrIdx(it.n) < nivel).map(it => it.w))
+  _lerNiv = { chave, itens: vivos, sel }
+  return vivos.length
+}
+
+async function lerNivAplicar(cap) {
+  const d = await _lerNivDoCache(cap)
+  if (_lerCap !== cap) return 0
+  if (!d) { _lerNiv = null; return 0 }
+  return _lerNivMontar(_lerChaveNiv(cap), d.itens)
+}
+
+async function lerClassificar(cap, refazer) {
+  if (cap === undefined) cap = _lerCap
+  if (!_lerLivro) return
+  if (!refazer && await lerNivAplicar(cap)) return
+
+  _lerPreProgresso('abrindo o capítulo…', 0, 0, 0)
+  const txt = await _lerTextoDoCapitulo(cap)
+  if (!txt) { toast('capítulo vazio', 'warning'); return }
+  // SEM teto aqui, ao contrário da glosa: a saída é de 2 letras por palavra, e
+  // classificar só metade do capítulo deixaria a outra metade inflando a
+  // contagem de "novas" para sempre.
+  const nov = lerAnalisar(txt).novas.filter(x => x.w.length > 2)
+  if (!nov.length) { toast('nenhuma palavra nova neste capítulo', 'info'); return }
+
+  const lang = (_lerLivro.lang || 'en').slice(0, 2)
+  const lotes = []
+  for (let i = 0; i < nov.length; i += LER_NIV_LOTE) lotes.push(nov.slice(i, i + LER_NIV_LOTE))
+
+  const sistema = [
+    'Você classifica vocabulário de ' + (lang === 'en' ? 'inglês' : lang) + ' na escala QECR/CEFR.',
+    'Para cada palavra recebida, devolva o nível em que um aprendiz TÍPICO já a reconheceria ao ler.',
+    'A1 = as ~500 palavras mais comuns. A2 = dia a dia. B1 = notícia e diálogo comum.',
+    'B2 = romance e texto técnico. C1 = literário, formal, irônico. C2 = raro, arcaico, técnico especializado.',
+    'Classifique a palavra em si, não o assunto do texto. Nome próprio, topônimo e marca: C1.',
+    'Forma flexionada herda o nível do lema ("began" tem o nível de "begin").',
+    '',
+    'Responda SÓ com JSON: {"itens":[{"w":"a palavra EXATAMENTE como veio","n":"B1"}]}',
+    '- "w": copie letra por letra. É por ela que a resposta é casada com a pergunta.',
+    '- "n": um de A1, A2, B1, B2, C1, C2. Nada além disso.',
+    '- Um objeto por palavra. Se estiver em dúvida, escolha o nível MAIS ALTO — errar para cima só faz a palavra aparecer para ele conferir; errar para baixo a esconde.'
+  ].join('\n')
+
+  const tokensIn = Math.ceil((sistema.length * lotes.length + nov.reduce((s, x) => s + x.w.length + 2, 0)) / 4)
+  const tokensVis = nov.length * 12
+  const rac = _lerRacPrevisto(aiModel(), nov.length, tokensVis)
+  const p = aiPrecoModelo()
+  const usd = (tokensIn * p.in + (tokensVis + rac.tokens) * p.out) / 1e6
+  const brl = usd * (await aiUsdBrl())
+  const ok = await confirmModal({
+    title: 'Classificar o vocabulário por nível',
+    icon: 'layers',
+    confirmText: 'Classificar — ' + _brl(brl),
+    html: '<div class="cost-rows">' +
+      '<div class="cost-row"><span>Palavras</span><b>' + nov.length + ' (todas as novas)</b></div>' +
+      '<div class="cost-row"><span>Chamadas</span><b>' + lotes.length + '</b></div>' +
+      '<div class="cost-row"><span>Modelo</span><b>' + esc(aiChatCfg().P.nome + ' · ' + aiModel()) + '</b></div>' +
+      '<div class="cost-row"><span>Seu nível</span><b>' + esc(cefrNivelAluno()) + ' (Configurações → IA)</b></div>' +
+      '<div class="cost-row total"><span>Custo estimado</span><b>' + _brl(brl) + '</b></div>' +
+      '</div><ul class="cost-bullets">' +
+      '<li>Tudo <b>abaixo de ' + esc(cefrNivelAluno()) + '</b> vem marcado como conhecido. Você só <b>desmarca</b> o que não souber.</li>' +
+      '<li>Nada é marcado sem você confirmar, e dá para desfazer.</li>' +
+      '<li>Depois disto a leitura com IA fica mais barata: sobra menos palavra para glosar.</li>' +
+      '</ul>'
+  })
+  if (!ok) { _lerRenderFerramentas(); return }
+
+  try {
+    if (typeof aiUsoZerar === 'function') aiUsoZerar()
+    const saida = []
+    let ignorados = 0
+    for (let n = 0; n < lotes.length; n++) {
+      _lerPreProgresso('classificando…', n, lotes.length, saida.length)
+      const j = await aiJSON([
+        { role: 'system', content: sistema },
+        { role: 'user', content: lotes[n].map(x => x.w).join('\n') }
+      ], { maxTokens: Math.min(4000, lotes[n].length * 14 + 300) })
+
+      // Casamento PELA PALAVRA, como na glosa — nunca por índice/ordem.
+      const pedidas = new Map(lotes[n].map(x => [knownNorm(x.w), x]))
+      for (const r of (Array.isArray(j) ? j : (j.itens || j.items || []))) {
+        if (!r) continue
+        const orig = pedidas.get(knownNorm(r.w || r.word || ''))
+        const niv = String(r.n || r.nivel || r.level || '').toUpperCase().trim()
+        if (!orig || cefrIdx(niv) < 0) { ignorados++; continue }
+        saida.push({ w: orig.w, n: niv, freq: orig.n })
+      }
+      _lerPreProgresso('classificando…', n + 1, lotes.length, saida.length)
+    }
+    if (!saida.length) throw new Error('a IA não devolveu nenhuma classificação reconhecível')
+
+    await BookDB.set(_lerChaveNiv(cap), new Blob([JSON.stringify({ v: LER_NIV_VER, itens: saida, at: Date.now() })]))
+    if (_lerCap === cap) _lerNivMontar(_lerChaveNiv(cap), saida)
+
+    let extra = ''
+    if (typeof aiUsoAcumulado === 'function') {
+      const uso = aiUsoAcumulado()
+      if (uso.chamadas) {
+        const brlReal = aiCustoDeUso(uso, aiModel()) * (await aiUsdBrl())
+        extra = ' · custou ' + _brl(brlReal)
+        if (uso.raciocinio > 0) _lerRacGuardar(aiModel(), uso.raciocinio / nov.length)
+        console.info('[nivel] medido:', uso, '→', _brl(brlReal), '· estimado', _brl(brl))
+      }
+    }
+    if (ignorados) console.warn('[nivel] ' + ignorados + ' resposta(s) descartadas (palavra fora do lote ou nível inválido)')
+    toast(saida.length + ' palavras classificadas' + extra, 'success')
+  } catch (e) {
+    toast('não deu para classificar: ' + e.message, 'error')
+  }
+  _lerRenderFerramentas()
+}
+
+// ---- A TELA ----------------------------------------------------
+function lerNivToggle(w) {
+  if (!_lerNiv) return
+  _lerNiv.sel.has(w) ? _lerNiv.sel.delete(w) : _lerNiv.sel.add(w)
+  _lerNivRepintar()
+}
+
+function lerNivGrupo(nivel, ligar) {
+  if (!_lerNiv) return
+  for (const it of _lerNiv.itens) {
+    if (it.n !== nivel) continue
+    if (ligar) _lerNiv.sel.add(it.w); else _lerNiv.sel.delete(it.w)
+  }
+  _lerNivRepintar()
+}
+
+function lerNivConfirmar() {
+  if (!_lerNiv || !_lerNiv.sel.size) return
+  // Guarda ANTES de marcar: só o que não era conhecido é que precisa voltar
+  // no desfazer, senão reverter apagaria marcação legítima antiga.
+  const marcadas = [..._lerNiv.sel].filter(w => !isKnownWord(w))
+  for (const w of marcadas) markKnownWord(w, true)
+  _lerNivDesfazer = marcadas
+  _lerNiv.itens = _lerNiv.itens.filter(it => !_lerNiv.sel.has(it.w))
+  _lerNiv.sel = new Set()
+  toast(marcadas.length + ' palavras marcadas como conhecidas', 'success')
+  _lerRenderFerramentas()
+}
+
+function lerNivDesfazerMarcacao() {
+  if (!_lerNivDesfazer || !_lerNivDesfazer.length) return
+  for (const w of _lerNivDesfazer) markKnownWord(w, false)
+  const n = _lerNivDesfazer.length
+  _lerNivDesfazer = null
+  toast(n + ' marcações desfeitas', 'info')
+  lerNivAplicar(_lerCap).then(() => _lerRenderFerramentas())
+}
+
+function _lerNivRepintar() {
+  const c = el('ler-niv-corpo')
+  if (c) c.innerHTML = _lerNivCorpoHTML()
+}
+
+function _lerNivCorpoHTML() {
+  if (!_lerNiv || !_lerNiv.itens.length) return ''
+  const meu = cefrIdx(cefrNivelAluno())
+  const porNivel = new Map(CEFR.map(c => [c.id, []]))
+  for (const it of _lerNiv.itens) (porNivel.get(it.n) || []).push(it)
+
+  const grupos = CEFR.map(c => {
+    const lista = (porNivel.get(c.id) || []).sort((a, b) => (b.freq || 0) - (a.freq || 0) || a.w.localeCompare(b.w))
+    if (!lista.length) return ''
+    const marcados = lista.filter(it => _lerNiv.sel.has(it.w)).length
+    const abaixo = c.i < meu
+    return `
+      <div class="ler-niv-grupo${abaixo ? ' abaixo' : ''}">
+        <div class="ler-niv-cab">
+          <b>${c.id}</b>
+          <span>${esc(c.dica)}</span>
+          <i>${marcados}/${lista.length}</i>
+          <button class="btn btn-ghost btn-sm" onclick="lerNivGrupo('${c.id}',${marcados < lista.length})">
+            ${marcados < lista.length ? 'marcar todas' : 'desmarcar'}</button>
+        </div>
+        <div class="ler-niv-lista">
+          ${lista.map(it => `
+            <button class="ler-niv-chip${_lerNiv.sel.has(it.w) ? ' on' : ''}"
+              onclick="lerNivToggle(${escA(JSON.stringify(it.w))})"
+              data-tip="${(it.freq || 1) > 1 ? 'aparece ' + it.freq + ' vezes neste capítulo' : 'aparece 1 vez'}">
+              ${_lerNiv.sel.has(it.w) ? ic('check', 'ic-sm') : ''}${esc(it.w)}</button>`).join('')}
+        </div>
+      </div>`
+  }).join('')
+
+  const n = _lerNiv.sel.size
+  return grupos + `
+    <div class="ler-niv-rodape">
+      ${n ? `<button class="btn btn-primary btn-sm" onclick="lerNivConfirmar()">
+        ${ic('check','ic-sm')} Marcar ${n} como conhecidas</button>`
+          : `<p class="ler-fer-nota" style="margin:0">Nenhuma marcada — desmarque ou marque as que quiser e volte aqui.</p>`}
+      ${_lerNivDesfazer && _lerNivDesfazer.length
+        ? `<button class="btn btn-ghost btn-sm" onclick="lerNivDesfazerMarcacao()">${ic('undo','ic-sm')} Desfazer (${_lerNivDesfazer.length})</button>` : ''}
+    </div>`
+}
+
+function _lerNivBlocoHTML() {
+  const temEstado = _lerNiv && _lerNiv.chave === _lerChaveNiv(_lerCap) && _lerNiv.itens.length
+  if (!temEstado) {
+    return '<div class="ler-pre">' +
+      '<button class="btn btn-secondary btn-sm" onclick="lerClassificar()">' +
+      ic('layers', 'ic-sm') + ' Classificar por nível (você é ' + esc(cefrNivelAluno()) + ')</button>' +
+      '<p class="ler-fer-nota">A IA põe cada palavra nova numa faixa do QECR. Tudo <b>abaixo do seu nível</b> ' +
+      'já vem marcado como conhecido, e você só <b>desmarca</b> o que não souber. ' +
+      '<b>As faixas acima também são marcáveis</b> — clique na palavra ou em "marcar todas". ' +
+      'Isso conserta a cobertura e <b>barateia a leitura com IA</b>, que passa a glosar só o que sobra.</p></div>'
+  }
+  return '<div class="ler-pre ler-niv">' +
+    '<div class="ler-niv-topo">' +
+      '<b>Triagem por nível</b>' +
+      '<span class="ler-fer-nota" style="margin:0">seu nível: <b>' + esc(cefrNivelAluno()) + '</b> — abaixo dele já veio marcado. ' +
+        'Clique em qualquer palavra, <b>de qualquer faixa</b>, para marcar ou desmarcar.</span>' +
+      '<button class="btn btn-ghost btn-sm" onclick="lerClassificar(undefined,true)">' + ic('refresh','ic-sm') + ' Refazer</button>' +
+    '</div>' +
+    '<div id="ler-niv-corpo">' + _lerNivCorpoHTML() + '</div></div>'
 }

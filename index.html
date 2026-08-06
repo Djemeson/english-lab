@@ -605,6 +605,12 @@
           <select id="cfg-ai-model" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
         </div>
         <div style="min-width:210px">
+          <!-- A regua da triagem por nivel do leitor: palavra abaixo deste
+               nivel ja entra marcada como conhecida. -->
+          <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Seu nível de leitura</label>
+          <select id="cfg-nivel-aluno" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
+        </div>
+        <div style="min-width:210px">
           <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Transcrição (fala → texto)</label>
           <select id="cfg-stt-provider" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)">
             <option value="auto">Automático (Groq se houver chave)</option>
