@@ -4851,55 +4851,109 @@ body.ler-full .mobile-bottom-nav{display:none}
 
 /* ================================================================
    TRIAGEM POR NÍVEL (QECR) no painel de ferramentas do leitor
-   Faixa abaixo do nível do aluno ganha um traço de acento — sinal de
-   "isto veio marcado por padrão". NÃO é desabilitado: todo chip, de
-   toda faixa, é clicável, porque ninguém sabe vocabulário em blocos
-   alinhados com a escala.
-   ================================================================ */
+   ================================================================
+   O painel padrão (.ler-painel) tem 46vh e serve para sumário e
+   tipografia, que são listas curtas. AQUI se trabalha centenas de
+   palavras uma a uma — 46vh obrigava a rolar o tempo todo numa
+   janelinha. As Ferramentas ganham altura própria, com o resumo e as
+   ações FIXOS no topo e só a lista rolando por dentro: o botão de
+   confirmar não pode fugir da tela enquanto ele triava. */
+#ler-ferramentas{max-height:86vh;padding:16px 20px}
+
 .ler-niv-topo{
-  display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  margin-bottom:12px;
 }
-.ler-niv-topo b{font-size:var(--fs-sm)}
+.ler-niv-topo>b{font-size:var(--fs-base)}
+.ler-niv-sub{font-size:var(--fs-3xs);color:var(--ler-fg2, var(--text2))}
 .ler-niv-topo .btn{margin-left:auto}
 
-.ler-niv-grupo{
-  margin-bottom:14px;padding-left:10px;
-  border-left:2px solid rgba(128,128,128,.22);
+/* Resumo + ação principal, colados no topo enquanto a lista rola */
+.ler-niv-barra{
+  position:sticky;top:-16px;z-index:3;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin:0 -20px 14px;padding:11px 20px;
+  background:var(--ler-bg);
+  border-bottom:1px solid rgba(128,128,128,.2);
+  box-shadow:0 6px 14px -12px rgba(0,0,0,.6);
 }
-.ler-niv-grupo.abaixo{border-left-color:rgba(var(--primary-rgb),.6)}
+.ler-niv-resumo{font-size:var(--fs-sm);color:var(--ler-fg2, var(--text2))}
+.ler-niv-resumo b{color:var(--ler-fg, var(--text));font-variant-numeric:tabular-nums}
+.ler-niv-barra .btn-primary{margin-left:auto}
 
-.ler-niv-cab{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap}
-.ler-niv-cab b{
-  font-size:var(--fs-xs);letter-spacing:.04em;
-  background:rgba(128,128,128,.16);border-radius:4px;padding:2px 7px;
+.ler-niv-rolo{max-height:62vh;overflow-y:auto;padding-right:4px;margin-right:-4px}
+
+/* Cada faixa é um cartão. A do nível dele ganha destaque próprio: é a
+   fronteira, onde estão os buracos reais — e é a única que não vem
+   pré-marcada. */
+.ler-niv-grupo{
+  margin-bottom:16px;padding:12px 14px;
+  border:1px solid rgba(128,128,128,.18);border-radius:var(--radius-sm);
+  background:rgba(128,128,128,.05);
 }
-.ler-niv-grupo.abaixo .ler-niv-cab b{
-  background:rgba(var(--primary-rgb),.16);color:rgba(var(--primary-rgb),.98);
+.ler-niv-grupo.abaixo{
+  border-color:rgba(var(--primary-rgb),.32);
+  background:rgba(var(--primary-rgb),.05);
 }
-.ler-niv-cab span{font-size:var(--fs-3xs);color:var(--text2)}
-.ler-niv-cab i{font-size:var(--fs-3xs);color:var(--text2);font-style:normal;font-variant-numeric:tabular-nums}
-.ler-niv-cab .btn{margin-left:auto;padding:2px 8px}
+.ler-niv-grupo.meu{
+  border-color:rgba(var(--primary-rgb),.55);
+  box-shadow:inset 3px 0 0 rgba(var(--primary-rgb),.75);
+}
+
+.ler-niv-cab{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px}
+.ler-niv-tag{
+  font-size:var(--fs-xs);letter-spacing:.06em;font-weight:700;
+  background:rgba(128,128,128,.2);border-radius:5px;padding:3px 9px;
+}
+.ler-niv-grupo.abaixo .ler-niv-tag,
+.ler-niv-grupo.meu .ler-niv-tag{
+  background:rgba(var(--primary-rgb),.9);color:#fff;
+}
+.ler-niv-desc{font-size:var(--fs-3xs);color:var(--ler-fg2, var(--text2))}
+.ler-niv-marca{
+  font-size:var(--fs-3xs);font-style:normal;
+  color:rgba(var(--primary-rgb),.98);
+  border:1px solid rgba(var(--primary-rgb),.45);border-radius:20px;padding:1px 8px;
+}
+.ler-niv-cont{
+  margin-left:auto;font-size:var(--fs-3xs);color:var(--ler-fg2, var(--text2));
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.ler-niv-cont b{color:var(--ler-fg, var(--text))}
+
+.ler-niv-acoes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.ler-niv-acoes .btn{padding:3px 9px;font-size:var(--fs-3xs)}
 
 .ler-niv-lista{display:flex;flex-wrap:wrap;gap:6px}
 .ler-niv-chip{
   display:inline-flex;align-items:center;gap:4px;
-  padding:5px 10px;border-radius:20px;cursor:pointer;
-  font-size:var(--fs-xs);
+  padding:5px 11px;border-radius:20px;cursor:pointer;
+  font-size:var(--fs-xs);line-height:1.3;
   background:var(--surface2);color:var(--text2);
   border:1px solid var(--border);
+  transition:background .12s,border-color .12s,color .12s;
 }
 .ler-niv-chip:hover{border-color:rgba(var(--primary-rgb),.55);color:var(--text)}
 .ler-niv-chip.on{
   background:rgba(var(--primary-rgb),.9);color:#fff;
   border-color:rgba(var(--primary-rgb),.9);
 }
-.ler-niv-rodape{
-  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  margin-top:14px;padding-top:12px;border-top:1px solid rgba(128,128,128,.16);
+/* Quantas vezes a palavra volta no capítulo — repetição é o melhor
+   argumento para estudá-la, então merece estar no chip. */
+.ler-niv-chip i{
+  font-style:normal;font-size:var(--fs-3xs);opacity:.7;
+  border-left:1px solid currentColor;padding-left:5px;margin-left:1px;
 }
 
 @media (max-width:768px){
-  /* Dedo: alvo maior e a lista rola por dentro em vez de esticar a página */
+  #ler-ferramentas{max-height:88vh;max-height:88dvh;padding:14px}
+  .ler-niv-barra{margin:0 -14px 12px;padding:10px 14px;top:-14px}
+  .ler-niv-rolo{max-height:56vh;max-height:56dvh}
   .ler-niv-chip{padding:8px 13px;min-height:38px}
-  .ler-niv-lista{max-height:42vh;overflow-y:auto}
+  .ler-niv-acoes .btn{min-height:32px}
+}
+/* Selo de expressão no chip: distingue "tire of" de "tire" na mesma lista */
+.ler-niv-chip u{
+  font-size:var(--fs-3xs);text-decoration:none;opacity:.85;
+  border:1px solid currentColor;border-radius:20px;padding:0 5px;margin-left:2px;
 }

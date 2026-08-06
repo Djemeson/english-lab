@@ -1177,6 +1177,43 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+180. **O CLIQUE QUE NÃO FAZIA NADA, O PAINEL CURTO E O CLASSIFICADOR CEGO A EXPRESSÕES
+     (87ª rodada, 2026-08-06)**. Três relatos seguidos, e o primeiro era um par de bugs mudos.
+     - **"clico em classificar e nada acontece"** — DOIS defeitos, os dois silenciosos:
+       · `_lerPreProgresso` escrevia num id FIXO (`#ler-pre-area`) que pertence só ao bloco da
+         GLOSA. O fluxo de nível desenhava no bloco errado e, quando aquele bloco estava no
+         estado "já foi lido" (que não tem esse id), a função **saía sem fazer nada**.
+         Agora o alvo é parâmetro (`_lerProgresso(areaId, …)`) e cada fluxo tem a sua área e o
+         seu atalho — nenhum ponto de chamada precisa lembrar o id, que foi como o bug nasceu.
+       · com a classificação já em cache, `lerClassificar` retornava **sem redesenhar**: o
+         segundo clique também não produzia nada visível. Agora redesenha e avisa.
+       · E a regra que ficou: **avisar ANTES do primeiro `await`**. Ler o IndexedDB e abrir o
+         capítulo do EPUB levam tempo; clique sem resposta é indistinguível de app travado.
+         Aplicado também ao fluxo da glosa, que tinha o mesmo buraco.
+     - **"tem que ter um painel maior, tá muito curto"** — `.ler-painel` tem 46vh, dimensão
+       pensada para sumário e tipografia (listas curtas). Aqui se triam centenas de palavras.
+       `#ler-ferramentas` ganhou **86vh**, com **resumo e ação principal fixos no topo**
+       (`position:sticky`) e só a lista rolando por dentro: o botão de confirmar não pode fugir
+       da tela no meio da triagem. Cada faixa virou cartão, e a do nível dele tem marca própria
+       — é a fronteira, onde estão os buracos reais.
+     - **Ação POR FAIXA** (`lerNivEstudarGrupo`): cada nível tem "estudar as N restantes", que
+       manda ao Revisar as **não marcadas** daquela faixa — marcado significa "eu conheço",
+       então mandar as marcadas criaria card do que ele acabou de dispensar. Reusa
+       `_lerCapturarSemFrase`, que já acha a frase de cada palavra no capítulo.
+     - **⚠️ "o classificador só traz palavras, não phrasal verbs / idioms / collocations, e
+       isso é fundamental"** — estava certo, e era falha ESTRUTURAL: o classificador mandava a
+       palavra **nua**. Sem a frase, "tire" e "of" chegam separados e sem vizinhança, então
+       "tire of" jamais poderia aparecer — o mesmo motivo pelo qual o dicionário embarcado foi
+       recusado. Agora vai `palavra :: frase`, e a expressão volta com **nível próprio** (`nx`).
+       Ela entra como item SEPARADO, não substitui a palavra: quem sabe "look" pode não saber
+       "look forward to", e são duas decisões diferentes de "eu conheço". Custa pouco — a frase
+       pesa na ENTRADA, o lado barato (US$ 0,20/1M contra 1,20 da saída).
+       As mesmas três travas da glosa contra unidade inventada, mais deduplicação (a mesma
+       expressão reaparece em várias frases). Testadas 8 situações, todas corretas.
+     - **Buraco vizinho fechado**: `_lerConjuntoEmEstudo` só guarda palavra de uma peça, então
+       expressão que JÁ era card escapava e voltava a aparecer na triagem. A checagem passou a
+       ser contra a lista de cards inteira. `CACHE` → **v120**.
+
 179. **TRIAGEM POR NÍVEL (QECR) — `lerClassificar()` (86ª rodada, 2026-08-06)**. Pedido:
      *"eu já entendo escrita muito bem, pelo nível médio. A cada capítulo você poderia fazer
      uma classificação de nível, onde todas as de nível menor que o meu já estão marcadas como

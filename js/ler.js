@@ -1757,6 +1757,10 @@ async function lerPreAplicar(cap) {
 async function lerPreAnalisar(cap, refazer) {
   if (cap === undefined) cap = _lerCap
   if (!_lerLivro) return
+  // Mesmo cuidado do fluxo de nível: avisar ANTES do primeiro await. Ler o
+  // cache no IndexedDB não é instantâneo, e clique sem resposta é o defeito
+  // que o Djemeson relatou — vale para todo botão que dispara trabalho longo.
+  _lerPreProgresso('procurando leitura já feita…', 0, 0, 0)
   if (!refazer) {
     const n = await lerPreAplicar(cap)
     if (n) { toast(n + ' palavras deste capítulo já estavam lidas', 'info'); return }
@@ -1989,8 +1993,13 @@ function _lerPreBlocoHTML() {
 // se travou ou se já acabou. Toast não serve aqui: ele some sozinho e some
 // justamente enquanto ainda está trabalhando.
 // Mostra a etapa, quantos lotes já voltaram e quantas glosas já entraram.
-function _lerPreProgresso(texto, feito, total, glosas) {
-  const a = el('ler-pre-area')
+// O ALVO é parâmetro. Antes era fixo em `#ler-pre-area`, que pertence só ao
+// bloco da GLOSA — então "Classificar por nível" desenhava o progresso no
+// bloco errado e, quando aquele bloco estava no estado "já foi lido" (que não
+// tem esse id), a função saía em silêncio e o clique não fazia nada visível.
+// Cada fluxo longo agora tem a sua própria área e escreve nela.
+function _lerProgresso(areaId, texto, feito, total, sub) {
+  const a = el(areaId)
   if (!a) return
   const pct = total ? Math.round((feito / total) * 100) : 0
   a.innerHTML =
@@ -2001,8 +2010,19 @@ function _lerPreProgresso(texto, feito, total, glosas) {
         (total > 1 ? '<span class="ler-pre-prog-n">' + feito + '/' + total + '</span>' : '') +
       '</div>' +
       (total ? '<div class="ler-pre-barra"><i style="width:' + pct + '%"></i></div>' : '') +
-      (glosas ? '<div class="ler-pre-prog-sub">' + glosas + ' palavras lidas até agora</div>' : '') +
+      (sub ? '<div class="ler-pre-prog-sub">' + esc(sub) + '</div>' : '') +
     '</div>'
+}
+
+// Atalhos por fluxo — cada um sabe a sua área. Assim nenhum ponto de chamada
+// precisa lembrar o id, que foi exatamente como o bug nasceu.
+function _lerPreProgresso(texto, feito, total, glosas) {
+  _lerProgresso('ler-pre-area', texto, feito, total,
+    glosas ? glosas + ' palavras lidas até agora' : '')
+}
+function _lerNivProgresso(texto, feito, total, n) {
+  _lerProgresso('ler-niv-area', texto, feito, total,
+    n ? n + ' palavras classificadas até agora' : '')
 }
 
 // ---- CALIBRAÇÃO DO RACIOCÍNIO -----------------------------------
@@ -2097,9 +2117,13 @@ async function _lerNivDoCache(cap) {
 function _lerNivMontar(chave, itens) {
   const nivel = cefrIdx(cefrNivelAluno())
   const emEstudo = _lerConjuntoEmEstudo()
+  // `_lerConjuntoEmEstudo` só guarda palavra de uma peça, então expressão que
+  // JÁ é card escapava dele e voltava a aparecer na triagem. Aqui a checagem
+  // é contra a lista de cards inteira.
+  const cards = new Set(words.map(w => knownNorm(w.word || '')).filter(Boolean))
   const vivos = itens.filter(it =>
     it && it.w && cefrIdx(it.n) >= 0 &&
-    !isKnownWord(it.w) && !emEstudo.has(knownNorm(it.w)) &&
+    !isKnownWord(it.w) && !emEstudo.has(knownNorm(it.w)) && !cards.has(knownNorm(it.w)) &&
     !(typeof ignoredWords === 'object' && ignoredWords[knownNorm(it.w)]))
   // Pré-marcado = está ABAIXO do nível dele. O nível dele mesmo NÃO entra:
   // "B1" para quem é B1 é exatamente a faixa onde ele ainda tem buracos, e
@@ -2124,20 +2148,43 @@ async function lerNivAplicar(cap) {
 async function lerClassificar(cap, refazer) {
   if (cap === undefined) cap = _lerCap
   if (!_lerLivro) return
-  if (!refazer && await lerNivAplicar(cap)) return
+  // FEEDBACK ANTES DO PRIMEIRO await. Ler o cache no IndexedDB e abrir o
+  // capítulo do EPUB levam tempo, e sem isto o clique não produzia nada
+  // visível — o usuário não tem como saber se está rodando ou se travou.
+  _lerNivProgresso('procurando classificação já feita…', 0, 0, 0)
+  if (!refazer && await lerNivAplicar(cap)) {
+    // Faltava redesenhar: com a classificação já em cache, a função saía
+    // calada e o clique parecia não fazer nada pela SEGUNDA razão.
+    _lerRenderFerramentas()
+    toast('classificação deste capítulo carregada', 'info')
+    return
+  }
 
-  _lerPreProgresso('abrindo o capítulo…', 0, 0, 0)
+  _lerNivProgresso('abrindo o capítulo…', 0, 0, 0)
   const txt = await _lerTextoDoCapitulo(cap)
-  if (!txt) { toast('capítulo vazio', 'warning'); return }
+  if (!txt) { toast('capítulo vazio', 'warning'); _lerRenderFerramentas(); return }
+  _lerNivProgresso('separando as palavras novas…', 0, 0, 0)
   // SEM teto aqui, ao contrário da glosa: a saída é de 2 letras por palavra, e
   // classificar só metade do capítulo deixaria a outra metade inflando a
   // contagem de "novas" para sempre.
   const nov = lerAnalisar(txt).novas.filter(x => x.w.length > 2)
-  if (!nov.length) { toast('nenhuma palavra nova neste capítulo', 'info'); return }
+  if (!nov.length) { toast('nenhuma palavra nova neste capítulo', 'info'); _lerRenderFerramentas(); return }
+
+  // A FRASE VAI JUNTO — e é isto que permite achar phrasal verb, idiom e
+  // colocação. A primeira versão mandava a palavra nua, e por construção não
+  // tinha como enxergar unidade nenhuma: "tire" e "of" chegavam separados e
+  // sem vizinhança, então "tire of" jamais apareceria. Palavra sem contexto
+  // não é classificável em expressão — é o mesmo motivo pelo qual recusamos o
+  // dicionário embarcado.
+  // Custa pouco: a frase pesa na ENTRADA, que é o lado barato (US$ 0,20/1M
+  // contra 1,20 da saída).
+  _lerNivProgresso('casando cada palavra com a frase dela…', 0, 0, 0)
+  const frasesN = _lerFrasesPara(txt, nov.map(x => x.w))
+  const comFrase = nov.map(x => ({ w: x.w, freq: x.n, f: frasesN.get(x.w) || '' }))
 
   const lang = (_lerLivro.lang || 'en').slice(0, 2)
   const lotes = []
-  for (let i = 0; i < nov.length; i += LER_NIV_LOTE) lotes.push(nov.slice(i, i + LER_NIV_LOTE))
+  for (let i = 0; i < comFrase.length; i += LER_NIV_LOTE) lotes.push(comFrase.slice(i, i + LER_NIV_LOTE))
 
   const sistema = [
     'Você classifica vocabulário de ' + (lang === 'en' ? 'inglês' : lang) + ' na escala QECR/CEFR.',
@@ -2147,14 +2194,25 @@ async function lerClassificar(cap, refazer) {
     'Classifique a palavra em si, não o assunto do texto. Nome próprio, topônimo e marca: C1.',
     'Forma flexionada herda o nível do lema ("began" tem o nível de "begin").',
     '',
-    'Responda SÓ com JSON: {"itens":[{"w":"a palavra EXATAMENTE como veio","n":"B1"}]}',
+    '',
+    'Cada item vem como "palavra :: frase do livro". Olhe a frase por DOIS motivos:',
+    '(a) desambiguar a palavra; (b) ver se ali ela forma uma UNIDADE MAIOR — phrasal verb',
+    '("tire of", "look forward to"), expressão idiomática ("bear the mark of Cain") ou colocação',
+    'fixa ("shed blood"). Quando formar, devolva a unidade em "expr" com o nível DELA em "nx".',
+    'A unidade quase sempre é mais difícil que a palavra: quem sabe "look" pode não saber',
+    '"look forward to". Por isso ela é classificada à parte, e não herda o nível da palavra.',
+    '',
+    'Responda SÓ com JSON: {"itens":[{"w":"a palavra EXATAMENTE como veio","n":"B1","expr":"","nx":""}]}',
     '- "w": copie letra por letra. É por ela que a resposta é casada com a pergunta.',
-    '- "n": um de A1, A2, B1, B2, C1, C2. Nada além disso.',
+    '- "n": nível da PALAVRA. Um de A1, A2, B1, B2, C1, C2. Nada além disso.',
+    '- "expr": a unidade inteira, copiada da frase, 2 ou 3 palavras, CONTENDO o "w". Se a palavra vale sozinha ali, deixe "" — não invente expressão.',
+    '- "nx": nível da unidade, na mesma escala. Só quando houver "expr".',
     '- Um objeto por palavra. Se estiver em dúvida, escolha o nível MAIS ALTO — errar para cima só faz a palavra aparecer para ele conferir; errar para baixo a esconde.'
   ].join('\n')
 
-  const tokensIn = Math.ceil((sistema.length * lotes.length + nov.reduce((s, x) => s + x.w.length + 2, 0)) / 4)
-  const tokensVis = nov.length * 12
+  const tokensIn = Math.ceil((sistema.length * lotes.length +
+    comFrase.reduce((a, x) => a + x.w.length + x.f.length + 6, 0)) / 4)
+  const tokensVis = nov.length * 22   // agora cabe expr + nx na resposta
   const rac = _lerRacPrevisto(aiModel(), nov.length, tokensVis)
   const p = aiPrecoModelo()
   const usd = (tokensIn * p.in + (tokensVis + rac.tokens) * p.out) / 1e6
@@ -2164,7 +2222,7 @@ async function lerClassificar(cap, refazer) {
     icon: 'layers',
     confirmText: 'Classificar — ' + _brl(brl),
     html: '<div class="cost-rows">' +
-      '<div class="cost-row"><span>Palavras</span><b>' + nov.length + ' (todas as novas)</b></div>' +
+      '<div class="cost-row"><span>Palavras</span><b>' + nov.length + ' (todas as novas) + as expressões que elas formarem</b></div>' +
       '<div class="cost-row"><span>Chamadas</span><b>' + lotes.length + '</b></div>' +
       '<div class="cost-row"><span>Modelo</span><b>' + esc(aiChatCfg().P.nome + ' · ' + aiModel()) + '</b></div>' +
       '<div class="cost-row"><span>Seu nível</span><b>' + esc(cefrNivelAluno()) + ' (Configurações → IA)</b></div>' +
@@ -2172,6 +2230,7 @@ async function lerClassificar(cap, refazer) {
       '</div><ul class="cost-bullets">' +
       '<li>Tudo <b>abaixo de ' + esc(cefrNivelAluno()) + '</b> vem marcado como conhecido. Você só <b>desmarca</b> o que não souber.</li>' +
       '<li>Nada é marcado sem você confirmar, e dá para desfazer.</li>' +
+      '<li>Cada palavra vai com a <b>frase do livro</b>, então entram também <b>phrasal verbs, expressões e colocações</b> — classificados à parte, porque quem sabe "look" pode não saber "look forward to".</li>' +
       '<li>Depois disto a leitura com IA fica mais barata: sobra menos palavra para glosar.</li>' +
       '</ul>'
   })
@@ -2180,12 +2239,13 @@ async function lerClassificar(cap, refazer) {
   try {
     if (typeof aiUsoZerar === 'function') aiUsoZerar()
     const saida = []
+    const vistas = new Set()   // expressões já colhidas, para não repetir
     let ignorados = 0
     for (let n = 0; n < lotes.length; n++) {
-      _lerPreProgresso('classificando…', n, lotes.length, saida.length)
+      _lerNivProgresso('classificando… (lote ' + (n + 1) + ' de ' + lotes.length + ')', n, lotes.length, saida.length)
       const j = await aiJSON([
         { role: 'system', content: sistema },
-        { role: 'user', content: lotes[n].map(x => x.w).join('\n') }
+        { role: 'user', content: lotes[n].map(x => x.w + (x.f ? ' :: ' + x.f : '')).join('\n') }
       ], { maxTokens: Math.min(4000, lotes[n].length * 14 + 300) })
 
       // Casamento PELA PALAVRA, como na glosa — nunca por índice/ordem.
@@ -2195,9 +2255,30 @@ async function lerClassificar(cap, refazer) {
         const orig = pedidas.get(knownNorm(r.w || r.word || ''))
         const niv = String(r.n || r.nivel || r.level || '').toUpperCase().trim()
         if (!orig || cefrIdx(niv) < 0) { ignorados++; continue }
-        saida.push({ w: orig.w, n: niv, freq: orig.n })
+        saida.push({ w: orig.w, n: niv, freq: orig.freq })
+
+        // A EXPRESSÃO vira item PRÓPRIO, com o nível dela — não substitui a
+        // palavra. Ele pode saber "tire" e não saber "tire of", e são duas
+        // decisões diferentes de "eu conheço". As mesmas três travas da glosa
+        // contra unidade inventada: 2–3 palavras, contém a palavra perguntada,
+        // e aparece na frase em ordem, dentro de uma janela curta.
+        const ex = String(r.expr || '').trim().replace(/\s+/g, ' ')
+        const nx = String(r.nx || r.nivelExpr || '').toUpperCase().trim()
+        if (!ex || cefrIdx(nx) < 0 || !orig.f) continue
+        const pe = knownNorm(ex).split(' ').filter(Boolean)
+        const pf = knownNorm(orig.f).split(' ').filter(Boolean)
+        if (pe.length < 2 || pe.length > 3) continue
+        if (!pe.includes(knownNorm(orig.w))) continue
+        let i2 = 0, iniE = -1, fimE = -1
+        for (let k = 0; k < pf.length && i2 < pe.length; k++) {
+          if (pf[k] === pe[i2]) { if (i2 === 0) iniE = k; fimE = k; i2++ }
+        }
+        if (i2 !== pe.length || (fimE - iniE) > 5) continue
+        if (vistas.has(knownNorm(ex))) continue      // a mesma unidade volta em várias frases
+        vistas.add(knownNorm(ex))
+        saida.push({ w: ex, n: nx, freq: orig.freq, ex: true })
       }
-      _lerPreProgresso('classificando…', n + 1, lotes.length, saida.length)
+      _lerNivProgresso('classificando…', n + 1, lotes.length, saida.length)
     }
     if (!saida.length) throw new Error('a IA não devolveu nenhuma classificação reconhecível')
 
@@ -2260,56 +2341,105 @@ function lerNivDesfazerMarcacao() {
   lerNivAplicar(_lerCap).then(() => _lerRenderFerramentas())
 }
 
+// Manda para o Revisar SÓ as palavras NÃO MARCADAS de uma faixa. A semântica
+// da tela é "marcado = eu conheço", então o que vale estudar é justamente o
+// que sobrou desmarcado — mandar as marcadas seria criar card do que ele
+// acabou de dizer que já sabe.
+// Reusa `_lerCapturarSemFrase`, que já acha a frase de cada palavra no
+// capítulo: card sem contexto é o que produz "barrel = barril".
+async function lerNivEstudarGrupo(nivel) {
+  if (!_lerNiv) return
+  const lista = _lerNiv.itens.filter(it => it.n === nivel && !_lerNiv.sel.has(it.w)).map(it => it.w)
+  if (!lista.length) { toast('nenhuma palavra desmarcada em ' + nivel, 'info'); return }
+  const c = CEFR.find(x => x.id === nivel)
+  const ok = await confirmModal({
+    title: 'Mandar ' + nivel + ' para o Revisar',
+    icon: 'plus',
+    confirmText: 'Mandar ' + lista.length,
+    html: '<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.55">' +
+      'Vai' + (lista.length > 1 ? 'o <b>' + lista.length + ' palavras</b>' : ' <b>1 palavra</b>') + ' da faixa <b>' + esc(nivel) + '</b>' +
+      (c ? ' (' + esc(c.dica) + ')' : '') +
+      (lista.length > 1 ? ' — as que continuam <b>desmarcadas</b>, ou seja, as que você não disse conhecer.<br><br>'
+                        : ' — a que continua <b>desmarcada</b>.<br><br>') +
+      'Cada uma vai com a <b>frase do capítulo</b> em que aparece. ' +
+      'A análise com IA continua sendo escolha sua, lá no Revisar.</p>'
+  })
+  if (!ok) return
+  _lerNivProgresso('mandando ' + lista.length + ' palavras de ' + nivel + '…', 0, 0, 0)
+  const n = await _lerCapturarSemFrase(lista)
+  // Some da triagem: virou item de estudo, não é mais candidata a "conheço".
+  _lerNiv.itens = _lerNiv.itens.filter(it => !(it.n === nivel && !_lerNiv.sel.has(it.w)))
+  _lerRenderFerramentas()
+  if (n) toast(n + ' palavras de ' + nivel + ' foram para o Revisar', 'success')
+}
+
 function _lerNivRepintar() {
   const c = el('ler-niv-corpo')
   if (c) c.innerHTML = _lerNivCorpoHTML()
 }
 
 function _lerNivCorpoHTML() {
-  if (!_lerNiv || !_lerNiv.itens.length) return ''
+  if (!_lerNiv || !_lerNiv.itens.length) {
+    return '<p class="ler-fer-nota">Tudo desta classificação já foi resolvido. ' +
+           'Use <b>Refazer</b> se quiser classificar o capítulo de novo.</p>'
+  }
   const meu = cefrIdx(cefrNivelAluno())
   const porNivel = new Map(CEFR.map(c => [c.id, []]))
   for (const it of _lerNiv.itens) (porNivel.get(it.n) || []).push(it)
 
   const grupos = CEFR.map(c => {
-    const lista = (porNivel.get(c.id) || []).sort((a, b) => (b.freq || 0) - (a.freq || 0) || a.w.localeCompare(b.w))
+    const lista = (porNivel.get(c.id) || [])
+      .sort((a, b) => (b.freq || 0) - (a.freq || 0) || a.w.localeCompare(b.w))
     if (!lista.length) return ''
     const marcados = lista.filter(it => _lerNiv.sel.has(it.w)).length
+    const restam = lista.length - marcados
     const abaixo = c.i < meu
+    const meuNivel = c.i === meu
     return `
-      <div class="ler-niv-grupo${abaixo ? ' abaixo' : ''}">
-        <div class="ler-niv-cab">
-          <b>${c.id}</b>
-          <span>${esc(c.dica)}</span>
-          <i>${marcados}/${lista.length}</i>
+      <section class="ler-niv-grupo${abaixo ? ' abaixo' : ''}${meuNivel ? ' meu' : ''}">
+        <header class="ler-niv-cab">
+          <b class="ler-niv-tag">${c.id}</b>
+          <span class="ler-niv-desc">${esc(c.dica)}</span>
+          ${meuNivel ? '<em class="ler-niv-marca">seu nível</em>' : ''}
+          <span class="ler-niv-cont"><b>${marcados}</b>/${lista.length} conheço</span>
+        </header>
+        <div class="ler-niv-acoes">
           <button class="btn btn-ghost btn-sm" onclick="lerNivGrupo('${c.id}',${marcados < lista.length})">
-            ${marcados < lista.length ? 'marcar todas' : 'desmarcar'}</button>
+            ${marcados < lista.length ? ic('check','ic-sm') + ' conheço todas' : ic('undo','ic-sm') + ' desmarcar todas'}</button>
+          <button class="btn btn-ghost btn-sm${restam ? '' : ' hidden'}" onclick="lerNivEstudarGrupo('${c.id}')">
+            ${ic('plus','ic-sm')} estudar ${restam === 1 ? 'a 1 restante' : 'as ' + restam + ' restantes'}</button>
         </div>
         <div class="ler-niv-lista">
           ${lista.map(it => `
             <button class="ler-niv-chip${_lerNiv.sel.has(it.w) ? ' on' : ''}"
               onclick="lerNivToggle(${escA(JSON.stringify(it.w))})"
               data-tip="${(it.freq || 1) > 1 ? 'aparece ' + it.freq + ' vezes neste capítulo' : 'aparece 1 vez'}">
-              ${_lerNiv.sel.has(it.w) ? ic('check', 'ic-sm') : ''}${esc(it.w)}</button>`).join('')}
+              ${_lerNiv.sel.has(it.w) ? ic('check', 'ic-sm') : ''}${esc(it.w)}${
+                it.ex ? '<u>expr</u>' : ''}${
+                (it.freq || 1) > 2 ? `<i>${it.freq}</i>` : ''}</button>`).join('')}
         </div>
-      </div>`
+      </section>`
   }).join('')
 
   const n = _lerNiv.sel.size
-  return grupos + `
-    <div class="ler-niv-rodape">
+  const total = _lerNiv.itens.length
+  return `
+    <div class="ler-niv-barra">
+      <div class="ler-niv-resumo">
+        <b>${n}</b> ${n === 1 ? 'marcada' : 'marcadas'} como ${n === 1 ? 'conhecida' : 'conhecidas'} · <b>${total - n}</b> para estudar
+      </div>
       ${n ? `<button class="btn btn-primary btn-sm" onclick="lerNivConfirmar()">
-        ${ic('check','ic-sm')} Marcar ${n} como conhecidas</button>`
-          : `<p class="ler-fer-nota" style="margin:0">Nenhuma marcada — desmarque ou marque as que quiser e volte aqui.</p>`}
+        ${ic('check','ic-sm')} Marcar ${n} como conhecidas</button>` : ''}
       ${_lerNivDesfazer && _lerNivDesfazer.length
         ? `<button class="btn btn-ghost btn-sm" onclick="lerNivDesfazerMarcacao()">${ic('undo','ic-sm')} Desfazer (${_lerNivDesfazer.length})</button>` : ''}
-    </div>`
+    </div>
+    <div class="ler-niv-rolo">${grupos}</div>`
 }
 
 function _lerNivBlocoHTML() {
   const temEstado = _lerNiv && _lerNiv.chave === _lerChaveNiv(_lerCap) && _lerNiv.itens.length
   if (!temEstado) {
-    return '<div class="ler-pre">' +
+    return '<div class="ler-pre" id="ler-niv-area">' +
       '<button class="btn btn-secondary btn-sm" onclick="lerClassificar()">' +
       ic('layers', 'ic-sm') + ' Classificar por nível (você é ' + esc(cefrNivelAluno()) + ')</button>' +
       '<p class="ler-fer-nota">A IA põe cada palavra nova numa faixa do QECR. Tudo <b>abaixo do seu nível</b> ' +
@@ -2317,11 +2447,10 @@ function _lerNivBlocoHTML() {
       '<b>As faixas acima também são marcáveis</b> — clique na palavra ou em "marcar todas". ' +
       'Isso conserta a cobertura e <b>barateia a leitura com IA</b>, que passa a glosar só o que sobra.</p></div>'
   }
-  return '<div class="ler-pre ler-niv">' +
+  return '<div class="ler-pre ler-niv" id="ler-niv-area">' +
     '<div class="ler-niv-topo">' +
       '<b>Triagem por nível</b>' +
-      '<span class="ler-fer-nota" style="margin:0">seu nível: <b>' + esc(cefrNivelAluno()) + '</b> — abaixo dele já veio marcado. ' +
-        'Clique em qualquer palavra, <b>de qualquer faixa</b>, para marcar ou desmarcar.</span>' +
+      '<span class="ler-niv-sub">clique em qualquer palavra, de qualquer faixa, para marcar ou desmarcar</span>' +
       '<button class="btn btn-ghost btn-sm" onclick="lerClassificar(undefined,true)">' + ic('refresh','ic-sm') + ' Refazer</button>' +
     '</div>' +
     '<div id="ler-niv-corpo">' + _lerNivCorpoHTML() + '</div></div>'
