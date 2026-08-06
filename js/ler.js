@@ -1802,7 +1802,11 @@ async function lerPreAnalisar(cap, refazer) {
   // O sistema REPETE a cada lote — contar uma vez só subestimaria a conta, e
   // aqui subestimar é pior que superestimar.
   const tokensIn = Math.ceil((sistema.length * lotes.length + lista.length) / 4)
-  const tokensOut = itens.length * 14
+  const tokensVis = itens.length * 14
+  // O RACIOCÍNIO entra na conta. Ele é cobrado como saída, e ignorá-lo era o
+  // que fazia a tela dizer R$ 0,02 numa operação que podia custar R$ 0,07.
+  const rac = _lerRacPrevisto(aiModel(), itens.length, tokensVis)
+  const tokensOut = tokensVis + rac.tokens
   const p = aiPrecoModelo()
   const usd = (tokensIn * p.in + tokensOut * p.out) / 1e6
   const brl = usd * (await aiUsdBrl())
@@ -1816,10 +1820,17 @@ async function lerPreAnalisar(cap, refazer) {
       '<div class="cost-row"><span>Chamadas</span><b>' + lotes.length +
         (lotes.length > 1 ? ' (lotes de ' + LER_PRE_LOTE + ')' : '') + '</b></div>' +
       '<div class="cost-row"><span>Modelo</span><b>' + esc(aiChatCfg().P.nome + ' · ' + aiModel()) + '</b></div>' +
-      '<div class="cost-row"><span>Base do cálculo</span><b>~' + tokensIn + ' tokens de entrada + ~' +
-        tokensOut + ' de saída (US$ ' + p.in + '/' + p.out + ' por 1M)</b></div>' +
+      '<div class="cost-row"><span>Entrada</span><b>~' + tokensIn + ' tokens (as palavras <b>com as frases</b>)</b></div>' +
+      '<div class="cost-row"><span>Saída</span><b>~' + tokensVis + ' tokens de glosa' +
+        (rac.raciocina ? ' + ~' + rac.tokens + ' de raciocínio' : '') + '</b></div>' +
+      '<div class="cost-row"><span>Preço do modelo</span><b>US$ ' + p.in + ' / ' + p.out + ' por 1M</b></div>' +
       '<div class="cost-row total"><span>Custo estimado</span><b>' + _brl(brl) + '</b></div>' +
       '</div><ul class="cost-bullets">' +
+      (rac.raciocina
+        ? (rac.medido
+            ? '<li>Este modelo <b>raciocina</b>, e a OpenAI cobra o raciocínio como saída. A conta acima usa o quanto ele <b>gastou de verdade</b> nas leituras anteriores.</li>'
+            : '<li>Este modelo <b>raciocina</b>, e a OpenAI cobra o raciocínio como saída. Ainda não medi quanto ele pensa, então esta estimativa é <b>alta de propósito</b> — o valor real aparece ao terminar e calibra as próximas.</li>')
+        : '') +
       '<li>Cada palavra vai com a FRASE do livro — a glosa é a daquele trecho, não a do dicionário.</li>' +
       '<li>O resultado fica guardado neste aparelho: reabrir o capítulo não cobra de novo.</li>' +
       '<li>Não vira card. É só a espiada do hover; estudar continua sendo escolha sua.</li>' +
@@ -1828,6 +1839,7 @@ async function lerPreAnalisar(cap, refazer) {
   if (!ok) return
 
   try {
+    if (typeof aiUsoZerar === 'function') aiUsoZerar()
     const saida = []
     let ignorados = 0
     for (let n = 0; n < lotes.length; n++) {
@@ -1878,7 +1890,24 @@ async function lerPreAnalisar(cap, refazer) {
     await BookDB.set(_lerChavePre(cap), new Blob([JSON.stringify({ v: LER_PRE_VER, itens: saida, at: Date.now() })]))
     if (_lerCap === cap) glossPreCarregar(_lerChavePre(cap), saida)
     const perdidos = itens.length - saida.length
-    toast(saida.length + ' palavras lidas' + (perdidos > 0 ? ' · ' + perdidos + ' a IA não devolveu' : ''), 'success')
+
+    // O QUE CUSTOU DE VERDADE. `usage` é fato; tudo acima era estimativa. E é
+    // esta medição que calibra a próxima — a primeira leitura de cada modelo
+    // paga o preço de eu não saber quanto ele pensa, mas só a primeira.
+    let extra = ''
+    if (typeof aiUsoAcumulado === 'function') {
+      const uso = aiUsoAcumulado()
+      if (uso.chamadas) {
+        const usdReal = aiCustoDeUso(uso, aiModel())
+        const brlReal = usdReal * (await aiUsdBrl())
+        extra = ' · custou ' + _brl(brlReal)
+        if (uso.raciocinio > 0) _lerRacGuardar(aiModel(), uso.raciocinio / itens.length)
+        console.info('[pre] medido:', uso.in + ' entrada · ' + uso.out + ' saída (dos quais ' +
+          uso.raciocinio + ' de raciocínio) em ' + uso.chamadas + ' chamada(s) — ' + _brl(brlReal) +
+          ' · estimado era ' + _brl(brl))
+      }
+    }
+    toast(saida.length + ' palavras lidas' + (perdidos > 0 ? ' · ' + perdidos + ' a IA não devolveu' : '') + extra, 'success')
   } catch (e) {
     toast('não deu para ler o capítulo: ' + e.message, 'error')
   }
@@ -1934,4 +1963,48 @@ function _lerPreProgresso(texto, feito, total, glosas) {
       (total ? '<div class="ler-pre-barra"><i style="width:' + pct + '%"></i></div>' : '') +
       (glosas ? '<div class="ler-pre-prog-sub">' + glosas + ' palavras lidas até agora</div>' : '') +
     '</div>'
+}
+
+// ---- CALIBRAÇÃO DO RACIOCÍNIO -----------------------------------
+// A estimativa de custo enxergava só as glosas visíveis (14 tokens por item) e
+// ignorava os tokens de RACIOCÍNIO — que o Luna cobra como saída, no preço
+// caro. Dependendo de quanto ele pensasse, o número na tela ficava entre 1,8×
+// e 6,7× abaixo do real.
+//
+// Chutar um multiplicador seria trocar um número errado por outro. Então a
+// primeira leitura de cada modelo roda com uma estimativa ALTA de propósito
+// (errar para cima é o lado seguro), MEDE o consumo real e guarda quantos
+// tokens de raciocínio aquele modelo gasta por item. Da segunda vez em diante
+// a conta é feita com o número dele, não com palpite meu.
+const SK_LER_RAC = 'el-rac-por-item'
+
+function _lerRacMedido(model) {
+  try {
+    const d = JSON.parse(localStorage.getItem(SK_LER_RAC) || '{}')
+    const v = Number(d[model])
+    return isFinite(v) && v >= 0 ? v : null
+  } catch (e) { return null }
+}
+
+function _lerRacGuardar(model, porItem) {
+  if (!model || !isFinite(porItem) || porItem < 0) return
+  try {
+    const d = JSON.parse(localStorage.getItem(SK_LER_RAC) || '{}')
+    // Média corrida com o que já havia: um capítulo atípico não deve virar a
+    // régua sozinho, mas a medição nova também não pode ser ignorada.
+    d[model] = d[model] != null ? Math.round((Number(d[model]) + porItem) / 2) : Math.round(porItem)
+    localStorage.setItem(SK_LER_RAC, JSON.stringify(d))
+  } catch (e) {}
+}
+
+// Quantos tokens de raciocínio esperar deste lote, e se isso é medida ou chute.
+function _lerRacPrevisto(model, nItens, tokensVisiveis) {
+  if (typeof _aiRaciocina !== 'function' || !_aiRaciocina(model)) {
+    return { tokens: 0, medido: true, raciocina: false }
+  }
+  const m = _lerRacMedido(model)
+  if (m != null) return { tokens: Math.round(m * nItens), medido: true, raciocina: true }
+  // Sem medição ainda: 4× o texto visível. É deliberadamente generoso — se o
+  // valor real vier menor, a surpresa é boa.
+  return { tokens: tokensVisiveis * 4, medido: false, raciocina: true }
 }

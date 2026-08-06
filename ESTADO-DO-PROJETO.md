@@ -3,7 +3,17 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-06 — **O ORÇAMENTO DE TOKENS ESTAVA ERRADO NO APP INTEIRO
+> Última atualização: 2026-08-06 — **O APP PASSOU A MEDIR O QUE GASTA (85ª rodada)**. Diante do
+> modal de R$ 0,02, o Djemeson perguntou se aquilo condizia com a realidade. O contexto estava
+> contado (a entrada inclui as frases), mas a **saída ignorava os tokens de RACIOCÍNIO**, que o
+> Luna cobra no preço caro — o real ficava entre **1,8× e 6,7×** a estimativa. Em vez de chutar
+> um multiplicador, o app passou a **medir**: todo `usage` é recolhido (entrada, saída,
+> raciocínio, cache), o custo REAL aparece no fim (*"…palavras lidas · custou R$ X"*) e a
+> medição **calibra a estimativa seguinte** por modelo. A primeira leitura de cada modelo usa
+> estimativa alta de propósito e **avisa que é chute**; da segunda em diante usa o medido.
+> Ver seção 8 (85ª rodada).
+>
+> Anterior: 2026-08-06 — **O ORÇAMENTO DE TOKENS ESTAVA ERRADO NO APP INTEIRO
 > (84ª rodada)**. "Ler o capítulo" falhou com *"a IA devolveu uma resposta vazia"* rodando o
 > Luna. Causa confirmada na doc da OpenAI: **modelos que raciocinam gastam os tokens de
 > raciocínio DENTRO do mesmo `max_completion_tokens`** — e se o teto acaba durante o
@@ -1152,6 +1162,38 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        reconhecidas, SAFETY/IMAGE_SAFETY/PROHIBITED_CONTENT viram recusa explicada, `STOP` não
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
+
+178. **A ESTIMATIVA DE CUSTO IGNORAVA O RACIOCÍNIO — e agora o app MEDE (85ª rodada,
+     2026-08-06)**. Pergunta do Djemeson diante do modal de R$ 0,02: *"analise se isso condiz
+     com a realidade, porque ele também lê o contexto da palavra"*.
+     - **A preocupação dele estava OK**: os ~5.773 tokens de entrada SÃO as 120 palavras **com
+       as frases** (`lista.length` entra na conta, ~23 mil caracteres). O contexto estava
+       contado.
+     - **O furo era outro**: `tokensOut = itens.length * 14` contava só as glosas **visíveis**.
+       O Luna raciocina, e a OpenAI cobra raciocínio **como saída** — o lado caro (US$ 1,20/1M
+       contra 0,20 da entrada). Conforme o quanto ele pense, o real fica entre **1,8× e 6,7×**
+       a estimativa: R$ 0,02 podia ser R$ 0,03 ou R$ 0,12.
+     - **A correção NÃO foi chutar um multiplicador** — seria trocar um número errado por
+       outro. O app passou a **medir**: `_aiGuardarUso()` recolhe o `usage` de toda chamada
+       (entrada, saída, `reasoning_tokens`, `cached_tokens`), `aiUsoZerar()`/`aiUsoAcumulado()`
+       delimitam uma operação inteira de N chamadas, e `aiCustoDeUso()` calcula o preço do que
+       foi REALMENTE consumido. Ao terminar, o toast diz *"…palavras lidas · custou R$ X"* e o
+       console traz entrada/saída/raciocínio/chamadas com o estimado ao lado.
+     - **E a medição CALIBRA a próxima**: `_lerRacGuardar()` guarda em `localStorage`
+       (`el-rac-por-item`) quantos tokens de raciocínio aquele modelo gasta **por item**, em
+       média corrida (um capítulo atípico não vira a régua sozinho). A primeira leitura de cada
+       modelo roda com estimativa **alta de propósito** (4× o texto visível — errar para cima é
+       o lado seguro) e o modal **diz que é chute**; da segunda em diante usa o número medido e
+       diz que é medição.
+     - Testado: sem medição → 6.720 tokens previstos e `medido:false`; modelo sem raciocínio →
+       0 tokens e nenhum aviso; três chamadas sintéticas → 5.520 de raciocínio, R$ 0,054 (2,7×
+       o que o modal dizia, no meio da faixa prevista); calibração gravada em 46/item; próxima
+       estimativa já usa 5.520; segunda medição mais leve move a régua para 33 e não para 20;
+       `cached_tokens` também é lido (serve para a conversa de cache do DeepSeek).
+     - ⚠️ **Armadilha do meu próprio teste, que vale registrar**: a primeira bateria disse que a
+       calibração não salvava. Era o arsenal de teste — extraí as funções sem a constante
+       `SK_LER_RAC`, e o `try/catch` de `_lerRacGuardar` engoliu o `ReferenceError` em silêncio.
+       Ou seja: `catch` vazio esconde erro de teste tão bem quanto erro de produção.
 
 177. **O ORÇAMENTO DE TOKENS ESTAVA ERRADO NO APP INTEIRO — modelo que raciocina (84ª rodada,
      2026-08-06)**. "Ler o capítulo com a IA" falhou com *"[OpenAI] a IA devolveu uma resposta

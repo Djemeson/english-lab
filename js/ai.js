@@ -431,6 +431,7 @@ async function aiJSON(messages, { maxTokens, model, timeoutMs, retries } = {}) {
     try {
       const res = await _aiFetch(chat.P.url, corpo(m, comFormato), { timeoutMs, retries, key: chat.key })
       const dados = await res.json()
+      _aiGuardarUso(dados, m)
       const j = _aiParseJSON(dados)
       if (j) return j
       erro = new Error(_aiPorQueVazio(dados))
@@ -465,6 +466,7 @@ async function aiText(messages, { maxTokens, model, timeoutMs, retries } = {}) {
     model: m, messages: msgs, ..._aiTokenParam(m, maxTokens)
   }, { timeoutMs, retries, key: chat.key })
   const data = await res.json()
+  _aiGuardarUso(data, m)
   const msg = data.choices?.[0]?.message || {}
   // `reasoning_content`: modelos que "pensam" às vezes gastam todo o orçamento
   // no raciocínio e devolvem content vazio — melhor mostrar o que veio.
@@ -886,4 +888,41 @@ async function aiConfirmBatch(tipo, n, rotulo, opts = {}) {
       ${opts.detalhe ? `<ul class="cost-bullets">${opts.detalhe.map(d => `<li>${esc(d)}</li>`).join('')}</ul>` : ''}
       <p class="cost-note">Estimativa pela cotação de hoje (US$ 1 ≈ R$ ${rate.toFixed(2).replace('.', ',')}) — muda junto com o modelo escolhido. A cobrança real é feita pelo fornecedor, em dólar, na sua conta.</p>`
   })
+}
+
+// ---- CONSUMO REAL -----------------------------------------------
+// Estimativa de custo é palpite; `usage` é fato. E para modelo que raciocina a
+// diferença não é detalhe: os tokens de RACIOCÍNIO são cobrados como SAÍDA (o
+// lado caro), e nenhuma estimativa baseada no texto visível os enxerga. Na
+// leitura de capítulo com o Luna a conta estimada ficava entre 1,8× e 6,7×
+// abaixo do real, dependendo de quanto ele pensasse.
+//
+// Todo caminho que fala com a API passa o `usage` por aqui. Quem quiser saber
+// o preço de uma operação inteira chama `aiUsoZerar()` antes e
+// `aiUsoAcumulado()` depois — vale para lote de N chamadas.
+let _aiUso = { in: 0, out: 0, raciocinio: 0, cache: 0, chamadas: 0, model: '' }
+
+function aiUsoZerar() { _aiUso = { in: 0, out: 0, raciocinio: 0, cache: 0, chamadas: 0, model: '' } }
+function aiUsoAcumulado() { return { ..._aiUso } }
+
+function _aiGuardarUso(dados, model) {
+  const u = dados && dados.usage
+  if (!u) return
+  const rac = u.completion_tokens_details?.reasoning_tokens
+           || u.output_tokens_details?.reasoning_tokens || 0
+  const cache = u.prompt_tokens_details?.cached_tokens || u.prompt_cache_hit_tokens || 0
+  _aiUso.in += Number(u.prompt_tokens || u.input_tokens || 0)
+  _aiUso.out += Number(u.completion_tokens || u.output_tokens || 0)
+  _aiUso.raciocinio += Number(rac)
+  _aiUso.cache += Number(cache)
+  _aiUso.chamadas++
+  _aiUso.model = model || _aiUso.model
+}
+
+// Custo em dólar a partir do consumo MEDIDO. `completion_tokens` já inclui os
+// de raciocínio (a OpenAI os soma ali), então não se conta duas vezes.
+function aiCustoDeUso(uso, model) {
+  const p = aiPrecoModelo(model || (uso && uso.model))
+  if (!p || !uso) return 0
+  return ((uso.in || 0) * p.in + (uso.out || 0) * p.out) / 1e6
 }
