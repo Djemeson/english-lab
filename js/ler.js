@@ -1183,13 +1183,39 @@ function lerFalar(txt) {
 // ================================================================
 // PINTURA — marca no texto o que você já está estudando
 // ================================================================
+// Palavras que JÁ SÃO CARD — não são "novas" e não podem voltar para a
+// triagem nem para o classificador.
+//
+// ⚠️ O conjunto guarda o card E OS LEMAS DELE. Sem isso a comparação era
+// literal e divergiu do `isKnownWord`, que ganhou lematização na 82ª rodada:
+// quem estudava "begin" recebia "began" como novidade, "run" não cobria
+// "running", "child" não cobria "children". Num capítulo isso são dezenas de
+// falsas novas — inflam a contagem, estragam a cobertura e fazem o
+// classificador gastar dinheiro com palavra que já está na fila de estudo.
+//
+// Os lemas entram nos DOIS sentidos: aqui, para o card "began" cobrir o texto
+// "begin"; e em `_lerEhEmEstudo`, para o card "begin" cobrir o texto "began".
 function _lerConjuntoEmEstudo() {
   const s = new Set()
   for (const w of words) {
     const k = knownNorm(w.word || '')
-    if (k && k.length > 1 && !/\s/.test(k)) s.add(k)
+    if (!k || k.length < 2 || /\s/.test(k)) continue
+    s.add(k)
+    if (typeof glossLemas === 'function') {
+      for (const l of glossLemas(k, { estrito: true })) s.add(l)
+    }
   }
   return s
+}
+
+// `estrito` de propósito, aqui e no conjunto: -er/-est derivam palavra nova
+// ("teacher" não é "teach"), e sumir com item legítimo da lista de estudo é
+// pior que mostrá-lo de novo.
+function _lerEhEmEstudo(conjunto, token) {
+  if (conjunto.has(token)) return true
+  if (typeof glossLemas !== 'function') return false
+  for (const l of glossLemas(token, { estrito: true })) if (conjunto.has(l)) return true
+  return false
 }
 
 function _lerRepintar() {
@@ -1429,7 +1455,7 @@ function lerAnalisar(txt) {
     total++
     if (LER_STOP.has(t)) { conhecidas++; continue }
     if (isKnownWord(t)) { conhecidas++; continue }
-    if (emEstudo.has(t)) { conhecidas++; continue }
+    if (_lerEhEmEstudo(emEstudo, t)) { conhecidas++; continue }
     freq.set(t, (freq.get(t) || 0) + 1)
   }
   const novas = [...freq.entries()].map(([w, n]) => ({ w, n })).sort((a, b) => b.n - a.n || a.w.localeCompare(b.w))
@@ -2123,7 +2149,7 @@ function _lerNivMontar(chave, itens) {
   const cards = new Set(words.map(w => knownNorm(w.word || '')).filter(Boolean))
   const vivos = itens.filter(it =>
     it && it.w && cefrIdx(it.n) >= 0 &&
-    !isKnownWord(it.w) && !emEstudo.has(knownNorm(it.w)) && !cards.has(knownNorm(it.w)) &&
+    !isKnownWord(it.w) && !_lerEhEmEstudo(emEstudo, knownNorm(it.w)) && !cards.has(knownNorm(it.w)) &&
     !(typeof ignoredWords === 'object' && ignoredWords[knownNorm(it.w)]))
   // Pré-marcado = está ABAIXO do nível dele. O nível dele mesmo NÃO entra:
   // "B1" para quem é B1 é exatamente a faixa onde ele ainda tem buracos, e

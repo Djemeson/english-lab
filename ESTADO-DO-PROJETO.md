@@ -1177,6 +1177,30 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+181. **O CLASSIFICADOR NÃO ENXERGAVA OS CARDS FLEXIONADOS (87ª rodada, 2026-08-06)**.
+     Relato: *"o classificador parece não olhar pras palavras já no projeto que estão pra
+     estudo"*. Estava certo, e o defeito era maior do que o classificador.
+     - **Reproduzido**: com cards de `begin`, `run`, `child`, `soldier`, um texto com
+       `began`, `children`, `running`, `soldiers` devolvia **as quatro como NOVAS**.
+     - **Causa raiz — divergência entre dois caminhos que deviam concordar**: na 82ª rodada o
+       `isKnownWord` (palavras marcadas como conhecidas) ganhou lematização, mas a checagem
+       contra **cards** (`_lerConjuntoEmEstudo` + `emEstudo.has(t)`) ficou em comparação
+       LITERAL. Quem estudava "begin" continuava recebendo "began" como novidade.
+     - **Estrago**: dezenas de falsas novas por capítulo — inflavam a contagem, faziam a
+       cobertura mentir para baixo, e o classificador **gastava dinheiro** com palavra que já
+       estava na fila de estudo. Medido no teste: cobertura **60% → 87%** no mesmo texto.
+     - **Correção nos DOIS sentidos**: o conjunto guarda o card **e os lemas dele** (card
+       "began" cobre o texto "begin") e `_lerEhEmEstudo()` testa os lemas do token contra o
+       conjunto (card "begin" cobre o texto "began"). Modo `estrito` nos dois: -er/-est derivam
+       palavra nova, e sumir com item legítimo é pior que mostrá-lo de novo — testado,
+       `teacher` continua aparecendo apesar do card `teach`.
+     - Aplicado também em `_lerNivMontar`, para a triagem por nível usar o mesmo critério que
+       a contagem. Não sobrou nenhum `emEstudo.has(` literal no arquivo. `CACHE` → **v121**.
+     - ⚠️ **Armadilha de teste, pela segunda vez nesta sessão**: a primeira verificação disse
+       que o conserto não funcionara. Era o arsenal — carregar `ler.js` duas vezes na mesma
+       página faz a segunda falhar na redeclaração dos `const` de topo, e o código ANTIGO
+       continua valendo em silêncio. Recarregar a página antes de reavaliar é obrigatório.
+
 180. **O CLIQUE QUE NÃO FAZIA NADA, O PAINEL CURTO E O CLASSIFICADOR CEGO A EXPRESSÕES
      (87ª rodada, 2026-08-06)**. Três relatos seguidos, e o primeiro era um par de bugs mudos.
      - **"clico em classificar e nada acontece"** — DOIS defeitos, os dois silenciosos:
