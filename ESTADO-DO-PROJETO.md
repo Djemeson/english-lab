@@ -1062,6 +1062,33 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      escapado e SÓ o `<b>` volta a valer como marcação (mais `**markdown**`, que modelo barato
      usa às vezes). `<script>` continua escapado — conferido no teste. `CACHE` → **v101**.
 
+171. **ÁUDIO: auditoria do TTS na fonte oficial — o app estava com a lista de vozes ANTIGA
+     (2026-08-06)**. Pedido: "analise a geração de áudio olhando na fonte da OpenAI agora".
+     - **O modelo está certo**: a doc oficial ainda chama o `gpt-4o-mini-tts` de "our newest
+       and most reliable text-to-speech model". Nada a trocar aí — o `tts-1`/`tts-1-hd`
+       continuam sendo os legados, e o app já usa o novo com queda para o antigo.
+     - **O achado**: o endpoint `/audio/speech` tem hoje **13 vozes** e a OpenAI recomenda
+       explicitamente **`marin` e `cedar`** "for best quality". O app tinha a lista de **9** —
+       a antiga, do `tts-1` — e portanto **sorteava justamente sem as duas melhores**. Agora
+       são 13: entraram `ballad`, `cedar`, `marin` e `verse`.
+     - **A armadilha que veio junto** (e que quase virou card mudo): o `tts-1`, usado como
+       FALLBACK do `aiTTS`, **não conhece as vozes novas**. Sortear "marin" e cair no fallback
+       daria 400 e o card ficaria sem áudio. Por isso a lista legada existe separada
+       (`OPENAI_VOICES_LEGACY`) e o `aiTTS` **troca a voz ao descer de modelo** (`vozLegada()`).
+       Testado: as 13 vozes sorteiam, e todas as 13 mapeiam para uma voz que o `tts-1` aceita;
+       as 9 clássicas não mudam.
+     - **Por que manter o sorteio**: é pedagógico. Cada card sai com uma voz diferente, e ouvir
+       timbres variados treina o ouvido melhor que uma voz só. Ampliar de 9 para 13 aumenta
+       essa variedade e ainda inclui as duas de melhor qualidade.
+     - **Preço do TTS conferido, sem mudança**: `gpt-4o-mini-tts` = US$ 0,60/1M tokens de texto
+       + US$ 12,00/1M tokens de áudio (≈ US$ 0,015 por minuto gerado — o número que já estava
+       no comentário do `ai.js` e na estimativa de custo).
+     - **Bônus na transcrição** (fora do pedido, anotado): a OpenAI hoje tem `gpt-transcribe`
+       a US$ 0,0045/min e `gpt-4o-mini-transcribe` a US$ 0,003/min — contra US$ 0,006/min do
+       Whisper. Ou seja, dá para reduzir pela metade SEM sair da OpenAI. Mas a Groq segue
+       imbatível a US$ 0,04/HORA (≈ US$ 0,00067/min), então a recomendação continua a mesma.
+     - `CACHE` → **v106**.
+
 170. **O TESTE COMPARATIVO RODOU — e o resultado mais importante foi um que ninguém esperava
      (2026-08-06)**. Os três casos (does / tire of + the mud / barrel) passaram pelos três
      modelos configurados. Leitura do resultado:

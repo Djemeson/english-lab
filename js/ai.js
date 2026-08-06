@@ -475,8 +475,11 @@ async function aiTTS(text, { voice, speed = 0.9, timeoutMs = 60000 } = {}) {
     }, { timeoutMs, retries: 0 })
     return blobToBase64(await res.blob())
   } catch (e) {
+    // O tts-1 não conhece as vozes novas (ballad/verse/marin/cedar): mandar
+    // uma delas aqui daria 400 e o card ficaria mudo. Troca por uma clássica.
+    const vLegada = (typeof vozLegada === 'function') ? vozLegada(v) : v
     const res = await _aiFetch('https://api.openai.com/v1/audio/speech', {
-      model: AI_TTS_FALLBACK, input: text, voice: v, speed
+      model: AI_TTS_FALLBACK, input: text, voice: vLegada, speed
     }, { timeoutMs, retries: 1 })
     return blobToBase64(await res.blob())
   }

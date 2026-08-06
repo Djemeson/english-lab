@@ -67,9 +67,25 @@ const AudioDB = {
 }
 
 // Vozes da OpenAI TTS (usado por ensureSrsAudio — fica aqui, arquivo não-lazy)
-const OPENAI_VOICES = ['alloy', 'ash', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer']
+// Conferido na doc oficial em 2026-08-06: o endpoint /audio/speech tem 13
+// vozes, e a OpenAI recomenda `marin` e `cedar` "for best quality". O app
+// vinha com a lista ANTIGA de 9 — justamente sem as duas melhores.
+//
+// A variedade é proposital e pedagógica: cada card sorteia uma voz, e ouvir
+// timbres diferentes treina o ouvido melhor que uma voz só.
+const OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'cedar', 'coral', 'echo', 'fable',
+                       'marin', 'nova', 'onyx', 'sage', 'shimmer', 'verse']
+// ⚠️ O tts-1 (fallback do aiTTS) só aceita as 9 clássicas. Sortear "marin" e
+// cair no fallback daria 400 e o card ficaria SEM áudio — por isso a lista
+// legada existe separada, e o aiTTS troca a voz ao descer de modelo.
+const OPENAI_VOICES_LEGACY = ['alloy', 'ash', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer']
 function randomVoice() {
   return OPENAI_VOICES[Math.floor(Math.random() * OPENAI_VOICES.length)]
+}
+// Voz equivalente que o modelo antigo aceita (usada só no fallback)
+function vozLegada(v) {
+  if (OPENAI_VOICES_LEGACY.includes(v)) return v
+  return OPENAI_VOICES_LEGACY[Math.floor(Math.random() * OPENAI_VOICES_LEGACY.length)]
 }
 
 // Gera chave de cache baseada no texto (hash simples)
