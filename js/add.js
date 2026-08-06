@@ -469,6 +469,8 @@ Examples of what to catch (English illustration — apply the equivalent categor
 - Slang: "freaked out", "bail", "crash"
 
 Do NOT include plain difficult words (e.g. "ephemeral", "gorget"). Only multi-word expressions or set phrases.
+DETERMINER + NOUN IS NEVER AN EXPRESSION: "the mud", "a house", "his hand" are grammar, not vocabulary — never return them.
+A free adjective+noun pair is not a collocation either unless it is genuinely fixed ("heavy rain", "make a difference").
 If none found, return empty vocab [].
 
 2. Translate the full sentence naturally to Brazilian Portuguese.

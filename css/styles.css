@@ -4749,3 +4749,12 @@ body.ler-full .mobile-bottom-nav{display:none}
    perdido o lugar. Transicao curta na volta, para nao piscar. */
 .ler-conteudo.ler-montando{opacity:0}
 .ler-conteudo{transition:opacity .14s ease-out}
+
+/* Traducao da frase de contexto, logo abaixo da citacao no Revisar.
+   Discreta de proposito: a frase original e o objeto de estudo; a traducao
+   e apoio, nao protagonista. */
+.wc-context-pt{
+  margin-top:6px;font-size:var(--fs-sm);color:var(--text2);
+  line-height:1.55;font-style:normal;
+}
+.wc-context-pt:empty{display:none}

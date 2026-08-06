@@ -17,6 +17,10 @@ function applyAiResult(w, result) {
     toast(`Idioma detectado: ${getLangDef(det).name}`, 'info')
   }
   if (result.audio_base64 && !w.audio_base64) w.audio_base64 = result.audio_base64
+  // Tradução da frase de contexto: vem de graça na mesma resposta da análise
+  // (é um campo, não uma chamada) e preenche o card de palavra, que não passa
+  // pela triagem. Nunca sobrescreve uma tradução já existente.
+  if (!w.context_pt && result.context_pt) w.context_pt = String(result.context_pt).trim().slice(0, 400)
   const rawMeanings = Array.isArray(result.meanings) && result.meanings.length > 0
     ? result.meanings
     : [{
@@ -192,6 +196,13 @@ WORKED EXAMPLE — "emasculating":
 - the literal veterinary sense "castrar (remover os testículos)" is another domain → SEPARATE object.
 So "emasculating" must return 2–3 meaning objects. Returning ONE object whose meaning_pt reads "desvirilizador, castrador, debilitante" is WRONG: "debilitante" is a different sense smuggled in as if it were a synonym.
 
+GRAMMAR BEFORE DICTIONARY — check this FIRST, it outranks everything below:
+Look at what "${target}" is DOING in the context sentence. If it is working as a STRUCTURAL element and not as vocabulary — emphatic/interrogative/negative auxiliary (do/does/did), perfect auxiliary (have/has/had), modal, copula or progressive/passive "be", infinitive marker "to", complementizer "that", dummy "it/there" — then the FIRST meaning object MUST describe that GRAMMATICAL FUNCTION in Portuguese, and it gets "context_match": true. The lexical dictionary sense may still be returned AFTER it, with "context_match": false.
+WORKED EXAMPLE — "does" with context "The boat ride does add time to the trip":
+- WRONG (what a cheap model does): meaning_pt "fazer, executar", examples "She does the laundry every Saturday". That is the lexical verb "do" — it is NOT what "does" is doing in this sentence, and the learner ends up studying the wrong thing.
+- RIGHT: first meaning_pt "de fato, realmente (ênfase)", definition "auxiliar enfático: reforça que a ação ACONTECE mesmo", context_match true, and its 3 examples must all use the EMPHATIC auxiliary ("I do like it", "She did tell me", "He does know the answer"). Only after that may "fazer, executar" appear as a separate object with context_match false.
+Same test for every example: an example placed under the grammatical meaning must show the word in that FUNCTION, never in the lexical sense.
+
 Rules for meanings — CRITICAL:
 - The context sentence is ONLY used to identify the word correctly and to mark which sense appeared there. It does NOT limit which meanings you return.
 - ALWAYS return ALL distinct senses the word has in common ${L.nameEn} usage — not just the one from the context.
@@ -224,6 +235,7 @@ Return ONLY this JSON (no markdown, no explanation):
 {
   "word": "exact word or expression to study",
   "detected_lang": "${L.code}",
+  "context_pt": "the CONTEXT SENTENCE translated into natural Brazilian Portuguese — what it SAYS in that scene, never word by word. Empty string if there is no context sentence. This must agree with the meaning marked context_match: if the translation contradicts it, one of the two is wrong.",
   "type": "word|phrasal_verb|idiom|collocation",
   "type_label": "precise local category in Brazilian Portuguese, or empty string",
   "ipa": ${promptIpaRule(wordLang(w))},
@@ -713,6 +725,7 @@ function renderWordCard(wordId) {
         <span class="wc-source">${srcIcon(w.source_type)} ${esc(w.source_title || w.source_type)}</span>
       </div>
       ${ctxHtml ? `<div class="wc-context">"${ctxHtml}"</div>` : ''}
+      ${ctxHtml ? `<div class="wc-context-pt" id="wc-ctx-pt-${w.id}">${w.context_pt ? esc(w.context_pt) : ''}</div>` : ''}
     </div>
     ${bodyHtml}
   </div>`
@@ -860,7 +873,8 @@ async function _revBreakPrefetch(w) {
   if (!aiChatCfg().key || _revBreakCache.has(w.id) || _revBreakBusy.has(w.id)) return
   _revBreakBusy.add(w.id)
   try {
-    const items = await _revBreakFetch(w)
+    const { items, trad } = await _revBreakFetch(w)
+    _revGuardarTrad(w, trad)
     _revBreakCache.set(w.id, { items, sel: new Set(), done: new Set() })
     // card aberto: re-renderiza inteiro para o layout assumir o estado
     // "com triagem" (a triagem vira protagonista, o resto recua)
@@ -876,12 +890,25 @@ async function revBreakdown(wordId) {
   if (_revBreakCache.has(wordId)) { _revBreakRender(wordId); return }
   area.innerHTML = `<div style="margin-top:14px"><span class="gen-spinner"></span> a IA está separando a frase...</div>`
   try {
-    const items = await _revBreakFetch(w)
+    const { items, trad } = await _revBreakFetch(w)
+    _revGuardarTrad(w, trad)
     _revBreakCache.set(wordId, { items, sel: new Set(), done: new Set() })
     renderWordCard(wordId)
   } catch (e) {
     area.innerHTML = `<div style="margin-top:14px;color:var(--error);font-size:var(--fs-sm)">Não deu: ${esc(e.message)} — clique de novo para tentar.</div>`
   }
+}
+
+// A tradução da frase vem NA MESMA chamada da triagem, de propósito: uma
+// segunda chamada custaria o dobro e — pior — poderia contradizer as glosas,
+// que é exatamente o defeito que estamos combatendo. Mesma leitura, mesma
+// frase, mesma resposta.
+function _revGuardarTrad(w, trad) {
+  if (!w || !trad || w.context_pt) return
+  const alvo = words.find(x => x.id === w.id) || w
+  alvo.context_pt = trad.slice(0, 400)
+  saveWords()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
 }
 
 // A chamada em si — UMA, curta (triagem, não análise): glosas de até 6
@@ -895,7 +922,7 @@ async function _revBreakFetch(w) {
 
 Snippet to break down (ONLY this): "${alvo}"${ctx && ctx !== alvo ? `\nSurrounding sentence (context to understand the MEANING only — NEVER take units from it): "${ctx}"` : ''}${w.source_title ? `\nSource: "${w.source_title}"` : ''}
 
-{"items":[{"expr":"exact text as it appears in the snippet","type":"word|phrasal_verb|idiom|collocation|chunk","gloss":"what it means IN THIS context, Brazilian Portuguese, max 6 words","nivel":"A1|A2|B1|B2|C1|C2"}]}
+{"trad":"the whole snippet translated into natural Brazilian Portuguese — what it SAYS, never word by word","items":[{"expr":"exact text as it appears in the snippet","type":"word|phrasal_verb|idiom|collocation|chunk","gloss":"what it means IN THIS context, Brazilian Portuguese, max 6 words","nivel":"A1|A2|B1|B2|C1|C2"}]}
 
 Rules:
 - FIRST identify multi-word units: phrasal verbs (e.g. "get you in" in "we'll get you in for that"), idioms, collocations and fixed conversational chunks worth learning as a block ("chunk").
@@ -903,12 +930,17 @@ Rules:
 - Every "expr" MUST be text that appears INSIDE the snippet — never from the surrounding sentence. Units that are not part of the snippet are discarded.
 - NEVER return the whole snippet itself as one unit — only its PARTS (smaller units inside it).
 - A free adjective+noun combination is NOT a collocation: if the pair is compositional, return the notable WORD alone ("Japanese ethos" → return "ethos" as a word, C1 — NOT the pair). Only return a pair when it is genuinely fixed ("heavy rain", "make a difference").
+- DETERMINER + NOUN IS NEVER A UNIT. "the mud", "a house", "his hand", "that day" are grammar, not vocabulary: return the NOUN alone if it is worth studying, or nothing. Returning "the mud" as a collocation is always wrong.
 - NEVER return trivial contractions or fillers as units ("it's", "I'm", "don't", "you know").
 - SKIP trivial function words (articles, pronouns, auxiliaries, basic prepositions) unless they belong to a unit.
+- SKIP A1 words the learner certainly knows ("began", "day", "house", "good") UNLESS they carry a non-obvious meaning right here.
 - "gloss" is the meaning HERE, not a dictionary list.
+- GLOSS IN CITATION FORM: verbs in the infinitive, nouns in the singular. "began" → "começar", NEVER "começamos"; "tire of" → "cansar-se de", NEVER "cansamos". The gloss names the unit; it does not re-translate the sentence.
+- SUBSTITUTION TEST — run it before returning every gloss: put the gloss back into the sentence in Portuguese. If the sentence stops saying what the ${L.nameEn} says, the gloss is wrong. "we began to tire of the mud" with "perder o interesse em" gives "começamos a perder o interesse na lama" — that is NOT what the sentence says; the right gloss is "cansar-se de" ("começamos a nos cansar da lama"). A gloss that is merely plausible for the unit in a dictionary FAILS this test.
 - LITERAL-TRANSLATION TRAP — avoid it explicitly: FIRST work out what the unit DOES in this scene, THEN write the gloss for that function. "We'll get you in for that" said at a hotel desk → gloss "a gente te encaixa (na agenda)", NEVER "colocar você dentro". If a gloss reads like word-by-word substitution, redo it before returning.
 - "nivel" is the CEFR difficulty of that unit for a learner.
-- Typically 1–8 items. Cover everything a learner might not know.`, { maxTokens: 700 })
+- "trad" must AGREE with the glosses: it is the same reading of the same sentence. If your translation of the whole snippet contradicts a gloss, one of them is wrong — fix it before returning.
+- Typically 1–8 items. Cover everything a learner might not know.`, { maxTokens: 800 })
   // Cinto e suspensório: modelo barato ignora a regra e devolve pedaços da
   // frase de CONTEXTO ("Okay.", "Great.") — só passa o que está literalmente
   // dentro do objeto de estudo (comparação sem caixa/pontuação).
@@ -920,9 +952,23 @@ Rules:
                   gloss: String(it.gloss || '').trim(), nivel: String(it.nivel || '').trim() }))
     // dentro do objeto de estudo, mas nunca o objeto INTEIRO repetido como chip
     .filter(it => it.expr && alvoNorm.includes(' ' + normB(it.expr) + ' ') && normB(it.expr) !== normB(alvo))
+    // Segundo cinto: "the mud" chegou como COLOCAÇÃO mesmo com a regra no
+    // prompt. Determinante + substantivo é gramática, não vocabulário — o
+    // modelo barato não segura isso sozinho, então o código descarta.
+    .filter(it => !_RVB_DET.test(it.expr))
+    .map(it => {
+      // "the mud" → às vezes vem como unidade só para carregar o substantivo;
+      // se sobrou o artigo colado num par, fica o substantivo sozinho.
+      const m = it.expr.match(_RVB_DET_PAR)
+      return m ? { ...it, expr: m[1], type: 'word' } : it
+    })
   if (!items.length) throw new Error('a IA não encontrou unidades de estudo')
-  return items
+  return { items, trad: String(r.trad || '').trim() }
 }
+// Determinantes que nunca formam unidade de estudo com o substantivo seguinte.
+const _RVB_DET_LISTA = 'the|a|an|this|that|these|those|my|your|his|her|its|our|their|some|any|no'
+const _RVB_DET = new RegExp(`^\\s*(${_RVB_DET_LISTA})\\s*$`, 'i')
+const _RVB_DET_PAR = new RegExp(`^\\s*(?:${_RVB_DET_LISTA})\\s+([\\p{L}'-]+)\\s*$`, 'iu')
 
 function _revBreakRender(wordId) {
   const area = el('rev-break-area'); if (!area) return

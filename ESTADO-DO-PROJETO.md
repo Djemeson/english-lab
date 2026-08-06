@@ -980,6 +980,47 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        página. Página 8, `top` 9360, `top` 9360 e página 11 — todos de volta no ponto exato.
        `CACHE` do `sw.js` → **v99**.
 
+163. **Qualidade da IA: glosa fora de contexto + tradução da frase no Revisar**. Dois casos
+     reais trazidos pelo Djemeson, com o pedido de calibrar para **modelo barato (DeepSeek)**.
+     - **Caso 1 — "does"** em "The boat ride does add time to the trip" foi analisado como
+       "fazer, executar", com exemplos "She does the laundry every Saturday". Ali `does` é
+       **auxiliar enfático**, não o verbo lexical. **Causa**: o prompt de análise não tinha
+       NENHUMA regra para palavra que está funcionando como GRAMÁTICA — e modelo barato vai
+       direto no primeiro sentido do dicionário. Entrou um bloco **GRAMMAR BEFORE DICTIONARY**,
+       antes de todas as outras regras: se a palavra é auxiliar (do/does/did, have/has, modal,
+       "be" de progressivo/passiva), marcador de infinitivo, complementizador ou "it/there"
+       vazio, o PRIMEIRO significado descreve a FUNÇÃO gramatical e leva o `context_match` — o
+       sentido lexical pode vir depois, com `context_match: false`. Com o caso do "does" escrito
+       como exemplo CONTRASTIVO (o errado e o certo lado a lado), que é a técnica que funciona
+       com modelo fraco.
+     - **Caso 2 — "tire of"** glosado como "perder o interesse em" enquanto a Lexa explicava
+       "cansar-se". **Causa**: a triagem pedia "o significado AQUI" mas não tinha como VERIFICAR.
+       Entrou o **teste de substituição**: devolva a glosa para dentro da frase em português; se
+       a frase parar de dizer o que o inglês diz, a glosa está errada ("começamos a perder o
+       interesse na lama" ≠ "começamos a nos cansar da lama"). Mais a regra de **forma de
+       citação** na glosa ("began" → "começar", nunca "começamos") e o descarte de palavras A1
+       óbvias, que só faziam ruído na triagem.
+     - **Caso 3 (visto no print, mesma família) — "the mud" como COLOCAÇÃO**. Determinante +
+       substantivo é gramática, não vocabulário. Como a regra no prompt já não segurava o
+       "adjetivo+substantivo" sozinha, aqui entrou **cinto e suspensório** (padrão da 56ª
+       rodada): regra no prompt E filtro no código — determinante sozinho é descartado e o par
+       encolhe para o substantivo ("the mud" → "mud", "that day" → "day"), enquanto
+       "heavy rain" e "make a difference" passam intactos. A mesma proibição foi para o prompt
+       do lote da aba Kindle (`add.js`), que tem a mesma natureza.
+     - **Tradução da frase no Revisar** (pedido junto): a frase capturada chegava sem tradução.
+       Duas descobertas: (a) `createWord` **descartava o `context_pt`** — o Kindle e a Mídia já
+       mandavam a tradução e ela morria no caminho; (b) não havia onde exibi-la. Agora o card
+       mostra a tradução logo abaixo da citação (discreta, some quando não existe) e ela é
+       preenchida **sem chamada extra**: vem como um campo a mais na resposta da triagem
+       (`trad`) e na da análise (`context_pt`), com a exigência explícita de CONCORDAR com as
+       glosas/o sentido marcado — mesma leitura, mesma resposta, em vez de duas chamadas que
+       podem se contradizer.
+     - ⚠️ **O que NÃO foi verificado**: as mudanças de prompt não puderam ser testadas aqui (o
+       ambiente de teste não tem chave de IA). Foram validados por código o filtro de
+       determinante, a preservação do `context_pt` e a exibição da tradução. **Os dois casos
+       reais precisam ser refeitos no app com o DeepSeek** — ver pendências.
+     - `CACHE` do `sw.js` → **v100**.
+
 157. **Busca de imagem no menu de seleção** (pedido junto): quarto botão da fileira de baixo,
      abrindo a aba de imagens do Google no idioma do livro (`tbm=isch&hl=…`). É o complemento
      natural da Wikipédia: para objeto, planta, roupa, arma ou bicho, a foto ensina o que a
@@ -3738,6 +3779,16 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
 ---
 
 ## 9. Pendências / a verificar
+
+- [ ] **REFAZER OS DOIS CASOS DA 163ª RODADA COM O DEEPSEEK.** As correções são de PROMPT e não
+      puderam ser testadas (o ambiente de teste não tem chave de IA). Repetir exatamente:
+      (a) mandar `"we began to tire of the mud"` para o Revisar e conferir se a glosa de
+      "tire of" agora é "cansar-se de" e se "the mud" sumiu das colocações;
+      (b) analisar `does` com o contexto `"The boat ride does add time to the trip"` e conferir
+      se o primeiro significado é o auxiliar enfático ("de fato, realmente") com exemplos de
+      ênfase — e não "fazer, executar" com "she does the laundry".
+      Se o DeepSeek ainda escorregar, o próximo passo é o mesmo da 49ª rodada: rede de segurança
+      no código (validar a resposta e repetir na OpenAI só nesse item).
 
 ### LER — buracos conhecidos (79ª rodada)
 

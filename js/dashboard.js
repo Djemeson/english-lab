@@ -737,6 +737,10 @@ function createWord(data) {
     id: uid(),
     word: (data.word || '').trim(),
     context: (data.context || '').trim(),
+    // A tradução da frase vinha sendo DESCARTADA aqui: o Kindle e a Mídia já
+    // mandavam `context_pt` e ele morria no caminho, então a frase chegava ao
+    // Revisar sempre sem tradução — e o app pagava de novo para traduzi-la.
+    context_pt: (data.context_pt || '').trim(),
     source_type: data.source_type || 'manual',
     source_title: data.source_title || '',
     source_context: (data.source_context || '').trim(),
