@@ -4694,3 +4694,52 @@ body.ler-full .mobile-bottom-nav{display:none}
   .ler-msg{max-width:94%}
   .ler-conversa-campo textarea{font-size:16px}  /* <16px faz o iOS dar zoom sozinho */
 }
+
+/* ================================================================
+   Triagem do capitulo: cada palavra tem tres destinos.
+   O nome e o alvo grande (a acao mais frequente e "nao conheco");
+   os dois pequenos ficam colados, na mesma peca, para o olho ler
+   "palavra + o que fazer com ela" de uma vez.
+   ================================================================ */
+.ler-fer-triagem{display:flex;flex-wrap:wrap;gap:6px}
+.ler-tri{
+  display:inline-flex;align-items:stretch;
+  border:1px solid rgba(128,128,128,.22);border-radius:20px;overflow:hidden;
+  background:rgba(128,128,128,.10);
+}
+.ler-tri button{
+  border:0;background:transparent;cursor:pointer;font-family:inherit;
+  display:inline-flex;align-items:center;justify-content:center;
+  color:var(--ler-fg);padding:5px 10px;font-size:var(--fs-xs);line-height:1;
+}
+.ler-tri-w{gap:5px}
+.ler-tri-w i{font-style:normal;font-size:var(--fs-3xs);opacity:.55}
+.ler-tri-w:hover{background:var(--primary);color:#fff}
+.ler-tri-ok,.ler-tri-no{
+  padding:5px 8px;color:var(--ler-fg2);
+  border-left:1px solid rgba(128,128,128,.22) !important;
+}
+.ler-tri-ok svg,.ler-tri-no svg{width:13px;height:13px}
+.ler-tri-ok:hover{background:var(--success,#1f9d63);color:#fff}
+.ler-tri-no:hover{background:rgba(128,128,128,.35);color:var(--ler-fg)}
+
+/* meta dos 95%: o alvo com fim, nao mais uma lista solta */
+.ler-fer-meta{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin:10px 0 0;padding:10px 12px;
+  background:rgba(var(--primary-rgb),.10);
+  border:1px solid rgba(var(--primary-rgb),.28);
+  border-radius:var(--radius-sm);
+  font-size:var(--fs-sm);color:var(--ler-fg);line-height:1.55;
+}
+.ler-fer-meta>span{flex:1;min-width:180px}
+.ler-fer-meta b{font-weight:700}
+
+@media (max-width:768px){
+  /* Triagem e acao repetida dezenas de vezes: 31px de altura era loteria
+     de dedo. 11px de respiro vertical levam o alvo a ~37px. */
+  .ler-tri button{padding:11px 13px;font-size:var(--fs-sm)}
+  .ler-tri-ok,.ler-tri-no{padding:11px 13px}
+  .ler-tri-ok svg,.ler-tri-no svg{width:15px;height:15px}
+  .ler-fer-meta{flex-direction:column;align-items:stretch}
+}

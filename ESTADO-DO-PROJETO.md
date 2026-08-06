@@ -920,6 +920,38 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        o título encolhe com reticências (115px) e a barra não transborda.
      - `CACHE` do `sw.js` → **v97**.
 
+161. **TRIAGEM na cobertura — "marcar como conhecido" era a metade que faltava da conta**.
+     Observação do Djemeson: "só tem a opção de mandar pra revisão. Não seria interessante ter
+     opção de marcar como conhecido?".
+     - **O buraco era maior do que parecia.** A cobertura é medida contra `knownWords`, mas esse
+       mapa só é alimentado pela triagem do Raio-X e por cards maduros do SRS. Com ele quase
+       vazio, **o número mente**: no teste apareceram "bright", "cold", "day" e "April" como
+       palavras novas, e a única saída era mandar lixo para o Revisar. Sem o caminho de volta,
+       o painel media contra o vazio.
+     - Cada palavra virou uma peça com **três destinos**: clicar no nome manda para o Revisar
+       (não conheço), **✓** marca como conhecida, **×** manda para os ignorados (nome próprio —
+       que num romance DOMINA a lista de frequência: Wade, Lufkin, Bayou).
+     - **Os números se refazem na hora**, sem recontar o capítulo: já sabemos quantas vezes cada
+       palavra aparece, então "conheço" soma às conhecidas e "ignorar" tira do total dos dois
+       lados (nome próprio não é vocabulário a aprender nem vocabulário que você sabe). Ver a
+       cobertura subir a cada clique é o que dá sentido ao trabalho.
+     - **Desfazer** para as marcações (não para o envio ao Revisar, que já criou o item lá). O
+       desfazer espelha exatamente o que foi feito — no primeiro teste ele devolvia a palavra à
+       lista mas esquecia de restaurar o `total` do "ignorar", e a cobertura continuava mentindo.
+     - **A meta dos 95%**: "estudando as N mais frequentes daqui, você sai de X% para 95% — o
+       patamar em que dá para ler sem travar", com botão para mandar exatamente essas N. Converte
+       uma lista solta num alvo com fim.
+     - **O que isso destrava além do painel**: o que você marca aqui é o MESMO vocabulário que
+       mede série, podcast e os outros livros. Uma triagem de dois minutos antes do capítulo
+       melhora toda medição futura do app — e é o que faz a ideia de "cobertura na capa da
+       estante" (roteiro, item 2) passar a valer alguma coisa.
+     - **Bug latente encontrado ao escrever**: os chips usavam `onclick="lerMandarUma('${w}')"`.
+       Palavra com apóstrofo (`don't`, `father's`) quebrava o handler, porque o HTML decodifica
+       `&#39;` ANTES de o JS ler e a string fechava no meio. Trocado por delegação com `data-w`
+       — o texto nunca passa pelo parser de JS. Testado com `father's`.
+     - Alvo de toque da triagem subiu de 31px para 37px no celular: é ação repetida dezenas de
+       vezes seguidas. `CACHE` do `sw.js` → **v98**.
+
 157. **Busca de imagem no menu de seleção** (pedido junto): quarto botão da fileira de baixo,
      abrindo a aba de imagens do Google no idioma do livro (`tbm=isch&hl=…`). É o complemento
      natural da Wikipédia: para objeto, planta, roupa, arma ou bicho, a foto ensina o que a
@@ -3723,9 +3755,12 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
     frequentes DELE. É o "Preparar para assistir" do módulo Vídeo aplicado ao livro, e a
     matemática já está pronta (`lerAnalisar`). Muda a experiência de "travo a cada parágrafo"
     para "leio corrido". **Provavelmente o item de maior impacto da lista.**
-2. **Cobertura na estante.** Calcular a cobertura de cada livro UMA vez, na importação, e
-    mostrá-la na capa: "97% — leitura fluida", "89% — vai doer". Escolher o livro certo é
-    metade da leitura extensiva. Custo: uma passada de texto no import (já lemos tudo lá).
+2. **Cobertura na estante.** Calcular a cobertura de cada livro e mostrá-la na capa: "97% —
+    leitura fluida", "89% — vai doer". Escolher o livro certo é metade da leitura extensiva.
+    **Ficou mais valioso depois da triagem (item 161)**: agora o `knownWords` cresce de verdade,
+    então o número na capa passa a significar alguma coisa. Cuidado de projeto: NÃO congelar o
+    valor na importação — ele muda toda vez que você triar um capítulo. Calcular sob demanda
+    (ou recalcular quando a estante abrir) e guardar com carimbo de quando foi medido.
 3. **Ler ouvindo.** A voz do navegador já está ligada na seleção; falta o modo contínuo com a
     frase atual destacada e avanço automático de página. Custo zero de API.
 4. **Retomar com resumo.** "Faz 6 dias que você parou" → a IA resume em 3 linhas o que

@@ -1346,16 +1346,26 @@ async function _lerRenderFerramentas(escopo) {
     for (let i = 0; i < _lerLivro.chapters.length; i++) partes.push(await _lerTextoDoCapitulo(i))
     txt = partes.join(' ')
   }
-  const a = lerAnalisar(txt)
-  _lerUltimaAnalise = a
-  const topo = a.novas.slice(0, 40)
-  const repetidas = a.novas.filter(x => x.n > 1).length
+  _lerUltimaAnalise = lerAnalisar(txt)
+  _lerDesfazer = []          // triagem nova, pilha de desfazer nova
 
   p.innerHTML = `
     <div class="ler-fer-abas">
       <button class="ler-btn ler-pill${alvo === 'capitulo' ? ' on' : ''}" onclick="_lerRenderFerramentas('capitulo')">Este capítulo</button>
       <button class="ler-btn ler-pill${alvo === 'livro' ? ' on' : ''}" onclick="_lerRenderFerramentas('livro')">O livro inteiro</button>
     </div>
+    <div id="ler-fer-corpo">${_lerFerCorpoHTML()}</div>`
+}
+
+// O corpo é redesenhado a cada triagem — por isso vive separado do resto do
+// painel (as abas e o cabeçalho não piscam).
+function _lerFerCorpoHTML() {
+  const a = _lerUltimaAnalise
+  if (!a) return ''
+  const repetidas = a.novas.filter(x => x.n > 1).length
+  const topo = a.novas.slice(0, 40)
+  const meta = _lerMetaCobertura(a)
+  return `
     <div class="ler-fer-num">
       <div><b>${Math.round(a.cobertura * 100)}%</b><span>você já conhece</span></div>
       <div><b>${a.novas.length.toLocaleString('pt-BR')}</b><span>palavras novas</span></div>
@@ -1363,16 +1373,47 @@ async function _lerRenderFerramentas(escopo) {
       <div><b>${a.total.toLocaleString('pt-BR')}</b><span>palavras no total</span></div>
     </div>
     <p class="ler-fer-nota">${_lerLeituraDaCobertura(a.cobertura)}</p>
+    ${meta.html}
     <div class="ler-fer-acoes">
       <button class="btn btn-primary btn-sm" onclick="lerMandarNovas(10)">${ic('plus','ic-sm')} As 10 mais frequentes para o Revisar</button>
-      <button class="btn btn-secondary btn-sm" onclick="lerMandarNovas(25)">As 25 mais</button>
+      ${_lerDesfazer.length ? `<button class="btn btn-secondary btn-sm" onclick="lerDesfazerTriagem()">${ic('undo','ic-sm')} Desfazer (${_lerDesfazer.length})</button>` : ''}
     </div>
-    <div class="ler-fer-chips">
-      ${topo.map(x => `<button class="ler-chip" onclick="lerMandarUma('${escA(x.w)}')" data-tip="Mandar para o Revisar">
-        ${esc(x.w)}${x.n > 1 ? `<i>${x.n}×</i>` : ''}</button>`).join('') || '<span class="ler-fer-nota">Nenhuma palavra nova por aqui.</span>'}
+    <div class="ler-fer-triagem" onclick="_lerCliqueTriagem(event)">
+      ${topo.map(x => `
+        <span class="ler-tri" data-w="${escA(x.w)}">
+          <button class="ler-tri-w" data-a="estudo" data-tip="Não conheço — mandar para o Revisar com a frase do livro">
+            ${esc(x.w)}${x.n > 1 ? `<i>${x.n}×</i>` : ''}
+          </button>
+          <button class="ler-tri-ok" data-a="conheco" data-tip="Já conheço — nunca mais sugerir, e a cobertura sobe">${ic('check','ic-sm')}</button>
+          <button class="ler-tri-no" data-a="ignorar" data-tip="Nome próprio ou jargão que não interessa — sai da conta">${ic('x','ic-sm')}</button>
+        </span>`).join('') || '<span class="ler-fer-nota">Nenhuma palavra nova por aqui.</span>'}
     </div>
-    <p class="ler-fer-nota">Clique numa palavra para mandá-la sozinha. O que já está no seu
-      vocabulário conhecido e as palavras gramaticais (the, of, and…) ficam de fora da conta.</p>`
+    <p class="ler-fer-nota"><b>Triagem:</b> clique na palavra para estudá-la, no <b>✓</b> se já
+      conhece, no <b>×</b> se for nome próprio. O que você marca aqui vale para o app inteiro —
+      é o mesmo vocabulário que mede série, podcast e os outros livros.</p>`
+}
+
+// Quantas palavras faltam para chegar aos 95% — o patamar em que a leitura
+// extensiva deixa de doer. Transforma a lista solta num alvo com fim.
+function _lerMetaCobertura(a) {
+  const ALVO = 0.95
+  if (!a.total || a.cobertura >= ALVO) {
+    return { n: 0, html: '' }
+  }
+  let conhecidas = a.conhecidas, n = 0
+  for (const x of a.novas) {
+    if (conhecidas / a.total >= ALVO) break
+    conhecidas += x.n; n++
+  }
+  if (!n) return { n: 0, html: '' }
+  return {
+    n,
+    html: `<div class="ler-fer-meta">
+      <span>Estudando as <b>${n}</b> mais frequentes daqui, você sai de
+        <b>${Math.round(a.cobertura * 100)}%</b> para <b>95%</b> — o patamar em que dá para ler sem travar.</span>
+      <button class="btn btn-primary btn-sm" onclick="lerMandarNovas(${n})">${ic('target','ic-sm')} Mandar as ${n}</button>
+    </div>`
+  }
 }
 
 function _lerLeituraDaCobertura(c) {
@@ -1383,10 +1424,100 @@ function _lerLeituraDaCobertura(c) {
   return 'Texto acima do seu nível agora. Vale pré-estudar as mais frequentes ou escolher algo mais leve.'
 }
 
-function lerMandarUma(palavra) { return _lerCapturarSemFrase([palavra]) }
+// Delegação em vez de onclick com a palavra embutida: `don't` e `father's`
+// quebravam o handler inline — o HTML decodifica `&#39;` ANTES de o JS ler, e
+// a string fechava no meio. Com `data-w` o texto nunca passa pelo parser de JS.
+function _lerCliqueTriagem(ev) {
+  const b = ev.target.closest('button[data-a]')
+  if (!b) return
+  const palavra = b.closest('.ler-tri')?.dataset.w
+  if (!palavra) return
+  if (b.dataset.a === 'conheco') lerConheco(palavra)
+  else if (b.dataset.a === 'ignorar') lerIgnorar(palavra)
+  else lerMandarUma(palavra)
+}
+
+function lerMandarUma(palavra) {
+  _lerTirarDaLista(palavra, 'estudo')
+  return _lerCapturarSemFrase([palavra])
+}
 function lerMandarNovas(n) {
   if (!_lerUltimaAnalise) return Promise.resolve()
-  return _lerCapturarSemFrase(_lerUltimaAnalise.novas.slice(0, n).map(x => x.w))
+  const lista = _lerUltimaAnalise.novas.slice(0, n).map(x => x.w)
+  lista.forEach(w => _lerTirarDaLista(w, 'estudo'))
+  return _lerCapturarSemFrase(lista)
+}
+
+// ================================================================
+// TRIAGEM — "eu já conheço" e "isso é nome próprio"
+// ================================================================
+// Faltava a outra metade da conta. A cobertura era medida contra o mapa de
+// palavras conhecidas, mas não havia como ALIMENTAR esse mapa a partir daqui —
+// então o painel mostrava "bright", "cold", "day" como palavras novas e a
+// única saída era mandar lixo para o Revisar. Marcar o que você já sabe é o
+// que faz o número virar verdade, e vale para o app inteiro: a mesma medida
+// serve para série, podcast e para os outros livros da estante.
+let _lerDesfazer = []      // últimas marcações, para voltar atrás sem medo
+
+function lerConheco(palavra) {
+  if (typeof markKnownWord !== 'function') return
+  markKnownWord(palavra, true)
+  _lerDesfazer.push({ w: palavra, tipo: 'conheco' })
+  _lerTirarDaLista(palavra, 'conheco')
+  _lerRepintar()
+}
+
+function lerIgnorar(palavra) {
+  if (typeof markIgnoredWord !== 'function') return
+  markIgnoredWord(palavra, true)
+  _lerDesfazer.push({ w: palavra, tipo: 'ignorar' })
+  _lerTirarDaLista(palavra, 'ignorar')
+}
+
+function lerDesfazerTriagem() {
+  const u = _lerDesfazer.pop()
+  if (!u) return
+  if (u.tipo === 'conheco' && typeof markKnownWord === 'function') markKnownWord(u.w, false)
+  if (u.tipo === 'ignorar' && typeof markIgnoredWord === 'function') markIgnoredWord(u.w, false)
+  // devolve a palavra à lista com a contagem que ela tinha
+  const a = _lerUltimaAnalise
+  if (a && u.n) {
+    a.novas.push({ w: u.w, n: u.n })
+    a.novas.sort((x, y) => y.n - x.n || x.w.localeCompare(y.w))
+    // Espelho exato do que _lerTirarDaLista fez: "conheço" mexeu em
+    // `conhecidas`, "ignorar" tirou as ocorrências do total. Desfazer que só
+    // devolve metade da conta deixaria a cobertura mentindo de novo.
+    if (u.tipo === 'ignorar') a.total += u.n
+    else a.conhecidas = Math.max(0, a.conhecidas - u.n)
+    a.cobertura = a.total ? Math.min(1, a.conhecidas / a.total) : 0
+  }
+  _lerRepintar()
+  _lerPintarFerramentas()
+  toast(`"${u.w}" voltou para a lista`, 'info')
+}
+
+// Tira a palavra da análise em memória e reescreve os números NA HORA.
+// Recontar o capítulo inteiro a cada clique seria lento e desnecessário: já
+// sabemos quantas vezes ela aparece.
+function _lerTirarDaLista(palavra, tipo) {
+  const a = _lerUltimaAnalise
+  if (!a) return
+  const i = a.novas.findIndex(x => x.w === palavra)
+  if (i < 0) return
+  const [item] = a.novas.splice(i, 1)
+  const ultimo = _lerDesfazer[_lerDesfazer.length - 1]
+  if (ultimo && ultimo.w === palavra && !ultimo.n) ultimo.n = item.n
+  // "Conheço" entra na cobertura. "Ignorar" (nome próprio) sai da conta dos
+  // dois lados: não é vocabulário a aprender nem vocabulário que você sabe.
+  if (tipo === 'conheco') a.conhecidas += item.n
+  else if (tipo === 'ignorar') a.total = Math.max(1, a.total - item.n)
+  a.cobertura = a.total ? Math.min(1, a.conhecidas / a.total) : 0
+  _lerPintarFerramentas()
+}
+
+function _lerPintarFerramentas() {
+  const c = el('ler-fer-corpo')
+  if (c) c.innerHTML = _lerFerCorpoHTML()
 }
 
 // Palavra vinda da lista de frequência não tem frase — e frase é o que faz o
