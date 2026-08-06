@@ -1062,6 +1062,38 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      escapado e SÓ o `<b>` volta a valer como marcação (mais `**markdown**`, que modelo barato
      usa às vezes). `<script>` continua escapado — conferido no teste. `CACHE` → **v101**.
 
+170. **O TESTE COMPARATIVO RODOU — e o resultado mais importante foi um que ninguém esperava
+     (2026-08-06)**. Os três casos (does / tire of + the mud / barrel) passaram pelos três
+     modelos configurados. Leitura do resultado:
+     - ✅ **As correções de prompt das rodadas 163–167 FUNCIONAM.** Todos acertaram:
+       `does` → "de fato, realmente" com `gramatical: true`; `tire of` → "cansar-se de";
+       `the mud` → não virou unidade; `barrel` → "cano". Os três casos que motivaram tudo
+       estão resolvidos.
+     - ⚠️ **A linha "deepseek-v4-flash" do teste NÃO É do DeepSeek.** O console mostrou
+       `[ai] JSON pelo fallback OpenAI` **quatro vezes** durante aquela rodada: TODAS as
+       chamadas JSON do DeepSeek falharam e o app caiu na OpenAI sozinho. O DeepSeek não errou
+       o teste — ele não respondeu. **O DeepSeek segue não validado.**
+     - 🔧 **Defeito de diagnóstico corrigido na hora**: o `aiJSON` guardava o erro do
+       fornecedor em `erro` e só o mostrava se a OpenAI TAMBÉM falhasse — ou seja, era
+       impossível saber POR QUE o DeepSeek não respondeu (chave? cota? modelo descontinuado?
+       JSON quebrado?). Agora o motivo vai junto no `console.warn`. E, pior que o console:
+       o fallback era **invisível para o usuário** — você escolhe DeepSeek, ele falha em toda
+       chamada e o app cobra OpenAI sem avisar. Agora sai um toast, **uma vez por sessão**
+       (não por chamada, senão vira spam).
+     - 📊 **Sinal forte de qualidade a favor da Luna** — no `sense_audit` (o log que a 50ª
+       rodada criou justamente para auditar sentidos):
+       · `does` → gpt-4o-mini achou **2** sentidos; **Luna achou 5**, incluindo auxiliar
+         interrogativo, auxiliar de negação e "corças" (plural de *doe*, fêmea de cervo).
+       · `barrel` → gpt-4o-mini achou **2**; **Luna achou 5**, incluindo a unidade de petróleo,
+         o corpo cilíndrico de um instrumento e o VERBO *to barrel* (avançar velozmente).
+       Como a regra do app é "devolva TODOS os sentidos distintos", a Luna está cumprindo o
+       prompt melhor. É uma amostra só — sinal forte, não prova.
+     - 🐞 **Achado colateral**: o console mostrou `net::ERR_BLOCKED_BY_CLIENT` em
+       `firestore.googleapis.com`. Alguma extensão do navegador (bloqueador de anúncios) está
+       barrando o Firebase — a sincronização com a nuvem está falhando em silêncio nesse
+       navegador. Ver pendências.
+     - `CACHE` → **v105**.
+
 169. **GPT-5.6 (Sol / Terra / Luna) no catálogo — e o número que decide (2026-08-06)**.
      A OpenAI lançou em 2026-07-09 uma família de TRÊS níveis com nome próprio: **Sol** (topo),
      **Terra** (equilibrado) e **Luna** (rápido/barato). Preços de tabela conferidos na página
@@ -3910,7 +3942,20 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
 
 ## 9. Pendências / a verificar
 
-- [ ] **REFAZER OS DOIS CASOS DA 163ª RODADA COM O DEEPSEEK.** As correções são de PROMPT e não
+- [ ] **DESCOBRIR POR QUE O DEEPSEEK NÃO RESPONDE** (170ª rodada). No teste de 06/08, as 4
+      chamadas JSON dele caíram no fallback da OpenAI. Agora o motivo aparece no console e um
+      toast avisa. Rodar de novo e ler a mensagem: se for `model not found`, o ID
+      `deepseek-v4-flash` mudou; se for 401/402, é chave ou saldo; se for "resposta vazia ou
+      fora do formato", é o modelo devolvendo texto não-JSON e aí o caminho é o de sempre
+      (prompt mais explícito ou parser mais tolerante).
+- [ ] **Firebase bloqueado por extensão do navegador** (visto na 170ª): `ERR_BLOCKED_BY_CLIENT`
+      em `firestore.googleapis.com`. A sincronização está falhando em silêncio nesse navegador
+      — vale liberar o domínio no bloqueador, ou o app passar a avisar quando o sync falhar
+      por bloqueio (hoje ele só marca o ponto como erro, sem dizer por quê).
+- [x] ~~REFAZER OS DOIS CASOS DA 163ª RODADA~~ — **feito em 06/08 e PASSOU** nos modelos da
+      OpenAI (ver 170ª rodada). Falta só refazer com o DeepSeek de fato respondendo.
+
+- [ ] **(histórico) REFAZER OS DOIS CASOS DA 163ª RODADA COM O DEEPSEEK.** As correções são de PROMPT e não
       puderam ser testadas (o ambiente de teste não tem chave de IA). Repetir exatamente:
       (a) mandar `"we began to tire of the mud"` para o Revisar e conferir se a glosa de
       "tire of" agora é "cansar-se de" e se "the mud" sumiu das colocações;

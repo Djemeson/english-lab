@@ -367,6 +367,17 @@ function _aiParseJSON(data) {
 //   1) fornecedor ativo COM json_object (quando ele se dá bem com isso)
 //   2) mesmo fornecedor SEM json_object, extraindo o JSON do texto
 //   3) OpenAI, se houver chave — nunca deixa a análise no vácuo
+// O fallback é SILENCIOSO por natureza — e silêncio aqui engana a conta: você
+// escolhe o DeepSeek, ele falha em toda chamada, e o app cobra OpenAI sem
+// você saber. Um aviso por sessão (não por chamada, senão vira spam).
+let _aiFallbackAvisado = false
+function _aiAvisarFallback(nome, modelo, motivo) {
+  if (_aiFallbackAvisado) return
+  _aiFallbackAvisado = true
+  if (typeof toast !== 'function') return
+  toast(`${nome} (${modelo}) não respondeu — o app seguiu pela OpenAI. Motivo: ${String(motivo).slice(0, 90)}`, 'warning')
+}
+
 async function aiJSON(messages, { maxTokens, model, timeoutMs, retries } = {}) {
   const chat = aiChatCfg()
   if (!chat.key) throw new Error('Chave da ' + chat.P.nome + ' não configurada (Configurações → IA)')
@@ -394,7 +405,15 @@ async function aiJSON(messages, { maxTokens, model, timeoutMs, retries } = {}) {
       const res = await _aiFetch('https://api.openai.com/v1/chat/completions',
         corpo(AI_DEFAULT_MODEL, true), { timeoutMs, retries: 1, key: cfg.openaiKey })
       const j = _aiParseJSON(await res.json())
-      if (j) { console.warn('[ai] JSON pelo fallback OpenAI —', chat.P.nome, 'não respondeu'); return j }
+      if (j) {
+        // O MOTIVO junto: sem ele, "não respondeu" some no console e não dá
+        // para saber se foi chave, cota, modelo descontinuado ou JSON quebrado
+        // — foi exatamente o que aconteceu no teste comparativo de 06/08.
+        const motivo = (erro && erro.message) || 'resposta vazia ou fora do formato'
+        console.warn(`[ai] JSON pelo fallback OpenAI — ${chat.P.nome} (${m}) não respondeu.`, 'Motivo:', motivo)
+        _aiAvisarFallback(chat.P.nome, m, motivo)
+        return j
+      }
     } catch (e) { erro = erro || e }
   }
   throw new Error(`[${chat.P.nome}] ${erro ? erro.message : 'não retornou um JSON válido'}`)
