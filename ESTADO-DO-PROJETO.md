@@ -3,7 +3,19 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-05 — **SEÇÃO LER: o leitor de ebooks nativo (79ª rodada)**:
+> Última atualização: 2026-08-06 — **Catálogo de imagens revisado na fonte (81ª rodada)**:
+> o nível barato do Gemini deixou de ser o `gemini-2.5-flash-image` (US$ 0,039, set/2025) e
+> passou a ser o **`gemini-3.1-flash-lite-image` — Nano Banana 2 Lite (US$ 0,0336, jun/2026)**:
+> mais novo E mais barato ao mesmo tempo, então manter o 2.5 era pagar mais por uma geração
+> anterior. O 2.5 saiu do catálogo. **Armadilha registrada:** o Imagen 4 Fast custa US$ 0,02 e
+> parece o mais barato de todos, mas os três Imagen 4 estão **depreciados e desligam em
+> 17/ago/2026** — não entrar. O seletor de Configurações parou de usar `toFixed(3)`, que
+> arredondava 0,0336 para "0,034" e fazia a tela cobrar mais do que a tabela.
+> **TTS avaliado e recusado:** o `gemini-2.5-flash-preview-tts` (US$ 0,50/10,00) sai perto do
+> `gpt-4o-mini-tts` que já usamos, e ambos os TTS do Gemini são *Preview* — trocar a pipeline
+> inteira por empate não se paga. Ver seção 8 (81ª rodada) e a pendência do Live Translate na 9.
+>
+> Anterior: 2026-08-05 — **SEÇÃO LER: o leitor de ebooks nativo (79ª rodada)**:
 > a ponte com o Kindle sempre terminava numa exportação manual, e o único ganho real do
 > aparelho era a tela. Então o livro passou a morar AQUI: nova seção **Ler** com estante,
 > leitor de `.epub`/`.txt`/`.html` (ZIP + EPUB lidos sem nenhuma dependência), tipografia de
@@ -1097,6 +1109,41 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        reconhecidas, SAFETY/IMAGE_SAFETY/PROHIBITED_CONTENT viram recusa explicada, `STOP` não
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
+
+174. **CATÁLOGO DE IMAGENS REVISADO NA FONTE — o nível barato ficou mais novo E mais barato
+     (2026-08-06)**. O Djemeson trouxe prints do catálogo do Google (abas Images, Audio e
+     Agents). Da lista inteira, **uma coisa era acionável hoje** — e vale registrar as duas
+     que NÃO eram, porque parecem boas e não são.
+     - **A troca**: o nível `low` do Gemini deixou de ser `gemini-2.5-flash-image`
+       (US$ 0,039, set/2025) e passou a ser **`gemini-3.1-flash-lite-image` — Nano Banana 2
+       Lite (US$ 0,0336, jun/2026)**. É simultaneamente **geração mais nova e preço menor**,
+       então manter o 2.5 era pagar a mais por um modelo anterior. O 2.5 saiu do catálogo:
+       com o Lite existindo, ele não é o melhor em nenhum critério.
+       O preço foi conferido na tabela oficial — o fetch embolou o valor padrão do Lite, mas
+       o batch fecha a conta: nessa família batch é sempre metade do padrão (0,067→0,034;
+       0,134→0,067; 0,039→0,0195), e o batch do Lite é 0,0168 → padrão **0,0336**, idêntico
+       ao print. Método a repetir quando a doc vier ambígua.
+     - **⚠️ ARMADILHA — Imagen 4 Fast, US$ 0,02**: é o preço mais baixo da tela inteira e é
+       uma cilada. Os três Imagen 4 (`imagen-4.0-generate-001`, `-ultra-`, `-fast-`) estão
+       **depreciados e desligam em 17/ago/2026** — 11 dias depois desta rodada. Adotar por
+       preço seria trocar um módulo funcionando por um que quebra em duas semanas.
+     - **Tela que cobrava a mais**: o seletor de Configurações usava `usd.toFixed(3)`, que
+       arredondava 0,0336 para **"0,034"**. Com preços de 4 casas isso deixa a interface
+       mentindo *para cima* sobre a fatura. Agora imprime o literal do catálogo.
+     - **TTS avaliado e RECUSADO** (a aba Audio): `gemini-2.5-flash-preview-tts` custa
+       US$ 0,50 in / 10,00 out e o `gemini-3.1-flash-tts-preview` US$ 1,00 / 20,00 — contra o
+       `gpt-4o-mini-tts` (US$ 0,60 / 12,00) que já roda. O 2.5 sai perto de empate e o 3.1 é
+       quase o dobro; os dois são **Preview** (mudam sem aviso), e a pipeline atual é
+       OpenAI-shaped (catálogo de 13 vozes + queda para voz legada no `tts-1`). Trocar tudo
+       por empate de preço não se paga. O atrativo real do 3.1 são as *expressive audio tags*
+       (narração dirigida — ler devagar, enfatizar a palavra-alvo), que seriam pedagogicamente
+       úteis; ficou como pendência, não como troca.
+     - **Nada a fazer** com Lyria (música), Antigravity/Deep Research (agentes precisam de
+       servidor; este app é 100% cliente).
+     - Verificado no app: os três níveis resolvem para os modelos certos, `aiImgNivel()` com
+       Gemini cai no Lite a US$ 0,0336, `'high'` explícito continua no 3-pro, console limpo.
+       Nenhum id de modelo é gravado junto da imagem, então **não há dado velho no aparelho** —
+       a troca vale para quem já tem `imgQuality: 'low'` salvo, sem migração. `CACHE` → **v109**.
 
 172. **IMAGENS: "gerei 4 no mais baixo e consumiu 1,80" — o app caía no MÉDIO em silêncio
      (2026-08-06)**. Preços do Gemini reconferidos na fonte e **corretos** (2.5-flash-image
@@ -4029,6 +4076,25 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
 
 ## 9. Pendências / a verificar
 
+- [ ] **CONFERIR O IMAGEN 4 EM 17/AGO/2026** — não é para adotar, é para não ser pego: se
+      alguma parte do projeto passar a citar `imagen-4.0-*`, ela quebra nessa data. Hoje o
+      projeto **não usa** nenhum Imagen (só a família Nano Banana), então é só vigilância.
+- [ ] **GERAR UM LOTE COM O NANO BANANA 2 LITE** (81ª rodada). O modelo `gemini-3.1-flash-lite-image`
+      nunca foi chamado de verdade daqui — a troca foi validada só no catálogo e no
+      `aiImgNivel()`. Falta a prova de fogo: gerar imagens e confirmar (a) que ele responde numa
+      das duas rotas (`:generateContent` ou `/interactions`) e (b) que a linha
+      `[img] … via <rota> — US$ 0.0336` sai no console. Se ele só existir numa das rotas, a
+      outra devolve 404/400 e a queda automática já cobre — mas convém saber qual é.
+- [ ] **NARRAÇÃO DIRIGIDA COM `gemini-3.1-flash-tts-preview`** (ideia da 81ª, NÃO é troca de
+      fornecedor). O TTS do Gemini não compensa por preço (avaliado e recusado), mas o 3.1 tem
+      *expressive audio tags* — dá para pedir "leia devagar", "enfatize a palavra-alvo",
+      "separe as sílabas". Isso é ganho **pedagógico**, não econômico: seria um botão extra no
+      card ("ouvir devagar / com ênfase"), convivendo com o `gpt-4o-mini-tts` atual, não
+      substituindo. Custa 2× por minuto e o modelo é *Preview* — só vale se o uso for pontual.
+- [ ] **Gemini 3.5 Live Translate — anotado, sem plano** (81ª). Tradução fala→fala em tempo
+      real, 70+ idiomas, US$ 3,50 in / 21,00 out. Abriria "conversar e ser entendido na hora",
+      mas é **Live API por WebSocket** (nada parecido com o que o app faz hoje), preço de outra
+      ordem de grandeza e status *Preview*. Registrado para não se perder; não priorizado.
 - [ ] **DESCOBRIR POR QUE O DEEPSEEK NÃO RESPONDE** (170ª rodada). No teste de 06/08, as 4
       chamadas JSON dele caíram no fallback da OpenAI. Agora o motivo aparece no console e um
       toast avisa. Rodar de novo e ler a mensagem: se for `model not found`, o ID

@@ -74,7 +74,9 @@ function updateImgQualityOptions() {
   const atual = cfg.imgQuality || 'low'
   sel.innerHTML = ['low', 'medium', 'high'].map(q => {
     const n = P.niveis[q]
-    return `<option value="${q}"${q === atual ? ' selected' : ''}>${esc(n.rotulo)} — US$ ${n.usd.toFixed(3)}/imagem</option>`
+    // Sem toFixed(3): arredondava 0,0336 para "0,034" e a tela passava a
+    // cobrar mais do que a tabela. Os preços são literais exatos no catálogo.
+    return `<option value="${q}"${q === atual ? ' selected' : ''}>${esc(n.rotulo)} — US$ ${n.usd}/imagem</option>`
   }).join('')
 }
 

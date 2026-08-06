@@ -501,9 +501,14 @@ const AI_IMG = {
   gemini: {
     nome: 'Google Gemini', keyCfg: 'geminiKey',
     niveis: {
-      low:    { model: 'gemini-2.5-flash-image', usd: 0.039, rotulo: 'Nano Banana (2.5 Flash)' },
-      medium: { model: 'gemini-3.1-flash-image', usd: 0.067, rotulo: 'Nano Banana 2 (3.1 Flash)' },
-      high:   { model: 'gemini-3-pro-image',     usd: 0.134, rotulo: 'Nano Banana Pro (3 Pro)' }
+      // O nível barato NÃO é mais o 2.5-flash-image: o Lite (jun/2026) é ao
+      // mesmo tempo mais novo E mais barato (0,0336 < 0,039). Manter o 2.5 era
+      // pagar mais por uma geração anterior. O 2.5 saiu do catálogo por isso.
+      // Imagen 4 Fast custa 0,02 e parece tentador — mas está DEPRECIADO e o
+      // Google desliga em 17/ago/2026. Entrar nele hoje é quebrar em 11 dias.
+      low:    { model: 'gemini-3.1-flash-lite-image', usd: 0.0336, rotulo: 'Nano Banana 2 Lite (3.1 Flash Lite)' },
+      medium: { model: 'gemini-3.1-flash-image',      usd: 0.067,  rotulo: 'Nano Banana 2 (3.1 Flash)' },
+      high:   { model: 'gemini-3-pro-image',          usd: 0.134,  rotulo: 'Nano Banana Pro (3 Pro)' }
     }
   }
 }
