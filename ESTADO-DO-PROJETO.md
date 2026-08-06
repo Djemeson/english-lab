@@ -3,7 +3,18 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-06 — **TRIAGEM POR NÍVEL (QECR) + "Estudar" no balão (86ª
+> Última atualização: 2026-08-06 — **ESTUDAR POR FONTE (88ª rodada)**: pedido de escolher a
+> origem na hora de estudar ("por exemplo Flags on the Bayou, assim eu foco só nessas novas
+> entradas"). O dado já existia — todo card carrega `source_type`/`source_title` desde que
+> nasce — mas nunca tinha sido usado na fila do SRS, que só filtrava por deck. Agora o painel
+> do Estudar traz uma fileira de cartões (livro, série, podcast) com **quantos há para hoje em
+> cada um**, e a fila passa a respeitar a escolha. Convive com o filtro de deck em vez de
+> substituí-lo: deck é a gaveta que ele montou, fonte é de onde a palavra veio. A escolha é
+> **persistida**, e por isso a fonte ativa aparece em três lugares (cartão, botão e aviso de
+> fila vazia com saída em um clique) — filtro invisível é o que faz o usuário achar que o app
+> quebrou. Ver seção 8 (88ª rodada).
+>
+> Anterior: 2026-08-06 — **TRIAGEM POR NÍVEL (QECR) + "Estudar" no balão (86ª
 > rodada)**. O Djemeson é intermediário e um capítulo acusava **647 palavras novas** — mas a
 > maioria só é nova para o APP: ele as conhece, e marcá-las uma a uma nunca aconteceria. A
 > cobertura mentia (67% quando o real é ~90%) e a leitura com IA pagava glosa de palavra
@@ -1176,6 +1187,39 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        reconhecidas, SAFETY/IMAGE_SAFETY/PROHIBITED_CONTENT viram recusa explicada, `STOP` não
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
+
+183. **ESTUDAR POR FONTE — `srsFontesHoje()` / filtro na fila (88ª rodada, 2026-08-06)**.
+     Pedido: *"quando eu for estudar quero poder escolher a fonte, por exemplo Flags on the
+     Bayou, assim eu foco só nessas novas entradas"*.
+     - **Nada de dado novo foi preciso**: `source_type` e `source_title` são carimbados na
+       criação de todo card (o leitor põe o título do livro, a Mídia a série, o Kindle o
+       livro). O que faltava era `buildSessionQueue` olhar para isso — ela só filtrava por
+       **deck**. Os dois filtros agora convivem: deck é a gaveta que ele montou, fonte é de
+       onde a palavra veio.
+     - **Por que vale**: vocabulário estudado junto do contexto em que apareceu gruda mais, e
+       "terminar este livro" vira meta concreta.
+     - **O painel** ganhou uma fileira rolável de cartões — ícone da fonte, nome da obra e as
+       contagens de hoje separadas em *revisar* (verde) e *novos* (acento). Fonte sem nada hoje
+       **não aparece**: cartão que não leva a lugar nenhum é ruído. Com uma fonte só, o seletor
+       inteiro some — não é escolha, é enfeite.
+     - **O teto diário de novos é GLOBAL**, não por fonte. Cada cartão mostra
+       `min(novos da fonte, teto restante do dia)` — anunciar "40 novos" numa fonte quando o
+       dia permite 10 seria prometer o que a sessão não entrega. Testado: com teto 1, o cartão
+       anuncia 1 e a fila traz exatamente 1.
+     - **O perigo de persistir um filtro** é fila vazia sem explicação, que se parece com app
+       quebrado. Por isso a fonte ativa aparece em três lugares: o cartão destacado, o texto do
+       botão (*"Começar — Flags on the Bayou"*) e um aviso próprio quando a fila fica vazia por
+       causa dela, com *"Estudar todas"* em um clique. O `startSrsSession` também nomeia a
+       fonte no toast de fila vazia.
+     - **Desempenho**: `_srsMapaFontes()` monta `wordId → fonte` uma vez por render; um `find`
+       por card dentro do laço seria quadrático numa coleção que cresce para milhares.
+     - Verificado: 3 fontes detectadas com as contagens certas; sem filtro a fila traz 9, com
+       "Flags on the Bayou" traz só os 5 do livro, com "The Wire" só os 3 da série; o cartão
+       ativo é destacado; fonte que zerou some da lista; e o teto global é respeitado.
+       ⚠️ Duas "falhas" do primeiro teste eram do arsenal, não do código: `loadSrs()` recarrega
+       `srsCfg` do localStorage e apagava o ajuste feito em memória, e cards órfãos (palavra
+       apagada, card mantido) criavam um balde "Sem fonte" que impedia o caso de fonte única.
+       `CACHE` → **v123**.
 
 182. **"CLASSIFIQUEI DE NOVO E CONTINUA SEM EXPRESSÕES" — eu esqueci de subir a versão do
      cache (87ª rodada, 2026-08-06)**. O recurso estava certo; o dado velho é que mandava.

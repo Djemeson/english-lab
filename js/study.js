@@ -36,17 +36,28 @@ function renderSrsSection() {
       <p style="font-size:var(--fs-md);color:var(--text2)">Volte amanhã — o algoritmo já agendou a próxima revisão.</p>
     </div>`
   } else {
-    startArea.innerHTML = `
-    <div style="text-align:center;padding:24px 0">
+    // Quantos a sessão REALMENTE traria com a fonte ativa. Sem isto o painel
+    // anunciaria o total geral e a sessão abriria com um punhado — ou com
+    // "nada para estudar", que é o pior desfecho de um filtro persistido.
+    const naFonte = buildSessionQueue().length
+    const nomeFonte = typeof srsFonteNome === 'function' ? srsFonteNome() : ''
+    startArea.innerHTML = _srsSeletorFonteHTML() + (naFonte === 0 ? `
+    <div class="srs-vazio-fonte">
+      ${ic('info','ic-sm')}
+      <span>Nada para hoje em <b>${esc(nomeFonte)}</b> — mas há <b>${due + newRem}</b> em outras fontes.</span>
+      <button class="btn btn-secondary btn-sm" onclick="srsFonteDefinir('')">Estudar todas</button>
+    </div>` : `
+    <div style="text-align:center;padding:20px 0 4px">
       <p style="color:var(--text2);margin-bottom:16px;font-size:var(--fs-base)">
         ${due > 0 ? `<strong style="color:var(--success)">${due}</strong> para revisar` : ''}
         ${due > 0 && newRem > 0 ? ' · ' : ''}
         ${newRem > 0 ? `<strong style="color:var(--primary)">${newRem}</strong> novos` : ''}
+        ${nomeFonte ? `<span class="srs-so-fonte">só de ${esc(nomeFonte)}: <b>${naFonte}</b></span>` : ''}
       </p>
       <button class="btn btn-primary btn-lg" onclick="startSrsSession()">
-        ${ic('play')}Começar sessão
+        ${ic('play')}Começar${nomeFonte ? ' — ' + esc(nomeFonte) : ' sessão'}
       </button>
-    </div>`
+    </div>`)
   }
 }
 
@@ -181,7 +192,14 @@ function buildSessionQueue(filterDeckId = null) {
 
   // Filtro por deck: inclui descendentes
   const deckIds = filterDeckId ? [filterDeckId, ...getAllDescendantIds(filterDeckId)] : null
-  const inDeck = c => !deckIds || deckIds.includes(c.deckId)
+  const inDeckSo = c => !deckIds || deckIds.includes(c.deckId)
+
+  // Filtro por FONTE (livro, série, podcast…). Convive com o de deck em vez de
+  // substituí-lo: um são as gavetas que ele montou, o outro é de onde a palavra
+  // veio. O mapa é montado uma vez — `find` por card seria quadrático.
+  const fonte = typeof srsFonteAtiva === 'function' ? srsFonteAtiva() : ''
+  const mapa = fonte ? _srsMapaFontes() : null
+  const inDeck = c => inDeckSo(c) && (!fonte || mapa.get(c.wordId) === fonte)
 
   // 1. Due reviews (review + relearning)
   let reviews = srsCards.filter(c => inDeck(c) && c.due <= now && (c.state === 'review' || c.state === 'relearning'))
@@ -202,7 +220,11 @@ function buildSessionQueue(filterDeckId = null) {
 function startSrsSession(filterDeckId = null) {
   loadSrs()
   const queue = buildSessionQueue(filterDeckId)
-  if (!queue.length) { toast('Nada para estudar agora!', 'info'); return }
+  if (!queue.length) {
+    const nf = typeof srsFonteNome === 'function' ? srsFonteNome() : ''
+    toast(nf ? 'Nada para estudar em "' + nf + '" agora — troque a fonte no painel' : 'Nada para estudar agora!', 'info')
+    return
+  }
 
   srsSession = {
     queue: queue.map(c => c.id),
@@ -973,3 +995,115 @@ ${typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(card.lang ||
 }
 
 // Bootstrap is handled by initApp() defined above
+// ================================================================
+// ESTUDAR POR FONTE — "hoje eu quero só Flags on the Bayou"
+// ================================================================
+// O dado já existia: todo card carrega `source_type` e `source_title` desde
+// que foi criado (o leitor carimba o título do livro, a Mídia carimba a série,
+// o Kindle carimba o livro). O que faltava era usar isso na hora de estudar.
+//
+// Por que importa: vocabulário aprendido junto do contexto em que apareceu
+// gruda mais. Estudar 30 palavras do mesmo romance, no mesmo campo semântico,
+// rende mais que 30 palavras soltas de cinco origens diferentes — e é o que
+// permite "vou terminar este livro" como meta concreta.
+//
+// A ESCOLHA É PERSISTIDA (`SK_SRS_FONTE`), porque re-escolher a cada sessão é
+// atrito. Mas persistir um filtro é perigoso: fila vazia sem explicação faz o
+// usuário achar que o app quebrou. Por isso a fonte ativa aparece SEMPRE — no
+// cartão destacado, no texto do botão e no aviso de fila vazia, que oferece
+// voltar para todas em um clique.
+const SK_SRS_FONTE = 'el-srs-fonte'
+
+function srsFonteAtiva() {
+  try { return localStorage.getItem(SK_SRS_FONTE) || '' } catch (e) { return '' }
+}
+function srsFonteDefinir(chave) {
+  try {
+    if (chave) localStorage.setItem(SK_SRS_FONTE, chave)
+    else localStorage.removeItem(SK_SRS_FONTE)
+  } catch (e) {}
+  renderSrsSection()
+}
+
+// Chave estável de uma fonte. Título E tipo: dois livros podem ter o mesmo
+// nome de um episódio, e o tipo é o que dá o ícone certo.
+function _srsChaveFonte(w) {
+  if (!w) return 'sem|Sem fonte'
+  const t = String(w.source_type || 'manual')
+  const nome = String(w.source_title || '').trim() || 'Sem título'
+  return t + '|' + nome
+}
+
+// wordId -> fonte, montado UMA vez por render. Sem isto seria um `find` por
+// card dentro de um laço sobre todos os cards — quadrático numa coleção que
+// cresce para milhares.
+function _srsMapaFontes() {
+  const m = new Map()
+  for (const w of words) m.set(w.id, _srsChaveFonte(w))
+  return m
+}
+
+// As fontes que TÊM algo para hoje, com as contagens. Fonte sem nada hoje não
+// aparece: cartão que não leva a lugar nenhum é ruído.
+function srsFontesHoje() {
+  loadSrs()
+  const mapa = _srsMapaFontes()
+  const now = nowTs()
+  const hoje = todayStr()
+  const log = srsLog.find(l => l.date === hoje)
+  const novosVistos = log ? (log.newSeen || 0) : 0
+  const tetoNovos = Math.max(0, srsCfg.newPerDay - novosVistos)
+
+  const acc = new Map()
+  for (const c of srsCards) {
+    const k = mapa.get(c.wordId) || 'sem|Sem fonte'
+    if (!acc.has(k)) acc.set(k, { chave: k, rev: 0, novos: 0, total: 0 })
+    const a = acc.get(k)
+    a.total++
+    if (c.due <= now && (c.state === 'review' || c.state === 'relearning' || c.state === 'learning')) a.rev++
+    else if (c.state === 'new') a.novos++
+  }
+  // O teto diário de novos é GLOBAL, não por fonte. Mostrar "40 novos" numa
+  // fonte quando o teto do dia é 10 seria prometer o que a sessão não entrega.
+  return [...acc.values()]
+    .map(a => ({ ...a, novos: Math.min(a.novos, tetoNovos), tipo: a.chave.split('|')[0], nome: a.chave.slice(a.chave.indexOf('|') + 1) }))
+    .filter(a => a.rev + a.novos > 0)
+    .sort((x, y) => (y.rev + y.novos) - (x.rev + x.novos) || x.nome.localeCompare(y.nome))
+}
+
+function _srsSeletorFonteHTML() {
+  const fontes = srsFontesHoje()
+  // Uma fonte só não é escolha — é enfeite que ocupa espaço.
+  if (fontes.length < 2) return ''
+  const ativa = srsFonteAtiva()
+  const totalGeral = fontes.reduce((s, f) => s + f.rev + f.novos, 0)
+  const cartao = (chave, icone, nome, rev, novos, sub) => `
+    <button class="srs-fonte${chave === ativa ? ' on' : ''}" onclick="srsFonteDefinir(${escA(JSON.stringify(chave))})">
+      <span class="srs-fonte-ic">${icone}</span>
+      <span class="srs-fonte-nome">${esc(nome)}</span>
+      <span class="srs-fonte-n">
+        ${rev ? `<b class="rev">${rev}</b>` : ''}${rev && novos ? '<i>·</i>' : ''}${novos ? `<b class="novo">${novos}</b>` : ''}
+      </span>
+      <span class="srs-fonte-sub">${esc(sub)}</span>
+    </button>`
+
+  return `
+    <div class="srs-fontes">
+      <div class="srs-fontes-cab">
+        ${ic('layers','ic-sm')} <b>Estudar de onde?</b>
+        <span>foque num livro, numa série — ou em tudo</span>
+      </div>
+      <div class="srs-fontes-lista">
+        ${cartao('', ic('layers'), 'Todas as fontes', 0, 0, totalGeral + ' cards hoje')}
+        ${fontes.map(f => cartao(f.chave, srcIcon(f.tipo), f.nome, f.rev, f.novos,
+            (f.rev ? f.rev + ' para revisar' : '') + (f.rev && f.novos ? ' · ' : '') + (f.novos ? f.novos + ' novos' : ''))).join('')}
+      </div>
+    </div>`
+}
+
+// Nome legível da fonte ativa — usado no botão e no aviso de fila vazia.
+function srsFonteNome() {
+  const k = srsFonteAtiva()
+  if (!k) return ''
+  return k.slice(k.indexOf('|') + 1)
+}
