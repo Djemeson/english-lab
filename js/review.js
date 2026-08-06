@@ -14,6 +14,36 @@ function _ptComNegrito(txt) {
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')   // modelo barato às vezes usa markdown
 }
 
+// ================================================================
+// REDE DE SEGURANÇA GRAMATICAL — o código conferindo o modelo
+// ================================================================
+// A regra no prompt (GRAMMAR BEFORE DICTIONARY) reduz o erro; esta rede pega
+// o que passar. Se o alvo é uma palavra-função do inglês (does/have/to/that…)
+// COM frase de contexto e a resposta não trouxe NENHUM significado marcado
+// como função gramatical, a análise repete UMA vez com a correção como
+// system — e, se ainda vier errada, segue com aviso no console (nunca
+// bloqueia o aluno; melhor um card imperfeito que nenhum).
+const _FUNC_EN = new Set(['do', 'does', 'did', 'have', 'has', 'had', 'am', 'is', 'are', 'was',
+  'were', 'be', 'been', 'being', 'will', 'would', 'shall', 'should', 'can', 'could', 'may',
+  'might', 'must', 'to', 'that', 'it', 'there'])
+
+async function _redeGramatical(target, ctx, PROMPT, result) {
+  const t = String(target || '').toLowerCase().trim()
+  if (!ctx || /\s/.test(t) || !_FUNC_EN.has(t)) return result
+  const temGram = (result.meanings || []).some(m => _ehSim(m.gramatical))
+  if (temGram) return result
+  console.warn(`[ia] "${t}" é palavra-função e a análise veio sem significado gramatical — repetindo com correção`)
+  try {
+    const r2 = await aiJSON([
+      { role: 'system', content: `Your previous analysis of "${target}" was WRONG: in the context sentence it works as a GRAMMATICAL FUNCTION (auxiliary/marker), and you returned only lexical dictionary senses. Redo the analysis now. The FIRST meaning MUST describe the grammatical function used in the context (with "gramatical": true and "context_match": true) and its examples MUST show that function. Follow the original instructions below.` },
+      { role: 'user', content: PROMPT }
+    ], { maxTokens: 5000 })
+    if ((r2.meanings || []).some(m => _ehSim(m.gramatical))) return r2
+  } catch (e) { /* fica com a primeira resposta */ }
+  console.warn(`[ia] a repetição também veio sem função gramatical — mantendo a resposta original`)
+  return result
+}
+
 // Booleano vindo de modelo barato em modo texto livre: aceita as formas que
 // eles realmente devolvem. `=== true` sozinho descartaria "true" (string).
 function _ehSim(v) {
@@ -195,21 +225,7 @@ LANGUAGE CHECK:
 ${ctx ? `Context sentence: "${ctx}"` : ''}
 ${sourceBlock}
 
-GRAMMAR BEFORE DICTIONARY — check this FIRST, it outranks everything below:
-Look at what "${target}" is DOING in the context sentence. If it is working as a STRUCTURAL element and not as vocabulary — emphatic/interrogative/negative auxiliary (do/does/did), perfect auxiliary (have/has/had), modal, copula or progressive/passive "be", infinitive marker "to", complementizer "that", dummy "it/there" — then the FIRST meaning object MUST describe that GRAMMATICAL FUNCTION in Portuguese, and it gets "context_match": true. The lexical dictionary sense may still be returned AFTER it, with "context_match": false.
-WORKED EXAMPLE — "does" with context "The boat ride does add time to the trip":
-- WRONG (what a cheap model does): meaning_pt "fazer, executar", examples "She does the laundry every Saturday". That is the lexical verb "do" — it is NOT what "does" is doing in this sentence, and the learner ends up studying the wrong thing.
-- RIGHT: first meaning_pt "de fato, realmente (ênfase)", definition "auxiliar enfático: reforça que a ação ACONTECE mesmo", context_match true, and its 3 examples must all use the EMPHATIC auxiliary ("I do like it", "She did tell me", "He does know the answer"). Only after that may "fazer, executar" appear as a separate object with context_match false.
-Same test for every example: an example placed under the grammatical meaning must show the word in that FUNCTION, never in the lexical sense.
-
-DOMAIN CHECK — the other big cheap-model failure, check it right after the one above:
-Decide WHAT the thing IS in the context sentence, then pick the Portuguese word for THAT thing. Never translate by the most frequent dictionary equivalent.
-WORKED EXAMPLE — "tip of its barrel" in "a bayonet mounted on the tip of its barrel":
-- WRONG: "extremidade do barril", "ponta do barril" — "barril" is a container. A bayonet is mounted on a RIFLE, so "barrel" here is the gun barrel.
-- RIGHT: "ponta do cano" (do fuzil).
-- NEVER hedge between two domains ("usado em armas ou recipientes"). The context sentence already decided which one it is; commit to it.
-- SELF-CHECK before returning: if your own 3 examples describe one domain (firearms, sailing, cooking…) while your Portuguese uses a word from another domain, the translation is WRONG. Fix it, don't ship it.
-
+${promptRegrasLexicais(wordLang(w), 'analise')}
 
 Rules for examples — CRITICAL, follow exactly:
 - Write EXACTLY 3 examples per meaning, in this FIXED order of tenses (so the learner sees the word morph):
@@ -310,7 +326,11 @@ Return ONLY this JSON (no markdown, no explanation):
   try {
     // Teto maior: com 2–3 sentidos × 3 exemplos, 2800 truncava a resposta
     // (e resposta truncada volta como 1 sentido só — o bug que o Djemeson viu)
-    const result = await aiJSON(PROMPT, { maxTokens: 5000 })
+    let result = await aiJSON(PROMPT, { maxTokens: 5000 })
+    // Rede de segurança: prompt não é garantia com modelo barato — o código
+    // confere a classe de erro conhecida e repete UMA vez quando a resposta
+    // vem errada (padrão da 49ª rodada).
+    result = await _redeGramatical(target, ctx, PROMPT, result)
     // A auditoria de sentidos não vai para a tela — serve para conferir a
     // decisão da IA quando um card volta com menos sentidos do que devia.
     if (Array.isArray(result.sense_audit) && result.sense_audit.length) {
@@ -994,14 +1014,12 @@ Rules:
 - Every "expr" MUST be text that appears INSIDE the snippet — never from the surrounding sentence. Units that are not part of the snippet are discarded.
 - NEVER return the whole snippet itself as one unit — only its PARTS (smaller units inside it).
 - A free adjective+noun combination is NOT a collocation: if the pair is compositional, return the notable WORD alone ("Japanese ethos" → return "ethos" as a word, C1 — NOT the pair). Only return a pair when it is genuinely fixed ("heavy rain", "make a difference").
-- DETERMINER + NOUN IS NEVER A UNIT. "the mud", "a house", "his hand", "that day" are grammar, not vocabulary: return the NOUN alone if it is worth studying, or nothing. Returning "the mud" as a collocation is always wrong.
 - NEVER return trivial contractions or fillers as units ("it's", "I'm", "don't", "you know").
 - SKIP trivial function words (articles, pronouns, auxiliaries, basic prepositions) unless they belong to a unit.
 - SKIP A1 words the learner certainly knows ("began", "day", "house", "good") UNLESS they carry a non-obvious meaning right here.
 - "gloss" is the meaning HERE, not a dictionary list.
-- GLOSS IN CITATION FORM: verbs in the infinitive, nouns in the singular. "began" → "começar", NEVER "começamos"; "tire of" → "cansar-se de", NEVER "cansamos". The gloss names the unit; it does not re-translate the sentence.
-- DOMAIN CHECK: decide WHAT the thing IS in this sentence, then pick the Portuguese word for THAT thing — never the most frequent dictionary equivalent. "the tip of its barrel" with a bayonet mounted on it is a RIFLE: "ponta do cano", never "ponta do barril" (barril = container). Never hedge between two domains.
-- SUBSTITUTION TEST — run it before returning every gloss: put the gloss back into the sentence in Portuguese. If the sentence stops saying what the ${L.nameEn} says, the gloss is wrong. "we began to tire of the mud" with "perder o interesse em" gives "começamos a perder o interesse na lama" — that is NOT what the sentence says; the right gloss is "cansar-se de" ("começamos a nos cansar da lama"). A gloss that is merely plausible for the unit in a dictionary FAILS this test.
+
+${promptRegrasLexicais(wordLang(w), 'glosa')}
 - LITERAL-TRANSLATION TRAP — avoid it explicitly: FIRST work out what the unit DOES in this scene, THEN write the gloss for that function. "We'll get you in for that" said at a hotel desk → gloss "a gente te encaixa (na agenda)", NEVER "colocar você dentro". If a gloss reads like word-by-word substitution, redo it before returning.
 - "nivel" is the CEFR difficulty of that unit for a learner.
 - "trad" must AGREE with the glosses: it is the same reading of the same sentence. If your translation of the whole snippet contradicts a gloss, one of them is wrong — fix it before returning.

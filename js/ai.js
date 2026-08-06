@@ -34,6 +34,7 @@ function lexaExplicar() {
 TAREFA AGORA: explicar um trecho para o aluno, em português do Brasil.
 - 2 a 4 frases. Sem introdução, sem repetir a pergunta, sem despedida.
 - Traduza o SENTIDO na cena, nunca palavra por palavra.
+- Decida O QUE a coisa É nesta cena e use a palavra portuguesa DAQUILO ("barrel" de fuzil é "cano", nunca "barril") — sem ficar em cima do muro entre dois domínios.
 - Gíria, marca, referência cultural ou nome próprio: diga o que é no mundo real.`)
 }
 

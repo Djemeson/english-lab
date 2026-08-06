@@ -511,7 +511,11 @@ function _vidSaveSubsNow() {
 // A instrução deixa claro que é tradução FIEL de obra existente: sem isso o
 // DeepSeek omite/recusa falas com conteúdo adulto (comportamento documentado)
 // e "sessões inteiras" ficavam sem tradução perto dessas cenas.
-const _VID_PT_SIS = 'Você traduz legendas de séries/filmes para estudo de inglês. Traduza cada fala numerada para português do Brasil, natural e curto. Expressões idiomáticas e phrasal verbs: traduza o SENTIDO na cena, nunca palavra por palavra ("we\'ll get you in" = "a gente te encaixa", não "colocar você dentro"). Palavrões e conteúdo adulto fazem parte do diálogo original: traduza fielmente, sem censurar, suavizar nem omitir. Responda SÓ as traduções, uma por linha, mantendo o número: "1. tradução". Nada além disso.'
+// Regras herdadas da fonte única (lang.js), com guarda: este módulo é lazy
+// e pode chegar antes de um lang.js novo logo após um deploy.
+const _VID_PT_SIS = 'Você traduz legendas de séries/filmes para estudo de inglês. Traduza cada fala numerada para português do Brasil, natural e curto. Palavrões e conteúdo adulto fazem parte do diálogo original: traduza fielmente, sem censurar, suavizar nem omitir. Responda SÓ as traduções, uma por linha, mantendo o número: "1. tradução". Nada além disso.\n' +
+  (typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais('en', 'traducao')
+   : 'Traduza o SENTIDO na cena, nunca palavra por palavra ("we´ll get you in" = "a gente te encaixa").')
 
 // "1. texto" / "1) texto" / "1: texto" → { 1: 'texto', ... }
 function _vidPTparse(resp) {

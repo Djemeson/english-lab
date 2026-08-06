@@ -178,6 +178,50 @@ function promptTypeRules(langCode) {
   return `- "type" is a universal supertype: "word" (single word), "phrasal_verb" (verbal expression), "idiom" (fixed expression with non-literal meaning), "collocation" (words that naturally go together). ${L.typeRule}
 - "type_label": the precise local category name, written in Brazilian Portuguese (keep the native term in parentheses when it helps, e.g. "verbo separável (trennbares Verb)"). Empty string for plain words.`
 }
+// ================================================================
+// REGRAS LEXICAIS — a fonte ÚNICA de verdade para todo prompt que
+// produz português (glosa, tradução, análise).
+// ================================================================
+// Por que existir (2026-08-05): as regras viviam espalhadas em 9 prompts,
+// cada um com a sua cópia — e cópia diverge. Foi assim que a triagem disse
+// "perder o interesse" enquanto a Lexa dizia "cansar-se", o `does` enfático
+// virou "fazer a roupa" e o cano do fuzil virou "barril". Cada erro novo de
+// modelo barato vira uma regra AQUI, com exemplo contrastivo (o formato que
+// modelo barato respeita), e todos os prompts herdam de uma vez.
+//
+// Modos (o teto de atenção do modelo barato é curto — cada prompt recebe só
+// o que precisa):
+//   'analise'  — análise completa de um item (review.js)
+//   'glosa'    — glosa curta em triagem/captura (raio-x, kindle, mídia, vídeo)
+//   'traducao' — tradução de frase/legenda inteira
+function promptRegrasLexicais(langCode, modo) {
+  const L = getLangDef(langCode)
+  // O núcleo que TODO produtor de português precisa — 4 regras, cada uma com
+  // o erro real que a motivou como exemplo contrastivo:
+  const nucleo = `MEANING RULES — each one exists because a cheap model actually made that mistake. Follow ALL:
+1. ANTI-LITERAL: translate what the ${L.nameEn} DOES in this scene, the way a Brazilian would say it — never word by word. "we'll get you in" (hotel desk) → "a gente te encaixa", NEVER "colocar você dentro".
+2. DOMAIN CHECK: decide WHAT the thing IS in this sentence, then pick the Portuguese word for THAT thing — never the most frequent dictionary equivalent. "a bayonet mounted on the tip of its barrel" → barrel is a RIFLE's barrel: "cano", NEVER "barril" (container). Never hedge between two domains ("de armas ou recipientes") — the sentence already decided.
+3. SUBSTITUTION TEST: put your Portuguese back into the sentence. If the sentence stops saying what the ${L.nameEn} says, it is wrong. "we began to tire of the mud" + "perder o interesse" → "começamos a perder o interesse na lama" is NOT what it says; "cansar-se de" is.
+4. SELF-CHECK: if your own examples/definition describe one domain and your Portuguese uses a word from another, the translation is WRONG — fix it before returning.`
+
+  if (modo === 'traducao') return nucleo
+
+  const glosa = `${nucleo}
+5. CITATION FORM: verbs in the infinitive ("began" → "começar", NEVER "começamos"), nouns in the singular, adjectives masculine singular. The gloss NAMES the unit; it does not re-translate the sentence.
+6. DETERMINER + NOUN IS NEVER A UNIT: "the mud", "a house", "his hand" are grammar, not vocabulary — return the noun alone or nothing.`
+
+  if (modo === 'glosa') return glosa
+
+  // 'analise' — tudo acima + a regra de gramática, que só faz sentido quando
+  // há objeto "meanings" com context_match para apontar
+  return `${glosa}
+7. GRAMMAR BEFORE DICTIONARY: look at what the item is DOING in the context sentence. If it works as a STRUCTURAL element — emphatic/interrogative/negative auxiliary (do/does/did), perfect auxiliary (have/has/had), modal, copula or progressive/passive "be", infinitive marker "to", complementizer "that", dummy "it/there" — the FIRST meaning MUST describe that GRAMMATICAL FUNCTION (with "gramatical": true and "context_match": true); the lexical sense may come after, with context_match false.
+   WORKED EXAMPLE — "does" in "The boat ride does add time to the trip":
+   WRONG: meaning "fazer, executar", examples "She does the laundry" (lexical verb — not what "does" is doing here).
+   RIGHT: first meaning "de fato, realmente (ênfase)" [gramatical:true, context_match:true], examples like "I do like it" / "She did tell me"; only then "fazer, executar" [context_match:false].
+   Every example under the grammatical meaning must show the word in that FUNCTION, never in the lexical sense.`
+}
+
 function promptIpaRule(langCode) {
   return `"/pronunciation in IPA — ${getLangDef(langCode).ipaNote}/"`
 }

@@ -259,6 +259,8 @@ Regras:
 - Inclua palavras significativas e ${L.variantHint} REALMENTE presentes na resposta. Deduplique. NÃO invente termos ausentes.
 - Se não houver nada que valha a pena estudar, retorne lista vazia.
 - Sobre "type" (supertipos universais): ${L.typeRule}
+
+${promptRegrasLexicais(activeLang(), 'glosa')}
 Para CADA item retorne:
 {"word":"<termo em ${nome}>","type":"word|phrasal_verb|idiom|collocation","type_label":"<categoria local precisa em PT, ou \\"\\">","variety":"${promptVarietyEnum(activeLang())}","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","meaning_pt":"2-6 palavras","ipa":${promptIpaRule(activeLang())},"definition_pt":"uma frase em PT","origin_pt":"origem/história em PT (1-2 frases) SÓ se houver etimologia/imagem interessante; senão \\"\\"","examples":[{"en":"Frase com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."},{"en":"Outra frase com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."},{"en":"Mais uma com <b>termo</b>.","pt":"Tradução com o <b>equivalente</b>."}]}
 Cada item tem EXATAMENTE 3 exemplos, em tempos/construções diferentes.

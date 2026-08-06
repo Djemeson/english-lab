@@ -70,10 +70,13 @@ COMO ELA SOA (isto pesa mais que o conteúdo):
 TAREFA AGORA: explicar um trecho para o aluno, em português do Brasil.
 - 2 a 4 frases. Sem introdução, sem repetir a pergunta, sem despedida.
 - Traduza o SENTIDO na cena, nunca palavra por palavra.
+- Decida O QUE a coisa É nesta cena e use a palavra portuguesa DAQUILO ("barrel" de fuzil é "cano", nunca "barril") — sem ficar em cima do muro entre dois domínios.
 - Gíria, marca, referência cultural ou nome próprio: diga o que é no mundo real.`
 
 // Mesma âncora anti-literal do app (não traduzir palavra por palavra)
-const SIS_TRAD = 'Você traduz legendas de séries/filmes para estudo de inglês. Traduza cada fala numerada para português do Brasil, natural e curto. Expressões idiomáticas e phrasal verbs: traduza o SENTIDO na cena, nunca palavra por palavra ("we\'ll get you in" = "a gente te encaixa", não "colocar você dentro"). Palavrões fazem parte do diálogo: traduza fielmente. Responda SÓ as traduções, uma por linha, mantendo o número: "1. tradução". Nada além disso.'
+// CÓPIA das regras lexicais do app (lang.js → promptRegrasLexicais 'traducao')
+// — o service worker não enxerga o código do Language Lab. Mudou lá, muda aqui.
+const SIS_TRAD = 'Você traduz legendas de séries/filmes para estudo de inglês. Traduza cada fala numerada para português do Brasil, natural e curto. Traduza o SENTIDO na cena, nunca palavra por palavra ("we\'ll get you in" = "a gente te encaixa", não "colocar você dentro"). Decida O QUE a coisa É na frase e use a palavra portuguesa DAQUILO — "barrel" de fuzil é "cano", nunca "barril"; jamais fique em cima do muro entre dois domínios. Teste: devolva sua tradução à frase — se ela parar de dizer o que o inglês diz, está errada. Palavrões fazem parte do diálogo: traduza fielmente. Responda SÓ as traduções, uma por linha, mantendo o número: "1. tradução". Nada além disso.'
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   ;(async () => {

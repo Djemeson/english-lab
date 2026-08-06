@@ -1062,6 +1062,43 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      escapado e SÓ o `<b>` volta a valer como marcação (mais `**markdown**`, que modelo barato
      usa às vezes). `<script>` continua escapado — conferido no teste. `CACHE` → **v101**.
 
+167. **AS REGRAS LEXICAIS VIRARAM UMA FONTE ÚNICA — `promptRegrasLexicais()` (80ª rodada)**.
+     Pedido do Djemeson: "faça uma varredura em todo o projeto e crie todas as normas para que
+     o DeepSeek não cometa nenhum erro nunca mais". Honestidade primeiro: **"nunca mais" não
+     existe com modelo barato via prompt** — o que existe é (a) regra centralizada que não
+     diverge e (b) validação no CÓDIGO que pega o erro quando ele vem. Os dois foram feitos.
+     - **O diagnóstico da varredura** (24 pontos de chamada de IA inventariados): as regras
+       viviam espalhadas em 9 prompts, cada um com a própria cópia — e cópia diverge. Foi assim
+       que a triagem disse "perder o interesse" enquanto a Lexa dizia "cansar-se".
+     - **A fonte única**: `promptRegrasLexicais(langCode, modo)` em `js/lang.js` (não-lazy, onde
+       já vivem os helpers de prompt). Três modos, porque o teto de atenção de modelo barato é
+       curto e cada prompt deve receber SÓ o que precisa:
+       · `'traducao'` (4 regras): anti-literal ("get you in"), domínio ("barrel"→cano, nunca
+         barril, sem hedge), teste de substituição, auto-checagem exemplos×domínio.
+       · `'glosa'` (+2): forma de citação ("began"→começar) e determinante+substantivo nunca é
+         unidade.
+       · `'analise'` (+1): GRAMMAR BEFORE DICTIONARY com o exemplo contrastivo do "does".
+       Cada regra existe porque um modelo barato COMETEU aquele erro — e cada uma carrega o
+       exemplo contrastivo (o formato que modelo fraco respeita).
+     - **Onde foi injetada** (9 prompts): análise e triagem do Revisar, lote do Kindle e da
+       Mídia (`add.js`), card-da-cena (`video-study.js`, com guarda `typeof` — módulo lazy pode
+       chegar antes de um lang.js novo), legenda em tempo real (`video-subs.js`, idem),
+       regenerar exemplo (`study.js`, idem), extrator do Assistente (`consulta.js`) e
+       `lexaExplicar()` (`ai.js`). Na extensão é CÓPIA marcada (`background.js` não enxerga o
+       app): mudou em lang.js, muda lá.
+     - **A rede de segurança no código** (`_redeGramatical` em review.js): se o alvo é
+       palavra-função do inglês (do/does/have/to/that/it/there…, 27 itens) COM contexto e a
+       análise voltou sem NENHUM significado `gramatical:true`, repete UMA vez com a correção
+       como system; se ainda vier errada, mantém com aviso no console — nunca bloqueia o aluno.
+       Testado nos 4 caminhos: palavra comum não repete, `does` errado repete e adota a
+       correção, falha dupla mantém a original, `does` já certo não repete.
+     - **Regra de manutenção para o futuro**: erro novo do modelo = exemplo contrastivo novo em
+       `promptRegrasLexicais`, NUNCA regra avulsa num prompt individual. Se a classe de erro
+       for verificável por código, também entra na rede (padrão `_redeGramatical`).
+     - `CACHE` → **v102** (lang.js/ai.js/consulta.js são do shell). ⚠️ Prompts novos não
+       testados com o DeepSeek real (ambiente sem chave) — os 3 casos da pendência continuam
+       valendo como prova final.
+
 157. **Busca de imagem no menu de seleção** (pedido junto): quarto botão da fileira de baixo,
      abrindo a aba de imagens do Google no idioma do livro (`tbm=isch&hl=…`). É o complemento
      natural da Wikipédia: para objeto, planta, roupa, arma ou bicho, a foto ensina o que a

@@ -474,8 +474,8 @@ A free adjective+noun pair is not a collocation either unless it is genuinely fi
 If none found, return empty vocab [].
 
 2. Translate the full sentence naturally to Brazilian Portuguese.
-LITERAL-TRANSLATION TRAP — avoid it explicitly: translate what the sentence DOES, the way a Brazilian would say it; idioms and verbal expressions get their Portuguese EQUIVALENT, never word-by-word ("we'll get you in" → "a gente te encaixa", not "colocar você dentro").
-For short inputs (1-3 words), return vocab [] and word meaning as trans.
+${promptRegrasLexicais(activeLang(), 'traducao')}
+For short inputs (1-3 words), return vocab [] and word meaning as trans (in citation form: "began" → "começar").
 
 Return ONLY valid JSON:
 {"items":[{"i":<n>,"vocab":["expression1","expression2"],"trans":"<full Portuguese translation>"}]}`
@@ -807,7 +807,7 @@ Categories (English examples for illustration — apply the equivalent ${_mL.nam
 - slang: informal/colloquial expression, e.g. "like crazy", "bail", "freak out"
 
 Also translate the full sentence to Brazilian Portuguese.
-LITERAL-TRANSLATION TRAP — avoid it explicitly: translate what the sentence DOES, the way a Brazilian would say it; idioms and verbal expressions get their Portuguese EQUIVALENT, never word-by-word ("we'll get you in" → "a gente te encaixa", not "colocar você dentro").
+${promptRegrasLexicais(activeLang(), 'traducao')}
 
 For short inputs (1-3 words), return that input in vocab with its type and its meaning as trans.
 

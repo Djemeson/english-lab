@@ -159,6 +159,7 @@ async function videoCreateCard(alvoOverride) {
 Fala da cena (fonte: ${_vidCur.title}): "${frase}"
 
 Analise o termo NO SENTIDO USADO NESTA FALA (não o sentido mais comum).
+${typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(_vidCur.lang || 'en', 'glosa') : ''}
 Responda:
 {"meaning_pt":"tradução curta do termo neste sentido",
  "definition_pt":"definição em 1 frase, PT-BR",
