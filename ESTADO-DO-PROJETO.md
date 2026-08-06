@@ -3,7 +3,21 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-06 — **CAMADA 1: A PRÉ-ANÁLISE DO CAPÍTULO (83ª rodada)**. O plano
+> Última atualização: 2026-08-06 — **O ORÇAMENTO DE TOKENS ESTAVA ERRADO NO APP INTEIRO
+> (84ª rodada)**. "Ler o capítulo" falhou com *"a IA devolveu uma resposta vazia"* rodando o
+> Luna. Causa confirmada na doc da OpenAI: **modelos que raciocinam gastam os tokens de
+> raciocínio DENTRO do mesmo `max_completion_tokens`** — e se o teto acaba durante o
+> raciocínio, volta `finish_reason: length` com content vazio, *"cobrando entrada e raciocínio
+> sem entregar resposta visível"*. Eu tinha dado **1.440** tokens; a OpenAI recomenda reservar
+> **~25.000**. E o erro não era só meu: `add.js` pedia 800, `review.js` 600, `ler.js` 600 —
+> **todo o app** quebraria do mesmo jeito em modelo que pensa. Corrigido no único ponto de
+> passagem (`_aiTokenParam`), que agora soma 25.000 de folga só para `gpt-5*`/`o*`. A folga é
+> de graça: o teto é LIMITE, não reserva. Junto, `_aiPorQueVazio()` passou a nomear a causa
+> real (estouro no raciocínio, corte, filtro, recusa, erro da API, JSON inválido) em vez do
+> inútil "vazia ou fora do formato". E a leitura do capítulo ganhou **barra de progresso** com
+> etapa, lote atual e palavras já lidas. Ver seção 8 (84ª rodada).
+>
+> Anterior: 2026-08-06 — **CAMADA 1: A PRÉ-ANÁLISE DO CAPÍTULO (83ª rodada)**. O plano
 > registrado era embarcar um dicionário inglês→português. **A medição derrubou o plano, e é bom
 > que tenha derrubado.** O extrato do Wikcionário português (kaikki.org, 18.044 verbetes) cabia
 > folgado — **0,26 MB comprimido**, cobrindo **91,5%** do texto corrido com o nosso lematizador.
@@ -1138,6 +1152,40 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        reconhecidas, SAFETY/IMAGE_SAFETY/PROHIBITED_CONTENT viram recusa explicada, `STOP` não
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
+
+177. **O ORÇAMENTO DE TOKENS ESTAVA ERRADO NO APP INTEIRO — modelo que raciocina (84ª rodada,
+     2026-08-06)**. "Ler o capítulo com a IA" falhou com *"[OpenAI] a IA devolveu uma resposta
+     vazia ou fora do formato"*, rodando `gpt-5.6-luna`.
+     - **Confirmado na doc oficial** (`developers.openai.com/api/docs/guides/reasoning`), e a
+       frase que fecha o caso: os tokens de raciocínio **contam dentro do
+       `max_completion_tokens`**, e se o orçamento acaba durante o raciocínio a resposta volta
+       com content VAZIO — *"você pode pagar entrada e raciocínio sem receber resposta
+       visível"*. A recomendação da OpenAI é **reservar ~25.000 tokens**.
+     - **Eu tinha dado 1.440** (`lote.length * 26 + 400`, dimensionado só para as glosas
+       visíveis). O Luna gastou tudo pensando e não sobrou texto. **A chamada foi cobrada.**
+     - **⚠️ E O ERRO NÃO ERA SÓ DA PRÉ-ANÁLISE.** A varredura achou o mesmo risco em todo o
+       app: `add.js` pedia 800 e `Math.max(800, n*60)`, `review.js` 600 e 800, `ler.js` 600 e
+       700 — **qualquer uma dessas quebra do mesmo jeito** em modelo que pensa. Por isso a
+       correção foi no ÚNICO ponto de passagem, `_aiTokenParam()`: para `gpt-5*`/`o*` ele
+       soma `AI_FOLGA_RACIOCINIO = 25000` ao que o chamador pediu. Nenhum chamador precisou
+       mudar, e todos ficaram protegidos.
+     - **Por que a folga é de graça**: `max_completion_tokens` é **limite, não reserva** — só
+       se paga o que for realmente gerado. Levantar o teto não encarece nada; o que encarecia
+       era a chamada que falhava e era cobrada assim mesmo. Modelos sem raciocínio
+       (`gpt-4o-mini`, DeepSeek, Groq) continuam com `max_tokens` intocado — testado.
+     - **`_aiPorQueVazio()`**: "resposta vazia ou fora do formato" era verdade e não servia
+       para nada, porque as causas pedem ações opostas. Agora olha o que a API devolveu e
+       nomeia: estouro no raciocínio (com a contagem de tokens pensados e o aviso de que foi
+       cobrado), corte por teto, filtro de conteúdo, recusa do modelo, erro da API, ou "veio
+       texto mas não era JSON". Sete casos testados, todos distinguidos.
+     - **PROGRESSO** (pedido junto: *"depois que aperta o botão nada acontece e tem que ficar
+       esperando"*). O botão vira estado ao vivo: etapa, lote atual/total, barra e quantas
+       palavras já entraram. Começa **no preparo** — abrir o capítulo do EPUB e casar as frases
+       também demora, e acontece ANTES da pergunta de custo. Atualiza **antes** de cada lote,
+       não só depois: a primeira chamada é a mais longa e deixar a barra em zero durante ela
+       seria repetir o silêncio que se está corrigindo. Toast não servia aqui — some sozinho, e
+       some justamente enquanto ainda está trabalhando. Testado: preparo sem barra, 0/3, 2/3 a
+       67%, 3/3 a 100%, e não explode se o painel for fechado no meio.
 
 176. **CAMADA 1 — PRÉ-ANÁLISE DO CAPÍTULO (83ª rodada, 2026-08-06)**. A pendência dizia "medir o
      kaikki.org antes de prometer". Medi, e **a medição derrubou o próprio plano**.

@@ -1753,8 +1753,13 @@ async function lerPreAnalisar(cap, refazer) {
     const n = await lerPreAplicar(cap)
     if (n) { toast(n + ' palavras deste capítulo já estavam lidas', 'info'); return }
   }
+  // O preparo TAMBÉM demora (ler o capítulo do EPUB, tokenizar, casar frases)
+  // e acontece ANTES de qualquer pergunta de custo — então o progresso começa
+  // aqui, e não só quando a IA entra.
+  _lerPreProgresso('abrindo o capítulo…', 0, 0, 0)
   const txt = await _lerTextoDoCapitulo(cap)
   if (!txt) { toast('capítulo vazio', 'warning'); return }
+  _lerPreProgresso('separando as frases…', 0, 0, 0)
 
   // As candidatas já vêm filtradas por lerAnalisar (fora: conhecidas, palavras
   // de função e as que já são card). Fica a ordem por frequência NO CAPÍTULO:
@@ -1827,6 +1832,9 @@ async function lerPreAnalisar(cap, refazer) {
     let ignorados = 0
     for (let n = 0; n < lotes.length; n++) {
       const lote = lotes[n]
+      // ANTES da chamada também: a primeira é a mais longa, e deixar a barra
+      // em zero durante ela é exatamente o silêncio que se está corrigindo.
+      _lerPreProgresso('lendo com a IA…', n, lotes.length, saida.length)
       const j = await aiJSON([
         { role: 'system', content: sistema },
         { role: 'user', content: lote.map(it => it.w + ' :: ' + it.f).join('\n') }
@@ -1859,7 +1867,7 @@ async function lerPreAnalisar(cap, refazer) {
         if (!orig) { ignorados++; continue }
         saida.push({ w: orig.w, pt: String(r.pt).trim().slice(0, 60), g: r.g === true || r.g === 'true' })
       }
-      if (lotes.length > 1) toast('lendo… ' + (n + 1) + '/' + lotes.length, 'info')
+      _lerPreProgresso('lendo com a IA…', n + 1, lotes.length, saida.length)
     }
     if (!saida.length) throw new Error('a IA não devolveu nenhuma glosa reconhecível')
     if (ignorados) console.warn('[pre] ' + ignorados + ' resposta(s) descartadas: palavra não estava no lote')
@@ -1898,11 +1906,32 @@ function _lerPreBlocoHTML() {
       '<button class="btn btn-ghost btn-sm" onclick="lerPreApagar().then(()=>_lerRenderFerramentas())">' +
       ic('refresh', 'ic-sm') + ' Ler de novo</button></div>'
   }
-  return '<div class="ler-pre">' +
+  return '<div class="ler-pre" id="ler-pre-area">' +
     '<button class="btn btn-secondary btn-sm" id="ler-pre-btn" ' +
     'onclick="lerPreAnalisar().then(()=>_lerRenderFerramentas())">' +
     ic('sparkles', 'ic-sm') + ' Ler este capítulo com a IA</button>' +
     '<p class="ler-fer-nota">Manda as palavras novas <b>com a frase em que aparecem</b> ' +
     'numa chamada só, e guarda. Depois, passar o mouse em qualquer uma delas mostra o ' +
     'sentido <b>daquela passagem</b> — não o do dicionário. Mostro o custo antes.</p></div>'
+}
+
+// PROGRESSO DA LEITURA. Sem isto o botão sumia e não acontecia nada visível
+// por dezenas de segundos — e o usuário não tem como saber se está rodando,
+// se travou ou se já acabou. Toast não serve aqui: ele some sozinho e some
+// justamente enquanto ainda está trabalhando.
+// Mostra a etapa, quantos lotes já voltaram e quantas glosas já entraram.
+function _lerPreProgresso(texto, feito, total, glosas) {
+  const a = el('ler-pre-area')
+  if (!a) return
+  const pct = total ? Math.round((feito / total) * 100) : 0
+  a.innerHTML =
+    '<div class="ler-pre-prog">' +
+      '<div class="ler-pre-prog-topo">' +
+        '<span class="gen-spinner"></span>' +
+        '<b>' + esc(texto) + '</b>' +
+        (total > 1 ? '<span class="ler-pre-prog-n">' + feito + '/' + total + '</span>' : '') +
+      '</div>' +
+      (total ? '<div class="ler-pre-barra"><i style="width:' + pct + '%"></i></div>' : '') +
+      (glosas ? '<div class="ler-pre-prog-sub">' + glosas + ' palavras lidas até agora</div>' : '') +
+    '</div>'
 }

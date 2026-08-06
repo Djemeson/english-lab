@@ -4826,3 +4826,18 @@ body.ler-full .mobile-bottom-nav{display:none}
   display:flex;align-items:center;gap:6px;margin-bottom:8px;
   font-size:var(--fs-sm);color:rgba(var(--primary-rgb),.95);
 }
+
+/* Progresso da leitura do capítulo — o botão vira estado enquanto roda */
+.ler-pre-prog{padding:4px 0}
+.ler-pre-prog-topo{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--text)}
+.ler-pre-prog-n{margin-left:auto;font-size:var(--fs-xs);color:var(--text2);font-variant-numeric:tabular-nums}
+.ler-pre-prog-sub{margin-top:6px;font-size:var(--fs-xs);color:var(--text2)}
+.ler-pre-barra{
+  margin-top:8px;height:5px;border-radius:3px;overflow:hidden;
+  background:rgba(128,128,128,.2);
+}
+.ler-pre-barra i{
+  display:block;height:100%;border-radius:3px;
+  background:rgba(var(--primary-rgb),.85);
+  transition:width .25s ease-out;
+}

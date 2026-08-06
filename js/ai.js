@@ -303,10 +303,24 @@ function aiModel() {
 }
 
 // A família gpt-5/o* rejeita `max_tokens` (exige `max_completion_tokens`).
+function _aiRaciocina(model) { return /^(gpt-5|o\d)/.test(model || '') }
+
+// ⚠️ ESTES MODELOS GASTAM TOKENS DE RACIOCÍNIO DENTRO DO MESMO ORÇAMENTO.
+// A doc da OpenAI é explícita: se o teto acabar durante o raciocínio, volta
+// `finish_reason: length` com content VAZIO — e "você paga a entrada e o
+// raciocínio sem receber resposta visível". Foi o que derrubou a leitura do
+// capítulo com o Luna: 1.440 tokens dimensionados para 40 glosas sumiram no
+// raciocínio e não sobrou nada para o texto. A recomendação da OpenAI é
+// reservar ~25.000.
+// A folga é DE GRAÇA: `max_completion_tokens` é LIMITE, não reserva — só se
+// paga o que for realmente gerado. Por isso vale para todas as chamadas do
+// app, e não só para a pré-análise: `add.js` pedia 800, `review.js` 600,
+// `ler.js` 600 — todas correndo o mesmo risco em modelo que pensa.
+const AI_FOLGA_RACIOCINIO = 25000
 function _aiTokenParam(model, maxTokens) {
   if (!maxTokens) return {}
-  return /^(gpt-5|o\d)/.test(model)
-    ? { max_completion_tokens: maxTokens }
+  return _aiRaciocina(model)
+    ? { max_completion_tokens: maxTokens + AI_FOLGA_RACIOCINIO }
     : { max_tokens: maxTokens }
 }
 
@@ -378,6 +392,27 @@ function _aiAvisarFallback(nome, modelo, motivo) {
   toast(`${nome} (${modelo}) não respondeu — o app seguiu pela OpenAI. Motivo: ${String(motivo).slice(0, 90)}`, 'warning')
 }
 
+// "resposta vazia ou fora do formato" era verdade e não servia para nada — as
+// causas exigem ações opostas. Esta função olha o que a API DE FATO devolveu e
+// diz qual delas foi. O caso `length` é o mais traiçoeiro: a chamada foi
+// COBRADA (entrada + raciocínio) e não trouxe texto nenhum.
+function _aiPorQueVazio(dados) {
+  const c = dados?.choices?.[0]
+  const fim = c?.finish_reason || c?.finishReason || ''
+  const uso = dados?.usage || {}
+  const rac = uso.completion_tokens_details?.reasoning_tokens
+  if (fim === 'length') {
+    return rac
+      ? `o teto de tokens acabou durante o raciocínio (${rac} tokens pensando, nada de texto) — a chamada foi cobrada mesmo assim`
+      : 'a resposta foi cortada no meio pelo teto de tokens'
+  }
+  if (fim === 'content_filter') return 'o filtro de conteúdo do fornecedor barrou a resposta'
+  if (c?.message?.refusal) return 'o modelo recusou: ' + String(c.message.refusal).slice(0, 140)
+  if (dados?.error?.message) return String(dados.error.message).slice(0, 180)
+  if (c?.message?.content) return 'a resposta veio, mas não era JSON válido'
+  return 'a IA devolveu uma resposta vazia ou fora do formato'
+}
+
 async function aiJSON(messages, { maxTokens, model, timeoutMs, retries } = {}) {
   const chat = aiChatCfg()
   if (!chat.key) throw new Error('Chave da ' + chat.P.nome + ' não configurada (Configurações → IA)')
@@ -395,9 +430,10 @@ async function aiJSON(messages, { maxTokens, model, timeoutMs, retries } = {}) {
   for (const comFormato of tentativas) {
     try {
       const res = await _aiFetch(chat.P.url, corpo(m, comFormato), { timeoutMs, retries, key: chat.key })
-      const j = _aiParseJSON(await res.json())
+      const dados = await res.json()
+      const j = _aiParseJSON(dados)
       if (j) return j
-      erro = new Error('a IA devolveu uma resposta vazia ou fora do formato')
+      erro = new Error(_aiPorQueVazio(dados))
     } catch (e) { erro = e }
   }
   if (chat.prov !== 'openai' && cfg.openaiKey) {
