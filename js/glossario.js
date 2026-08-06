@@ -235,11 +235,55 @@ function _glossIx() {
   return _glossIndice
 }
 
+// ---- CAMADA 1: A PRÉ-ANÁLISE DO CAPÍTULO -----------------------
+// Por que NÃO existe aqui um dicionário inglês→português embarcado, apesar de
+// ele caber folgado. Medido em 06/08/2026 sobre o extrato do Wikcionário
+// português (kaikki.org/ptwiktionary/Inglês, 18.044 verbetes):
+//
+//   tamanho ..... 0,86 MB em JSON, 0,26 MB comprimido — caberia sem dor
+//   cobertura ... 91,5% do texto corrido (top 20 mil, com o lematizador)
+//   QUALIDADE ... reprovada, e é o que decidiu
+//
+// As palavras do livro que o Djemeson está lendo:
+//   barrel → "barril"      (no romance é o CANO do fuzil)
+//   bore   → "chateação"   (é o passado de bear: "não NUTRI rancor")
+//   yank   → "puxão"       (é Billy Yank, o soldado da União)
+//   tire, animus → sem verbete nenhum
+// E não é escolha ruim de sentido: `barrel` tem três acepções lá e NENHUMA é o
+// cano; `bore` tem quatro e nenhuma é o passado de bear. O sentido certo não
+// existe no dado. Embarcar aquilo seria reintroduzir, por 0,26 MB, exatamente
+// o erro que as rodadas 163–167 gastaram para eliminar.
+//
+// A camada 1 é outra coisa: ele não lê "inglês em geral", lê UM LIVRO, e o app
+// tem o livro na mão. A pré-análise manda as palavras novas do capítulo COM A
+// FRASE DE CADA UMA para a IA, de uma vez, e guarda. O resultado é uma glosa
+// presa ao contexto — o oposto do verbete cego. Quem produz esse mapa é
+// `lerPreAnalisar()` em ler.js; aqui só se consulta.
+let _glossPre = null          // Map(palavra normalizada -> entrada)
+let _glossPreChave = ''       // que capítulo está carregado
+
+function glossPreCarregar(chave, itens) {
+  if (!itens || !itens.length) { glossPreLimpar(); return 0 }
+  const norm = s => (typeof knownNorm === 'function' ? knownNorm(s) : String(s || '').toLowerCase().trim())
+  const m = new Map()
+  for (const it of itens) {
+    const k = norm(it.w)
+    if (!k || !it.pt) continue
+    m.set(k, { termo: it.w, pt: String(it.pt).trim(), def: String(it.nota || '').trim(),
+               tipo: '', gramatical: !!it.g, doContexto: true, outros: 0, fonte: 'pre' })
+  }
+  _glossPre = m; _glossPreChave = chave
+  return m.size
+}
+function glossPreLimpar() { _glossPre = null; _glossPreChave = '' }
+function glossPreChave() { return _glossPreChave }
+
 // Busca principal. `seguinte` é a palavra à direita no texto — é o que permite
 // "tire of" ganhar de "tire", e é a defesa contra o erro que mais dói aqui.
 function glossBuscar(palavra, seguinte) {
   const ix = _glossIx()
-  if (!ix.size) return null
+  const pre = _glossPre
+  if (!ix.size && !(pre && pre.size)) return null
   const norm = s => (typeof knownNorm === 'function' ? knownNorm(s) : String(s || '').toLowerCase().trim())
 
   // 1) EXPRESSÃO primeiro, sempre. Duas e depois três palavras.
@@ -248,17 +292,18 @@ function glossBuscar(palavra, seguinte) {
     const hit = par && ix.get(par)
     if (hit && hit.pt) return { ...hit, casou: palavra + ' ' + seguinte, viaLema: false, frase: true }
   }
-  // 2) a palavra como está
-  const direto = ix.get(norm(palavra))
-  if (direto) return { ...direto, casou: palavra, original: palavra, viaLema: false }
-  // 3) os lemas, do mais provável ao menos.
-  // `original` guarda a forma que está NO TEXTO — é ela que o balão mostra em
-  // "de …". Sem isso ele repetia o próprio verbete ('begin | de "begin"'), que
-  // não informa nada; o que ensina é ver que o "began" da página é o "begin"
-  // do card.
-  for (const l of glossLemas(palavra)) {
-    const h = ix.get(norm(l))
-    if (h) return { ...h, casou: l, original: palavra, viaLema: norm(l) !== norm(palavra) }
+  // 2) e 3) cada forma candidata — a palavra como está e depois os lemas —
+  // consultada nas DUAS camadas, o card antes da pré-análise.
+  // A ordem importa e é deliberada: o card é material que ELE curou e corrigiu,
+  // a pré-análise é uma leitura automática. Quando as duas têm resposta, vale a
+  // dele. `original` guarda a forma que está NO TEXTO — é ela que o balão
+  // mostra em "você viu …"; sem isso ele repetia o próprio verbete
+  // ('begin | de "begin"'), que não informa nada. O que ensina é ver que o
+  // "began" da página é o "begin" do card.
+  for (const l of [palavra, ...glossLemas(palavra)]) {
+    const k = norm(l)
+    const h = ix.get(k) || (pre && pre.get(k))
+    if (h) return { ...h, casou: l, original: palavra, viaLema: k !== norm(palavra) }
   }
   return null
 }
@@ -359,7 +404,9 @@ function glossLinhaHTML(achado, opts = {}) {
         achado.tipo ? `<span class="gloss-tipo">${e(achado.tipo)}</span>` : ''}</div>
       <div class="gloss-pt">${e(achado.pt)}</div>
       ${achado.def && !opts.curto ? `<div class="gloss-def">${e(achado.def)}</div>` : ''}
-      ${achado.doContexto ? `<div class="gloss-rodape">${icone('check')} sentido da frase em que você a encontrou</div>` : ''}
+      ${achado.fonte === 'pre'
+        ? `<div class="gloss-rodape">${icone('sparkles')} lido nesta passagem — ainda não é um card seu</div>`
+        : achado.doContexto ? `<div class="gloss-rodape">${icone('check')} sentido da frase em que você a encontrou</div>` : ''}
       ${achado.outros > 0 ? `<div class="gloss-rodape">+${achado.outros} outro${achado.outros > 1 ? 's' : ''} significado${achado.outros > 1 ? 's' : ''} no card</div>` : ''}
     </div>`
 }

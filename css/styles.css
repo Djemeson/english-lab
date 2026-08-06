@@ -4816,3 +4816,13 @@ body.ler-full .mobile-bottom-nav{display:none}
   border-left:2px solid rgba(var(--primary-rgb),.55);
 }
 .gloss-embutido .gloss-pt{font-size:var(--fs-sm)}
+
+/* Bloco da pré-análise no painel de ferramentas do leitor */
+.ler-pre{
+  margin-top:14px;padding-top:12px;
+  border-top:1px solid rgba(128,128,128,.16);
+}
+.ler-pre-ok{
+  display:flex;align-items:center;gap:6px;margin-bottom:8px;
+  font-size:var(--fs-sm);color:rgba(var(--primary-rgb),.95);
+}

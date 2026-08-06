@@ -3,7 +3,20 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-06 — **GLOSSÁRIO NO HOVER — camada 0 (82ª rodada)**: pedido
+> Última atualização: 2026-08-06 — **CAMADA 1: A PRÉ-ANÁLISE DO CAPÍTULO (83ª rodada)**. O plano
+> registrado era embarcar um dicionário inglês→português. **A medição derrubou o plano, e é bom
+> que tenha derrubado.** O extrato do Wikcionário português (kaikki.org, 18.044 verbetes) cabia
+> folgado — **0,26 MB comprimido**, cobrindo **91,5%** do texto corrido com o nosso lematizador.
+> Reprovou na qualidade: `barrel`→"barril" (no livro dele é o **cano** do fuzil), `bore`→
+> "chateação" (é o passado de *bear*), `yank`→"puxão" (é *Billy Yank*, o soldado da União), e
+> `tire`/`animus` sem verbete. E o sentido certo **não está lá**: `barrel` tem três acepções e
+> nenhuma é a arma. Embarcar aquilo seria reintroduzir por 0,26 MB o erro que as rodadas 163–167
+> gastaram para matar. **Em vez disso**: ele não lê "inglês em geral", lê UM livro — então as
+> palavras novas do capítulo vão para a IA **com a frase em que aparecem**, numa chamada só, e
+> ficam guardadas no IndexedDB. A glosa nasce presa ao contexto. Nunca automático: confirma com
+> o custo real na frente (~1 centavo por capítulo no `gpt-5-nano`). Ver seção 8 (83ª rodada).
+>
+> Anterior: 2026-08-06 — **GLOSSÁRIO NO HOVER — camada 0 (82ª rodada)**: pedido
 > "um dicionário onde passar o mouse numa palavra mostra o significado, como o Language
 > Reactor". **A medição decidiu a arquitetura**: Wiktionary REST responde em 772–1234 ms,
 > MediaWiki em 2817 ms, `dictionaryapi.dev` devolve **200 com corpo vazio** (quebrado) e o
@@ -1125,6 +1138,57 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        reconhecidas, SAFETY/IMAGE_SAFETY/PROHIBITED_CONTENT viram recusa explicada, `STOP` não
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
+
+176. **CAMADA 1 — PRÉ-ANÁLISE DO CAPÍTULO (83ª rodada, 2026-08-06)**. A pendência dizia "medir o
+     kaikki.org antes de prometer". Medi, e **a medição derrubou o próprio plano**.
+     - **O DICIONÁRIO EMBARCADO FOI MEDIDO E RECUSADO** — registrar isto por extenso evita que
+       alguém (eu, daqui a três rodadas) refaça o estudo e chegue à mesma parede:
+       · fonte: `kaikki.org/ptwiktionary/Inglês` — 18.044 verbetes, 11 MB de JSONL cru.
+         (O dump do Wikcionário INGLÊS tem 3,0 GB e está fora de cogitação.)
+       · **CORS bloqueia** todos eles (kaikki, FreeDict, WikDict) — o arquivo teria de ser
+         servido pelo NOSSO repositório, não buscado em tempo de execução.
+       · tamanho: 0,86 MB em JSON enxuto, **0,26 MB comprimido** (recorte nas 10 mil mais
+         frequentes: 0,09 MB). Minha estimativa anterior de "poucos MB" estava errada — para
+         melhor. **Cabia.**
+       · cobertura ponderada por frequência real: 94,7% (top 1.000) e 87,3% (top 20.000) na
+         forma crua; **96,7% e 91,5% com o nosso lematizador**. Parecia ótimo.
+       · **QUALIDADE — foi aqui que reprovou.** Nas palavras do livro que ele está lendo:
+         `barrel`→"barril" (é o **cano** do fuzil), `bore`→"chateação" (é o passado de *bear*:
+         "não **nutri** rancor"), `yank`→"puxão" (é *Billy Yank*, o soldado da União),
+         `tire` e `animus` **sem verbete**. Conferido se outro sentido salvava: **não salva** —
+         `barrel` tem três acepções e nenhuma é a arma, `bore` tem quatro e nenhuma é o passado
+         de *bear*. O sentido certo **não existe no dado**.
+       · **Conclusão**: as três palavras dos prints que ele mandou (`animus`, `bore`,
+         `Billy Yank`) o dicionário erra ou não tem, e `barrel`→barril é literalmente o erro
+         das rodadas 163–167. Seria reintroduzi-lo por 0,26 MB.
+     - **O QUE ENTROU NO LUGAR**: ele não lê "inglês em geral", lê **um livro**, e o app tem o
+       livro inteiro. `lerPreAnalisar()` pega as palavras novas do capítulo (as que
+       `lerAnalisar` já filtra: fora conhecidas, palavras de função e as que já são card),
+       casa cada uma com **a frase em que aparece** (`_lerFrasesPara`) e manda tudo numa
+       chamada só, com `promptRegrasLexicais(lang,'glosa')` embutido. A glosa nasce **presa ao
+       contexto** — o oposto do verbete cego. Guardado em `BookDB` sob `pre:<livro>:<cap>`.
+     - **Ordem de consulta no `glossBuscar`**: card **antes** da pré-análise, e é deliberado —
+       o card é material que ELE curou e corrigiu; a pré-análise é leitura automática. Testado:
+       com card "cano" e pré-análise "barril" para `barrel`, ganha **cano**.
+     - **Nunca automático.** Confirma com o custo calculado sobre o **prompt real** (~4 chars/
+       token na entrada, ~14 tokens de saída por item), não sobre a média de 1.800 do
+       `aiConfirmBatch` — que superestimaria em ~100×, porque aqui é UMA chamada para até 120
+       palavras. Precedente que justifica o rigor: o episódio das imagens no nível médio.
+     - **Três armadilhas de estado fechadas** (todas da mesma família do bug de posição da 79ª):
+       · trocar de capítulo **zera** a pré-análise antes de recarregar — mostrar a glosa do
+         capítulo 3 no capítulo 4 é pior que não mostrar nada;
+       · `lerPreAplicar` confere `_lerCap === cap` **depois** do await do IndexedDB, e
+         `lerPreAnalisar` confere de novo depois do await da IA (que leva segundos) — mas
+         **grava sempre**, porque o trabalho já foi pago;
+       · fechar o livro limpa a camada, senão as glosas do romance apareceriam sobre o texto do
+         Revisar e do Assistente, que usam o mesmo glossário;
+       · e remover o livro apaga as chaves `pre:<id>:*`, que de outro modo ficariam órfãs para
+         sempre no IndexedDB (a chave depende de um livro que não existe mais).
+     - **Não sincroniza** (é IndexedDB, por aparelho) e **não vira card** — é apoio de leitura;
+       estudar continua sendo escolha explícita.
+     - Verificado: as 8 combinações de busca nas duas camadas, a extração de frase em 9 palavras
+       de um trecho do livro dele (cada uma saiu com a frase certa, `barrel` inclusive), e o
+       carregamento do `ler.js` lazy com a UI renderizando sem livro aberto. `CACHE` → **v112**.
 
 175. **GLOSSÁRIO NO HOVER — `js/glossario.js` (82ª rodada, 2026-08-06)**. Pedido: "uma espécie
      de dicionário no projeto, onde ao passar o mouse sobre uma palavra em inglês apareça o
@@ -4195,14 +4259,20 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
 
 ## 9. Pendências / a verificar
 
-- [ ] **GLOSSÁRIO CAMADA 1 — dicionário bilíngue embarcado** (a fase 2 do que começou na 82ª).
-      A camada 0 só cobre palavra que o aluno JÁ encontrou. Para palavra nova, o caminho
-      medido é dado local: **kaikki.org / Wiktextract** (o Wiktionary inglês em JSON, com as
-      traduções em português), recortado nos ~20–25 mil lemas mais frequentes, baixado uma vez
-      e guardado no **IndexedDB** (o app já usa, nos livros). ⚠️ **O tamanho ainda NÃO foi
-      medido** — "poucos MB comprimidos" é estimativa minha, e medir é o primeiro passo, não o
-      último. Só faz sentido depois de o Djemeson usar a camada 0 e dizer se hover ajuda ou
-      atrapalha a leitura.
+- [x] ~~GLOSSÁRIO CAMADA 1 — dicionário bilíngue embarcado~~ — **medido e RECUSADO** na 83ª
+      rodada. Cabia (0,26 MB comprimido) e cobria 91,5% do texto, mas erra `barrel`, `bore` e
+      `yank` e não tem `animus` nem `tire`. Substituído pela **pré-análise do capítulo**.
+      ⚠️ **Não refazer este estudo** — os números, as fontes e o porquê estão no item 176.
+- [ ] **USAR A PRÉ-ANÁLISE COM A IA DE VERDADE** (83ª rodada). Toda a camada 1 foi validada com
+      dados sintéticos — o ambiente de teste não tem chave. Falta rodar "Ler este capítulo com
+      a IA" num capítulo real e conferir: (a) se o custo cobrado bate com o estimado no modal;
+      (b) se a glosa de `barrel` naquela frase sai **cano** e não "barril" — é o teste que
+      justifica a rodada inteira; (c) quantos itens a IA deixa de devolver (o toast já conta os
+      perdidos). ⚠️ Com DeepSeek o `aiJSON` cai para texto livre: vale medir a perda com ele.
+- [ ] **PRÉ-ANÁLISE DO LIVRO INTEIRO, não só do capítulo.** Hoje é um capítulo por vez, e num
+      livro de 40 capítulos isso vira 40 confirmações. Só vale depois de saber o custo REAL de
+      um capítulo (pendência acima); com o número na mão dá para oferecer "ler os próximos 5"
+      com o total na frente.
 - [ ] **GLOSSÁRIO na legenda do vídeo** (`video-subs.js`). Leitor, Revisar e Assistente já
       chamam `glossAtivar`; a legenda ficou de fora porque ela se re-renderiza a cada segundo e
       precisa de um ponto de ligação estável — do contrário vira listener novo por quadro.

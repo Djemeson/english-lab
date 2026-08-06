@@ -217,6 +217,15 @@ async function lerExcluir(id) {
            Os <b>cards que você já criou continuam</b> — eles vivem no Revisar/Estudar, não aqui.</p>`
   }))) return
   await BookDB.del(id)
+  // As leituras de capítulo (`pre:<id>:<n>`) morrem com o livro. Sem isto elas
+  // ficariam órfãs no IndexedDB para sempre — ninguém mais teria como
+  // alcançá-las para apagar, porque a chave depende de um livro que não existe.
+  try {
+    const chaves = await BookDB.keys()
+    for (const k of chaves) {
+      if (typeof k === 'string' && k.startsWith('pre:' + id + ':')) await BookDB.del(k)
+    }
+  } catch (e) {}
   livros = livros.filter(x => x.id !== id)
   saveLivros()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
@@ -262,6 +271,10 @@ function lerFechar() {
   _lerBlobs = []
   _lerLivro = null; _lerEpub = null
   _lerT = null
+  // Fechar o livro derruba a leitura junto: sem isto, as glosas do romance
+  // apareceriam sobre o texto do Revisar e do Assistente, que usam o mesmo
+  // glossário e não têm nada a ver com aquele contexto.
+  if (typeof glossPreLimpar === 'function') glossPreLimpar()
   document.body.classList.remove('lendo')
   document.removeEventListener('keydown', _lerTeclas)
   document.removeEventListener('selectionchange', _lerSelecaoMudou)
@@ -672,6 +685,11 @@ async function lerIrParaCapitulo(i, frac = 0) {
   if (nome) nome.textContent = _lerLivro.chapters[i].titulo || `Parte ${i + 1}`
   _lerRepintar()
   _lerMedirPaginas()
+  // A leitura do capítulo anterior NÃO pode sobrar: as glosas são presas ao
+  // contexto DAQUELE capítulo, e mostrar a do capítulo 3 no capítulo 4 seria
+  // pior do que não mostrar nada. Troca de capítulo zera e recarrega.
+  if (typeof glossPreLimpar === 'function') glossPreLimpar()
+  lerPreAplicar(i).catch(() => {})
 
   await _lerEsperarLayout(cont)
   if (!_lerLivro || _lerCap !== i) { _lerRestaurando = false; _lerMostrarTexto(true); return }
@@ -1466,6 +1484,7 @@ function _lerFerCorpoHTML() {
       <button class="btn btn-primary btn-sm" onclick="lerMandarNovas(10)">${ic('plus','ic-sm')} As 10 mais frequentes para o Revisar</button>
       ${_lerDesfazer.length ? `<button class="btn btn-secondary btn-sm" onclick="lerDesfazerTriagem()">${ic('undo','ic-sm')} Desfazer (${_lerDesfazer.length})</button>` : ''}
     </div>
+    ${_lerPreBlocoHTML()}
     <div class="ler-fer-triagem" onclick="_lerCliqueTriagem(event)">
       ${topo.map(x => `
         <span class="ler-tri" data-w="${escA(x.w)}">
@@ -1642,4 +1661,191 @@ async function _lerCapturarSemFrase(lista) {
   _lerRepintar()
   toast(`${n} palavra${n > 1 ? 's' : ''} ${n > 1 ? 'foram' : 'foi'} para o Revisar`, 'success')
   return n
+}
+
+// ================================================================
+// PRÉ-ANÁLISE DO CAPÍTULO — a camada 1 do glossário
+//
+// POR QUE NÃO É UM DICIONÁRIO EMBARCADO. Um extrato inglês→português do
+// Wikcionário foi medido (06/08/2026) e caberia com folga: 0,26 MB comprimido,
+// 91,5% do texto corrido coberto. Reprovou na QUALIDADE, que é o que importa:
+//   barrel → "barril"     (no livro dele é o CANO do fuzil)
+//   bore   → "chateação"  (é o passado de bear — "não NUTRI rancor")
+//   yank   → "puxão"      (é Billy Yank, o soldado da União)
+//   tire, animus → não existem lá
+// E o sentido certo não está ausente por acaso: `barrel` tem três acepções no
+// verbete e nenhuma é a arma. Seria reintroduzir, de graça, o erro que as
+// rodadas 163–167 gastaram para matar.
+//
+// O QUE FAZEMOS EM VEZ DISSO. Ele não lê "inglês em geral" — lê UM livro, e o
+// app tem o livro inteiro. Então as palavras novas do capítulo vão para a IA
+// COM A FRASE EM QUE APARECEM, numa chamada só, e o resultado fica guardado.
+// A glosa nasce presa ao contexto: é o oposto do verbete cego.
+//
+// NUNCA automático. Gasta dinheiro, e neste projeto já houve o episódio das
+// imagens que rodaram no nível médio sem ninguém escolher — desde então, o que
+// custa pede confirmação com o número na frente.
+// ================================================================
+
+const LER_PRE_MAX = 120   // teto por capítulo: segura o custo E o tamanho do
+                          // prompt, que é onde modelo barato começa a errar
+
+function _lerChavePre(cap) { return 'pre:' + (_lerLivro ? _lerLivro.id : '?') + ':' + cap }
+
+// Para cada palavra, a frase onde ela aparece — sem isso a IA não teria como
+// desambiguar e a camada 1 viraria o dicionário cego que recusamos.
+function _lerFrasesPara(txt, palavras) {
+  const alvo = new Map(palavras.map(w => [w, null]))
+  const frases = String(txt || '').replace(/\s+/g, ' ').split(/(?<=[.!?…])\s+/)
+  for (const f of frases) {
+    if (f.length < 12 || f.length > 320) continue
+    for (const t of _lerTokens(f)) {
+      if (alvo.has(t) && !alvo.get(t)) alvo.set(t, f.trim())
+    }
+  }
+  return alvo
+}
+
+async function _lerPreDoCache(cap) {
+  try {
+    const b = await BookDB.get(_lerChavePre(cap))
+    if (!b) return null
+    const t = typeof b.text === 'function' ? await b.text() : String(b)
+    const d = JSON.parse(t)
+    return (d && Array.isArray(d.itens)) ? d : null
+  } catch (e) { return null }
+}
+
+// Chamada ao abrir o capítulo: carrega o que já foi lido, se houver.
+// Silenciosa de propósito — não gasta nada e não pergunta nada.
+async function lerPreAplicar(cap) {
+  if (typeof glossPreCarregar !== 'function') return 0
+  const d = await _lerPreDoCache(cap)
+  // Guarda contra virada rápida de capítulo: entre pedir o cache e recebê-lo o
+  // leitor pode já estar em outro capítulo, e aplicar aqui carregaria as
+  // glosas do capítulo ERRADO — mesma classe do bug de posição da 79ª rodada.
+  if (_lerCap !== cap) return 0
+  if (d && d.itens.length) return glossPreCarregar(_lerChavePre(cap), d.itens)
+  glossPreLimpar()
+  return 0
+}
+
+async function lerPreAnalisar(cap, refazer) {
+  if (cap === undefined) cap = _lerCap
+  if (!_lerLivro) return
+  if (!refazer) {
+    const n = await lerPreAplicar(cap)
+    if (n) { toast(n + ' palavras deste capítulo já estavam lidas', 'info'); return }
+  }
+  const txt = await _lerTextoDoCapitulo(cap)
+  if (!txt) { toast('capítulo vazio', 'warning'); return }
+
+  // As candidatas já vêm filtradas por lerAnalisar (fora: conhecidas, palavras
+  // de função e as que já são card). Fica a ordem por frequência NO CAPÍTULO:
+  // se o teto cortar, corta o que aparece menos.
+  const nov = lerAnalisar(txt).novas.filter(x => x.w.length > 2).slice(0, LER_PRE_MAX)
+  if (!nov.length) { toast('nenhuma palavra nova neste capítulo', 'info'); return }
+
+  const frases = _lerFrasesPara(txt, nov.map(x => x.w))
+  const itens = nov.map(x => ({ w: x.w, f: frases.get(x.w) || '' })).filter(x => x.f)
+  if (!itens.length) { toast('não consegui isolar as frases deste capítulo', 'warning'); return }
+
+  const lang = (_lerLivro.lang || 'en').slice(0, 2)
+  const regras = typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(lang, 'glosa') : ''
+  const lista = itens.map((it, i) => (i + 1) + '. ' + it.w + ' :: ' + it.f).join('\n')
+  const sistema = [
+    'Você glosa vocabulário para um brasileiro que está lendo um livro em ' + (lang === 'en' ? 'inglês' : lang) + '.',
+    'Para CADA item você recebe a palavra e A FRASE DO LIVRO em que ela aparece.',
+    'Devolva o significado que a palavra tem NAQUELA FRASE — nunca o primeiro do dicionário.',
+    regras,
+    'Responda SÓ com JSON: {"itens":[{"i":1,"pt":"tradução em forma de citação","g":false}]}',
+    '- "pt": 1 a 4 palavras em português, forma neutra (verbo no INFINITIVO, substantivo no SINGULAR). Sem explicação, sem frase.',
+    '- "g": true apenas quando a palavra ali exerce função gramatical (auxiliar, marcador) em vez de sentido lexical.',
+    '- Um objeto por item, repetindo o "i" do item. Não pule itens.'
+  ].join('\n')
+
+  // A conta sai do prompt REAL, não de uma média: ~4 caracteres por token na
+  // entrada e ~14 tokens de saída por item (a glosa é curta de propósito).
+  const tokensIn = Math.ceil((sistema.length + lista.length) / 4)
+  const tokensOut = itens.length * 14
+  const p = aiPrecoModelo()
+  const usd = (tokensIn * p.in + tokensOut * p.out) / 1e6
+  const brl = usd * (await aiUsdBrl())
+  const ok = await confirmModal({
+    title: 'Ler o capítulo com a IA',
+    icon: 'sparkles',
+    confirmText: 'Ler — ' + _brl(brl),
+    html: '<div class="cost-rows">' +
+      '<div class="cost-row"><span>Palavras novas</span><b>' + itens.length +
+        (nov.length >= LER_PRE_MAX ? ' (teto do capítulo)' : '') + '</b></div>' +
+      '<div class="cost-row"><span>Chamadas</span><b>1</b></div>' +
+      '<div class="cost-row"><span>Modelo</span><b>' + esc(aiChatCfg().P.nome + ' · ' + aiModel()) + '</b></div>' +
+      '<div class="cost-row"><span>Base do cálculo</span><b>~' + tokensIn + ' tokens de entrada + ~' +
+        tokensOut + ' de saída (US$ ' + p.in + '/' + p.out + ' por 1M)</b></div>' +
+      '<div class="cost-row total"><span>Custo estimado</span><b>' + _brl(brl) + '</b></div>' +
+      '</div><ul class="cost-bullets">' +
+      '<li>Cada palavra vai com a FRASE do livro — a glosa é a daquele trecho, não a do dicionário.</li>' +
+      '<li>O resultado fica guardado neste aparelho: reabrir o capítulo não cobra de novo.</li>' +
+      '<li>Não vira card. É só a espiada do hover; estudar continua sendo escolha sua.</li>' +
+      '</ul>'
+  })
+  if (!ok) return
+
+  try {
+    const j = await aiJSON([
+      { role: 'system', content: sistema },
+      { role: 'user', content: lista }
+    ], { maxTokens: Math.min(4000, itens.length * 26 + 400) })
+
+    const brutos = Array.isArray(j) ? j : (j.itens || j.items || [])
+    const saida = []
+    for (const r of brutos) {
+      const idx = Number(r.i || r.idx || r.n) - 1
+      const orig = itens[idx]
+      if (!orig || !r.pt) continue
+      saida.push({ w: orig.w, pt: String(r.pt).trim().slice(0, 60), g: r.g === true || r.g === 'true' })
+    }
+    if (!saida.length) throw new Error('a IA não devolveu nenhuma glosa reconhecível')
+
+    // Grava SEMPRE (o trabalho foi pago, guardar é o mínimo), mas só carrega no
+    // glossário se ele ainda estiver NESTE capítulo — a chamada leva segundos e
+    // nesse tempo ele pode ter virado a página para outro.
+    await BookDB.set(_lerChavePre(cap), new Blob([JSON.stringify({ itens: saida, at: Date.now() })]))
+    if (_lerCap === cap) glossPreCarregar(_lerChavePre(cap), saida)
+    const perdidos = itens.length - saida.length
+    toast(saida.length + ' palavras lidas' + (perdidos > 0 ? ' · ' + perdidos + ' a IA não devolveu' : ''), 'success')
+  } catch (e) {
+    toast('não deu para ler o capítulo: ' + e.message, 'error')
+  }
+}
+
+// Apaga a leitura deste capítulo (para refazer com outro modelo, por exemplo)
+async function lerPreApagar(cap) {
+  if (cap === undefined) cap = _lerCap
+  await BookDB.del(_lerChavePre(cap))
+  glossPreLimpar()
+  toast('leitura deste capítulo apagada', 'info')
+}
+
+// O bloco da pré-análise dentro do painel de ferramentas. Fica DEPOIS da
+// triagem de propósito: primeiro ele decide o que vai estudar, e só então
+// oferece a leitura do resto — que é apoio para a passagem, não material de
+// estudo. O texto do botão diz o que acontece e que custa.
+function _lerPreBlocoHTML() {
+  const carregado = typeof glossPreChave === 'function' &&
+                    glossPreChave() === _lerChavePre(_lerCap)
+  if (carregado) {
+    return '<div class="ler-pre">' +
+      '<div class="ler-pre-ok">' + ic('check', 'ic-sm') +
+      ' Este capítulo já foi lido: passe o mouse em qualquer palavra nova.</div>' +
+      '<button class="btn btn-ghost btn-sm" onclick="lerPreApagar().then(()=>_lerRenderFerramentas())">' +
+      ic('refresh', 'ic-sm') + ' Ler de novo</button></div>'
+  }
+  return '<div class="ler-pre">' +
+    '<button class="btn btn-secondary btn-sm" id="ler-pre-btn" ' +
+    'onclick="lerPreAnalisar().then(()=>_lerRenderFerramentas())">' +
+    ic('sparkles', 'ic-sm') + ' Ler este capítulo com a IA</button>' +
+    '<p class="ler-fer-nota">Manda as palavras novas <b>com a frase em que aparecem</b> ' +
+    'numa chamada só, e guarda. Depois, passar o mouse em qualquer uma delas mostra o ' +
+    'sentido <b>daquela passagem</b> — não o do dicionário. Mostro o custo antes.</p></div>'
 }
