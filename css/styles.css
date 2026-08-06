@@ -4770,9 +4770,12 @@ body.ler-full .mobile-bottom-nav{display:none}
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,.34);
   padding:9px 11px;font-size:var(--fs-sm);color:var(--text);
-  /* o balão nunca rouba o cursor: ele nasce sob o mouse e um pointer
-     ativo aqui faria o pointermove do texto parar de disparar */
-  pointer-events:none;
+  /* O balão PRECISA receber o ponteiro: ele nasce acima da palavra e o
+     "Ver com a Lexa" só é clicável se a mão puder chegar até lá. Com
+     pointer-events:none o botão existia e era inalcançável — o mouse
+     saía da palavra no caminho e o balão fechava antes. Quem segura o
+     balão aberto agora é a trégua do GLOSS_GRACA, não o CSS. */
+  pointer-events:auto;
   animation:glossEntra .12s ease-out;
 }
 @keyframes glossEntra{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
@@ -4797,7 +4800,7 @@ body.ler-full .mobile-bottom-nav{display:none}
   display:flex;align-items:center;gap:5px;
 }
 .gloss-lexa{
-  pointer-events:auto;margin-top:8px;width:100%;
+  margin-top:8px;width:100%;
   display:flex;align-items:center;justify-content:center;gap:5px;
   background:rgba(var(--primary-rgb),.12);color:rgba(var(--primary-rgb),.98);
   border:1px solid rgba(var(--primary-rgb),.3);border-radius:var(--radius-sm);

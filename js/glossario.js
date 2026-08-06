@@ -311,8 +311,22 @@ let _glossBalao = null
 let _glossTimer = 0
 let _glossUltima = ''
 let _glossUltimoMove = 0
+let _glossFecharTimer = 0
+
+// O balão nasce ACIMA da palavra. Subir o mouse para alcançá-lo é sair da
+// palavra — e fechar nesse instante tornava o "Ver com a Lexa" impossível de
+// clicar: o botão sumia no caminho até ele. Sair da palavra agora só AGENDA o
+// fechamento; entrar no balão cancela o agendamento.
+const GLOSS_GRACA = 280   // ms de trégua para a mão atravessar o vão
+
+function _glossAgendarFechar() {
+  if (!_glossBalao) { glossFechar(); return }
+  clearTimeout(_glossFecharTimer)
+  _glossFecharTimer = setTimeout(glossFechar, GLOSS_GRACA)
+}
 
 function glossFechar() {
+  clearTimeout(_glossFecharTimer)
   clearTimeout(_glossTimer)
   if (_glossBalao) { _glossBalao.remove(); _glossBalao = null }
   _glossUltima = ''
@@ -325,8 +339,15 @@ function glossLinhaHTML(achado, opts = {}) {
   const e = s => (typeof esc === 'function' ? esc(s) : String(s || ''))
   const icone = n => (typeof ic === 'function' ? ic(n, 'ic-sm') : '')
   if (!achado.pt) {
-    const rotulo = achado.fonte === 'ignored' ? 'você marcou como ignorada' : 'você marcou como conhecida'
-    return `<div class="gloss-corpo"><div class="gloss-vazio">${icone('check')} ${rotulo}</div></div>`
+    // TRÊS estados sem glosa, e confundi-los mente para o aluno. O caso do
+    // meio é o que aparecia errado: palavra que ele MANDOU para o Revisar mas
+    // que a IA ainda não analisou entrava aqui e recebia "você marcou como
+    // conhecida" — exatamente o contrário do que ele fez com ela.
+    const rotulo = achado.fonte === 'ignored' ? 'você marcou como ignorada'
+                 : achado.fonte === 'card'    ? 'já está no Revisar, ainda sem análise'
+                 : 'você marcou como conhecida'
+    const icn = achado.fonte === 'card' ? 'clock' : 'check'
+    return `<div class="gloss-corpo"><div class="gloss-vazio">${icone(icn)} ${rotulo}</div></div>`
   }
   const cabeca = achado.frase
     ? `<b class="gloss-termo">${e(achado.casou)}</b><span class="gloss-sel">expressão</span>`
@@ -344,7 +365,10 @@ function glossLinhaHTML(achado, opts = {}) {
 }
 
 function _glossMostrar(achado, x, y, opts, pos) {
-  glossFechar()
+  // Remove o balão anterior SEM chamar glossFechar(): ele limparia também o
+  // fechamento agendado, e aí um balão criado depois de o mouse já ter saído
+  // do texto ficaria preso na tela para sempre.
+  if (_glossBalao) { _glossBalao.remove(); _glossBalao = null }
   const b = document.createElement('div')
   b.className = 'gloss-balao'
   b.setAttribute('role', 'tooltip')
@@ -353,6 +377,10 @@ function _glossMostrar(achado, x, y, opts, pos) {
     ? `<button class="gloss-lexa" type="button">${typeof ic === 'function' ? ic('sparkles', 'ic-sm') : ''} Ver com a Lexa</button>`
     : '')
   document.body.appendChild(b)
+  // O balão é território seguro: enquanto o mouse estiver nele, nada fecha.
+  // Sair dele fecha na hora — aí a intenção é clara.
+  b.addEventListener('pointerenter', () => clearTimeout(_glossFecharTimer))
+  b.addEventListener('pointerleave', glossFechar)
   if (podeLexa) {
     b.querySelector('.gloss-lexa').onclick = ev => {
       ev.stopPropagation()
@@ -364,11 +392,13 @@ function _glossMostrar(achado, x, y, opts, pos) {
       try { opts.aoExplicar(alvo, pos) } catch (e) {}
     }
   }
-  // Posiciona acima da palavra; cai para baixo quando não cabe.
+  // Posiciona acima da palavra; cai para baixo quando não cabe. O vão é curto
+  // (6px) de propósito: é distância que a mão atravessa antes de a trégua
+  // acabar. Vão grande transforma "ir até o botão" em prova de pontaria.
   const larg = b.offsetWidth, alt = b.offsetHeight
   let px = Math.max(8, Math.min(x - larg / 2, window.innerWidth - larg - 8))
-  let py = y - alt - 12
-  if (py < 8) py = y + 20
+  let py = y - alt - 6
+  if (py < 8) py = y + 18
   b.style.left = Math.round(px) + 'px'
   b.style.top = Math.round(py) + 'px'
   _glossBalao = b
@@ -406,12 +436,18 @@ function glossAtivar(container, opts = {}) {
 
     const sel = window.getSelection()
     if (sel && !sel.isCollapsed) { glossFechar(); return }
+    // Sair da palavra AGENDA o fechamento em vez de fechar: é o espaço entre
+    // as linhas que o mouse cruza a caminho do balão.
     const p = glossPalavraNoPonto(ev.clientX, ev.clientY)
-    if (!p) { glossFechar(); return }
+    if (!p) { _glossAgendarFechar(); return }
     const chave = p.palavra + '|' + p.seguinte
-    if (chave === _glossUltima) return                 // mesma palavra: nada a refazer
+    if (chave === _glossUltima) {
+      clearTimeout(_glossFecharTimer)                  // voltou para a mesma palavra: fica
+      return
+    }
     _glossUltima = chave
     clearTimeout(_glossTimer)
+    clearTimeout(_glossFecharTimer)
     if (_glossBalao) { _glossBalao.remove(); _glossBalao = null }
     const achado = glossBuscar(p.palavra, p.seguinte)
     if (!achado) return
@@ -419,7 +455,10 @@ function glossAtivar(container, opts = {}) {
     _glossTimer = setTimeout(() => _glossMostrar(achado, x, y, opts, p), GLOSS_ESPERA)
   }, { passive: true })
 
-  container.addEventListener('pointerleave', glossFechar, { passive: true })
+  // Sair do container inteiro também usa a trégua: o balão pode estar FORA
+  // dele (ele vive no body), então fechar na hora mataria o caminho até o
+  // botão sempre que a palavra estivesse na primeira linha do texto.
+  container.addEventListener('pointerleave', _glossAgendarFechar, { passive: true })
   // Rolagem e tecla fecham: um balão preso na tela depois que o texto andou
   // aponta para a palavra errada — pior que não ter balão nenhum.
   container.addEventListener('scroll', glossFechar, { passive: true, capture: true })

@@ -1046,7 +1046,10 @@ function _lerAoSelecionar() {
       const achado = partes.length > 1
         ? (glossBuscar(partes[0], partes[1]) || glossBuscar(txt))
         : glossBuscar(txt)
-      if (achado && achado.pt) {
+      // Entra mesmo SEM glosa: "já está no Revisar" evita que ele mande a
+      // mesma palavra de novo pelo botão Estudar logo abaixo, e "você marcou
+      // como conhecida" explica por que ela não aparece mais para estudar.
+      if (achado) {
         glosaHTML = `<div class="gloss-embutido">${glossLinhaHTML(achado, { curto: true })}</div>`
       }
     }
