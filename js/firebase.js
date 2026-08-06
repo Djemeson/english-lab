@@ -203,7 +203,7 @@ async function fbPushData() {
     const cfgPayload = {
       theme:       cfg.theme        || 'midnight',
       accent:      cfg.accent       || '',
-      imgQuality:  cfg.imgQuality   || 'medium',
+      imgQuality:  cfg.imgQuality   || 'low',
       aiProvider:  cfg.aiProvider   || 'openai',
       aiModel:     cfg.aiModel       || '',
       ttsProvider: cfg.ttsProvider   || 'openai',

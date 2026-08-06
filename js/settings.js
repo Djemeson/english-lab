@@ -69,7 +69,9 @@ function updateImgQualityOptions() {
   const sel = el('cfg-img-quality'); if (!sel) return
   const prov = el('cfg-img-provider')?.value || aiImgProvider()
   const P = AI_IMG[prov] || AI_IMG.openai
-  const atual = cfg.imgQuality || 'medium'
+  // 'low' aqui também: com 'medium', o seletor MOSTRAVA "Padrão" enquanto o
+  // aiImgNivel usava outro nível — a tela mentia sobre o que ia ser cobrado.
+  const atual = cfg.imgQuality || 'low'
   sel.innerHTML = ['low', 'medium', 'high'].map(q => {
     const n = P.niveis[q]
     return `<option value="${q}"${q === atual ? ' selected' : ''}>${esc(n.rotulo)} — US$ ${n.usd.toFixed(3)}/imagem</option>`
@@ -115,7 +117,7 @@ function saveSettings() {
     if (i) cfg[P.keyCfg] = i.value.trim()
   }
   cfg.imgProvider = AI_IMG[el('cfg-img-provider')?.value] ? el('cfg-img-provider').value : 'openai'
-  cfg.imgQuality = el('cfg-img-quality')?.value || 'medium'
+  cfg.imgQuality = el('cfg-img-quality')?.value || 'low'
   cfg.sttProvider = el('cfg-stt-provider')?.value || 'auto'
   saveCfg()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()

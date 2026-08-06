@@ -102,6 +102,11 @@ const DEF_CFG = {
   vidPT: '',        // modo de tradução no vídeo, lembrado entre sessões
   sttProvider: 'auto',  // quem transcreve: auto (Groq se houver chave) | groq | openai
   imgProvider: 'openai',// quem gera as imagens: openai | gemini
+  // FALTAVA aqui, e o buraco custava dinheiro: sem `imgQuality` no padrão,
+  // `aiImgNivel()` caía em 'medium' — no Gemini isso é o 3.1 Flash a
+  // US$ 0,067 em vez do 2.5 Flash a US$ 0,039, 1,7× mais caro, sem ninguém
+  // pedir. Para ilustrar card de vocabulário, o nível econômico basta.
+  imgQuality: 'low',
   theme: 'midnight'
 }
 

@@ -513,8 +513,10 @@ function aiImgProvider() { return AI_IMG[cfg.imgProvider] ? cfg.imgProvider : 'o
 function aiImgKey() { return (cfg[AI_IMG[aiImgProvider()].keyCfg] || '').trim() }
 function aiImgNivel(quality) {
   const P = AI_IMG[aiImgProvider()]
-  const q = quality || cfg.imgQuality || 'medium'
-  return { prov: aiImgProvider(), P, q, ...(P.niveis[q] || P.niveis.medium) }
+  // Padrão 'low' (e não 'medium'): imagem de card de vocabulário não precisa
+  // de resolução alta, e o salto medium/high multiplica a conta por 1,7 e 3,4.
+  const q = quality || cfg.imgQuality || 'low'
+  return { prov: aiImgProvider(), P, q, ...(P.niveis[q] || P.niveis.low) }
 }
 
 // Imagem — retorna data URL base64 (contrato usado por audio.js/study).
@@ -522,8 +524,11 @@ async function aiImage(prompt, { size = '1024x1024', quality, timeoutMs = 180000
   const n = aiImgNivel(quality)
   const key = (cfg[n.P.keyCfg] || '').trim()
   if (!key) throw new Error(`Chave da ${n.P.nome} não configurada (Configurações → IA)`)
+  // Qual nível está REALMENTE valendo — o "gerei no baixo e veio caro" nasceu
+  // de o app cair no médio em silêncio (imgQuality faltava no DEF_CFG).
+  console.info(`[img] nível "${n.q}" · ${n.P.nome} · ${n.model || n.quality} · US$ ${n.usd}/imagem`)
   return n.prov === 'gemini'
-    ? _aiImageGemini(prompt, n.model, key, timeoutMs)
+    ? _aiImageGemini(prompt, n.model, key, timeoutMs, n)
     : _aiImageOpenAI(prompt, n.quality, size, timeoutMs)
 }
 
@@ -541,7 +546,7 @@ async function _aiImageOpenAI(prompt, quality, size, timeoutMs) {
 // O Gemini tem DUAS rotas para gerar imagem: a clássica `:generateContent` e
 // a nova `/interactions`. Tenta a clássica e cai na nova se o modelo só
 // existir lá — assim um modelo novo não quebra a geração.
-async function _aiImageGemini(prompt, model, key, timeoutMs) {
+async function _aiImageGemini(prompt, model, key, timeoutMs, n2) {
   const tentativas = [
     {
       url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -570,8 +575,12 @@ async function _aiImageGemini(prompt, model, key, timeoutMs) {
         throw ultimoErro
       }
       const img = _aiGeminiImgDaResposta(await res.json())
-      if (img) return img
-      ultimoErro = new Error('[Gemini] a resposta não trouxe imagem (o prompt pode ter sido recusado)')
+      if (img) { console.info(`[img] ${model} via ${t.url.includes('interactions') ? 'interactions' : 'generateContent'} — US$ ${n2 ? n2.usd : '?'}`); return img }
+      // 200 SEM imagem = o Google GEROU (e cobrou) e recusou entregar, ou o
+      // formato mudou. Cair na outra rota aqui gerava DE NOVO — duas cobranças
+      // pela mesma imagem. Agora para: a segunda rota só serve para "modelo
+      // não existe aqui" (404/400), que é o caso tratado acima com `continue`.
+      throw new Error('[Gemini] a resposta não trouxe imagem (prompt recusado ou formato novo) — não repeti para não cobrar duas vezes')
     } catch (e) {
       ultimoErro = e.name === 'AbortError' ? new Error('[Gemini] tempo esgotado ao gerar a imagem') : e
     } finally { clearTimeout(timer) }

@@ -1062,6 +1062,30 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      escapado e SÓ o `<b>` volta a valer como marcação (mais `**markdown**`, que modelo barato
      usa às vezes). `<script>` continua escapado — conferido no teste. `CACHE` → **v101**.
 
+172. **IMAGENS: "gerei 4 no mais baixo e consumiu 1,80" — o app caía no MÉDIO em silêncio
+     (2026-08-06)**. Preços do Gemini reconferidos na fonte e **corretos** (2.5-flash-image
+     US$ 0,039 · 3.1-flash-image US$ 0,067 · 3-pro-image US$ 0,134). O problema era outro, e a
+     conta fechou exata: **R$ 1,80 = US$ 0,333 = 5 gerações a US$ 0,067 (nível MÉDIO)**.
+     - **Causa raiz**: `imgQuality` **não existia no `DEF_CFG`**. Sem ele salvo,
+       `aiImgNivel()` caía em `'medium'` — no Gemini, 1,7× o preço do econômico — sem ninguém
+       pedir. Havia **quatro cópias** desse `|| 'medium'`: `aiImgNivel` (ai.js),
+       `updateImgQualityOptions` e `saveSettings` (settings.js) e o push do `fbPushData`
+       (firebase.js). Todas passaram para `'low'`, e `imgQuality: 'low'` entrou no `DEF_CFG`.
+     - **A mentira na tela**: o seletor de Configurações mostrava **"Padrão"** selecionado
+       (porque lia `|| 'medium'`) enquanto o código gerava no nível que o `aiImgNivel` decidia.
+       A tela dizia uma coisa e a fatura dizia outra.
+     - **Bug de cobrança DUPLA encontrado no caminho**: `_aiImageGemini` tem duas rotas
+       (`:generateContent` e `/interactions`). Se a primeira devolvia **HTTP 200 sem imagem**
+       (prompt recusado, ou formato de resposta novo), o laço **caía na segunda rota e gerava
+       de novo** — duas cobranças pela mesma imagem. Agora só há queda para a segunda rota em
+       404/400 ("o modelo não existe aqui"); 200-sem-imagem para na hora e explica.
+     - **Visibilidade**: o `aiImage` agora imprime no console o nível, o fornecedor, o modelo e
+       o preço por imagem ANTES de gerar — dá para conferir o que vai ser cobrado sem esperar a
+       fatura.
+     - Validado com `cfg` vazio: nível `low` nos dois fornecedores (OpenAI US$ 0,011 ·
+       Gemini US$ 0,039); escolha explícita de "high" continua mandando. Quatro imagens no
+       Gemini caem de **R$ 1,45 para R$ 0,84**. `CACHE` → **v107**.
+
 171. **ÁUDIO: auditoria do TTS na fonte oficial — o app estava com a lista de vozes ANTIGA
      (2026-08-06)**. Pedido: "analise a geração de áudio olhando na fonte da OpenAI agora".
      - **O modelo está certo**: a doc oficial ainda chama o `gpt-4o-mini-tts` de "our newest
