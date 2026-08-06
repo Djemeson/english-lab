@@ -2119,7 +2119,17 @@ function _lerRacPrevisto(model, nItens, tokensVisiveis) {
 // e há desfazer — `knownWords` alimenta a cobertura, a triagem e o próprio
 // glossário, então marcação errada em massa contamina tudo.
 
-const LER_NIV_VER = 1
+// Versão do formato gravado. SUBIR sempre que mudar O QUE a classificação
+// produz — não só quando o formato quebra.
+//   v1 → v2: mandava a palavra NUA e por isso nunca achava phrasal verb,
+//            idiom nem colocação. Classificação v1 é incompleta por
+//            construção e é descartada para ser refeita com a frase junto.
+// ⚠️ Esqueci este bump ao adicionar as expressões, e o efeito foi o pior
+// possível: clicar em "Classificar" achava o cache velho, carregava, avisava
+// "classificação carregada" e NUNCA chamava a IA — parecia que o recurso novo
+// não funcionava. Mesma armadilha que o LER_PRE_VER cobriu no glossário uma
+// rodada antes.
+const LER_NIV_VER = 2
 const LER_NIV_LOTE = 80        // saída curtíssima (palavra + 2 letras), então
                                // cabe lote maior que o da glosa
 

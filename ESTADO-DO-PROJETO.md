@@ -1177,6 +1177,25 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+182. **"CLASSIFIQUEI DE NOVO E CONTINUA SEM EXPRESSÕES" — eu esqueci de subir a versão do
+     cache (87ª rodada, 2026-08-06)**. O recurso estava certo; o dado velho é que mandava.
+     - **O que acontecia**: a classificação anterior foi gravada como `v:1`. Ao adicionar a
+       busca de expressões eu **não subi `LER_NIV_VER`**, então a checagem
+       `Number(d.v||0) < LER_NIV_VER` dava `1 < 1` = falso e o cache antigo era **aceito**.
+       Clicar em "Classificar por nível" achava o cache, carregava, avisava "classificação
+       carregada" e **nunca chamava a IA** — parecia que o recurso novo não funcionava.
+     - **`LER_NIV_VER` → 2.** Classificação v1 é incompleta *por construção* (foi produzida
+       pela versão que mandava a palavra nua), então é descartada para ser refeita.
+     - **A regra que faltou aplicar**: subir a versão do cache não é só para quando o FORMATO
+       quebra — é para quando muda **o que aquele dado contém**. Uma rodada antes eu tinha
+       feito exatamente isso no glossário (`LER_PRE_VER` 1→2) e não transportei a lição para o
+       código novo do mesmo dia.
+     - **Verificado que o resto do caminho está íntegro**, para não trocar um diagnóstico por
+       outro: o prompt pede `expr` e `nx`; o envio vai `palavra :: frase` (conferido
+       interceptando a chamada, sem gastar); e o parser aprova as sete expressões reais do
+       livro dele — `tire of`, `shed the blood`, `bear the mark`, `arm myself`, `picked up`
+       (separável), `look forward to`, `burn inside`. `CACHE` → **v122**.
+
 181. **O CLASSIFICADOR NÃO ENXERGAVA OS CARDS FLEXIONADOS (87ª rodada, 2026-08-06)**.
      Relato: *"o classificador parece não olhar pras palavras já no projeto que estão pra
      estudo"*. Estava certo, e o defeito era maior do que o classificador.
