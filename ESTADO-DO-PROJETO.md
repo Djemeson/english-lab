@@ -1256,6 +1256,24 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      fonte original e atualize os números se for o caso". Conferidos os 14 modelos um a um em
      `developers.openai.com/api/docs/pricing`, `api-docs.deepseek.com`,
      `ai.google.dev/gemini-api/docs/pricing` e `console.groq.com/docs/models`.
+     - **ONDE CONFERIR PREÇO (atualizado em 06/08 — as URLs da OpenAI MUDARAM)**. O antigo
+       `platform.openai.com/docs/*` devolve **301** para `developers.openai.com/api/docs/*`.
+       São três páginas, e a segunda é a que resolve discussão de custo:
+       · `developers.openai.com/api/docs/models` — cartão por modelo (entrada/saída por MTok,
+         contexto, corte de conhecimento). **Não mostra cached input.**
+       · `developers.openai.com/api/docs/models/compare` — lado a lado, e este **inclui
+         cached input**, tokens de raciocínio e limites de taxa. É o único lugar onde dá para
+         comparar honestamente com o desconto de cache do DeepSeek.
+       · `developers.openai.com/api/docs/pricing` — tabela completa: texto (Standard/Batch/
+         Flex/Fast), áudio, realtime, imagem, vídeo, transcrição, embeddings, fine-tuning.
+       O Playground só RODA prompt; não exibe preço.
+     - **⚠️ Os preços de imagem da OpenAI no `AI_IMG` são DERIVADOS, não copiados.** A tabela
+       oficial lista só `gpt-image-1` a **US$ 40 / 1M tokens de saída** — não existe linha
+       "low/medium/high" lá. Os nossos três vêm da contagem de tokens por qualidade em
+       1024×1024: **272 → 0,011 · 1.056 → 0,042 · 4.160 → 0,167** (conferido em 06/08, bate).
+       Consequência para manutenção: se a OpenAI mexer no preço por token, o site continua com
+       um número só e os **três** do app têm de ser recalculados à mão — diferente do Gemini,
+       que cobra por imagem e é cópia direta.
      - **13 de 14 estavam corretos.** Um errado: `openai/gpt-oss-120b` (Groq) estava com saída
        **0,75** e o correto é **0,60**.
      - **`gpt-5-nano` (0,05/0,40) entrou no catálogo** e vale registrar por quê: ele custa
