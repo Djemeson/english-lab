@@ -1189,6 +1189,34 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      - Verificado: as 8 combinações de busca nas duas camadas, a extração de frase em 9 palavras
        de um trecho do livro dele (cada uma saiu com a frase certa, `barrel` inclusive), e o
        carregamento do `ler.js` lazy com a UI renderizando sem livro aberto. `CACHE` → **v112**.
+     - 🔴 **O BUG QUE ISSO TROUXE, E QUE É A LIÇÃO MAIS CARA DA RODADA** (`CACHE` → **v113**).
+       Rodando com o Luna, o Djemeson viu `ordered` glosado como **"para"**. Não era a IA
+       errando: era **eu casando resposta com pergunta pelo ÍNDICE que o modelo devolve**.
+       A lista ia numerada 1..N e a resposta trazia `{"i":n,"pt":…}`. Basta o modelo **pular um
+       item e renumerar** — comportamento comum com lista longa em modelo barato — para TODAS as
+       glosas seguintes grudarem na palavra vizinha, **em silêncio e com cara de acerto**.
+       Reproduzido em teste: com um item pulado, o casamento antigo devolvia
+       `pledge→"ordenar"`, `ordered→"armar-se"`, `arm→"fileira"`; o novo devolve as quatro
+       certas e o item pulado apenas fica sem glosa.
+       · **Causa raiz nomeada**: índice é *bookkeeping do modelo*; palavra é *conteúdo*. Nunca
+         confiar no bookkeeping dele — é a MESMA lição do lote de imagens que contava falha
+         como sucesso (item 173). Agora o modelo **repete a palavra** e é ela que casa; resposta
+         com palavra que não foi perguntada é descartada e contada no console.
+       · Porta tolerante: se o modelo devolver o LEMA ("order" para "ordered"), casa mesmo
+         assim — **desde que só uma palavra do lote leve àquele lema**; se duas levarem, é
+         ambíguo e adivinhar seria repetir o erro que se está consertando.
+       · Lotes de **40** em vez de 120 numa tacada: lista longa é o que convida ao pulo. O custo
+         no modal passou a contar o sistema repetido por lote (subestimar é pior).
+       · **Dado velho no aparelho**: `LER_PRE_VER = 2`. O que a v1 gravou está errado e não tem
+         conserto possível depois, então é descartado em silêncio ao carregar — melhor não
+         mostrar nada do que mostrar a glosa da palavra vizinha. Testado: v1 com e sem o campo
+         `v`, JSON corrompido e cache ausente, todos recusados; v2 aceita.
+       · **Varredura do mesmo padrão no projeto**: `add.js` tem dois prompts que também pedem
+         `"i"` (lote do Kindle, linha ~481, e da Mídia, ~815). Os dois são **estruturalmente
+         mais seguros** — buscam pelo VALOR (`kindleItems[idx]` e
+         `find(x => Number(x.i) === i)`), então item pulado é ignorado sem deslocar o resto, e a
+         numeração 0-based bate com o consumo. `review.js` e `video-*` não casam por índice: a
+         IA devolve objetos autocontidos (`{expr, gloss}`). Risco residual registrado na seção 9.
 
 175. **GLOSSÁRIO NO HOVER — `js/glossario.js` (82ª rodada, 2026-08-06)**. Pedido: "uma espécie
      de dicionário no projeto, onde ao passar o mouse sobre uma palavra em inglês apareça o
@@ -4263,6 +4291,14 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
       rodada. Cabia (0,26 MB comprimido) e cobria 91,5% do texto, mas erra `barrel`, `bore` e
       `yank` e não tem `animus` nem `tire`. Substituído pela **pré-análise do capítulo**.
       ⚠️ **Não refazer este estudo** — os números, as fontes e o porquê estão no item 176.
+- [ ] **ENDURECER OS DOIS LOTES DO `add.js` CONTRA RENUMERAÇÃO** (risco achado na varredura da
+      83ª, NÃO é bug observado). Os prompts do lote do Kindle (`add.js` ~481) e da Mídia (~815)
+      pedem `{"i":<n>}` e casam pelo VALOR do índice, então **item pulado não desloca nada** —
+      diferente do bug da pré-análise. O risco que sobra é o modelo **renumerar de 1**: aí
+      `find(x => Number(x.i) === i)` casaria conteúdo com a linha errada. Hoje isso é improvável
+      porque o lote do Kindle imprime índices ABSOLUTOS (ex.: "47.", não "1."), que desencorajam
+      a renumeração. A blindagem definitiva é a mesma da pré-análise: **pedir o texto de volta e
+      casar por ele**. Não foi feito nesta rodada porque mexe em dois fluxos que funcionam.
 - [ ] **USAR A PRÉ-ANÁLISE COM A IA DE VERDADE** (83ª rodada). Toda a camada 1 foi validada com
       dados sintéticos — o ambiente de teste não tem chave. Falta rodar "Ler este capítulo com
       a IA" num capítulo real e conferir: (a) se o custo cobrado bate com o estimado no modal;

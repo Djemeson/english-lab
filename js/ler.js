@@ -1689,6 +1689,15 @@ async function _lerCapturarSemFrase(lista) {
 
 const LER_PRE_MAX = 120   // teto por capítulo: segura o custo E o tamanho do
                           // prompt, que é onde modelo barato começa a errar
+// Versão do formato gravado. SUBIR sempre que a forma de produzir as glosas
+// mudar de um jeito que invalide o que já está no aparelho — o cache é local e
+// ninguém mais tem como alcançá-lo para corrigir.
+//   v1 → v2: casava por índice do modelo; item pulado deslocava tudo.
+const LER_PRE_VER = 2
+const LER_PRE_LOTE = 40   // itens por chamada. Foi 120 numa tacada só, e o Luna
+                          // pulou item no meio — com casamento por índice, isso
+                          // deslocou todas as glosas seguintes. Lote curto reduz
+                          // o pulo; o casamento por palavra o torna inofensivo.
 
 function _lerChavePre(cap) { return 'pre:' + (_lerLivro ? _lerLivro.id : '?') + ':' + cap }
 
@@ -1712,7 +1721,14 @@ async function _lerPreDoCache(cap) {
     if (!b) return null
     const t = typeof b.text === 'function' ? await b.text() : String(b)
     const d = JSON.parse(t)
-    return (d && Array.isArray(d.itens)) ? d : null
+    if (!d || !Array.isArray(d.itens)) return null
+    // O que a v1 gravou está ERRADO e não dá para consertar depois: ela casava
+    // resposta com pergunta pelo índice do modelo, então um item pulado
+    // deslocava todas as glosas seguintes. Capítulo lido pela v1 é descartado
+    // em silêncio — melhor não mostrar nada do que mostrar a glosa da palavra
+    // vizinha, que é errado com cara de certo.
+    if (Number(d.v || 1) < LER_PRE_VER) return null
+    return d
   } catch (e) { return null }
 }
 
@@ -1752,21 +1768,35 @@ async function lerPreAnalisar(cap, refazer) {
 
   const lang = (_lerLivro.lang || 'en').slice(0, 2)
   const regras = typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(lang, 'glosa') : ''
-  const lista = itens.map((it, i) => (i + 1) + '. ' + it.w + ' :: ' + it.f).join('\n')
+  // SEM numeração. A primeira versão numerava os itens e casava a resposta pelo
+  // índice que o modelo devolvia — e foi assim que "ordered" recebeu a glosa
+  // "para": basta o modelo pular UM item e renumerar (comportamento comum com
+  // lista longa em modelo barato) para TODAS as glosas seguintes grudarem na
+  // palavra errada, em silêncio. Agora ele repete a PALAVRA, e é ela que casa.
+  // Índice é bookkeeping do modelo; palavra é conteúdo. Nunca confiar no
+  // bookkeeping dele — mesma lição do lote de imagens que contava falha como
+  // sucesso.
+  const lista = itens.map(it => it.w + ' :: ' + it.f).join('\n')
+  // Lotes menores pela mesma razão: 120 itens de uma vez convidam ao pulo.
+  const lotes = []
+  for (let i = 0; i < itens.length; i += LER_PRE_LOTE) lotes.push(itens.slice(i, i + LER_PRE_LOTE))
   const sistema = [
     'Você glosa vocabulário para um brasileiro que está lendo um livro em ' + (lang === 'en' ? 'inglês' : lang) + '.',
     'Para CADA item você recebe a palavra e A FRASE DO LIVRO em que ela aparece.',
     'Devolva o significado que a palavra tem NAQUELA FRASE — nunca o primeiro do dicionário.',
     regras,
-    'Responda SÓ com JSON: {"itens":[{"i":1,"pt":"tradução em forma de citação","g":false}]}',
+    'Responda SÓ com JSON: {"itens":[{"w":"a palavra EXATAMENTE como veio","pt":"tradução em forma de citação","g":false}]}',
+    '- "w": copie a palavra recebida, letra por letra. É por ela que a resposta é casada com a pergunta.',
     '- "pt": 1 a 4 palavras em português, forma neutra (verbo no INFINITIVO, substantivo no SINGULAR). Sem explicação, sem frase.',
     '- "g": true apenas quando a palavra ali exerce função gramatical (auxiliar, marcador) em vez de sentido lexical.',
-    '- Um objeto por item, repetindo o "i" do item. Não pule itens.'
+    '- Um objeto por palavra recebida. Se não souber alguma, omita-a — nunca invente nem desloque.'
   ].join('\n')
 
   // A conta sai do prompt REAL, não de uma média: ~4 caracteres por token na
   // entrada e ~14 tokens de saída por item (a glosa é curta de propósito).
-  const tokensIn = Math.ceil((sistema.length + lista.length) / 4)
+  // O sistema REPETE a cada lote — contar uma vez só subestimaria a conta, e
+  // aqui subestimar é pior que superestimar.
+  const tokensIn = Math.ceil((sistema.length * lotes.length + lista.length) / 4)
   const tokensOut = itens.length * 14
   const p = aiPrecoModelo()
   const usd = (tokensIn * p.in + tokensOut * p.out) / 1e6
@@ -1778,7 +1808,8 @@ async function lerPreAnalisar(cap, refazer) {
     html: '<div class="cost-rows">' +
       '<div class="cost-row"><span>Palavras novas</span><b>' + itens.length +
         (nov.length >= LER_PRE_MAX ? ' (teto do capítulo)' : '') + '</b></div>' +
-      '<div class="cost-row"><span>Chamadas</span><b>1</b></div>' +
+      '<div class="cost-row"><span>Chamadas</span><b>' + lotes.length +
+        (lotes.length > 1 ? ' (lotes de ' + LER_PRE_LOTE + ')' : '') + '</b></div>' +
       '<div class="cost-row"><span>Modelo</span><b>' + esc(aiChatCfg().P.nome + ' · ' + aiModel()) + '</b></div>' +
       '<div class="cost-row"><span>Base do cálculo</span><b>~' + tokensIn + ' tokens de entrada + ~' +
         tokensOut + ' de saída (US$ ' + p.in + '/' + p.out + ' por 1M)</b></div>' +
@@ -1792,25 +1823,51 @@ async function lerPreAnalisar(cap, refazer) {
   if (!ok) return
 
   try {
-    const j = await aiJSON([
-      { role: 'system', content: sistema },
-      { role: 'user', content: lista }
-    ], { maxTokens: Math.min(4000, itens.length * 26 + 400) })
-
-    const brutos = Array.isArray(j) ? j : (j.itens || j.items || [])
     const saida = []
-    for (const r of brutos) {
-      const idx = Number(r.i || r.idx || r.n) - 1
-      const orig = itens[idx]
-      if (!orig || !r.pt) continue
-      saida.push({ w: orig.w, pt: String(r.pt).trim().slice(0, 60), g: r.g === true || r.g === 'true' })
+    let ignorados = 0
+    for (let n = 0; n < lotes.length; n++) {
+      const lote = lotes[n]
+      const j = await aiJSON([
+        { role: 'system', content: sistema },
+        { role: 'user', content: lote.map(it => it.w + ' :: ' + it.f).join('\n') }
+      ], { maxTokens: Math.min(4000, lote.length * 26 + 400) })
+
+      // O CASAMENTO É PELA PALAVRA, e só entre as palavras DESTE lote. Resposta
+      // com palavra que não foi perguntada é descartada — sem isso, um modelo
+      // que inventa item contamina o capítulo inteiro.
+      const pedidas = new Map()
+      for (const it of lote) pedidas.set(knownNorm(it.w), it)
+      // Segunda porta, tolerante: o modelo às vezes devolve o LEMA em vez da
+      // forma perguntada ("order" no lugar de "ordered"). Vale, desde que só
+      // uma palavra do lote leve àquele lema — se duas levarem, é ambíguo e
+      // adivinhar seria repetir o erro que estamos consertando.
+      const porLema = new Map()
+      if (typeof glossLemas === 'function') {
+        for (const it of lote) {
+          for (const l of glossLemas(it.w)) {
+            const k = knownNorm(l)
+            if (pedidas.has(k)) continue
+            porLema.set(k, porLema.has(k) ? null : it)   // null = ambíguo
+          }
+        }
+      }
+      const brutos = Array.isArray(j) ? j : (j.itens || j.items || [])
+      for (const r of brutos) {
+        if (!r || !r.pt) continue
+        const k = knownNorm(r.w || r.word || r.palavra || '')
+        const orig = pedidas.get(k) || porLema.get(k)
+        if (!orig) { ignorados++; continue }
+        saida.push({ w: orig.w, pt: String(r.pt).trim().slice(0, 60), g: r.g === true || r.g === 'true' })
+      }
+      if (lotes.length > 1) toast('lendo… ' + (n + 1) + '/' + lotes.length, 'info')
     }
     if (!saida.length) throw new Error('a IA não devolveu nenhuma glosa reconhecível')
+    if (ignorados) console.warn('[pre] ' + ignorados + ' resposta(s) descartadas: palavra não estava no lote')
 
     // Grava SEMPRE (o trabalho foi pago, guardar é o mínimo), mas só carrega no
     // glossário se ele ainda estiver NESTE capítulo — a chamada leva segundos e
     // nesse tempo ele pode ter virado a página para outro.
-    await BookDB.set(_lerChavePre(cap), new Blob([JSON.stringify({ itens: saida, at: Date.now() })]))
+    await BookDB.set(_lerChavePre(cap), new Blob([JSON.stringify({ v: LER_PRE_VER, itens: saida, at: Date.now() })]))
     if (_lerCap === cap) glossPreCarregar(_lerChavePre(cap), saida)
     const perdidos = itens.length - saida.length
     toast(saida.length + ' palavras lidas' + (perdidos > 0 ? ' · ' + perdidos + ' a IA não devolveu' : ''), 'success')
