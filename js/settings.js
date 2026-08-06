@@ -80,7 +80,24 @@ function updateImgQualityOptions() {
   }).join('')
 }
 
+// O rótulo do fornecedor CARREGA O MODELO, e por isso não pode ser escrito à
+// mão: era literalmente "OpenAI · gpt-image-1" no HTML, e continuou dizendo
+// isso depois de o catálogo passar para o gpt-image-2 — a tela mentia sobre o
+// que ia ser chamado. Agora sai do AI_IMG, e mostra o modelo da qualidade
+// ATIVA, que é o que de fato vai rodar.
+function updateImgProviderOptions() {
+  const sel = el('cfg-img-provider'); if (!sel) return
+  const atual = AI_IMG[cfg.imgProvider] ? cfg.imgProvider : aiImgProvider()
+  const q = cfg.imgQuality || 'low'
+  sel.innerHTML = Object.entries(AI_IMG).map(([id, P]) => {
+    const n = P.niveis[q] || P.niveis.low
+    return `<option value="${id}"${id === atual ? ' selected' : ''}>${esc(P.nome)} · ${esc(n.model || n.quality || '')}</option>`
+  }).join('')
+}
+
 function imgProviderMudou() {
+  cfg.imgProvider = AI_IMG[el('cfg-img-provider')?.value] ? el('cfg-img-provider').value : cfg.imgProvider
+  updateImgProviderOptions()
   updateImgQualityOptions()
   const prov = el('cfg-img-provider')?.value
   const P = AI_IMG[prov]
@@ -97,7 +114,7 @@ function fillSettings() {
   }
   updateModelOptions()
   renderKeyRows()
-  const ip = el('cfg-img-provider'); if (ip) ip.value = aiImgProvider()
+  updateImgProviderOptions()
   updateImgQualityOptions()
   const nv = el('cfg-nivel-aluno')
   if (nv) {

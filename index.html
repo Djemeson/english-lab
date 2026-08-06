@@ -621,8 +621,10 @@
         <div style="min-width:170px">
           <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Imagens (fornecedor)</label>
           <select id="cfg-img-provider" onchange="imgProviderMudou()" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)">
-            <option value="openai">OpenAI · gpt-image-1</option>
-            <option value="gemini">Google Gemini · Nano Banana</option>
+            <!-- Vazio de proposito: as opcoes sao montadas por
+                 updateImgProviderOptions() a partir do AI_IMG. Escritas a mao,
+                 elas envelheciam em silencio — ficaram dizendo "gpt-image-1"
+                 depois da troca para o gpt-image-2. -->
           </select>
         </div>
         <div style="min-width:230px">

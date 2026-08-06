@@ -1199,6 +1199,22 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+186. **O SELETOR CONTINUAVA DIZENDO "gpt-image-1" (90ª rodada, 2026-08-06)**. Relato com
+     print: a caixa de qualidade já mostrava US$ 0,006 (vem do catálogo), mas a de fornecedor
+     insistia em "OpenAI · gpt-image-1".
+     - **Causa**: os `<option>` estavam **escritos à mão no index.html**. É a MESMA família do
+       `model` hardcoded consertado minutos antes — rótulo que duplica dado do catálogo e
+       envelhece em silêncio. Pior: aqui a tela mentia sobre qual modelo seria chamado.
+     - **Correção estrutural, não cosmética**: o HTML ficou vazio e `updateImgProviderOptions()`
+       monta as opções a partir do `AI_IMG`, mostrando o modelo da **qualidade ativa** — que é o
+       que de fato vai rodar. Trocar a qualidade atualiza o rótulo junto.
+     - Verificado: o HTML não traz mais rótulo nenhum; com low aparece "OpenAI · gpt-image-2" e
+       "Google Gemini · gemini-3.1-flash-lite-image"; em high o Gemini vira `gemini-3-pro-image`;
+       a seleção é preservada; e `aiImgNivel()` devolve exatamente o par que a tela anuncia.
+     - ⚠️ **Mesmo padrão ainda existe no seletor de transcrição** (`index.html`): os preços
+       "US$ 0,04/h" e "US$ 0,36/h" estão escritos à mão. Estão CORRETOS hoje (conferidos na
+       84ª rodada), mas vão envelhecer do mesmo jeito. Registrado na seção 9.
+
 185. **IMAGENS DA OPENAI: gpt-image-1 → gpt-image-2 (90ª rodada, 2026-08-06)**. Pedido de
      análise do catálogo novo do playground.
      - **Preços por imagem em 1024×1024** (fonte: guia oficial de geração de imagens — e note
@@ -4645,6 +4661,11 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
 - [ ] **Wiktionary como último recurso NO CLIQUE** (nunca no hover). Aquele ~1 s é inaceitável
       passando o mouse e perfeitamente aceitável clicando: seria o "não achei no seu material"
       para palavra que ainda não é card. Inglês→inglês, então é apoio, não tradução.
+- [ ] **TIRAR OS PREÇOS DE TRANSCRIÇÃO DO HTML** (achado na 90ª). O seletor `cfg-stt-provider`
+      tem "whisper-large-v3-turbo (US$ 0,04/h)" e "whisper-1 (US$ 0,36/h)" **escritos à mão** no
+      `index.html`. Hoje estão certos, mas é exatamente o padrão que fez o seletor de imagens
+      continuar anunciando `gpt-image-1` depois da troca. O conserto é o mesmo: um catálogo
+      (como `AI_IMG`) e um `updateSttProviderOptions()` que monta a partir dele.
 - [ ] **MEDIR O `gpt-image-1-mini`** (90ª rodada). A saída dele é US$ 8/1M — 5× abaixo do
       gpt-image-1 e 3,75× abaixo do image-2 — e ele pode ser o mais barato do catálogo para
       ilustrar card. Mas a OpenAI **não publica a tabela por imagem** dele, então cotar seria
