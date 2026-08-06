@@ -890,6 +890,36 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        352×482 (celular), sempre dentro da tela; botão de fechar de 40px respeitando a área
        segura. `CACHE` do `sw.js` → **v96**.
 
+160. **Conversar com a Lexa DENTRO do livro + modo tela cheia**. Pedido: "quero um botão pra
+     abrir uma interação com a Lexa dentro do contexto do livro. Por exemplo, em Flags on the
+     Bayou eu quero perguntar quem são os invasores do Norte e onde acontece a história".
+     - **A regra que decide se presta é a de SPOILER.** Um companheiro de leitura que entrega o
+       final não é companheiro. A Lexa recebe em que ponto você está (capítulo + % do livro) e
+       tem ordem explícita, em maiúsculas no prompt, de **nunca contar o que vem depois** — se a
+       resposta honesta exigir isso, ela diz que aquilo ainda vem e responde só até onde você leu.
+     - **Ela fala do que está na SUA tela**, não de um resumo genérico: vai junto um recorte de
+       3.000 caracteres em volta do ponto de leitura (janela centrada na fração atual). Mandar o
+       capítulo inteiro estouraria tokens à toa; mandar nada faria a resposta ser sobre "o livro
+       em geral", que é justamente o que não se quer.
+     - **Anti-invenção**: ordem explícita de dizer "não tenho certeza" em vez de inventar fato
+       sobre o livro — o modelo conhece muitos títulos, mas não todos, e leitor não tem como
+       checar.
+     - Quatro perguntas sugeridas prontas (onde/quando se passa, quem é quem, me situa, contexto
+       histórico). A conversa **fica salva por livro** (`livro.chat`, últimas 12 mensagens, teto
+       de 1.400 caracteres cada) e sincroniza — reabrir o livro devolve a conversa. As últimas
+       7 trocas vão como histórico no prompt.
+     - **Modo tela cheia** (botão e tecla **F**): Fullscreen API de verdade + classe que esconde
+       a barra lateral e recua barra/rodapé para 22% de opacidade (voltam no hover/foco). Sair é
+       Esc ou o mesmo botão. **Entrar e sair repagina e volta ao MESMO ponto** — sem isso, sair
+       da tela cheia jogava o leitor para longe (testado: página 6 antes, 6 durante, 6 depois).
+     - **Detalhe do celular**: o teclado abrindo muda a altura em centenas de pixels e disparava
+       repaginação embaixo do dedo. `_lerAoRedimensionar` agora ignora o evento quando o foco
+       está num campo de texto. E o `textarea` tem `font-size:16px` — abaixo disso o iOS dá zoom
+       sozinho ao focar.
+     - A barra passou a ter 4 botões à direita. Conferido a 375px com título de capítulo longo:
+       o título encolhe com reticências (115px) e a barra não transborda.
+     - `CACHE` do `sw.js` → **v97**.
+
 157. **Busca de imagem no menu de seleção** (pedido junto): quarto botão da fileira de baixo,
      abrindo a aba de imagens do Google no idioma do livro (`tbm=isch&hl=…`). É o complemento
      natural da Wikipédia: para objeto, planta, roupa, arma ou bicho, a foto ensina o que a

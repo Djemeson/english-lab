@@ -4629,3 +4629,68 @@ mark.ler-w{
   #ll-zoom img{max-height:72vh;max-height:72dvh}
   #ll-zoom .ll-zoom-x{top:calc(10px + env(safe-area-inset-top,0));right:10px}
 }
+
+/* ================================================================
+   Conversa com a Lexa dentro do leitor + modo tela cheia
+   ================================================================ */
+.ler-conversa{display:flex;flex-direction:column;gap:10px;min-height:0}
+.ler-conversa-topo{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  font-size:var(--fs-xs);color:var(--ler-fg2);
+}
+.ler-conversa-topo b{color:var(--ler-fg);font-size:var(--fs-sm)}
+.ler-conversa-limpar{margin-left:auto;font-size:var(--fs-3xs);padding:3px 8px}
+.ler-conversa-msgs{
+  display:flex;flex-direction:column;gap:8px;
+  max-height:34vh;overflow-y:auto;padding-right:4px;
+}
+.ler-conversa-vazio{font-size:var(--fs-sm);color:var(--ler-fg2);line-height:1.6}
+.ler-msg{
+  font-size:var(--fs-sm);line-height:1.6;padding:8px 12px;
+  border-radius:12px;max-width:88%;white-space:pre-wrap;word-break:break-word;
+}
+.ler-msg-eu{
+  align-self:flex-end;background:rgba(var(--primary-rgb),.16);
+  color:var(--ler-fg);border-bottom-right-radius:4px;
+}
+.ler-msg-lexa{
+  align-self:flex-start;background:rgba(128,128,128,.14);
+  color:var(--ler-fg);border-bottom-left-radius:4px;
+}
+.ler-msg-pensando{opacity:.65;font-style:italic}
+.ler-conversa-sug{display:flex;flex-wrap:wrap;gap:6px}
+.ler-conversa-campo{display:flex;gap:8px;align-items:flex-end}
+.ler-conversa-campo textarea{
+  flex:1;resize:none;min-height:38px;max-height:110px;
+  background:rgba(128,128,128,.10);color:var(--ler-fg);
+  border:1px solid rgba(128,128,128,.28);border-radius:10px;
+  padding:9px 12px;font-family:inherit;font-size:var(--fs-sm);line-height:1.45;
+}
+.ler-conversa-campo textarea:focus{outline:none;border-color:var(--primary)}
+.ler-conversa-campo textarea::placeholder{color:var(--ler-fg2);opacity:.8}
+.ler-conversa-campo .btn{flex-shrink:0;height:38px;padding:0 14px}
+
+/* ---- tela cheia: some tudo o que nao e texto ---- */
+.ler-leitor.em-full{border:0;border-radius:0;height:100vh;height:100dvh}
+body.ler-full .sidebar,
+body.ler-full .mobile-header,
+body.ler-full .mobile-bottom-nav{display:none}
+/* A barra e o rodape ficam, mas recuam: aparecem de verdade no hover/foco.
+   Em leitura longa a moldura e o que mais cansa. */
+.ler-leitor.em-full .ler-barra,
+.ler-leitor.em-full .ler-rodape{opacity:.22;transition:opacity .18s}
+.ler-leitor.em-full .ler-barra:hover,
+.ler-leitor.em-full .ler-rodape:hover,
+.ler-leitor.em-full .ler-barra:focus-within,
+.ler-leitor.em-full .ler-rodape:focus-within{opacity:1}
+.ler-leitor.em-full .ler-seta{opacity:.14}
+.ler-leitor.em-full .ler-seta:hover{opacity:.9}
+/* Em tela cheia o painel aberto precisa de contraste proprio: o fundo do
+   leitor e a unica coisa atras dele. */
+.ler-leitor.em-full .ler-painel{background:rgba(128,128,128,.12);backdrop-filter:blur(8px)}
+
+@media (max-width:768px){
+  .ler-conversa-msgs{max-height:38vh;max-height:38dvh}
+  .ler-msg{max-width:94%}
+  .ler-conversa-campo textarea{font-size:16px}  /* <16px faz o iOS dar zoom sozinho */
+}

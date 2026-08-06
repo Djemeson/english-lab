@@ -257,7 +257,10 @@ function lerFechar() {
   document.removeEventListener('keydown', _lerTeclas)
   document.removeEventListener('selectionchange', _lerSelecaoMudou)
   document.removeEventListener('visibilitychange', _lerAoEsconder)
+  document.removeEventListener('fullscreenchange', _lerFullMudou)
   window.removeEventListener('resize', _lerAoRedimensionar)
+  document.body.classList.remove('ler-full')
+  try { if (document.fullscreenElement) document.exitFullscreen() } catch (e) {}
   clearTimeout(_lerSelTimer); clearTimeout(_lerResizeTimer)
   _lerFecharPopup()
   try { speechSynthesis.cancel() } catch (e) {}
@@ -298,14 +301,17 @@ function renderLeitor() {
           <span id="ler-cap-nome"></span>${ic('chevronDown','ic-sm')}
         </button>
         <div class="ler-barra-dir">
+          <button class="ler-btn" onclick="lerToggle('conversa')" data-tip="Conversar com a ${escA(lexaNome())} sobre este livro — quem é quem, onde se passa, o que está acontecendo">${ic('message','ic-sm')}</button>
           <button class="ler-btn" onclick="lerToggle('ferramentas')" data-tip="Palavras deste capítulo, cobertura e pré-estudo">${ic('sparkles','ic-sm')}</button>
           <button class="ler-btn" onclick="lerToggle('tipografia')" data-tip="Tamanho, fonte, tema e largura da coluna"><b style="font-size:15px">Aa</b></button>
+          <button class="ler-btn" id="ler-btn-full" onclick="lerAlternarFull()" data-tip="Modo tela cheia (F) — só o texto">${ic('expand','ic-sm')}</button>
         </div>
       </div>
 
       <div class="ler-painel hidden" id="ler-sumario"></div>
       <div class="ler-painel hidden" id="ler-tipografia"></div>
       <div class="ler-painel hidden" id="ler-ferramentas"></div>
+      <div class="ler-painel hidden" id="ler-conversa"></div>
 
       <div class="ler-palco">
         <button class="ler-seta ler-seta-e" onclick="lerVoltarPagina()" aria-label="Página anterior">${ic('chevronLeft','ic-sm')}</button>
@@ -340,9 +346,11 @@ function renderLeitor() {
   document.removeEventListener('selectionchange', _lerSelecaoMudou)
   document.removeEventListener('keydown', _lerTeclas)
   window.removeEventListener('resize', _lerAoRedimensionar)
+  document.removeEventListener('fullscreenchange', _lerFullMudou)
   document.addEventListener('selectionchange', _lerSelecaoMudou)
   document.addEventListener('keydown', _lerTeclas)
   document.addEventListener('visibilitychange', _lerAoEsconder)
+  document.addEventListener('fullscreenchange', _lerFullMudou)
   window.addEventListener('resize', _lerAoRedimensionar)
   _lerDicaDeToque()
 }
@@ -449,7 +457,8 @@ function _lerSelecaoMudou() {
 }
 
 function lerToggle(qual) {
-  const alvos = { sumario: _lerRenderSumario, tipografia: _lerRenderTipografia, ferramentas: _lerRenderFerramentas }
+  const alvos = { sumario: _lerRenderSumario, tipografia: _lerRenderTipografia,
+                  ferramentas: _lerRenderFerramentas, conversa: _lerRenderConversa }
   for (const k of Object.keys(alvos)) {
     const p = el('ler-' + k)
     if (!p) continue
@@ -807,6 +816,9 @@ let _lerResizeTimer = null
 function _lerAoRedimensionar() {
   if (!_lerLivro) return
   const vp = el('ler-viewport'); if (!vp) return
+  // Teclado do celular aberto (digitando na conversa) muda a altura em
+  // centenas de pixels e não tem nada a ver com paginação.
+  if (/input|textarea/i.test((document.activeElement || {}).tagName || '')) return
   const w = vp.clientWidth, h = vp.clientHeight
   if (w === _lerMedida.w && Math.abs(h - _lerMedida.h) < 120) return
   clearTimeout(_lerResizeTimer)
@@ -826,6 +838,7 @@ function _lerTeclas(e) {
   if (dentroDeCampo) return
   if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); lerAvancarPagina() }
   else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); lerVoltarPagina() }
+  else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); lerAlternarFull() }
   else if (e.key === 'Escape') { _lerFecharPopup(); lerToggle('') }
 }
 
@@ -1105,6 +1118,181 @@ function _lerRepintar() {
     if (ultimo < no.nodeValue.length) frag.appendChild(document.createTextNode(no.nodeValue.slice(ultimo)))
     no.replaceWith(frag)
   }
+}
+
+// ================================================================
+// CONVERSA COM A LEXA — dentro do contexto do livro
+// ================================================================
+// O caso que pediu isto: "no livro Flags on the Bayou eu quero perguntar quem
+// são os invasores do Norte e onde acontece a história".
+//
+// A regra que decide se presta é a de SPOILER. Um companheiro de leitura que
+// entrega o final não é companheiro: a Lexa recebe em que ponto você está e
+// tem ordem explícita de não passar dali. E recebe também o trecho que está
+// na tela, para falar do que você tem diante dos olhos — não de um resumo
+// genérico da internet.
+const LER_CHAT_MAX = 12          // mensagens guardadas por livro
+const LER_CHAT_CORTE = 1400      // teto por mensagem (o doc da nuvem é 1 MB)
+
+function _lerChat() {
+  if (!_lerLivro) return []
+  if (!Array.isArray(_lerLivro.chat)) _lerLivro.chat = []
+  return _lerLivro.chat
+}
+
+function _lerSugestoes() {
+  return ['Onde e quando se passa a história?', 'Quem é quem até aqui?',
+          'Me situa: o que está acontecendo?', 'Que contexto histórico eu preciso saber?']
+}
+
+function _lerRenderConversa() {
+  const p = el('ler-conversa')
+  const msgs = _lerChat()
+  const nome = lexaNome()
+  p.innerHTML = `
+    <div class="ler-conversa">
+      <div class="ler-conversa-topo">
+        <b>${esc(nome)}</b>
+        <span>conhece o livro e sabe onde você parou — não conta o que vem depois</span>
+        ${msgs.length ? `<button class="ler-btn ler-conversa-limpar" onclick="lerLimparConversa()">limpar</button>` : ''}
+      </div>
+      <div class="ler-conversa-msgs" id="ler-conversa-msgs">
+        ${msgs.length ? msgs.map(m => `<div class="ler-msg ler-msg-${m.q ? 'eu' : 'lexa'}">${esc(m.q || m.a)}</div>`).join('')
+          : `<div class="ler-conversa-vazio">Pergunte o que quiser sobre <b>${esc(_lerLivro.title)}</b>.</div>`}
+      </div>
+      <div class="ler-conversa-sug">
+        ${_lerSugestoes().map(s => `<button class="ler-chip" onclick="lerPerguntar(${escA(JSON.stringify(s))})">${esc(s)}</button>`).join('')}
+      </div>
+      <div class="ler-conversa-campo">
+        <textarea id="ler-conversa-input" rows="1" placeholder="Perguntar sobre o livro…"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();lerPerguntar()}"></textarea>
+        <button class="btn btn-primary btn-sm" onclick="lerPerguntar()" aria-label="Perguntar">${ic('send','ic-sm')}</button>
+      </div>
+    </div>`
+  const cx = el('ler-conversa-msgs'); if (cx) cx.scrollTop = cx.scrollHeight
+  setTimeout(() => { const i = el('ler-conversa-input'); if (i && window.innerWidth > 768) i.focus() }, 60)
+}
+
+function lerLimparConversa() {
+  if (!_lerLivro) return
+  _lerLivro.chat = []
+  saveLivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  _lerRenderConversa()
+}
+
+// Recorte do que está na tela: a janela em volta do ponto de leitura. Mandar
+// o capítulo inteiro estouraria tokens à toa; mandar nada faria a Lexa falar
+// do livro "em geral", que é justamente o que não se quer.
+async function _lerTrechoAtual() {
+  try {
+    const txt = await _lerTextoDoCapitulo(_lerCap)
+    if (!txt) return ''
+    const frac = Math.max(0, Math.min(1, _lerFracAtual()))
+    const meio = Math.floor(txt.length * frac)
+    const ini = Math.max(0, meio - 1500)
+    return txt.slice(ini, ini + 3000)
+  } catch (e) { return '' }
+}
+
+async function lerPerguntar(textoFixo) {
+  if (!_lerLivro) return
+  const campo = el('ler-conversa-input')
+  const pergunta = String(textoFixo || (campo && campo.value) || '').trim()
+  if (!pergunta) return
+  if (campo && !textoFixo) campo.value = ''
+
+  const livro = _lerLivro
+  const chat = _lerChat()
+  chat.push({ q: pergunta.slice(0, LER_CHAT_CORTE) })
+  _lerPintarConversa(true)
+
+  const pct = Math.round((livro.progress || 0) * 100)
+  const cap = livro.chapters[_lerCap]?.titulo || ''
+  const trecho = await _lerTrechoAtual()
+
+  const sistema = (typeof lexaSistema === 'function')
+    ? lexaSistema(`
+AGORA: o aluno está LENDO e quer conversar sobre o livro.
+- Livro: "${livro.title}"${livro.author ? `, de ${livro.author}` : ''}. Ele está em "${cap}", a ${pct}% do livro.
+- REGRA DE OURO, ACIMA DE TUDO: **não estrague a leitura**. NUNCA conte o que acontece depois do ponto em que ele está. Se a resposta honesta exigir isso, diga que aquilo ainda vem pela frente e responda só até onde ele leu.
+- Se você não tiver certeza sobre um fato DESTE livro, diga que não tem certeza em vez de inventar. Você pode se apoiar no trecho abaixo, que é o que está na tela dele agora.
+- Contexto histórico, geográfico e cultural é bem-vindo: é justamente o que ajuda a entender o que está lendo.
+- Responda em português do Brasil, 3 a 6 frases, salvo se ele pedir mais.
+${trecho ? `\nTRECHO NA TELA AGORA:\n"""${trecho}"""` : ''}`)
+    : 'Você é a Lexa, tutora de inglês. Responda em português do Brasil, curto, sem estragar a leitura contando o que vem depois.'
+
+  // Só as últimas trocas viram histórico: conversa longa em prompt caro não
+  // melhora resposta, e o doc da nuvem tem teto.
+  const historico = []
+  for (const m of chat.slice(-7)) {
+    if (m.q) historico.push({ role: 'user', content: m.q })
+    else if (m.a) historico.push({ role: 'assistant', content: m.a })
+  }
+
+  try {
+    const resp = await aiTextSeguro([{ role: 'system', content: sistema }, ...historico], { maxTokens: 700 })
+    chat.push({ a: String(resp || '').slice(0, LER_CHAT_CORTE) })
+  } catch (e) {
+    chat.push({ a: 'Não deu para responder agora: ' + e.message })
+  }
+  if (chat.length > LER_CHAT_MAX) chat.splice(0, chat.length - LER_CHAT_MAX)
+  livro.updatedAt = Date.now()
+  saveLivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  _lerPintarConversa(false)
+}
+
+function _lerPintarConversa(pensando) {
+  const cx = el('ler-conversa-msgs'); if (!cx) return
+  const nome = lexaNome()
+  cx.innerHTML = _lerChat().map(m => `<div class="ler-msg ler-msg-${m.q ? 'eu' : 'lexa'}">${esc(m.q || m.a)}</div>`).join('') +
+    (pensando ? `<div class="ler-msg ler-msg-lexa ler-msg-pensando">${esc(nome)} está pensando…</div>` : '')
+  cx.scrollTop = cx.scrollHeight
+  if (!pensando) {
+    const p = el('ler-conversa')
+    if (p && !p.querySelector('.ler-conversa-limpar')) _lerRenderConversa()
+  }
+}
+
+// ================================================================
+// MODO TELA CHEIA
+// ================================================================
+// Fullscreen de verdade (API do navegador) + uma classe que tira tudo o que
+// não é texto. Sair é Esc (o próprio navegador) ou o mesmo botão.
+function lerAlternarFull() {
+  const alvo = document.querySelector('.ler-leitor')
+  if (!alvo) return
+  const estaFull = document.fullscreenElement || document.webkitFullscreenElement
+  if (estaFull) {
+    ;(document.exitFullscreen || document.webkitExitFullscreen || (() => {})).call(document)
+    return
+  }
+  const pedir = alvo.requestFullscreen || alvo.webkitRequestFullscreen
+  if (!pedir) { toast('Este navegador não permite tela cheia aqui', 'warning'); return }
+  Promise.resolve(pedir.call(alvo)).catch(e => toast('Não deu para abrir em tela cheia', 'warning'))
+}
+
+// A troca de fullscreen muda a altura da tela inteira: é preciso repaginar e
+// voltar ao MESMO ponto, senão sair da tela cheia joga o leitor para longe.
+function _lerFullMudou() {
+  const alvo = document.querySelector('.ler-leitor')
+  const full = !!(document.fullscreenElement || document.webkitFullscreenElement)
+  document.body.classList.toggle('ler-full', full)
+  if (alvo) alvo.classList.toggle('em-full', full)
+  const btn = el('ler-btn-full')
+  if (btn) {
+    btn.innerHTML = ic(full ? 'shrink' : 'expand', 'ic-sm')
+    btn.setAttribute('data-tip', full ? 'Sair da tela cheia (Esc)' : 'Modo tela cheia (F) — só o texto')
+  }
+  if (!_lerLivro) return
+  const frac = _lerFracAtual()
+  setTimeout(() => {
+    _lerMedirPaginas()
+    const vp = el('ler-viewport')
+    if (vp) _lerMedida = { w: vp.clientWidth, h: vp.clientHeight }
+    requestAnimationFrame(() => _lerIrParaFrac(frac))
+  }, 120)
 }
 
 // ================================================================
