@@ -472,8 +472,14 @@ async function generateCardImage(cardId, callerEl, force = true) {
       showBrowserCardPreview(_browserPreviewCardId)
     }
     if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value||'')
+    return 'ok'
   } catch(e) {
-    toast('Erro ao gerar imagem: ' + e.message, 'error')
+    // No LOTE não adianta um toast por falha: eles se atropelam e somem. Quem
+    // chamou em lote (callerEl nulo) recebe o erro no retorno e mostra um
+    // resumo no fim — antes a falha voltava `undefined` e era contada como
+    // sucesso, então o app dizia "10 geradas" com 3 faltando.
+    if (callerEl) toast('Erro ao gerar imagem: ' + e.message, 'error')
+    return { erro: e.message, word: (srsCards.find(c => c.id === cardId) || {}).word || '' }
   } finally {
     if (callerEl) { callerEl.disabled = false; callerEl.innerHTML = ic('image','ic-sm') + ' Gerar imagem' }
   }
@@ -491,11 +497,30 @@ async function browserGenerateImagesSelected() {
   if (!(await aiConfirmBatch('image', toGenerate.length, 'Gerar imagens'))) return
   toast(`Gerando imagens para ${toGenerate.length} significado(s)...`, 'info')
   let feitos = 0, pulados = 0
+  const falhas = []
   for (const card of toGenerate) {
     const r = await generateCardImage(card.id, null, false)
-    if (r === 'skip') pulados++; else feitos++
+    if (r === 'skip') pulados++
+    else if (r && r.erro) falhas.push(r)
+    else feitos++
   }
-  if (pulados) toast(`${feitos} gerada${feitos!==1?'s':''} · ${pulados} já existia${pulados!==1?'m':''} (não re-cobradas)`, 'info')
+  // O resumo agora conta a verdade — e diz QUAIS palavras falharam e por quê.
+  // "Algumas imagens não são geradas" era exatamente isto: o lote reportava
+  // sucesso para todas e o motivo real morria num toast atropelado.
+  const partes = [`${feitos} gerada${feitos !== 1 ? 's' : ''}`]
+  if (pulados) partes.push(`${pulados} já existia${pulados !== 1 ? 'm' : ''} (não re-cobradas)`)
+  if (falhas.length) partes.push(`${falhas.length} falhou${falhas.length !== 1 ? 'ram' : ''}`)
+  toast(partes.join(' · '), falhas.length ? 'warning' : 'info')
+  if (falhas.length) {
+    console.warn('[img] falhas do lote:', falhas.map(f => `${f.word}: ${f.erro}`).join('\n'))
+    const lista = falhas.slice(0, 8).map(f => `<li><b>${esc(f.word || '(sem palavra)')}</b> — ${esc(f.erro)}</li>`).join('')
+    confirmModal({
+      title: `${falhas.length} imagem${falhas.length !== 1 ? 'ns' : ''} não gerada${falhas.length !== 1 ? 's' : ''}`,
+      icon: 'alert', confirmText: 'Entendi', cancelText: '',
+      html: `<ul style="font-size:var(--fs-sm);color:var(--text2);line-height:1.7;padding-left:18px;margin:0">${lista}</ul>
+        ${falhas.length > 8 ? `<p style="font-size:var(--fs-xs);color:var(--text3);margin-top:8px">…e mais ${falhas.length - 8}. A lista completa está no console (F12).</p>` : ''}`
+    })
+  }
   await refreshImageKeyCache()
   if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value||'')
 }

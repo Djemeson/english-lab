@@ -1062,6 +1062,42 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      escapado e SÓ o `<b>` volta a valer como marcação (mais `**markdown**`, que modelo barato
      usa às vezes). `<script>` continua escapado — conferido no teste. `CACHE` → **v101**.
 
+173. **IMAGENS: "tem umas que não estão sendo geradas" — TRÊS causas, e a pior mentia
+     (2026-08-06)**. Sem print, a investigação foi por leitura de código + doc oficial.
+     - **(1) O lote contava falha como sucesso.** Em `browserGenerateImagesSelected`:
+       `const r = await generateCardImage(...); if (r === 'skip') pulados++; else feitos++`.
+       Mas `generateCardImage` **capturava o próprio erro** e devolvia `undefined` — que caía
+       em `feitos`. Gerar 10 com 3 falhas dizia **"10 geradas"**, e os toasts de erro
+       individuais se atropelavam e sumiam. Era isto que fazia parecer que a imagem
+       "simplesmente não aparecia". Agora `generateCardImage` devolve `'ok'` ou
+       `{erro, word}`, o resumo conta a verdade, e um modal lista **quais palavras** falharam
+       e **por quê** (as 8 primeiras; o resto no console).
+     - **(2) O parser não conhecia o formato da rota nova.** A doc oficial mostra que a
+       `/v1beta/interactions` responde com um array **`steps`**, cada passo com blocos de
+       conteúdo. O `_aiGeminiImgDaResposta` procurava em `candidates`, `output_image` e
+       `output` — **`steps` nunca**. Ou seja: a chamada dava 200, a imagem vinha, e o app não
+       sabia onde procurar. Adicionado (`steps[].content[]` e `steps[].blocks[]`), com os
+       formatos antigos mantidos.
+     - **(3) Recusa de segurança não era explicada.** Vocabulário de romance de guerra
+       (arma, sangue, morte…) faz o Gemini recusar a cena — e o app dizia só "a resposta não
+       trouxe imagem". Nasceu `_aiGeminiMotivoSemImagem`, que lê `promptFeedback.blockReason`
+       e `candidates[0].finishReason` e traduz: SAFETY, IMAGE_SAFETY, PROHIBITED_CONTENT,
+       BLOCKLIST, RECITATION. E, sobretudo, **separa recusa de formato desconhecido**: recusa
+       para na hora (repetir daria a mesma recusa e cobraria de novo); formato desconhecido
+       loga a forma da resposta e tenta a outra rota, porque aí o erro é nosso.
+       ⚠️ Isto CORRIGE o excesso da 172ª rodada, em que eu tinha trocado a queda para a
+       segunda rota por um `throw` seco — com o parser incompleto, aquilo podia ter deixado
+       imagens legítimas sem gerar.
+     - **Dois acertos de contrato com a API**: `responseModalities` passou de `['Image']` para
+       **`['IMAGE']`** (é enum — a forma errada podia passar hoje e virar 400 amanhã), e a
+       rota `/interactions` agora manda **`image_size: '1K'` explícito**, porque no
+       `3.1-flash-image` o preço sobe com o tamanho (0,067 → 0,101 em 2K → 0,151 em 4K) e um
+       padrão maior do Google viraria fatura maior sem ninguém escolher.
+     - Validado com respostas sintéticas nos formatos reais: as 4 formas de resposta são
+       reconhecidas, SAFETY/IMAGE_SAFETY/PROHIBITED_CONTENT viram recusa explicada, `STOP` não
+       é tratado como recusa, e a contagem do lote passou de "4 geradas" para
+       "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
+
 172. **IMAGENS: "gerei 4 no mais baixo e consumiu 1,80" — o app caía no MÉDIO em silêncio
      (2026-08-06)**. Preços do Gemini reconferidos na fonte e **corretos** (2.5-flash-image
      US$ 0,039 · 3.1-flash-image US$ 0,067 · 3-pro-image US$ 0,134). O problema era outro, e a

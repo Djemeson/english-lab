@@ -550,11 +550,20 @@ async function _aiImageGemini(prompt, model, key, timeoutMs, n2) {
   const tentativas = [
     {
       url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      body: { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['Image'] } }
+      // 'IMAGE' MAIÚSCULO: é enum na API. 'Image' podia passar por sorte hoje
+      // e virar 400 amanhã — e 400 aqui manda a geração para a outra rota.
+      body: { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['IMAGE'] } }
     },
     {
       url: 'https://generativelanguage.googleapis.com/v1beta/interactions',
-      body: { model, input: [{ type: 'text', text: prompt }], response_format: { type: 'image', mime_type: 'image/png' } }
+      // `image_size: '1K'` EXPLÍCITO: no 3.1-flash-image o preço sobe com o
+      // tamanho (0,067 em 1K → 0,101 em 2K → 0,151 em 4K). Sem fixar, um
+      // padrão maior do Google viraria fatura maior sem ninguém escolher.
+      body: {
+        model,
+        input: [{ type: 'text', text: prompt }],
+        response_format: { type: 'image', mime_type: 'image/png', image_size: '1K' }
+      }
     }
   ]
   let ultimoErro = null
@@ -574,13 +583,23 @@ async function _aiImageGemini(prompt, model, key, timeoutMs, n2) {
         if (res.status === 404 || res.status === 400) continue   // rota/modelo não existe aqui: tenta a outra
         throw ultimoErro
       }
-      const img = _aiGeminiImgDaResposta(await res.json())
-      if (img) { console.info(`[img] ${model} via ${t.url.includes('interactions') ? 'interactions' : 'generateContent'} — US$ ${n2 ? n2.usd : '?'}`); return img }
-      // 200 SEM imagem = o Google GEROU (e cobrou) e recusou entregar, ou o
-      // formato mudou. Cair na outra rota aqui gerava DE NOVO — duas cobranças
-      // pela mesma imagem. Agora para: a segunda rota só serve para "modelo
-      // não existe aqui" (404/400), que é o caso tratado acima com `continue`.
-      throw new Error('[Gemini] a resposta não trouxe imagem (prompt recusado ou formato novo) — não repeti para não cobrar duas vezes')
+      const rota = t.url.includes('interactions') ? 'interactions' : 'generateContent'
+      const json = await res.json()
+      const img = _aiGeminiImgDaResposta(json)
+      if (img) { console.info(`[img] ${model} via ${rota} — US$ ${n2 ? n2.usd : '?'}`); return img }
+
+      // 200 sem imagem tem DOIS motivos muito diferentes:
+      const motivo = _aiGeminiMotivoSemImagem(json)
+      if (motivo.recusa) {
+        // Recusa declarada: nada foi entregue e repetir na outra rota daria a
+        // mesma recusa — só gastaria de novo. Para aqui, e diz o porquê.
+        throw new Error(`[Gemini] imagem não gerada: ${motivo.texto}`)
+      }
+      // Formato que não reconheço: aí o erro é NOSSO, e a outra rota pode
+      // salvar. Loga a forma da resposta para o parser ser corrigido depois.
+      console.warn(`[img] ${rota} respondeu 200 sem imagem reconhecível. Campos:`,
+        Object.keys(json || {}).join(', '), json)
+      ultimoErro = new Error(`[Gemini] ${motivo.texto}`)
     } catch (e) {
       ultimoErro = e.name === 'AbortError' ? new Error('[Gemini] tempo esgotado ao gerar a imagem') : e
     } finally { clearTimeout(timer) }
@@ -590,19 +609,55 @@ async function _aiImageGemini(prompt, model, key, timeoutMs, n2) {
 
 // Aceita os dois formatos de resposta (parts[].inlineData e output_image)
 function _aiGeminiImgDaResposta(j) {
+  // 1) rota clássica :generateContent
   const parts = j?.candidates?.[0]?.content?.parts || []
   for (const p of parts) {
     const inline = p.inlineData || p.inline_data
     if (inline?.data) return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,` + inline.data
   }
+  // 2) /interactions — atalho de conveniência
   const oi = j?.output_image || j?.outputImage
   if (oi?.data) return `data:${oi.mime_type || oi.mimeType || 'image/png'};base64,` + oi.data
+  // 3) /interactions — o formato REAL do REST: um array `steps`, cada um com
+  //    blocos de conteúdo. FALTAVA aqui, e era isto que fazia "algumas imagens
+  //    não serem geradas": a chamada dava 200, a imagem vinha, e o parser não
+  //    sabia onde procurar. `output` era chute; a doc diz `steps`.
+  for (const st of (j?.steps || [])) {
+    for (const c of (st?.content || st?.blocks || [])) {
+      if (c?.data && (c.type === 'image' || String(c.mime_type || c.mimeType || '').startsWith('image/'))) {
+        return `data:${c.mime_type || c.mimeType || 'image/png'};base64,` + c.data
+      }
+    }
+  }
+  // 4) formato antigo que já estava aqui — mantido por segurança
   for (const o of (j?.output || [])) {
     if (o?.data && (o.type === 'image' || o.mime_type?.startsWith('image/'))) {
       return `data:${o.mime_type || 'image/png'};base64,` + o.data
     }
   }
   return null
+}
+
+// Por que NÃO veio imagem: recusa de segurança tem motivo declarado e não
+// adianta repetir; formato desconhecido é bug nosso e vale tentar a outra
+// rota. Distinguir os dois é o que separa "explique ao usuário" de "insista".
+function _aiGeminiMotivoSemImagem(j) {
+  const bloqueio = j?.promptFeedback?.blockReason || j?.prompt_feedback?.block_reason
+  const fim = j?.candidates?.[0]?.finishReason || j?.candidates?.[0]?.finish_reason
+  const recusaFim = fim && !/^STOP$/i.test(fim)
+  if (bloqueio || recusaFim) {
+    const cod = bloqueio || fim
+    const humano = {
+      SAFETY: 'a cena foi barrada pelo filtro de segurança do Google',
+      IMAGE_SAFETY: 'a imagem foi barrada pelo filtro de segurança do Google',
+      PROHIBITED_CONTENT: 'o conteúdo é proibido pela política do Google',
+      BLOCKLIST: 'o prompt caiu numa lista de termos bloqueados',
+      RECITATION: 'a resposta foi barrada por semelhança com material protegido',
+      OTHER: 'o Google recusou sem detalhar o motivo'
+    }[String(cod).toUpperCase()] || `o Google recusou (${cod})`
+    return { recusa: true, texto: humano }
+  }
+  return { recusa: false, texto: 'a resposta veio 200 mas sem imagem num formato que eu reconheça' }
 }
 
 // Teste de chave POR FORNECEDOR: GET /models não consome token nenhum.
