@@ -1199,6 +1199,34 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+185. **IMAGENS DA OPENAI: gpt-image-1 → gpt-image-2 (90ª rodada, 2026-08-06)**. Pedido de
+     análise do catálogo novo do playground.
+     - **Preços por imagem em 1024×1024** (fonte: guia oficial de geração de imagens — e note
+     que agora eles são COTADOS, enquanto o gpt-image-1 publicava só US$ 40/1M e obrigava a
+     multiplicar pelos tokens de cada qualidade: 272 / 1.056 / 4.160):
+       | qualidade | gpt-image-1 | **gpt-image-2** | |
+       |---|---|---|---|
+       | low | 0,0109 | **0,006** | **−45%** |
+       | medium | 0,0422 | 0,053 | +26% |
+       | high | 0,1664 | 0,211 | +26% |
+     - **A troca vale porque o app usa `low` por padrão** (decidido depois do episódio do
+       R$ 1,80). Medium e high sobem, mas não por tarifa — a saída caiu de US$ 40 para 30/1M;
+       eles emitem MAIS tokens (~1.766 e ~7.033 contra 1.056 e 4.160), são imagens maiores.
+     - ⚠️ **Risco anotado**: no `low` o image-2 emite MENOS que o image-1 (~200 contra 272
+       tokens), então parte da economia vem de peso. Se a ilustração ficar pobre, o caminho é
+       subir para `medium`, não voltar ao image-1. **Não deu para avaliar a qualidade** — o
+       ambiente de teste não tem chave.
+     - **BUG LATENTE ACHADO DE PASSAGEM**: `_aiImageOpenAI` tinha `model: 'gpt-image-1'`
+       **hardcoded**, o que tornava o campo `model` das faixas OpenAI puramente decorativo —
+       trocar no catálogo não mudaria nada e o preço exibido podia divergir do modelo
+       realmente chamado. Agora o catálogo manda (`n.model`), com `gpt-image-2` como padrão.
+       O lado Gemini nunca teve esse problema.
+     - **Outros do catálogo**: `gpt-image-1-mini` tem saída a **US$ 8/1M** (5× abaixo do
+       image-1) e pode ser o mais barato de todos — mas a OpenAI **não publica a tabela por
+       imagem dele**, então não dá para cotar sem medir. Ficou como pendência.
+       `gpt-image-1.5` e `chatgpt-image-latest` saem a US$ 32/1M, sem tabela por imagem.
+       `CACHE` → **v125**.
+
 184. **"NÃO LEMBRO" NO BALÃO + RETORNO GENÉRICO (89ª rodada, 2026-08-06)**. Pedido: *"ao ver
      uma palavra que não lembro, a informação diz que já conheço; poderia ter uma pequena opção
      de revisar… mas deve voltar rápido pra exatamente onde eu estava"*, com o complemento
@@ -4617,6 +4645,14 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
 - [ ] **Wiktionary como último recurso NO CLIQUE** (nunca no hover). Aquele ~1 s é inaceitável
       passando o mouse e perfeitamente aceitável clicando: seria o "não achei no seu material"
       para palavra que ainda não é card. Inglês→inglês, então é apoio, não tradução.
+- [ ] **MEDIR O `gpt-image-1-mini`** (90ª rodada). A saída dele é US$ 8/1M — 5× abaixo do
+      gpt-image-1 e 3,75× abaixo do image-2 — e ele pode ser o mais barato do catálogo para
+      ilustrar card. Mas a OpenAI **não publica a tabela por imagem** dele, então cotar seria
+      chute. O jeito é gerar uma imagem e ler o `usage` real (o app já mede desde a 85ª
+      rodada). Só depois disso vale considerar a troca.
+- [ ] **AVALIAR A QUALIDADE DO `low` NO gpt-image-2** (90ª rodada). Ele emite ~200 tokens
+      contra 272 do image-1 na mesma faixa: é 45% mais barato, mas em parte por ser mais leve.
+      Se a ilustração ficar pobre, subir para `medium` — não voltar ao image-1.
 - [ ] **CONFERIR O IMAGEN 4 EM 17/AGO/2026** — não é para adotar, é para não ser pego: se
       alguma parte do projeto passar a citar `imagen-4.0-*`, ela quebra nessa data. Hoje o
       projeto **não usa** nenhum Imagen (só a família Nano Banana), então é só vigilância.

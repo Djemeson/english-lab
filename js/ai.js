@@ -531,9 +531,21 @@ const AI_IMG = {
   openai: {
     nome: 'OpenAI', keyCfg: 'openaiKey',
     niveis: {
-      low:    { model: 'gpt-image-1', quality: 'low',    usd: 0.011, rotulo: 'Econômica' },
-      medium: { model: 'gpt-image-1', quality: 'medium', usd: 0.042, rotulo: 'Padrão' },
-      high:   { model: 'gpt-image-1', quality: 'high',   usd: 0.167, rotulo: 'Alta' }
+      // gpt-image-2 (abr/2026). Preços POR IMAGEM em 1024×1024, da tabela
+      // oficial — e aqui eles são cotados, não derivados como no gpt-image-1
+      // (que publicava só US$ 40/1M e obrigava a multiplicar pelos tokens de
+      // cada qualidade: 272 / 1.056 / 4.160).
+      //
+      // A troca vale porque o app usa 'low' por padrão, e nessa faixa o
+      // image-2 é 45% MAIS BARATO (0,006 contra 0,011). Nas outras duas ele
+      // é ~26% mais caro — não por tarifa (a saída caiu de US$ 40 para 30/1M)
+      // mas porque emite mais tokens: são imagens maiores de verdade.
+      // ⚠️ No 'low' ele emite MENOS que o image-1 (~200 contra 272 tokens),
+      // então parte da economia vem de peso. Se a ilustração ficar pobre
+      // demais, o caminho é subir para 'medium', não voltar ao image-1.
+      low:    { model: 'gpt-image-2', quality: 'low',    usd: 0.006, rotulo: 'Econômica' },
+      medium: { model: 'gpt-image-2', quality: 'medium', usd: 0.053, rotulo: 'Padrão' },
+      high:   { model: 'gpt-image-2', quality: 'high',   usd: 0.211, rotulo: 'Alta' }
     }
   },
   gemini: {
@@ -572,12 +584,15 @@ async function aiImage(prompt, { size = '1024x1024', quality, timeoutMs = 180000
   console.info(`[img] nível "${n.q}" · ${n.P.nome} · ${n.model || n.quality} · US$ ${n.usd}/imagem`)
   return n.prov === 'gemini'
     ? _aiImageGemini(prompt, n.model, key, timeoutMs, n)
-    : _aiImageOpenAI(prompt, n.quality, size, timeoutMs)
+    : _aiImageOpenAI(prompt, n.quality, size, timeoutMs, n.model)
 }
 
-async function _aiImageOpenAI(prompt, quality, size, timeoutMs) {
+// ⚠️ O `model` vinha HARDCODED aqui, o que tornava o campo `model` do catálogo
+// OpenAI puramente decorativo: trocar lá não mudava nada, e o preço exibido
+// podia divergir do modelo realmente chamado. Agora o catálogo manda.
+async function _aiImageOpenAI(prompt, quality, size, timeoutMs, modelo) {
   const res = await _aiFetch('https://api.openai.com/v1/images/generations', {
-    model: 'gpt-image-1', prompt, n: 1, size, quality
+    model: modelo || 'gpt-image-2', prompt, n: 1, size, quality
   }, { timeoutMs, retries: 1 })
   const data = await res.json()
   if (data.data?.[0]?.b64_json) return 'data:image/png;base64,' + data.data[0].b64_json
