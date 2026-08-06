@@ -4743,3 +4743,9 @@ body.ler-full .mobile-bottom-nav{display:none}
   .ler-tri-ok svg,.ler-tri-no svg{width:15px;height:15px}
   .ler-fer-meta{flex-direction:column;align-items:stretch}
 }
+
+/* Texto escondido enquanto o capitulo se monta e procura o ponto salvo.
+   Sem isto aparecia a pagina 0 e um salto - parecia que o leitor tinha
+   perdido o lugar. Transicao curta na volta, para nao piscar. */
+.ler-conteudo.ler-montando{opacity:0}
+.ler-conteudo{transition:opacity .14s ease-out}

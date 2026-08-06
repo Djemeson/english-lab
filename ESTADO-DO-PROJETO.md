@@ -952,6 +952,34 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      - Alvo de toque da triagem subiu de 31px para 37px no celular: é ação repetida dezenas de
        vezes seguidas. `CACHE` do `sw.js` → **v98**.
 
+162. **A posição AINDA se perdia — TRÊS bugs diferentes, um deles autodestrutivo**. Relato:
+     "voltar pra seção onde eu estava lendo ainda está com problema, tanto ao ir pra outra aba e
+     voltar quanto recarregando a página" (+ "verifique não só o modo virar página, mas o
+     rolagem também"). A 156ª rodada consertou a restauração; faltavam os caminhos de SAÍDA.
+     - **(1) A gravação media com a viewport de tamanho ZERO.** `_lerSalvarPos` tirava a medida
+       DENTRO do debounce de 1,5s. Ao trocar de seção, o timer disparava com `#section-ler` já
+       em `display:none` — `scrollWidth − clientWidth` = 0, `frac` = 0, e o marcador bom era
+       sobrescrito. Reproduzido: `frac 0,533` virava `frac 0`. É o mesmo motivo do "recarregar
+       não funciona": o reload apenas lia o zero que a saída já tinha gravado.
+       **Correção**: a medida é congelada NA HORA da rolagem (layout válido) e o debounce só
+       persiste; mais o guard `_lerMedivel()` (`offsetParent` + largura > 40) barrando qualquer
+       medida fora da tela. E o pendente pode ser descarregado a qualquer momento sem risco.
+     - **(2) Voltar para a seção deixava a PÁGINA EM BRANCO.** `renderLerSection` chamava
+       `renderLeitor()`, que só reconstrói a moldura — ninguém recarregava o capítulo. Voltava a
+       barra, o rodapé e nada de texto. Agora a volta recarrega o capítulo no ponto salvo.
+     - **(3) Só no modo ROLAGEM**: a viewport tem `scroll-behavior:smooth`, então restaurar
+       virava uma animação de ~300ms e cada quadro dela disparava `scroll`, gravando posições
+       intermediárias por cima da boa. Agora a restauração usa `scrollTo({behavior:'instant'})`,
+       que vence o CSS **sem alterar o elemento** — a primeira tentativa trocava
+       `style.scrollBehavior` e devolvia num `requestAnimationFrame` que não roda com a aba em
+       segundo plano, deixando o `auto` grudado para sempre.
+     - **De quebra**: o texto fica invisível enquanto o capítulo se monta e procura o ponto
+       (`.ler-montando`). Antes via-se a página 0 e um salto — parecia que o leitor tinha
+       perdido o lugar sozinho.
+     - Validado nos QUATRO cenários: virar-página e rolagem × trocar de seção e recarregar a
+       página. Página 8, `top` 9360, `top` 9360 e página 11 — todos de volta no ponto exato.
+       `CACHE` do `sw.js` → **v99**.
+
 157. **Busca de imagem no menu de seleção** (pedido junto): quarto botão da fileira de baixo,
      abrindo a aba de imagens do Google no idioma do livro (`tbm=isch&hl=…`). É o complemento
      natural da Wikipédia: para objeto, planta, roupa, arma ou bicho, a foto ensina o que a

@@ -45,7 +45,15 @@ function lerSetCfg(chave, valor) {
 // ESTANTE
 // ================================================================
 function renderLerSection() {
-  if (_lerLivro) { renderLeitor(); return }
+  if (_lerLivro) {
+    // Voltar de outra seção RECONSTRÓI a moldura (innerHTML novo) — e o
+    // capítulo tem de voltar junto, no ponto em que estava. Sem isto o leitor
+    // reaparecia com a barra, o rodapé… e a página em branco.
+    renderLeitor()
+    const pos = _lerLivro.pos || {}
+    lerIrParaCapitulo(_lerCap, pos.cap === _lerCap ? (pos.frac || 0) : 0)
+    return
+  }
   document.body.classList.remove('lendo')
   const area = el('ler-area'); if (!area) return
   const acoes = el('ler-ph-actions')
@@ -249,6 +257,7 @@ async function lerAbrir(id) {
 function lerFechar() {
   _lerRegistrarTempo()
   _lerSalvarPos(true)
+  _lerGravarPendente()
   _lerBlobs.forEach(u => { try { URL.revokeObjectURL(u) } catch (e) {} })
   _lerBlobs = []
   _lerLivro = null; _lerEpub = null
@@ -274,6 +283,7 @@ function _lerAoEsconder() {
   if (document.visibilityState !== 'hidden' || !_lerLivro) return
   _lerRegistrarTempo()
   _lerSalvarPos(true)
+  _lerGravarPendente()   // fecha a aba antes do debounce? o pendente vai junto
 }
 
 function _lerRegistrarTempo() {
@@ -622,16 +632,25 @@ async function _lerEsperarLayout(cont) {
   ])
 }
 
+// Enquanto o capítulo se monta e procura o ponto certo, o texto fica
+// invisível: sem isto via-se a página 0 e um salto — parecia que o leitor
+// tinha perdido o lugar e voltado sozinho.
+function _lerMostrarTexto(mostrar) {
+  const c = el('ler-conteudo')
+  if (c) c.classList.toggle('ler-montando', !mostrar)
+}
+
 async function lerIrParaCapitulo(i, frac = 0) {
   if (!_lerLivro) return
   i = Math.max(0, Math.min(i, _lerLivro.chapters.length - 1))
   _lerCap = i
   const cont = el('ler-conteudo'); if (!cont) return
   _lerRestaurando = true
+  _lerMostrarTexto(false)
   _lerFracAlvo = frac
   cont.innerHTML = '<p class="ler-carregando">carregando…</p>'
   const html = await _lerHtmlDoCapitulo(i)
-  if (!_lerLivro || _lerCap !== i) { _lerRestaurando = false; return }   // trocou de capítulo no meio
+  if (!_lerLivro || _lerCap !== i) { _lerRestaurando = false; _lerMostrarTexto(true); return }   // trocou de capítulo no meio
   cont.innerHTML = html || '<p class="ler-carregando">(capítulo vazio)</p>'
   cont.querySelectorAll('.ler-link-int').forEach(a => {
     a.onclick = () => lerIrParaCapitulo(+a.dataset.cap, 0)
@@ -642,7 +661,7 @@ async function lerIrParaCapitulo(i, frac = 0) {
   _lerMedirPaginas()
 
   await _lerEsperarLayout(cont)
-  if (!_lerLivro || _lerCap !== i) { _lerRestaurando = false; return }
+  if (!_lerLivro || _lerCap !== i) { _lerRestaurando = false; _lerMostrarTexto(true); return }
   _lerMedirPaginas()          // remede já com a forma final
   _lerIrParaFrac(frac)
 
@@ -664,6 +683,7 @@ async function lerIrParaCapitulo(i, frac = 0) {
     }, { once: true })
   })
   _lerRestaurando = false
+  _lerMostrarTexto(true)
   const p = el('ler-sumario'); if (p) p.classList.add('hidden')
 }
 
@@ -708,6 +728,14 @@ function _lerMedirPaginas() {
   }
 }
 
+// A viewport só serve de RÉGUA quando está de fato na tela. Fora da seção ela
+// continua no DOM com tamanho ZERO — e medir ali devolve 0, que é o valor mais
+// destrutivo que existe aqui: vira "você parou no começo do capítulo".
+function _lerMedivel() {
+  const vp = el('ler-viewport')
+  return !!(vp && vp.offsetParent && vp.clientWidth > 40)
+}
+
 // Largura REAL de uma página (fracionária). `clientWidth` é arredondado, e
 // somar 646 numa coluna de 646,4 acumula meia linha de desvio a cada dezena
 // de páginas — o texto ia "escorregando" para o lado.
@@ -729,15 +757,25 @@ function _lerFracAtual() {
 function _lerIrParaFrac(frac) {
   const vp = el('ler-viewport'); if (!vp) return
   frac = Math.max(0, Math.min(1, frac || 0))
+  // Restaurar tem de ser INSTANTÂNEO. No modo rolagem a viewport tem
+  // `scroll-behavior:smooth` (bom para virar página na mão, péssimo aqui): a
+  // volta virava uma animação de ~300ms e cada quadro dela disparava `scroll`,
+  // gravando posições intermediárias por cima da boa.
+  // `behavior:'instant'` vence o CSS SEM alterar o elemento — a primeira
+  // versão trocava `style.scrollBehavior` e devolvia num requestAnimationFrame
+  // que nem sempre roda (aba em segundo plano), deixando o 'auto' grudado.
+  let alvo
   if (_lerPaginado()) {
     const max = vp.scrollWidth - vp.clientWidth
     const pag = _lerPasso()
     // Cai sempre no COMEÇO de uma página: meia página cortada é o que mais
     // incomoda quem retoma a leitura.
-    vp.scrollLeft = Math.min(max, Math.round((max * frac) / pag) * pag)
+    alvo = { left: Math.min(max, Math.round((max * frac) / pag) * pag) }
   } else {
-    vp.scrollTop = (vp.scrollHeight - vp.clientHeight) * frac
+    alvo = { top: (vp.scrollHeight - vp.clientHeight) * frac }
   }
+  try { vp.scrollTo({ ...alvo, behavior: 'instant' }) }
+  catch (e) { if (alvo.left != null) vp.scrollLeft = alvo.left; else vp.scrollTop = alvo.top }
   _lerAtualizarProgresso()
 }
 
@@ -796,15 +834,31 @@ function _lerSalvarPos(agora = false) {
   // Trava do parágrafo acima: durante a restauração, a posição na tela ainda
   // não é a posição do leitor — gravá-la apagaria o marcador.
   if (_lerRestaurando) return
+  if (!_lerMedivel()) return
+
+  // A MEDIDA é congelada AQUI, com o layout válido; o debounce só persiste.
+  // Antes ela era tirada DENTRO do timer — e 1,5s depois de você trocar de
+  // seção a viewport já estava com tamanho zero, então o marcador de verdade
+  // era sobrescrito por `frac: 0`. Era esta linha que fazia o livro "não
+  // voltar onde eu parei" ao ir para outra aba e voltar.
+  _lerPosPendente = { cap: _lerCap, frac: _lerFracAtual() }
   clearTimeout(_lerSalvarTimer)
-  const gravar = () => {
-    if (!_lerLivro) return
-    _lerLivro.pos = { cap: _lerCap, frac: _lerFracAtual() }
-    _lerLivro.updatedAt = Date.now()
-    saveLivros()
-    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
-  }
-  if (agora) gravar(); else _lerSalvarTimer = setTimeout(gravar, 1500)
+  if (agora) _lerGravarPendente()
+  else _lerSalvarTimer = setTimeout(_lerGravarPendente, 1500)
+}
+
+// Como a medida já está congelada, gravar não depende mais de a seção estar
+// na tela — dá para descarregar o pendente a qualquer momento (sair da seção,
+// esconder a aba, fechar o livro) sem risco de gravar zero.
+let _lerPosPendente = null
+function _lerGravarPendente() {
+  clearTimeout(_lerSalvarTimer)
+  if (!_lerLivro || !_lerPosPendente) return
+  _lerLivro.pos = _lerPosPendente
+  _lerLivro.updatedAt = Date.now()
+  _lerPosPendente = null
+  saveLivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
 }
 
 // No celular, esconder a barra de endereço dispara `resize` a cada rolagem.
@@ -814,7 +868,7 @@ function _lerSalvarPos(agora = false) {
 let _lerMedida = { w: 0, h: 0 }
 let _lerResizeTimer = null
 function _lerAoRedimensionar() {
-  if (!_lerLivro) return
+  if (!_lerLivro || !_lerMedivel()) return
   const vp = el('ler-viewport'); if (!vp) return
   // Teclado do celular aberto (digitando na conversa) muda a altura em
   // centenas de pixels e não tem nada a ver com paginação.
