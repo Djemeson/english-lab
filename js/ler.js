@@ -372,7 +372,22 @@ function renderLeitor() {
       // neste aparelho. Card é o que persiste, entra no SRS e sincroniza — é
       // esta a resposta para "tem como salvar essas palavras". Vai com a frase
       // do livro, então a análise nasce com o contexto certo.
-      aoEstudar: (alvo, ctx) => { _lerCapturar(alvo, ctx || '') }
+      aoEstudar: (alvo, ctx) => { _lerCapturar(alvo, ctx || '') },
+      // "Não lembro" numa palavra que ele já marcara como conhecida. O leitor
+      // só descreve DE ONDE se veio e COMO se volta; desmarcar, criar o card e
+      // navegar é do mecanismo compartilhado, que serve a vídeo, podcast e
+      // qualquer tela futura. A posição não precisa de `restaurar` próprio:
+      // `renderLerSection()` já reabre o livro no capítulo e no ponto salvos.
+      aoNaoLembro: (alvo, ctx) => {
+        if (typeof _lerSalvarPos === 'function') _lerSalvarPos(true)
+        estudoNaoLembro(alvo, ctx, {
+          secao: 'ler',
+          rotulo: _lerLivro ? _lerLivro.title : 'a leitura',
+          source_type: 'kindle',
+          source_title: _lerLivro ? _lerLivro.title : '',
+          lang: (_lerLivro && _lerLivro.lang) || 'en'
+        })
+      }
     })
   }
   // Toque: arrastar para virar, tocar nas bordas para virar, segurar numa

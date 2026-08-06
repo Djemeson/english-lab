@@ -886,3 +886,100 @@ function populateDeckSelect(selectEl, selectedId) {
   addOpts(null, 0)
 }
 
+
+// ================================================================
+// "NÃO LEMBRO" — tirar uma palavra do limbo sem perder o lugar
+// ================================================================
+// O caso: passando o mouse numa palavra, o balão diz "você marcou como
+// conhecida" — e ele não lembra dela. Hoje isso é um beco: a palavra está
+// marcada, não volta para a fila, e a única saída é caçá-la no Revisar.
+//
+// Três coisas têm de acontecer juntas, e é isso que torna o botão útil:
+//   1. DESMARCAR o "conheço" — sem isso a cobertura, a triagem por nível e o
+//      próprio glossário continuam achando que ele sabe;
+//   2. criar o card COM A FRASE, para a análise nascer com contexto;
+//   3. levá-lo até aquele item e trazê-lo de volta ao ponto exato.
+//
+// O PONTO 3 É GENÉRICO DE PROPÓSITO. Isto não é código do leitor: vale para
+// vídeo, podcast, Assistente e qualquer tela que venha depois. A tela de
+// origem registra COMO se volta para ela; o resto é mecanismo compartilhado.
+// Se a tela não precisar de nada além de reabrir, `restaurar` fica vazio e
+// `showSection` sozinho já devolve o estado (o leitor, por exemplo, restaura
+// capítulo e posição no próprio render).
+let _voltarPara = null
+
+function estudoVoltarDefinir(p) {
+  _voltarPara = (p && p.secao) ? p : null
+  _voltarPintar()
+}
+
+function estudoVoltarLimpar() { _voltarPara = null; _voltarPintar() }
+
+function estudoVoltar() {
+  const p = _voltarPara
+  _voltarPara = null
+  _voltarPintar()
+  if (!p) return
+  showSection(p.secao)
+  // Depois do showSection: a seção pode ser lazy e o módulo dela só existe
+  // depois do carregamento. O atraso curto cobre isso sem precisar de gancho.
+  if (typeof p.restaurar === 'function') setTimeout(() => { try { p.restaurar() } catch (e) {} }, 60)
+}
+
+// Pílula flutuante, fora de qualquer seção — é o que faz o retorno valer para
+// TODOS os métodos de estudo em vez de um banner por tela.
+function _voltarPintar() {
+  let b = document.getElementById('voltar-pill')
+  if (!_voltarPara) { if (b) b.remove(); return }
+  if (!b) {
+    b = document.createElement('button')
+    b.id = 'voltar-pill'
+    b.type = 'button'
+    b.onclick = estudoVoltar
+    document.body.appendChild(b)
+  }
+  b.innerHTML = ic('arrowRight', 'ic-sm') + '<span>Voltar para ' + esc(_voltarPara.rotulo || 'onde eu estava') + '</span>'
+}
+
+// O caminho completo, chamado pelo balão do glossário em qualquer tela.
+// `origem` descreve de onde veio e como voltar.
+function estudoNaoLembro(alvo, ctx, origem) {
+  const termo = String(alvo || '').trim()
+  if (!termo) return
+  // 1) sai do limbo
+  if (typeof markKnownWord === 'function') markKnownWord(termo, false)
+  const k = typeof knownNorm === 'function' ? knownNorm(termo) : termo.toLowerCase()
+  if (typeof ignoredWords === 'object' && ignoredWords && ignoredWords[k]) {
+    delete ignoredWords[k]
+    if (typeof saveIgnoredLocal === 'function') saveIgnoredLocal()
+  }
+  if (typeof glossInvalidar === 'function') glossInvalidar()
+
+  // 2) vira card com a frase — se já não for um
+  let w = words.find(x => knownNorm(x.word || '') === k)
+  if (!w) {
+    w = createWord({
+      word: termo,
+      context: String(ctx || '').slice(0, 400),
+      source_type: (origem && origem.source_type) || 'manual',
+      source_title: (origem && origem.source_title) || '',
+      lang: (origem && origem.lang) || 'en'
+    })
+    saveWords()
+    if (typeof autoSyncAfterChange === 'function') { try { autoSyncAfterChange() } catch (e) {} }
+  }
+
+  // 3) guarda a volta ANTES de sair, e vai para o item
+  if (origem && origem.secao) {
+    estudoVoltarDefinir({ secao: origem.secao, rotulo: origem.rotulo, restaurar: origem.restaurar })
+  }
+  activeWordId = w.id
+  showSection('revisar')
+  setTimeout(() => {
+    try {
+      if (typeof selectWord === 'function') selectWord(w.id)
+      else if (typeof renderWordCard === 'function') renderWordCard(w.id)
+    } catch (e) {}
+  }, 80)
+  toast('"' + termo + '" saiu das conhecidas e está aqui — analise e volte', 'success')
+}

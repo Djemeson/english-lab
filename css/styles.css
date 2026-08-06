@@ -5023,3 +5023,23 @@ body.ler-full .mobile-bottom-nav{display:none}
   .srs-fonte{width:158px;padding:11px 12px}
   .srs-fontes-lista{margin:0 -14px;padding:2px 14px 8px}
 }
+
+/* Pílula de retorno — vive FORA das seções, porque o "volte para onde eu
+   estava" vale para o leitor, o vídeo, o podcast e o que vier depois. */
+#voltar-pill{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(18px + env(safe-area-inset-bottom,0));
+  z-index:900;display:flex;align-items:center;gap:7px;cursor:pointer;
+  padding:11px 18px;border-radius:30px;
+  background:rgba(var(--primary-rgb),.96);color:#fff;border:0;
+  font-size:var(--fs-sm);font-weight:600;
+  box-shadow:0 8px 26px -6px rgba(0,0,0,.55);
+  animation:voltarSobe .18s ease-out;
+}
+#voltar-pill:hover{background:rgba(var(--primary-rgb),1)}
+#voltar-pill .ic{transform:rotate(180deg)}
+@keyframes voltarSobe{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+@media (max-width:768px){
+  /* acima da barra de navegação do celular */
+  #voltar-pill{bottom:calc(72px + env(safe-area-inset-bottom,0))}
+}

@@ -3,7 +3,18 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-06 — **ESTUDAR POR FONTE (88ª rodada)**: pedido de escolher a
+> Última atualização: 2026-08-06 — **"NÃO LEMBRO" — saindo do limbo sem perder o lugar
+> (89ª rodada)**. O balão dizia *"você marcou como conhecida"* para uma palavra que ele não
+> reconhecia, e aquilo era um beco: a palavra ficava marcada, não voltava para a fila, e a
+> única saída era caçá-la no Revisar. Agora esse estado (e o de *ignorada*) ganha um botão
+> **"Não lembro"** que faz três coisas juntas: **desmarca** o conheço — sem isso a cobertura,
+> a triagem por nível e o próprio glossário continuam achando que ele sabe —, cria o card
+> **com a frase**, e o leva até aquele item. A volta ao ponto exato é um **mecanismo
+> compartilhado em core.js**, não código do leitor: a tela de origem só declara de onde veio e
+> como se volta, então vale para vídeo, podcast, Assistente e o que vier. A pílula "Voltar
+> para <obra>" vive no `body`, fora de qualquer seção. Ver seção 8 (89ª rodada).
+>
+> Anterior: 2026-08-06 — **ESTUDAR POR FONTE (88ª rodada)**: pedido de escolher a
 > origem na hora de estudar ("por exemplo Flags on the Bayou, assim eu foco só nessas novas
 > entradas"). O dado já existia — todo card carrega `source_type`/`source_title` desde que
 > nasce — mas nunca tinha sido usado na fila do SRS, que só filtrava por deck. Agora o painel
@@ -1187,6 +1198,36 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        reconhecidas, SAFETY/IMAGE_SAFETY/PROHIBITED_CONTENT viram recusa explicada, `STOP` não
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
+
+184. **"NÃO LEMBRO" NO BALÃO + RETORNO GENÉRICO (89ª rodada, 2026-08-06)**. Pedido: *"ao ver
+     uma palavra que não lembro, a informação diz que já conheço; poderia ter uma pequena opção
+     de revisar… mas deve voltar rápido pra exatamente onde eu estava"*, com o complemento
+     *"tem que servir pra todos os métodos de estudo"*.
+     - **O beco que existia**: o balão informava o estado e não oferecia saída. A palavra
+       continuava marcada, fora da fila, e recuperá-la exigia procurá-la no Revisar.
+     - **Três coisas juntas, e é a junção que torna o botão útil**: (1) `markKnownWord(w,false)`
+       — e o mesmo para `ignoredWords` —, porque enquanto a marca existe a cobertura, a triagem
+       por nível e o glossário seguem achando que ele sabe; (2) card criado **com a frase em
+       volta** (`glossFraseEmVolta`), para a análise nascer com contexto; (3) navegação até
+       aquele item, com `activeWordId` já apontando para ele.
+     - **O retorno é GENÉRICO de propósito** (`estudoVoltarDefinir/estudoVoltar` em core.js).
+       A tela de origem declara `{secao, rotulo, restaurar}` e nada mais; desmarcar, criar e
+       navegar é mecanismo compartilhado. O leitor nem precisa de `restaurar` próprio —
+       `renderLerSection()` já reabre no capítulo e na posição salvos (só força
+       `_lerSalvarPos(true)` antes de sair). Vídeo, podcast e Assistente entram passando o
+       mesmo objeto.
+     - **A pílula flutuante vive no `body`**, fora de qualquer seção — é isso que faz o
+       "volte para onde eu estava" valer para todos os métodos de estudo em vez de virar um
+       banner por tela. O `restaurar` roda 60 ms depois do `showSection` porque a seção pode
+       ser lazy e o módulo dela só existe após o carregamento.
+     - O botão **substitui** o "Estudar" nesse estado em vez de conviver com ele: dois botões
+       que criam o mesmo card, um deles sem desfazer a marcação, seria armadilha.
+     - Verificado (10 casos): o balão mostra "Não lembro" só para conhecida/ignorada e some com
+       o "Estudar" redundante; o callback leva palavra E frase inteira; a palavra sai das
+       conhecidas; o card nasce com contexto e a fonte do livro; o glossário passa a responder
+       como `card`; a pílula aparece com o nome da obra, está no `body`, restaura ao clique e
+       some depois; palavra ignorada também é liberada; e chamar duas vezes não duplica o card.
+       `CACHE` → **v124**.
 
 183. **ESTUDAR POR FONTE — `srsFontesHoje()` / filtro na fila (88ª rodada, 2026-08-06)**.
      Pedido: *"quando eu for estudar quero poder escolher a fonte, por exemplo Flags on the

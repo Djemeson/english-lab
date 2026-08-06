@@ -453,16 +453,33 @@ function _glossMostrar(achado, x, y, opts, pos) {
   // algo que já está no Revisar convidaria ao item duplicado — o mesmo cuidado
   // que fez o painel do toque longo avisar "já está no Revisar".
   const podeEstudar = !!(opts && opts.aoEstudar) && achado.fonte !== 'card'
+  // "NÃO LEMBRO": exclusivo de palavra que ele já declarou conhecer (ou
+  // ignorou). É o beco que o balão criava — dizia "você marcou como
+  // conhecida" para uma palavra que ele não reconhece, e não havia saída
+  // dali. Aqui o botão desfaz a marcação, cria o card com a frase e leva até
+  // ele; a volta ao ponto exato é do mecanismo compartilhado (core.js).
+  const esqueceu = (achado.fonte === 'known' || achado.fonte === 'ignored')
+  const podeEsqueci = esqueceu && !!(opts && opts.aoNaoLembro)
   const icn = n => (typeof ic === 'function' ? ic(n, 'ic-sm') : '')
-  const botoes = (podeLexa || podeEstudar)
+  const botoes = (podeLexa || podeEstudar || podeEsqueci)
     ? `<div class="gloss-acoes">
-        ${podeEstudar ? `<button class="gloss-btn gloss-estudar" type="button">${icn('plus')} Estudar</button>` : ''}
+        ${podeEsqueci ? `<button class="gloss-btn gloss-esqueci" type="button">${icn('undo')} Não lembro</button>` : ''}
+        ${podeEstudar && !esqueceu ? `<button class="gloss-btn gloss-estudar" type="button">${icn('plus')} Estudar</button>` : ''}
         ${podeLexa ? `<button class="gloss-btn gloss-lexa" type="button">${icn('sparkles')} Lexa</button>` : ''}
        </div>`
     : ''
   b.innerHTML = glossLinhaHTML(achado) + botoes
   document.body.appendChild(b)
-  if (podeEstudar) {
+  if (podeEsqueci) {
+    b.querySelector('.gloss-esqueci').onclick = ev => {
+      ev.stopPropagation()
+      const alvo = pos ? pos.palavra : achado.termo
+      const ctx = glossFraseEmVolta(pos)
+      glossFechar()
+      try { opts.aoNaoLembro(alvo, ctx) } catch (e) {}
+    }
+  }
+  if (podeEstudar && !esqueceu) {
     b.querySelector('.gloss-estudar').onclick = ev => {
       ev.stopPropagation()
       const alvo = achado.frase ? achado.casou : (pos ? pos.palavra : achado.termo)
