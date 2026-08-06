@@ -267,10 +267,17 @@ function glossPreCarregar(chave, itens) {
   const norm = s => (typeof knownNorm === 'function' ? knownNorm(s) : String(s || '').toLowerCase().trim())
   const m = new Map()
   for (const it of itens) {
-    const k = norm(it.w)
+    // `expr` (quando existe) é a EXPRESSÃO que a palavra formava na frase —
+    // phrasal, idiom, colocação. A chave é ela, não a palavra solta: guardar
+    // "cansar-se de" sob "tire" faria o balão dar o sentido do phrasal para um
+    // "tire" que ali era pneu. A sonda de 2 e 3 palavras do glossBuscar é quem
+    // reencontra a expressão no texto.
+    const termo = String(it.expr || it.w || '').trim()
+    const k = norm(termo)
     if (!k || !it.pt) continue
-    m.set(k, { termo: it.w, pt: String(it.pt).trim(), def: String(it.nota || '').trim(),
-               tipo: '', gramatical: !!it.g, doContexto: true, outros: 0, fonte: 'pre' })
+    m.set(k, { termo, pt: String(it.pt).trim(), def: String(it.nota || '').trim(),
+               tipo: String(it.tipo || '').trim(), gramatical: !!it.g,
+               doContexto: true, outros: 0, fonte: 'pre' })
   }
   _glossPre = m; _glossPreChave = chave
   return m.size
@@ -280,17 +287,23 @@ function glossPreChave() { return _glossPreChave }
 
 // Busca principal. `seguinte` é a palavra à direita no texto — é o que permite
 // "tire of" ganhar de "tire", e é a defesa contra o erro que mais dói aqui.
-function glossBuscar(palavra, seguinte) {
+function glossBuscar(palavra, seguinte, seguinte2) {
   const ix = _glossIx()
   const pre = _glossPre
   if (!ix.size && !(pre && pre.size)) return null
   const norm = s => (typeof knownNorm === 'function' ? knownNorm(s) : String(s || '').toLowerCase().trim())
 
-  // 1) EXPRESSÃO primeiro, sempre. Duas e depois três palavras.
-  if (seguinte) {
-    const par = norm(palavra + ' ' + seguinte)
-    const hit = par && ix.get(par)
-    if (hit && hit.pt) return { ...hit, casou: palavra + ' ' + seguinte, viaLema: false, frase: true }
+  // 1) EXPRESSÃO primeiro, sempre — e da MAIOR para a menor. "look forward to"
+  // tem de ganhar de "look forward", que por sua vez ganha de "look": a unidade
+  // maior é a mais específica, e responder pela menor seria dizer ao aluno que
+  // ele está diante de outra coisa. Vale nas duas camadas (card e pré-análise).
+  const combos = []
+  if (seguinte && seguinte2) combos.push(palavra + ' ' + seguinte + ' ' + seguinte2)
+  if (seguinte) combos.push(palavra + ' ' + seguinte)
+  for (const c of combos) {
+    const k = norm(c)
+    const hit = k && (ix.get(k) || (pre && pre.get(k)))
+    if (hit && hit.pt) return { ...hit, casou: c, original: palavra, viaLema: false, frase: true }
   }
   // 2) e 3) cada forma candidata — a palavra como está e depois os lemas —
   // consultada nas DUAS camadas, o card antes da pré-análise.
@@ -330,16 +343,32 @@ function glossPalavraNoPonto(x, y) {
   while (b < t.length && _GLOSS_LETRA.test(t[b])) b++
   const palavra = t.slice(a, b).replace(/^['’-]+|['’-]+$/g, '')
   if (!palavra || palavra.length < 2) return null
-  // a palavra seguinte, para a sonda de expressão
-  const resto = t.slice(b, b + 40)
-  const m = /^[\s]+([\p{L}\p{M}'’-]{2,})/u.exec(resto)
-  return { palavra, seguinte: m ? m[1] : '', no, a, b }
+  // As DUAS palavras seguintes, para a sonda de expressão. Duas e não uma
+  // porque phrasal de três partes é comum e é justamente o que o aluno não
+  // decompõe sozinho: "get away with", "look forward to", "put up with".
+  const resto = t.slice(b, b + 60)
+  const m = /^\s+([\p{L}\p{M}'’-]{1,})(?:\s+([\p{L}\p{M}'’-]{1,}))?/u.exec(resto)
+  return { palavra, seguinte: (m && m[1]) || '', seguinte2: (m && m[2]) || '', no, a, b }
 }
 
 // Seleciona no documento a palavra que o balão está mostrando. É assim que o
 // "Ver com a Lexa" reaproveita o painel que a tela JÁ tem (no leitor: o popup
 // com Explicar/Estudar/Ouvir/Imagens/Wikipédia) em vez de o glossário
 // reimplementar esse fluxo por fora e ele passar a divergir.
+// A frase inteira em volta da palavra, tirada do próprio nó de texto. É o que
+// permite mandar a palavra para o Revisar JÁ COM O CONTEXTO do livro, sem
+// obrigar o aluno a selecionar a frase na mão — e contexto é o que separa um
+// card que ensina de uma palavra solta numa lista.
+function glossFraseEmVolta(pos, max = 300) {
+  if (!pos || !pos.no) return ''
+  const t = pos.no.textContent || ''
+  let a = pos.a, b = pos.b
+  while (a > 0 && !/[.!?…]/.test(t[a - 1]) && pos.a - a < max) a--
+  while (b < t.length && !/[.!?…]/.test(t[b]) && b - pos.b < max) b++
+  if (b < t.length) b++                       // leva o ponto final junto
+  return t.slice(a, b).replace(/\s+/g, ' ').trim()
+}
+
 function glossSelecionar(pos) {
   if (!pos || !pos.no) return false
   try {
@@ -420,10 +449,30 @@ function _glossMostrar(achado, x, y, opts, pos) {
   b.className = 'gloss-balao'
   b.setAttribute('role', 'tooltip')
   const podeLexa = !!(opts && opts.aoExplicar)
-  b.innerHTML = glossLinhaHTML(achado) + (podeLexa
-    ? `<button class="gloss-lexa" type="button">${typeof ic === 'function' ? ic('sparkles', 'ic-sm') : ''} Ver com a Lexa</button>`
-    : '')
+  // "Estudar" só aparece quando a palavra AINDA NÃO é card: oferecê-lo para
+  // algo que já está no Revisar convidaria ao item duplicado — o mesmo cuidado
+  // que fez o painel do toque longo avisar "já está no Revisar".
+  const podeEstudar = !!(opts && opts.aoEstudar) && achado.fonte !== 'card'
+  const icn = n => (typeof ic === 'function' ? ic(n, 'ic-sm') : '')
+  const botoes = (podeLexa || podeEstudar)
+    ? `<div class="gloss-acoes">
+        ${podeEstudar ? `<button class="gloss-btn gloss-estudar" type="button">${icn('plus')} Estudar</button>` : ''}
+        ${podeLexa ? `<button class="gloss-btn gloss-lexa" type="button">${icn('sparkles')} Lexa</button>` : ''}
+       </div>`
+    : ''
+  b.innerHTML = glossLinhaHTML(achado) + botoes
   document.body.appendChild(b)
+  if (podeEstudar) {
+    b.querySelector('.gloss-estudar').onclick = ev => {
+      ev.stopPropagation()
+      const alvo = achado.frase ? achado.casou : (pos ? pos.palavra : achado.termo)
+      // A FRASE vai junto. Card sem contexto é o que produz "barrel = barril";
+      // com a frase, a análise tem como acertar o sentido daquela cena.
+      const ctx = glossFraseEmVolta(pos)
+      glossFechar()
+      try { opts.aoEstudar(alvo, ctx, achado) } catch (e) {}
+    }
+  }
   // O balão é território seguro: enquanto o mouse estiver nele, nada fecha.
   // Sair dele fecha na hora — aí a intenção é clara.
   b.addEventListener('pointerenter', () => clearTimeout(_glossFecharTimer))
@@ -487,7 +536,7 @@ function glossAtivar(container, opts = {}) {
     // as linhas que o mouse cruza a caminho do balão.
     const p = glossPalavraNoPonto(ev.clientX, ev.clientY)
     if (!p) { _glossAgendarFechar(); return }
-    const chave = p.palavra + '|' + p.seguinte
+    const chave = p.palavra + '|' + p.seguinte + '|' + p.seguinte2
     if (chave === _glossUltima) {
       clearTimeout(_glossFecharTimer)                  // voltou para a mesma palavra: fica
       return
@@ -496,7 +545,7 @@ function glossAtivar(container, opts = {}) {
     clearTimeout(_glossTimer)
     clearTimeout(_glossFecharTimer)
     if (_glossBalao) { _glossBalao.remove(); _glossBalao = null }
-    const achado = glossBuscar(p.palavra, p.seguinte)
+    const achado = glossBuscar(p.palavra, p.seguinte, p.seguinte2)
     if (!achado) return
     const x = ev.clientX, y = ev.clientY
     _glossTimer = setTimeout(() => _glossMostrar(achado, x, y, opts, p), GLOSS_ESPERA)

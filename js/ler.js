@@ -367,7 +367,12 @@ function renderLeitor() {
       // entrega (Explicar, Estudar, Ouvir, Imagens, Wikipédia, Web).
       aoExplicar: (alvo, pos) => {
         if (typeof glossSelecionar === 'function' && glossSelecionar(pos)) _lerAoSelecionar()
-      }
+      },
+      // "Estudar" no balão: a glosa da pré-análise é APOIO DE LEITURA e vive só
+      // neste aparelho. Card é o que persiste, entra no SRS e sincroniza — é
+      // esta a resposta para "tem como salvar essas palavras". Vai com a frase
+      // do livro, então a análise nasce com o contexto certo.
+      aoEstudar: (alvo, ctx) => { _lerCapturar(alvo, ctx || '') }
     })
   }
   // Toque: arrastar para virar, tocar nas bordas para virar, segurar numa
@@ -1687,8 +1692,10 @@ async function _lerCapturarSemFrase(lista) {
 // custa pede confirmação com o número na frente.
 // ================================================================
 
-const LER_PRE_MAX = 120   // teto por capítulo: segura o custo E o tamanho do
-                          // prompt, que é onde modelo barato começa a errar
+const LER_PRE_MAX = 500   // teto por capítulo. Era 120, escolhido antes de eu
+                          // saber o preço real; com o custo agora MEDIDO (e não
+                          // estimado no escuro), 500 cobre o capítulo de verdade
+                          // — num de 647 palavras novas, passa de 19% para 77%.
 // Versão do formato gravado. SUBIR sempre que a forma de produzir as glosas
 // mudar de um jeito que invalide o que já está no aparelho — o cache é local e
 // ninguém mais tem como alcançá-lo para corrigir.
@@ -1790,8 +1797,15 @@ async function lerPreAnalisar(cap, refazer) {
     'Para CADA item você recebe a palavra e A FRASE DO LIVRO em que ela aparece.',
     'Devolva o significado que a palavra tem NAQUELA FRASE — nunca o primeiro do dicionário.',
     regras,
-    'Responda SÓ com JSON: {"itens":[{"w":"a palavra EXATAMENTE como veio","pt":"tradução em forma de citação","g":false}]}',
-    '- "w": copie a palavra recebida, letra por letra. É por ela que a resposta é casada com a pergunta.',
+    'ANTES de traduzir, veja se a palavra faz parte de uma UNIDADE MAIOR naquela frase:',
+    'phrasal verb ("tire of", "look forward to"), expressão idiomática ("bear the mark of Cain"),',
+    'ou colocação fixa ("shed blood", "arm myself"). Se fizer, glose a UNIDADE INTEIRA — é ela que',
+    'tem o significado; traduzir a palavra solta ali é o erro mais caro que existe neste app.',
+    '',
+    'Responda SÓ com JSON: {"itens":[{"w":"a palavra EXATAMENTE como veio","expr":"a unidade inteira, se houver","tipo":"phrasal|idiom|colocação","pt":"tradução em forma de citação","g":false}]}',
+    '- "w": copie a palavra recebida, letra por letra. É por ela que a resposta é casada com a pergunta — NUNCA a altere.',
+    '- "expr": só quando houver unidade maior, copiada da frase, no máximo 3 palavras e CONTENDO o "w". Se a palavra vale sozinha ali, deixe "" e não invente expressão.',
+    '- "tipo": só quando houver "expr".',
     '- "pt": 1 a 4 palavras em português, forma neutra (verbo no INFINITIVO, substantivo no SINGULAR). Sem explicação, sem frase.',
     '- "g": true apenas quando a palavra ali exerce função gramatical (auxiliar, marcador) em vez de sentido lexical.',
     '- Um objeto por palavra recebida. Se não souber alguma, omita-a — nunca invente nem desloque.'
@@ -1877,7 +1891,32 @@ async function lerPreAnalisar(cap, refazer) {
         const k = knownNorm(r.w || r.word || r.palavra || '')
         const orig = pedidas.get(k) || porLema.get(k)
         if (!orig) { ignorados++; continue }
-        saida.push({ w: orig.w, pt: String(r.pt).trim().slice(0, 60), g: r.g === true || r.g === 'true' })
+        // A EXPRESSÃO só vale se for real: até 3 palavras, contendo a palavra
+        // perguntada, e presente na frase que eu mandei. Sem essas três travas,
+        // um modelo inventivo devolve "unidades" que não existem no texto e o
+        // balão passa a ensinar expressão imaginária — pior que não ter nada.
+        let expr = String(r.expr || '').trim().replace(/\s+/g, ' ')
+        if (expr) {
+          const pe = knownNorm(expr).split(' ').filter(Boolean)
+          const pf = knownNorm(orig.f).split(' ').filter(Boolean)
+          const contemAlvo = pe.includes(knownNorm(orig.w))
+          // Presença EM ORDEM, com folga — não substring literal. A trava
+          // literal parecia mais segura e rejeitava expressão legítima: a frase
+          // diz "shed THE blood" e a forma de citação é "shed blood"; pior, todo
+          // phrasal separável ("picked the book UP") morria. Agora as palavras
+          // precisam aparecer na ordem e dentro de uma janela curta — invenção
+          // ("shed a tear" numa frase sem "tear") continua barrada.
+          let i = 0, ini = -1, fim = -1
+          for (let k = 0; k < pf.length && i < pe.length; k++) {
+            if (pf[k] === pe[i]) { if (i === 0) ini = k; fim = k; i++ }
+          }
+          const naFrase = i === pe.length && (fim - ini) <= 5
+          if (pe.length < 2 || pe.length > 3 || !contemAlvo || !naFrase) expr = ''
+        }
+        saida.push({
+          w: orig.w, expr, tipo: expr ? String(r.tipo || '').slice(0, 14) : '',
+          pt: String(r.pt).trim().slice(0, 60), g: r.g === true || r.g === 'true'
+        })
       }
       _lerPreProgresso('lendo com a IA…', n + 1, lotes.length, saida.length)
     }
