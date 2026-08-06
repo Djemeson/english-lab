@@ -893,6 +893,10 @@
 <div id="toasts"></div>
 
 <script src="js/core.js"></script>
+<!-- glossario.js depois de core.js: usa words/knownWords/knownNorm/ic/esc.
+     Não é lazy de propósito — o leitor, a legenda do vídeo, o Revisar e o
+     Assistente chamam glossAtivar(), e três deles carregam sob demanda. -->
+<script src="js/glossario.js"></script>
 <script src="js/lang.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/firebase.js"></script>

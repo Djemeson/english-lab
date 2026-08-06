@@ -130,6 +130,16 @@ function knownNorm(s) {
 function isKnownWord(s) {
   const k = knownNorm(s); if (!k) return false
   if (knownWords[k]) return true
+  // Usa o lematizador do glossário quando ele existe: a regra de sufixo abaixo
+  // nunca enxergou VERBO IRREGULAR, que é justamente o vocabulário mais comum
+  // do inglês — quem marcava "begin" como conhecida continuava recebendo
+  // "began" para estudar, e "go" não cobria "went". O modo `estrito` deixa de
+  // fora -er/-est, que derivam palavra nova ("teacher" não é "teach") e
+  // sumiriam com item legítimo da lista de estudo.
+  if (typeof glossLemas === 'function') {
+    for (const l of glossLemas(k, { estrito: true })) if (knownWords[l]) return true
+    return false
+  }
   for (const suf of ['s', 'es', 'ed', 'd', 'ing']) {
     if (k.length > suf.length + 2 && k.endsWith(suf) && knownWords[k.slice(0, -suf.length)]) return true
   }
@@ -139,6 +149,7 @@ function markKnownWord(s, on = true) {
   const k = knownNorm(s); if (!k) return
   if (on) knownWords[k] = Date.now(); else delete knownWords[k]
   saveKnownLocal()
+  if (typeof glossInvalidar === 'function') glossInvalidar()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
 }
 function saveKnownLocal() {
@@ -510,8 +521,16 @@ function srcIcon(t) {
 }
 function loadWords() {
   try { words = JSON.parse(localStorage.getItem(SK.words) || '[]') } catch { words = [] }
+  if (typeof glossInvalidar === 'function') glossInvalidar()
 }
-function saveWords() { localStorage.setItem(SK.words, JSON.stringify(words)) }
+// Todo caminho que MUDA um card passa por aqui, então é aqui que o índice do
+// glossário morre. Sem isto, corrigir a tradução de uma palavra deixaria o
+// balão do hover mostrando a versão velha para sempre — e o erro seria
+// invisível, porque o card na tela já estaria certo.
+function saveWords() {
+  localStorage.setItem(SK.words, JSON.stringify(words))
+  if (typeof glossInvalidar === 'function') glossInvalidar()
+}
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7) }
 
 

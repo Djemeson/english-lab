@@ -814,6 +814,11 @@ function renderWordCard(wordId) {
     ${bodyHtml}
   </div>`
   renderWcToolbarLeft()
+  // Glossário também aqui: a frase de contexto e os exemplos estão cheios de
+  // OUTRAS palavras que ele já estudou, e reencontrá-las é metade do reforço.
+  // O container é o mesmo a cada card (innerHTML só troca o miolo), então a
+  // guarda `_glossOn` dentro de glossAtivar impede listener duplicado.
+  if (typeof glossAtivar === 'function') glossAtivar(main, {})
 }
 
 function renderMeaningItem(wordId, m, mi) {

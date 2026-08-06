@@ -3,7 +3,23 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> Última atualização: 2026-08-06 — **Catálogo de imagens revisado na fonte (81ª rodada)**:
+> Última atualização: 2026-08-06 — **GLOSSÁRIO NO HOVER — camada 0 (82ª rodada)**: pedido
+> "um dicionário onde passar o mouse numa palavra mostra o significado, como o Language
+> Reactor". **A medição decidiu a arquitetura**: Wiktionary REST responde em 772–1234 ms,
+> MediaWiki em 2817 ms, `dictionaryapi.dev` devolve **200 com corpo vazio** (quebrado) e o
+> endpoint de definições do `pt.wiktionary` **não existe (501)** — ou seja, nenhuma API serve
+> para hover (que precisa de ~50 ms) e não há rota gratuita de inglês→português. O dado tem de
+> estar no aparelho. Nasceu `js/glossario.js` (SHELL) com a **camada 0**: o dicionário é o que
+> **o próprio aluno já escreveu** — cards, `knownWords`, `ignoredWords`. Zero download, zero
+> custo, e a tradução é a certa porque já foi validada no contexto. Lê a palavra sob o cursor
+> por `caretPositionFromPoint` (**sem tocar no DOM** — envolver palavra em `<span>` quebraria a
+> paginação por colunas do leitor), tem lematizador com irregulares (`began`→begin,
+> `went`→go, `children`→child, `running`→run) e **prefere o sentido `context_match`** —
+> `barrel` mostra "cano", não "barril". Ligado no leitor, no Revisar e no Assistente pelo MESMO
+> componente. No celular **nenhum gesto novo**: a glosa entra no popup que o toque longo já
+> abre. De graça: o `isKnownWord` passou a enxergar verbo irregular. Ver seção 8 (82ª rodada).
+>
+> Anterior: 2026-08-06 — **Catálogo de imagens revisado na fonte (81ª rodada)**:
 > o nível barato do Gemini deixou de ser o `gemini-2.5-flash-image` (US$ 0,039, set/2025) e
 > passou a ser o **`gemini-3.1-flash-lite-image` — Nano Banana 2 Lite (US$ 0,0336, jun/2026)**:
 > mais novo E mais barato ao mesmo tempo, então manter o 2.5 era pagar mais por uma geração
@@ -1109,6 +1125,68 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        reconhecidas, SAFETY/IMAGE_SAFETY/PROHIBITED_CONTENT viram recusa explicada, `STOP` não
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
+
+175. **GLOSSÁRIO NO HOVER — `js/glossario.js` (82ª rodada, 2026-08-06)**. Pedido: "uma espécie
+     de dicionário no projeto, onde ao passar o mouse sobre uma palavra em inglês apareça o
+     significado — vi que o Language Reactor tem isso".
+     - **A MEDIÇÃO QUE DECIDIU TUDO** (feita do próprio app, e é o que evita refazer o estudo):
+       `en.wiktionary.org/api/rest_v1/page/definition/` → **772–1234 ms** (funciona, CORS ok);
+       MediaWiki action API → **2817 ms** e HTML sujo; `api.dictionaryapi.dev` → **HTTP 200 com
+       CORPO VAZIO**, quebrado; `pt.wiktionary` definitions → **HTTP 501, não existe**.
+       Conclusão dupla: (a) hover precisa de ~50 ms, então **nenhuma API serve**; (b) **não há
+       rota REST gratuita inglês→português**. O Language Reactor não faz mágica — ele embarca
+       os dados. Logo o dado tem de estar no aparelho, e o que muda entre as opções é QUAL.
+     - **A camada 0 (esta rodada)**: o dicionário é **o que o aluno já escreveu** — os cards,
+       o `knownWords` e o `ignoredWords`. Baixa **zero byte**, custa zero, responde na hora, e
+       a tradução é a CERTA porque já foi validada no contexto em que ele encontrou a palavra.
+       Cobre só o que ele já viu — que no livro é justamente onde o reforço vale mais.
+     - **Sem tocar no DOM**: a palavra sob o cursor sai de `caretPositionFromPoint` /
+       `caretRangeFromPoint` (validado: lê corretamente palavra a palavra numa linha). Envolver
+       cada palavra num `<span>` — o caminho óbvio — **quebraria a paginação por colunas do
+       leitor** e encheria o DOM de um capítulo inteiro à toa.
+     - **A defesa contra o erro das rodadas 163–167**, que é o risco central de qualquer
+       dicionário: ele é cego ao contexto por construção. Três travas, e as três testadas:
+       · a glosa mostrada é a do significado marcado **`context_match`** — `barrel` devolve
+         **"cano"**, não "barril", e o balão avisa "+1 outro significado no card";
+       · antes de responder pela palavra, testa se ela abre uma **expressão** que já é card:
+         passar o mouse em `tire` dentro de "tire of" devolve **"cansar-se de"** com o selo
+         *expressão* — e `tire` sozinho não devolve nada, em vez de chutar;
+       · o balão sempre oferece **"Ver com a Lexa"**, que não reimplementa nada: chama
+         `glossSelecionar()`, seleciona a palavra e deixa o popup normal do leitor abrir com
+         Explicar/Estudar/Ouvir/Imagens/Wikipédia. Um caminho só, que não diverge.
+     - **Lematizador** (`glossLemas`), sem o qual o recurso morre no primeiro parágrafo — o
+       texto traz "began" e o card é "begin". Tabela de irregulares (verbos, plurais,
+       comparativos) + regras de sufixo com consoante dobrada e -ies→y. Testado:
+       `began`→begin, `went`→go, `children`→child, `running`→run, `stopped`→stop.
+       **A regra de -ly ficou DE FORA de propósito**: "hardly" não é "hard", "barely" não é
+       "bare" — é a mesma família de erro do "barrel"→barril, significado trocado com cara de
+       acerto. E o modo `estrito` corta -er/-est, que derivam palavra nova ("teacher" não é
+       "teach").
+     - **UM componente para TODAS as telas** (leitor, Revisar, Assistente). Se cada uma tivesse
+       a sua cópia, o mesmo defeito seria consertado três vezes — foi exatamente o que
+       aconteceu com as regras lexicais até a 80ª rodada.
+     - **No celular, nenhum gesto novo.** O leitor já tem três (borda vira página, arrasto vira
+       página, toque longo seleciona); um quarto quebraria o virar-página. A glosa entra no
+       **topo do popup que o toque longo já abre**, via `glossLinhaHTML()`. Hover só entra em
+       `(hover:hover) and (pointer:fine)`.
+     - **Invalidação do índice** — o pior bug possível aqui seria mostrar para sempre uma
+       tradução velha, e em silêncio, porque o card na tela já estaria certo. `saveWords()` e
+       `markKnownWord()` matam o índice; há ainda rede de segurança pelo tamanho de `words`
+       (importação em lote/snapshot da nuvem que troquem o array sem avisar). Testado nos 4
+       caminhos: corrigir card, apagar card, marcar conhecida, e o `saveWords` da nuvem.
+     - **⚠️ Armadilha de ambiente encontrada no teste, e que virou correção real**: o
+       estrangulamento era por `requestAnimationFrame`, que **é suspenso em aba de fundo** — uma
+       chamada pendente na troca de aba nunca devolve e a trava ficaria presa, matando o hover
+       em silêncio. Trocado por carimbo de tempo (40 ms), que não tem esse estado. Alinhar com o
+       quadro não servia para nada aqui: quem manda no ritmo é a mão.
+     - **De graça (`isKnownWord`)**: a regra de sufixo dele nunca enxergou **verbo irregular**,
+       que é o vocabulário mais frequente do inglês — quem marcava "begin" como conhecida
+       continuava recebendo "began" para estudar, e "go" não cobria "went". Agora usa
+       `glossLemas(…, {estrito:true})`. ⚠️ **Efeito colateral consciente**: a cobertura por
+       capítulo no leitor vai SUBIR (mais formas reconhecidas). É correção, não regressão, mas
+       o número muda de um dia para o outro.
+     - `CACHE` → **v110**; `js/glossario.js` entrou no SHELL (não é lazy: três das telas que o
+       chamam carregam sob demanda).
 
 174. **CATÁLOGO DE IMAGENS REVISADO NA FONTE — o nível barato ficou mais novo E mais barato
      (2026-08-06)**. O Djemeson trouxe prints do catálogo do Google (abas Images, Audio e
@@ -4094,6 +4172,20 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
 
 ## 9. Pendências / a verificar
 
+- [ ] **GLOSSÁRIO CAMADA 1 — dicionário bilíngue embarcado** (a fase 2 do que começou na 82ª).
+      A camada 0 só cobre palavra que o aluno JÁ encontrou. Para palavra nova, o caminho
+      medido é dado local: **kaikki.org / Wiktextract** (o Wiktionary inglês em JSON, com as
+      traduções em português), recortado nos ~20–25 mil lemas mais frequentes, baixado uma vez
+      e guardado no **IndexedDB** (o app já usa, nos livros). ⚠️ **O tamanho ainda NÃO foi
+      medido** — "poucos MB comprimidos" é estimativa minha, e medir é o primeiro passo, não o
+      último. Só faz sentido depois de o Djemeson usar a camada 0 e dizer se hover ajuda ou
+      atrapalha a leitura.
+- [ ] **GLOSSÁRIO na legenda do vídeo** (`video-subs.js`). Leitor, Revisar e Assistente já
+      chamam `glossAtivar`; a legenda ficou de fora porque ela se re-renderiza a cada segundo e
+      precisa de um ponto de ligação estável — do contrário vira listener novo por quadro.
+- [ ] **Wiktionary como último recurso NO CLIQUE** (nunca no hover). Aquele ~1 s é inaceitável
+      passando o mouse e perfeitamente aceitável clicando: seria o "não achei no seu material"
+      para palavra que ainda não é card. Inglês→inglês, então é apoio, não tradução.
 - [ ] **CONFERIR O IMAGEN 4 EM 17/AGO/2026** — não é para adotar, é para não ser pego: se
       alguma parte do projeto passar a citar `imagen-4.0-*`, ela quebra nessa data. Hoje o
       projeto **não usa** nenhum Imagen (só a família Nano Banana), então é só vigilância.

@@ -4758,3 +4758,58 @@ body.ler-full .mobile-bottom-nav{display:none}
   line-height:1.55;font-style:normal;
 }
 .wc-context-pt:empty{display:none}
+
+/* ================================================================
+   GLOSSÁRIO — o balão do dicionário instantâneo (js/glossario.js)
+   Deliberadamente DISCRETO: aparece enquanto os olhos correm a linha,
+   então não pode competir com o texto. Fundo de superfície, sem cor
+   de acento, sombra curta — quem manda na tela continua sendo o livro.
+   ================================================================ */
+.gloss-balao{
+  position:fixed;z-index:500;max-width:min(340px,88vw);
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,.34);
+  padding:9px 11px;font-size:var(--fs-sm);color:var(--text);
+  /* o balão nunca rouba o cursor: ele nasce sob o mouse e um pointer
+     ativo aqui faria o pointermove do texto parar de disparar */
+  pointer-events:none;
+  animation:glossEntra .12s ease-out;
+}
+@keyframes glossEntra{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+.gloss-cab{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin-bottom:3px}
+.gloss-termo{font-size:var(--fs-sm);color:var(--text);font-weight:600}
+.gloss-sel,.gloss-tipo{
+  font-size:var(--fs-3xs);color:var(--text2);
+  background:rgba(128,128,128,.14);border-radius:20px;padding:1px 7px;
+}
+/* "expressão" é o aviso de que a unidade é maior que a palavra sob o
+   cursor (o caso "tire of") — merece o acento do tema, não o cinza */
+.gloss-sel{color:rgba(var(--primary-rgb),.95);background:rgba(var(--primary-rgb),.13)}
+.gloss-pt{font-size:var(--fs-base);line-height:1.4;color:var(--text)}
+.gloss-def{margin-top:4px;font-size:var(--fs-xs);color:var(--text2);line-height:1.45}
+.gloss-rodape{
+  margin-top:5px;font-size:var(--fs-3xs);color:var(--text2);
+  display:flex;align-items:center;gap:4px;line-height:1.35;
+}
+.gloss-vazio{
+  font-size:var(--fs-xs);color:var(--text2);
+  display:flex;align-items:center;gap:5px;
+}
+.gloss-lexa{
+  pointer-events:auto;margin-top:8px;width:100%;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  background:rgba(var(--primary-rgb),.12);color:rgba(var(--primary-rgb),.98);
+  border:1px solid rgba(var(--primary-rgb),.3);border-radius:var(--radius-sm);
+  padding:6px 10px;font-size:var(--fs-xs);cursor:pointer;
+}
+.gloss-lexa:hover{background:rgba(var(--primary-rgb),.2)}
+
+/* Dentro de um painel que já existe (o caminho do celular, sem gesto novo):
+   sem posição fixa, sem sombra — é só mais um bloco do painel. */
+.gloss-embutido{
+  margin:0 0 10px;padding:8px 10px;
+  background:rgba(128,128,128,.09);border-radius:var(--radius-sm);
+  border-left:2px solid rgba(var(--primary-rgb),.55);
+}
+.gloss-embutido .gloss-pt{font-size:var(--fs-sm)}

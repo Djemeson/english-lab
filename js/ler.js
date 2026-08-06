@@ -344,6 +344,19 @@ function renderLeitor() {
   vp.addEventListener('scroll', _lerAoRolar, { passive: true })
   vp.addEventListener('dblclick', _lerDuploClique)
   vp.addEventListener('mouseup', () => setTimeout(_lerAoSelecionar, 10))
+  // Glossário no hover: passar o mouse numa palavra que já virou card mostra a
+  // SUA glosa na hora. Só entra em ponteiro fino — no celular a mesma coisa
+  // aparece dentro do popup de seleção (nenhum gesto novo; ver _lerAoSelecionar).
+  if (typeof glossAtivar === 'function') {
+    glossAtivar(vp, {
+      // Não reimplementa Explicar: seleciona a palavra e deixa o popup normal
+      // abrir. Assim o botão da Lexa no balão entrega TUDO que a seleção
+      // entrega (Explicar, Estudar, Ouvir, Imagens, Wikipédia, Web).
+      aoExplicar: (alvo, pos) => {
+        if (typeof glossSelecionar === 'function' && glossSelecionar(pos)) _lerAoSelecionar()
+      }
+    })
+  }
   // Toque: arrastar para virar, tocar nas bordas para virar, segurar numa
   // palavra para selecionar (o popup vem pelo selectionchange, porque no
   // celular não existe mouseup depois do toque longo).
@@ -1021,9 +1034,27 @@ function _lerAoSelecionar() {
   // O botão diz o que VAI acontecer: palavra/expressão vira item de estudo;
   // trecho longo entra como frase, para a triagem quebrar depois.
   const ehFrase = txt.split(' ').filter(Boolean).length > LER_MAX_ALVO
+  // A GLOSA NO TOQUE. No celular não existe hover, e o leitor já tem três
+  // gestos (borda vira página, arrasto vira página, toque longo seleciona) —
+  // um quarto quebraria o virar-página. Então a espiada não ganha gesto: ela
+  // entra no topo do popup que o toque longo JÁ abre. No desktop ela também
+  // aparece, e não incomoda: quem chegou aqui soltou o mouse de propósito.
+  let glosaHTML = ''
+  if (typeof glossBuscar === 'function') {
+    const partes = txt.split(/\s+/).filter(Boolean)
+    if (partes.length <= 3) {
+      const achado = partes.length > 1
+        ? (glossBuscar(partes[0], partes[1]) || glossBuscar(txt))
+        : glossBuscar(txt)
+      if (achado && achado.pt) {
+        glosaHTML = `<div class="gloss-embutido">${glossLinhaHTML(achado, { curto: true })}</div>`
+      }
+    }
+  }
+
   const pop = document.createElement('div')
   pop.id = 'ler-pop'
-  pop.innerHTML = `
+  pop.innerHTML = glosaHTML + `
     <div class="ler-pop-linha">
       <b>"${esc(txt.length > 34 ? txt.slice(0, 34) + '…' : txt)}"</b>
       <button data-p="exp">Explicar</button>
