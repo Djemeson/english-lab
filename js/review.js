@@ -2,6 +2,25 @@
 // IA — DIRETO NO SITE (OpenAI) + FALLBACK N8N
 // ================================================================
 
+// A IA marca o equivalente da palavra em <b> nas traduções (é o padrão do
+// projeto nos exemplos), e a tradução da frase veio com ele também. Escapado
+// inteiro, o leitor via "<b>adiciona</b>" cru na tela. Aqui o texto é
+// escapado normalmente e SÓ o <b> volta a valer como marcação.
+function _ptComNegrito(txt) {
+  if (!txt) return ''
+  return esc(String(txt))
+    .replace(/&lt;b&gt;/gi, '<b>')
+    .replace(/&lt;\/b&gt;/gi, '</b>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')   // modelo barato às vezes usa markdown
+}
+
+// Booleano vindo de modelo barato em modo texto livre: aceita as formas que
+// eles realmente devolvem. `=== true` sozinho descartaria "true" (string).
+function _ehSim(v) {
+  if (v === true || v === 1) return true
+  return /^(true|sim|yes|1)$/i.test(String(v || '').trim())
+}
+
 function applyAiResult(w, result) {
   w.word = result.word || w.word
   // Campos de nível-palavra: preserva o que já existir (não apaga dado curado de uma
@@ -40,6 +59,13 @@ function applyAiResult(w, result) {
     variety:       m.variety       || 'general',
     register:      m.register      || 'neutral',
     level:         m.level         || '',
+    // Marca o significado que descreve uma FUNÇÃO gramatical (auxiliar
+    // enfático, marcador de infinitivo…) em vez de um sentido lexical. É o que
+    // impede o merge de preservação de trocar um pelo outro.
+    // Leitura TOLERANTE de propósito: com DeepSeek o JSON vem por texto livre
+    // (o `response_format` não é usado — ver ai.js), então booleano volta como
+    // `true`, `"true"`, `"sim"` ou `1` conforme o humor do modelo.
+    gramatical:    _ehSim(m.gramatical),
     examples:      Array.isArray(m.examples) && m.examples.length > 0
                      ? m.examples
                      : (m.example_en ? [{ en: m.example_en, pt: m.example_pt || '' }] : []),
@@ -64,11 +90,21 @@ function applyAiResult(w, result) {
   // a IA devolveu, exemplos inclusos (nada a preservar ali).
   const oldMeanings = Array.isArray(w.meanings) ? w.meanings : []
   const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
-  const curated = oldMeanings.filter(om => Array.isArray(om.examples) && om.examples.length > 0)
+  const curated = w._refazer ? [] : oldMeanings.filter(om => Array.isArray(om.examples) && om.examples.length > 0)
   const usedOld = new Set()
   w.meanings = freshMeanings.map(nm => {
     let match = curated.find(om => !usedOld.has(om.id) && norm(om.meaning_pt) === norm(nm.meaning_pt))
-    if (!match && nm.context_match) match = curated.find(om => !usedOld.has(om.id) && om.context_match)
+    // Casamento POR CONTEXTO (sem título igual) é o último recurso e vinha
+    // sendo cego: bastava os dois serem "o do contexto" para o significado
+    // antigo voltar por cima do novo. Foi ele que fez "Re-analisar" devolver
+    // "fazer, executar" para o `does` de "the boat ride DOES add time" mesmo
+    // depois de a IA acertar o auxiliar enfático — a correção era descartada
+    // pela própria preservação. Agora só vale entre significados da MESMA
+    // natureza: função gramatical não se funde com sentido lexical.
+    if (!match && nm.context_match) {
+      match = curated.find(om => !usedOld.has(om.id) && om.context_match &&
+        !!om.gramatical === !!nm.gramatical)
+    }
     if (!match) return nm
     usedOld.add(match.id)
     // --- Resolução de contradição entre sentidos ---
@@ -159,6 +195,22 @@ LANGUAGE CHECK:
 ${ctx ? `Context sentence: "${ctx}"` : ''}
 ${sourceBlock}
 
+GRAMMAR BEFORE DICTIONARY — check this FIRST, it outranks everything below:
+Look at what "${target}" is DOING in the context sentence. If it is working as a STRUCTURAL element and not as vocabulary — emphatic/interrogative/negative auxiliary (do/does/did), perfect auxiliary (have/has/had), modal, copula or progressive/passive "be", infinitive marker "to", complementizer "that", dummy "it/there" — then the FIRST meaning object MUST describe that GRAMMATICAL FUNCTION in Portuguese, and it gets "context_match": true. The lexical dictionary sense may still be returned AFTER it, with "context_match": false.
+WORKED EXAMPLE — "does" with context "The boat ride does add time to the trip":
+- WRONG (what a cheap model does): meaning_pt "fazer, executar", examples "She does the laundry every Saturday". That is the lexical verb "do" — it is NOT what "does" is doing in this sentence, and the learner ends up studying the wrong thing.
+- RIGHT: first meaning_pt "de fato, realmente (ênfase)", definition "auxiliar enfático: reforça que a ação ACONTECE mesmo", context_match true, and its 3 examples must all use the EMPHATIC auxiliary ("I do like it", "She did tell me", "He does know the answer"). Only after that may "fazer, executar" appear as a separate object with context_match false.
+Same test for every example: an example placed under the grammatical meaning must show the word in that FUNCTION, never in the lexical sense.
+
+DOMAIN CHECK — the other big cheap-model failure, check it right after the one above:
+Decide WHAT the thing IS in the context sentence, then pick the Portuguese word for THAT thing. Never translate by the most frequent dictionary equivalent.
+WORKED EXAMPLE — "tip of its barrel" in "a bayonet mounted on the tip of its barrel":
+- WRONG: "extremidade do barril", "ponta do barril" — "barril" is a container. A bayonet is mounted on a RIFLE, so "barrel" here is the gun barrel.
+- RIGHT: "ponta do cano" (do fuzil).
+- NEVER hedge between two domains ("usado em armas ou recipientes"). The context sentence already decided which one it is; commit to it.
+- SELF-CHECK before returning: if your own 3 examples describe one domain (firearms, sailing, cooking…) while your Portuguese uses a word from another domain, the translation is WRONG. Fix it, don't ship it.
+
+
 Rules for examples — CRITICAL, follow exactly:
 - Write EXACTLY 3 examples per meaning, in this FIXED order of tenses (so the learner sees the word morph):
   - #1 PRESENT (simple present)
@@ -195,13 +247,6 @@ WORKED EXAMPLE — "emasculating":
 - "que esvazia / enfraquece" (an emasculated bill, emasculating the regulations) fails Test 2 — it applies to laws and rules, not to a man's masculinity → SEPARATE object.
 - the literal veterinary sense "castrar (remover os testículos)" is another domain → SEPARATE object.
 So "emasculating" must return 2–3 meaning objects. Returning ONE object whose meaning_pt reads "desvirilizador, castrador, debilitante" is WRONG: "debilitante" is a different sense smuggled in as if it were a synonym.
-
-GRAMMAR BEFORE DICTIONARY — check this FIRST, it outranks everything below:
-Look at what "${target}" is DOING in the context sentence. If it is working as a STRUCTURAL element and not as vocabulary — emphatic/interrogative/negative auxiliary (do/does/did), perfect auxiliary (have/has/had), modal, copula or progressive/passive "be", infinitive marker "to", complementizer "that", dummy "it/there" — then the FIRST meaning object MUST describe that GRAMMATICAL FUNCTION in Portuguese, and it gets "context_match": true. The lexical dictionary sense may still be returned AFTER it, with "context_match": false.
-WORKED EXAMPLE — "does" with context "The boat ride does add time to the trip":
-- WRONG (what a cheap model does): meaning_pt "fazer, executar", examples "She does the laundry every Saturday". That is the lexical verb "do" — it is NOT what "does" is doing in this sentence, and the learner ends up studying the wrong thing.
-- RIGHT: first meaning_pt "de fato, realmente (ênfase)", definition "auxiliar enfático: reforça que a ação ACONTECE mesmo", context_match true, and its 3 examples must all use the EMPHATIC auxiliary ("I do like it", "She did tell me", "He does know the answer"). Only after that may "fazer, executar" appear as a separate object with context_match false.
-Same test for every example: an example placed under the grammatical meaning must show the word in that FUNCTION, never in the lexical sense.
 
 Rules for meanings — CRITICAL:
 - The context sentence is ONLY used to identify the word correctly and to mark which sense appeared there. It does NOT limit which meanings you return.
@@ -249,6 +294,7 @@ Return ONLY this JSON (no markdown, no explanation):
       "variety": "${promptVarietyEnum(wordLang(w))}",
       "register": "neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar",
       "level": "A2|B1|B2|C1|C2",
+      "gramatical": "true if this meaning is a GRAMMATICAL FUNCTION (see GRAMMAR BEFORE DICTIONARY above), false if it is a lexical sense",
       "context_match": true,
       "synonyms": ["syn1", "syn2", "syn3"],
       "antonyms": ["ant1", "ant2"],
@@ -285,6 +331,23 @@ Return ONLY this JSON (no markdown, no explanation):
     if (activeWordId === wordId) renderWordCard(wordId)
     return false
   }
+}
+
+// Saída de emergência para quando a IA errou o card inteiro.
+// "Re-analisar" PRESERVA o que já tem exemplos (regra pedida em 2026-07-05) —
+// ótimo para completar dados, péssimo quando o que está lá é justamente o
+// erro: a correção da IA era descartada pela própria preservação. Aqui o
+// aluno diz explicitamente "joga fora e faz de novo".
+async function refazerAnalise(wordId) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const n = (w.meanings || []).length
+  if (!(await confirmModal({
+    title: 'Refazer a análise do zero', icon: 'refresh', confirmText: 'Refazer',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Descarta ${n} significado${n !== 1 ? 's' : ''} e exemplos deste item e pede uma análise nova.
+      Use quando a IA <b>errou o sentido</b> — o "Re-analisar" normal preserva o que já existe e devolveria o mesmo erro.
+      Os cards já salvos no estudo <b>não são afetados</b>.</p>` }))) return
+  w._refazer = true
+  try { await analyzeWord(wordId) } finally { delete w._refazer }
 }
 
 async function analyzeWord(wordId) {
@@ -498,7 +561,8 @@ function renderWcToolbarLeft() {
       const totalCards = selM.reduce((sum, m) => sum + ((m.examples?.length) || 1), 0)
       leftEl.innerHTML = `
         <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')" data-tip="Cria os cards e envia para a fila de estudo (SRS)">${ic('book')}Salvar ${totalCards} card${totalCards!==1?'s':''} para estudo</button>
-        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Roda a IA novamente para esta palavra">${ic('refresh')}Re-analisar</button>`
+        <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Roda a IA de novo PRESERVANDO o que já tem exemplos — completa o que falta">${ic('refresh')}Re-analisar</button>
+        <button class="btn btn-ghost btn-sm" onclick="refazerAnalise('${w.id}')" data-tip="A análise está errada? Descarta os significados atuais e refaz do zero">${ic('undo')}Refazer do zero</button>`
     } else if (w.status === 'pending_ai') {
       leftEl.innerHTML = `
         <button class="btn btn-primary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Analisa esta palavra com IA: significados, exemplos, nível e registro">${ic('sparkles')}Analisar com IA</button>`
@@ -725,7 +789,7 @@ function renderWordCard(wordId) {
         <span class="wc-source">${srcIcon(w.source_type)} ${esc(w.source_title || w.source_type)}</span>
       </div>
       ${ctxHtml ? `<div class="wc-context">"${ctxHtml}"</div>` : ''}
-      ${ctxHtml ? `<div class="wc-context-pt" id="wc-ctx-pt-${w.id}">${w.context_pt ? esc(w.context_pt) : ''}</div>` : ''}
+      ${ctxHtml ? `<div class="wc-context-pt" id="wc-ctx-pt-${w.id}">${_ptComNegrito(w.context_pt)}</div>` : ''}
     </div>
     ${bodyHtml}
   </div>`
@@ -936,6 +1000,7 @@ Rules:
 - SKIP A1 words the learner certainly knows ("began", "day", "house", "good") UNLESS they carry a non-obvious meaning right here.
 - "gloss" is the meaning HERE, not a dictionary list.
 - GLOSS IN CITATION FORM: verbs in the infinitive, nouns in the singular. "began" → "começar", NEVER "começamos"; "tire of" → "cansar-se de", NEVER "cansamos". The gloss names the unit; it does not re-translate the sentence.
+- DOMAIN CHECK: decide WHAT the thing IS in this sentence, then pick the Portuguese word for THAT thing — never the most frequent dictionary equivalent. "the tip of its barrel" with a bayonet mounted on it is a RIFLE: "ponta do cano", never "ponta do barril" (barril = container). Never hedge between two domains.
 - SUBSTITUTION TEST — run it before returning every gloss: put the gloss back into the sentence in Portuguese. If the sentence stops saying what the ${L.nameEn} says, the gloss is wrong. "we began to tire of the mud" with "perder o interesse em" gives "começamos a perder o interesse na lama" — that is NOT what the sentence says; the right gloss is "cansar-se de" ("começamos a nos cansar da lama"). A gloss that is merely plausible for the unit in a dictionary FAILS this test.
 - LITERAL-TRANSLATION TRAP — avoid it explicitly: FIRST work out what the unit DOES in this scene, THEN write the gloss for that function. "We'll get you in for that" said at a hotel desk → gloss "a gente te encaixa (na agenda)", NEVER "colocar você dentro". If a gloss reads like word-by-word substitution, redo it before returning.
 - "nivel" is the CEFR difficulty of that unit for a learner.

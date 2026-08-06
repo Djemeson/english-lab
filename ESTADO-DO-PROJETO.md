@@ -1021,6 +1021,47 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        reais precisam ser refeitos no app com o DeepSeek** — ver pendências.
      - `CACHE` do `sw.js` → **v100**.
 
+164. **"Mandei reanalisar e veio a mesma coisa" — o culpado NÃO era o prompt**. O Djemeson
+     refez a análise do `does` e o card voltou igual. A investigação achou o verdadeiro
+     bloqueio, em `applyAiResult`:
+     ```js
+     if (!match && nm.context_match) match = curated.find(om => om.context_match)
+     ```
+     O merge de preservação (regra pedida em 2026-07-05: "não sobrescrever o que já tem
+     exemplos") casava significados **só por os dois serem "o do contexto"** — sem olhar se
+     falavam da mesma coisa. Ou seja: a IA podia ter ACERTADO o auxiliar enfático e a
+     preservação colava "fazer, executar" por cima. **A correção era descartada pelo próprio
+     mecanismo que deveria proteger a curadoria.** Três consertos:
+     - O casamento por contexto agora exige **mesma natureza**: significado de função
+       gramatical não se funde com sentido lexical (campo novo `gramatical` em cada meaning).
+     - **"Refazer do zero"** ao lado de "Re-analisar": descarta os significados atuais e pede
+       análise nova, com confirmação. É a saída para "a IA errou o card inteiro" — antes o único
+       botão preservava justamente o erro. Os dois botões ganharam `data-tip` explicando a
+       diferença, que não era óbvia.
+     - O bloco **GRAMMAR BEFORE DICTIONARY** subiu para logo depois da frase de contexto: estava
+       enterrado no meio de um prompt enorme, e modelo barato pesa o início e o schema.
+     - **`gramatical` é lido com tolerância** (`true`, `"true"`, `1`, `"sim"`): pergunta do
+       Djemeson — "tem certeza que o DeepSeek lê esses JSON?". Lê: o que ele não suporta é o
+       PARÂMETRO `response_format: json_object`, e `ai.js` já nem tenta usá-lo com DeepSeek
+       (conserto da 49ª rodada) — o JSON vem por texto livre com parser tolerante. Justamente
+       por isso booleano pode voltar como string, e `=== true` descartaria a resposta certa.
+       Pela mesma razão a descrição do campo no schema foi encurtada: descrição longa dentro do
+       JSON é convite a o modelo devolvê-la como valor.
+
+165. **"tip of its barrel" traduzido como "barril"** (mesmo lote): em "a bayonet mounted on the
+     tip of its barrel", `barrel` é o **cano do fuzil**. O card veio "extremidade do barril" —
+     e os próprios exemplos que a IA gerou falavam de atirador e armas de fogo. Entrou o bloco
+     **DOMAIN CHECK**, logo abaixo do GRAMMAR: decida o QUE a coisa é na frase e escolha a
+     palavra portuguesa para AQUILO, nunca o equivalente mais frequente do dicionário; proibido
+     hedge entre dois domínios ("usado em armas ou recipientes"); e uma auto-checagem que casa
+     exatamente com o erro observado — "se os seus 3 exemplos descrevem um domínio e o seu
+     português usa palavra de outro, a tradução está errada". A mesma regra foi para a triagem.
+
+166. **`<b>` cru na tela** (bug introduzido na 163ª): a tradução da frase vinha com o negrito da
+     IA e era escapada inteira, então o leitor via `<b>adiciona</b>` literal. Agora o texto é
+     escapado e SÓ o `<b>` volta a valer como marcação (mais `**markdown**`, que modelo barato
+     usa às vezes). `<script>` continua escapado — conferido no teste. `CACHE` → **v101**.
+
 157. **Busca de imagem no menu de seleção** (pedido junto): quarto botão da fileira de baixo,
      abrindo a aba de imagens do Google no idioma do livro (`tbm=isch&hl=…`). É o complemento
      natural da Wikipédia: para objeto, planta, roupa, arma ou bicho, a foto ensina o que a
@@ -3789,6 +3830,10 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
       ênfase — e não "fazer, executar" com "she does the laundry".
       Se o DeepSeek ainda escorregar, o próximo passo é o mesmo da 49ª rodada: rede de segurança
       no código (validar a resposta e repetir na OpenAI só nesse item).
+      ⚠️ **Use "Refazer do zero", não "Re-analisar"** — o "Re-analisar" preserva o que já tem
+      exemplos, então devolveria o mesmo erro (foi exatamente o que aconteceu na 164ª rodada).
+      Terceiro caso a refazer: `"a bayonet mounted on the tip of its barrel"` → o significado
+      tem de ser **"ponta do cano"** (fuzil), nunca "barril".
 
 ### LER — buracos conhecidos (79ª rodada)
 
