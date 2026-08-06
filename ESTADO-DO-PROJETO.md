@@ -1062,6 +1062,34 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      escapado e SÓ o `<b>` volta a valer como marcação (mais `**markdown**`, que modelo barato
      usa às vezes). `<script>` continua escapado — conferido no teste. `CACHE` → **v101**.
 
+168. **Auditoria do catálogo de preços nas fontes oficiais (2026-08-05)**. Pedido: "cheque na
+     fonte original e atualize os números se for o caso". Conferidos os 14 modelos um a um em
+     `developers.openai.com/api/docs/pricing`, `api-docs.deepseek.com`,
+     `ai.google.dev/gemini-api/docs/pricing` e `console.groq.com/docs/models`.
+     - **13 de 14 estavam corretos.** Um errado: `openai/gpt-oss-120b` (Groq) estava com saída
+       **0,75** e o correto é **0,60**.
+     - **`gpt-5-nano` (0,05/0,40) entrou no catálogo** e vale registrar por quê: ele custa
+       **R$ 0,0040 por card analisado contra R$ 0,0044 do `deepseek-v4-flash`** — ou seja, o
+       modelo mais barato da OpenAI é HOJE mais barato que o DeepSeek para a carga deste app.
+       O argumento de custo a favor do DeepSeek **deixou de existir**; a escolha passou a ser só
+       de qualidade.
+     - **ARMADILHA evitada na hora**: `settings.js` usa `P.modelos[0].id` como padrão de quem
+       nunca escolheu modelo. Colocar o nano no topo da lista trocaria o padrão de todo mundo
+       por um modelo pequeno — justamente o que solta regra em prompt longo, que é a batalha das
+       rodadas 163–167. Ele entrou em SEGUNDO, com a nota "lote sim, análise não", e o comentário
+       no código agora avisa que a ordem importa.
+     - **Não adotados, mas anotados** (existem e são mais caros que os equivalentes já no
+       catálogo): Gemini 3.x inteiro (3.1-flash-lite 0,25/1,50; 3.5-flash 1,50/9,00;
+       3.6-flash 1,50/7,50 — a linha 3 é MAIS cara que a 2.5), `gpt-4.1-nano` (0,10/0,40,
+       pior custo que o gpt-5-nano), `gpt-5.6-luna` e `gpt-5.4-nano` (0,20/1,20 e 0,20/1,25 —
+       posteriores ao meu conhecimento, sem base para recomendar), `o3-mini`/`o4-mini`
+       (1,10/4,40, modelos de raciocínio, caros para glosa).
+     - Confirmado também o preço dinâmico do DeepSeek (**2× no horário de pico da China**,
+       9h–12h e 14h–18h de Pequim) — o comentário já existia no código e continua válido.
+     - Custo real de UM card analisado (~2.800 tokens de entrada, ~1.500 de saída, a US$ 5,40):
+       llama-3.1-8b R$ 0,0014 · gpt-5-nano R$ 0,0040 · deepseek-v4-flash R$ 0,0044 ·
+       gemini-2.5-flash-lite R$ 0,0048 · gpt-4o-mini R$ 0,0071 · gpt-4.1-mini R$ 0,0190.
+
 167. **AS REGRAS LEXICAIS VIRARAM UMA FONTE ÚNICA — `promptRegrasLexicais()` (80ª rodada)**.
      Pedido do Djemeson: "faça uma varredura em todo o projeto e crie todas as normas para que
      o DeepSeek não cometa nenhum erro nunca mais". Honestidade primeiro: **"nunca mais" não

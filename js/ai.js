@@ -212,9 +212,17 @@ const AI_PROVIDERS = {
     keyCfg: 'openaiKey',
     placeholder: 'sk-proj-...',
     // `preco`: US$ por 1 MILHÃO de tokens (entrada/saída), preço de tabela do
-    // fornecedor (conferido em ago/2026). É daqui que sai a estimativa em reais.
+    // fornecedor. É daqui que sai a estimativa em reais.
+    // CONFERIDO nas páginas oficiais em 2026-08-05 (developers.openai.com/api/docs/pricing,
+    // api-docs.deepseek.com, ai.google.dev/gemini-api/docs/pricing, console.groq.com/docs/models).
+    // ORDEM IMPORTA: o primeiro da lista é o padrão de quem nunca escolheu
+    // (settings.js → `P.modelos[0].id`). Por isso o gpt-4o-mini continua no
+    // topo e o gpt-5-nano vem depois: nano é o mais barato de todos, mas
+    // modelo pequeno é justamente o que solta regra em prompt longo — e o
+    // prompt de análise deste app tem centenas de linhas.
     modelos: [
       { id: 'gpt-4o-mini',  tier: 'baixo', nota: 'rápido e barato (padrão do app)', preco: { in: 0.15, out: 0.60 } },
+      { id: 'gpt-5-nano',   tier: 'baixo', nota: 'o mais barato daqui — lote sim, análise não', preco: { in: 0.05, out: 0.40 } },
       { id: 'gpt-4.1-mini', tier: 'baixo', nota: 'melhor texto, preço próximo',     preco: { in: 0.40, out: 1.60 } },
       { id: 'gpt-4o',       tier: 'médio', nota: 'equilibrado',                     preco: { in: 2.50, out: 10.00 } },
       { id: 'gpt-5-mini',   tier: 'médio', nota: 'nova geração',                    preco: { in: 0.25, out: 2.00 } },
@@ -257,7 +265,7 @@ const AI_PROVIDERS = {
     modelos: [
       { id: 'llama-3.1-8b-instant',    tier: 'baixo', nota: 'muito rápido, quase grátis',    preco: { in: 0.05, out: 0.08 } },
       { id: 'llama-3.3-70b-versatile', tier: 'baixo', nota: 'mais qualidade, ainda barato',  preco: { in: 0.59, out: 0.79 } },
-      { id: 'openai/gpt-oss-120b',     tier: 'médio', nota: 'modelo aberto grande',          preco: { in: 0.15, out: 0.75 } },
+      { id: 'openai/gpt-oss-120b',     tier: 'médio', nota: 'modelo aberto grande',          preco: { in: 0.15, out: 0.60 } },
     ]
   }
 }
