@@ -220,13 +220,24 @@ const AI_PROVIDERS = {
     // topo e o gpt-5-nano vem depois: nano é o mais barato de todos, mas
     // modelo pequeno é justamente o que solta regra em prompt longo — e o
     // prompt de análise deste app tem centenas de linhas.
+    // GPT-5.6 (lançada 2026-07-09) é uma família de TRÊS níveis com nome
+    // próprio: Sol (topo), Terra (equilibrado) e Luna (rápido/barato).
+    // ⚠️ A ressalva que importa para este app está no MRCR (recall em contexto
+    // longo): Sol 91,5% · Terra 89,6% · **Luna 41,3%**. O prompt de análise
+    // daqui tem ~3.000 tokens — não é "contexto longo" no sentido do teste —,
+    // mas é longo em REGRAS, e é justamente soltar regra que dói. Por isso a
+    // Luna entra como candidata a testar, não como padrão.
+    // Sol ficou de fora: R$ 0,32 por card analisado é desproporcional para
+    // glosa de vocabulário.
     modelos: [
-      { id: 'gpt-4o-mini',  tier: 'baixo', nota: 'rápido e barato (padrão do app)', preco: { in: 0.15, out: 0.60 } },
-      { id: 'gpt-5-nano',   tier: 'baixo', nota: 'o mais barato daqui — lote sim, análise não', preco: { in: 0.05, out: 0.40 } },
-      { id: 'gpt-4.1-mini', tier: 'baixo', nota: 'melhor texto, preço próximo',     preco: { in: 0.40, out: 1.60 } },
-      { id: 'gpt-4o',       tier: 'médio', nota: 'equilibrado',                     preco: { in: 2.50, out: 10.00 } },
-      { id: 'gpt-5-mini',   tier: 'médio', nota: 'nova geração',                    preco: { in: 0.25, out: 2.00 } },
-      { id: 'gpt-5',        tier: 'alto',  nota: 'mais capaz',                      preco: { in: 1.25, out: 10.00 } },
+      { id: 'gpt-4o-mini',   tier: 'baixo', nota: 'rápido e barato (padrão do app)',          preco: { in: 0.15, out: 0.60 } },
+      { id: 'gpt-5-nano',    tier: 'baixo', nota: 'o mais barato daqui — lote sim, análise não', preco: { in: 0.05, out: 0.40 } },
+      { id: 'gpt-5.6-luna',  tier: 'baixo', nota: 'GPT-5.6 Luna — geração atual pelo preço de um mini', preco: { in: 0.20, out: 1.20 } },
+      { id: 'gpt-4.1-mini',  tier: 'baixo', nota: 'melhor texto, preço próximo',              preco: { in: 0.40, out: 1.60 } },
+      { id: 'gpt-4o',        tier: 'médio', nota: 'equilibrado (geração 2024)',               preco: { in: 2.50, out: 10.00 } },
+      { id: 'gpt-5-mini',    tier: 'médio', nota: 'nova geração',                             preco: { in: 0.25, out: 2.00 } },
+      { id: 'gpt-5.6-terra', tier: 'alto',  nota: 'GPT-5.6 Terra — quase o topo por 1/2,5 do preço', preco: { in: 2.00, out: 12.00 } },
+      { id: 'gpt-5',         tier: 'alto',  nota: 'mais capaz',                               preco: { in: 1.25, out: 10.00 } },
     ]
   },
   gemini: {

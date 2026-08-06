@@ -1062,6 +1062,30 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      escapado e SÓ o `<b>` volta a valer como marcação (mais `**markdown**`, que modelo barato
      usa às vezes). `<script>` continua escapado — conferido no teste. `CACHE` → **v101**.
 
+169. **GPT-5.6 (Sol / Terra / Luna) no catálogo — e o número que decide (2026-08-06)**.
+     A OpenAI lançou em 2026-07-09 uma família de TRÊS níveis com nome próprio: **Sol** (topo),
+     **Terra** (equilibrado) e **Luna** (rápido/barato). Preços de tabela conferidos na página
+     oficial: Sol 5,00/30,00 · Terra 2,00/12,00 · Luna 0,20/1,20 (cache: 0,50 · 0,20 · **0,02**).
+     - **O dado que manda para ESTE app** está no MRCR (recall em contexto longo):
+       Sol 91,5% · Terra 89,6% · **Luna 41,3%**. Nos outros testes a Luna praticamente empata
+       com a Terra (Agents' Last Exam 50,3 vs 50,4), mas despenca nesse. O prompt de análise
+       daqui tem ~3.000 tokens — não é "contexto longo" no sentido do teste —, porém é longo em
+       REGRAS, e soltar regra é exatamente a nossa dor das rodadas 163–167. Por isso a Luna
+       entrou como **candidata a testar, não como padrão**.
+     - **O argumento a favor da Luna**: o padrão do app é `gpt-4o-mini-2024-07-18` — modelo de
+       **julho de 2024**, dois anos atrás. A Luna é geração atual por R$ 0,0127/card contra
+       R$ 0,0071 do 4o-mini (1,8×) — ou R$ 1,27 contra R$ 0,71 em 100 cards/mês. E o desconto de
+       cache dela é 10× (0,20→0,02) contra 2× do 4o-mini, o que a favorece ainda mais se o
+       prompt for reestruturado para cachear (ver pendência).
+     - **Terra** entrou como tier alto (R$ 0,127/card): "quase o topo por 1/2,5 do preço", para
+       quando a qualidade do card importar mais que o custo.
+     - **Sol ficou de fora**: R$ 0,32 por card analisado é desproporcional para glosa de
+       vocabulário. Se um dia fizer sentido, é só acrescentar.
+     - **Compatibilidade conferida antes de adicionar**: `_aiTokenParam` já manda
+       `max_completion_tokens` para tudo que casa com `/^(gpt-5|o\d)/` — `gpt-5.6-luna` e
+       `gpt-5.6-terra` entram sem ajuste nenhum.
+     - Catálogo agora tem **16 modelos**; a ordem continua importando (primeiro = padrão).
+
 168. **Auditoria do catálogo de preços nas fontes oficiais (2026-08-05)**. Pedido: "cheque na
      fonte original e atualize os números se for o caso". Conferidos os 14 modelos um a um em
      `developers.openai.com/api/docs/pricing`, `api-docs.deepseek.com`,
