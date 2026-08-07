@@ -478,21 +478,33 @@ function handleEditWordKey(e, wordId) {
 let selectedWordIds = new Set()
 let sidebarStatusFilter = 'all'
 
+// O subtítulo conta a fila, então TODO caminho que tira item dela precisa
+// chamá-lo. Ficava só dentro do renderReview(), e quem saía pelo "pular" (ou,
+// agora, pelo "enviar") deixava para trás um cabeçalho dizendo um número que
+// já não era verdade.
+function _prepAtualizarCabecalho() {
+  const sub = el('review-header-sub')
+  if (!sub) return
+  const fila = words.filter(w => ['pending_ai','pending_review'].includes(w.status))
+  const pending = fila.filter(w => w.status === 'pending_ai').length
+  const ready   = fila.filter(w => w.status === 'pending_review').length
+  const parts = []
+  if (pending) parts.push(`${pending} pendente${pending!==1?'s':''} de IA`)
+  if (ready)   parts.push(`${ready} pronta${ready!==1?'s':''} para enviar`)
+  sub.textContent = parts.join(' · ') || 'Tudo em dia!'
+}
+
 function renderReview() {
   const reviewable = words.filter(w => ['pending_ai','pending_review'].includes(w.status))
   el('review-empty').classList.toggle('hidden', reviewable.length > 0)
   el('review-content').classList.toggle('hidden', reviewable.length === 0)
+  _prepAtualizarCabecalho()
   if (!reviewable.length) return
-  // Update header subtitle
-  const pending = reviewable.filter(w => w.status === 'pending_ai').length
-  const ready   = reviewable.filter(w => w.status === 'pending_review').length
-  const parts = []
-  if (pending) parts.push(`${pending} pendente${pending!==1?'s':''} de IA`)
-  if (ready)   parts.push(`${ready} pronta${ready!==1?'s':''} para enviar`)
-  const sub = el('review-header-sub')
-  if (sub) sub.textContent = parts.join(' · ') || 'Tudo em dia!'
   renderSidebar()
-  if (!activeWordId || !words.find(w => w.id === activeWordId)) {
+  // O item ativo tem de continuar SENDO desta fila. Antes bastava existir em
+  // `words`, e com o envio isso passou a deixar na tela o card de um item que
+  // já saiu daqui — inclusive quando quem chamou foi o snapshot da nuvem.
+  if (!activeWordId || !reviewable.some(w => w.id === activeWordId)) {
     activeWordId = reviewable[0].id
   }
   renderWordCard(activeWordId)
@@ -573,20 +585,19 @@ function renderWcToolbarLeft() {
     leftEl.innerHTML = `
       <span style="font-size:var(--fs-sm);font-weight:600;color:var(--primary);white-space:nowrap">${selCount} selecionada${selCount!==1?'s':''}</span>
       <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()" data-tip="Gera significados, exemplos e nível com IA para as selecionadas">${ic('sparkles')}Analisar</button>
-      <button class="btn btn-srs btn-sm" onclick="abrirNoEstudar()" data-tip="O material já está lá, reunido por obra e capítulo. É lendo e marcando 'Estudei' que o item vai para a Revisão.">${ic('book')}Ver em Estudar</button>
-      <button class="btn btn-ghost btn-sm" onclick="saveSelectedToSrs()" data-tip="Atalho: pula a leitura do dossiê e joga direto na repetição espaçada">${ic('arrowRight')}Pular para a Revisão</button>
+      <button class="btn btn-srs btn-sm" onclick="enviarSelecionadasParaEstudo()" data-tip="Tira daqui e põe no dossiê da obra, em Estudar. É lá que você lê o material — e marcar 'Estudei' é o que manda o item para a Revisão.">${ic('book')}Enviar para o Estudo</button>
+      <button class="btn btn-ghost btn-sm wct-atalho" onclick="saveSelectedToSrs()" data-tip="Atalho: pula a leitura do dossiê e joga direto na repetição espaçada">${ic('arrowRight')}Pular para a Revisão</button>
       <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()" data-tip="Remove as palavras selecionadas da fila">${ic('trash')}Excluir</button>`
   } else if (w) {
     if (w.status === 'pending_review' && w.meanings?.length > 0) {
       const selM = w.meanings.filter(m => m.selected !== false)
       const totalCards = selM.reduce((sum, m) => sum + ((m.examples?.length) || 1), 0)
-      // A AÇÃO PRINCIPAL DAQUI É O CAMINHO, NÃO O ATALHO. O material deste item
-      // JÁ está em Estudar — ele entra no dossiê no instante em que ganha
-      // significado, não é preciso "mandar". Anunciar a Revisão como ação
-      // principal ensinava o caminho errado: pulava a leitura, que é o motivo
-      // de a seção Estudar existir. O atalho continua ali, como atalho.
+      // A AÇÃO PRINCIPAL DAQUI É PASSAR A FILA ADIANTE. O item preparado SAI
+      // do Preparar: some da lista e passa a viver no dossiê da obra, em
+      // Estudar. Anunciar a Revisão aqui ensinava a pular a leitura, que é o
+      // motivo de a seção Estudar existir. O atalho continua ali, como atalho.
       leftEl.innerHTML = `
-        <button class="btn btn-srs btn-sm" onclick="abrirNoEstudar('${w.id}')" data-tip="Abre o dossiê desta obra neste item. É lendo e marcando 'Estudei' que ele vai para a Revisão.">${ic('book')}Ver em Estudar</button>
+        <button class="btn btn-srs btn-sm" onclick="enviarParaEstudo('${w.id}')" data-tip="Tira daqui e põe no dossiê desta obra, em Estudar. É lá que você lê o material — e marcar 'Estudei' é o que manda o item para a Revisão.">${ic('book')}Enviar para o Estudo</button>
         <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Roda a IA de novo PRESERVANDO o que já tem exemplos — completa o que falta">${ic('refresh')}Re-analisar</button>
         <button class="btn btn-ghost btn-sm" onclick="refazerAnalise('${w.id}')" data-tip="A análise está errada? Descarta os significados atuais e refaz do zero">${ic('undo')}Refazer do zero</button>
         <button class="btn btn-ghost btn-sm wct-atalho" onclick="saveToSrs('${w.id}')" data-tip="Atalho: pula a leitura do dossiê e joga os ${totalCards} card${totalCards!==1?'s':''} direto na repetição espaçada">${ic('arrowRight')}Pular para a Revisão</button>`
@@ -906,11 +917,86 @@ function capFirst(s) {
   return s.replace(/^(<b>)?([a-záàãâéêíóôõúüç])/i, (_, tag, ch) => (tag || '') + ch.toUpperCase())
 }
 
+// ================================================================
+// ENVIAR PARA O ESTUDO — o item SAI daqui
+// ================================================================
+// A fila do Preparar é uma fila: ela tem de esvaziar. Enquanto o item
+// preparado continuava aqui E aparecia no dossiê, as duas telas mostravam a
+// mesma coisa e nenhuma das duas dizia onde ele estava de verdade — foi o que
+// o Djemeson viu na tela ("o material precisa sair daqui e viver só no
+// Estudar"). Agora o caminho é uma passagem de estado, não uma navegação:
+//   pending_ai → pending_review → IN_STUDY (dossiê) → in_srs (repetição)
+// Volta existe (`voltarParaPreparar`): análise errada não pode virar beco.
+function _prepPodeEnviar(w) {
+  return !!(w && w.status === 'pending_review' &&
+    Array.isArray(w.meanings) && w.meanings.some(m => m && m.selected !== false && m.meaning_pt))
+}
+
+function _prepMarcarEnviado(w) {
+  w.status = 'in_study'
+  w.enviadoEm = Date.now()
+  w.updated_at = new Date().toISOString()   // bump p/ vencer o merge do fbPull
+}
+
+function enviarParaEstudo(id) {
+  const w = words.find(x => x.id === id)
+  if (!w) return
+  if (!_prepPodeEnviar(w)) {
+    toast('Selecione ao menos um significado com material antes de enviar', 'warning')
+    return
+  }
+  _prepMarcarEnviado(w)
+  saveWords()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  toast(`"${w.word || '(frase)'}" foi para o Estudo`, 'success')
+  // Avança para o próximo, como o "pular" já fazia: quem envia está passando
+  // a fila, e voltar para a tela vazia a cada envio seria atrito puro.
+  renderSidebar()
+  _prepAtualizarCabecalho()
+  const next = words.find(x => ['pending_ai','pending_review'].includes(x.status) && x.id !== id)
+  if (next) { activeWordId = next.id; renderWordCard(next.id) }
+  else { activeWordId = null; renderReview() }
+  renderDashboard()
+  if (typeof updateDossieBadge === 'function') updateDossieBadge()
+}
+
+function enviarSelecionadasParaEstudo() {
+  const alvos = [...selectedWordIds].map(id => words.find(x => x.id === id)).filter(_prepPodeEnviar)
+  if (!alvos.length) { toast('Nenhuma das selecionadas está pronta para enviar', 'warning'); return }
+  alvos.forEach(_prepMarcarEnviado)
+  saveWords()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  selectedWordIds.clear()
+  activeWordId = null
+  toast(`${alvos.length} ${alvos.length !== 1 ? 'itens foram' : 'item foi'} para o Estudo`, 'success')
+  renderReview(); renderDashboard()
+  if (typeof updateDossieBadge === 'function') updateDossieBadge()
+}
+
+// A volta. Chamada pelo dossiê (js/dossie.js, lazy) quando a análise saiu
+// errada: sem ela, enviar seria uma porta de mão única e o item ficaria preso
+// com material ruim — o mesmo beco que o "Não lembro" resolveu no glossário.
+function voltarParaPreparar(id) {
+  const w = words.find(x => x.id === id)
+  if (!w) return
+  w.status = 'pending_review'
+  delete w.enviadoEm
+  w.updated_at = new Date().toISOString()
+  saveWords()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  if (typeof updateDossieBadge === 'function') updateDossieBadge()
+  activeWordId = w.id
+  showSection('preparar')
+  setTimeout(() => { try { selectWord(w.id) } catch (e) {} }, 80)
+  toast(`"${w.word || '(frase)'}" voltou para o Preparar`, 'info')
+}
+
 function skipWord(id) {
   const w = words.find(x => x.id === id); if (!w) return
   w.status = 'skipped'; w.updated_at = new Date().toISOString(); saveWords()
   toast(`"${w.word || '(frase)'}" pulada`, 'info')
   renderSidebar()
+  _prepAtualizarCabecalho()
   const next = words.find(x => ['pending_ai','pending_review'].includes(x.status) && x.id !== id)
   if (next) { activeWordId = next.id; renderWordCard(next.id) }
   else renderReview()

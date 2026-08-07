@@ -29,8 +29,10 @@
 > O portão virou uma verdade só: quem marca `estudadoEm` é o `saveToSrs`, então o atalho
 > "Mandar para a Revisão" do Preparar não deixa mais o dossiê mentir. Itens antigos
 > (`in_srs` sem `estudadoEm`) são costurados no primeiro render. A seção também nasceu com
-> **busca e filtro** (Todos / Com pendência / Concluídos). Ainda na mesma rodada, o botão
-> principal do Preparar deixou de ser o atalho e virou **"Ver em Estudar"** (`CACHE` → `v132`).
+> **busca e filtro** (Todos / Com pendência / Concluídos). Ainda na mesma rodada, e por dois
+> apontamentos dele usando a tela, o fluxo virou **fila que esvazia**: nasceu o status
+> **`in_study`** e o botão principal do Preparar é **"Enviar para o Estudo"** — o item sai da
+> fila e passa a viver só no dossiê (com volta pelo "Corrigir em Preparar").
 > Ver seção 8 (90ª rodada) e a 8.1.
 >
 > Anterior: 2026-08-06 — **"NÃO LEMBRO" — saindo do limbo sem perder o lugar
@@ -645,7 +647,12 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
 
 - **`words[]`** — itens capturados. Cada um: `{id, word, context, source_type, source_title,
   source_context, lang, status, ipa, type, type_label, meanings[], created_at, updated_at}`.
-  `status`: `pending_ai` → `pending_review` → `in_srs` (ou `skipped`).
+  `status`: `pending_ai` → `pending_review` → **`in_study`** → `in_srs` (ou `skipped`).
+  - **`in_study`** (desde 2026-08-07) — o item **foi enviado para o Estudo**: sumiu da fila do
+    Preparar e vive no dossiê. É o estado que faz cada tela ser uma fila que ESVAZIA, em vez de
+    o mesmo item aparecer em duas telas ao mesmo tempo. `enviadoEm` guarda quando.
+    Ida: `enviarParaEstudo()`/`enviarSelecionadasParaEstudo()` (review.js).
+    Volta: `voltarParaPreparar()` — análise errada não pode virar beco sem saída.
   - **`estudadoEm`** (número, desde 2026-08-07): o instante em que o item foi dado por
     estudado — é o que o manda para a repetição espaçada e o que a seção **Estudar** usa
     para saber o que já saiu do dossiê. Quem grava é o **`saveToSrs()`**, sempre; itens
@@ -808,12 +815,12 @@ maxInterval (36500), leechThreshold (50)
     fonte**. Cada item vira palavra em `pending_review` (via `createDocWord`) já com significado +
     exemplo + IPA + nível — pronto para salvar no SRS, sem perdas na revisão.
 - **Preparar** (id `preparar`, `js/review.js`) — sidebar (filtros em pílula + busca + lista) e
-  card central com significados selecionáveis. Ação principal: **"Ver em Estudar"**, que abre o
-  dossiê daquele item (nada é "enviado" — ele já está lá desde que ganhou significado). O
-  **"Pular para a Revisão"** é o atalho assumido, discreto e no fim da fila. Badge de pendentes
-  fica NESTE item do menu.
-- **Estudar** (id `estudar`, `js/dossie.js`, LAZY) — os **dossiês**: tudo que foi captado de uma
-  obra + capítulo, com o material que a IA montou (frase original com tradução, significados,
+  card central com significados selecionáveis. Ação principal: **"Enviar para o Estudo"** — o
+  item vira `in_study`, **sai desta fila** e passa a viver no dossiê. O **"Pular para a
+  Revisão"** é o atalho assumido, discreto e no fim. Badge de pendentes fica NESTE item do menu.
+- **Estudar** (id `estudar`, `js/dossie.js`, LAZY) — os **dossiês**: o que foi **enviado do
+  Preparar** (`in_study`) mais o que já foi estudado (`in_srs`, legível para releitura),
+  agrupado por obra + capítulo, com o material que a IA montou (frase original com tradução, significados,
   definições e exemplos). Duas telas: grade de dossiês com barra de progresso e a leitura item
   a item. **Marcar "Estudei" é o portão** que manda aquele item para a repetição espaçada.
   Busca + filtro (Todos / Com pendência / Concluídos) no topo. Ver 8.1.
@@ -956,13 +963,20 @@ criou os 3 cards, mudou os dois badges e moveu o item; desfazer preservou os car
 a um segundo render; a chave com `U+0001` sobreviveu ao recarregamento; busca acha por
 capítulo, por significado e sem acento; e o foco não se perde ao digitar.
 
-**Correção na mesma rodada, vinda do uso**: "estou na Preparar e tá dizendo que vai mandar pra
-Revisão ao invés do Estudar". O botão estava honesto (ele cria mesmo os cards), mas era o
-**principal** — a tela anunciava o atalho e não mostrava o caminho. Agora a ação principal do
-Preparar é **"Ver em Estudar"**, que abre o dossiê daquela obra no item e o destaca; o atalho
-virou "Pular para a Revisão", fantasma e no fim. Detalhes na 8.1. Lição de método: **rótulo
-correto não conserta hierarquia errada** — o que a tela ensina é o que ela põe em primeiro
-lugar. (`CACHE` → `v132`: sem o bump, o shell em cache continuava mostrando o botão antigo.)
+**Duas correções na mesma rodada, as duas vindas do uso** (detalhes na 8.1):
+
+1. "estou na Preparar e tá dizendo que vai mandar pra Revisão ao invés do Estudar" — o botão
+   estava honesto, mas era o **principal**: a tela anunciava o atalho e não mostrava o caminho.
+2. "o material que está aqui precisa **sair daqui** e viver só no Estudar e depois no Revisar"
+   — e essa derrubou o meu desenho, não só o rótulo. Eu tinha feito o dossiê mostrar tudo que
+   tivesse material, então o item vivia nas DUAS telas. Entrou o status **`in_study`**: agora
+   "Enviar para o Estudo" tira o item da fila do Preparar, e cada tela é uma fila que esvazia.
+   Com volta (`voltarParaPreparar`), porque análise errada não pode virar beco.
+
+Duas lições de método, registradas: **rótulo correto não conserta hierarquia errada** (o que a
+tela ensina é o que ela põe em primeiro lugar) e **duas telas mostrando o mesmo item é sinal de
+que falta um estado**, não de que falta um filtro. (`CACHE` → `v132` e depois `v133`: sem o
+bump, o shell em cache continuava servindo os botões antigos — aconteceu no teste.)
 
 **O que NÃO foi feito e por quê**: os arquivos continuam `review.js`/`study.js`/`dossie.js` —
 renomeá-los custaria histórico do git e lista do SW sem ganho real; e a seção não ganhou áudio
@@ -5251,19 +5265,44 @@ Passou a existir **uma verdade só**: quem grava `estudadoEm` é o **`saveToSrs(
 Preparar deixam o dossiê coerente — item que está girando no SRS nunca aparece como
 "para estudar".
 
-⚠️ **CORREÇÃO no mesmo dia, achada pelo Djemeson usando a tela**: na primeira versão o botão
-principal do Preparar era o ATALHO ("Mandar N cards para a Revisão"). Estava rotulado com
-honestidade, mas **a tela ensinava o caminho errado** — anunciava a Revisão como próximo passo
-e a leitura do dossiê não tinha representação nenhuma ali. Corrigido assim:
+⚠️ **DUAS CORREÇÕES no mesmo dia, as duas achadas pelo Djemeson usando a tela.**
 
-- **Ação principal do Preparar = "Ver em Estudar"** (`abrirNoEstudar(wordId)`, em `core.js`
-  porque `dossie.js` é lazy). Abre o dossiê **daquela obra/capítulo**, rola até o item e o
-  destaca por 2s. Note que nada é "enviado": **o item já está no dossiê** desde que ganhou
-  significado — o botão só leva até ele.
-- O atalho virou **"Pular para a Revisão"**, fantasma e no fim da fila (`.wct-atalho`).
-  Continua existindo; deixou de ser o protagonista.
-- O pedido reseta busca e filtro do dossiê: filtro de antes não pode esconder justamente o
-  item que ele pediu para ver.
+**1ª:** o botão principal do Preparar era o ATALHO ("Mandar N cards para a Revisão"). Rotulado
+com honestidade, mas **a tela ensinava o caminho errado** — anunciava a Revisão como próximo
+passo e a leitura do dossiê não tinha representação nenhuma. Virou "Ver em Estudar".
+
+**2ª (a que corrigiu o MODELO, não o rótulo):** *"não faz sentido. o botão deveria ser enviar
+pro estudo e não ver ela no estudo. afinal de contas o material que está aqui precisa sair
+daqui e viver só no Estudar e depois no Revisar."* Estava certo, e o erro era meu, de desenho:
+eu tinha feito o dossiê mostrar **tudo que tivesse material**, então o item preparado aparecia
+ao mesmo tempo no Preparar e no Estudar — e nenhuma das duas telas dizia onde ele estava.
+
+**O modelo certo é fila que ESVAZIA**, e isso exigiu um estado novo:
+
+| status | onde o item aparece |
+|---|---|
+| `pending_ai` | Preparar (esperando a IA) |
+| `pending_review` | Preparar (material pronto, **esperando o envio**) |
+| **`in_study`** | **só** no dossiê, em Estudar |
+| `in_srs` | Revisar (e continua legível no dossiê, como estudado) |
+
+- **Ação principal do Preparar = "Enviar para o Estudo"** (`enviarParaEstudo` /
+  `enviarSelecionadasParaEstudo`). O item **some da fila** e a tela avança para o próximo,
+  como o "pular" já fazia.
+- `_dossieItens()` passou a filtrar por **status**, não por "tem material".
+- **A volta existe**: `voltarParaPreparar()`, no rodapé de cada item do dossiê
+  ("Corrigir em Preparar"). Sem ela, enviar seria porta de mão única e um item com análise
+  errada ficaria preso — o mesmo beco que o "Não lembro" resolveu no glossário.
+- "não estudei ainda" devolve o item para **`in_study`** (reler), não para o Preparar
+  (refazer). São duas intenções diferentes e agora têm dois botões diferentes.
+- O atalho **"Pular para a Revisão"** continua, fantasma e no fim (`.wct-atalho`).
+- Efeito colateral bom: **a fila do Preparar pode ficar vazia** — e o vazio virou informação
+  ("o que você já enviou está em Estudar"), com o dossiê vazio dizendo quantos itens esperam
+  envio do outro lado.
+- **Bug vizinho consertado de graça**: o subtítulo ("N pendentes · N prontas") só era
+  recalculado dentro do `renderReview()`, então quem saía pela lateral — o "pular" já fazia
+  isso antes de existir o "enviar" — deixava um número mentindo no cabeçalho. Virou
+  `_prepAtualizarCabecalho()`, chamado pelos três caminhos.
 
 `dossieDesfazerEstudo()` **não apaga cards do SRS** (eles já podem ter histórico), mas **devolve
 o `status` para `pending_review`** — sem isso a costura do legado (abaixo) remarcaria o item no
@@ -5343,6 +5382,14 @@ A revisão de design foi dividida em três rodadas, da mais barata e segura para
       fica gigante demais (um livro com 40 capítulos = 40 cartões — se incomodar, agrupar por
       obra e abrir os capítulos dentro); (c) a busca continua instantânea com centenas de itens
       (`_dosItemTexto` remonta o texto a cada tecla; se pesar, cachear por `id`+`updated_at`).
+- [ ] **ENVIAR OS 97 ITENS QUE JÁ ESTÃO PRONTOS** (90ª rodada). Com o status `in_study`, os
+      itens antigos em `pending_review` continuam **no Preparar esperando envio** — é o certo,
+      mas são muitos de uma vez. Se for chato item a item, use "Selecionar todas" + "Enviar
+      para o Estudo" (o lote já funciona); e se ainda assim incomodar, vale um "enviar todos
+      os prontos deste capítulo" na própria barra.
+- [ ] **`saveAllToSrs()` é CÓDIGO MORTO** (achado na 90ª): a função existe em `review.js` (~402)
+      e procura o botão `btn-save-all-srs`, que não existe mais no HTML. Não foi removida nesta
+      rodada por ser anterior a ela e não atrapalhar; ao mexer no Preparar, apagar.
 - [ ] **RENOMEAR OS ARQUIVOS `review.js`/`study.js`** — decidido NÃO fazer na 90ª. Só vale se um
       dia o custo de lembrar "review.js é Preparar" superar o de perder o histórico do git e
       mexer na lista do service worker. Registrado para não virar dúvida recorrente.

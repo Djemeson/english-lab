@@ -542,24 +542,16 @@ function loadWords() {
   updateDossieBadge()
 }
 
-// ---- Ir do Preparar para o dossiê deste item -------------------------
-// Mora aqui pelo motivo de sempre: `js/dossie.js` é LAZY e quem chama é o
-// Preparar (review.js, do shell). O pedido fica guardado e a seção o consome
-// quando o módulo chega — mesmo padrão do `_pendingLibraryFilter`.
-let _dossiePedidoAbrir = null
-function abrirNoEstudar(wordId) {
-  _dossiePedidoAbrir = wordId || null
-  showSection('estudar')
-}
-
 // ---- Badge da seção ESTUDAR (os dossiês) -----------------------------
 // Mora aqui, e não em js/dossie.js, pelo motivo de sempre: dossie.js é LAZY
 // e o menu existe em todas as telas. Um item "pendente de estudo" é o que já
 // tem material montado e ainda não foi marcado como estudado.
 function dossiePendentes() {
   if (!Array.isArray(words)) return 0
-  return words.filter(w => !w.estudadoEm && w.status !== 'in_srs' &&
-    Array.isArray(w.meanings) && w.meanings.some(m => m && m.meaning_pt)).length
+  // `in_study` = foi ENVIADO para o dossiê e ainda não foi estudado. Contar
+  // "tem material" contaria também o que ainda está na fila do Preparar — o
+  // badge diria que há trabalho numa tela em que não há.
+  return words.filter(w => w.status === 'in_study' && !w.estudadoEm).length
 }
 function updateDossieBadge() {
   const n = dossiePendentes()

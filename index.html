@@ -469,17 +469,23 @@
   <div class="page-header">
     <div class="ph-left">
       <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Preparar</h1>
-      <p id="review-header-sub">A IA gera todos os significados — o material montado fica em <b>Estudar</b></p>
+      <p id="review-header-sub">A IA monta o material — depois <b>envie para o Estudo</b> e o item sai desta fila</p>
     </div>
     <div class="ph-actions">
       <button class="btn btn-ghost btn-sm" onclick="showSection('adicionar')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Adicionar</button>
     </div>
   </div>
 
+  <!-- Fila vazia é BOM aqui: significa que tudo que estava pronto já foi
+       enviado. O texto tem de dizer para onde foi, senão some sem explicação. -->
   <div id="review-empty" class="empty-state" style="margin-top:40px">
     <svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-    <p>Nada na fila de revisão ainda.</p>
-    <button class="btn btn-primary mt-4" onclick="showSection('adicionar')" style="margin-top:16px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Adicionar palavras</button>
+    <p>Fila vazia — nada aguardando preparação.</p>
+    <p style="margin-top:6px">O que você já enviou está em <b>Estudar</b>, no dossiê de cada obra.</p>
+    <div class="btn-group" style="margin-top:16px;justify-content:center">
+      <button class="btn btn-primary" onclick="showSection('adicionar')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Adicionar palavras</button>
+      <button class="btn btn-ghost" onclick="showSection('estudar')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Ir para Estudar</button>
+    </div>
   </div>
 
   <div id="review-content" class="hidden">

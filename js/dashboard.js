@@ -63,8 +63,8 @@ function renderDashboard() {
   if (statsArea) {
     const secondaryHTML = pending > 0 ? `
       <div class="dash-secondary">
-        <span>${pendingAI > 0 ? pendingAI + ' palavra' + (pendingAI!==1?'s':'') + ' aguardando IA' : ''}${pendingAI>0&&pendingRev>0?' · ':''}${pendingRev > 0 ? pendingRev + ' com material pronto' : ''}</span>
-        <button class="btn btn-ghost btn-sm" onclick="showSection(${pendingAI > 0 ? "'preparar'" : "'estudar'"})">${pendingAI > 0 ? ic('sparkles')+'Ir para Preparar' : ic('bookOpen')+'Ir para Estudar'}</button>
+        <span>${pendingAI > 0 ? pendingAI + ' palavra' + (pendingAI!==1?'s':'') + ' aguardando IA' : ''}${pendingAI>0&&pendingRev>0?' · ':''}${pendingRev > 0 ? pendingRev + ' pronta' + (pendingRev!==1?'s':'') + ' para enviar ao Estudo' : ''}</span>
+        <button class="btn btn-ghost btn-sm" onclick="showSection('preparar')">${pendingAI > 0 ? ic('sparkles') : ic('eye')}Ir para Preparar</button>
       </div>` : ''
     statsArea.innerHTML = secondaryHTML + `
       <div class="metric-grid">
@@ -725,7 +725,7 @@ function renderDashboardAchievements() {
 }
 
 function statusLabel(s) {
-  return { pending_ai:'Pendente IA', pending_review:'Material pronto', in_srs:'Na revisão', skipped:'Pulada' }[s] || s
+  return { pending_ai:'Pendente IA', pending_review:'Pronta para enviar', in_study:'No estudo', in_srs:'Na revisão', skipped:'Pulada' }[s] || s
 }
 
 

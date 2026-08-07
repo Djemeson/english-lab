@@ -46,10 +46,15 @@ function _dossiePartes(chave) {
   return { tipo: p[0] || 'manual', obra: p[1] || '', cap: p[2] || '' }
 }
 
-// Só entra no dossiê o que JÁ TEM MATERIAL. Item ainda sem análise pertence
-// a Preparar — mostrá-lo aqui seria oferecer para estudar o que não existe.
+// Só entra no dossiê o que FOI ENVIADO para cá. Ter material não basta: se
+// bastasse, o item apareceria ao mesmo tempo no Preparar e aqui, e nenhuma
+// das duas telas diria onde ele está de verdade. O envio é um ato — e é ele
+// que esvazia a fila do Preparar.
+//   in_study → está no dossiê, ainda não estudado
+//   in_srs   → já foi estudado, continua legível aqui para releitura
 function _dossieItens() {
   return words.filter(w =>
+    (w.status === 'in_study' || w.status === 'in_srs') &&
     Array.isArray(w.meanings) && w.meanings.some(m => m && m.meaning_pt))
 }
 
@@ -119,10 +124,11 @@ function dossieDesfazerEstudo(wordId) {
   // jogar fora progresso real por causa de um clique errado seria pior que o
   // clique errado. Desmarcar só devolve o item ao dossiê para reler.
   delete w.estudadoEm
-  // O status VOLTA junto. Sem isto a costura do legado (que trata `in_srs`
-  // como estudado) remarcaria o item no render seguinte — o desfazer duraria
-  // uma fração de segundo.
-  if (w.status === 'in_srs') w.status = 'pending_review'
+  // O status volta para IN_STUDY, não para o Preparar: desmarcar é "quero
+  // reler", não "quero refazer a análise" (para isso existe o `voltarParaPreparar`).
+  // Sem esta troca a costura do legado (que trata `in_srs` como estudado)
+  // remarcaria o item no render seguinte — o desfazer duraria uma fração de segundo.
+  if (w.status === 'in_srs') w.status = 'in_study'
   w.updated_at = new Date().toISOString()
   saveWords()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
@@ -162,6 +168,8 @@ function _dossieCardHTML(w) {
         ${feito
           ? `<button class="btn btn-ghost btn-sm" onclick="dossieDesfazerEstudo('${w.id}')">${ic('undo','ic-sm')} não estudei ainda</button>`
           : `<button class="btn btn-primary btn-sm" onclick="dossieEstudei('${w.id}')">${ic('check','ic-sm')} Estudei — mandar para a Revisão</button>`}
+        <button class="btn btn-ghost btn-sm dos-corrigir" onclick="voltarParaPreparar('${w.id}')"
+          data-tip="A análise saiu errada? Devolve o item ao Preparar para re-analisar ou refazer do zero.">${ic('refresh','ic-sm')} Corrigir em Preparar</button>
       </footer>
     </article>`
 }
@@ -328,22 +336,6 @@ function renderDossieSection() {
   const lista = dossieLista()
   _dossieListaCache = lista
 
-  // Veio do "Ver em Estudar", no Preparar: abre o dossiê DAQUELE item e para
-  // em cima dele. Chegar na grade e ter de caçar o item na mão seria mandar o
-  // aluno refazer o caminho que ele acabou de pedir para o app fazer.
-  let alvoId = null
-  if (typeof _dossiePedidoAbrir === 'string' && _dossiePedidoAbrir) {
-    const w = words.find(x => x.id === _dossiePedidoAbrir)
-    _dossiePedidoAbrir = null
-    if (w) {
-      alvoId = w.id
-      _dossieAberto = _dossieChave(w)
-      try { localStorage.setItem(SK_DOSSIE_ABERTO, _dossieAberto) } catch (e) {}
-      // Um filtro de antes não pode esconder justamente o item pedido.
-      _dosBusca = ''; _dosFiltro = 'todos'
-    }
-  }
-
   // A seção só existe depois da 1ª visita, mas o estado sobrevive a ela:
   // reabrir o app no dossiê onde parou é o mesmo cuidado do "continuar de
   // onde parou" do vídeo.
@@ -352,9 +344,14 @@ function renderDossieSection() {
   }
 
   if (!lista.length) {
+    // O vazio precisa dizer o ATO que enche a tela. "Ainda não tem nada" sem
+    // dizer como chega aqui é o tipo de tela morta que faz o app parecer quebrado.
+    const prontas = words.filter(w => w.status === 'pending_review').length
     area.innerHTML = `<div class="dos-vazio">${ic('bookOpen','ic-xl')}
-      <p><b>Nenhum material pronto ainda</b></p>
-      <p>Capture itens e monte o material em <b>Preparar</b> — eles aparecem aqui organizados por obra e capítulo.</p>
+      <p><b>Nenhum item no estudo ainda</b></p>
+      <p>${prontas
+        ? `Você tem <b>${prontas} ${prontas !== 1 ? 'itens prontos' : 'item pronto'}</b> em <b>Preparar</b>. Use <b>"Enviar para o Estudo"</b> lá — eles chegam aqui organizados por obra e capítulo.`
+        : 'Prepare o material em <b>Preparar</b> e use <b>"Enviar para o Estudo"</b> — os itens chegam aqui organizados por obra e capítulo.'}</p>
       <button class="btn btn-primary" onclick="showSection('preparar')">${ic('arrowRight')}Ir para Preparar</button></div>`
     return
   }
@@ -362,14 +359,4 @@ function renderDossieSection() {
   area.innerHTML = _dossieBarraHTML() + '<div id="dossie-corpo"></div>'
   _dossiePintarFiltros()
   _dossiePintarCorpo()
-  if (alvoId) _dossieDestacar(alvoId)     // depois de pintar: o item já existe
-}
-
-// Rola até o item e o marca por um instante. O destaque some sozinho: piscar
-// é para dizer "é este aqui", não para virar um estado que fica na tela.
-function _dossieDestacar(wordId) {
-  const alvo = el('dos-' + wordId); if (!alvo) return
-  alvo.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  alvo.classList.add('alvo')
-  setTimeout(() => alvo.classList.remove('alvo'), 2200)
 }
