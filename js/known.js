@@ -44,7 +44,7 @@ async function _knLevantar() {
       }
     }
   } catch (e) { console.warn('[palavras] legendas:', e.message) }
-  // 2) Contextos capturados (Revisar/Kindle/mídia)
+  // 2) Contextos capturados (Preparar/Kindle/mídia)
   for (const w of words) {
     const t = String(w.context || '')
     for (const raw of (t.toLowerCase().match(/[\p{L}']+/gu) || [])) add(raw.replace(/^'+|'+$/g, ''), t)
@@ -140,7 +140,7 @@ function _knPintar() {
           <span class="kn-w">${esc(it.w)}</span>
           ${it.freq ? `<span class="kn-f">${it.freq}</span>` : ''}
           <span class="kn-acts">
-            <button onclick="event.stopPropagation();knEstudar('${escA(it.w)}')" data-tip="Mandar para o Revisar (a IA analisa)">${ic('arrowRight','ic-sm')}</button>
+            <button onclick="event.stopPropagation();knEstudar('${escA(it.w)}')" data-tip="Mandar para o Preparar (a IA analisa)">${ic('arrowRight','ic-sm')}</button>
             <button onclick="event.stopPropagation();knIgnorar('${escA(it.w)}')" data-tip="Nunca mais sugerir">${ic('x','ic-sm')}</button>
           </span>
         </div>`).join('')}
@@ -179,11 +179,11 @@ function knIgnorar(w) {
 
 function knEstudar(w) {
   const it = _knInventario.find(x => x.w === w); if (!it) return
-  if (it.status === 'estudando') { showSection('revisar'); return }
+  if (it.status === 'estudando') { showSection('preparar'); return }
   markKnownWord(w, false); markIgnoredWord(w, false)
   createWord({ word: w, context: it.ex || '', source_type: 'manual', source_title: 'Palavras', lang: activeLang() })
   saveWords(); renderSidebar(); renderDashboard()
-  toast(`"${w}" foi para o Revisar`, 'success')
+  toast(`"${w}" foi para o Preparar`, 'success')
   _knAtualizaItem(w, 'estudando')
 }
 

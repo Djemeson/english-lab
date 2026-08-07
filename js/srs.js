@@ -408,20 +408,29 @@ function saveToSrs(wordId) {
   saveSrsCards()
   autoSyncAfterChange()
 
-  // Mark word status
-  if (added > 0) {
+  // O PORTÃO TEM UMA VERDADE SÓ: o que entra na repetição espaçada está
+  // estudado. Marcar aqui — e não em cada tela — é o que impede o dossiê
+  // (seção Estudar) de mentir quando o item chegou ao SRS por um atalho:
+  // o botão do Preparar, o Assistente ou o card com áudio do vídeo.
+  // `skipped > 0` entra junto: cards que já existiam também são item que já
+  // está girando lá.
+  if (added > 0 || skipped > 0) {
+    if (!w.estudadoEm) w.estudadoEm = Date.now()
     w.status = 'in_srs'
     w.updated_at = new Date().toISOString()  // bump p/ vencer o merge do fbPull
     saveWords()
+  }
+
+  if (added > 0) {
     renderSidebar()
     renderDashboard()
     updateSrsBadge()
-    toast(`${added} card${added !== 1 ? 's' : ''} salvos no site SRS${skipped ? ` (${skipped} já existiam)` : ''}`, 'success')
+    toast(`${added} card${added !== 1 ? 's' : ''} ${added !== 1 ? 'foram' : 'foi'} para a Revisão${skipped ? ` (${skipped} já estavam lá)` : ''}`, 'success')
     // Pré-gera áudio; ao final, sync automático de novos áudios para Firebase
     const newCards = srsCards.slice(-added)
     preGenerateAudio(newCards).then(() => autoSyncAudioAfterChange())
   } else {
-    toast(`Todos os cards já existem no SRS (${skipped} duplicados)`, 'info')
+    toast(`Todos os cards já estão na Revisão (${skipped} duplicados)`, 'info')
   }
 }
 

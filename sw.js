@@ -9,7 +9,7 @@
 // novos na hora; o shell é cache-first. Sem o bump, um deploy pode juntar
 // ler.js NOVO com ai.js VELHO — e "LEXA_NOME is not defined" na primeira
 // visita. O `activate` apaga os caches antigos, então o bump resolve.
-const CACHE = 'englab-v130'
+const CACHE = 'englab-v131'
 // Cache separado e PERMANENTE para o ffmpeg.wasm (31 MB): não pode ser
 // apagado a cada versão do shell, senão cada deploy custaria 31 MB de novo.
 const CACHE_FFMPEG = 'englab-ffmpeg-v1'
@@ -109,7 +109,7 @@ self.addEventListener('fetch', e => {
   }
 
   // Módulos lazy: network-first (mudam mais e não estão no shell)
-  if (url.includes('/js/add.js') || url.includes('/js/study.js') || url.includes('/js/known.js') || url.includes('/js/kindle-db.js') || url.includes('/js/epub.js') || url.includes('/js/ler.js') || url.includes('/js/video')) {
+  if (url.includes('/js/add.js') || url.includes('/js/study.js') || url.includes('/js/dossie.js') || url.includes('/js/known.js') || url.includes('/js/kindle-db.js') || url.includes('/js/epub.js') || url.includes('/js/ler.js') || url.includes('/js/video')) {
     e.respondWith(
       fetch(e.request)
         .then(r => { caches.open(CACHE).then(c => c.put(e.request, r.clone())); return r })

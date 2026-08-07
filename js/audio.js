@@ -866,7 +866,7 @@ function glossWordHtml(g, TYPE) {
   const typeLabel = TYPE[g.type] || ''
   const sensesHtml = senses.map((s, i) => {
     // Renderizadores em js/lang.js (não-lazy) — este arquivo não pode depender
-    // do study.js, que só carrega ao abrir Estudar/Biblioteca.
+    // do study.js, que só carrega ao abrir Revisar/Biblioteca.
     const chips = varietyChip(s.variety, g.lang) + registerChip(s.register)
     const ex = s.examples[0]
     const exHtml = ex ? `<div class="gloss-ex">
@@ -903,7 +903,7 @@ function glossWordHtml(g, TYPE) {
   </div>`
 }
 
-// Chamado pelos contadores do Estudar (números clicáveis)
+// Chamado pelos contadores do Revisar (números clicáveis)
 function openLibraryFiltered(type, deckId) {
   _pendingLibraryFilter = { type, deckId: deckId || null }
   showSection('biblioteca')

@@ -122,7 +122,7 @@ function renderActiveConversa() {
   if (!c || !c.messages.length) { msgs.innerHTML = asstEmptyState(); return }
   msgs.innerHTML = c.messages.map((m, i) => renderMsgHTML(m, i)).join('')
   msgs.scrollTop = msgs.scrollHeight
-  // Mesmo componente do leitor e do Revisar: a resposta do Assistente vem
+  // Mesmo componente do leitor e do Preparar: a resposta do Assistente vem
   // cheia de exemplos em inglês, e reconhecer ali uma palavra já estudada vale
   // tanto quanto no livro. `_glossOn` evita listener repetido a cada render.
   if (typeof glossAtivar === 'function') glossAtivar(msgs, {})
@@ -234,7 +234,7 @@ function consultaSystem() {
   const nome = L.name.toLowerCase()
   // A persona vive em js/ai.js (lexaSistema) — aqui entra só o que é do chat.
   // Antes havia um "Lex" escrito à mão só neste arquivo; com a Lexa nascendo
-  // no leitor, no Revisar e no vídeo, duas personas seriam duas pessoas.
+  // no leitor, no Preparar e no vídeo, duas personas seriam duas pessoas.
   return `${lexaSistema(`
 NO CHAT ESPECIFICAMENTE:
 - Comemora o acerto do aluno em meia frase e segue em frente; quando ele erra, mostra o porquê sem drama.

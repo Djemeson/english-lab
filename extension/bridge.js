@@ -1,6 +1,6 @@
 // ================================================================
 // PONTE — roda DENTRO do Language Lab (Pages/Vercel/localhost).
-//   ← entrega as capturas da Netflix ao app (viram itens do Revisar);
+//   ← entrega as capturas da Netflix ao app (viram itens do Preparar);
 //   → espelha a config de IA do app para a extensão (a barra da Netflix
 //     traduz/explica sem você digitar chave lá).
 //

@@ -169,7 +169,7 @@ function parseKindleVocabDb(buffer) {
     const kid = String(l.id || '')
     if (!kid) continue
     // Incremental: o que já entrou uma vez não volta. É isso que faz o
-    // "conectei o Kindle → só o novo cai no Revisar".
+    // "conectei o Kindle → só o novo cai no Preparar".
     if (seen.has('L:' + kid)) { skipped++; continue }
     const w = palavras.get(l.word_key); if (!w) continue
     // O `stem` é a forma de citação (lema) — é o que o resto do app usa como

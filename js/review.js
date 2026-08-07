@@ -573,14 +573,14 @@ function renderWcToolbarLeft() {
     leftEl.innerHTML = `
       <span style="font-size:var(--fs-sm);font-weight:600;color:var(--primary);white-space:nowrap">${selCount} selecionada${selCount!==1?'s':''}</span>
       <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()" data-tip="Gera significados, exemplos e nível com IA para as selecionadas">${ic('sparkles')}Analisar</button>
-      <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()" data-tip="Cria os cards e envia para a fila de estudo (SRS)">${ic('book')}Salvar para estudo</button>
+      <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()" data-tip="Atalho: pula a leitura do dossiê em Estudar e manda direto para a repetição espaçada">${ic('book')}Mandar para a Revisão</button>
       <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()" data-tip="Remove as palavras selecionadas da fila">${ic('trash')}Excluir</button>`
   } else if (w) {
     if (w.status === 'pending_review' && w.meanings?.length > 0) {
       const selM = w.meanings.filter(m => m.selected !== false)
       const totalCards = selM.reduce((sum, m) => sum + ((m.examples?.length) || 1), 0)
       leftEl.innerHTML = `
-        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')" data-tip="Cria os cards e envia para a fila de estudo (SRS)">${ic('book')}Salvar ${totalCards} card${totalCards!==1?'s':''} para estudo</button>
+        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')" data-tip="Atalho: pula a leitura do dossiê em Estudar e manda os cards direto para a repetição espaçada">${ic('book')}Mandar ${totalCards} card${totalCards!==1?'s':''} para a Revisão</button>
         <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Roda a IA de novo PRESERVANDO o que já tem exemplos — completa o que falta">${ic('refresh')}Re-analisar</button>
         <button class="btn btn-ghost btn-sm" onclick="refazerAnalise('${w.id}')" data-tip="A análise está errada? Descarta os significados atuais e refaz do zero">${ic('undo')}Refazer do zero</button>`
     } else if (w.status === 'pending_ai') {
@@ -925,11 +925,11 @@ async function deleteWord(id) {
 }
 
 // ================================================================
-// DÚVIDA DENTRO DA DÚVIDA — seleção no card do Revisar.
+// DÚVIDA DENTRO DA DÚVIDA — seleção no card do Preparar.
 // Caso real (closet Adderall snorter): a análise explica a expressão,
 // mas "o que é Adderall?" ficava para outra aba. Agora: selecione
 // qualquer palavra/trecho no card → popup com "Explicar" (mini-gloss
-// da IA ali mesmo, cobrindo referência cultural) e "Revisar" (vira um
+// da IA ali mesmo, cobrindo referência cultural) e "Preparar" (vira um
 // item novo da fila). Sem sair do flow.
 // ================================================================
 // ================================================================
@@ -1069,7 +1069,7 @@ function _revBreakRender(wordId) {
   const rodape = (st.sel.size || st.done.size) ? `
       <div class="rvb-foot">
         ${st.sel.size ? `<button class="btn btn-primary btn-sm" onclick="revBreakStudy('${wordId}')">
-          ${ic('arrowRight','ic-sm')}Estudar ${st.sel.size}</button>` : ''}
+          ${ic('arrowRight','ic-sm')}Preparar ${st.sel.size}</button>` : ''}
         ${st.done.size ? `<button class="btn btn-ghost btn-sm" onclick="deleteWord('${wordId}')"
           data-tip="As partes escolhidas já viraram itens próprios — a frase original pode sair da fila">${ic('trash','ic-sm')}Dispensar a frase</button>` : ''}
       </div>` : ''
@@ -1143,12 +1143,12 @@ if (!window._revSelBound) {
   document.addEventListener('mouseup', (e) => {
     setTimeout(() => {
       const pop = el('rev-sel-pop')
-      // Clique DENTRO do popup (Explicar/Revisar) não pode fechá-lo: o
+      // Clique DENTRO do popup (Explicar/Preparar) não pode fechá-lo: o
       // mousedown no botão colapsa a seleção e este handler via "seleção
       // vazia" e escondia o popup ANTES da explicação aparecer — o bug do
       // "cliquei em Explicar e nada aconteceu".
       if (pop && !pop.classList.contains('hidden') && e.target && pop.contains(e.target)) return
-      const sec = document.getElementById('section-revisar')
+      const sec = document.getElementById('section-preparar')
       if (!sec || !sec.classList.contains('active')) { pop && pop.classList.add('hidden'); return }
       const card = sec.querySelector('.word-card')
       const sel = window.getSelection()
@@ -1186,7 +1186,7 @@ function _revShowSelPop(txt, sel) {
   pop.innerHTML = `
     <b>"${esc(txt)}"</b>
     <button class="btn btn-secondary btn-sm" onclick="revSelExplain()" data-tip="Mini-explicação da IA aqui mesmo — sentido, e o que é se for marca/gíria/referência">${ic('sparkles','ic-sm')}Explicar</button>
-    <button class="btn btn-ghost btn-sm" onclick="revSelMine()" data-tip="Vira um item novo na fila do Revisar">${ic('eye','ic-sm')}Revisar</button>`
+    <button class="btn btn-ghost btn-sm" onclick="revSelMine()" data-tip="Vira um item novo na fila do Preparar">${ic('eye','ic-sm')}Preparar</button>`
   pop.classList.remove('hidden')
   const r = sel.getRangeAt(0).getBoundingClientRect()
   const acima = r.top > 64
@@ -1247,5 +1247,5 @@ function revSelMine() {
   // Sidebar e badges atualizam; o card aberto NÃO re-renderiza — o flow continua
   if (typeof renderSidebar === 'function') renderSidebar()
   renderDashboard()
-  toast(`"${txt}" virou um item novo na fila do Revisar`, 'success')
+  toast(`"${txt}" virou um item novo na fila do Preparar`, 'success')
 }

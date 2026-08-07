@@ -129,8 +129,10 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .main{flex:1;min-width:0;padding:28px 28px;overflow-y:auto;max-height:100vh}
 .section{display:none}
 .section.active{display:block}
-#section-estudar.active{display:block}
-#section-estudar .srs-library-wrap{margin:0 -28px;width:calc(100% + 56px)}
+/* `revisar` = a seção do SRS (js/study.js). O id trocou de nome em 2026-08-07
+   junto com o fluxo — ver o mapa em core.js, acima de SECTIONS. */
+#section-revisar.active{display:block}
+#section-revisar .srs-library-wrap{margin:0 -28px;width:calc(100% + 56px)}
 .page-header{margin-bottom:24px}
 .page-header h1{font-size:var(--fs-xl);font-weight:700;letter-spacing:-.3px}
 .page-header p{color:var(--text2);margin-top:4px;font-size:var(--fs-md)}
@@ -554,7 +556,7 @@ select option{background:var(--surface)}
 .mt-2{margin-top:8px}.mt-4{margin-top:16px}.mb-4{margin-bottom:16px}
 .text-muted{color:var(--text2)}.text-sm{font-size:var(--fs-md)}
 @media(max-width:900px){
-  #section-estudar .srs-library-grid{grid-template-columns:180px 1fr !important}
+  #section-revisar .srs-library-grid{grid-template-columns:180px 1fr !important}
   .browser-preview-panel{display:none}
 }
 /* ===== MOBILE SRS ===== */
@@ -5064,4 +5066,131 @@ body.ler-full .mobile-bottom-nav{display:none}
 @media (max-width:768px){
   /* acima da barra de navegação do celular */
   #voltar-pill{bottom:calc(72px + env(safe-area-inset-bottom,0))}
+}
+
+/* ================================================================
+   ESTUDAR — os dossiês (js/dossie.js)
+   Duas telas: a GRADE de obras/capítulos e a LEITURA item a item.
+   Nada de cor fixa: tudo por variável, para seguir os 6 temas.
+   ================================================================ */
+/* ---- barra de busca + filtro (fica FORA do corpo que se repinta) ---- */
+.dos-barra-topo{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);
+}
+.dos-busca{
+  position:relative;display:flex;align-items:center;gap:8px;
+  flex:1 1 280px;min-width:0;
+  padding:0 12px;border-radius:var(--radius-sm);
+  background:var(--surface);border:1px solid var(--border);
+  transition:border-color .15s;
+}
+.dos-busca:focus-within{border-color:rgba(var(--primary-rgb),.55)}
+.dos-busca .ic{color:var(--text3);flex-shrink:0}
+.dos-busca input{
+  flex:1;min-width:0;padding:9px 0;font-size:var(--fs-sm);
+  background:transparent;border:0;outline:none;color:var(--text);
+}
+.dos-fils{display:flex;gap:6px;flex-wrap:wrap}
+.dos-fil{
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  padding:8px 12px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;
+  color:var(--text2);background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);transition:all .12s;
+}
+.dos-fil:hover{color:var(--text);border-color:var(--border-strong)}
+.dos-fil.active{color:var(--text);background:var(--surface);box-shadow:var(--shadow-sm)}
+.dos-fil-n{
+  display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;
+  border-radius:var(--radius-xs);font-size:var(--fs-3xs);font-weight:700;
+  background:rgba(var(--primary-rgb),.16);color:var(--primary);
+}
+.dos-vazio-filtro{text-align:center;padding:56px 20px;color:var(--text3)}
+.dos-vazio-filtro p{margin:10px 0 14px;font-size:var(--fs-md)}
+
+.dos-intro{color:var(--text2);font-size:var(--fs-md);margin-bottom:18px;max-width:70ch}
+.dos-vazio{text-align:center;padding:72px 20px;color:var(--text3)}
+.dos-vazio p{margin:8px 0}
+.dos-vazio p b{color:var(--text);font-size:var(--fs-base)}
+.dos-vazio .btn{margin-top:18px}
+
+/* ---- grade de dossiês ---- */
+.dos-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.dos-card{
+  display:flex;flex-direction:column;align-items:flex-start;gap:6px;
+  padding:16px 16px 14px;text-align:left;cursor:pointer;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  transition:border-color .18s,transform .18s,box-shadow .18s;
+}
+.dos-card:hover{
+  border-color:rgba(var(--primary-rgb),.45);transform:translateY(-2px);box-shadow:var(--shadow);
+}
+.dos-card-ic{color:var(--text3);display:flex;margin-bottom:2px}
+.dos-card-obra{font-weight:650;color:var(--text);font-size:var(--fs-base);line-height:1.3}
+.dos-card-cap{color:var(--text2);font-size:var(--fs-sm)}
+.dos-card-n{margin-top:6px;display:flex;flex-direction:column;gap:1px;font-size:var(--fs-sm);color:var(--text2)}
+.dos-card-n b{color:rgba(var(--primary-rgb),1);font-size:var(--fs-base);font-weight:700}
+.dos-card-n i{font-style:normal;color:var(--text3);font-size:var(--fs-xs)}
+.dos-barra{margin-top:10px;width:100%;height:5px;border-radius:3px;background:var(--surface2);overflow:hidden;display:block}
+.dos-barra i{display:block;height:100%;background:rgba(var(--primary-rgb),.85);transition:width .3s}
+
+/* ---- cabeçalho do dossiê aberto ---- */
+.dos-topo{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.dos-titulo{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.dos-titulo b{font-size:var(--fs-lg);font-weight:700}
+.dos-titulo span{color:var(--text2);font-size:var(--fs-sm)}
+.dos-contagem{margin-left:auto;color:var(--text2);font-size:var(--fs-sm);white-space:nowrap}
+.dos-contagem i{font-style:normal;color:var(--text3)}
+.dos-parabens{
+  display:flex;align-items:center;gap:8px;margin-bottom:16px;
+  padding:12px 14px;border-radius:var(--radius-sm);
+  background:rgba(var(--primary-rgb),.08);border:1px solid rgba(var(--primary-rgb),.28);
+  color:var(--text);font-size:var(--fs-sm);
+}
+
+/* ---- os itens ---- */
+.dos-lista{display:flex;flex-direction:column;gap:14px;max-width:860px}
+.dos-item{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px 20px;transition:opacity .2s,border-color .2s;
+}
+/* Estudado continua legível — é material de releitura, não lixo. Só recua. */
+.dos-item.feito{opacity:.62;border-style:dashed}
+.dos-item.feito:hover{opacity:1}
+.dos-cab{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.dos-cab b{font-family:'Newsreader',serif;font-size:var(--fs-lg);font-weight:600}
+.dos-ipa{color:var(--text3);font-size:var(--fs-sm)}
+.dos-selo{
+  margin-left:auto;display:inline-flex;align-items:center;gap:5px;
+  color:var(--success);font-size:var(--fs-xs);font-weight:600;
+}
+.dos-ctx{
+  color:var(--text2);font-size:var(--fs-sm);font-style:italic;
+  border-left:2px solid var(--border);padding-left:12px;margin:0 0 12px;
+}
+.dos-ctx span{display:block;font-style:normal;color:var(--text3);margin-top:3px}
+.dos-sig{padding:10px 0;border-top:1px solid var(--border)}
+.dos-sig.ctx{border-left:2px solid rgba(var(--primary-rgb),.6);padding-left:12px}
+.dos-sig-pt{font-weight:600;font-size:var(--fs-base);display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.dos-sig-pt i{font-style:normal;color:var(--text3);font-size:var(--fs-xs);font-weight:500}
+.dos-sig-def{color:var(--text2);font-size:var(--fs-sm);margin-top:3px}
+.dos-ex{margin-top:8px;font-size:var(--fs-sm);line-height:1.55}
+.dos-ex b{color:rgba(var(--primary-rgb),1);font-weight:650}
+.dos-ex span{display:block;color:var(--text3)}
+.dos-acoes{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap}
+
+@media (max-width:640px){
+  .dos-grade{grid-template-columns:1fr}
+  .dos-item{padding:15px 15px}
+  .dos-contagem{margin-left:0;width:100%}
+}
+
+/* Rodapé do celular com 7 itens: o rótulo não pode quebrar nem empurrar o
+   vizinho — antes eram 6 e cada um tinha folga de sobra. */
+@media (max-width:768px){
+  .mobile-bottom-nav .nav-item{min-width:0;padding:6px 1px}
+  .mobile-bottom-nav .nav-item span:not(.badge){white-space:nowrap;letter-spacing:0;max-width:100%}
+}
+@media (max-width:400px){
+  .mobile-bottom-nav .nav-item span:not(.badge){font-size:9px}
 }

@@ -154,12 +154,18 @@
     <button class="nav-item" id="nav-adicionar" onclick="showSection('adicionar')" data-tip="Capturar novas palavras (manual, Kindle, mídia, site)">
       <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span>Adicionar</span>
     </button>
-    <button class="nav-item" id="nav-revisar" onclick="showSection('revisar')" data-tip="Analisar palavras com IA e salvá-las para estudo">
-      <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>Revisar</span>
+    <!-- A ORDEM É O FLUXO: captar (Adicionar) → PREPARAR (a IA monta) →
+         ESTUDAR (ler o dossiê) → REVISAR (repetição espaçada). -->
+    <button class="nav-item" id="nav-preparar" onclick="showSection('preparar')" data-tip="A IA monta o material: significados, exemplos e a frase de onde o item saiu">
+      <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>Preparar</span>
       <span class="badge red hidden" id="badge-review">0</span>
     </button>
-    <button class="nav-item" id="nav-estudar" onclick="showSection('estudar')" data-tip="Sessão de revisão espaçada (SRS) dos seus cards">
+    <button class="nav-item" id="nav-estudar" onclick="showSection('estudar')" data-tip="Ler o material montado, por obra e capítulo — marcar um item como estudado é o que o manda para a Revisão">
       <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Estudar</span>
+      <span class="badge hidden" id="badge-dossie">0</span>
+    </button>
+    <button class="nav-item" id="nav-revisar" onclick="showSection('revisar')" data-tip="Repetição espaçada (SRS) dos cards que você já estudou">
+      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg><span>Revisar</span>
       <span class="badge hidden" id="badge-srs">0</span>
     </button>
     <button class="nav-item" id="nav-biblioteca" onclick="showSection('biblioteca')" data-tip="Todos os seus cards, organizados por baralho">
@@ -177,7 +183,7 @@
     <!-- Bloco "Hoje": ancora o fim da lista (o vazio deixa de parecer menu
          inacabado) e transforma espaço morto no sinal que importa todo dia.
          Renderizado por renderSbToday() em js/srs.js — não-lazy. -->
-    <button class="sb-today hidden" id="sb-today" onclick="showSection('estudar')" aria-label="Progresso de hoje"></button>
+    <button class="sb-today hidden" id="sb-today" onclick="showSection('revisar')" aria-label="Progresso de hoje"></button>
   </nav>
   <div class="sb-foot">
     <button class="nav-item" id="nav-configuracoes" onclick="showSection('configuracoes')">
@@ -458,12 +464,12 @@
 
 </section>
 
-<!-- =========== REVISAR =========== -->
-<section id="section-revisar" class="section">
+<!-- =========== PREPARAR (js/review.js — a IA monta o material) =========== -->
+<section id="section-preparar" class="section">
   <div class="page-header">
     <div class="ph-left">
-      <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Revisar</h1>
-      <p id="review-header-sub">A IA gera todos os significados — selecione e salve para estudo</p>
+      <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Preparar</h1>
+      <p id="review-header-sub">A IA gera todos os significados — o material montado fica em <b>Estudar</b></p>
     </div>
     <div class="ph-actions">
       <button class="btn btn-ghost btn-sm" onclick="showSection('adicionar')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Adicionar</button>
@@ -511,6 +517,22 @@
 
     </div>
   </div>
+</section>
+
+<!-- =========== ESTUDAR (dossiês — js/dossie.js, LAZY) =========== -->
+<!-- Área vazia de propósito: quem pinta é renderDossieSection(), e o módulo
+     só chega na primeira visita (_LAZY em core.js). -->
+<section id="section-estudar" class="section">
+  <div class="page-header">
+    <div class="ph-left">
+      <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Estudar</h1>
+      <p>O material que a IA montou, reunido por obra e capítulo — marcar um item como estudado é o que o manda para a Revisão</p>
+    </div>
+    <div class="ph-actions">
+      <button class="btn btn-ghost btn-sm" onclick="showSection('preparar')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Preparar</button>
+    </div>
+  </div>
+  <div id="dossie-area"></div>
 </section>
 
 <!-- =========== CONFIGURAÇÕES =========== -->
@@ -690,13 +712,13 @@
 
 </section>
 
-<!-- =========== ESTUDAR (SRS) =========== -->
-<section id="section-estudar" class="section">
+<!-- =========== REVISAR (SRS — js/study.js, LAZY) =========== -->
+<section id="section-revisar" class="section">
   <div id="srs-view-dashboard">
     <div class="page-header">
       <div class="ph-left">
-        <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Estudar</h1>
-        <p>Revisão espaçada nativa, direto no navegador</p>
+        <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>Revisar</h1>
+        <p>Repetição espaçada nativa, direto no navegador</p>
       </div>
       <div class="ph-actions">
         <button class="btn btn-ghost btn-sm" onclick="showSrsCfgModal()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurar SRS</button>
@@ -775,8 +797,8 @@
   <div id="biblioteca-empty" class="srs-empty" style="display:none">
     <svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 12 10 5 10-5"/><path d="m2 17 10 5 10-5"/></svg>
     <p style="font-size:var(--fs-base);font-weight:600;margin-bottom:8px">Biblioteca vazia</p>
-    <p style="font-size:var(--fs-md);margin-bottom:20px">Revise palavras e salve-as para estudo para vê-las aqui.</p>
-    <button class="btn btn-primary" onclick="showSection('revisar')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>Ir para Revisar</button>
+    <p style="font-size:var(--fs-md);margin-bottom:20px">Marque itens como estudados em <b>Estudar</b> para vê-los aqui.</p>
+    <button class="btn btn-primary" onclick="showSection('estudar')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>Ir para Estudar</button>
   </div>
 </section>
 
@@ -882,19 +904,25 @@
     <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     <span>Adicionar</span>
   </button>
-  <button class="nav-item" id="nav-revisar-mob" onclick="showSection('revisar')">
+  <button class="nav-item" id="nav-preparar-mob" onclick="showSection('preparar')">
     <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-    <span>Revisar</span>
+    <span>Preparar</span>
     <span class="badge red hidden" id="badge-review-mob">0</span>
   </button>
   <button class="nav-item" id="nav-estudar-mob" onclick="showSection('estudar')">
     <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
     <span>Estudar</span>
+    <span class="badge hidden" id="badge-dossie-mob">0</span>
+  </button>
+  <button class="nav-item" id="nav-revisar-mob" onclick="showSection('revisar')">
+    <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+    <span>Revisar</span>
     <span class="badge hidden" id="badge-srs-mob">0</span>
   </button>
+  <!-- "Cards" e não "Biblioteca": com 7 itens o rótulo longo espremia os vizinhos. -->
   <button class="nav-item" id="nav-biblioteca-mob" onclick="showSection('biblioteca')">
     <svg viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 12 10 5 10-5"/><path d="m2 17 10 5 10-5"/></svg>
-    <span>Biblioteca</span>
+    <span>Cards</span>
   </button>
 </nav>
 
@@ -902,7 +930,7 @@
 
 <script src="js/core.js"></script>
 <!-- glossario.js depois de core.js: usa words/knownWords/knownNorm/ic/esc.
-     Não é lazy de propósito — o leitor, a legenda do vídeo, o Revisar e o
+     Não é lazy de propósito — o leitor, a legenda do vídeo, o Preparar e o
      Assistente chamam glossAtivar(), e três deles carregam sob demanda. -->
 <script src="js/glossario.js"></script>
 <script src="js/lang.js"></script>

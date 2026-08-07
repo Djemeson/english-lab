@@ -592,8 +592,11 @@ function _refreshActiveViews() {
     if (typeof updateSrsBadge === 'function') updateSrsBadge()
     const active = id => document.getElementById(id)?.classList.contains('active')
     if (active('section-assistente') && typeof renderAssistente === 'function') renderAssistente()
-    if (active('section-revisar')  && typeof renderReview === 'function')     renderReview()
-    if (active('section-estudar')  && typeof renderSrsSection === 'function' && !srsSession) renderSrsSection()
+    // Os nomes trocaram de lugar (ver SECTIONS em core.js): preparar = a fila
+    // da IA (review.js), revisar = o SRS (study.js), estudar = os dossiês.
+    if (active('section-preparar') && typeof renderReview === 'function')     renderReview()
+    if (active('section-revisar')  && typeof renderSrsSection === 'function' && !srsSession) renderSrsSection()
+    if (active('section-estudar')  && typeof renderDossieSection === 'function') renderDossieSection()
     if (active('section-biblioteca') && typeof openBiblioteca === 'function') openBiblioteca()
     if (active('section-configuracoes') && typeof fillSettings === 'function') fillSettings()
     if (active('section-video') && typeof renderVideoSection === 'function') renderVideoSection()

@@ -356,7 +356,7 @@ function glossPalavraNoPonto(x, y) {
 // com Explicar/Estudar/Ouvir/Imagens/Wikipédia) em vez de o glossário
 // reimplementar esse fluxo por fora e ele passar a divergir.
 // A frase inteira em volta da palavra, tirada do próprio nó de texto. É o que
-// permite mandar a palavra para o Revisar JÁ COM O CONTEXTO do livro, sem
+// permite mandar a palavra para o Preparar JÁ COM O CONTEXTO do livro, sem
 // obrigar o aluno a selecionar a frase na mão — e contexto é o que separa um
 // card que ensina de uma palavra solta numa lista.
 function glossFraseEmVolta(pos, max = 300) {
@@ -414,11 +414,11 @@ function glossLinhaHTML(achado, opts = {}) {
   const icone = n => (typeof ic === 'function' ? ic(n, 'ic-sm') : '')
   if (!achado.pt) {
     // TRÊS estados sem glosa, e confundi-los mente para o aluno. O caso do
-    // meio é o que aparecia errado: palavra que ele MANDOU para o Revisar mas
+    // meio é o que aparecia errado: palavra que ele MANDOU para o Preparar mas
     // que a IA ainda não analisou entrava aqui e recebia "você marcou como
     // conhecida" — exatamente o contrário do que ele fez com ela.
     const rotulo = achado.fonte === 'ignored' ? 'você marcou como ignorada'
-                 : achado.fonte === 'card'    ? 'já está no Revisar, ainda sem análise'
+                 : achado.fonte === 'card'    ? 'já está no Preparar, ainda sem análise'
                  : 'você marcou como conhecida'
     const icn = achado.fonte === 'card' ? 'clock' : 'check'
     return `<div class="gloss-corpo"><div class="gloss-vazio">${icone(icn)} ${rotulo}</div></div>`
@@ -450,8 +450,8 @@ function _glossMostrar(achado, x, y, opts, pos) {
   b.setAttribute('role', 'tooltip')
   const podeLexa = !!(opts && opts.aoExplicar)
   // "Estudar" só aparece quando a palavra AINDA NÃO é card: oferecê-lo para
-  // algo que já está no Revisar convidaria ao item duplicado — o mesmo cuidado
-  // que fez o painel do toque longo avisar "já está no Revisar".
+  // algo que já está no Preparar convidaria ao item duplicado — o mesmo cuidado
+  // que fez o painel do toque longo avisar "já está no Preparar".
   const podeEstudar = !!(opts && opts.aoEstudar) && achado.fonte !== 'card'
   // "NÃO LEMBRO": exclusivo de palavra que ele já declarou conhecer (ou
   // ignorou). É o beco que o balão criava — dizia "você marcou como
@@ -518,7 +518,7 @@ function _glossMostrar(achado, x, y, opts, pos) {
 }
 
 // ---- ATIVAÇÃO --------------------------------------------------
-// Um só componente para TODAS as telas (leitor, legenda, Revisar, Assistente).
+// Um só componente para TODAS as telas (leitor, legenda, Preparar, Assistente).
 // Se cada uma tivesse a sua cópia, o mesmo defeito seria consertado quatro
 // vezes — foi o que aconteceu com as regras lexicais até a 80ª rodada.
 const GLOSS_ESPERA = 220   // ms parado antes de aparecer: menos que isso pisca

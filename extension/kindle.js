@@ -3,7 +3,9 @@
 // ================================================================
 // A ponte com o aparelho físico é por arquivo (vocab.db / My Clippings.txt):
 // o Kindle não fala com a rede em tempo real. Quem lê no NAVEGADOR, porém,
-// pode ter o "marcou → caiu no Revisar" de verdade — é o que este script faz.
+// pode ter o "marcou → caiu no Preparar" de verdade — é o que este script faz.
+// (No app, "Preparar" é a seção onde a IA monta o material — antes chamada
+//  "Revisar". O nome mudou em 2026-08-07; ver core.js, acima de SECTIONS.)
 //
 // Vale para livro comprado E para documento pessoal (Enviar para Kindle):
 // aqui não existe a restrição do Vocabulary Builder do aparelho, porque a
@@ -188,16 +190,16 @@ function abrirPilula(sel) {
   const ehFrase = PALAVRAS(alvoAtual) > 4
   const bAdd = document.createElement('button')
   bAdd.className = 'englab-k-pri'
-  bAdd.innerHTML = IC_ADD + `<span>${ehFrase ? 'Salvar frase' : 'Revisar'}</span>`
+  bAdd.innerHTML = IC_ADD + `<span>${ehFrase ? 'Salvar frase' : 'Preparar'}</span>`
   bAdd.title = ehFrase
-    ? 'Manda o trecho marcado para o Revisar — a triagem por IA quebra em itens lá'
-    : 'Manda a palavra + a frase desta página para o Revisar do Language Lab'
+    ? 'Manda o trecho marcado para o Preparar — a triagem por IA quebra em itens lá'
+    : 'Manda a palavra + a frase desta página para o Preparar do Language Lab'
   bAdd.onclick = () => {
     const p = alvoAtual, c = ctxAtual
     const alvo = ehFrase ? '' : p
     const ctx = ehFrase ? p : c
     salvarCaptura(alvo, ctx).then(ok => avisar(
-      ok ? (ehFrase ? 'trecho salvo para o Revisar' : `"${p}" vai para o Revisar`)
+      ok ? (ehFrase ? 'trecho salvo para o Preparar' : `"${p}" vai para o Preparar`)
          : 'recarregue a página (F5)'))
     fecharPilula()
     try { window.getSelection().removeAllRanges() } catch (e) {}
@@ -209,7 +211,7 @@ function abrirPilula(sel) {
   bFrase.title = 'Salva a frase inteira, sem palavra-alvo — o Raio-X do Lab tria depois'
   bFrase.onclick = () => {
     const c = ctxAtual
-    salvarCaptura('', c).then(ok => avisar(ok ? 'frase salva para o Revisar' : 'recarregue a página (F5)'))
+    salvarCaptura('', c).then(ok => avisar(ok ? 'frase salva para o Preparar' : 'recarregue a página (F5)'))
     fecharPilula()
     try { window.getSelection().removeAllRanges() } catch (e) {}
   }
@@ -218,7 +220,7 @@ function abrirPilula(sel) {
   const bAuto = document.createElement('button')
   bAuto.className = 'englab-k-auto' + (cfgK.auto ? ' on' : '')
   bAuto.textContent = 'auto'
-  bAuto.title = 'Automático: toda palavra que você selecionar vai direto para o Revisar, sem clicar aqui'
+  bAuto.title = 'Automático: toda palavra que você selecionar vai direto para o Preparar, sem clicar aqui'
   bAuto.onclick = () => {
     cfgK.auto = !cfgK.auto; salvarCfgK()
     bAuto.classList.toggle('on', cfgK.auto)
@@ -269,7 +271,7 @@ function aoSelecionar() {
   if (cfgK.auto && PALAVRAS(txt) === 1) {
     autoTimer = setTimeout(() => {
       if (alvoAtual !== txt) return
-      salvarCaptura(txt, ctxAtual).then(ok => { if (ok) avisar(`"${txt}" → Revisar`, true) })
+      salvarCaptura(txt, ctxAtual).then(ok => { if (ok) avisar(`"${txt}" → Preparar`, true) })
       fecharPilula()
     }, 700)
   }

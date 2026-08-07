@@ -36,7 +36,7 @@ function renderDashboard() {
       mainArea.innerHTML = `
         <div class="dash-action-card">
           <div class="dash-action-left">
-            <div class="dash-eyebrow">Para estudar hoje</div>
+            <div class="dash-eyebrow">Para revisar hoje</div>
             <div class="dash-num">${paraHoje}</div>
           </div>
           <div class="dash-hero-split">
@@ -44,7 +44,7 @@ function renderDashboard() {
             <div class="dhs-item"><b>${newToday}</b><span>novo${newToday !== 1 ? 's' : ''}</span></div>
             ${streak > 0 ? `<div class="dhs-item streak"><b>${ic('flame','ic-sm')}${streak}</b><span>dia${streak!==1?'s':''} seguido${streak!==1?'s':''}</span></div>` : ''}
           </div>
-          <button class="btn btn-primary" onclick="showSection('estudar')">Estudar agora ${ic('arrowRight')}</button>
+          <button class="btn btn-primary" onclick="showSection('revisar')">Revisar agora ${ic('arrowRight')}</button>
         </div>`
     } else {
       mainArea.innerHTML = `
@@ -63,8 +63,8 @@ function renderDashboard() {
   if (statsArea) {
     const secondaryHTML = pending > 0 ? `
       <div class="dash-secondary">
-        <span>${pendingAI > 0 ? pendingAI + ' palavra' + (pendingAI!==1?'s':'') + ' aguardando IA' : ''}${pendingAI>0&&pendingRev>0?' · ':''}${pendingRev > 0 ? pendingRev + ' pronta' + (pendingRev!==1?'s':'') + ' para revisar' : ''}</span>
-        <button class="btn btn-ghost btn-sm" onclick="showSection('revisar')">${pendingAI > 0 ? ic('sparkles')+'Ir para revisão' : ic('eye')+'Revisar agora'}</button>
+        <span>${pendingAI > 0 ? pendingAI + ' palavra' + (pendingAI!==1?'s':'') + ' aguardando IA' : ''}${pendingAI>0&&pendingRev>0?' · ':''}${pendingRev > 0 ? pendingRev + ' com material pronto' : ''}</span>
+        <button class="btn btn-ghost btn-sm" onclick="showSection(${pendingAI > 0 ? "'preparar'" : "'estudar'"})">${pendingAI > 0 ? ic('sparkles')+'Ir para Preparar' : ic('bookOpen')+'Ir para Estudar'}</button>
       </div>` : ''
     statsArea.innerHTML = secondaryHTML + `
       <div class="metric-grid">
@@ -640,7 +640,7 @@ function dashRecentCard() {
       <span class="dash-metaval">${words.length} no total</span>
     </div>
     <div class="dash-recent-chips">
-      ${recent.map(w => `<span class="dash-recent-chip" onclick="showSection('revisar')" style="cursor:pointer"
+      ${recent.map(w => `<span class="dash-recent-chip" onclick="showSection('preparar')" style="cursor:pointer"
         title="${escA(w.context || '')}">${esc(w.word || '(frase)')}</span>`).join('')}
       <span class="dash-recent-chip" style="color:var(--text3);cursor:pointer" onclick="showSection('adicionar')">+ adicionar</span>
     </div>
@@ -725,7 +725,7 @@ function renderDashboardAchievements() {
 }
 
 function statusLabel(s) {
-  return { pending_ai:'Pendente IA', pending_review:'Revisar', in_srs:'Em estudo', skipped:'Pulada' }[s] || s
+  return { pending_ai:'Pendente IA', pending_review:'Material pronto', in_srs:'Na revisão', skipped:'Pulada' }[s] || s
 }
 
 
@@ -739,7 +739,7 @@ function createWord(data) {
     context: (data.context || '').trim(),
     // A tradução da frase vinha sendo DESCARTADA aqui: o Kindle e a Mídia já
     // mandavam `context_pt` e ele morria no caminho, então a frase chegava ao
-    // Revisar sempre sem tradução — e o app pagava de novo para traduzi-la.
+    // Preparar sempre sem tradução — e o app pagava de novo para traduzi-la.
     context_pt: (data.context_pt || '').trim(),
     source_type: data.source_type || 'manual',
     source_title: data.source_title || '',
@@ -770,6 +770,6 @@ function quickAdd() {
   el('q-word').value = ''
   el('q-ctx').value = ''
   renderDashboard()
-  toast(`Adicionado! Vá em Revisar para analisar com IA.`, 'success')
+  toast(`Adicionado! Vá em Preparar para analisar com IA.`, 'success')
 }
 

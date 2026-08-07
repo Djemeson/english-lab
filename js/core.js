@@ -237,7 +237,7 @@ function markKindleItemsAsSeen(items) {
 // A extensão (pasta /extension) captura palavras/frases das legendas da
 // Netflix e as guarda no chrome.storage; quando o app abre, o content
 // script bridge.js as entrega por postMessage. Aqui viram itens do
-// Revisar (o Raio-X e a análise seguem o fluxo normal via createWord).
+// Preparar (o Raio-X e a análise seguem o fluxo normal via createWord).
 // __englabReady NÃO é marcado aqui: este é o primeiro script do app e as
 // palavras só existem depois do loadWords() (no initApp). Marcar cedo fazia
 // a extensão entregar antes da hora — as capturas entravam num `words` vazio
@@ -296,7 +296,7 @@ function _englabReceber(items) {
     // SEM isto as capturas ficavam só no localStorage e o snapshot da nuvem
     // as apagava no recarregamento seguinte (a nuvem é a fonte da verdade).
     if (typeof autoSyncAfterChange === 'function') { try { autoSyncAfterChange() } catch (e) {} }
-    toast(`${n} captura${n > 1 ? 's' : ''} ${fonte} ${n > 1 ? 'entraram' : 'entrou'} no Revisar`.replace(/\s{2,}/g, ' '), 'success')
+    toast(`${n} captura${n > 1 ? 's' : ''} ${fonte} ${n > 1 ? 'entraram' : 'entrou'} no Preparar`.replace(/\s{2,}/g, ' '), 'success')
   }
   // ack mesmo com n=0 (duplicatas): a fila da extensão pode ser limpa
   window.postMessage({ type: 'englab-ext-ack', got: items.length }, location.origin)
@@ -531,7 +531,7 @@ function ic(name, extra) {
   const inner = ICONS[name]; if (!inner) return ''
   return `<svg class="ic${extra ? ' ' + extra : ''}" viewBox="0 0 24 24" aria-hidden="true">${inner}</svg>`
 }
-// Ícone por tipo de fonte (série, filme, etc.) — usado em Revisar, Adicionar e Estudar
+// Ícone por tipo de fonte (série, filme, etc.) — usado em Preparar, Adicionar e Estudar
 function srcIcon(t) {
   const m = { series:'tv', movie:'film', youtube:'playCircle', kindle:'book', podcast:'mic', website:'globe', manual:'pencil' }
   return ic(m[t] || 'bookOpen', 'ic-sm')
@@ -539,6 +539,26 @@ function srcIcon(t) {
 function loadWords() {
   try { words = JSON.parse(localStorage.getItem(SK.words) || '[]') } catch { words = [] }
   if (typeof glossInvalidar === 'function') glossInvalidar()
+  updateDossieBadge()
+}
+
+// ---- Badge da seção ESTUDAR (os dossiês) -----------------------------
+// Mora aqui, e não em js/dossie.js, pelo motivo de sempre: dossie.js é LAZY
+// e o menu existe em todas as telas. Um item "pendente de estudo" é o que já
+// tem material montado e ainda não foi marcado como estudado.
+function dossiePendentes() {
+  if (!Array.isArray(words)) return 0
+  return words.filter(w => !w.estudadoEm && w.status !== 'in_srs' &&
+    Array.isArray(w.meanings) && w.meanings.some(m => m && m.meaning_pt)).length
+}
+function updateDossieBadge() {
+  const n = dossiePendentes()
+  for (const id of ['badge-dossie', 'badge-dossie-mob']) {
+    const b = document.getElementById(id)
+    if (!b) continue
+    b.textContent = n
+    b.classList.toggle('hidden', n === 0)
+  }
 }
 // Todo caminho que MUDA um card passa por aqui, então é aqui que o índice do
 // glossário morre. Sem isto, corrigir a tradução de uma palavra deixaria o
@@ -547,6 +567,10 @@ function loadWords() {
 function saveWords() {
   localStorage.setItem(SK.words, JSON.stringify(words))
   if (typeof glossInvalidar === 'function') glossInvalidar()
+  // Mesmo raciocínio do glossário: TODO caminho que muda um item passa aqui,
+  // então é aqui que o contador de "para estudar" deixa de mentir — inclusive
+  // quando quem mudou foi o snapshot da nuvem.
+  updateDossieBadge()
 }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7) }
 
@@ -554,7 +578,14 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 // ================================================================
 // NAVIGATION
 // ================================================================
-const SECTIONS = ['dashboard','assistente','adicionar','revisar','estudar','biblioteca','video','ler','configuracoes']
+// O NOME DA SEÇÃO É O FLUXO (renomeado em 2026-08-07 — ver ESTADO 8.1):
+//   preparar  → js/review.js   (a IA monta o material)   — era 'revisar'
+//   estudar   → js/dossie.js   (ler o dossiê da obra)    — seção nova
+//   revisar   → js/study.js    (repetição espaçada/SRS)  — era 'estudar'
+// Os ARQUIVOS mantiveram os nomes antigos de propósito: renomeá-los quebraria
+// o histórico do git e o cache do service worker sem ganhar nada. É aqui que
+// a tradução mora — não invente outra em nenhum outro arquivo.
+const SECTIONS = ['dashboard','assistente','adicionar','preparar','estudar','revisar','biblioteca','palavras','video','ler','configuracoes']
 // Lazy-load map: section → arquivo JS carregado só na 1ª visita
 // biblioteca usa funções de study.js (buildSrsFrente/Verso/MetaChips/fmtDays)
 // (assistente NÃO é lazy — js/consulta.js é carregado sempre, pois firebase.js
@@ -566,7 +597,10 @@ const _LAZY = {
   adicionar: ['js/kindle-db.js', 'js/add.js'],
   // ler = PACOTE: epub.js (formato, sem DOM da página) antes de ler.js (tela)
   ler: ['js/epub.js', 'js/ler.js'],
-  estudar: 'js/study.js', biblioteca: 'js/study.js',
+  // revisar = SRS (study.js); estudar = os dossiês (dossie.js). Ver o mapa
+  // acima de SECTIONS antes de mexer: os nomes trocaram de lugar.
+  revisar: 'js/study.js', biblioteca: 'js/study.js',
+  estudar: 'js/dossie.js',
   palavras: 'js/known.js',
   video: ['js/video.js', 'js/video-subs.js', 'js/video-sync.js', 'js/video-study.js', 'js/video-podcast.js']
 }
@@ -617,9 +651,10 @@ function _activateSection(name) {
   if (name === 'dashboard') renderDashboard()
   if (name === 'assistente') { if (typeof renderAssistente === 'function') renderAssistente() }
   if (name === 'adicionar') { if (loadKindleQueue()) renderKindleList() }
-  if (name === 'revisar') renderReview()
+  if (name === 'preparar') renderReview()
   if (name === 'configuracoes') fillSettings()
-  if (name === 'estudar') renderSrsSection()
+  if (name === 'revisar') renderSrsSection()
+  if (name === 'estudar') { if (typeof renderDossieSection === 'function') renderDossieSection() }
   if (name === 'biblioteca') openBiblioteca()
   if (name === 'video') { if (typeof renderVideoSection === 'function') renderVideoSection() }
   // O modo de leitura esconde o cabeçalho e a barra de baixo no celular:
@@ -892,7 +927,7 @@ function populateDeckSelect(selectEl, selectedId) {
 // ================================================================
 // O caso: passando o mouse numa palavra, o balão diz "você marcou como
 // conhecida" — e ele não lembra dela. Hoje isso é um beco: a palavra está
-// marcada, não volta para a fila, e a única saída é caçá-la no Revisar.
+// marcada, não volta para a fila, e a única saída é caçá-la no Preparar.
 //
 // Três coisas têm de acontecer juntas, e é isso que torna o botão útil:
 //   1. DESMARCAR o "conheço" — sem isso a cobertura, a triagem por nível e o
@@ -974,7 +1009,7 @@ function estudoNaoLembro(alvo, ctx, origem) {
     estudoVoltarDefinir({ secao: origem.secao, rotulo: origem.rotulo, restaurar: origem.restaurar })
   }
   activeWordId = w.id
-  showSection('revisar')
+  showSection('preparar')
   setTimeout(() => {
     try {
       if (typeof selectWord === 'function') selectWord(w.id)

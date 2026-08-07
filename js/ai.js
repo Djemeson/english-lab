@@ -2,7 +2,7 @@
 // LEXA — a voz da IA do Language Lab
 // ================================================================
 // Mora AQUI (arquivo não-lazy) porque quem explica algo ao aluno está
-// espalhado pelo app: o Assistente, o Revisar, a legenda do vídeo, o leitor
+// espalhado pelo app: o Assistente, o Preparar, a legenda do vídeo, o leitor
 // de ebooks e o service worker da extensão. Personalidade escrita em cinco
 // lugares vira cinco pessoas diferentes.
 //
@@ -27,7 +27,7 @@ COMO ELA SOA (isto pesa mais que o conteúdo):
 ${extra || ''}`
 }
 
-// Explicação curta (Revisar, vídeo, leitor, extensão): a mesma voz, com o
+// Explicação curta (Preparar, vídeo, leitor, extensão): a mesma voz, com o
 // formato que essas telas comportam — 2 a 4 frases, sem introdução.
 function lexaExplicar() {
   return lexaSistema(`
@@ -107,7 +107,7 @@ async function wikiIlustracao(termo, idioma) {
   return out
 }
 
-// Markup compartilhado (leitor e Revisar usam o mesmo) — sem estado, só HTML.
+// Markup compartilhado (leitor e Preparar usam o mesmo) — sem estado, só HTML.
 // A MINIATURA abre o zoom (é o que a mão quer fazer ao ver uma foto pequena);
 // o link para o verbete foi para o título, embaixo, que é onde se procura
 // "quero ler mais". Antes a imagem levava para fora do app no primeiro clique.
@@ -130,7 +130,7 @@ function wikiFiguraHTML(info) {
 // Lupa da figura — vale para qualquer tela que use wikiFiguraHTML
 // ---------------------------------------------------------------
 // Delegação num ouvinte só: o HTML da figura é injetado em popups diferentes
-// (leitor, Revisar) que nascem e morrem o tempo todo; ligar handler em cada
+// (leitor, Preparar) que nascem e morrem o tempo todo; ligar handler em cada
 // um seria ouvinte órfão garantido.
 function llZoomFechar() {
   const z = document.getElementById('ll-zoom')

@@ -403,8 +403,8 @@ function videoPrepAdd() {
     added++
   })
   renderDashboard()
-  toast(`${added} palavra${added !== 1 ? 's' : ''} enviada${added !== 1 ? 's' : ''} para Revisar (a IA analisa lá)`, 'success')
-  showSection('revisar')
+  toast(`${added} palavra${added !== 1 ? 's' : ''} enviada${added !== 1 ? 's' : ''} para Preparar (a IA analisa lá)`, 'success')
+  showSection('preparar')
 }
 async function videoOpenPlayerBack() {
   if ((_vidFile || _vidStream) && _vidCur) await videoOpenPlayer(_vidCur)
@@ -477,7 +477,7 @@ function _vidRenderFocus(panel) {
       <div class="vid-dit-res">
         <div class="vid-dit-score">Ditado: <b>${r.pct}%</b> do trecho reconhecido de ouvido</div>
         <div class="vid-dit-marks">${r.ref.map((w, k) =>
-          `<span class="vid-word ${r.okRef[k] ? 'dit-ok' : 'dit-bad'}"${r.okRef[k] ? '' : ` onclick="videoDitAddRevisar('${escA(w)}')" data-tip="Não pegou de ouvido — clique para mandar ao Revisar"`}>${esc(w)}</span>`).join(' ')}</div>
+          `<span class="vid-word ${r.okRef[k] ? 'dit-ok' : 'dit-bad'}"${r.okRef[k] ? '' : ` onclick="videoDitAddRevisar('${escA(w)}')" data-tip="Não pegou de ouvido — clique para mandar ao Preparar"`}>${esc(w)}</span>`).join(' ')}</div>
         ${r.extras.length ? `<div class="vid-dit-extras">Você escreveu a mais: ${r.extras.map(esc).join(', ')}</div>` : ''}
       </div>`
   }
@@ -581,7 +581,7 @@ function videoDitAddRevisar(palavra) {
   if (!_vidCur) return
   createWord({ word: palavra, context: _vidSelText(), source_type: _vidCur.source_type || 'series', source_title: _vidCur.title, lang: _vidCur.lang })
   renderDashboard()
-  toast(`"${palavra}" enviada para Revisar`, 'success')
+  toast(`"${palavra}" enviada para Preparar`, 'success')
 }
 
 // ================================================================
@@ -669,12 +669,12 @@ function _vidOvSelCheck() {
       <b>"${esc(txt)}"</b>
       <button class="btn btn-secondary btn-sm" onclick="videoOvExplain()" data-tip="Mini-explicação da IA aqui mesmo — sentido na fala, gíria, referência cultural">${ic('sparkles','ic-sm')}Explicar</button>
       <button class="btn btn-primary btn-sm" onclick="videoOvStudy(true)" data-tip="Cria o card já com o áudio real desta cena">${ic('zap','ic-sm')}Estudar com áudio</button>
-      <button class="btn btn-ghost btn-sm" onclick="videoOvStudy(false)" data-tip="Manda para a fila do Revisar (a IA analisa lá)">${ic('eye','ic-sm')}Revisar</button>
+      <button class="btn btn-ghost btn-sm" onclick="videoOvStudy(false)" data-tip="Manda para a fila do Preparar (a IA analisa lá)">${ic('eye','ic-sm')}Preparar</button>
     </div>`
   pop.classList.remove('hidden')
 }
 
-// Explicar ALI MESMO, sobre o vídeo — mesma mecânica do Revisar (34ª rodada):
+// Explicar ALI MESMO, sobre o vídeo — mesma mecânica do Preparar (34ª rodada):
 // clique no popup não colapsa a seleção nem o fecha; cache compartilhado.
 async function videoOvExplain() {
   const txt = window._vidOvSelText
@@ -731,7 +731,7 @@ async function videoOvStudy(comAudio) {
   } else {
     createWord({ word: alvo, context: c.t, source_type: _vidCur.source_type || 'series', source_title: _vidCur.title, lang: _vidCur.lang })
     renderDashboard()
-    toast(`"${alvo}" enviado para Revisar`, 'success')
+    toast(`"${alvo}" enviado para Preparar`, 'success')
   }
 }
 

@@ -214,7 +214,7 @@ async function lerExcluir(id) {
   if (!(await confirmModal({
     title: 'Remover da estante', icon: 'trash', confirmText: 'Remover',
     html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Apagar <b>${esc(l.title)}</b> e o arquivo deste aparelho.
-           Os <b>cards que você já criou continuam</b> — eles vivem no Revisar/Estudar, não aqui.</p>`
+           Os <b>cards que você já criou continuam</b> — eles vivem em Estudar/Revisar, não aqui.</p>`
   }))) return
   await BookDB.del(id)
   // As leituras de capítulo (`pre:<id>:<n>`) morrem com o livro. Sem isto elas
@@ -272,7 +272,7 @@ function lerFechar() {
   _lerLivro = null; _lerEpub = null
   _lerT = null
   // Fechar o livro derruba a leitura junto: sem isto, as glosas do romance
-  // apareceriam sobre o texto do Revisar e do Assistente, que usam o mesmo
+  // apareceriam sobre o texto do Preparar e do Assistente, que usam o mesmo
   // glossário e não têm nada a ver com aquele contexto.
   if (typeof glossPreLimpar === 'function') glossPreLimpar()
   document.body.classList.remove('lendo')
@@ -556,7 +556,7 @@ function _lerRenderTipografia() {
       `<button class="ler-btn ler-pill${m === c.modo ? ' on' : ''}" onclick="lerAjustar('modo','${m}')">${m === 'pag' ? 'Virar página' : 'Rolagem'}</button>`).join(''))}
     ${linha('Destacar', [['nada', 'Nada'], ['minhas', 'O que estou estudando']].map(([v, r]) =>
       `<button class="ler-btn ler-pill${v === c.pintar ? ' on' : ''}" onclick="lerAjustar('pintar','${v}')">${r}</button>`).join(''))}
-    <div class="ler-tip-nota">Dica: <b>duplo-clique</b> numa palavra manda ela para o Revisar com a frase.
+    <div class="ler-tip-nota">Dica: <b>duplo-clique</b> numa palavra manda ela para o Preparar com a frase.
       Selecione um trecho para a ${lexaNome()} explicar, ouvir em voz alta, salvar para estudo
       ou procurar na Wikipédia.</div>`
 }
@@ -951,7 +951,7 @@ function _lerTeclas(e) {
 // CAPTURA — a razão de o livro morar aqui dentro
 // ================================================================
 // Duplo-clique numa palavra: o navegador já a seleciona sozinho, então só
-// precisamos ler a seleção, achar a frase em volta e mandar para o Revisar.
+// precisamos ler a seleção, achar a frase em volta e mandar para o Preparar.
 function _lerDuploClique(ev) {
   const sel = window.getSelection()
   const palavra = String(sel || '').replace(/\s+/g, ' ').trim()
@@ -990,7 +990,7 @@ function _lerFraseEmVolta(sel, alvo) {
 
 // Quantas palavras ainda são "um objeto de estudo" e não uma frase inteira.
 // Acima disso, o que você marcou É o contexto — não faz sentido virar título
-// de card, e quem quebra em itens é o Raio-X da triagem, no Revisar.
+// de card, e quem quebra em itens é o Raio-X da triagem, no Preparar.
 const LER_MAX_ALVO = 4
 
 function _lerCapturar(selecao, frase, alvoDOM) {
@@ -1014,7 +1014,7 @@ function _lerCapturar(selecao, frase, alvoDOM) {
       id: uid(), cap: _lerCap, word: '', text: bruto, wordId: w && w.id, created_at: Date.now()
     })
     _lerPersistirCaptura()
-    toast('Trecho salvo no Revisar — a triagem quebra em itens lá', 'success')
+    toast('Trecho salvo no Preparar — a triagem quebra em itens lá', 'success')
     return
   }
 
@@ -1033,7 +1033,7 @@ function _lerCapturar(selecao, frase, alvoDOM) {
     id: uid(), cap: _lerCap, word: limpa, text: frase, wordId: w && w.id, created_at: Date.now()
   })
   _lerPersistirCaptura()
-  toast(`"${limpa}" foi para o Revisar`, 'success')
+  toast(`"${limpa}" foi para o Preparar`, 'success')
 }
 
 function _lerPersistirCaptura() {
@@ -1084,7 +1084,7 @@ function _lerAoSelecionar() {
       const achado = partes.length > 1
         ? (glossBuscar(partes[0], partes[1]) || glossBuscar(txt))
         : glossBuscar(txt)
-      // Entra mesmo SEM glosa: "já está no Revisar" evita que ele mande a
+      // Entra mesmo SEM glosa: "já está no Preparar" evita que ele mande a
       // mesma palavra de novo pelo botão Estudar logo abaixo, e "você marcou
       // como conhecida" explica por que ela não aparece mais para estudar.
       if (achado) {
@@ -1100,7 +1100,7 @@ function _lerAoSelecionar() {
       <b>"${esc(txt.length > 34 ? txt.slice(0, 34) + '…' : txt)}"</b>
       <button data-p="exp">Explicar</button>
       <button data-p="rev" data-tip="${ehFrase
-        ? 'Salva a frase no Revisar — a triagem por IA quebra em palavras, phrasals e expressões'
+        ? 'Salva a frase no Preparar — a triagem por IA quebra em palavras, phrasals e expressões'
         : 'Cria o item de estudo com a frase do livro como contexto'}">${ehFrase ? 'Salvar frase' : 'Estudar'}</button>
     </div>
     <div class="ler-pop-extras">
@@ -1527,7 +1527,7 @@ function _lerFerCorpoHTML() {
     <p class="ler-fer-nota">${_lerLeituraDaCobertura(a.cobertura)}</p>
     ${meta.html}
     <div class="ler-fer-acoes">
-      <button class="btn btn-primary btn-sm" onclick="lerMandarNovas(10)">${ic('plus','ic-sm')} As 10 mais frequentes para o Revisar</button>
+      <button class="btn btn-primary btn-sm" onclick="lerMandarNovas(10)">${ic('plus','ic-sm')} As 10 mais frequentes para o Preparar</button>
       ${_lerDesfazer.length ? `<button class="btn btn-secondary btn-sm" onclick="lerDesfazerTriagem()">${ic('undo','ic-sm')} Desfazer (${_lerDesfazer.length})</button>` : ''}
     </div>
     ${_lerNivBlocoHTML()}
@@ -1535,7 +1535,7 @@ function _lerFerCorpoHTML() {
     <div class="ler-fer-triagem" onclick="_lerCliqueTriagem(event)">
       ${topo.map(x => `
         <span class="ler-tri" data-w="${escA(x.w)}">
-          <button class="ler-tri-w" data-a="estudo" data-tip="Não conheço — mandar para o Revisar com a frase do livro">
+          <button class="ler-tri-w" data-a="estudo" data-tip="Não conheço — mandar para o Preparar com a frase do livro">
             ${esc(x.w)}${x.n > 1 ? `<i>${x.n}×</i>` : ''}
           </button>
           <button class="ler-tri-ok" data-a="conheco" data-tip="Já conheço — nunca mais sugerir, e a cobertura sobe">${ic('check','ic-sm')}</button>
@@ -1608,7 +1608,7 @@ function lerMandarNovas(n) {
 // Faltava a outra metade da conta. A cobertura era medida contra o mapa de
 // palavras conhecidas, mas não havia como ALIMENTAR esse mapa a partir daqui —
 // então o painel mostrava "bright", "cold", "day" como palavras novas e a
-// única saída era mandar lixo para o Revisar. Marcar o que você já sabe é o
+// única saída era mandar lixo para o Preparar. Marcar o que você já sabe é o
 // que faz o número virar verdade, e vale para o app inteiro: a mesma medida
 // serve para série, podcast e para os outros livros da estante.
 let _lerDesfazer = []      // últimas marcações, para voltar atrás sem medo
@@ -1706,7 +1706,7 @@ async function _lerCapturarSemFrase(lista) {
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   if (typeof renderSidebar === 'function') { try { renderSidebar() } catch (e) {} }
   _lerRepintar()
-  toast(`${n} palavra${n > 1 ? 's' : ''} ${n > 1 ? 'foram' : 'foi'} para o Revisar`, 'success')
+  toast(`${n} palavra${n > 1 ? 's' : ''} ${n > 1 ? 'foram' : 'foi'} para o Preparar`, 'success')
   return n
 }
 
@@ -2392,7 +2392,7 @@ function lerNivDesfazerMarcacao() {
   lerNivAplicar(_lerCap).then(() => _lerRenderFerramentas())
 }
 
-// Manda para o Revisar SÓ as palavras NÃO MARCADAS de uma faixa. A semântica
+// Manda para o Preparar SÓ as palavras NÃO MARCADAS de uma faixa. A semântica
 // da tela é "marcado = eu conheço", então o que vale estudar é justamente o
 // que sobrou desmarcado — mandar as marcadas seria criar card do que ele
 // acabou de dizer que já sabe.
@@ -2404,7 +2404,7 @@ async function lerNivEstudarGrupo(nivel) {
   if (!lista.length) { toast('nenhuma palavra desmarcada em ' + nivel, 'info'); return }
   const c = CEFR.find(x => x.id === nivel)
   const ok = await confirmModal({
-    title: 'Mandar ' + nivel + ' para o Revisar',
+    title: 'Mandar ' + nivel + ' para o Preparar',
     icon: 'plus',
     confirmText: 'Mandar ' + lista.length,
     html: '<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.55">' +
@@ -2413,7 +2413,7 @@ async function lerNivEstudarGrupo(nivel) {
       (lista.length > 1 ? ' — as que continuam <b>desmarcadas</b>, ou seja, as que você não disse conhecer.<br><br>'
                         : ' — a que continua <b>desmarcada</b>.<br><br>') +
       'Cada uma vai com a <b>frase do capítulo</b> em que aparece. ' +
-      'A análise com IA continua sendo escolha sua, lá no Revisar.</p>'
+      'A análise com IA continua sendo escolha sua, lá no Preparar.</p>'
   })
   if (!ok) return
   _lerNivProgresso('mandando ' + lista.length + ' palavras de ' + nivel + '…', 0, 0, 0)
@@ -2421,7 +2421,7 @@ async function lerNivEstudarGrupo(nivel) {
   // Some da triagem: virou item de estudo, não é mais candidata a "conheço".
   _lerNiv.itens = _lerNiv.itens.filter(it => !(it.n === nivel && !_lerNiv.sel.has(it.w)))
   _lerRenderFerramentas()
-  if (n) toast(n + ' palavras de ' + nivel + ' foram para o Revisar', 'success')
+  if (n) toast(n + ' palavras de ' + nivel + ' foram para o Preparar', 'success')
 }
 
 function _lerNivRepintar() {

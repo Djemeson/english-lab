@@ -25,8 +25,8 @@ function renderSrsSection() {
     <div class="srs-empty">
       ${ic('book','ic-xl')}
       <p style="font-size:var(--fs-base);font-weight:600;margin-bottom:8px">Nenhum card ainda</p>
-      <p style="font-size:var(--fs-md);margin-bottom:20px">Revise suas palavras e clique em <strong>"Salvar para estudo"</strong></p>
-      <button class="btn btn-primary" onclick="showSection('revisar')">${ic('arrowRight')}Ir para Revisar</button>
+      <p style="font-size:var(--fs-md);margin-bottom:20px">Leia o material em <strong>Estudar</strong> e marque os itens estudados — é isso que enche esta fila</p>
+      <button class="btn btn-primary" onclick="showSection('estudar')">${ic('arrowRight')}Ir para Estudar</button>
     </div>`
   } else if (total === 0) {
     startArea.innerHTML = `
@@ -45,7 +45,7 @@ function renderSrsSection() {
     <div class="srs-vazio-fonte">
       ${ic('info','ic-sm')}
       <span>Nada para hoje em <b>${esc(nomeFonte)}</b> — mas há <b>${due + newRem}</b> em outras fontes.</span>
-      <button class="btn btn-secondary btn-sm" onclick="srsFonteDefinir('')">Estudar todas</button>
+      <button class="btn btn-secondary btn-sm" onclick="srsFonteDefinir('')">Revisar todas</button>
     </div>` : `
     <div style="text-align:center;padding:20px 0 4px">
       <p style="color:var(--text2);margin-bottom:16px;font-size:var(--fs-base)">
@@ -143,8 +143,8 @@ function renderDeckStatsTable() {
           <div class="dfs-item"><span class="dfs-value" style="color:var(--text2)">${counts.amanha}</span><span class="dfs-label">Amanhã</span></div>
         </div>
         ${hasCards
-          ? `<button class="btn btn-primary btn-sm" onclick="startSrsSession('${_focusDeckId}')">${ic('play')}Estudar agora (${queueSize} cards)</button>`
-          : `<p style="color:var(--text3);font-size:var(--fs-md);margin:0">Nenhum card para estudar agora neste baralho.</p>`
+          ? `<button class="btn btn-primary btn-sm" onclick="startSrsSession('${_focusDeckId}')">${ic('play')}Revisar agora (${queueSize} cards)</button>`
+          : `<p style="color:var(--text3);font-size:var(--fs-md);margin:0">Nenhum card para revisar agora neste baralho.</p>`
         }
       </div>`
     }
@@ -1090,7 +1090,7 @@ function _srsSeletorFonteHTML() {
   return `
     <div class="srs-fontes">
       <div class="srs-fontes-cab">
-        ${ic('layers','ic-sm')} <b>Estudar de onde?</b>
+        ${ic('layers','ic-sm')} <b>Revisar de onde?</b>
         <span>foque num livro, numa série — ou em tudo</span>
       </div>
       <div class="srs-fontes-lista">

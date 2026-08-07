@@ -3,12 +3,21 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
-> ⏳ **ENTREGA EM CURSO — leia a seção 8.1 antes de mexer em `js/dossie.js` ou em nomes de
-> seção.** O fluxo de 4 etapas (Preparar → Estudar → Revisar) foi aprovado e o módulo dos
-> dossiês existe, mas **ainda não está ligado a nenhuma tela**. A 8.1 traz o desenho, as duas
-> regras que o Djemeson decidiu, o que falta na ordem segura e as armadilhas.
+> ✅ **A ENTREGA DO FLUXO DE 4 ETAPAS ESTÁ CONCLUÍDA** (90ª rodada, 2026-08-07). A seção 8.1
+> deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
+> mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-06 — **"NÃO LEMBRO" — saindo do limbo sem perder o lugar
+> Última atualização: 2026-08-07 — **FLUXO DE 4 ETAPAS NO AR + RENOMEAÇÃO DOS IDS
+> (90ª rodada)**. A seção dos dossiês foi ligada (menu do computador e do celular, `_LAZY`,
+> service worker, CSS) e os ids internos trocaram de nome junto com os rótulos: `revisar` →
+> **`preparar`** (js/review.js), `estudar` → **`revisar`** (js/study.js, o SRS) e a seção nova
+> ficou com **`estudar`** (js/dossie.js). Os NOMES DOS ARQUIVOS não mudaram — de propósito.
+> O portão virou uma verdade só: quem marca `estudadoEm` é o `saveToSrs`, então o atalho
+> "Mandar para a Revisão" do Preparar não deixa mais o dossiê mentir. Itens antigos
+> (`in_srs` sem `estudadoEm`) são costurados no primeiro render. A seção também nasceu com
+> **busca e filtro** (Todos / Com pendência / Concluídos). Ver seção 8 (90ª rodada) e a 8.1.
+>
+> Anterior: 2026-08-06 — **"NÃO LEMBRO" — saindo do limbo sem perder o lugar
 > (89ª rodada)**. O balão dizia *"você marcou como conhecida"* para uma palavra que ele não
 > reconhecia, e aquilo era um beco: a palavra ficava marcada, não voltava para a fila, e a
 > única saída era caçá-la no Revisar. Agora esse estado (e o de *ignorada*) ganha um botão
@@ -19,7 +28,8 @@
 > como se volta, então vale para vídeo, podcast, Assistente e o que vier. A pílula "Voltar
 > para <obra>" vive no `body`, fora de qualquer seção. Ver seção 8 (89ª rodada).
 >
-> Anterior: 2026-08-06 — **ESTUDAR POR FONTE (88ª rodada)**: pedido de escolher a
+> Anterior: 2026-08-06 — **ESTUDAR POR FONTE (88ª rodada)** — hoje esse painel vive na
+> seção **Revisar** (era "Estudar" antes da renomeação da 90ª): pedido de escolher a
 > origem na hora de estudar ("por exemplo Flags on the Bayou, assim eu foco só nessas novas
 > entradas"). O dado já existia — todo card carrega `source_type`/`source_title` desde que
 > nasce — mas nunca tinha sido usado na fila do SRS, que só filtrava por deck. Agora o painel
@@ -567,7 +577,7 @@ js/firebase.js    — sincronização Firestore (TEMPO REAL)
 js/audio.js       — IndexedDB (AudioDB/CardsDB/ImageDB), TTS, Biblioteca (browser de cards), reanálise
 js/srs.js         — MOTOR SM-2 (estado srsCards/srsCfg/srsLog/srsSession)
 js/dashboard.js   — render do Dashboard
-js/review.js      — fila de Revisar + análise de IA (prompt principal)
+js/review.js      — seção PREPARAR (fila + análise de IA, prompt principal). Id: `preparar`
 js/settings.js    — Configurações (cfg, temas, AI_MODELS, limpar dados)
 js/init.js        — bootstrap (initApp) + service worker
 js/add.js         — aba Adicionar (manual/Kindle/Mídia/Website)  (CARREGADO LAZY)
@@ -575,7 +585,8 @@ js/kindle-db.js   — leitor SQLite só-leitura (vocab.db do Kindle), sem WASM  
 js/epub.js        — leitor de ZIP (DecompressionStream nativo) + parser EPUB  (LAZY, antes de ler.js)
 js/ler.js         — seção LER: estante, leitor, tipografia, captura, cobertura  (LAZY)
 js/consulta.js    — seção Assistente (chat IA, histórico, streaming, SRS múltiplo)  (NÃO-lazy)
-js/study.js       — UI/sessão do SRS          (CARREGADO LAZY)
+js/study.js       — seção REVISAR: UI/sessão do SRS. Id: `revisar`   (CARREGADO LAZY)
+js/dossie.js      — seção ESTUDAR: os dossiês por obra+capítulo. Id: `estudar`  (LAZY)
 js/known.js       — seção Palavras (gerenciador de vocabulário)  (LAZY)
 js/video*.js      — PACOTE lazy da seção Vídeo, carregado NESTA ordem:
                     video.js (estado + player + biblioteca)
@@ -584,6 +595,10 @@ js/video*.js      — PACOTE lazy da seção Vídeo, carregado NESTA ordem:
                     video-study.js (seleção, card com áudio real, ditado, shadowing)
                     video-podcast.js (agregador de podcasts: busca, feed, download)
 ```
+
+> ⚠️ **O NOME DO ARQUIVO NÃO É O NOME DA SEÇÃO** desde 2026-08-07: `review.js` = **Preparar**,
+> `study.js` = **Revisar**, `dossie.js` = **Estudar**. O mapa oficial está em `js/core.js`,
+> acima de `SECTIONS`. Ver seção 8.1.
 
 > ⚠️ **`consulta.js` é NÃO-lazy** (incluído sempre no index.html). Motivo: o `firebase.js`
 > precisa de `conversas`/`saveConversas` no sync e re-renderiza o Assistente no snapshot.
@@ -615,6 +630,10 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
 - **`words[]`** — itens capturados. Cada um: `{id, word, context, source_type, source_title,
   source_context, lang, status, ipa, type, type_label, meanings[], created_at, updated_at}`.
   `status`: `pending_ai` → `pending_review` → `in_srs` (ou `skipped`).
+  - **`estudadoEm`** (número, desde 2026-08-07): o instante em que o item foi dado por
+    estudado — é o que o manda para a repetição espaçada e o que a seção **Estudar** usa
+    para saber o que já saiu do dossiê. Quem grava é o **`saveToSrs()`**, sempre; itens
+    anteriores ao campo são costurados no 1º render do dossiê (ver 8.1).
   - `lang`: código ISO do idioma do item ('en' padrão/legado). `type` é supertipo universal
     (`word|phrasal_verb|idiom|collocation`; `phrasal_verb` = expressão verbal do idioma);
     `type_label` = nome local da categoria em PT (ex.: "verbo separável"). Ver `js/lang.js`.
@@ -753,11 +772,18 @@ maxInterval (36500), leechThreshold (50)
     a IA infere o gênero pela fonte e extrai só o que vira card, com significado **no contexto da
     fonte**. Cada item vira palavra em `pending_review` (via `createDocWord`) já com significado +
     exemplo + IPA + nível — pronto para salvar no SRS, sem perdas na revisão.
-- **Revisar** — sidebar (filtros em pílula + busca + lista) e card central com significados
-  selecionáveis. Ação principal: "Salvar para estudo" (cria os cards SRS). Badge de pendentes
-  fica NESTE item do menu.
-- **Estudar** — números clicáveis (Novos/Revisar/Aprender) abrem a Biblioteca filtrada;
-  tabela de baralhos; sessão de flip card + 4 botões (Errei/Difícil/Bom/Fácil).
+- **Preparar** (id `preparar`, `js/review.js`) — sidebar (filtros em pílula + busca + lista) e
+  card central com significados selecionáveis. Daqui o caminho normal é **Estudar**; o botão
+  **"Mandar para a Revisão"** é o atalho assumido que pula o dossiê. Badge de pendentes fica
+  NESTE item do menu.
+- **Estudar** (id `estudar`, `js/dossie.js`, LAZY) — os **dossiês**: tudo que foi captado de uma
+  obra + capítulo, com o material que a IA montou (frase original com tradução, significados,
+  definições e exemplos). Duas telas: grade de dossiês com barra de progresso e a leitura item
+  a item. **Marcar "Estudei" é o portão** que manda aquele item para a repetição espaçada.
+  Busca + filtro (Todos / Com pendência / Concluídos) no topo. Ver 8.1.
+- **Revisar** (id `revisar`, `js/study.js`, LAZY) — o SRS: números clicáveis
+  (Novos/Revisar/Aprender) abrem a Biblioteca filtrada; escolha de fonte; tabela de baralhos;
+  sessão de flip card + 4 botões (Errei/Difícil/Bom/Fácil).
 - **Biblioteca** — aba própria. Browser de todos os cards por baralho + preview. Botão
   **"Reanalisar tudo (corrigir)"**: regenera exemplos batendo com o significado, preenche
   variedade/registro e gera áudio das novas frases, **preservando o agendamento SRS**.
@@ -773,6 +799,55 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-07 (90ª rodada) — O FLUXO DE 4 ETAPAS NO AR + os ids renomeados
+
+**O pedido**: "continue a entrega em curso do ESTADO e já renomeie os ids também pra ficar tudo
+perfeitinho" — e, no meio da rodada, "adicione um filtro e um buscador pra essa nova seção".
+
+**O que foi ligado.** `js/dossie.js` existia desde `aa97a07` e não era carregado por ninguém.
+Agora tem seção no `index.html` (`#section-estudar` com `#dossie-area`), entrada no menu do
+computador **e do celular**, `_LAZY.estudar`, CSS próprio (`dos-*`) e lugar na lista
+network-first do `sw.js` (`CACHE` → `v131`).
+
+**A renomeação, que era a parte perigosa.** Foi um ciclo de três nomes, não uma troca:
+`revisar`→`preparar`, `estudar`→`revisar`, e a seção nova ficou com `estudar`. Varridos os ids
+(`section-*`, `nav-*`, `showSection()`, `_LAZY`, o `_refreshActiveViews` do **sync** e as regras
+`#section-estudar` do CSS) **e também os rótulos e textos** — deixar "vai para o Revisar" numa
+tela em que Revisar agora é o SRS seria pior que não renomear. A varredura alcançou
+`core.js`, `review.js`, `study.js`, `dashboard.js`, `firebase.js`, `known.js`, `ler.js`,
+`glossario.js`, `consulta.js`, `add.js`, `ai.js`, `audio.js`, `video-study.js`, `srs.js`,
+`index.html`, `styles.css` **e a extensão** (`kindle.js`, `netflix.js`, `bridge.js`,
+`popup.html`) — o botão da Netflix e o do Kindle Cloud Reader diziam "Revisar"/"Estudar".
+
+**O portão ganhou uma verdade só.** Em vez de cada tela marcar o item, quem grava `estudadoEm`
+passou a ser o **`saveToSrs()`**. O atalho do Preparar virou "Mandar para a Revisão" (com
+tooltip dizendo o que ele pula) e não deixa mais o dossiê mentir. `dossieEstudei()` chama
+`saveToSrs` **antes** de considerar feito: se ele recusar (nenhum significado marcado), o item
+não fica marcado com base numa gravação que não aconteceu.
+
+**Três coisas achadas olhando além do pedido:**
+1. **O dado velho.** Item com `status: 'in_srs'` e sem `estudadoEm` apareceria como pendente —
+   centenas deles. `_dossieCosturarLegado()` costura no render e só grava se mudou.
+   E o `desfazer` precisou devolver o `status`, senão a costura desfazia o desfazer.
+2. **O separador da chave era um caractere de CONTROLE literal no fonte** (invisível, morre em
+   copiar/colar). Virou escape `'\u0001'` — e a chave saiu de dentro do `onclick`, onde título
+   de livro com aspas ou `&` quebraria o clique.
+3. **O rodapé do celular tinha 6 itens e passou a ter 7.** Medido a 375px: o maior rótulo
+   ocupa 42px num espaço de 52px. "Biblioteca" virou "Cards" ali (e só ali).
+
+**Busca e filtro** (detalhes na 8.1): barra fixa fora do trecho que se repinta — senão o campo
+perde o foco a cada tecla — e filtro **não** persistido, pela lição do filtro de fonte do SRS.
+
+**Verificado ao vivo** (servidor local, dados de teste depois apagados): as 9 seções abrem e
+marcam o menu certo, sem erro no console; dossiês agrupados por obra+capítulo; marcar "Estudei"
+criou os 3 cards, mudou os dois badges e moveu o item; desfazer preservou os cards e sobreviveu
+a um segundo render; a chave com `U+0001` sobreviveu ao recarregamento; busca acha por
+capítulo, por significado e sem acento; e o foco não se perde ao digitar.
+
+**O que NÃO foi feito e por quê**: os arquivos continuam `review.js`/`study.js`/`dossie.js` —
+renomeá-los custaria histórico do git e lista do SW sem ganho real; e a seção não ganhou áudio
+nem imagem no dossiê (o material tem os dois) — é rodada própria, com decisão de layout.
 
 ### Sessão 2026-08-05 (79ª rodada) — SEÇÃO LER: o leitor de ebooks nativo
 
@@ -5015,11 +5090,12 @@ capítulo, análise. O padrão é a API de `core.js`:
 Tudo entra na pilha `#toasts`. **Nunca criar outro elemento `position:fixed` num canto da
 tela** — foi exatamente isso que fez o banner de áudio sobrepor os toasts.
 
-## 8.1 ENTREGA EM CURSO — o fluxo de 4 etapas (aprovado, PARCIALMENTE feito)
+## 8.1 O FLUXO DE 4 ETAPAS — CONCLUÍDO em 2026-08-07 (90ª rodada)
 
 > **Leia isto antes de mexer em `js/dossie.js` ou em qualquer nome de seção.**
-> Desenho aprovado pelo Djemeson em 2026-08-06. O módulo existe e está correto;
-> falta LIGAR e RENOMEAR. Nada aqui é especulação: são decisões já tomadas.
+> Desenho aprovado pelo Djemeson em 2026-08-06, implementado por inteiro em 2026-08-07.
+> A tabela de nomes abaixo é a MESMA que está em `js/core.js`, acima de `SECTIONS` —
+> se um dia divergirem, o código manda.
 
 ### O problema que motivou
 
@@ -5028,13 +5104,18 @@ O material que a IA monta é rico (item, significados, exemplos, frase original,
 cards de um significado cada**. Não havia onde LER o material montado, e ele não queria mandar
 para a repetição espaçada aquilo que ainda não tinha estudado.
 
-### O fluxo aprovado e os nomes
+### O fluxo e os nomes — COMO FICOU
 
-| Hoje (id interno) | Passa a se chamar | Papel |
-|---|---|---|
-| Revisar (`revisar`) | **Preparar** | a IA monta o material |
-| — (`dossie`, novo) | **Estudar** | ler o dossiê inteiro, por obra + capítulo |
-| Estudar (`estudar`) | **Revisar** | repetição espaçada (SRS) |
+| id da seção | Rótulo na tela | Arquivo | Papel |
+|---|---|---|---|
+| `preparar` (era `revisar`) | **Preparar** | `js/review.js` (não-lazy) | a IA monta o material |
+| `estudar` (novo) | **Estudar** | `js/dossie.js` (LAZY) | ler o dossiê inteiro, por obra + capítulo |
+| `revisar` (era `estudar`) | **Revisar** | `js/study.js` (LAZY) | repetição espaçada (SRS) |
+
+⚠️ **Os NOMES DOS ARQUIVOS não acompanharam a troca, e isso é decisão, não esquecimento:**
+renomeá-los quebraria o histórico do git e a lista do service worker sem ganhar nada. Então
+`review.js` = Preparar e `study.js` = Revisar. O mapa vive em `core.js` acima de `SECTIONS`,
+e cada um dos três arquivos tem a nota no topo. **Não invente outro mapa em outro arquivo.**
 
 "palavra" → **item** na interface: entram idiom, phrasal verb e colocação.
 
@@ -5044,39 +5125,68 @@ para a repetição espaçada aquilo que ainda não tinha estudado.
    revisão espaçada — não é preciso terminar o dossiê. Um ato, um significado.
 2. **Item por item**, não um botão único no fim.
 
-### O que JÁ ESTÁ FEITO (commit `aa97a07`)
+### Como o portão foi resolvido (item que faltava decidir)
 
-`js/dossie.js`, completo e com sintaxe validada — **mas não carregado por ninguém**.
-Agrupa por `source_title` + `source_context` (o capítulo já era gravado na captura: veja
-`ler.js` ~1010/1029/1696 — **nenhuma migração de dado é necessária**). Chave em JSON, não texto
-com separador (a 1ª tentativa usou caractere de CONTROLE, que sumiu ao gravar o arquivo).
-`dossieEstudei()` chama `saveToSrs(w.id)` para reusar a única verdade sobre "mandar para a
-revisão". `dossieDesfazerEstudo()` **não apaga cards do SRS** — eles podem ter histórico.
+O atalho **não sumiu**: "Salvar para estudo" no Preparar virou **"Mandar para a Revisão"**, com
+tooltip dizendo que ele pula a leitura do dossiê. O que mudou é que passou a existir **uma
+verdade só**: quem grava `estudadoEm` é o **`saveToSrs()`** (`js/srs.js`), não cada tela. Assim
+o Assistente, o card com áudio do vídeo e o atalho do Preparar deixam o dossiê coerente — item
+que está girando no SRS nunca aparece como "para estudar".
 
-### O QUE FALTA, na ordem segura
+`dossieDesfazerEstudo()` **não apaga cards do SRS** (eles já podem ter histórico), mas **devolve
+o `status` para `pending_review`** — sem isso a costura do legado (abaixo) remarcaria o item no
+render seguinte e o desfazer duraria uma fração de segundo.
 
-1. **Ligar a seção nova** (aditivo, não quebra nada): `<section id="section-dossie">` com um
-   `<div id="dossie-area">` no `index.html`; entrada no menu **desktop e mobile** (o mobile fica
-   por volta da linha 885); `_LAZY.dossie = 'js/dossie.js'` em `core.js` (~563); e `dossie.js`
-   na lista de módulos lazy do `sw.js` (~112).
-2. **CSS** das classes `dos-*` (grade de dossiês, cartão, item, barra de progresso).
-3. **RENOMEAR — a parte perigosa, merece passada própria e verificação inteira.**
-   `revisar` e `estudar` aparecem em **10 arquivos** (`core.js`, `dashboard.js`, `study.js`,
-   `ler.js`, `review.js`, `firebase.js`, `audio.js`, `consulta.js`, `known.js`, `glossario.js`)
-   — incluindo **o sync** e o **`_LAZY`**. Decidir antes: renomear só os RÓTULOS visíveis
-   (barato e seguro) ou também os ids internos (correto, mas exige varrer os 10).
-4. **O portão no botão antigo**: "Salvar para estudo" em Preparar ainda manda direto para o
-   SRS, contornando o dossiê. Depois de a seção nova existir, decidir se ele some, vira atalho
-   assumido, ou passa a exigir a marcação.
+### O dado que já existia no aparelho
 
-### Armadilhas conhecidas desta entrega
+Itens antigos têm `status: 'in_srs'` e nenhum `estudadoEm` (o campo nasceu aqui). O primeiro
+dossiê diria "300 para estudar" sobre coisas revisadas há semanas. `_dossieCosturarLegado()`
+roda a cada render, preenche `estudadoEm` a partir do `updated_at` e **só grava se mudou algo**
+— então também cura o aparelho que receber esses itens pela nuvem. Nenhuma migração manual.
 
-- `js/dossie.js` é **lazy**: não pode ser referenciado por arquivo do shell (armadilha nº 1).
-- `estudadoEm` é campo novo no card — conferir se o snapshot do Firebase o preserva
-  (`firebase.js`), senão ele some no primeiro sync.
-- Bumpar o `CACHE` do `sw.js` ao ligar.
+### Busca e filtro (mesma rodada, a pedido dele)
+
+Barra fixa no topo da seção: busca + três pílulas com contagem. Na grade elas são
+**Todos / Com pendência / Concluídos**; dentro de um dossiê, **Todos / Para estudar /
+Estudados**. A busca varre termo, frase de origem, significados, definições e exemplos — e na
+grade também casa **dentro dos itens**, porque "onde foi que eu vi *barrel*?" é a pergunta que
+traz alguém a esta tela. Sem acento e sem caixa (`_dosNorm`).
+Dois cuidados que valem para qualquer tela nova: **a barra fica FORA do trecho que se repinta**
+(`#dossie-corpo`), senão o campo perde o foco no meio da palavra; e **filtro não é persistido**,
+pela lição já paga do filtro de fonte do SRS — tela vazia sem explicação parece app quebrado.
+
+### Armadilhas desta entrega (todas verificadas)
+
+- `js/dossie.js` é **lazy**: nada do shell pode chamá-lo. Por isso o **badge da seção Estudar**
+  (`dossiePendentes`/`updateDossieBadge`) mora em **`core.js`**, chamado dentro de
+  `loadWords`/`saveWords` — todo caminho que muda um item passa por lá, inclusive o snapshot
+  da nuvem.
+- `estudadoEm` **sobrevive ao sync**: o `firebase.js` grava `words` inteiro (`{list: words}`),
+  sem lista de campos — verificado.
+- O separador da chave do dossiê é `'\u0001'` (U+0001) **por escape, nunca o caractere literal** no
+  fonte (invisível no editor, some em copiar/colar). Mesmo cuidado no regex de acentos.
+  A chave **não viaja dentro do `onclick`**: vai pelo índice, com o handler ligado em JS.
+- `CACHE` do `sw.js` bumpado para `v131` e `dossie.js` acrescentado à lista network-first.
 
 ## 9. Pendências / a verificar
+
+- [x] ~~Ligar a seção dos dossiês, renomear as seções e decidir o portão~~ — **feito na 90ª
+      rodada** (2026-08-07). Ver 8.1: está tudo lá, inclusive por que os arquivos NÃO foram
+      renomeados.
+- [ ] **O DOSSIÊ AINDA NÃO MOSTRA ÁUDIO NEM IMAGEM** (90ª rodada). O material tem os dois
+      (`AudioDB`, `ImageDB`) e a tela só mostra texto. É a diferença entre ler o material e
+      *estudar* o material. Ficou de fora por ser decisão de layout própria — um botão de ouvir
+      por exemplo, e a ilustração do sentido no cabeçalho do item.
+- [ ] **USAR O FLUXO NOVO COM DADO REAL** (90ª rodada). Tudo foi exercitado ao vivo, mas com 5
+      itens sintéticos. Com a base de verdade, conferir três coisas: (a) a **costura do legado**
+      (`_dossieCosturarLegado`) marcou como estudado exatamente o que já está no SRS — abrir a
+      seção e ver se algum dossiê antigo aparece com pendência que não existe; (b) a grade não
+      fica gigante demais (um livro com 40 capítulos = 40 cartões — se incomodar, agrupar por
+      obra e abrir os capítulos dentro); (c) a busca continua instantânea com centenas de itens
+      (`_dosItemTexto` remonta o texto a cada tecla; se pesar, cachear por `id`+`updated_at`).
+- [ ] **RENOMEAR OS ARQUIVOS `review.js`/`study.js`** — decidido NÃO fazer na 90ª. Só vale se um
+      dia o custo de lembrar "review.js é Preparar" superar o de perder o histórico do git e
+      mexer na lista do service worker. Registrado para não virar dúvida recorrente.
 
 - [x] ~~GLOSSÁRIO CAMADA 1 — dicionário bilíngue embarcado~~ — **medido e RECUSADO** na 83ª
       rodada. Cabia (0,26 MB comprimido) e cobria 91,5% do texto, mas erra `barrel`, `bore` e

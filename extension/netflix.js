@@ -337,7 +337,7 @@ function garantirBarra() {
     if (document.getElementById('englab-pop')) return
     if (pausadoPorNos) { tocar(); pausadoPorNos = false }
   })
-  // seleção de trecho → Explicar / Estudar (o popup do app)
+  // seleção de trecho → Explicar / Preparar (o popup do app)
   barra.querySelector('#englab-rule').addEventListener('click', ev => {
     const b = ev.target.closest('.englab-rb')
     if (b) { ev.stopPropagation(); seek(parseFloat(b.dataset.t) - 0.15) }
@@ -604,7 +604,7 @@ function renderFala(texto) {
   pintarPT()
 }
 
-// ---- popup de seleção: Explicar / Estudar / Revisar ----
+// ---- popup de seleção: Explicar / Preparar ----
 let popCtx = ''          // fala de origem CONGELADA no instante da selecao
 let popPausou = false
 function mostrarPopupSel() {
@@ -622,13 +622,13 @@ function mostrarPopupSel() {
     <div class="englab-pop-row">
       <b>"${sel.length > 40 ? sel.slice(0, 40) + '…' : sel}"</b>
       <button data-p="exp">Explicar</button>
-      <button data-p="rev">Estudar</button>
+      <button data-p="rev">Preparar</button>
     </div>
     <div class="englab-pop-body" id="englab-pop-body"></div>`
   if (!antigo) document.body.appendChild(pop)
   pop.onmousedown = e => e.preventDefault()   // não colapsa a seleção
   pop.querySelector('[data-p="rev"]').onclick = () => {
-    salvarCaptura(sel.toLowerCase(), popCtx); avisar(`"${sel}" vai para o Revisar`); fecharPopupSel()
+    salvarCaptura(sel.toLowerCase(), popCtx); avisar(`"${sel}" vai para o Preparar`); fecharPopupSel()
   }
   pop.querySelector('[data-p="exp"]').onclick = () => {
     const v2 = vid(); if (v2 && !v2.paused) { pausar(); popPausou = true }
