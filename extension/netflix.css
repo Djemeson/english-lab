@@ -27,7 +27,11 @@
   /* Largura FIXA: o padrao de legendagem (Netflix inclusive) e 42
      caracteres por linha, ate 2 linhas — dimensionamos por esse teto para
      o painel parar de mudar de tamanho a cada fala. */
-  width: min(1040px, 92vw); padding: 12px 16px;
+  /* Alargada (era 1040/92vw): a tradução quebrava em duas linhas por falta
+     de espaço — "ao longo de / anos" — e quebrar joga o texto para baixo,
+     afastando as duas legendas justamente quando ele quer acompanhar as
+     duas juntas. Mais largura resolve na horizontal, sem descer. */
+  width: min(1320px, 96vw); padding: 12px 18px;
   background: var(--ll-bg);
   border: 1px solid var(--ll-line);
   border-radius: 16px;
@@ -41,6 +45,14 @@
 .englab-mid {
   flex: 1; min-width: 0; text-align: center; padding: 0 2px;
   display: flex; flex-direction: column; justify-content: center;
+  /* A ALTURA RESERVADA MORA AQUI, não em cada linha. Antes o inglês
+     reservava 2,7em SEMPRE (duas linhas) mesmo exibindo uma só, e o
+     português era empurrado para o fim daquele espaço — era essa a
+     distância que incomodava. Agora o par fica colado e centralizado
+     junto, e o painel continua sem mudar de tamanho, que era o motivo
+     da reserva existir. */
+  min-height: clamp(74px, 6.2vw, 108px);
+  gap: 2px;
 }
 /* O player da Netflix aplica user-select:none nos containers — sem isto,
    arrastar para selecionar um trecho simplesmente nao funciona. */
@@ -52,9 +64,12 @@
 .englab-line {
   /* display BLOCK de proposito: com flex, os espacos entre as palavras
      viram "gaps" descartados e o texto sai grudado. */
-  display: block; min-height: 2.7em;
+  display: block; min-height: 1.35em;
   color: var(--ll-txt);
-  font-size: clamp(15px, 1.55vw, 23px); line-height: 1.35; font-weight: 500;
+  /* Um ponto menor que antes (era 1.55vw / 23px): encurta a linha, reduz a
+     quebra, e diminui o degrau de tamanho entre as duas legendas — os olhos
+     saltam menos de uma para a outra. */
+  font-size: clamp(15px, 1.45vw, 21px); line-height: 1.34; font-weight: 500;
   letter-spacing: 0; text-shadow: 0 2px 8px rgba(0,0,0,.6);
   overflow-wrap: break-word; word-break: normal; white-space: normal;
   max-height: 2.8em; overflow: hidden;
@@ -71,8 +86,11 @@
    pouquinho" que o Djemeson viu. Agora o espaco existe sempre que o modo
    PT esta ligado; so o conteudo fica invisivel. */
 .englab-pt {
-  display: none; margin-top: 5px; min-height: 1.3em; color: var(--ll-pt);
-  font-size: clamp(13px, 1.2vw, 17px); line-height: 1.35; font-weight: 400;
+  display: none; margin-top: 0; min-height: 1.3em; color: var(--ll-pt);
+  /* Sobe de 1.2vw/17px: com o inglês menor e o português maior, as duas
+     ficam mais próximas em peso — acompanhar as duas ao mesmo tempo deixa
+     de ser um salto. */
+  font-size: clamp(13px, 1.28vw, 18px); line-height: 1.34; font-weight: 400;
   overflow-wrap: break-word; max-height: 2.7em; overflow: hidden;
   text-shadow: 0 2px 8px rgba(0,0,0,.6);
   transition: filter .2s ease, opacity .2s ease;
@@ -190,7 +208,7 @@
 /* ---------------- régua de falas ---------------- */
 #englab-bar.englab-mudo .englab-line::after { content: '\00a0'; }
 .englab-rule {
-  position: relative; width: 100%; height: 22px; margin-top: 10px;
+  position: relative; width: 100%; height: 22px; margin-top: 12px;
   border-top: 1px solid var(--ll-line); padding-top: 8px; cursor: pointer;
   overflow: hidden;
   /* esmaece nas pontas: o trilho parece entrar e sair, nao ser cortado */
@@ -201,17 +219,32 @@
   position: absolute; left: 0; top: 8px; height: 14px; width: 100%;
   will-change: transform; backface-visibility: hidden;
 }
+/* PÍLULAS, não tracinhos. `border-radius: 3px` numa barra de 6px ainda lê
+   como traço reto; com raio total as pontas viram semicírculo e a régua
+   deixa de parecer pontilhado. Um leve degradê dá volume em vez do cinza
+   chapado, e o realce cresce a partir do CENTRO (top e height juntos), o
+   que evita o pulinho para baixo que havia. */
 .englab-rb {
-  position: absolute; top: 4px; height: 6px; border-radius: 3px;
-  background: rgba(255,255,255,.26);
-  transition: background-color .18s ease, height .18s ease, top .18s ease;
+  position: absolute; top: 4px; height: 7px; border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,.18));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
+  transition: background .18s ease, height .18s ease, top .18s ease, box-shadow .18s ease;
 }
-.englab-rb:hover { background: rgba(255,255,255,.55); height: 9px; top: 2.5px; }
-.englab-rb.cur { background: var(--ll-acc); height: 10px; top: 2px; }
+.englab-rb:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,.46));
+  height: 10px; top: 2.5px;
+}
+.englab-rb.cur {
+  background: linear-gradient(180deg, var(--ll-acc), color-mix(in srgb, var(--ll-acc) 72%, #000));
+  height: 12px; top: 1.5px;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ll-acc) 55%, transparent);
+}
+/* O cursor do agora: cápsula com brilho, não um risco de 2px */
 .englab-rnow {
-  position: absolute; left: 50%; top: 6px; width: 2px; height: 18px;
-  background: #fff; border-radius: 1px; opacity: .9; pointer-events: none;
-  box-shadow: 0 0 8px rgba(255,255,255,.5);
+  position: absolute; left: 50%; top: 4px; width: 3px; height: 15px;
+  transform: translateX(-1.5px);
+  background: #fff; border-radius: 999px; opacity: .95; pointer-events: none;
+  box-shadow: 0 0 10px rgba(255,255,255,.65), 0 0 2px rgba(255,255,255,.9);
 }
 
 /* Controles da Netflix a mostra (mouse em movimento): a barra sobe para
@@ -225,7 +258,9 @@
    "crescer um pouquinho" quando a fala chegava. Fixando, nao varia nunca e
    ainda cabe traducao de duas linhas sem cortar. */
 #englab-bar.englab-tem-pt .englab-pt {
-  display: block; height: 2.7em; min-height: 0; max-height: none;
+  /* `height` fixo saiu: quem garante que o painel não muda de tamanho agora
+     é o min-height do .englab-mid. Aqui o bloco só cresce até 2 linhas. */
+  display: block; height: auto; min-height: 1.34em; max-height: 2.7em;
 }
 #englab-bar.englab-tem-pt .englab-pt.englab-vazia { visibility: hidden; }
 

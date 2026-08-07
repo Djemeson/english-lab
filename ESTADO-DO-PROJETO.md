@@ -1199,6 +1199,31 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+191. **A BARRA DA NETFLIX: as duas legendas coladas e a régua em pílulas
+     (95ª rodada, 2026-08-06)**. Pedido: *"na tradução, alargue o espaçamento em vez de
+     descer… a distância entre a original e a tradução é grande… os pontilhados do tempo de
+     fala estão feios"*.
+     - **A distância tinha uma CAUSA, não era margem**: `.englab-line` reservava
+       **`min-height: 2.7em` SEMPRE** — duas linhas — mesmo exibindo uma só, e a tradução ia
+       para o fim daquele espaço vazio. A reserva existia por um bom motivo (o painel não pode
+       mudar de tamanho a cada fala), então a solução não foi removê-la e sim **mudá-la de
+       lugar**: a altura fixa passou para o `.englab-mid`
+       (`min-height: clamp(74px, 6.2vw, 108px)`), e o par fica junto e centralizado dentro
+       dela. Vão medido: **2px** (era uma linha inteira).
+     - **Largura de 1040 → 1320px** (96vw): a tradução quebrava em duas linhas por falta de
+       espaço, e quebrar empurra o texto para baixo — exatamente o oposto do que ele queria.
+     - **Degrau de tamanho reduzido**: inglês de 23 → 21px e português de 17 → 18px. Ele
+       sugeriu diminuir a original; fazer os dois movimentos aproxima mais sem encolher
+       demais a que ele lê primeiro.
+     - **A régua**: `border-radius: 3px` numa barra de 6px ainda lê como TRAÇO. Virou pílula
+       (`999px`), com degradê leve no lugar do cinza chapado, brilho na fala corrente e o
+       cursor do "agora" como cápsula em vez de risco de 2px. O realce cresce a partir do
+       centro (top e height juntos), o que tira o pulinho para baixo que havia.
+     - Verificado nos três regimes — fala curta, a do print e uma de duas linhas nos dois
+       idiomas: a barra mede **184px nos três** (a estabilidade que motivou a reserva está
+       preservada), o vão é 2px em todos, e nada é cortado (`scrollHeight` vs `clientHeight`).
+       `manifest.json` → **3.2.0**.
+
 190. **A EXTENSÃO NÃO ACOMPANHOU AS DUAS LIÇÕES DE IA DO DIA (94ª rodada, 2026-08-06)**.
      Erro na tela durante o episódio: *"Unsupported parameter: 'max_tokens' is not supported
      with this model. Use 'max_completion_tokens' instead."*
