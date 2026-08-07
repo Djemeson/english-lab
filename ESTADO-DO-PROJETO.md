@@ -3,6 +3,11 @@
 > Documento vivo. **Sempre leia este arquivo antes de iniciar qualquer tarefa** e
 > **atualize-o ao finalizar cada tarefa** (instrução fixada no `CLAUDE.md`).
 >
+> ⏳ **ENTREGA EM CURSO — leia a seção 8.1 antes de mexer em `js/dossie.js` ou em nomes de
+> seção.** O fluxo de 4 etapas (Preparar → Estudar → Revisar) foi aprovado e o módulo dos
+> dossiês existe, mas **ainda não está ligado a nenhuma tela**. A 8.1 traz o desenho, as duas
+> regras que o Djemeson decidiu, o que falta na ordem segura e as armadilhas.
+>
 > Última atualização: 2026-08-06 — **"NÃO LEMBRO" — saindo do limbo sem perder o lugar
 > (89ª rodada)**. O balão dizia *"você marcou como conhecida"* para uma palavra que ele não
 > reconhecia, e aquilo era um beco: a palavra ficava marcada, não voltava para a fila, e a
@@ -5009,6 +5014,67 @@ capítulo, análise. O padrão é a API de `core.js`:
 
 Tudo entra na pilha `#toasts`. **Nunca criar outro elemento `position:fixed` num canto da
 tela** — foi exatamente isso que fez o banner de áudio sobrepor os toasts.
+
+## 8.1 ENTREGA EM CURSO — o fluxo de 4 etapas (aprovado, PARCIALMENTE feito)
+
+> **Leia isto antes de mexer em `js/dossie.js` ou em qualquer nome de seção.**
+> Desenho aprovado pelo Djemeson em 2026-08-06. O módulo existe e está correto;
+> falta LIGAR e RENOMEAR. Nada aqui é especulação: são decisões já tomadas.
+
+### O problema que motivou
+
+O material que a IA monta é rico (item, significados, exemplos, frase original, imagem,
+áudio), mas o único caminho para fora era "salvar para estudo", que **estilhaça o dossiê em
+cards de um significado cada**. Não havia onde LER o material montado, e ele não queria mandar
+para a repetição espaçada aquilo que ainda não tinha estudado.
+
+### O fluxo aprovado e os nomes
+
+| Hoje (id interno) | Passa a se chamar | Papel |
+|---|---|---|
+| Revisar (`revisar`) | **Preparar** | a IA monta o material |
+| — (`dossie`, novo) | **Estudar** | ler o dossiê inteiro, por obra + capítulo |
+| Estudar (`estudar`) | **Revisar** | repetição espaçada (SRS) |
+
+"palavra" → **item** na interface: entram idiom, phrasal verb e colocação.
+
+### As duas regras que ELE decidiu
+
+1. **O portão é por item, não por dossiê.** Marcar um item como estudado é o que o manda para a
+   revisão espaçada — não é preciso terminar o dossiê. Um ato, um significado.
+2. **Item por item**, não um botão único no fim.
+
+### O que JÁ ESTÁ FEITO (commit `aa97a07`)
+
+`js/dossie.js`, completo e com sintaxe validada — **mas não carregado por ninguém**.
+Agrupa por `source_title` + `source_context` (o capítulo já era gravado na captura: veja
+`ler.js` ~1010/1029/1696 — **nenhuma migração de dado é necessária**). Chave em JSON, não texto
+com separador (a 1ª tentativa usou caractere de CONTROLE, que sumiu ao gravar o arquivo).
+`dossieEstudei()` chama `saveToSrs(w.id)` para reusar a única verdade sobre "mandar para a
+revisão". `dossieDesfazerEstudo()` **não apaga cards do SRS** — eles podem ter histórico.
+
+### O QUE FALTA, na ordem segura
+
+1. **Ligar a seção nova** (aditivo, não quebra nada): `<section id="section-dossie">` com um
+   `<div id="dossie-area">` no `index.html`; entrada no menu **desktop e mobile** (o mobile fica
+   por volta da linha 885); `_LAZY.dossie = 'js/dossie.js'` em `core.js` (~563); e `dossie.js`
+   na lista de módulos lazy do `sw.js` (~112).
+2. **CSS** das classes `dos-*` (grade de dossiês, cartão, item, barra de progresso).
+3. **RENOMEAR — a parte perigosa, merece passada própria e verificação inteira.**
+   `revisar` e `estudar` aparecem em **10 arquivos** (`core.js`, `dashboard.js`, `study.js`,
+   `ler.js`, `review.js`, `firebase.js`, `audio.js`, `consulta.js`, `known.js`, `glossario.js`)
+   — incluindo **o sync** e o **`_LAZY`**. Decidir antes: renomear só os RÓTULOS visíveis
+   (barato e seguro) ou também os ids internos (correto, mas exige varrer os 10).
+4. **O portão no botão antigo**: "Salvar para estudo" em Preparar ainda manda direto para o
+   SRS, contornando o dossiê. Depois de a seção nova existir, decidir se ele some, vira atalho
+   assumido, ou passa a exigir a marcação.
+
+### Armadilhas conhecidas desta entrega
+
+- `js/dossie.js` é **lazy**: não pode ser referenciado por arquivo do shell (armadilha nº 1).
+- `estudadoEm` é campo novo no card — conferir se o snapshot do Firebase o preserva
+  (`firebase.js`), senão ele some no primeiro sync.
+- Bumpar o `CACHE` do `sw.js` ao ligar.
 
 ## 9. Pendências / a verificar
 
