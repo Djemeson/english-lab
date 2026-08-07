@@ -1199,6 +1199,28 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+196. **PAREI DE DEPENDER DE CSS: a posição do flutuante passou a ser MEDIDA
+     (100ª rodada, 2026-08-06)**. Ele voltou dizendo que a régua continuava aparecendo e que o
+     painel não encolheu — e o CSS estava correto e bem formado nos dois casos, conferido no
+     arquivo. **Terceira vez na sessão que algo confere no meu teste e não vale na tela dele.**
+     - **A decisão**: quando uma regra visual depende de (a) vencer especificidade numa folha
+       grande e (b) acertar o nome de uma classe da NETFLIX, ela tem duas chances de falhar em
+       silêncio. Os dois problemas foram para o JS, onde são verificáveis:
+       · a **régua** some por `style` inline no flutuante — nenhuma folha sobrescreve isso, e
+         ela volta sozinha ao entrar na doca;
+       · a **posição** é ancorada 10px acima do **topo real dos controles**, medido com
+         `getBoundingClientRect` numa lista de seletores conhecidos. Renomeou classe? A lista
+         não casa, a função devolve o controle ao CSS e a legenda fica só um pouco mais alta.
+     - Filtro contra falso positivo: o seletor só vale se o elemento tiver altura > 8px **e**
+       estiver na metade de baixo da tela — alguns desses seletores também casam com
+       contêineres que ocupam a página inteira.
+     - ⚠️ **Bug que o teste pegou**: eu usava `null` para dois significados — "ainda não
+       calculei" e "calculei e não achei painel". Depois de um reset, `alvo === _ultimoFundo`
+       dava `null === null` e a função saía cedo, deixando o valor velho grudado no `style`.
+       Agora `undefined` é "não calculei" e `null` é "não achei". Verificado nos 4 estados:
+       painel normal (130px), painel maior (190px, a barra sobe junto), **sem painel** (devolve
+       ao CSS) e doca (limpa o `style` e a régua volta). `manifest.json` → **3.7.1**.
+
 195. **COMPRIMIR O PAINEL DA NETFLIX, COMO O LANGUAGE REACTOR FAZ (99ª rodada, 2026-08-06)**.
      Ele mandou duas capturas **do Language Reactor** (ligado e desligado) — a referência, não
      um defeito nosso — e pediu "exatamente igual ao Reactor ativado".

@@ -379,6 +379,58 @@ function observarDoca() {
   docaRO = new ResizeObserver(() => medirDoca())
   docaRO.observe(barra)
 }
+// ================================================================
+// POSIÇÃO DO FLUTUANTE — medida, não adivinhada
+// ================================================================
+// Duas coisas vinham falhando por depender só de CSS:
+//   1. esconder a régua no flutuante (`display:none` numa regra que confere
+//      no teste e não valia na tela dele);
+//   2. subir a legenda o suficiente acima da barra de progresso, o que exigia
+//      acertar o nome da classe do painel da Netflix — que muda sem aviso.
+// Aqui os dois são resolvidos MEDINDO o que está na tela: a régua some por
+// `style` inline (vence qualquer folha), e a barra é ancorada logo acima do
+// topo real dos controles. Se nada for encontrado, o CSS assume — a legenda
+// fica um pouco mais alta e nunca cobre nada.
+const SEL_CONTROLES = [
+  '[data-uia="controls-standard"]',
+  '.watch-video--bottom-controls-container',
+  '[data-uia="timeline-bar"]',
+  '.PlayerControlsNeo__bottom-controls',
+  '.PlayerControlsNeo__layout'
+]
+function _topoDosControles() {
+  for (const sel of SEL_CONTROLES) {
+    const n = document.querySelector(sel)
+    if (!n) continue
+    const r = n.getBoundingClientRect()
+    // Só serve se estiver visível E na metade de baixo da tela: alguns desses
+    // seletores também casam com contêineres que ocupam a página inteira.
+    if (r.height > 8 && r.top > innerHeight * 0.5) return r.top
+  }
+  return null
+}
+
+// `undefined` = ainda não calculei; `null` = calculei e NÃO achei o painel.
+// Usar `null` para os dois fazia a função sair cedo depois de um reset e
+// deixar o valor velho grudado no style — o teste pegou.
+let _ultimoFundo
+function posicionarFlutuante() {
+  if (!barra) return
+  const flut = barra.classList.contains('englab-flut')
+  const rule = barra.querySelector('#englab-rule')
+  // A RÉGUA sai por style inline no flutuante: nenhuma folha de estilo
+  // sobrescreve isso, e ela volta sozinha ao entrar na doca.
+  if (rule) rule.style.display = flut ? 'none' : ''
+  if (!flut) { if (_ultimoFundo !== undefined) { barra.style.bottom = ''; _ultimoFundo = undefined } return }
+  const topo = _topoDosControles()
+  // 10px de folga acima dos controles. Piso de 72px para o caso de a medida
+  // vir estranha (player em transição, tela pequena).
+  const alvo = topo == null ? null : Math.max(72, Math.round(innerHeight - topo + 10))
+  if (alvo === _ultimoFundo) return
+  _ultimoFundo = alvo
+  barra.style.bottom = alvo == null ? '' : alvo + 'px'
+}
+
 function aplicarDoca() {
   const on = !!(cfgUI.ligada && cfgUI.doca && idDoTitulo())
   document.documentElement.classList.toggle('englab-dock', on)
@@ -391,6 +443,8 @@ function aplicarDoca() {
   // tamanho dela e nada nosso fica pendurado no player.
   document.documentElement.classList.toggle(
     'englab-flut-on', !!(cfgUI.ligada && !cfgUI.doca && idDoTitulo()))
+  _ultimoFundo = undefined       // força recalcular ao trocar de modo
+  posicionarFlutuante()
   const btn = barra && barra.querySelector('button[data-a="doca"]')
   if (btn) {
     btn.innerHTML = cfgUI.doca ? IC_BAIXO : IC_CIMA
@@ -616,6 +670,7 @@ function renderAtual() {
   // ela so era criada quando um texto MUDAVA, entao um video que comecava
   // calado ficava sem barra (e sem os botoes de navegacao).
   if (cfgUI.ligada && idDoTitulo() && v) garantirBarra().style.display = 'flex'
+  posicionarFlutuante()   // os controles aparecem e somem; a medida acompanha
   const doDOM = textoDOM()
   let t = ''
   if (cues.length && v) {
