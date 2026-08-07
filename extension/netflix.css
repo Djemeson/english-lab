@@ -261,12 +261,45 @@
    legenda que pula de lugar a cada movimento do mouse é pior de acompanhar
    do que legenda um pouco mais alta. Fica FIXA numa altura que já livra os
    controles, e a regra de subida é anulada aqui. */
+/* ================================================================
+   COMPACTAR O PAINEL DE CONTROLES DA NETFLIX (só no flutuante)
+   ================================================================
+   Medido nas capturas do Language Reactor: com ele ativo a barra de
+   progresso fica a ~87px do chão; sem ele, a ~110px. Ele ENCOLHE o painel
+   inferior da Netflix, e é isso que libera a legenda para descer.
+   Sem esse encolhimento, descer a nossa legenda a colocaria por cima da
+   barra de progresso — que é exatamente o que ele não quer.
+
+   ⚠️ Estes seletores são da Netflix, não nossos: se ela renomear as
+   classes, a regra deixa de casar e o painel volta ao tamanho normal. A
+   legenda continua legível nesse caso (fica só um pouco mais alta), então
+   a falha é BENIGNA — nunca cobre a barra, porque a nossa altura tem piso
+   próprio. Nada aqui usa !important por isso mesmo.
+   Só vale no modo flutuante: na doca o player já é redimensionado. */
+html.englab-flut-on .watch-video--bottom-controls-container {
+  padding-bottom: 0;
+}
+html.englab-flut-on .watch-video--bottom-controls-container > div {
+  padding-bottom: 8px;
+}
+
 /* Encostada na barra de progresso, sem cobri-la. Em px com piso, não em %:
    os controles da Netflix têm altura praticamente FIXA, então uma
    porcentagem afasta demais em tela alta e encosta demais em tela baixa.
    O piso de 104px é o que livra a barra de progresso e a fileira de botões. */
 #englab-bar.englab-flut,
 #englab-bar.englab-flut.englab-up { bottom: max(104px, 11vh); }
+/* Com o painel comprimido dá para descer: o piso cai de 104 para 84px.
+   Continua ACIMA da barra de progresso comprimida (~72px), com folga. */
+html.englab-flut-on #englab-bar.englab-flut,
+html.englab-flut-on #englab-bar.englab-flut.englab-up { bottom: max(84px, 9vh); }
+/* E o respiro interno encolhe: no flutuante a barra é transparente, então
+   padding ali é só distância entre o texto e o chão. */
+html.englab-flut-on #englab-bar.englab-flut { padding: 4px 18px; }
+/* A transição de `bottom` existia para suavizar o salto 9% ↔ 22%. Sem salto,
+   ela só pode produzir um deslize na entrada — e foi ela que fez meu próprio
+   teste medir 110px onde o valor final era 90px. */
+#englab-bar.englab-flut { transition: none; }
 
 /* Com o modo PT ligado, a linha de traducao SEMPRE ocupa o lugar dela.
    ALTURA FIXA (2 linhas, como a do ingles): com min-height, a linha vazia

@@ -385,6 +385,12 @@ function aplicarDoca() {
   if (on) { observarDoca(); medirDoca(); setTimeout(medirDoca, 80) }
   else document.documentElement.style.removeProperty('--ll-dock')
   if (barra) barra.classList.toggle('englab-flut', !cfgUI.doca)
+  // Classe no <html> porque o painel de controles da Netflix é IRMÃO da
+  // nossa barra, não filho — não dá para alcançá-lo de dentro dela.
+  // Só quando a barra está de fato visível: desligada, a Netflix volta ao
+  // tamanho dela e nada nosso fica pendurado no player.
+  document.documentElement.classList.toggle(
+    'englab-flut-on', !!(cfgUI.ligada && !cfgUI.doca && idDoTitulo()))
   const btn = barra && barra.querySelector('button[data-a="doca"]')
   if (btn) {
     btn.innerHTML = cfgUI.doca ? IC_BAIXO : IC_CIMA
@@ -643,6 +649,7 @@ setInterval(() => {
     if (barra) barra.style.display = 'none'
     document.documentElement.classList.remove('englab-hide-native')
     document.documentElement.classList.remove('englab-dock')
+    document.documentElement.classList.remove('englab-flut-on')
     return
   }
   const v = vid(); if (!v) return

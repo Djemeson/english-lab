@@ -1199,6 +1199,30 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+195. **COMPRIMIR O PAINEL DA NETFLIX, COMO O LANGUAGE REACTOR FAZ (99ª rodada, 2026-08-06)**.
+     Ele mandou duas capturas **do Language Reactor** (ligado e desligado) — a referência, não
+     um defeito nosso — e pediu "exatamente igual ao Reactor ativado".
+     - **O que as capturas mostram, medido**: com o LR ativo a barra de progresso da Netflix
+       fica a **~87px** do chão; sem ele, a **~110px**. O LR **encolhe o painel inferior da
+       Netflix**, e é isso que libera a legenda dele para descer. Era o "painel menor".
+     - **Por que a nossa não descia**: o texto já estava a 114px do chão, a 4px da barra de
+       progresso no tamanho normal. Descer mais **cobriria** a barra — exatamente o que ele
+       não queria. Sem comprimir o painel, não havia para onde ir.
+     - **Implementado**: classe `englab-flut-on` no `<html>` (o painel da Netflix é IRMÃO da
+       nossa barra, não filho — não dá para alcançá-lo de dentro dela), que zera o
+       `padding-bottom` do container de controles. Com ele comprimido, o piso da legenda cai de
+       104 para **84px** e o respiro interno da barra de 12 para 4px.
+     - **Falha benigna por desenho**: os seletores do container são da NETFLIX. Se ela
+       renomear as classes, a regra deixa de casar e o painel volta ao tamanho normal — a
+       legenda fica só um pouco mais alta e **nunca** cobre a barra, porque a altura tem piso
+       próprio. Nada de `!important` justamente para não brigar com o layout deles.
+     - ⚠️ **Meu teste mentiu por 220ms**: a primeira medição acusou "ganho de 1px" porque
+       `#englab-bar` tem `transition: bottom .22s` e eu medi 100ms depois de trocar a classe —
+       no meio da animação. O valor final era 90px, não 110. E o achado colateral: com a
+       posição agora fixa, essa transição não serve mais para nada e só pode produzir deslize
+       na entrada — **removida** no flutuante. Regra prática: medir propriedade animada só
+       depois da transição, ou desligá-la no teste. `manifest.json` → **3.6.0**.
+
 194. **TRÊS DEFEITOS DO FLUTUANTE, DOIS DELES MEUS (98ª rodada, 2026-08-06)**.
      - **Mais perto da barra de progresso**: de `18%` para `max(104px, 11vh)`. Em px com piso,
        não em porcentagem: os controles da Netflix têm altura praticamente FIXA, então uma
