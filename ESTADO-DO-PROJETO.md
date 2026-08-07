@@ -7,7 +7,21 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-07 — **FLUXO DE 4 ETAPAS NO AR + RENOMEAÇÃO DOS IDS
+> Última atualização: 2026-08-07 — **AS TRÊS ESCADAS DO CSS (91ª rodada)**. Rodada de
+> *design*, não de função: o pedido foi "passar o olho no layout e propor mudanças". A varredura
+> achou o CSS **já bem tokenizado em cor e tipografia** (1.451 `var(--…)`, só 7 `font-size` em
+> px) e **sem escada nenhuma** nas outras três dimensões: espaçamento (244 valores distintos,
+> zero token), camadas (18 z-index inventados um a um, de 1 a 99999) e breakpoints (11 valores
+> em 20 grafias). O z-index não era estética: a **navegação inferior do celular estava em 999,
+> ACIMA do overlay de modal (600)** — modal aberto no celular nascia atravessado pela barra.
+> Junto veio **código morto que mentia sobre o app**: dois blocos de `@media(max-width:700px)`
+> encolhendo a sidebar para 52px e 60px (medidas diferentes entre si!), impossíveis de acontecer
+> porque em 768px a sidebar já é `display:none`. Agora existem `--sp-1..--sp-10`, `--z-*`
+> nomeados e cinco degraus de breakpoint escritos como contrato no topo do arquivo. **`sw.js`
+> foi para `englab-v133`** — sem o bump o aparelho continuaria servindo o CSS velho.
+> Ver seção 8 (91ª rodada) e as pendências de design na 9.
+>
+> Anterior: 2026-08-07 — **FLUXO DE 4 ETAPAS NO AR + RENOMEAÇÃO DOS IDS
 > (90ª rodada)**. A seção dos dossiês foi ligada (menu do computador e do celular, `_LAZY`,
 > service worker, CSS) e os ids internos trocaram de nome junto com os rótulos: `revisar` →
 > **`preparar`** (js/review.js), `estudar` → **`revisar`** (js/study.js, o SRS) e a seção nova
@@ -745,6 +759,25 @@ maxInterval (36500), leechThreshold (50)
 - **Layout:** conteúdo centralizado (`.section` com max-width; Biblioteca é full-width),
   sidebar com logo + nav em pílulas agrupada ("Geral"/"Vocabulário") + bloco "Hoje" ancorado no
   fim do menu + linha de conta no rodapé, page-headers com ícone + ação à direita.
+- **As quatro escadas (91ª rodada).** Nada de valor solto: toda medida nova sai de um destes.
+  - **Tipografia** — `--fs-3xs` … `--fs-3xl` (10 degraus).
+  - **Espaçamento** — `--sp-1` (4px) … `--sp-10` (40px). Ficam fora só 1-3px (borda,
+    deslocamento óptico), o 0 e as medidas calibradas no olho de um componente único (barra de
+    legenda do vídeo, tipografia do leitor).
+  - **Camadas** — `--z-sticky` 60 · `--z-panel` 100 · `--z-nav` 200 · `--z-popover` 300 ·
+    `--z-hover` 400 · `--z-modal` 500 · `--z-modal-pop` 550 · `--z-lightbox` 600 · `--z-pill`
+    650 · `--z-gate` 700 · `--z-toast` 800 · `--z-tooltip` 900. **Camada nova entra AQUI,
+    nomeada** — nunca com um número solto na regra. Valores 1-10 literais no arquivo são
+    empilhamento local dentro de um componente e não competem com nada global.
+  - **Breakpoints** — 480 / 640 / **768 (CORTE MOBILE: a sidebar some e entram o header e a nav
+    inferior)** / 1040 / 1280. Sempre `@media (max-width:NNNpx)`, com espaço depois do `@media`.
+    ⚠️ **Nada abaixo de 768px pode mexer na `.sidebar`** — ela já é `display:none` ali. Duas
+    rodadas escreveram regras assim e as duas eram código morto.
+  - As escadas de espaço e camada moram em `:root` de propósito (como as famílias tipográficas):
+    **não mudam com o tema**, só as cores mudam.
+- **⚠️ Mexeu em `css/styles.css`? Bumpe o `CACHE` do `sw.js`.** O shell é cache-first: sem o
+  bump o aparelho continua servindo o CSS anterior mesmo depois do reload. Descoberto na
+  verificação da 91ª rodada, quando o navegador insistia em mostrar o layout velho.
 
 ---
 
@@ -802,6 +835,81 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-07 (91ª rodada) — AS TRÊS ESCADAS DO CSS (espaço, camada, breakpoint)
+
+**O pedido**: "vc tem skills ou plugins específicos de layout, design que poderia passar o olho
+no projeto e propor mudanças?" — e, depois do diagnóstico, "sim, pode fazer".
+
+**Resposta honesta sobre ferramenta**: não existe skill de auditoria de design para app
+existente. As que há (`artifact-design`, `artifact-diagramming`, `dataviz`, `DesignSync`) servem
+para artefatos publicados, gráficos e sincronização com design system — nenhuma revisa este
+projeto. A revisão foi feita à mão.
+
+**O diagnóstico.** O CSS **já estava bem tratado onde alguém tratou**: 1.451 usos de `var(--…)`,
+só 7 `font-size` em px, escala tipográfica de 10 degraus, `--text3` já corrigido para AA, seis
+temas, fontes com `preconnect` e cacheadas no service worker. O problema estava nas três
+dimensões que nenhuma rodada tinha tocado:
+
+1. **Espaçamento sem escada** — 244 valores DISTINTOS de `padding`/`gap`/`margin`, com 5, 7, 9,
+   11, 13, 15 e 18px convivendo com a escala par. Zero token. É o mesmo defeito que a escala
+   tipográfica resolveu (77 tamanhos → 10), na dimensão que ninguém tinha olhado.
+2. **Camadas sem escada** — 18 valores de `z-index` inventados um a um: 1, 3, 4, 5, 10, 20, 40,
+   60, 400, 500, 600, 620, 900, 999, 4000, 9999, 99999.
+3. **Breakpoints sem escada** — 11 valores (400/480/600/640/700/768/860/900/980/1040/1280) em
+   20 grafias diferentes (`@media (max-width:768px)` e `@media(max-width:768px)` no mesmo
+   arquivo).
+
+**O bug que estava escondido na desordem das camadas.** `.mobile-bottom-nav` tinha `z-index:999`
+e `.srs-modal-overlay` tinha `600`. Ou seja: **no celular, todo modal nascia atravessado pela
+barra de navegação** — a barra ficava por cima do overlay que deveria cobrir a tela inteira.
+Não era um caso raro, era toda vez. Agora chrome do app é `--z-nav` (200) e fica abaixo de
+modal, lightbox, toast e tooltip, como manda a ordem real da interface.
+
+**O código morto que MENTIA sobre o app.** Dois blocos separados de `@media(max-width:700px)`
+encolhiam a sidebar para o modo "só ícones" — um para `52px` com `padding:12px`, outro para
+`60px` com `padding:11px` (medidas diferentes para a mesma coisa, o segundo vencendo em
+silêncio). **Nenhum dos dois podia acontecer**: o corte mobile em 768px faz
+`.sidebar{display:none}`, e 700 < 768. Quem lesse o arquivo concluiria que existe uma sidebar
+de ícones no celular — não existe, ela some. Mesma história com
+`@media(max-width:700px){ .sb-today{display:none} }`: o bloco "Hoje" mora dentro da `.sb-nav`,
+que já não existe nessa largura. Tudo removido com o porquê registrado no lugar.
+
+**O que passou a existir** (topo de `css/styles.css`, junto dos tokens que já havia):
+
+- `--sp-1: 4px` … `--sp-10: 40px`. Os degraus **não foram inventados**: são os valores que o
+  arquivo já mais usava (8px 73×, 6px 52×, 10px 40×, 12px 36×, 4px 25×, 16px 19×), justamente
+  para que adotar a escala não redesenhe nada — só tire as sobras de 1px do meio. Ficam fora de
+  propósito: 1-3px (borda, deslocamento óptico), o 0, e as medidas calibradas no olho de um
+  componente só (barra de legenda do vídeo, tipografia do leitor).
+- `--z-sticky` (60) → `--z-panel` (100) → `--z-nav` (200) → `--z-popover` (300) → `--z-hover`
+  (400) → `--z-modal` (500) → `--z-modal-pop` (550) → `--z-lightbox` (600) → `--z-pill` (650) →
+  `--z-gate` (700) → `--z-toast` (800) → `--z-tooltip` (900). **A ordem antiga foi preservada
+  item a item**, com uma exceção deliberada: a navegação inferior, que era o bug.
+  Os valores 1-10 soltos que sobraram (9 deles) são empilhamento LOCAL dentro de um card, de uma
+  célula do heatmap ou do palco do vídeo — continuam literais porque não competem com nada.
+- Os cinco degraus de breakpoint **escritos como contrato em comentário** (CSS não tem variável
+  em `@media`): 480 / 640 / **768 = corte mobile** / 1040 / 1280. Consolidações feitas:
+  400→480, 600→640, 700→768, 860→768, 900→1040, 980→1040. Cada uma tem o motivo no comentário
+  ao lado — a de 860→768 alinha a gaveta do Assistente com o momento em que o app inteiro vira
+  mobile; as de 900/980→1040 alinham Biblioteca e Vídeo com o Dashboard, que já colapsava lá.
+
+**Onde os tokens de espaçamento foram aplicados**: na faixa compartilhada (sidebar, layout,
+stats, card-box, lista de recentes, chips, quick-add, tabs, forms, botões, upload) **e na camada
+de reskin do fim do arquivo**, que é quem de fato vence a cascata. Descoberta da rodada: a faixa
+do topo é largamente sobrescrita pelo reskin — tokenizar só o topo teria sido decorativo. 113
+usos de `var(--sp-*)` no fim.
+
+**Verificado ao vivo** (servidor próprio na 8766, porque a 8765 estava ocupada): o CSS parseia
+inteiro (1.709 regras), **nenhuma `var()` fica sem resolver**, chaves balanceadas (1.979/1.979),
+zero erro no console, os tokens resolvem **nos seis temas** (estão em `:root` de propósito, como
+as famílias tipográficas: não mudam com o tema), sem overflow horizontal, e a escada de camadas
+confirmada no DOM em 375px (nav 200, toast 800, login 700).
+
+**⚠️ Armadilha encontrada na verificação**: o service worker estava servindo `englab-v132` em
+cache e o navegador mostrava o CSS VELHO mesmo depois do reload — foi preciso desregistrar o SW
+e limpar o cache para ver a mudança. **`CACHE` foi para `englab-v133`.** Toda rodada que mexer
+em `css/styles.css` precisa do bump, senão o aparelho do usuário fica com a versão anterior.
 
 ### Sessão 2026-08-07 (90ª rodada) — O FLUXO DE 4 ETAPAS NO AR + os ids renomeados
 
@@ -5196,6 +5304,30 @@ pela lição já paga do filtro de fonte do SRS — tela vazia sem explicação 
   teste: o navegador serviu o `review.js` velho até a versão subir.
 
 ## 9. Pendências / a verificar
+
+### Design / CSS — o que a 91ª rodada deixou aberto de propósito
+
+A revisão de design foi dividida em três rodadas, da mais barata e segura para a mais invasiva.
+**A rodada A saiu** (as escadas + o bug das camadas + o código morto). Faltam B e C:
+
+- [ ] **RODADA B — FOCO DE TECLADO E ALVO DE TOQUE.** Em 5.196 linhas de CSS há **dois**
+      `:focus-visible`, e o `index.html` tem **24 `<input>` com zero `<label for=>`**. Num app
+      onde ele digita palavra, frase e tradução o tempo todo, andar de Tab hoje é às cegas.
+      O material para consertar já existe: `--ring` está definido e é usado no `:focus` dos
+      inputs — falta um `:focus-visible` global usando o mesmo anel, e ligar cada `label` ao seu
+      campo. Junto: `--control-h` é 40px e só 5 regras no arquivo chegam a 44px — subir os
+      controles para 44px **só em `@media (hover:none) and (pointer:coarse)`**, sem tocar no
+      desktop (o leitor já faz isso certo nos seus botões; é o padrão a copiar).
+- [ ] **RODADA C — OS ESTILOS INLINE.** 136 `style="` no `index.html` e ~250 gerados nos JS
+      (`audio.js` 66, `study.js` 57, `add.js` 39, `dashboard.js` 25, `review.js` 22). Cada um é
+      um ponto onde o tema ativo pode não chegar — é a causa raiz típica de "no tema claro tal
+      caixa fica escura". Mexe em JS de várias telas, então é a de maior risco.
+- [ ] **ESPAÇAMENTO NO RESTO DO ARQUIVO.** Os `--sp-*` foram aplicados na faixa compartilhada e
+      na camada de reskin (113 usos). O CSS específico de cada seção (vídeo, leitor, dossiê,
+      assistente) ainda usa literais. Não é urgente e **não deve ser feito em varredura cega**:
+      parte daquelas medidas é calibrada no olho e perde ao ser arredondada.
+- [ ] **DUAS REGRAS `@media (hover:none)` separadas** (uma esconde `.ler-seta`, a outra também).
+      Sobreposição inofensiva, mas são o mesmo caso — vale unir quando alguém passar por ali.
 
 - [x] ~~Ligar a seção dos dossiês, renomear as seções e decidir o portão~~ — **feito na 90ª
       rodada** (2026-08-07). Ver 8.1: está tudo lá, inclusive por que os arquivos NÃO foram
