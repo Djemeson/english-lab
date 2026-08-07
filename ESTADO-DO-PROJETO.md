@@ -1199,6 +1199,32 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+193. **O FLUTUANTE: parou de pular e ganhou o desenho de legenda de verdade
+     (97ª rodada, 2026-08-06)**. Pedido com duas imagens — a nossa e a referência
+     (Language Reactor), *"exceto as cores"*.
+     - **Parou de subir e descer.** O salto `bottom: 9% ↔ 22%` existia para sair da frente da
+       barra de progresso quando os controles aparecem. Mas legenda que muda de lugar a cada
+       movimento do mouse é pior de acompanhar do que legenda um pouco mais alta — foi o que
+       ele pediu explicitamente. Agora é **fixa em 18%**, altura que já livra a barra de
+       progresso E a fileira de controles, e a regra de subida é anulada no flutuante.
+     - **⚠️ AS CAIXAS LARGAS ERAM CULPA MINHA, da 95ª rodada.** O `inline-block` que faz a
+       caixa abraçar o texto sempre esteve lá — mas eu tinha posto
+       `display:flex; flex-direction:column` no `.englab-mid`, e **`align-items: stretch` é o
+       padrão do flex**, o que estica os filhos para a largura toda e anula o `inline-block`.
+       Resultado: duas barras atravessando a tela com o texto perdido no meio. `align-items:
+       center` devolveu a largura do conteúdo (medido: 389px de caixa em 1220px disponíveis).
+     - **A hierarquia visual, lida da referência**: o inglês **sem caixa**, só texto com sombra
+       em camadas (contorno curto e opaco encostado na letra + halo largo que apaga fundo
+       claro — o truque da legenda nativa), maior e mais pesado; o português **com caixa justa**,
+       menor. Duas caixas empilhadas viram duas barras que competem com a cena; uma só separa
+       os papéis — o inglês é a cena, a tradução é o apoio. Cores mantidas (branco/âmbar), como
+       ele pediu.
+     - Verificado no modo flutuante: fundo do inglês transparente, sombra presente, caixa do
+       português presente e justa, inglês não estica, vão de 6px, fontes 27/20, e a posição
+       **idêntica com e sem a classe de controles à mostra** (180px nos dois).
+     - Lembrete que agora tem precedente: esta extensão tem **três** aparências — doca,
+       flutuante e a barra normal. Conferir na que o relato menciona. `manifest.json` → **3.4.0**.
+
 192. **EU ARRUMEI A MODALIDADE ERRADA — o modo DOCA (96ª rodada, 2026-08-06)**.
      Resposta ao ajuste anterior: *"ainda tá longe… as barrinhas você não mexeu, ainda tá
      feio"*. As duas observações estavam **literalmente certas**.

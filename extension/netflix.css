@@ -53,6 +53,11 @@
      da reserva existir. */
   min-height: clamp(74px, 6.2vw, 108px);
   gap: 2px;
+  /* `stretch` é o padrão do flex em coluna, e ele ANULA o `inline-block` que
+     faz a caixa da legenda abraçar o texto — era por isso que no flutuante
+     saíam duas barras largas com o texto perdido no meio. Centralizado, cada
+     linha volta a ter a largura do seu próprio conteúdo. */
+  align-items: center;
 }
 /* O player da Netflix aplica user-select:none nos containers — sem isto,
    arrastar para selecionar um trecho simplesmente nao funciona. */
@@ -251,6 +256,13 @@
    nao cobrir a barra de progresso — sem isso nao da para avancar o video. */
 #englab-bar.englab-up { bottom: 22%; }
 #englab-pop.englab-up { bottom: calc(22% + 104px); }
+/* NO FLUTUANTE A LEGENDA NÃO SOBE NEM DESCE. O salto 9% ↔ 22% existia para
+   sair da frente da barra de progresso quando os controles aparecem — mas
+   legenda que pula de lugar a cada movimento do mouse é pior de acompanhar
+   do que legenda um pouco mais alta. Fica FIXA numa altura que já livra os
+   controles, e a regra de subida é anulada aqui. */
+#englab-bar.englab-flut,
+#englab-bar.englab-flut.englab-up { bottom: 18%; }
 
 /* Com o modo PT ligado, a linha de traducao SEMPRE ocupa o lugar dela.
    ALTURA FIXA (2 linhas, como a do ingles): com min-height, a linha vazia
@@ -346,13 +358,38 @@ html.englab-dock #englab-pop { bottom: calc(var(--ll-dock) + 16px); }
 
 /* ---- MODO FLUTUANTE (minimizado): só a legenda volta à cena ---- */
 #englab-bar.englab-flut { background: transparent; border: none; box-shadow: none; backdrop-filter: none; }
-#englab-bar.englab-flut .englab-line,
-#englab-bar.englab-flut .englab-pt {
-  display: inline-block; padding: 6px 16px; border-radius: 10px;
-  background: rgba(10, 14, 20, .72); backdrop-filter: blur(6px);
+#englab-bar.englab-flut .englab-mid { min-height: 0; gap: 6px; }
+
+/* O INGLÊS NÃO TEM CAIXA. Duas caixas empilhadas viram duas barras que
+   competem com a cena; sem caixa, o texto flutua sobre a imagem e a leitura
+   fica mais leve. O que garante a legibilidade é a sombra em camadas — o
+   mesmo truque da legenda nativa: um contorno curto e opaco encostado na
+   letra, mais um halo largo e suave que apaga fundo claro atrás. */
+#englab-bar.englab-flut .englab-line {
+  display: inline-block; padding: 2px 6px; background: none; backdrop-filter: none;
+  color: var(--ll-txt); font-weight: 700;
+  font-size: clamp(18px, 1.75vw, 27px); line-height: 1.3;
+  text-shadow:
+    0 0 3px rgba(0,0,0,.95), 0 1px 2px rgba(0,0,0,.95),
+    0 2px 14px rgba(0,0,0,.75), 0 0 28px rgba(0,0,0,.5);
 }
-#englab-bar.englab-flut .englab-line { color: var(--ll-txt); font-weight: 600; }
-#englab-bar.englab-flut .englab-pt { color: var(--ll-pt); margin-top: 8px; }
+/* O PORTUGUÊS MANTÉM A CAIXA, e ela é o que separa os dois papéis: o inglês é
+   a cena, a tradução é o apoio. Justa ao texto (inline-block sem esticar),
+   cantos suaves e desfoque atrás — nunca uma faixa atravessando a tela. */
+#englab-bar.englab-flut .englab-pt {
+  display: inline-block; margin-top: 0;
+  padding: 5px 15px; border-radius: 12px;
+  background: rgba(8, 12, 18, .82); backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow: 0 4px 18px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.07);
+  color: var(--ll-pt); font-weight: 500;
+  font-size: clamp(15px, 1.32vw, 20px); line-height: 1.35;
+  text-shadow: 0 1px 2px rgba(0,0,0,.6);
+  max-width: min(1100px, 92vw);
+}
+/* A palavra sob o cursor precisa de fundo próprio agora que a linha não tem
+   caixa — sem isto o realce sumia contra cena clara. */
+#englab-bar.englab-flut .englab-w:hover,
+#englab-bar.englab-flut .englab-w.englab-ok { text-shadow: none; }
 #englab-bar.englab-flut .englab-nav,
 #englab-bar.englab-flut .englab-tools {
   background: rgba(10, 14, 20, .72); border-radius: 10px; padding: 4px 8px;
