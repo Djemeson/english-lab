@@ -1177,6 +1177,7 @@ CANONICALIZE AND MERGE — this is critical. Output each distinct EXPRESSION onl
 - different SENSES of the same expression (e.g. "run by" meaning "falar com alguém", "apresentar uma ideia", "repassar", "dar um pulo", "passar correndo" → still ONE item: "run by"),
 - INFLECTIONS (e.g. "ran by", "running by" → "run by"),
 - STRUCTURAL variants / patterns (e.g. "run something by someone", "run that by me again" → "run by").
+⚠️ CANONICALIZING IS NOT SHORTENING. The base form must keep every word the meaning DEPENDS ON. If the taught meaning only exists with fixed accompanying words, those words are PART of the item: the document teaching "apaixonar-se" teaches "fall in love", not "fall" — delete "in love" and the meaning is gone. Strip only inflection ("ran by" → "run by") and free slots ("run something by someone" → "run by"), never the fixed material itself.
 The base form uses the citation form of the language (bare verb + particle(s) for English phrasal verbs, infinitive — including the pronoun for pronominal/separable verbs, e.g. "arrepentirse", "se débrouiller", "aufgeben" — for verbs, the canonical wording for idioms). The multiple senses are added LATER (enrichment); here you only output the single base expression once, with the meaning of its MAIN/first sense.
 
 Eligible item types: meaningful single words, ${promptVariantHint(activeLang())}, set phrases. IGNORE titles, section headings, instructions, difficulty legends/emojis, "how to use" text and Portuguese-only filler.
@@ -1264,6 +1265,9 @@ Each sense object has:
 - "variety": "${promptVarietyEnum(activeLang())}" — ${_dL.varietyRule}
 - "origin_pt": Brazilian-Portuguese note (1-2 sentences) on the ORIGIN / why it means this — ONLY for idioms, multi-word verbal expressions, metaphors and words with a genuinely interesting etymology; EMPTY STRING "" otherwise; never invent.
 - "examples": EXACTLY 3 objects {"en":"...","pt":"..."} FOR THIS SENSE. PREFER the document's REAL example sentences that belong to this sense (read the whole document — including inflected forms like "ran by" and patterns like "run something by someone" — and assign each sentence to its correct sense). If the document has MORE than 3 for this sense, pick the 3 clearest. If it has FEWER than 3, keep the real ones and ADD natural examples faithful to THIS exact sense to reach 3. The 3 should differ in tense/construction.
+
+${promptUnidadeDoSentido('the target term', 'curto')}
+- Applied here: a sense that only exists with fixed extra words is NOT a sense of the target term. Do not create such a sense object — that meaning belongs to the longer expression, which is a different item.
 
 Rules for bold in "examples" — CRITICAL, on BOTH sides of every example:
 - "en": wrap the target in <b></b> exactly as it appears conjugated/inflected in that sentence (e.g. "ran by" for "run by"). For a multi-word or separable expression wrap ALL its parts even when another word sits between them; for an idiom wrap the whole expression.

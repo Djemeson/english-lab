@@ -222,6 +222,47 @@ function promptRegrasLexicais(langCode, modo) {
    Every example under the grammatical meaning must show the word in that FUNCTION, never in the lexical sense.`
 }
 
+// ================================================================
+// DE QUEM É O SENTIDO — a fonte ÚNICA da regra da unidade fixa
+// ================================================================
+// Por que existir (2026-08-07, 92ª rodada): `fall` voltou com o sentido
+// "apaixonar-se" e os três exemplos diziam *fall in love*. Os testes lexicais
+// que já existiam decidem se dois sentidos são DIFERENTES, olhando o
+// português; nenhum perguntava, do lado do idioma estudado, DE QUEM é o
+// sentido — da palavra sozinha ou de uma expressão maior.
+//
+// Vive aqui, e não no review.js, porque o mesmo erro cabe em todo prompt que
+// produz significado: análise, reanálise em lote, regeneração de exemplo,
+// Assistente e extrator de documento. Regra em cópia é regra que diverge —
+// foi por isso que as regras lexicais vieram para cá em 2026-08-05.
+//
+// Modos (o teto de atenção do modelo barato é curto):
+//   'analise'  — o bloco inteiro, com as 3 categorias e o caso trabalhado
+//   'curto'    — 4 linhas, para quem só gera exemplo ou extrai item
+//   'curto-pt' — as mesmas 4 linhas em português, para os prompts escritos em
+//                PT (Assistente). Mesma regra, uma fonte só — o que não pode
+//                existir é uma SEGUNDA versão da regra escrita à mão por lá.
+function promptUnidadeDoSentido(alvo, modo) {
+  const A = alvo ? `"${alvo}"` : 'the item'
+  if (modo === 'curto-pt') {
+    return `DE QUEM É O SENTIDO (teste do apagamento): quando um sentido só existe junto de palavras FIXAS, ele é da expressão inteira, não da palavra sozinha. O termo a extrair é a expressão COMPLETA: "fall in love" (apaixonar-se), nunca "fall" com o significado "apaixonar-se" — apague "in love" e o sentido some.
+- Complemento que VARIA não forma unidade nova: "fall silent / asleep / ill" é "fall + adjetivo", sentido legítimo de "fall".
+- Os 3 exemplos de um item nunca podem repetir as mesmas palavras extras depois do termo: se repetem, o termo certo era a expressão inteira.`
+  }
+  if (modo === 'curto') {
+    return `WHOSE SENSE IS IT (deletion test): a meaning that only exists together with FIXED accompanying words belongs to the whole expression, not to ${A} alone. "fall in love" = apaixonar-se; delete "in love" and the meaning is gone, so that sense is NOT a sense of "fall".
+- Every example you write must illustrate the sense using ${A} itself. NEVER write 3 examples that all repeat the same extra words after ${A} — that is proof you drifted into a different expression.
+- A complement that VARIES is fine and is not a separate unit ("fall silent / asleep / ill" is "fall + adjective", a real sense of "fall").`
+  }
+  return `WHOSE SENSE IS IT — the item alone, or a bigger unit? (decide this for EVERY meaning)
+The tests above ask whether two senses are different. This one asks something else: does the sense belong to ${A} by itself, or only to a larger fixed expression? Apply the DELETION TEST: strip everything else away and keep ${A} alone. Does the meaning survive?
+- (a) SENSE OF THE ITEM — it survives; whatever follows is free and varies. "fall" = cair, diminuir, desabar. → "requires": "", "unit": "".
+- (b) SEPARATE UNIT — the meaning needs FIXED accompanying words, always the same ones. "fall in love" (apaixonar-se), "fall short", "fall through", "fall behind". Delete "in love" and "apaixonar-se" is gone, so the sense belongs to "fall in love", not to "fall". → still RETURN the meaning (the learner met it and must be able to study it), but set "requires": "in love" and "unit": "fall in love". The app turns it into its own study item.
+- (c) OPEN PATTERN — the item takes a complement, but the complement is a whole CLASS, not one fixed word: "fall silent / fall asleep / fall ill" is "fall + adjective". That IS a sense of the item. → "requires": "", "unit": "", and every one of its 3 examples must use a DIFFERENT complement from that class.
+HARD RULE against contamination: a meaning of type (c) must NEVER include an example that is actually a case of (b). "The runner is falling behind" does not belong under "ficar, tornar-se" — "fall behind" is its own unit, so it becomes its own meaning object with "requires": "behind".
+CHECK BEFORE RETURNING: read the 3 examples of each meaning side by side. If the same word or words appear right after ${A} in ALL THREE, that is proof of case (b) — fill "requires" and "unit". If they differ, it is (a) or (c) and both stay empty.`
+}
+
 function promptIpaRule(langCode) {
   return `"/pronunciation in IPA — ${getLangDef(langCode).ipaNote}/"`
 }

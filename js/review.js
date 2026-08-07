@@ -80,7 +80,26 @@ function applyAiResult(w, result) {
           : e).filter(Boolean),
         context_match: true, tags: result.tags || []
       }]
-  const freshMeanings = rawMeanings.map((m, i) => ({
+  // --- Sentido que já virou item próprio não volta ---
+  // Sem isto o conserto se desfaz sozinho: separar "apaixonar-se" de "fall" e
+  // depois clicar em "Re-analisar" traria o sentido de volta, porque a IA vai
+  // continuar (com razão) achando que "fall in love" existe. É o espelho da
+  // lição da 51ª rodada — lá o fóssil antigo vencia a análise nova; aqui é a
+  // análise nova que não pode desfazer uma decisão do aluno.
+  // A lista mora em `w.spun_off` e não dentro de `meanings` porque este array é
+  // RECONSTRUÍDO a cada análise: marca posta ali não sobreviveria.
+  // Autocura: se o item filho foi apagado, o bloqueio cai junto e o sentido
+  // pode voltar — a decisão deixou de existir.
+  const bloqueados = (Array.isArray(w.spun_off) ? w.spun_off : [])
+    .filter(s => s && words.some(x => x.id === s.wordId))
+  const rawFiltradas = !bloqueados.length ? rawMeanings : rawMeanings.filter(m => {
+    const nm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+    const fora = bloqueados.some(s => nm(s.meaning_pt) === nm(m.meaning_pt) ||
+      (m.unit && nm(m.unit) === nm(s.word)))
+    if (fora) console.log(`[unidade] sentido "${m.meaning_pt}" ignorado: já é o item "${bloqueados.find(s => nm(s.meaning_pt) === nm(m.meaning_pt) || (m.unit && nm(m.unit) === nm(s.word))).word}"`)
+    return !fora
+  })
+  const freshMeanings = rawFiltradas.map((m, i) => ({
     id: uid(), selected: true, idx: i,
     meaning_pt:    m.meaning_pt    || '',
     definition_pt: m.definition_pt || '',
@@ -96,6 +115,11 @@ function applyAiResult(w, result) {
     // (o `response_format` não é usado — ver ai.js), então booleano volta como
     // `true`, `"true"`, `"sim"` ou `1` conforme o humor do modelo.
     gramatical:    _ehSim(m.gramatical),
+    // Declaração da própria IA de que este sentido só existe com material fixo
+    // ("in love"). É a fonte primária; o detector do código (unidadeFixaDoSentido)
+    // é o suspensório para quando o modelo barato ignora a regra.
+    requires:      String(m.requires || '').trim(),
+    unit:          String(m.unit || '').trim(),
     examples:      Array.isArray(m.examples) && m.examples.length > 0
                      ? m.examples
                      : (m.example_en ? [{ en: m.example_en, pt: m.example_pt || '' }] : []),
@@ -210,9 +234,17 @@ SOURCE-AWARE DISAMBIGUATION — CRITICAL:
 - Inside a specific genre, a common word frequently carries a special domain-specific meaning. You MUST treat the sense as it is actually used IN THIS SOURCE'S CONTEXT as the PRIMARY meaning: set its "context_match": true and place it FIRST in the array.
 - Canonical example: "snuff" captured from *Survivor* means "apagar (a tocha)" — the host snuffs the eliminated player's torch — NOT "rapé" (powdered tobacco). The reality-show sense wins because of the source.
 - If a context sentence is present, combine it WITH the inferred genre to choose the right primary sense.
-- You MUST still ALSO return the other common general senses with "context_match": false, exactly as usual — never drop them.${w._seedMeaning ? `
-- A curated meaning for this item was already provided from the source material: "${w._seedMeaning}". Preserve THIS as the primary (context_match:true) sense; refine its Portuguese only if it is clearly wrong, and make sure one example illustrates it.` : ''}`
+- You MUST still ALSO return the other common general senses with "context_match": false, exactly as usual — never drop them.`
   }
+
+  // A SEMENTE VIVE FORA DO BLOCO DE FONTE, de propósito. Enquanto morava lá
+  // dentro, ela só chegava ao prompt quando o item tinha título de fonte — um
+  // item manual, ou nascido de uma separação de sentido, perdia a semente em
+  // silêncio, que é justamente o caso em que ela mais importa.
+  const seedBlock = w._seedMeaning ? `
+CURATED MEANING — ALREADY DECIDED, DO NOT DROP IT:
+- The learner already has a meaning for this item: "${w._seedMeaning}". Keep THIS as the primary sense ("context_match": true, first in the array); refine its Portuguese only if it is clearly wrong, and make sure its examples illustrate it.${w._seedFrom ? `
+- This item was split out of "${w._seedFrom}": the learner decided that this meaning belongs to the whole expression "${target}", not to "${w._seedFrom}" alone. Every example MUST contain the complete expression "${target}", and the <b> bold MUST wrap ALL of its words, not just the verb.` : ''}` : ''
 
   const L = getLangDef(wordLang(w))
   const PROMPT = `Analyze this ${L.nameEn} vocabulary item for a Brazilian Portuguese-speaking learner and return ONLY valid JSON.
@@ -224,6 +256,7 @@ LANGUAGE CHECK:
 - If the item is valid in ${L.nameEn} (even if it also exists in other languages), keep "detected_lang": "${L.code}". Only return a different code when the item clearly belongs to another language (use the context sentence to decide). In that case, analyze it in ITS language.
 ${ctx ? `Context sentence: "${ctx}"` : ''}
 ${sourceBlock}
+${seedBlock}
 
 ${promptRegrasLexicais(wordLang(w), 'analise')}
 
@@ -263,6 +296,8 @@ WORKED EXAMPLE — "emasculating":
 - "que esvazia / enfraquece" (an emasculated bill, emasculating the regulations) fails Test 2 — it applies to laws and rules, not to a man's masculinity → SEPARATE object.
 - the literal veterinary sense "castrar (remover os testículos)" is another domain → SEPARATE object.
 So "emasculating" must return 2–3 meaning objects. Returning ONE object whose meaning_pt reads "desvirilizador, castrador, debilitante" is WRONG: "debilitante" is a different sense smuggled in as if it were a synonym.
+
+${promptUnidadeDoSentido(target, 'analise')}
 
 Rules for meanings — CRITICAL:
 - The context sentence is ONLY used to identify the word correctly and to mark which sense appeared there. It does NOT limit which meanings you return.
@@ -311,6 +346,8 @@ Return ONLY this JSON (no markdown, no explanation):
       "register": "neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar",
       "level": "A2|B1|B2|C1|C2",
       "gramatical": "true if this meaning is a GRAMMATICAL FUNCTION (see GRAMMAR BEFORE DICTIONARY above), false if it is a lexical sense",
+      "requires": "the FIXED words this meaning cannot exist without (deletion test, case b) — e.g. \\"in love\\". EMPTY STRING when the meaning belongs to the item alone (case a) or takes an open class of complements (case c).",
+      "unit": "the full expression to study when \\"requires\\" is filled — e.g. \\"fall in love\\". EMPTY STRING otherwise.",
       "context_match": true,
       "synonyms": ["syn1", "syn2", "syn3"],
       "antonyms": ["ant1", "ant2"],
@@ -360,12 +397,14 @@ Return ONLY this JSON (no markdown, no explanation):
 // aluno diz explicitamente "joga fora e faz de novo".
 async function refazerAnalise(wordId) {
   const w = words.find(x => x.id === wordId); if (!w) return
-  const n = (w.meanings || []).length
+  const n = (w.meanings || []).filter(m => !m.moved_to).length
+  const nSep = (Array.isArray(w.spun_off) ? w.spun_off : []).filter(s => words.some(x => x.id === s.wordId)).length
   if (!(await confirmModal({
     title: 'Refazer a análise do zero', icon: 'refresh', confirmText: 'Refazer',
     html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Descarta ${n} significado${n !== 1 ? 's' : ''} e exemplos deste item e pede uma análise nova.
       Use quando a IA <b>errou o sentido</b> — o "Re-analisar" normal preserva o que já existe e devolveria o mesmo erro.
-      Os cards já salvos no estudo <b>não são afetados</b>.</p>` }))) return
+      Os cards já salvos no estudo <b>não são afetados</b>.</p>${nSep ? `
+      <p style="font-size:var(--fs-sm);color:var(--text2);margin-top:8px">${nSep} sentido${nSep !== 1 ? 's' : ''} que você separou em item próprio <b>não volta${nSep !== 1 ? 'm' : ''}</b> — a expressão já existe sozinha.</p>` : ''}` }))) return
   w._refazer = true
   try { await analyzeWord(wordId) } finally { delete w._refazer }
 }
@@ -432,6 +471,97 @@ async function saveAllToSrs() {
   renderReview(); renderDashboard(); renderSidebar(); updateSrsBadge()
 }
 
+// Os cards que o sentido separado já tinha na Revisão. Eles continuam válidos
+// como frase, mas ensinam a palavra ERRADA na frente ("fall", quando o que se
+// aprende ali é "fall in love"). Avisar e não oferecer saída seria empurrar o
+// problema; apagar sem perguntar destruiria agendamento (ease, intervalo,
+// lapsos) que ele levou semanas para construir. Então: pergunta, com o preço
+// escrito.
+async function _separarCuidarDosCards(w, mi, nome) {
+  if (typeof srsCards === 'undefined') return
+  const alvos = srsCards.filter(c => c.wordId === w.id && c.meaningIdx === mi)
+  if (!alvos.length) return
+  const n = alvos.length
+  const ok = await confirmModal({
+    title: n === 1 ? 'E o card que já está na Revisão?' : `E os ${n} cards que já estão na Revisão?`, icon: 'alert', danger: true,
+    confirmText: `Excluir ${n} card${n !== 1 ? 's' : ''}`, cancelText: 'Deixar como estão',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Esse sentido já tinha <b>${n} card${n !== 1 ? 's' : ''}</b> na repetição espaçada, com <b>${esc(w.word)}</b> na frente — a palavra que acabou de deixar de ser a certa para ele.</p>
+      <p style="font-size:var(--fs-sm);color:var(--text2);margin-top:8px">Excluir perde o agendamento (intervalo, facilidade, lapsos) dess${n !== 1 ? 'es' : 'e'} card${n !== 1 ? 's' : ''}. <b>${esc(nome)}</b> entra do zero de qualquer jeito, quando você enviá-lo.</p>` })
+  if (!ok) return
+  const ids = new Set(alvos.map(c => c.id))
+  srsCards = srsCards.filter(c => !ids.has(c.id))
+  saveSrsCards()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  renderDashboard()
+  if (typeof renderSrsSection === 'function' && document.getElementById('section-revisar')?.classList.contains('active')) renderSrsSection()
+  toast(`${n} card${n !== 1 ? 's' : ''} de "${w.word}" excluído${n !== 1 ? 's' : ''}`, 'info')
+}
+
+// ================================================================
+// VARREDURA DA BASE — o prompt novo não conserta o que já está salvo
+// ================================================================
+// Lição literal da 50ª rodada: "cards antigos não se corrigem sozinhos".
+// A base foi montada com um prompt que nunca perguntou de quem era o sentido,
+// então ela está cheia de "fall/apaixonar-se" — e caçá-los item a item não
+// aconteceria nunca. A varredura é de graça: roda o detector local sobre
+// `words` inteiro, sem uma chamada de IA sequer. A IA só entra depois, na
+// expressão que ELE decidir separar.
+function varrerUnidades() {
+  const achados = []
+  for (const w of (words || [])) {
+    if (!Array.isArray(w.meanings)) continue
+    w.meanings.forEach((m, mi) => {
+      if (!m || m.moved_to) return
+      const un = unidadeDoSentido(w, m)
+      if (un) achados.push({ wordId: w.id, mi, palavra: w.word || '', status: w.status, meaning_pt: m.meaning_pt || '', un })
+    })
+  }
+  return achados
+}
+
+function _varreduraRefresh() {
+  if (document.getElementById('el-varredura-modal')) abrirVarreduraUnidades(true)
+}
+
+function abrirVarreduraUnidades(reabrindo) {
+  const achados = varrerUnidades()
+  document.getElementById('el-varredura-modal')?.remove()
+  const overlay = document.createElement('div')
+  overlay.id = 'el-varredura-modal'
+  overlay.className = 'srs-modal-overlay'
+  const fechar = () => { overlay.remove(); document.removeEventListener('keydown', teclas) }
+  const teclas = e => { if (e.key === 'Escape') fechar() }
+  overlay.addEventListener('click', e => { if (e.target === overlay) fechar() })
+  // Lista vazia depois de separar tudo é uma boa notícia e precisa dizer isso —
+  // modal em branco parece defeito.
+  const corpo = achados.length ? `
+    <div class="vru-lista">
+      ${achados.map(a => `
+        <div class="vru-item">
+          <div class="vru-txt">
+            <div class="vru-top"><b>${esc(a.palavra)}</b><span class="vru-seta">${ic('arrowRight','ic-sm')}</span><b class="vru-alvo">${esc(a.un.unidade)}</b>
+              ${a.status === 'in_srs' ? `<span class="chip" data-tip="Este item já está na repetição espaçada">na Revisão</span>` : ''}</div>
+            <div class="vru-sub">${esc(a.meaning_pt)} — só existe com <b>${esc(a.un.extra)}</b>${a.un.fonte === 'ia' ? ' (apontado pela própria IA)' : ''}</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="separarSentido('${a.wordId}',${a.mi})">${ic('layers','ic-sm')}Separar</button>
+        </div>`).join('')}
+    </div>` : `
+    <p class="vru-vazio">${ic('checkCircle')} Nenhum sentido preso a uma expressão maior. ${reabrindo ? 'Acabou a fila.' : ''}</p>`
+  overlay.innerHTML = `<div class="srs-modal-box vru-box" role="dialog" aria-labelledby="vru-title">
+    <h4 id="vru-title" style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px">Sentidos que são de outra expressão</h4>
+    <p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">${achados.length
+      ? `${achados.length} sentido${achados.length !== 1 ? 's' : ''} da sua base parece${achados.length !== 1 ? 'm' : ''} pertencer a uma expressão inteira, não à palavra sozinha. Separar cria a expressão como item próprio.`
+      : 'Varredura de toda a base — nada a fazer aqui.'}</p>
+    ${corpo}
+    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost btn-sm" id="vru-fechar">Fechar</button>
+    </div>
+  </div>`
+  document.body.appendChild(overlay)
+  document.getElementById('vru-fechar').onclick = fechar
+  document.addEventListener('keydown', teclas)
+}
+
 function startEditWord(wordId) {
   const textEl = document.getElementById(`wc-word-text-${wordId}`)
   const inputEl = document.getElementById(`wc-word-input-${wordId}`)
@@ -492,6 +622,16 @@ function _prepAtualizarCabecalho() {
   if (pending) parts.push(`${pending} pendente${pending!==1?'s':''} de IA`)
   if (ready)   parts.push(`${ready} pronta${ready!==1?'s':''} para enviar`)
   sub.textContent = parts.join(' · ') || 'Tudo em dia!'
+  // O botão da varredura só existe quando há o que separar: botão permanente
+  // dizendo "0" é ruído, e a varredura roda sobre a base inteira, não sobre
+  // esta fila — por isso ele mora no cabeçalho e não na barra de ações.
+  const slot = el('prep-unidades-slot')
+  if (slot) {
+    const n = varrerUnidades().length
+    slot.innerHTML = n ? `<button class="btn btn-ghost btn-sm" onclick="abrirVarreduraUnidades()"
+      data-tip="Sentidos que parecem pertencer a uma expressão inteira (como 'apaixonar-se' em 'fall'), e não à palavra sozinha">
+      ${ic('layers')}Expressões presas <span class="badge">${n}</span></button>` : ''
+  }
 }
 
 function renderReview() {
@@ -664,7 +804,7 @@ function renderSidebar(filter = '') {
       for (const w of group.words) {
         const isActive  = w.id === activeWordId
         const isChecked = selectedWordIds.has(w.id)
-        const nMean = (w.meanings || []).length
+        const nMean = (w.meanings || []).filter(m => !m.moved_to).length
         // Marie Kondo: o chip "Pendente IA" repetido em toda linha era ruído —
         // virou um ponto discreto (âmbar = aguardando; nº = significados prontos)
         const statusHtml = w.status === 'pending_ai'
@@ -763,7 +903,11 @@ function renderWordCard(wordId) {
 
   const typeMap = { word:'word', phrasal_verb: typeLabel('phrasal_verb', wordLang(w), w.type_label), idiom:'idiom', collocation:'collocation' }
 
-  const selMeanings = (w.meanings || []).filter(m => m.selected !== false)
+  // Sentido que virou item próprio continua NO ARRAY (o `meaningIdx` dos cards
+  // já criados é posicional — ver ESTADO, seção 9), mas está fora desta tela e
+  // fora de qualquer contagem. Quem o exclui do SRS é o `selected:false`.
+  const vivos = (w.meanings || []).filter(m => !m.moved_to)
+  const selMeanings = vivos.filter(m => m.selected !== false)
   const selCount = selMeanings.length
   const totalCards = selMeanings.reduce((sum, m) => sum + ((m.examples && m.examples.length) || 1), 0)
   let bodyHtml
@@ -775,12 +919,24 @@ function renderWordCard(wordId) {
     // que não entendi").
     const alvoBrk = (w.word || w.context || '').trim()
     const ehFrase = alvoBrk.split(/\s+/).length >= 3
+    // Uma palavra só, capturada de dentro de uma frase: é AQUI que nasce o
+    // "fall" que devia ter sido "fall in love" — e nesse caso não há sentido
+    // para separar depois, porque o item já nasceu errado.
+    const ehPalavraNaFrase = alvoBrk.split(/\s+/).length === 1 &&
+      (w.context || '').trim().split(/\s+/).length >= 3
+    const jaEstudada = ehPalavraNaFrase ? unidadeJaEstudada(w) : null
     // KonMari: cada estado mostra SÓ o que serve àquele momento.
     // Com a triagem pronta, ela é a protagonista e "analisar tudo" recua a
     // ação secundária; sem triagem, o botão de análise é o destaque.
     const temTriagem = _revBreakCache.has(w.id)
     bodyHtml = `
     <div class="wc-pending-ai">
+      ${jaEstudada ? `
+      <div class="mi-unidade" style="margin:0 0 var(--sp-3)">
+        <div class="miu-txt">${ic('info','ic-sm')}<span>A frase contém <b>${esc(jaEstudada.word)}</b>, que você já estuda — talvez seja ele o item certo aqui, e não <b>${esc(w.word)}</b> sozinho.</span></div>
+        <button class="btn btn-secondary btn-sm" onclick="irParaItem('${jaEstudada.id}')">${ic('arrowRight','ic-sm')}Abrir ${esc(jaEstudada.word)}</button>
+      </div>` : ''}
+      <div id="rev-expr-area"></div>
       <div id="rev-break-area"></div>
       <div class="wc-pend-acts">
         <button class="btn ${temTriagem ? 'btn-ghost btn-sm' : 'btn-primary big-btn'}" onclick="analyzeWord('${w.id}')"
@@ -792,8 +948,16 @@ function renderWordCard(wordId) {
           data-tip="A IA separa a frase em palavras, phrasal verbs, expressões e estruturas — você marca o que NÃO conhece">
           ${ic('layers')}Separar em partes
         </button>` : ''}
+        ${ehPalavraNaFrase && !_revExprCache.has(w.id) ? `
+        <button class="btn btn-ghost btn-sm" onclick="revExprBuscar('${w.id}')"
+          data-tip="A IA lê a frase e diz se esta palavra faz parte de uma expressão maior (como 'fall' em 'fall in love')">
+          ${ic('search','ic-sm')}Faz parte de uma expressão?
+        </button>` : ''}
       </div>
     </div>`
+    if (ehPalavraNaFrase) setTimeout(() => {
+      if (activeWordId === w.id && _revExprCache.has(w.id)) _revExprRender(w.id)
+    }, 0)
     // Triagem automática: se já rodou em segundo plano, mostra os chips ao
     // abrir; se está rodando, mostra o aviso; se nem começou, dispara agora.
     if (ehFrase) setTimeout(() => {
@@ -808,7 +972,7 @@ function renderWordCard(wordId) {
     <div class="wc-meanings">
       <div class="meanings-toolbar">
         <div class="meanings-toolbar-left">
-          <span class="meanings-count">${w.meanings.length} significado${w.meanings.length !== 1 ? 's'  : ''}</span>
+          <span class="meanings-count">${vivos.length} significado${vivos.length !== 1 ? 's'  : ''}</span>
           <span>·</span>
           <span>${selCount} selecionado${selCount !== 1 ? 's' : ''} · ${totalCards} card${totalCards !== 1 ? 's' : ''}</span>
         </div>
@@ -817,7 +981,7 @@ function renderWordCard(wordId) {
           <button class="btn btn-ghost btn-sm" onclick="selectAllMeanings('${w.id}',false)">Nenhum</button>
         </div>
       </div>
-      ${w.meanings.map((m, mi) => renderMeaningItem(w.id, m, mi)).join('')}
+      ${w.meanings.map((m, mi) => m.moved_to ? '' : renderMeaningItem(w.id, m, mi)).join('')}
     </div>`
   }
 
@@ -843,6 +1007,7 @@ function renderWordCard(wordId) {
         ${w.ipa ? `<span class="wc-ipa">${esc(w.ipa)}</span>` : ''}
         <span class="wc-source">${srcIcon(w.source_type)} ${esc(w.source_title || w.source_type)}</span>
       </div>
+      ${_familiaHtml(w)}
       ${ctxHtml ? `<div class="wc-context">"${ctxHtml}"</div>` : ''}
       ${ctxHtml ? `<div class="wc-context-pt" id="wc-ctx-pt-${w.id}">${_ptComNegrito(w.context_pt)}</div>` : ''}
     </div>
@@ -856,9 +1021,56 @@ function renderWordCard(wordId) {
   if (typeof glossAtivar === 'function') glossAtivar(main, {})
 }
 
+// Quem decide se o sentido é de uma unidade maior: a IA (campo `requires`) OU
+// o detector local. Os dois, nesta ordem — o prompt é a regra, o detector é o
+// suspensório para quando o modelo barato a ignora (padrão da 49ª rodada).
+// Devolve {extra, unidade, fonte} ou null.
+function unidadeDoSentido(w, m) {
+  if (!w || !m || m.moved_to) return null
+  const base = (w.word || '').trim()
+  if (!base) return null
+  if (m.requires) {
+    const extra = String(m.requires).trim()
+    return { extra, unidade: (m.unit || `${base} ${extra}`).trim(), fonte: 'ia' }
+  }
+  const achado = unidadeFixaDoSentido(m, base)
+  return achado ? { ...achado, fonte: 'detector' } : null
+}
+
+// A FAMÍLIA NA TELA. Sem isto, separar um sentido faz o material sumir sem
+// explicação: o aluno abre "fall" no dia seguinte e não sabe para onde foi o
+// "apaixonar-se". A fileira só aparece quando existe parentesco — item comum
+// não ganha rótulo nenhum.
+const _FAM_ESTADO = { pending_ai:'aguardando IA', pending_review:'no Preparar', in_study:'no Estudo', in_srs:'na Revisão', skipped:'pulada' }
+function _famChip(item, papel) {
+  return `<button class="wcf-chip" onclick="irParaItem('${item.id}')"
+    data-tip="${papel} · ${_FAM_ESTADO[item.status] || item.status} — clique para abrir">
+    ${ic(papel === 'veio de' ? 'chevronLeft' : 'chevronRight','ic-sm')}${esc(item.word || '(frase)')}</button>`
+}
+function _familiaHtml(w) {
+  if (typeof familiaDoItem !== 'function') return ''
+  const { pai, filhos } = familiaDoItem(w)
+  if (!pai && !filhos.length) return ''
+  return `<div class="wc-familia">
+    <span class="wcf-lbl">${ic('layers','ic-sm')}Família</span>
+    ${pai ? _famChip(pai, 'veio de') : ''}
+    ${filhos.map(f => _famChip(f, 'saiu daqui')).join('')}
+  </div>`
+}
+
 function renderMeaningItem(wordId, m, mi) {
   const sel = m.selected !== false
   const isMatch = m.context_match === true
+  const w = words.find(x => x.id === wordId)
+  const un = unidadeDoSentido(w, m)
+  // O aviso nomeia a unidade e oferece a saída em um clique. Sem nomear, viraria
+  // "algo está errado aqui" — que é o tipo de aviso que se aprende a ignorar.
+  const avisoUnidade = un ? `
+      <div class="mi-unidade" onclick="event.stopPropagation()">
+        <div class="miu-txt">${ic('alert','ic-sm')}<span>Este sentido só existe com <b>${esc(un.extra)}</b> — parece ser a expressão <b>${esc(un.unidade)}</b>, não ${esc(w.word)} sozinho.</span></div>
+        <button class="btn btn-secondary btn-sm" onclick="separarSentido('${wordId}',${mi})"
+          data-tip="Cria um item próprio para a expressão, com baralho e agendamento dele — e tira este sentido daqui">${ic('layers','ic-sm')}Separar em item próprio</button>
+      </div>` : ''
   return `
   <div class="meaning-item ${sel ? 'selected' : ''} ${isMatch ? 'context-match' : ''}"
        onclick="toggleMeaning('${wordId}',${mi})" id="mi-${wordId}-${mi}">
@@ -870,9 +1082,13 @@ function renderMeaningItem(wordId, m, mi) {
           ${isMatch ? `<span class="context-match-badge">${ic('check','ic-sm')} contexto</span>` : ''}
           ${m.register ? `<span class="chip register-${m.register}">${m.register}</span>` : ''}
           ${m.level ? `<span class="chip level-${m.level.toLowerCase()}">${m.level}</span>` : ''}
+          ${un ? '' : `<button class="btn btn-ghost btn-xs mi-sep" title="Separar em item próprio"
+            data-tip="Se este sentido pertence a uma expressão maior, separe: vira item próprio, com baralho e agendamento dele"
+            onclick="event.stopPropagation();separarSentido('${wordId}',${mi})">${ic('layers','ic-sm')}</button>`}
         </div>
       </div>
-      ${m.definition_pt ? `<div class="mi-note" style="font-style:italic;opacity:0.8;margin-top:4px">${esc(m.definition_pt)}</div>` : ''}
+      ${avisoUnidade}
+      ${m.definition_pt ?`<div class="mi-note" style="font-style:italic;opacity:0.8;margin-top:4px">${esc(m.definition_pt)}</div>` : ''}
       ${m.origin_pt ? `<div class="mi-note" style="margin-top:6px;padding:7px 10px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:var(--fs-sm)"><b>Origem:</b> ${esc(m.origin_pt)}</div>` : ''}
       ${m.context_note ? `<div class="mi-note">${esc(m.context_note)}</div>` : ''}
       ${m.synonyms && m.synonyms.length ? `<div class="mi-note" style="font-size:var(--fs-sm);color:var(--text3)">↔ ${m.synonyms.slice(0,4).map(esc).join(', ')}</div>` : ''}
@@ -912,9 +1128,98 @@ function toggleMeaning(wordId, mi) {
 
 function selectAllMeanings(wordId, val) {
   const w = words.find(x => x.id === wordId); if (!w) return
-  w.meanings.forEach(m => m.selected = val)
+  w.meanings.forEach(m => { if (!m.moved_to) m.selected = val })
   saveWords()
   renderWordCard(wordId)
+}
+
+// ================================================================
+// SEPARAR O SENTIDO QUE NÃO ERA DO ITEM
+// ================================================================
+// "fall" voltou com o sentido "apaixonar-se" e os três exemplos diziam
+// "fall in love": o sentido é da expressão, não da palavra. Separar aqui é
+// criar a expressão como ITEM PRÓPRIO — baralho certo (expressões, não
+// vocabulário), card próprio, agendamento próprio — e tirar o sentido do pai.
+//
+// O nome passa pelo aluno antes de virar item: o detector acerta muito, mas
+// "fall to the ground" e "fall in love" chegam aqui pelo mesmo caminho e só
+// ele sabe qual das duas vale um item.
+function separarSentido(wordId, mi) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const m = w.meanings && w.meanings[mi]; if (!m || m.moved_to) return
+  const un = unidadeDoSentido(w, m)
+  const nCards = (typeof srsCards !== 'undefined' ? srsCards : [])
+    .filter(c => c.wordId === w.id && c.meaningIdx === mi).length
+  const aviso = nCards
+    ? ` Atenção: ${nCards} card${nCards !== 1 ? 's' : ''} deste sentido já está${nCards !== 1 ? 'ão' : ''} na Revisão com a palavra antiga — remova-o${nCards !== 1 ? 's' : ''} pela Biblioteca se quiser.`
+    : ''
+  inputModal({
+    title: 'Separar em item próprio',
+    label: `O sentido "${m.meaning_pt}" sai de "${w.word}" e vira um item novo, que a IA vai analisar do zero. Confira o nome da expressão:${aviso}`,
+    value: un ? un.unidade : (w.word || ''),
+    placeholder: 'ex.: fall in love',
+    confirmText: 'Separar e analisar',
+    onConfirm: nome => _separarSentidoExec(wordId, mi, nome)
+  })
+}
+
+function _separarSentidoExec(wordId, mi, nomeRaw) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const m = w.meanings && w.meanings[mi]; if (!m || m.moved_to) return
+  const nome = String(nomeRaw || '').trim()
+  const igual = s => String(s || '').trim().toLowerCase()
+  if (!nome) return
+  if (igual(nome) === igual(w.word)) {
+    toast('A expressão precisa ser diferente do item atual', 'warning')
+    return
+  }
+  // Já existe? Então não se cria outro: liga-se a este e o sentido sai do pai
+  // do mesmo jeito. Duplicar "fall in love" seria criar duas filas de revisão
+  // para a mesma expressão.
+  const ja = words.find(x => x.id !== w.id && igual(x.word) === igual(nome))
+  const alvo = ja || createWord({
+    word: nome,
+    context: w.context || '',
+    context_pt: w.context_pt || '',
+    source_type: w.source_type || 'manual',
+    source_title: w.source_title || '',
+    source_context: w.source_context || '',
+    lang: wordLang(w),
+    no_break: true
+  })
+  if (!ja) {
+    // A semente garante que o sentido do aluno sobreviva à análise nova; o
+    // `_seedFrom` é o que faz a IA marcar a expressão INTEIRA em negrito, em
+    // vez de repetir o negrito só no verbo, como estava no exemplo herdado.
+    alvo._seedMeaning = m.meaning_pt
+    alvo._seedFrom = w.word
+    // O tipo fica em branco de propósito: `applyAiResult` só preenche o que
+    // está vazio, então quem decide entre phrasal verb e expressão idiomática
+    // (e portanto o baralho) é a análise, não um chute do detector.
+    alvo.from = { id: w.id, word: w.word, rel: 'mwe', meaning_pt: m.meaning_pt }
+  }
+  m.selected = false
+  m.moved_to = alvo.id
+  m.moved_word = nome
+  w.spun_off = [...(Array.isArray(w.spun_off) ? w.spun_off : []),
+    { meaning_pt: m.meaning_pt, word: nome, wordId: alvo.id, at: Date.now() }]
+  w.updated_at = new Date().toISOString()
+  saveWords()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  // O card só é redesenhado se for ELE que está na tela: a separação também
+  // sai da varredura, onde o item pode estar em `in_srs` e nem ter card aberto.
+  renderSidebar()
+  if (activeWordId === w.id && el('review-main')) renderWordCard(w.id)
+  renderDashboard(); _prepAtualizarCabecalho(); _varreduraRefresh()
+  _separarCuidarDosCards(w, mi, nome)
+  if (ja) {
+    toast(`"${nome}" já existia — o sentido saiu de "${w.word}" e ficou com ele`, 'success')
+    return
+  }
+  toast(`"${nome}" criado — analisando com IA...`, 'success')
+  // `analyzeWordDirect` já avisa quando termina (e quando falha) — aqui só
+  // resta atualizar a lista, que passou a ter um item a mais.
+  analyzeWordDirect(alvo.id).then(() => { renderSidebar(); _prepAtualizarCabecalho() })
 }
 
 
@@ -1225,6 +1530,10 @@ function revBreakStudy(wordId) {
       lang: wordLang(w)
     })
     if (it.type !== 'word') nova.type = it.type === 'chunk' ? 'collocation' : it.type
+    // De onde esta parte saiu. Ganho retroativo da 93ª rodada: o raio-X já
+    // criava itens a partir de uma frase e não guardava origem nenhuma — agora
+    // guarda, pelo mesmo campo que a separação de sentido usa.
+    nova.from = { id: w.id, word: w.word || w.context || '', rel: 'part' }
     criadas.push(nova)
     st.done.add(i)
   }
@@ -1244,6 +1553,143 @@ function revBreakStudy(wordId) {
     }
     renderSidebar()
   })()
+}
+
+// ================================================================
+// A PALAVRA QUE NASCEU DENTRO DE UMA EXPRESSÃO
+// ================================================================
+// O sentido inverso do "fall/apaixonar-se": lá o item existia e o sentido
+// estava no lugar errado; aqui o ITEM já nasce errado — clicar em "fall" numa
+// frase que diz "fell in love" cria um item que nunca vai poder ser
+// consertado por separação, porque o material certo nunca chegou a existir.
+//
+// Duas camadas, na ordem de custo: primeiro o que é de graça (uma expressão
+// que ele JÁ estuda e que está nesta frase), depois, só se ele pedir, a IA.
+
+// De graça. Casa pela CAUDA da expressão ("in love"), não pelo verbo: a frase
+// traz o verbo flexionado ("fell", "falling") e comparar forma com forma
+// erraria em todo verbo irregular — o mesmo motivo pelo qual o negrito da IA
+// é a âncora do detector.
+function unidadeJaEstudada(w) {
+  const palavra = (w.word || '').trim()
+  if (!palavra || palavra.split(/\s+/).length > 1) return null
+  const frase = ' ' + _ufNormTxt(w.context) + ' '
+  if (frase.trim().length < 3) return null
+  const alvo = _ufNormTxt(palavra)
+  return (words || []).find(x => {
+    if (x.id === w.id) return false
+    const partes = String(x.word || '').trim().split(/\s+/)
+    if (partes.length < 2) return false
+    if (_ufNormTxt(partes[0]) !== alvo) return false           // a expressão começa por esta palavra
+    const resto = _ufNormTxt(partes.slice(1).join(' '))
+    return !!resto && frase.includes(' ' + resto + ' ')        // e o resto dela está na frase
+  }) || null
+}
+function _ufNormTxt(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z'’\- ]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+const _revExprCache = new Map()   // wordId → [{expr, gloss, type}]
+const _revExprBusy = new Set()
+
+async function revExprBuscar(wordId) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
+  if (_revExprBusy.has(wordId)) return
+  const area = el('rev-expr-area')
+  if (area) area.innerHTML = `<div class="rvb-loading"><span class="gen-spinner"></span> lendo a frase...</div>`
+  _revExprBusy.add(wordId)
+  try {
+    const L = getLangDef(wordLang(w))
+    const r = await aiJSON(`In this ${L.nameEn} sentence, is the word "${w.word}" part of a larger FIXED expression? Return ONLY JSON.
+
+Sentence: "${(w.context || '').trim()}"
+Word the learner captured: "${w.word}"
+
+{"items":[{"expr":"the full expression in CITATION form (bare verb + particle(s), e.g. \\"fall in love\\" — never the inflected form \\"fell in love\\")","gloss":"what it means, Brazilian Portuguese, max 6 words","type":"phrasal_verb|idiom|collocation"}]}
+
+Rules:
+- Apply the DELETION TEST: only return an expression when removing its other words DESTROYS the meaning it has here. "fell in love" → "fall in love" (delete "in love" and "apaixonar-se" is gone) → RETURN it.
+- If "${w.word}" is used in its own plain meaning here and the surrounding words are free, return an EMPTY list. "She fell on the ice" is just "fall" → {"items":[]}.
+- Every "expr" MUST contain "${w.word}" (in its base form) and MUST correspond to words actually present in the sentence.
+- A verb + a free preposition phrase is NOT an expression: "fall on the ice", "fall from the tree" → empty list.
+- At most 2 items. Prefer the single best one.
+
+${promptRegrasLexicais(wordLang(w), 'glosa')}`, { maxTokens: 300 })
+    const alvo = _ufNormTxt(w.word)
+    const items = (Array.isArray(r.items) ? r.items : [])
+      .map(it => ({ expr: String(it.expr || '').trim(), gloss: String(it.gloss || '').trim(),
+                    type: ['phrasal_verb','idiom','collocation'].includes(it.type) ? it.type : 'collocation' }))
+      // Cinto e suspensório: o modelo barato devolve a expressão sem a palavra,
+      // ou devolve a própria palavra como "expressão".
+      .filter(it => it.expr && it.expr.split(/\s+/).length > 1 &&
+        (' ' + _ufNormTxt(it.expr) + ' ').includes(' ' + alvo + ' '))
+      .slice(0, 2)
+    _revExprCache.set(wordId, items)
+    _revExprRender(wordId)
+  } catch (e) {
+    if (area) area.innerHTML = `<div style="margin-top:14px;color:var(--error);font-size:var(--fs-sm)">Não deu: ${esc(e.message)} — clique de novo para tentar.</div>`
+  } finally { _revExprBusy.delete(wordId) }
+}
+
+function _revExprRender(wordId) {
+  const area = el('rev-expr-area'); if (!area) return
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const items = _revExprCache.get(wordId) || []
+  // Resposta vazia é resposta: dizer "não, é a palavra mesmo" evita que ele
+  // clique de novo achando que falhou.
+  if (!items.length) {
+    area.innerHTML = `<div class="rvb-hint" style="margin-bottom:var(--sp-3)">${ic('checkCircle','ic-sm')} Aqui <b>${esc(w.word)}</b> está no sentido dela mesma — não faz parte de expressão nenhuma.</div>`
+    return
+  }
+  area.innerHTML = `
+    <div class="rvb" style="margin-bottom:var(--sp-3)">
+      <p class="rvb-hint">Nesta frase, <b>${esc(w.word)}</b> faz parte de:</p>
+      <div class="rvb-row">${items.map((it, i) => `
+        <button class="rvb-chip" onclick="revExprAdotar('${wordId}',${i})"
+          data-tip="Cria a expressão como item próprio, com a mesma frase e fonte">
+          <b>${esc(it.expr)}</b><span>${esc(it.gloss)}</span></button>`).join('')}
+      </div>
+    </div>`
+}
+
+// Adotar a expressão: ela vira o item, e a palavra solta deixa de fazer
+// sentido como item — mas quem apaga é ele, não o app.
+async function revExprAdotar(wordId, i) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const it = (_revExprCache.get(wordId) || [])[i]; if (!it) return
+  const igual = s => String(s || '').trim().toLowerCase()
+  const ja = words.find(x => x.id !== w.id && igual(x.word) === igual(it.expr))
+  const alvo = ja || createWord({
+    word: it.expr,
+    context: w.context || '', context_pt: w.context_pt || '',
+    source_type: w.source_type || 'manual', source_title: w.source_title || '',
+    source_context: w.source_context || '', lang: wordLang(w), no_break: true
+  })
+  if (!ja) {
+    alvo.type = it.type
+    alvo._seedMeaning = it.gloss
+    alvo.from = { id: w.id, word: w.word, rel: 'mwe' }
+    saveWords()
+  }
+  renderSidebar(); _prepAtualizarCabecalho(); renderDashboard()
+  toast(ja ? `"${it.expr}" já estava na fila` : `"${it.expr}" criado — analisando com IA...`, 'success')
+  if (!ja) analyzeWordDirect(alvo.id).then(() => { renderSidebar(); _prepAtualizarCabecalho() })
+  const ok = await confirmModal({
+    title: `Dispensar "${w.word}"?`, icon: 'trash', danger: true,
+    confirmText: 'Dispensar', cancelText: 'Manter as duas',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">A expressão <b>${esc(it.expr)}</b> é o que essa frase ensina. Manter <b>${esc(w.word)}</b> sozinho na fila só faz sentido se você quiser estudar a palavra por conta própria também.</p>` })
+  if (!ok) { activeWordId = alvo.id; renderReview(); return }
+  // A remoção é feita aqui, e não pelo `deleteWord`, porque ele abre a PRÓPRIA
+  // confirmação — e perguntar duas vezes a mesma coisa ensina a clicar sem ler.
+  // `markDeleted` é o que faz a exclusão propagar para os outros aparelhos.
+  if (typeof markDeleted === 'function') markDeleted(w.id)
+  words = words.filter(x => x.id !== w.id)
+  saveWords()
+  activeWordId = alvo.id
+  renderReview(); renderDashboard()
+  toast(`"${w.word}" dispensada`, 'info')
 }
 
 const _revExplainCache = new Map()

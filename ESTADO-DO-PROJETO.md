@@ -7,7 +7,40 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-07 — **A COR QUE NÃO SEGUIA O TEMA (91ª rodada, parte C)**.
+> Última atualização: 2026-08-07 — **FECHANDO O QUE A 92ª DEIXOU ABERTO (93ª rodada)**.
+> As seis pendências da rodada anterior, todas entregues. **A regra "de quem é o sentido" virou
+> fonte única** em `lang.js` (`promptUnidadeDoSentido`, modos `analise`/`curto`/`curto-pt`) e
+> alcançou os **cinco** prompts que produzem significado — análise, reanálise em lote,
+> regeneração de exemplo, Assistente e extrator de documento (lá com a ressalva de que
+> *canonicalizar não é encurtar*: "ran by"→"run by" continua certo, "fall in love"→"fall" nunca).
+> **O `meaningIdx` posicional foi consertado na raiz**: todo card ganhou `meaningId` e a busca
+> passa por `meaningDoCard()` — provado ao vivo invertendo `w.meanings` e vendo o card continuar
+> no sentido certo (pela posição ele viraria outro). **O lado da captura** ganhou duas camadas:
+> a de graça (a frase contém uma expressão que ele JÁ estuda) e a sob demanda ("Faz parte de uma
+> expressão?", uma chamada, só se ele clicar). **A família** apareceu na tela — o item diz de
+> onde veio e o que saiu dele, com clique que leva à seção certa **conforme o estado** —, e os
+> itens do raio-X passaram a guardar origem retroativamente. Os **cards já na Revisão** de um
+> sentido separado agora têm saída oferecida, com o preço escrito. E o detector passou a olhar
+> **também à esquerda** do alvo, com barra mais alta. `sw.js` → `englab-v139`.
+> Ver seção 8 (93ª rodada).
+>
+> Anterior: 2026-08-07 — **DE QUEM É O SENTIDO (92ª rodada)**. O item `fall` voltou
+> da IA com o sentido **"apaixonar-se"** — e os três exemplos diziam *fall **in love***. Sentido
+> que só existe com um complemento FIXO não é sentido da palavra: é outra unidade de estudo.
+> **Causa raiz:** o prompt tinha três testes para decidir se dois sentidos são DIFERENTES, e
+> todos operavam do lado do PORTUGUÊS; ninguém perguntava, do lado do inglês, **de quem é o
+> sentido**. Entrou o **teste do apagamento** com três categorias (sentido da palavra ·
+> unidade própria · padrão aberto — `fall silent/asleep/ill` continua sendo sentido de `fall`),
+> os campos `requires`/`unit` por significado, e um **detector local, sem IA**: se os 3 exemplos
+> repetem as mesmas palavras logo depois do alvo, o complemento é fixo. Separar cria a expressão
+> como **item próprio** (baralho, card e agendamento dele), com `_seedMeaning` preservando o
+> sentido. **Nada some do array `meanings`** — `meaningIdx` é posicional e está gravado em
+> `srsCards` e na chave das imagens; o sentido movido fica com `moved_to`+`selected:false`.
+> `spun_off` impede o sentido de voltar na re-análise (e se autocura se o filho for apagado).
+> Junto: **varredura da base inteira** (a lição da 50ª — prompt novo não conserta dado velho),
+> gratuita, 10ms em 400 itens. `sw.js` → `englab-v138`. Ver seção 8 (92ª rodada).
+>
+> Anterior: 2026-08-07 — **A COR QUE NÃO SEGUIA O TEMA (91ª rodada, parte C)**.
 > **A medição desmentiu a premissa que a própria rodada A tinha registrado.** A pendência dizia
 > "390 estilos inline, cada um um ponto onde o tema pode não chegar". Falso: dos 403 estilos
 > inline, **236 são só layout, 157 já usam `var(--)` e apenas 6 prendiam uma cor**. Mover os
@@ -616,7 +649,10 @@ index.html        — markup de todas as seções + modais
 css/styles.css    — todo o CSS (tokens/temas no topo, camadas premium no fim)
 sw.js             — service worker (cache do shell)
 js/core.js        — estado, storage, temas, ÍCONES, toast, inputModal, tooltips, navegação
-js/lang.js        — MULTI-IDIOMA: registro LANGS, idioma ativo, prompts, decks/idioma, migração (NÃO-lazy)
+js/lang.js        — MULTI-IDIOMA: registro LANGS, idioma ativo, decks/idioma, migração (NÃO-lazy)
+                    + as REGRAS DE PROMPT compartilhadas: promptRegrasLexicais (lexicais) e
+                    promptUnidadeDoSentido (de quem é o sentido). Regra nova de significado
+                    nasce AQUI, nunca dentro do prompt que precisou dela.
 js/firebase.js    — sincronização Firestore (TEMPO REAL)
 js/audio.js       — IndexedDB (AudioDB/CardsDB/ImageDB), TTS, Biblioteca (browser de cards), reanálise
 js/srs.js         — MOTOR SM-2 (estado srsCards/srsCfg/srsLog/srsSession)
@@ -688,12 +724,36 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
     `type_label` = nome local da categoria em PT (ex.: "verbo separável"). Ver `js/lang.js`.
   - `source_context`: nota opcional de gênero/contexto da fonte (ex.: "reality de sobrevivência").
     Usada pela IA para desambiguar (resolve o caso "snuff" → "apagar a tocha" no Survivor).
+  - **`spun_off[]`** (desde 2026-08-07, 92ª rodada) — sentidos que **viraram item próprio**:
+    `{meaning_pt, word, wordId, at}`. É o que impede a re-análise de trazer de volta um sentido
+    que o aluno separou. Mora AQUI, e não dentro de `meanings`, porque `meanings` é
+    **reconstruído** a cada análise — marca posta lá não sobreviveria. **Autocura**: se o item
+    filho não existe mais em `words`, o bloqueio cai (a decisão deixou de existir).
+  - **`from`** (no item FILHO) — `{id, word, rel:'mwe', meaning_pt}`: de qual item ele saiu.
+    Hoje serve ao bloqueio acima; é também a base pronta para as "variantes/família" (pendência).
   - `meanings[]`: `{meaning_pt, definition_pt, origin_pt, variety, register, level, examples[], ...}`
+    - **`requires` / `unit`** (92ª rodada): o material FIXO sem o qual o sentido não existe
+      (`"in love"`) e a expressão inteira (`"fall in love"`). Vazios quando o sentido é da
+      palavra sozinha OU de um padrão aberto (`fall + adjetivo`). Quem preenche é a IA; o
+      detector `unidadeFixaDoSentido` (core.js) confere sozinho, sem custo.
+    - **`moved_to` / `moved_word`** (92ª rodada): o sentido virou o item `moved_to`. Ele
+      **continua no array** — `meaningIdx` é POSICIONAL e está gravado em `srsCards` e na chave
+      das imagens, então remover embaralharia os cards já criados. Quem o exclui do SRS é o
+      `selected:false` que vai junto; quem o exclui das telas é o filtro `!m.moved_to`
+      (Preparar, dossiê, glossário, prompt de imagem).
     - `origin_pt`: origem/história da expressão (só quando há etimologia/imagem interessante;
       vazio para palavras comuns). Vai para o snapshot do card e aparece no estudo e na revisão.
   - `examples[]`: `{en, pt}` (en com a palavra-alvo em `<b>`).
 - **`srsCards[]`** — um card por (wordId, meaningIdx, exampleIdx). Guarda *snapshot*
-  do conteúdo + estado SM-2: `{id, wordId, meaningIdx, exampleIdx, deckId, state, due,
+  do conteúdo + estado SM-2.
+  - ⚠️ **`meaningId` (desde 2026-08-07, 93ª rodada) é quem identifica o significado**, não o
+    `meaningIdx`: `w.meanings` é RECONSTRUÍDO a cada análise, então a posição muda em silêncio se
+    a IA devolver os sentidos em outra ordem. **Sempre use `meaningDoCard(w, card)`** (core.js,
+    não-lazy) para ir do card ao significado — ele tenta o id e cai na posição só para card
+    antigo. `migrateMeaningIds()` (no `initApp`) preenche o campo na base existente.
+    O `meaningIdx` **continua sendo gravado**: é a chave da imagem (`img_wordId_meaningIdx`) e o
+    que agrupa cards irmãos.
+  Campos: `{id, wordId, meaningIdx, meaningId, exampleIdx, deckId, state, due,
   interval, ease, lapses, stepIdx, variety, register, word, lang, type_label, meaning_pt,
   example_en, example_pt, leech?}`. `state`: `new|learning|review|relearning`.
 - **`srsDecks[]`** — baralhos (árvore). Padrão em `DEFAULT_DECKS` (core.js).
@@ -865,6 +925,20 @@ maxInterval (36500), leechThreshold (50)
   card central com significados selecionáveis. Ação principal: **"Enviar para o Estudo"** — o
   item vira `in_study`, **sai desta fila** e passa a viver no dossiê. O **"Pular para a
   Revisão"** é o atalho assumido, discreto e no fim. Badge de pendentes fica NESTE item do menu.
+  - **Separar sentido que é de outra expressão** (92ª rodada): significado cujo sentido só
+    existe com material fixo ("fall" + *in love*) ganha um aviso âmbar nomeando a expressão e o
+    botão **"Separar em item próprio"**; os demais têm a mesma ação discreta (ícone de camadas
+    nos chips), para quando o detector não vê o que o aluno vê. No cabeçalho, **"Expressões
+    presas N"** abre a varredura da base INTEIRA (todos os status, sem custo de IA) — e só
+    aparece quando há o que separar.
+  - **A palavra que nasceu dentro de uma expressão** (93ª rodada): item de UMA palavra com frase
+    de contexto ganha duas camadas. De graça, um aviso quando a frase contém uma expressão que
+    ele **já estuda** ("a frase contém *fall in love*"). Sob demanda, o botão **"Faz parte de uma
+    expressão?"** — uma chamada de IA, só se ele clicar; adotar a expressão cria o item e
+    pergunta se dispensa a palavra solta.
+  - **Família** (93ª rodada): quando o item veio de outro (sentido separado ou parte escolhida no
+    raio-X), o cabeçalho mostra de onde ele veio e o que saiu dele. O clique leva à seção onde o
+    parente está AGORA — Preparar, dossiê ou glossário.
 - **Estudar** (id `estudar`, `js/dossie.js`, LAZY) — os **dossiês**: o que foi **enviado do
   Preparar** (`in_study`) mais o que já foi estudado (`in_srs`, legível para releitura),
   agrupado por obra + capítulo, com o material que a IA montou (frase original com tradução, significados,
@@ -889,6 +963,151 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-07 (93ª rodada) — FECHANDO AS SEIS PENDÊNCIAS DA 92ª
+
+**O pedido**: "implemente o que ficou de fora e depois pode comitar e dar push". As seis
+pendências abertas pela rodada anterior, todas nesta rodada.
+
+**1. A regra virou FONTE ÚNICA e alcançou os cinco prompts.** `promptUnidadeDoSentido(alvo, modo)`
+mora agora em **`lang.js`**, ao lado de `promptRegrasLexicais` e pelo mesmo motivo registrado em
+2026-08-05: *regra em cópia é regra que diverge*. Três modos, porque o teto de atenção do modelo
+barato é curto: **`analise`** (bloco inteiro, 3 categorias + caso trabalhado), **`curto`** (4
+linhas, para quem só gera exemplo) e **`curto-pt`** (as mesmas em português, para o Assistente,
+cujo prompt é escrito em PT — o que não podia existir era uma SEGUNDA versão da regra escrita à
+mão por lá). Aplicada em: `analyzeWordDirect` (review.js), `regenerateMeaning` (audio.js),
+`regenerateCardExample` (study.js), `srsExtractSystem` (consulta.js) e `ENRICH_SYSTEM` (add.js).
+- ⚠️ **No extrator de documento a regra podia virar contradição** e por isso entrou nomeada:
+  *CANONICALIZING IS NOT SHORTENING*. A canonicalização da 4ª rodada de 2026-06-24 ("ran by" →
+  "run by", "run something by someone" → "run by") continua **certa** — ela tira flexão e
+  encaixe livre. O que ela nunca pode tirar é o material FIXO: "fall in love" → "fall" seria
+  perder o sentido junto.
+
+**2. `meaningIdx` posicional — consertado na raiz, não contornado.** Era uma fragilidade
+ANTERIOR à 92ª: toda análise reconstrói `w.meanings`, então bastava a IA devolver os sentidos em
+outra ordem para todo card existente passar a apontar, em silêncio, para outro significado — sem
+erro, só trocando nível, definição e imagem de lugar. Agora:
+- `createSrsCard` grava **`meaningId`** (o `id` que cada significado já tinha desde o
+  `applyAiResult`, e que o merge de curadoria preserva).
+- **`meaningDoCard(w, card)`** (core.js, não-lazy) é o único jeito de ir do card ao significado:
+  tenta pelo id, cai na posição quando o card é antigo. Substituiu os **6 pontos** que liam
+  `w.meanings[card.meaningIdx]` (audio.js ×4, study.js ×1, e o agrupamento de nível).
+- **`migrateMeaningIds()`** (chamado no `initApp`, junto do `migrateLangFields`) congela a
+  identidade dos cards antigos **enquanto a posição ainda é a verdade** — depois seria tarde.
+- `meaningIdx` **continua sendo gravado**: é a chave das imagens (`img_wordId_meaningIdx`) e o
+  que agrupa cards irmãos. Mudar a chave da imagem órfãaria as imagens já geradas.
+- Provado ao vivo: com `w.meanings` invertido, o card continuou em "apaixonar-se" (pela posição
+  teria virado "cair"); card sem `meaningId` continua resolvendo pela posição.
+
+**3. O lado da captura — o item que já NASCE errado.** Clicar em "fall" numa frase que diz
+"fell in love" cria um item que nunca poderá ser consertado por separação, porque o material
+certo nunca existiu. Duas camadas, na ordem do custo:
+- **De graça**: `unidadeJaEstudada(w)` acha uma expressão que ele **já estuda** e que está nesta
+  frase. Casa pela **cauda** ("in love"), nunca pelo verbo — a frase traz "fell"/"falling" e
+  comparar forma com forma erraria em todo verbo irregular (a mesma razão pela qual o negrito é a
+  âncora do detector). Vira um aviso no card com "Abrir <expressão>".
+- **Sob demanda**: botão **"Faz parte de uma expressão?"** (só para item de UMA palavra com frase
+  de ≥3 palavras). Uma chamada curta, com o teste do apagamento dentro do prompt e a instrução
+  explícita de devolver **lista vazia** quando a palavra está no sentido dela mesma ("She fell on
+  the ice" → vazio). A resposta vazia é mostrada como resposta ("está no sentido dela mesma"),
+  senão ele clicaria de novo achando que falhou. Adotar a expressão cria o item com a mesma frase
+  e fonte e **pergunta se dispensa** a palavra solta — com remoção inline, porque o `deleteWord`
+  abre a própria confirmação e perguntar duas vezes a mesma coisa ensina a clicar sem ler.
+
+**4. A família na tela.** `familiaDoItem(w)` deriva pai e filhos de `w.from` — **o pai não guarda
+lista**: duas listas para a mesma verdade divergem. A fileira só aparece quando há parentesco.
+**`irParaItem(id)`** (core.js) manda para a seção certa **conforme o estado**: Preparar
+(pending), dossiê aberto na obra certa (in_study, com o cuidado do `dossie.js` ser lazy),
+glossário focado (in_srs). Mandar para a tela errada é pior do que não ter link.
+**Ganho retroativo**: os itens que o **raio-X** cria a partir de uma frase agora guardam origem
+(`rel:'part'`) — antes não guardavam nada.
+
+**5. Os cards que já estavam na Revisão.** Antes só o número era avisado. Agora, ao separar, o
+app **pergunta** se exclui, com o preço escrito (perde intervalo, facilidade e lapsos) e a
+alternativa nomeada ("Deixar como estão"). Apagar sem perguntar destruiria agendamento de
+semanas; avisar sem oferecer saída seria empurrar o problema.
+
+**6. O detector passou a olhar à esquerda.** A 92ª registrou que olhar os dois lados "dobraria o
+falso positivo" — **medindo, isso se mostrou pessimista**: à esquerda do alvo costuma estar o
+SUJEITO, e o prompt exige que ele varie, então repetição ali é sinal forte. Entrou com barra
+mais alta (**2+ palavras**, contra 1 à direita) e só quando a direita não disse nada. Pega
+"make up" a partir de "make"; e continua devolvendo `null` quando o possessivo varia
+("make up **your/his/our** mind" a partir de "mind") — conservador, como deve ser.
+
+**Verificado ao vivo** (servidor local): as 5 funções de prompt carregam a regra (inclusive as
+lazy, `study.js` e `add.js`); `meaningDoCard` resolve por id com o array invertido; separação com
+card na Revisão pergunta e exclui; família aparece nos dois lados e navega para as 3 seções;
+aviso de graça acerta a frase com a expressão e **não** acerta "She fell on the ice"; varredura
+zera depois de separar; chip da família segue o tema nos 6; sem transbordo; console limpo.
+⚠️ **Armadilha de verificação (nova, vale registrar)**: além do service worker, o **cache HTTP do
+navegador** serviu um `lang.js` velho por dois recarregamentos seguidos — o sintoma foi
+`promptUnidadeDoSentido` indefinida enquanto a função VIZINHA no mesmo arquivo existia. Só caiu
+com `fetch(src, {cache:'reload'})` em todos os scripts antes do reload. `CACHE`: `v138` → **`v139`**.
+
+### Sessão 2026-08-07 (92ª rodada) — DE QUEM É O SENTIDO: "fall" não significa apaixonar-se
+
+**O caso** (print dele): o item `fall` voltou com **8 significados**, e um deles era
+**"apaixonar-se"**. Os três exemplos: *"People **fall** in love…"*, *"Clara **fell** in love…"*,
+*"He is **falling** in love…"*. A prova estava no próprio dado, sem IA nenhuma: **os três
+exemplos compartilham as mesmas duas palavras extras**. Se o sentido fosse de `fall`, o
+complemento variaria. Junto, um segundo defeito no mesmo card: o sentido "ficar, tornar-se"
+(*falls silent*, *fell asleep*) vinha **contaminado** com *"is falling **behind**"* — que é
+outra unidade.
+
+**A causa raiz.** O prompt tinha os três testes lexicográficos da 50ª rodada (substituição,
+combinação, antônimo) — e **todos os três decidem se dois sentidos são DIFERENTES, olhando o
+português**. Nenhum perguntava, do lado do inglês, **de quem é o sentido**: da palavra sozinha
+ou de uma expressão maior. O modelo então acerta ("apaixonar-se" é mesmo um sentido distinto)
+e erra de lugar (pendura no item errado). Detalhe que confirma o diagnóstico: o prompt da
+**triagem** (raio-X) já mandava *"FIRST identify multi-word units"* — o app já sabia fazer isso
+partindo de uma FRASE; só não fazia partindo de uma PALAVRA.
+
+**O critério — três categorias, não duas.** Duas categorias fariam o conserto dividir demais:
+1. **Sentido do item** — sobrevive à palavra sozinha (`fall` = cair, diminuir, ruir).
+2. **Unidade própria** — precisa de material **fixo**: *fall in love*, *fall short*,
+   *fall through*, *fall behind*. → vira item separado.
+3. **Padrão com encaixe** — o complemento é uma **classe aberta** (`fall + adjetivo`:
+   silent/asleep/ill). → **continua sendo sentido da palavra**, e os 3 exemplos têm de usar
+   complementos DIFERENTES dessa classe.
+Teste operacional: **apague o resto e veja se o sentido sobrevive.**
+
+**O que foi feito, em camadas** (cada uma independente, barata → cara):
+- **Prompt** (`review.js`): bloco "WHOSE SENSE IS IT" com o teste do apagamento, as três
+  categorias, o caso `fall`/`fall in love` por extenso e a **regra anti-contaminação** (um
+  sentido de tipo (3) nunca pode conter um exemplo de tipo (2)). Cada significado ganhou
+  `requires` (o material fixo) e `unit` (a expressão inteira).
+- **Detector local** (`unidadeFixaDoSentido`, **core.js** — não-lazy porque o Preparar e a
+  varredura usam): prefixo comum das caudas dos exemplos, ancorado no `<b>` (regex de radical
+  não acerta verbo irregular — *fell*). Corta genéricas do fim ("in love **with**"), ignora
+  determinante sozinho, exige 2+ palavras quando o item **já** é expressão, e não atravessa
+  vírgula/ponto. É o "suspensório" do padrão da 49ª: prompt é regra, código é garantia.
+- **A ação** (`separarSentido`): o nome passa pelo aluno num `inputModal` — o detector acerta
+  muito, mas *fall to the ground* e *fall in love* chegam pelo mesmo caminho e só ele sabe
+  qual vale um item. Cria via `createWord` (como o raio-X já fazia), **herda contexto e fonte**,
+  e roda a análise completa com **`_seedMeaning`** preservando o sentido dele.
+- **Anti-regressão** (`spun_off` no pai): sem isso, "Re-analisar" traria "apaixonar-se" de
+  volta — o espelho da lição da 51ª. **Autocura**: se o item filho for apagado, o bloqueio cai.
+- **Varredura da base** (`varrerUnidades` + modal): a lição da 50ª é literal — *"cards antigos
+  não se corrigem sozinhos"*. Roda o detector sobre `words` inteiro **sem uma chamada de IA**;
+  botão só aparece quando há o que separar. Medido: **10,6ms em 401 itens / 1.203 significados**.
+
+**A armadilha que quase entrou.** Remover o significado do array com `splice` era o caminho
+óbvio e estava **errado**: `meaningIdx` é **posicional** e está gravado em `srsCards`, na chave
+das imagens (`img_wordId_meaningIdx`) e no agrupamento de áudio — tirar o 4º repontaria em
+silêncio os cards do 5º em diante. O mecanismo certo **já existia**: `selected:false` (que o
+`saveToSrs` respeita) + a marca `moved_to`. Índice preservado, sentido fora da tela.
+
+**Varredura do horizonte — onde mais o sentido movido apareceria** (todos corrigidos):
+`dossie.js` (3 pontos: predicado de material, card e busca), `glossario.js` (balão da leitura)
+e `audio.js` (o "outros sentidos" que orienta a geração de imagem). E uma quarta, preventiva:
+`createWord` ganhou `no_break` — sem ele, criar "fall in love" (3 palavras) dispararia o raio-X
+em segundo plano e pagaria uma chamada para desmontar o que acabou de ser montado.
+
+**Verificado ao vivo** (servidor local, sem chave de IA): detector acerta os 8 casos de teste
+(inclusive negrito já na expressão, exemplo único, item multi-palavra e fallback sem negrito);
+separação preserva o array em 3 e mostra 2; `spun_off` bloqueia a volta e libera ao apagar o
+filho; aviso segue `--warning` nos **6 temas**; sem transbordo horizontal em 375px; console
+limpo. `CACHE`: `v137` → **`v138`**.
 
 ### Sessão 2026-08-07 (91ª rodada, parte C) — A COR QUE NÃO SEGUIA O TEMA
 
@@ -5533,6 +5752,30 @@ pela lição já paga do filtro de fonte do SRS — tela vazia sem explicação 
   teste: o navegador serviu o `review.js` velho até a versão subir.
 
 ## 9. Pendências / a verificar
+
+### De quem é o sentido (92ª + 93ª) — o que fechou e o que sobrou
+
+**As seis pendências da 92ª foram fechadas na 93ª** (ver seção 8): fonte única da regra nos 5
+prompts, `meaningId` no lugar da posição, as duas camadas da captura, a família na tela, a saída
+para os cards já na Revisão e o detector também à esquerda. O que continua aberto:
+
+- [ ] **A FAMÍLIA SÓ APARECE NO PREPARAR.** O dossiê (Estudar) e o glossário da Biblioteca
+      mostram o mesmo item sem dizer de onde ele veio. `familiaDoItem` e `irParaItem` são
+      genéricos e não-lazy — é só chamar de lá. Ficou fora por serem duas telas com layout
+      próprio, não por dificuldade.
+- [ ] **A CAPTURA AVISA NO PREPARAR, NÃO NA HORA DO CLIQUE.** O aviso ("a frase contém *fall in
+      love*") aparece quando ele abre o item no Preparar — não no balão do leitor/vídeo, onde a
+      captura de fato acontece. `unidadeJaEstudada(w)` é de graça e serve igual lá; falta só o
+      lugar na UI daquelas telas.
+- [ ] **`imageKey` AINDA USA A POSIÇÃO** (`img_wordId_meaningIdx`). Mantido de propósito: trocar
+      a chave orfanaria toda imagem já gerada. Se um dia valer, precisa de migração das chaves no
+      `ImageDB`, não de uma troca no código.
+- [ ] **A COBERTURA DO DETECTOR À ESQUERDA É ESTREITA.** Exige 2+ palavras iguais e falha quando
+      o possessivo varia ("make up **your/his** mind" a partir de "mind"). É deliberado — a
+      alternativa é falso positivo em série —, mas significa que expressão com encaixe no meio
+      continua dependendo do olho dele ou do "Faz parte de uma expressão?".
+- [ ] **VARREDURA SÓ RODA NA BASE LOCAL DE `words`.** Item cujo `words[]` foi apagado mas que
+      ainda tem cards no SRS (snapshot) não é varrido. Não deve ser comum, mas existe.
 
 ### Design / CSS — o que a 91ª rodada deixou aberto de propósito
 

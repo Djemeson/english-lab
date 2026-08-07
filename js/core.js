@@ -713,6 +713,214 @@ function buildSrsFrente(card) {
     return escB(cleanSentence.replace(regex, '<b>$1</b>'))
   } catch { return esc(cleanSentence) }
 }
+// ================================================================
+// UNIDADE FIXA — o sentido que não é do item, é da EXPRESSÃO inteira
+// ================================================================
+// O caso que criou isto (2026-08-07): "fall" voltou da IA com o sentido
+// "apaixonar-se" — e os TRÊS exemplos diziam "fall in love". Sentido que só
+// existe com um complemento FIXO não é sentido da palavra: é outra unidade de
+// estudo, com baralho, card e agendamento próprios ("fall in love").
+//
+// A prova está no próprio dado, sem gastar IA: se os exemplos compartilham as
+// mesmas palavras logo DEPOIS do alvo, o complemento é fixo. Se variam
+// (fall silent / asleep / ill), é padrão aberto — e aí o sentido É da palavra.
+// Por isso o teste roda sobre os exemplos e não sobre o significado em PT:
+// é o inglês que decide de quem é o sentido.
+//
+// Mora aqui (NÃO-lazy) porque quem usa é o review.js (Preparar) e a varredura
+// da base inteira — e amanhã, provavelmente, a reanálise em lote do audio.js.
+
+// Palavras que sozinhas não provam unidade nenhuma: determinantes, pronomes e
+// conectivos. Preposição e partícula ficam FORA desta lista de propósito — são
+// justamente elas que formam "fall in love", "fall through", "fall apart".
+const _UF_GENERICAS = new Set(['the','a','an','this','that','these','those','my','your','his','her','its','our','their',
+  'and','but','or','so','then','when','while','because','if','as','than','it','him','them','me','us','you','he','she',
+  'they','i','we','there','here','again','now','very','just','more','most','some','any','no','not'])
+
+function _ufTokens(txt) {
+  const limpo = String(txt || '').replace(/<[^>]*>/g, '')
+  // A cauda não atravessa fronteira de oração: o que vem depois de vírgula ou
+  // ponto é outra coisa, não parte da expressão.
+  const corte = limpo.search(/[.,;:!?—–"“”]/)
+  const trecho = corte >= 0 ? limpo.slice(0, corte) : limpo
+  return trecho.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .split(/[^a-z'’-]+/).filter(Boolean)
+}
+
+// O que vem DEPOIS do alvo neste exemplo. Âncora preferida: o negrito, que o
+// projeto inteiro garante estar no termo flexionado (fell, falling) — regex de
+// radical não acerta verbo irregular. Se o negrito já engloba a expressão
+// ("<b>fell in love</b>"), o excedente também conta como cauda.
+function _ufCauda(en, palavra) {
+  const s = String(en || '')
+  const nBase = String(palavra || '').trim().split(/\s+/).filter(Boolean).length || 1
+  const b = /<b>([\s\S]*?)<\/b>/i.exec(s)
+  if (b) {
+    const dentro = _ufTokens(b[1]).slice(nBase)
+    return [...dentro, ..._ufTokens(s.slice(b.index + b[0].length))].slice(0, 4)
+  }
+  const raiz = String(palavra || '').trim().split(/\s+/)[0].toLowerCase()
+  if (!raiz) return []
+  const limpo = s.replace(/<\/?b>/gi, '')
+  let m
+  try { m = new RegExp(`\\b${escR(raiz)}[a-z]*\\b`, 'i').exec(limpo) } catch { return [] }
+  if (!m) return []
+  return _ufTokens(limpo.slice(m.index + m[0].length)).slice(0, 4)
+}
+
+// O que vem ANTES do alvo, do mais próximo para o mais distante. Existe porque
+// nem toda expressão põe o material fixo depois do verbo: capturar "mind" de
+// "make up your mind" deixa o item sem nada à direita. O corte é mais alto
+// aqui (2+ palavras) porque à esquerda costuma estar o SUJEITO — e o prompt
+// exige que ele varie, então repetição de 2+ palavras ali é sinal forte.
+function _ufCabeca(en, palavra) {
+  const s = String(en || '')
+  const b = /<b>([\s\S]*?)<\/b>/i.exec(s)
+  let antes
+  if (b) antes = _ufTokensAntes(s.slice(0, b.index))
+  else {
+    const raiz = String(palavra || '').trim().split(/\s+/)[0].toLowerCase()
+    if (!raiz) return []
+    const limpo = s.replace(/<\/?b>/gi, '')
+    let m
+    try { m = new RegExp(`\\b${escR(raiz)}[a-z]*\\b`, 'i').exec(limpo) } catch { return [] }
+    if (!m) return []
+    antes = _ufTokensAntes(limpo.slice(0, m.index))
+  }
+  return antes.reverse().slice(0, 4)
+}
+// Igual ao _ufTokens, mas a fronteira de oração é a ÚLTIMA pontuação, não a
+// primeira: aqui se lê de trás para a frente.
+function _ufTokensAntes(txt) {
+  const limpo = String(txt || '').replace(/<[^>]*>/g, '')
+  let corte = -1
+  for (let i = limpo.length - 1; i >= 0; i--) if (/[.,;:!?—–"“”]/.test(limpo[i])) { corte = i; break }
+  const trecho = corte >= 0 ? limpo.slice(corte + 1) : limpo
+  return trecho.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .split(/[^a-z'’-]+/).filter(Boolean)
+}
+
+function _ufPrefixoComum(listas) {
+  const comum = []
+  for (let i = 0; i < listas[0].length; i++) {
+    const t = listas[0][i]
+    if (listas.every(c => c[i] === t)) comum.push(t)
+    else break
+  }
+  return comum
+}
+
+// Devolve {extra, unidade, lado} quando o sentido depende de material fixo;
+// null quando o sentido é da palavra. Conservador de propósito: na dúvida,
+// null — isto vira SUGESTÃO na tela, e sugestão errada em excesso é o que faz
+// o usuário parar de ler as sugestões.
+function unidadeFixaDoSentido(m, palavra) {
+  const exs = (m && Array.isArray(m.examples) ? m.examples : []).filter(e => e && e.en)
+  if (exs.length < 2) return null
+  const base = String(palavra || '').trim()
+  const nBase = base.split(/\s+/).filter(Boolean).length || 1
+
+  // 1) À DIREITA — o caso dominante do inglês (fall in love, fall apart).
+  const caudas = exs.map(e => _ufCauda(e.en, palavra))
+  if (!caudas.some(c => !c.length)) {
+    const comum = _ufPrefixoComum(caudas)
+    // "in love with" → a preposição solta do fim não faz parte da unidade
+    while (comum.length && _UF_GENERICAS.has(comum[comum.length - 1])) comum.pop()
+    const serve = comum.length && !(comum.length === 1 && _UF_GENERICAS.has(comum[0])) &&
+      !(nBase > 1 && comum.length < 2)
+    if (serve) {
+      const extra = comum.join(' ')
+      return { extra, unidade: base ? `${base} ${extra}` : extra, lado: 'direita' }
+    }
+  }
+
+  // 2) À ESQUERDA — só quando a direita não disse nada, e com barra mais alta.
+  const cabecas = exs.map(e => _ufCabeca(e.en, palavra))
+  if (cabecas.some(c => !c.length)) return null
+  const antes = _ufPrefixoComum(cabecas)
+  // O começo da expressão não pode ser artigo/pronome solto ("the mind").
+  while (antes.length && _UF_GENERICAS.has(antes[antes.length - 1])) antes.pop()
+  if (antes.length < 2) return null
+  const extra = antes.slice().reverse().join(' ')
+  return { extra, unidade: base ? `${extra} ${base}` : extra, lado: 'esquerda' }
+}
+
+// ================================================================
+// O SIGNIFICADO DE UM CARD — por id, não por posição
+// ================================================================
+// `meaningIdx` é POSICIONAL, e `w.meanings` é RECONSTRUÍDO a cada análise: se a
+// IA devolver os sentidos em outra ordem, todo card existente passa a apontar,
+// em silêncio, para outro significado. O bug nunca dá erro — só troca o nível,
+// a definição e a imagem de lugar. Cada significado já nasce com `id` (uid em
+// applyAiResult, preservado pelo merge de curadoria): é ele que identifica.
+//
+// `meaningIdx` continua no card e continua sendo gravado: é a chave das imagens
+// (`img_wordId_meaningIdx`) e o que agrupa cards irmãos. O que muda é só a
+// BUSCA dentro de `w.meanings`, que passa a preferir o id e a cair no índice
+// quando o card é antigo (ou quando o significado foi apagado).
+function meaningDoCard(w, card) {
+  if (!w || !card || !Array.isArray(w.meanings)) return null
+  if (card.meaningId) {
+    const porId = w.meanings.find(m => m && m.id === card.meaningId)
+    if (porId) return porId
+  }
+  return w.meanings[card.meaningIdx] || null
+}
+
+// Migração aditiva: cards antigos não têm `meaningId`. Enquanto a posição ainda
+// é a verdade (nenhuma análise nova rodou desde então), este é o momento certo
+// de congelar a identidade — depois seria tarde.
+function migrateMeaningIds() {
+  if (typeof srsCards === 'undefined' || !Array.isArray(srsCards)) return false
+  let changed = false
+  for (const c of srsCards) {
+    if (c.meaningId) continue
+    const w = (words || []).find(x => x.id === c.wordId)
+    const m = w && Array.isArray(w.meanings) ? w.meanings[c.meaningIdx] : null
+    if (m && m.id) { c.meaningId = m.id; changed = true }
+  }
+  if (changed && typeof saveSrsCards === 'function') saveSrsCards()
+  return changed
+}
+
+// ================================================================
+// FAMÍLIA DE UM ITEM — de onde ele veio e o que saiu dele
+// ================================================================
+// Um item guarda em `from` de qual outro ele nasceu: o sentido separado
+// ("fall in love" veio de "fall") e a parte escolhida no raio-X ("get you in"
+// veio da frase inteira). O PAI não guarda lista nenhuma — os filhos são
+// derivados por varredura. Duas listas para a mesma verdade divergem, e este
+// projeto já apanhou disso.
+function familiaDoItem(w) {
+  if (!w) return { pai: null, filhos: [] }
+  const pai = w.from && w.from.id ? (words || []).find(x => x.id === w.from.id) || null : null
+  const filhos = (words || []).filter(x => x.from && x.from.id === w.id)
+  return { pai, filhos }
+}
+
+// Onde o item mora AGORA decide para onde o clique leva: cada estado tem uma
+// tela só dele desde o fluxo de 4 etapas. Mandar para a tela errada é pior do
+// que não ter link nenhum — o usuário procura e não acha.
+function irParaItem(id) {
+  const w = (words || []).find(x => x.id === id)
+  if (!w) { toast('Esse item não existe mais', 'warning'); return }
+  if (w.status === 'pending_ai' || w.status === 'pending_review') {
+    showSection('preparar')
+    setTimeout(() => { try { selectWord(w.id) } catch (e) {} }, 60)
+    return
+  }
+  if (w.status === 'in_study') {
+    showSection('estudar')
+    // dossie.js é LAZY: só existe depois que a seção abre.
+    setTimeout(() => {
+      try { if (typeof dossieAbrir === 'function' && typeof _dossieChave === 'function') dossieAbrir(_dossieChave(w)) } catch (e) {}
+    }, 120)
+    return
+  }
+  if (typeof openWordGlossary === 'function') { openWordGlossary(w.id); return }
+  toast(`"${w.word}" está na Revisão`, 'info')
+}
+
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
 function selectAll(cls, val) {

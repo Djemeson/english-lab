@@ -952,6 +952,7 @@ Definition (Portuguese): "${card.definition_pt || card.meaning_pt}"
 Rules:
 - The sentence MUST clearly and naturally illustrate the specific meaning above
 - The Portuguese bold MUST be interchangeable with "${card.meaning_pt}" in that sentence — never a word that belongs to a DIFFERENT sense of "${card.word}"
+${typeof promptUnidadeDoSentido === 'function' ? promptUnidadeDoSentido(card.word, 'curto') : ''}
 ${typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(card.lang || 'en', 'traducao') : ''}
 - Write like a native speaker — feel free to use a novel, news article or real conversation style
 - Keep it 10-20 words long
@@ -972,8 +973,8 @@ ${typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(card.lang ||
 
     // Also update original word data so future cards reflect the change
     const w = words && words.find(x => x.id === card.wordId)
-    if (w && w.meanings && w.meanings[card.meaningIdx]) {
-      const m = w.meanings[card.meaningIdx]
+    const m = meaningDoCard(w, card)
+    if (m) {
       const ei = card.exampleIdx >= 0 ? card.exampleIdx : 0
       if (m.examples && m.examples[ei]) {
         m.examples[ei].en = result.en

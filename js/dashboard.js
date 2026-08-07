@@ -754,7 +754,11 @@ function createWord(data) {
   saveWords()
   // Frase multi-palavra entrando na revisão: a triagem leve (raio-X) roda em
   // segundo plano JÁ — quando o card for aberto, os chips estão prontos.
-  if (typeof _revBreakPrefetch === 'function') _revBreakPrefetch(w)
+  // `no_break` desliga isso para quem já nasce sabendo o que é: a expressão
+  // separada de um sentido ("fall in love") vai direto para a análise completa,
+  // e triá-la em partes seria pagar uma chamada para desmontar o que acabamos
+  // de montar.
+  if (typeof _revBreakPrefetch === 'function' && !data.no_break) _revBreakPrefetch(w)
   return w
 }
 

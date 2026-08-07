@@ -55,7 +55,9 @@ function _dossiePartes(chave) {
 function _dossieItens() {
   return words.filter(w =>
     (w.status === 'in_study' || w.status === 'in_srs') &&
-    Array.isArray(w.meanings) && w.meanings.some(m => m && m.meaning_pt))
+    // `moved_to` = sentido que virou item próprio; não conta como material
+    // deste item (ver "separar sentido" em review.js).
+    Array.isArray(w.meanings) && w.meanings.some(m => m && m.meaning_pt && !m.moved_to))
 }
 
 // O DADO ANTIGO. Quem já usava o app tem centenas de itens com `status:
@@ -146,7 +148,7 @@ function dossieVoltar() { dossieAbrir(null) }
 // ---- telas -----------------------------------------------------------
 function _dossieCardHTML(w) {
   const feito = !!w.estudadoEm
-  const ms = (w.meanings || []).filter(m => m && m.meaning_pt)
+  const ms = (w.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to)
   const sig = ms.map(m => `
     <div class="dos-sig${m.context_match ? ' ctx' : ''}">
       <div class="dos-sig-pt">${esc(m.meaning_pt)}${m.type_label ? `<i>${esc(m.type_label)}</i>` : ''}</div>
@@ -192,7 +194,7 @@ function _dosNorm(s) {
 // material que a IA montou. Buscar só pelo termo obrigaria a lembrar a grafia
 // exata — e o valor do dossiê está justamente no material.
 function _dosItemTexto(w) {
-  const ms = (w.meanings || []).filter(m => m && m.meaning_pt)
+  const ms = (w.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to)
   return _dosNorm([
     w.word, w.context, w.context_pt,
     ...ms.map(m => [m.meaning_pt, m.definition_pt, m.type_label,

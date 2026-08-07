@@ -415,12 +415,14 @@ async function refreshImageKeyCache() {
 // modelo de imagem — é justamente ela que puxava para o sentido errado.
 async function buildImageScene(card) {
   const w = words.find(x => x.id === card.wordId)
-  const sense = w?.meanings?.[card.meaningIdx] || {}
+  const sense = meaningDoCard(w, card) || {}
   const significado = card.meaning_pt || sense.meaning_pt || ''
   const definicao   = sense.definition_pt || card.definition_pt || ''
   const frase       = (card.example_en || '').replace(/<[^>]*>/g, '')
   const outros = (w?.meanings || [])
-    .map((m, i) => i === card.meaningIdx ? null : (m.meaning_pt || '').trim())
+    // Sentido que virou item próprio não é "outro sentido desta palavra" — a
+    // imagem não deve se afastar dele, ele nem mora mais aqui.
+    .map((m, i) => (i === card.meaningIdx || m.moved_to) ? null : (m.meaning_pt || '').trim())
     .filter(Boolean)
 
   const r = await aiJSON([
@@ -1018,6 +1020,7 @@ Return ONLY this JSON:
 Rules — follow exactly:
 - Return EXACTLY ${n} example object(s).
 - Every example MUST match the meaning "${it.meaning_pt}". If "${it.word}" has other senses, IGNORE them — an example must not make sense under a different meaning.
+${promptUnidadeDoSentido(it.word, 'curto')}
 - The Portuguese bold in every example MUST be interchangeable with "${it.meaning_pt}" in that sentence — never a word from a different sense.
 - Each example: a different subject and a different real-world situation; natural like a novel/news/conversation, never formulaic.
 - Tense order when generating 3 or more: #1 PRESENT, #2 PAST, #3 a construction where the word CHANGES FORM the most (continuous/future/conditional/passive) — the learner must see the word inflected differently in each.
@@ -1131,7 +1134,7 @@ async function fillMissingAll() {
   for (const g of groups.values()) {
     const w = words.find(x => x.id === g.wordId)
     g.wordRef = w
-    const wm = w && Array.isArray(w.meanings) ? w.meanings[g.meaningIdx] : null
+    const wm = meaningDoCard(w, g.cards[0] || { meaningIdx: g.meaningIdx })
     if (wm && wm.level && wm.level.trim()) g.level = wm.level
   }
 
@@ -1176,8 +1179,8 @@ Return ONLY this JSON:
       const w = it.wordRef
       if (w) {
         if (patch.ipa) w.ipa = patch.ipa
-        if (Array.isArray(w.meanings) && w.meanings[it.meaningIdx]) {
-          const wm = w.meanings[it.meaningIdx]
+        const wm = meaningDoCard(w, it.cards[0] || { meaningIdx: it.meaningIdx })
+        if (wm) {
           if (patch.type_label) wm.type_label = patch.type_label
           if ('origin_pt' in patch) wm.origin_pt = patch.origin_pt
           if (levelPatch) wm.level = levelPatch
@@ -1274,8 +1277,8 @@ async function markBoldAll() {
         if (en) c.example_en = en
         if (pt) c.example_pt = pt
         const w = words.find(x => x.id === c.wordId)
-        if (w && Array.isArray(w.meanings) && w.meanings[c.meaningIdx]) {
-          const m = w.meanings[c.meaningIdx]
+        const m = meaningDoCard(w, c)
+        if (m) {
           const ei = c.exampleIdx >= 0 ? c.exampleIdx : 0
           if (Array.isArray(m.examples) && m.examples[ei]) {
             if (en) m.examples[ei].en = en

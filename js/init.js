@@ -15,6 +15,7 @@ async function initApp() {
   loadSrs()          // loads srsCfg, srsLog, decks
   await loadSrsAsync() // loads srsCards from IDB (migrates if needed)
   migrateLangFields()  // multi-idioma: words/cards antigos ganham lang:'en' (aditivo)
+  migrateMeaningIds()  // card antigo ganha `meaningId`: identidade por id, não por posição
   mountLangSelector('lang-selector-add')  // seletor de idioma ativo (Adicionar)
   mountLangSelector('lang-selector-asst') // seletor de idioma ativo (Assistente)
   renderDashboard()

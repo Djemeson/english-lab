@@ -185,6 +185,10 @@ function createSrsCard(wordId, meaningIdx, exampleIdx) {
   return {
     id: uid(),
     wordId, meaningIdx, exampleIdx,
+    // Identidade do significado. `meaningIdx` fica (chave da imagem, agrupamento
+    // de irmãos), mas quem responde "que sentido é este?" é o id — a posição
+    // muda toda vez que a análise reconstrói `w.meanings`. Ver `meaningDoCard`.
+    meaningId: m.id || '',
     deckId,
     state: 'new',
     due: nowTs(),

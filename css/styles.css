@@ -541,6 +541,70 @@ select option{background:var(--surface)}
   background:color-mix(in srgb, var(--success) 20%, transparent);color:var(--success);white-space:nowrap;
 }
 
+/* ---- Sentido que pertence a uma expressão inteira, não à palavra ---- */
+/* Aviso, não erro: o material está certo, só está no item errado — por isso
+   usa --warning, e não --error. */
+.mi-unidade{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);
+  flex-wrap:wrap;margin:var(--sp-2) 0 var(--sp-3);
+  padding:var(--sp-2) var(--sp-3);border-radius:var(--radius-sm);
+  background:color-mix(in srgb, var(--warning) 10%, transparent);
+  border-left:3px solid var(--warning);
+  cursor:default;
+}
+.miu-txt{
+  display:flex;align-items:flex-start;gap:var(--sp-2);
+  font-size:var(--fs-sm);color:var(--text2);line-height:1.5;flex:1;min-width:180px;
+}
+.miu-txt .ic{color:var(--warning);flex-shrink:0;margin-top:2px}
+.miu-txt b{color:var(--text)}
+/* Ação discreta: existe em todo significado para o caso de o detector não ver
+   o que o aluno vê, mas não pode competir com o conteúdo do card. */
+.mi-sep{padding:2px 5px;color:var(--text3);opacity:.55;transition:opacity .15s,color .15s}
+.mi-sep:hover{opacity:1;color:var(--primary)}
+
+/* ---- Família: de onde o item veio e o que saiu dele ---- */
+.wc-familia{
+  display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;
+  margin-top:var(--sp-3);
+}
+.wcf-lbl{
+  display:inline-flex;align-items:center;gap:var(--sp-1);
+  font-size:var(--fs-2xs);font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--text3);
+}
+.wcf-lbl .ic{width:13px;height:13px}
+.wcf-chip{
+  display:inline-flex;align-items:center;gap:var(--sp-1);
+  font-size:var(--fs-xs);font-weight:600;
+  padding:3px var(--sp-2);border-radius:999px;
+  border:1px solid var(--border);background:var(--surface2);color:var(--text2);
+  cursor:pointer;transition:border-color .15s,color .15s,background .15s;
+}
+.wcf-chip:hover{border-color:var(--primary);color:var(--primary);background:rgba(var(--primary-rgb),.08)}
+.wcf-chip .ic{width:13px;height:13px;color:var(--text3)}
+.wcf-chip:hover .ic{color:var(--primary)}
+
+/* ---- Varredura: os sentidos presos a uma expressão, em toda a base ---- */
+.vru-box{max-width:640px;width:100%}
+.vru-lista{display:flex;flex-direction:column;gap:var(--sp-2);max-height:52vh;overflow-y:auto}
+.vru-item{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);
+  padding:var(--sp-2) var(--sp-3);border:1px solid var(--border);
+  border-radius:var(--radius-sm);background:var(--bg);
+}
+.vru-txt{min-width:0;flex:1}
+.vru-top{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;font-size:var(--fs-sm);color:var(--text)}
+.vru-seta{display:inline-flex;color:var(--text3)}
+.vru-alvo{color:var(--primary)}
+.vru-sub{font-size:var(--fs-xs);color:var(--text3);margin-top:2px;line-height:1.5}
+.vru-sub b{color:var(--text2)}
+.vru-vazio{
+  display:flex;align-items:center;gap:var(--sp-2);
+  font-size:var(--fs-sm);color:var(--text2);padding:var(--sp-4) 0;
+}
+.vru-vazio .ic{color:var(--success)}
+
 /* Actions bar */
 .wc-actions{
   padding:16px 24px;border-top:1px solid var(--border);

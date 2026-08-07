@@ -164,7 +164,10 @@ function glossInvalidar() { _glossSelo++; _glossIndice = null }
 // marcado `context_match` — é o que a IA escolheu para a frase real, e é o que
 // separa esta camada de um dicionário cego (ver o caso "barrel"→cano).
 function _glossDoCard(w) {
-  const ms = Array.isArray(w.meanings) ? w.meanings.filter(m => m && m.meaning_pt) : []
+  // `moved_to`: sentido que virou item próprio (ex.: "apaixonar-se" saiu de
+  // "fall" e virou "fall in love"). Continua no array só para não mover o
+  // índice dos cards já criados — mas não é mais sentido DESTA palavra.
+  const ms = Array.isArray(w.meanings) ? w.meanings.filter(m => m && m.meaning_pt && !m.moved_to) : []
   if (!ms.length) return null
   const m = ms.find(x => x.context_match && x.selected !== false)
       || ms.find(x => x.context_match)
