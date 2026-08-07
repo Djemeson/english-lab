@@ -473,7 +473,25 @@ function _engolirMovimento(e) {
   // próprios eventos de mouse (seleção de palavra, hover, arrastar).
   const t = e.target
   if (t && t.closest && t.closest('#englab-bar, #englab-pop, #englab-transcript')) return
+  // ⚠️ O PONTEIRO SOME sem isto. A Netflix esconde o cursor junto com o
+  // painel quando acha que você parou de mexer — e como estamos engolindo o
+  // movimento, para ela você parou para sempre. Aqui devolvemos o cursor no
+  // elemento sob o ponteiro, sem precisar saber em qual container ela pôs o
+  // `cursor: none` (o valor é herdado, então mandar no filho basta).
+  _garantirCursor(e.clientX, e.clientY)
   e.stopPropagation()
+}
+
+// Cacheado por elemento: `elementFromPoint` + `getComputedStyle` a cada pixel
+// de movimento seria caro, e o alvo muda pouco enquanto se assiste.
+let _cursorArrumado = null
+function _garantirCursor(x, y) {
+  const alvo = document.elementFromPoint(x, y)
+  if (!alvo || alvo === _cursorArrumado) return
+  if (getComputedStyle(alvo).cursor === 'none') {
+    alvo.style.setProperty('cursor', 'auto', 'important')
+    _cursorArrumado = alvo
+  }
 }
 for (const tipo of ['mousemove', 'pointermove']) {
   document.addEventListener(tipo, _engolirMovimento, true)

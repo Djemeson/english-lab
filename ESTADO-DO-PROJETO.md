@@ -1199,6 +1199,21 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+200. **O CURSOR SUMIU — efeito colateral direto da supressão (104ª rodada, 2026-08-06)**.
+     - **Causa**: a Netflix esconde o ponteiro junto com o painel quando conclui que o usuário
+       parou de mexer. Como passamos a **engolir** o movimento, para ela ele parou **para
+       sempre** — e o cursor nunca voltava. Não é bug da supressão: é a consequência lógica
+       dela, e eu devia ter previsto ao escrever a rodada anterior.
+     - **Conserto sem depender de classe**, pelo mesmo motivo de sempre: `elementFromPoint` no
+       ponto do cursor e, se o `cursor` computado ali for `none`, devolve `auto` por `style`
+       inline. Como `cursor` é **herdado**, mandar no elemento sob o ponteiro basta — não é
+       preciso descobrir em qual container da Netflix o `none` foi declarado.
+     - **Cacheado por elemento**: `elementFromPoint` + `getComputedStyle` a cada pixel de
+       movimento seria caro, e o alvo muda pouco enquanto se assiste.
+     - Verificado: filho herdando `cursor:none` volta a `auto` depois de um movimento engolido,
+       e um elemento que já tem cursor válido (`pointer`, nas palavras da legenda) **não é
+       tocado**. `manifest.json` → **3.10.1**.
+
 199. **CONTROLES DA NETFLIX SÓ PERTO DO RODAPÉ (103ª rodada, 2026-08-06)**.
      Pedido: *"quando se move o mouse o painel aparece, mas o Reactor desabilitou isso — só
      aparece quando o mouse passa em cima da barra de progresso. Quero isso."*
