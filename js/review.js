@@ -582,11 +582,22 @@ function renderWcToolbarLeft() {
   const selCount = selectedWordIds.size
 
   if (selCount > 0) {
+    // SEM MATERIAL DA IA, NÃO EXISTE ENVIO. Item em `pending_ai` é só a palavra
+    // e a frase de onde ela saiu — mandá-lo ao dossiê seria oferecer para
+    // estudar uma página em branco. A função de envio já recusava, mas a barra
+    // continuava OFERECENDO: oferecer o que não pode acontecer é o erro, mesmo
+    // quando o dado está a salvo. Agora a barra mostra só o que cabe agora.
+    const sels = [...selectedWordIds].map(id => words.find(x => x.id === id)).filter(Boolean)
+    const prontas = sels.filter(_prepPodeEnviar).length
+    const semMaterial = sels.length - prontas
+    const parcial = prontas > 0 && semMaterial > 0
     leftEl.innerHTML = `
       <span style="font-size:var(--fs-sm);font-weight:600;color:var(--primary);white-space:nowrap">${selCount} selecionada${selCount!==1?'s':''}</span>
-      <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()" data-tip="Gera significados, exemplos e nível com IA para as selecionadas">${ic('sparkles')}Analisar</button>
-      <button class="btn btn-srs btn-sm" onclick="enviarSelecionadasParaEstudo()" data-tip="Tira daqui e põe no dossiê da obra, em Estudar. É lá que você lê o material — e marcar 'Estudei' é o que manda o item para a Revisão.">${ic('book')}Enviar para o Estudo</button>
-      <button class="btn btn-ghost btn-sm wct-atalho" onclick="saveSelectedToSrs()" data-tip="Atalho: pula a leitura do dossiê e joga direto na repetição espaçada">${ic('arrowRight')}Pular para a Revisão</button>
+      ${semMaterial ? `<span class="wct-aviso" data-tip="Item sem análise não tem significado, exemplo nem nível — não há o que estudar nele ainda.">${ic('info','ic-sm')}${semMaterial} sem material da IA</span>` : ''}
+      <button class="btn ${prontas ? 'btn-secondary' : 'btn-srs'} btn-sm" onclick="analyzeSelected()" data-tip="Gera significados, exemplos e nível com IA para as selecionadas">${ic('sparkles')}Analisar</button>
+      ${prontas ? `
+      <button class="btn btn-srs btn-sm" onclick="enviarSelecionadasParaEstudo()" data-tip="Tira daqui e põe no dossiê da obra, em Estudar. É lá que você lê o material — e marcar 'Estudei' é o que manda o item para a Revisão.">${ic('book')}Enviar ${parcial ? prontas + ' ' : ''}para o Estudo</button>
+      <button class="btn btn-ghost btn-sm wct-atalho" onclick="saveSelectedToSrs()" data-tip="Atalho: pula a leitura do dossiê e joga direto na repetição espaçada">${ic('arrowRight')}Pular para a Revisão</button>` : ''}
       <button class="btn btn-ghost btn-sm" style="color:var(--error)" onclick="deleteSelected()" data-tip="Remove as palavras selecionadas da fila">${ic('trash')}Excluir</button>`
   } else if (w) {
     if (w.status === 'pending_review' && w.meanings?.length > 0) {
@@ -596,11 +607,17 @@ function renderWcToolbarLeft() {
       // do Preparar: some da lista e passa a viver no dossiê da obra, em
       // Estudar. Anunciar a Revisão aqui ensinava a pular a leitura, que é o
       // motivo de a seção Estudar existir. O atalho continua ali, como atalho.
+      // Sem nenhum significado marcado não há o que enviar: o botão fica
+      // desabilitado dizendo o porquê, em vez de aceitar o clique e recusar
+      // depois com um aviso.
+      const podeEnviar = _prepPodeEnviar(w)
       leftEl.innerHTML = `
-        <button class="btn btn-srs btn-sm" onclick="enviarParaEstudo('${w.id}')" data-tip="Tira daqui e põe no dossiê desta obra, em Estudar. É lá que você lê o material — e marcar 'Estudei' é o que manda o item para a Revisão.">${ic('book')}Enviar para o Estudo</button>
+        <button class="btn btn-srs btn-sm"${podeEnviar ? '' : ' disabled'} onclick="enviarParaEstudo('${w.id}')" data-tip="${podeEnviar
+          ? 'Tira daqui e põe no dossiê desta obra, em Estudar. É lá que você lê o material — e marcar \'Estudei\' é o que manda o item para a Revisão.'
+          : 'Marque ao menos um significado abaixo para poder enviar.'}">${ic('book')}Enviar para o Estudo</button>
         <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Roda a IA de novo PRESERVANDO o que já tem exemplos — completa o que falta">${ic('refresh')}Re-analisar</button>
         <button class="btn btn-ghost btn-sm" onclick="refazerAnalise('${w.id}')" data-tip="A análise está errada? Descarta os significados atuais e refaz do zero">${ic('undo')}Refazer do zero</button>
-        <button class="btn btn-ghost btn-sm wct-atalho" onclick="saveToSrs('${w.id}')" data-tip="Atalho: pula a leitura do dossiê e joga os ${totalCards} card${totalCards!==1?'s':''} direto na repetição espaçada">${ic('arrowRight')}Pular para a Revisão</button>`
+        ${podeEnviar ? `<button class="btn btn-ghost btn-sm wct-atalho" onclick="saveToSrs('${w.id}')" data-tip="Atalho: pula a leitura do dossiê e joga os ${totalCards} card${totalCards!==1?'s':''} direto na repetição espaçada">${ic('arrowRight')}Pular para a Revisão</button>` : ''}`
     } else if (w.status === 'pending_ai') {
       leftEl.innerHTML = `
         <button class="btn btn-primary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Analisa esta palavra com IA: significados, exemplos, nível e registro">${ic('sparkles')}Analisar com IA</button>`

@@ -1149,9 +1149,15 @@ capítulo, por significado e sem acento; e o foco não se perde ao digitar.
    "Enviar para o Estudo" tira o item da fila do Preparar, e cada tela é uma fila que esvazia.
    Com volta (`voltarParaPreparar`), porque análise errada não pode virar beco.
 
-Duas lições de método, registradas: **rótulo correto não conserta hierarquia errada** (o que a
-tela ensina é o que ela põe em primeiro lugar) e **duas telas mostrando o mesmo item é sinal de
-que falta um estado**, não de que falta um filtro. (`CACHE` → `v132` e depois `v133`: sem o
+3. "essas palavras nesse estágio nunca devem ser enviadas pro Estudo sem antes ser gerado o
+   material por IA" — a barra oferecia o envio para itens `pending_ai`. A função recusava (o
+   dado nunca correu risco), mas oferecer o impossível já é o erro. A barra passou a mostrar
+   só o que cabe: com pendentes, **Analisar** vira a ação principal.
+
+Três lições de método, registradas: **rótulo correto não conserta hierarquia errada** (o que a
+tela ensina é o que ela põe em primeiro lugar); **duas telas mostrando o mesmo item é sinal de
+que falta um estado**, não de que falta um filtro; e **guarda no dado não dispensa guarda na
+tela** — recusar depois do clique é pior que não oferecer. (`CACHE` → `v132` e depois `v133`: sem o
 bump, o shell em cache continuava servindo os botões antigos — aconteceu no teste.)
 
 **O que NÃO foi feito e por quê**: os arquivos continuam `review.js`/`study.js`/`dossie.js` —
@@ -5472,6 +5478,14 @@ ao mesmo tempo no Preparar e no Estudar — e nenhuma das duas telas dizia onde 
 - "não estudei ainda" devolve o item para **`in_study`** (reler), não para o Preparar
   (refazer). São duas intenções diferentes e agora têm dois botões diferentes.
 - O atalho **"Pular para a Revisão"** continua, fantasma e no fim (`.wct-atalho`).
+- **SEM MATERIAL DA IA NÃO EXISTE ENVIO** (3ª correção do dia, também vinda do uso: ele
+  selecionou os 11 `pending_ai` e a barra ofereceu "Enviar para o Estudo"). `_prepPodeEnviar()`
+  já recusava — o dado nunca esteve em risco —, mas **a barra oferecia o que não podia
+  acontecer**, e isso já é o erro. Agora ela reflete a regra: seleção só com pendentes mostra
+  apenas **Analisar** (promovida a principal) e **Excluir**, com o aviso *"N sem material da
+  IA"*; seleção mista rotula **"Enviar N para o Estudo"**, dizendo quantos vão; e no item único
+  sem nenhum significado marcado o botão fica **desabilitado** com o motivo no tooltip, em vez
+  de aceitar o clique e recusar depois.
 - Efeito colateral bom: **a fila do Preparar pode ficar vazia** — e o vazio virou informação
   ("o que você já enviou está em Estudar"), com o dossiê vazio dizendo quantos itens esperam
   envio do outro lado.
