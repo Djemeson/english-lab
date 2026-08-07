@@ -413,6 +413,9 @@ function _topoDosControles() {
 // `undefined` = ainda não calculei; `null` = calculei e NÃO achei o painel.
 // Usar `null` para os dois fazia a função sair cedo depois de um reset e
 // deixar o valor velho grudado no style — o teste pegou.
+// O ponto mais alto que os controles já ocuparam nesta sessão de vídeo. É a
+// régua da posição fixa. Zerado ao trocar de título (a altura do player muda).
+let _pisoControles = null
 let _ultimoFundo
 function posicionarFlutuante() {
   if (!barra) return
@@ -423,9 +426,19 @@ function posicionarFlutuante() {
   if (rule) rule.style.display = flut ? 'none' : ''
   if (!flut) { if (_ultimoFundo !== undefined) { barra.style.bottom = ''; _ultimoFundo = undefined } return }
   const topo = _topoDosControles()
-  // 10px de folga acima dos controles. Piso de 72px para o caso de a medida
-  // vir estranha (player em transição, tela pequena).
-  const alvo = topo == null ? null : Math.max(72, Math.round(innerHeight - topo + 10))
+  // ⚠️ TRAVA NA POSIÇÃO DE CONTROLES VISÍVEIS. Medir a cada quadro fazia a
+  // legenda SUBIR E DESCER junto com os controles, que aparecem e somem ao
+  // mexer o mouse — o mesmo defeito que o salto 9%↔22% tinha, só que por
+  // outro caminho. Guardamos o ponto MAIS ALTO já medido (controles à
+  // mostra) e ficamos nele: some da frente da barra de progresso quando ela
+  // aparece, e não se mexe quando ela some.
+  let alvo = topo == null ? null : Math.max(72, Math.round(innerHeight - topo + 10))
+  if (alvo != null) {
+    if (_pisoControles == null || alvo > _pisoControles) _pisoControles = alvo
+    alvo = _pisoControles
+  } else if (_pisoControles != null) {
+    alvo = _pisoControles          // controles sumiram: mantém o lugar
+  }
   if (alvo === _ultimoFundo) return
   _ultimoFundo = alvo
   barra.style.bottom = alvo == null ? '' : alvo + 'px'
@@ -444,6 +457,7 @@ function aplicarDoca() {
   document.documentElement.classList.toggle(
     'englab-flut-on', !!(cfgUI.ligada && !cfgUI.doca && idDoTitulo()))
   _ultimoFundo = undefined       // força recalcular ao trocar de modo
+  _pisoControles = null          // player pode ter outra altura
   posicionarFlutuante()
   const btn = barra && barra.querySelector('button[data-a="doca"]')
   if (btn) {

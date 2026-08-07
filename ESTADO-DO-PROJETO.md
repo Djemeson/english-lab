@@ -1199,6 +1199,21 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+197. **A LEGENDA PAROU DE SEGUIR OS CONTROLES (101ª rodada, 2026-08-06)**.
+     - **Efeito colateral do conserto anterior**: passei a medir o topo dos controles A CADA
+       QUADRO, e eles aparecem e somem conforme o mouse. A legenda passou a subir e descer
+       junto — o MESMO defeito do salto `9% ↔ 22%`, por outro caminho. Agora a função guarda o
+       ponto **mais alto** já medido (controles à mostra) e fica nele: sai da frente da barra
+       de progresso quando ela aparece e **não se mexe** quando ela some. Zerado ao trocar de
+       título, porque o player pode ter outra altura.
+     - Verificado nos 4 estados — controles visíveis, sumidos, de volta e menores: **130px nos
+       quatro**. E ao simular outro vídeo com player mais alto, recalcula (210px).
+     - **A compressão do painel da Netflix foi REMOVIDA**, não corrigida. Os seletores tentados
+       não casaram com o DOM atual e a regra não fazia nada. Mantê-la seria código morto
+       fingindo que funciona — pior que ausência, porque esconde o problema real. Virou
+       pendência com o que falta para refazer: o nome da classe, pego no inspetor.
+       `manifest.json` → **3.8.0**.
+
 196. **PAREI DE DEPENDER DE CSS: a posição do flutuante passou a ser MEDIDA
      (100ª rodada, 2026-08-06)**. Ele voltou dizendo que a régua continuava aparecendo e que o
      painel não encolheu — e o CSS estava correto e bem formado nos dois casos, conferido no
@@ -4927,6 +4942,13 @@ tela** — foi exatamente isso que fez o banner de áudio sobrepor os toasts.
 - [ ] **Wiktionary como último recurso NO CLIQUE** (nunca no hover). Aquele ~1 s é inaceitável
       passando o mouse e perfeitamente aceitável clicando: seria o "não achei no seu material"
       para palavra que ainda não é card. Inglês→inglês, então é apoio, não tradução.
+- [ ] **ENCOLHER O PAINEL DE CONTROLES DA NETFLIX** (tentado e REMOVIDO na 101ª). É o que o
+      Language Reactor faz para a legenda poder descer mais: com ele ativo a barra de progresso
+      fica a ~87px do chão, sem ele a ~110px. Tentei `[data-uia="controls-standard"]`,
+      `.watch-video--bottom-controls-container` e `.PlayerControlsNeo__*` — **nenhum casou**, a
+      regra não fazia nada, e código morto fingindo que funciona é pior que ausência. Para
+      refazer é preciso o **nome real da classe do container**, pego no inspetor da página
+      (F12 → selecionar a área dos controles). Sem isso é chute.
 - [ ] **TIRAR OS PREÇOS DE TRANSCRIÇÃO DO HTML** (achado na 90ª). O seletor `cfg-stt-provider`
       tem "whisper-large-v3-turbo (US$ 0,04/h)" e "whisper-1 (US$ 0,36/h)" **escritos à mão** no
       `index.html`. Hoje estão certos, mas é exatamente o padrão que fez o seletor de imagens
