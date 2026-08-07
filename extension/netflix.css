@@ -295,27 +295,50 @@ html.englab-dock #englab-bar {
   box-shadow: none; animation: none;
   align-items: center;
 }
-/* na doca o texto respira: é o protagonista da seção */
+/* ⚠️ ESTE BLOCO É O QUE VALE NA DOCA — e foi o que ficou de fora quando eu
+   aproximei as legendas da barra FLUTUANTE. As duas modalidades têm regras
+   próprias; mexer numa não muda a outra. A reserva de 2,5em vivia aqui, e era
+   ELA que empurrava a tradução para longe na seção abaixo do vídeo.
+   Na doca o texto respira, mas respirar não é ficar longe do par. */
+html.englab-dock .englab-mid {
+  /* A altura fixa mora no BLOCO, como na barra flutuante: o par fica junto e
+     a seção não muda de tamanho a cada fala. */
+  min-height: clamp(96px, 8vw, 140px);
+  justify-content: center; gap: 0;
+}
 html.englab-dock .englab-line {
-  font-size: clamp(20px, 2.1vw, 32px); font-weight: 600;
-  color: var(--ll-txt); min-height: 2.5em; max-height: 2.6em;
+  /* 32px era grande demais ao lado de uma tradução de 21px: o degrau fazia os
+     olhos saltarem. Menor aqui e maior no PT aproxima os dois. */
+  font-size: clamp(19px, 1.85vw, 28px); font-weight: 600;
+  color: var(--ll-txt); min-height: 1.3em; max-height: 2.6em;
   text-shadow: none;
 }
 /* O teal e reservado a palavra CONHECIDA/capturada — nao pode ser tambem a
    cor do texto corrido, senao o sinal perde o significado. */
 html.englab-dock .englab-pt,
 html.englab-dock.englab-x #englab-bar.englab-tem-pt .englab-pt {
-  color: var(--ll-pt); font-size: clamp(15px, 1.35vw, 21px); text-shadow: none;
+  color: var(--ll-pt); font-size: clamp(16px, 1.5vw, 23px); text-shadow: none;
 }
-/* fio discreto separando a fala da traducao */
+/* O FIO era o outro motivo da distância: `padding-top: 9px` mais a margem que
+   o `border-top` cria somavam ao vazio da reserva. Ele continua — separar as
+   duas ajuda a ler — mas fino, curto e colado: um respiro, não um degrau. */
 html.englab-dock #englab-bar.englab-tem-pt .englab-pt {
-  border-top: 1px solid var(--ll-line); padding-top: 9px;
-  width: min(560px, 60%); margin-left: auto; margin-right: auto;
+  border-top: 1px solid var(--ll-line); padding-top: 5px; margin-top: 5px;
+  width: min(420px, 46%); margin-left: auto; margin-right: auto;
+  height: auto; min-height: 1.3em; max-height: 2.7em;
 }
 html.englab-dock .englab-rule {
   position: absolute; left: 22px; right: 22px; bottom: 8px;
-  width: auto; margin: 0; border-top: none; padding-top: 0; height: 16px;
+  width: auto; margin: 0; border-top: none; padding-top: 0; height: 18px;
 }
+/* A régua da doca tem 16–18px de altura e a pista nasce em `top: 8px` (medida
+   da barra flutuante, que é mais alta): as pílulas ficavam espremidas embaixo,
+   com metade cortada — o "ainda tá feio". Aqui elas ganham a altura toda. */
+html.englab-dock .englab-rtrack { top: 2px; height: 14px; }
+html.englab-dock .englab-rb { top: 3px; height: 8px; }
+html.englab-dock .englab-rb:hover { top: 1.5px; height: 11px; }
+html.englab-dock .englab-rb.cur { top: 0.5px; height: 13px; }
+html.englab-dock .englab-rnow { top: 1px; height: 16px; }
 html.englab-dock #englab-bar button { color: #7c8b99; }
 html.englab-dock #englab-bar button:hover { background: rgba(255,255,255,.08); color: #fff; }
 html.englab-dock #englab-bar button.on { background: var(--ll-acc); color: #06231f; }

@@ -1199,6 +1199,31 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+192. **EU ARRUMEI A MODALIDADE ERRADA — o modo DOCA (96ª rodada, 2026-08-06)**.
+     Resposta ao ajuste anterior: *"ainda tá longe… as barrinhas você não mexeu, ainda tá
+     feio"*. As duas observações estavam **literalmente certas**.
+     - **A extensão tem DUAS modalidades com CSS próprio**: a barra flutuante sobre o vídeo e
+       a **doca** (`html.englab-dock`), que é uma seção abaixo do vídeo. Ele usa a doca. Toda a
+       95ª rodada mexeu só na flutuante — a doca redefine fonte, alturas e régua e **ignorou
+       tudo**. Minha maquete de teste também não tinha a classe `englab-dock`, então o teste
+       confirmou uma correção que não valia para a tela dele.
+     - **A distância na doca tinha TRÊS somas**: `min-height: 2.5em` no `.englab-line` (a
+       mesma reserva de duas linhas, duplicada aqui), mais `padding-top: 9px` e a margem do
+       `border-top` do fio separador. Agora a reserva foi para o `.englab-mid`
+       (`clamp(96px, 8vw, 140px)`), e o fio ficou fino, curto (420px em vez de 560) e colado.
+       **Vão medido: 5px** — era a soma acima.
+     - **Degrau de tamanho**: 32px no inglês contra 21px no português fazia os olhos saltarem.
+       Agora 28 e 23.
+     - **⚠️ POR QUE AS PÍLULAS CONTINUAVAM FEIAS, e não era o raio**: a régua da doca tem
+       16px de altura, mas `.englab-rtrack` nasce em `top: 8px` — medida da barra flutuante,
+       que é mais alta. **Metade de cada pílula ficava fora da régua, cortada.** Estilo novo
+       nenhum resolveria isso. A doca ganhou as próprias medidas de pista e pílula.
+     - Verificado COM a classe `englab-dock` ativa: vão de 5px, fontes 28/23, régua de 18px, e
+       as pílulas (normal e a corrente) **cabendo inteiras** dentro dela — comparação de
+       `getBoundingClientRect` da pílula contra a da régua.
+     - **Lição**: antes de dar por consertado um ajuste visual desta extensão, reproduzir a
+       maquete **nas duas modalidades**. `manifest.json` → **3.3.0**.
+
 191. **A BARRA DA NETFLIX: as duas legendas coladas e a régua em pílulas
      (95ª rodada, 2026-08-06)**. Pedido: *"na tradução, alargue o espaçamento em vez de
      descer… a distância entre a original e a tradução é grande… os pontilhados do tempo de
