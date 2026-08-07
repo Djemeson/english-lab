@@ -1199,6 +1199,28 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+202. **O CURSOR PISCAVA: consertar depois é diferente de impedir
+     (106ª rodada, 2026-08-06)**. Terceira volta no mesmo sintoma, e cada uma errou por um
+     motivo diferente — vale registrar a escada inteira, porque é um caso-escola:
+       · **1ª** (104ª rodada): consertava só ao MOVER o mouse. A Netflix esconde por
+         ociosidade, quando ele está parado — gatilho errado.
+       · **2ª** (105ª rodada): passou a vigiar de 400 em 400ms, mas **devolvendo** o cursor
+         depois de ela o esconder. Ela esconde, nós devolvemos, ela esconde de novo: **piscava**
+         a cada ciclo. Diminuir o intervalo só encurtaria o piscar, não o eliminaria.
+       · **3ª (esta)**: parar de consertar e passar a **vencer**. Um atributo marcador
+         (`data-ll-cursor`) e uma folha injetada com `cursor: auto !important`. A Netflix pode
+         tirar e pôr a classe dela quantas vezes quiser — a nossa regra ganha sempre, e não há
+         momento nenhum em que o cursor fique escondido.
+     - **Marca os ANCESTRAIS, não só o elemento sob o ponteiro**: ela declara o `none` num
+       container, não na folha da árvore. Marcar só o elemento resolvia até ela trocar de
+       classe. Sobe até 12 níveis marcando quem esconde.
+     - **Por que marcar ancestral é seguro**: `cursor: auto !important` num pai **não impede**
+       um filho de declarar o próprio cursor — o `!important` só decide o valor DAQUELE
+       elemento. Testado: um botão com `cursor: pointer` dentro da área marcada continua
+       `pointer`.
+     - Verificado com a Netflix tirando e pondo a classe 5 vezes seguidas: **0 de 5 ciclos com
+       o cursor sumido**. `manifest.json` → **3.11.0**.
+
 201. **O CURSOR SUMIA DE NOVO: reagir não bastava, era preciso VIGIAR
      (105ª rodada, 2026-08-06)**.
      - **Por que a correção anterior era incompleta**: ela rodava dentro de

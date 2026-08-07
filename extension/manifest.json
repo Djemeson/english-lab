@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Language Lab — Netflix e Kindle",
-  "version": "3.10.2",
+  "version": "3.11.0",
   "description": "Captura vocabulário para o Language Lab direto da Netflix (legendas clicáveis, tradução por IA, transcript) e do Kindle Cloud Reader (palavra selecionada + a frase da página).",
   "permissions": [
     "storage",

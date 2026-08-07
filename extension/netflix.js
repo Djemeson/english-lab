@@ -489,13 +489,38 @@ function _engolirMovimento(e) {
 // seguinte desistir no mesmo elemento, então o cursor ficava sumido.
 // Agora a decisão é sempre pelo valor COMPUTADO — e só há escrita quando ele
 // está de fato `none`, então repetir a checagem não custa nada.
+// ⚠️ MARCA PERMANENTE, não conserto a cada ciclo. Devolver o cursor depois de
+// a Netflix escondê-lo faz ele PISCAR: ela esconde, nós devolvemos 400ms
+// depois, ela esconde de novo. O que resolve é a nossa regra passar a vencer
+// para sempre naquele elemento — daí um atributo marcador e uma folha de
+// estilo com `!important`, que ela não tem como derrubar ao trocar de classe.
+//
+// Marcar ANCESTRAIS é seguro: `cursor: auto !important` num pai NÃO impede um
+// filho de declarar o próprio cursor (`pointer` num botão continua valendo).
+// O !important só decide o valor DAQUELE elemento.
+const ATTR_CURSOR = 'data-ll-cursor'
+;(function _folhaDoCursor() {
+  if (document.getElementById('englab-cursor-css')) return
+  const st = document.createElement('style')
+  st.id = 'englab-cursor-css'
+  st.textContent = '[' + ATTR_CURSOR + ']{cursor:auto !important}'
+  ;(document.head || document.documentElement).appendChild(st)
+})()
+
 let _ultimoX = 0, _ultimoY = 0
 function _garantirCursor(x, y) {
   if (x != null) { _ultimoX = x; _ultimoY = y }
-  const alvo = document.elementFromPoint(_ultimoX, _ultimoY)
-  if (!alvo) return
-  if (getComputedStyle(alvo).cursor === 'none') {
-    alvo.style.setProperty('cursor', 'auto', 'important')
+  let n = document.elementFromPoint(_ultimoX, _ultimoY)
+  // Sobe a árvore marcando TUDO que esconde o cursor. A Netflix declara o
+  // `none` num container, não na folha — marcar só o elemento sob o ponteiro
+  // resolvia até ela trocar de classe, e o piscar voltava.
+  let subiu = 0
+  while (n && n !== document.documentElement && subiu < 12) {
+    if (!n.hasAttribute(ATTR_CURSOR) && getComputedStyle(n).cursor === 'none') {
+      n.setAttribute(ATTR_CURSOR, '')
+    }
+    n = n.parentElement
+    subiu++
   }
 }
 
