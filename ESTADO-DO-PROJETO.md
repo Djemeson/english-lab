@@ -1199,6 +1199,31 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+189. **LEGENDA INCOMPLETA NA NETFLIX — o parser de TTML perdia a segunda linha
+     (93ª rodada, 2026-08-06)**. Relato com print: a legenda oficial da Netflix mostrava
+     *"Well, if you hadn't meddled / to start with,"* e a nossa, embaixo, só a primeira metade.
+     - **Onde NÃO estava**: o `parseSubtitle` do app junta as linhas certo
+       (`lines.slice(ti+1).join(' ')`), e o `textoDOM()` da extensão junta os
+       `.player-timedtext-text-container` certo. Investigar os dois antes evitou consertar o
+       arquivo errado — e a informação que virou a chave veio dele: *"está rodando dentro da
+       Netflix, com a extensão"*, o que descartou o player do app inteiro.
+     - **DOIS bugs no `parseTTML` de `extension/inject.js`**, ambos produzindo "legenda
+       incompleta" por caminhos diferentes:
+       · o comentário dizia *"`<br/>` vira espaço"* e **não virava**: `p.textContent` concatena
+         os nós de texto SEM separador, então "meddled&lt;br/&gt;to start" saía
+         **"meddledto start"**. Agora o `<br>` é trocado por espaço antes da leitura.
+       · a Netflix às vezes manda **cada linha num `<p>` próprio com o MESMO intervalo de
+         tempo**. Viravam duas falas, e a tela mostrava só a primeira — este era o caso do
+         print. Falas de tempo idêntico (tolerância 50 ms) passam a ser remontadas numa só.
+     - Verificado nos 5 casos: `<br>` na mesma `<p>`; `<p>` separados com mesmo tempo;
+       tempos DIFERENTES que **não** podem ser fundidos (são falas distintas); três linhas; e
+       tags de estilo que continuam sumindo.
+     - ⚠️ Junto foi para o app o botão **"Usar a legenda do próprio arquivo"** no painel Sync
+       (`videoUsarFaixaEmbutida`), que lê `player.textTracks`. **Ele NÃO resolve o caso da
+       Netflix** — foi escrito antes de eu saber que era a extensão, e serve ao player do app
+       com arquivo local que exponha faixa legível. Fica registrado para ninguém achar que é a
+       resposta para aquele sintoma.
+
 188. **PILHA ÚNICA DE AVISOS + PROGRESSO EM TUDO QUE GERA (92ª rodada, 2026-08-06)**.
      Duas coisas num pedido: *"qualquer coisa que for gerada tem que ter informação de
      progresso"* (regra permanente) e *"quando mando uma palavra da revisão pro estudo aparecem

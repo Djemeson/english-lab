@@ -29,12 +29,30 @@
       for (const p of doc.querySelectorAll('p')) {
         const s = seg(p.getAttribute('begin')), e = seg(p.getAttribute('end'))
         if (s == null || e == null) continue
-        // <br/> vira espaço; tags de estilo somem
-        const t = p.textContent.replace(/\s+/g, ' ').trim()
+        // O comentário antigo dizia "<br/> vira espaço" — e NÃO virava:
+        // `textContent` concatena os nós de texto sem separador, então
+        // "meddled<br/>to start" saía "meddledto start". Aqui o <br> é
+        // trocado por espaço ANTES de ler o texto.
+        const clone = p.cloneNode(true)
+        clone.querySelectorAll('br').forEach(br => br.replaceWith(doc.createTextNode(' ')))
+        const t = clone.textContent.replace(/\s+/g, ' ').trim()
         if (t) cues.push({ s, e, t })
       }
-      cues.sort((a, b) => a.s - b.s)
-      return cues.length ? cues : null
+      cues.sort((a, b) => a.s - b.s || a.e - b.e)
+
+      // ⚠️ AS DUAS LINHAS DA MESMA FALA. A Netflix às vezes manda cada linha
+      // num <p> PRÓPRIO com o MESMO intervalo de tempo — e aí viravam duas
+      // falas, das quais a tela mostrava só a primeira. Era exatamente o
+      // "Well, if you hadn't meddled" aparecendo sem o "to start with,".
+      // Quem tem o mesmo tempo é uma fala só e é remontado aqui.
+      const juntos = []
+      for (const c of cues) {
+        const ult = juntos[juntos.length - 1]
+        const mesmoTempo = ult && Math.abs(ult.s - c.s) < 0.05 && Math.abs(ult.e - c.e) < 0.05
+        if (mesmoTempo) ult.t += ' ' + c.t
+        else juntos.push({ ...c })
+      }
+      return juntos.length ? juntos : null
     } catch (e) { return null }
   }
 

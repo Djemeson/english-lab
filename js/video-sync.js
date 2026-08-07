@@ -24,6 +24,13 @@ function _vidSyncRender(msg) {
       <div class="vid-sync-row">
         <span class="vid-sync-hint">Legenda ATRASADA (fala vem antes do texto)? Use −. Adiantada? Use +.</span>
       </div>
+      <!-- Antes de ajustar no dedo, vale tentar a legenda do PRÓPRIO arquivo:
+           quando existe, ela dispensa alinhamento — o tempo já é o do vídeo. -->
+      <div class="vid-sync-row">
+        <button class="btn btn-secondary btn-sm" onclick="videoUsarFaixaEmbutida()"
+          data-tip="Se o arquivo já traz a legenda oficial, ela é a fonte mais exata: mesma segmentação e mesmo tempo do vídeo">
+          ${ic('message','ic-sm')}Usar a legenda do próprio arquivo</button>
+      </div>
       <div class="vid-sync-row">
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(-5)">−5s</button>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(-0.5)">−0,5s</button>
@@ -320,3 +327,115 @@ function _vidDecodeSubBuf(buf) {
 
 // ---- Baixar a legenda SINCRONIZADA como .srt ----
 // Mesmo nome do arquivo de vídeo: players externos a carregam sozinhos.
+
+// ================================================================
+// LEGENDA EMBUTIDA — usar a faixa OFICIAL que já está no arquivo
+// ================================================================
+// O caso que motivou isto: o Djemeson viu a legenda da Netflix sobre o vídeo
+// e a NOSSA embaixo, com texto diferente — "Well, if you hadn't meddled to
+// start with," contra "Well, if you hadn't meddled". Não era truncamento: são
+// DUAS TRANSCRIÇÕES diferentes. A nossa vem dos addons (OpenSubtitles e
+// afins), que quebram as falas em outros pontos e muitas vezes são de outra
+// versão do episódio — daí os dois sintomas juntos, "legenda incompleta" e
+// "fora de sincronia".
+//
+// Se o arquivo já traz a legenda oficial e o navegador consegue renderizá-la,
+// ela é a MELHOR fonte que existe: segmentação e tempo oficiais, sem
+// download, sem alinhamento, sem palpite. O app criava faixa própria
+// (`addTextTrack`) e nunca olhava as que já estavam ali.
+//
+// ⚠️ LIMITE REAL, e é por isso que a função explica quando não acha nada: o
+// navegador só expõe faixa que ele mesmo sabe ler. MKV com legenda soft não
+// aparece, e legenda "queimada" no vídeo é pixel — não há o que extrair.
+
+// A faixa precisa estar em 'hidden' ou 'showing' para `cues` popular. Deixar
+// 'hidden' lê sem forçar exibição por cima do que ele já escolheu ver.
+function _vidFaixasEmbutidas() {
+  const p = el('vid-player')
+  if (!p || !p.textTracks) return []
+  const out = []
+  for (let i = 0; i < p.textTracks.length; i++) {
+    const tr = p.textTracks[i]
+    if (!tr) continue
+    if (tr.label === 'Estudo') continue                 // a nossa, criada pelo app
+    if (!/subtitles|captions/i.test(tr.kind || '')) continue
+    if (tr.mode === 'disabled') tr.mode = 'hidden'      // sem isso `cues` fica nulo
+    out.push({ i, tr, nome: tr.label || tr.language || ('faixa ' + (i + 1)), lang: tr.language || '' })
+  }
+  return out
+}
+
+function _vidCuesDaFaixa(tr) {
+  const cues = []
+  const lista = tr.cues
+  if (!lista || !lista.length) return cues
+  for (let i = 0; i < lista.length; i++) {
+    const c = lista[i]
+    const t = String(c.text || '')
+      .replace(/<[^>]*>/g, '').replace(/\{[^}]*\}/g, '')
+      .replace(/\s+/g, ' ').trim()
+    if (t) cues.push({ s: c.startTime, e: c.endTime, t })
+  }
+  cues.sort((a, b) => a.s - b.s)
+  return cues
+}
+
+// Adota a faixa do próprio arquivo como legenda de estudo.
+async function videoUsarFaixaEmbutida() {
+  const faixas = _vidFaixasEmbutidas()
+  if (!faixas.length) {
+    confirmModal({
+      title: 'Nenhuma legenda embutida disponível',
+      icon: 'info', confirmText: 'Entendi', cancelText: '',
+      html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.6">
+        Este arquivo não expõe nenhuma faixa de legenda que o navegador consiga ler.<br><br>
+        Isso acontece quando a legenda está <b>queimada na imagem</b> (é pixel, não texto) ou
+        quando o arquivo é <b>MKV com legenda soft</b>, que o navegador não decodifica.<br><br>
+        Nesse caso a saída é a legenda baixada mesmo — e o painel <b>Sync</b> corrige o
+        deslocamento se ela estiver adiantada ou atrasada.</p>`
+    })
+    return
+  }
+  // `cues` pode demorar um tique a popular depois de ligar o modo.
+  await new Promise(r => setTimeout(r, 120))
+  const comCues = faixas.map(f => ({ ...f, cues: _vidCuesDaFaixa(f.tr) })).filter(f => f.cues.length)
+  if (!comCues.length) {
+    toast('As faixas existem mas não expuseram as falas — o navegador não conseguiu decodificá-las', 'warning')
+    return
+  }
+  // Mais de uma: ele escolhe. Uma só: adota direto, sem pergunta inútil.
+  let escolhida = comCues[0]
+  if (comCues.length > 1) {
+    const lista = comCues.map((f, k) =>
+      `<label style="display:flex;gap:8px;align-items:center;padding:7px 0;cursor:pointer">
+         <input type="radio" name="faixaemb" value="${k}"${k === 0 ? ' checked' : ''}>
+         <span><b>${esc(f.nome)}</b> <i style="color:var(--text3)">${f.cues.length} falas</i></span>
+       </label>`).join('')
+    const ok = await confirmModal({
+      title: 'Qual legenda do arquivo usar?', icon: 'message', confirmText: 'Usar esta',
+      html: `<div style="font-size:var(--fs-sm)">${lista}</div>`
+    })
+    if (!ok) return
+    const sel = document.querySelector('input[name="faixaemb"]:checked')
+    escolhida = comCues[Number(sel ? sel.value : 0)] || comCues[0]
+  }
+
+  _vidCues = escolhida.cues
+  _vidCuesPT = []
+  _vidCueIdx = -1
+  if (_vidCur) {
+    // Zera o deslocamento: ele existia para consertar a legenda BAIXADA. A do
+    // próprio arquivo já está no tempo do vídeo — manter o shift antigo
+    // introduziria o erro que ele corrigia.
+    _vidCur.subShift = 0
+    _vidCur.subFonte = 'embutida:' + (escolhida.lang || escolhida.nome)
+    saveVideos()
+  }
+  // Mesmos passos do videoSubShift, que é quem já sabia repintar tudo:
+  // persiste as falas, redesenha a lista e o overlay, atualiza o painel Sync.
+  if (typeof _vidSaveSubs === 'function') _vidSaveSubs()
+  if (typeof renderVidTranscript === 'function') renderVidTranscript()
+  if (typeof _vidUpdateOverlay === 'function') _vidUpdateOverlay()
+  if (typeof _vidSyncRender === 'function') _vidSyncRender()
+  toast(`Legenda do próprio arquivo adotada — ${escolhida.cues.length} falas, sem ajuste de tempo`, 'success')
+}
