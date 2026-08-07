@@ -38,7 +38,7 @@ function renderKeyRows() {
       <div class="cfg-key-row">
         <span class="cfg-key-nome">${P.nome}${id === 'openai' ? ' <i>· também áudio/imagens</i>' : ''}</span>
         <div class="cfg-key-campo">
-          <input type="password" id="cfg-key-${id}" placeholder="${P.placeholder}" autocomplete="off">
+          <input type="password" id="cfg-key-${id}" aria-label="Chave de API — ${escA(P.nome)}" placeholder="${P.placeholder}" autocomplete="off">
           <button type="button" class="cfg-key-eye" onclick="togglePasswordVisibility('cfg-key-${id}')" aria-label="Mostrar/ocultar">${olho}</button>
         </div>
         <button type="button" class="btn btn-ghost btn-sm" onclick="testarChaveProv('${id}', this)">Testar</button>

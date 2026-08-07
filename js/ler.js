@@ -1316,7 +1316,7 @@ function _lerRenderConversa() {
         ${_lerSugestoes().map(s => `<button class="ler-chip" onclick="lerPerguntar(${escA(JSON.stringify(s))})">${esc(s)}</button>`).join('')}
       </div>
       <div class="ler-conversa-campo">
-        <textarea id="ler-conversa-input" rows="1" placeholder="Perguntar sobre o livro…"
+        <textarea id="ler-conversa-input" rows="1" aria-label="Perguntar sobre o livro" placeholder="Perguntar sobre o livro…"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();lerPerguntar()}"></textarea>
         <button class="btn btn-primary btn-sm" onclick="lerPerguntar()" aria-label="Perguntar">${ic('send','ic-sm')}</button>
       </div>

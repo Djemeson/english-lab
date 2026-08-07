@@ -376,7 +376,7 @@ function videoPrepare() {
       <div class="vid-prep-list">
         ${list.map(([tok, n]) => `
           <label class="vid-prep-row">
-            <input type="checkbox" class="vid-prep-chk" value="${escA(tok)}" ${n >= 3 ? 'checked' : ''}>
+            <input type="checkbox" class="vid-prep-chk" value="${escA(tok)}" ${n >= 3 ? 'checked' : ''} aria-label="Estudar ${escA(tok)}">
             <span class="vid-prep-word">${esc(tok)}</span>
             <span class="vid-prep-n">${n}×</span>
             <span class="vid-prep-ctx" title="${escA(firstCue[tok])}">${esc(firstCue[tok])}</span>
@@ -468,7 +468,7 @@ function _vidRenderFocus(panel) {
     ditadoHtml = `
       <div class="vid-dit">
         <div class="vid-dit-hint">Ouça o trecho e escreva o que entendeu — sem olhar. Depois eu corrijo.</div>
-        <textarea id="vid-dit-ta" rows="2" placeholder="Escreva aqui o que você ouviu...">${esc(f.dit.user || '')}</textarea>
+        <textarea id="vid-dit-ta" rows="2" aria-label="Ditado: escreva o que você ouviu" placeholder="Escreva aqui o que você ouviu...">${esc(f.dit.user || '')}</textarea>
         <button class="btn btn-primary btn-sm" onclick="videoFocusDitadoCheck()">${ic('check','ic-sm')}Corrigir</button>
       </div>`
   } else if (f.dit && f.dit.res) {

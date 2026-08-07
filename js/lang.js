@@ -276,7 +276,7 @@ function langSelectorHtml(extraClass) {
   const known = Object.values(LANGS)
   const opts = known.map(L => `<option value="${L.code}" ${L.code === cur ? 'selected' : ''}>${esc(L.name)}</option>`).join('')
   const extra = LANGS[cur] ? '' : `<option value="${esc(cur)}" selected>${esc(getLangDef(cur).name)}</option>`
-  return `<select class="lang-select ${extraClass || ''}" onchange="setActiveLang(this.value)" data-tip="Idioma ativo — vale para novas capturas e para o Assistente">${opts}${extra}</select>`
+  return `<select class="lang-select ${extraClass || ''}" aria-label="Idioma ativo" onchange="setActiveLang(this.value)" data-tip="Idioma ativo — vale para novas capturas e para o Assistente">${opts}${extra}</select>`
 }
 function mountLangSelector(containerId) {
   const el = document.getElementById(containerId)

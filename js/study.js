@@ -795,7 +795,7 @@ function buildSrsVerso(card, imgData, imageBelow) {
     <div class="srs-card-settings-body" style="flex-direction:column;gap:10px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <label style="font-size:var(--fs-xs);color:var(--text3);min-width:70px">Variedade</label>
-        <select style="font-size:var(--fs-sm);padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"
+        <select aria-label="Variedade do idioma" style="font-size:var(--fs-sm);padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"
           onchange="event.stopPropagation();updateCardMeta('${card.id}','variety',this.value)">
           ${getLangDef(_cl).varieties.map(x => `<option value="${x.v}" ${((card.variety || 'general') === x.v) ? 'selected' : ''}>${x.v === 'general' ? 'Geral (todas as variedades)' : esc(x.label)}</option>`).join('')}
           <option value="other" ${card.variety==='other'?'selected':''}>Outra</option>
@@ -803,7 +803,7 @@ function buildSrsVerso(card, imgData, imageBelow) {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <label style="font-size:var(--fs-xs);color:var(--text3);min-width:70px">Registro</label>
-        <select style="font-size:var(--fs-sm);padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"
+        <select aria-label="Registro (formal, informal, gíria)" style="font-size:var(--fs-sm);padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"
           onchange="event.stopPropagation();updateCardMeta('${card.id}','register',this.value)">
           <option value="neutral" ${(!card.register||card.register==='neutral')?'selected':''}>Neutro / padrão</option>
           <option value="informal" ${card.register==='informal'?'selected':''}>Informal</option>

@@ -628,7 +628,7 @@ function renderSrsAllCards() {
     <div class="card-box-header">
       <h3>${srsCards.length} card${srsCards.length!==1?'s':''}</h3>
       <div style="display:flex;gap:8px;align-items:center">
-        <input type="text" id="srs-browser-search" placeholder="Buscar palavra ou significado..."
+        <input type="text" id="srs-browser-search" aria-label="Buscar na Biblioteca" placeholder="Buscar palavra ou significado..."
           oninput="filterBrowser(this.value)"
           style="padding:5px 10px;font-size:var(--fs-sm);width:220px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);outline:none">
         <button class="btn btn-ghost btn-sm" onclick="addRootDeck()" data-tip="Criar um novo baralho na raiz">${ic('plus')}Deck</button>
@@ -650,7 +650,7 @@ function renderSrsAllCards() {
         </div>
         <!-- Header de colunas clicável -->
         <div class="browser-col-hdr" id="browser-col-hdr" style="display:none">
-          <input type="checkbox" class="browser-cb" id="browser-cb-all" onchange="browserToggleAll(this.checked)" title="Selecionar tudo">
+          <input type="checkbox" class="browser-cb" id="browser-cb-all" onchange="browserToggleAll(this.checked)" title="Selecionar tudo" aria-label="Selecionar todos os cards">
           <span style="flex:1" onclick="setBrowserSort('word')">Palavra <span id="bsort-word"></span></span>
           <span style="width:75px;text-align:center" onclick="setBrowserSort('state')">Estado <span id="bsort-state"></span></span>
           <span style="width:60px;text-align:center" onclick="setBrowserSort('due')">Prazo <span id="bsort-due"></span></span>
@@ -828,7 +828,7 @@ function renderWordsGlossary(query) {
           _libLang !== 'all' ? ' · ' + esc(getLangDef(_libLang).name) : ''}</span>
       </div>
       ${libLangChipsHtml()}
-      <input type="text" id="gloss-search" placeholder="Buscar palavra ou significado..."
+      <input type="text" id="gloss-search" aria-label="Buscar no glossário" placeholder="Buscar palavra ou significado..."
         value="${escA(q)}" oninput="renderWordsGlossaryDebounced(this.value)"
         class="gloss-search-input">
     </div>
@@ -1475,7 +1475,7 @@ function buildBrowserRow(c, now) {
   const dueTxt = c.due <= now ? `<span style="color:var(--primary)">Agora</span>` : fmtDays(Math.round((c.due-now)/86400000))
   const isSel  = _browserSelected.has(c.id)
   return `<div class="srs-browser-row${isSel?' selected':''}" data-id="${c.id}" onclick="showBrowserCardPreview('${c.id}')">
-    <input type="checkbox" class="browser-cb" ${isSel?'checked':''} onchange="event.stopPropagation();browserToggleCard('${c.id}',this.checked)">
+    <input type="checkbox" class="browser-cb" ${isSel?'checked':''} onchange="event.stopPropagation();browserToggleCard('${c.id}',this.checked)" aria-label="Selecionar ${escA(c.word || 'este card')}">
     <div style="flex:1;min-width:0">
       <div style="font-weight:600;font-size:var(--fs-md)">${esc(c.word)}</div>
       <div style="font-size:var(--fs-sm);color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.meaning_pt||'')}</div>
@@ -1561,7 +1561,7 @@ async function filterBrowser(query) {
     const hasAudio = _audioKeyCache.has(audioKey(c.example_en || c.word || ''))
     const isSel = _browserSelected.has(c.id)
     return `<div class="srs-browser-row${isSel?' selected':''}" data-id="${c.id}">
-      <input type="checkbox" class="browser-cb" ${isSel?'checked':''} onchange="browserToggleCard('${c.id}',this.checked)">
+      <input type="checkbox" class="browser-cb" ${isSel?'checked':''} onchange="browserToggleCard('${c.id}',this.checked)" aria-label="Selecionar ${escA(c.word || 'este card')}">
       <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:var(--fs-md)">${esc(c.word)}</div>
       <div style="font-size:var(--fs-sm);color:var(--text2)">${esc(c.meaning_pt||'')}</div></div>
       <span style="font-size:var(--fs-2xs);color:${SC[c.state]};font-weight:600;margin-right:8px">${SL[c.state]}</span>
@@ -1591,7 +1591,7 @@ function moveSrsCardDeck(cardId) {
   modal.addEventListener('click', e => { if (e.target === modal) closeMoveModal() })
   modal.innerHTML = `<div class="srs-modal-box">
     <h4 style="margin-bottom:12px">Mover card para deck</h4>
-    <select id="move-deck-sel" class="srs-modal-select"></select>
+    <select id="move-deck-sel" class="srs-modal-select" aria-label="Baralho de destino"></select>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn btn-ghost btn-sm" onclick="closeMoveModal()">Cancelar</button>
       <button class="btn btn-primary btn-sm" onclick="confirmMoveDeck('${cardId}',document.getElementById('move-deck-sel').value);closeMoveModal()">Mover</button>

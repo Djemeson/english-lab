@@ -5281,3 +5281,74 @@ body.ler-full .mobile-bottom-nav{display:none}
 @media (max-width:480px){
   .mobile-bottom-nav .nav-item span:not(.badge){font-size:var(--fs-3xs)}
 }
+
+/* ================================================================
+   ACESSIBILIDADE — foco de teclado e alvo de toque (91ª rodada, B)
+   Fica no FIM do arquivo de propósito, pela mesma razão que o reskin:
+   vence a cascata sem editar as regras antigas.
+   ================================================================ */
+
+/* ---- 1. FOCO DE TECLADO ----
+   Em 5.196 linhas havia DOIS `:focus-visible` (`.seg-tab` e `.sb-signout`) e
+   nove `outline:none` espalhados, vários sem nada no lugar — `.asst-search
+   input` desligava o contorno e não colocava substituto nenhum. Resultado:
+   andar de Tab pelo app era às cegas, e este é um app onde se digita o tempo
+   todo (palavra, frase, tradução, chat).
+
+   `:focus-visible` e não `:focus`: o navegador só acende para quem navega por
+   teclado. Quem clica com o mouse não vê anel nenhum — o comportamento atual
+   com mouse fica EXATAMENTE como está.
+
+   `outline` e não `box-shadow`: outline não ocupa espaço no layout (não
+   empurra vizinho), segue o border-radius e não é cortado pelo próprio
+   overflow do elemento.
+
+   O `!important` é deliberado e é a correção da causa raiz, não do sintoma:
+   sem ele, qualquer `outline:none` antigo com um seletor mais específico
+   apaga o anel em silêncio — que é exatamente como o app chegou até aqui. Um
+   indicador de foco não pode depender de ordem de arquivo para existir.
+
+   ⚠️ NÃO declare `border-radius` aqui. O outline já acompanha sozinho o raio
+   que o elemento tem — declarar raio no `:focus-visible` MUDA A FORMA do
+   elemento enquanto ele está focado (um avatar redondo vira quadrado
+   arredondado ao receber Tab). Foi o primeiro rascunho desta regra e estava
+   errado; ficou registrado para não voltar. */
+:focus-visible{
+  outline:2px solid var(--accent-bright) !important;
+  outline-offset:2px !important;
+}
+/* Campos já ganham o anel interno `--ring` no `:focus` (mantido: é o
+   acabamento de clique que o app sempre teve). Aqui o contorno cola mais para
+   não virar dois anéis concêntricos com folga no meio. */
+input:focus-visible,textarea:focus-visible,select:focus-visible{
+  outline-offset:1px !important;
+}
+
+/* O leitor esconde a barra e o rodapé quando o texto está em foco de leitura.
+   Sem esta regra, quem chega de Tab move o foco para um botão INVISÍVEL — o
+   anel aparece no nada. `:focus-within` já traz a barra de volta (regra antiga,
+   logo acima); aqui garantimos o mesmo para o rodapé em qualquer tema. */
+.ler-leitor.em-full .ler-barra:focus-within,
+.ler-leitor.em-full .ler-rodape:focus-within{opacity:1}
+
+/* ---- 2. ALVO DE TOQUE ----
+   `--control-h` é 40px e só 5 regras do arquivo chegavam a 44px — todas
+   dentro do leitor, que já tinha resolvido isso sozinho ("barra fina demais é
+   loteria de dedo", comentário da 79ª rodada). O resto do app não seguiu.
+
+   Vale SÓ em ponteiro grosseiro: no desktop, 44px de altura em cada botão
+   incharia a interface sem beneficiar ninguém. Por isso `pointer:coarse` e
+   não uma largura de tela — tablet com caneta e desktop com touch existem, e
+   quem decide é o ponteiro, não o breakpoint. */
+@media (hover:none) and (pointer:coarse){
+  :root{--control-h:44px}
+  .btn{min-height:44px}
+  /* `.btn-sm` para em 40px, não 44: ele vive em fileiras densas (ações do
+     dossiê, linha do card, rodapé da lista) e 44px ali quebraria a linha em
+     duas. 40px é o ganho que cabe sem redesenhar essas fileiras — se algum dia
+     elas virarem coluna no celular, sobe para 44. */
+  .btn-sm{min-height:40px}
+  .tab,.seg-tab{min-height:44px}
+  /* Botões só de ícone: sem texto para dar corpo, o alvo é o padding. */
+  .mob-action-btn{min-width:44px;min-height:44px}
+}

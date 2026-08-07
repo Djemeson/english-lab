@@ -438,7 +438,7 @@ function renderKindleList(skipped, total) {
       : ''
     return `
     <div class="parsed-item" id="ki-${i}">
-      <input type="checkbox" class="kindle-check" data-i="${i}" checked>
+      <input type="checkbox" class="kindle-check" data-i="${i}" checked aria-label="Importar ${escA(item.word || 'este item')}">
       <div class="parsed-item-body">
         <div class="kindle-sentence selectable-sentence" id="ks-${i}" onmouseup="handleSentenceMouseUp(event,${i},'kindle')" title="Selecione com o mouse para adicionar ao estudo">${sentenceHTML}</div>
         <div class="kindle-sentence-pt" id="ks-pt-${i}">${esc(item.context_pt || '')}</div>
@@ -877,7 +877,7 @@ function renderMidiaProcessed() {
       : ''
     return `
     <div class="parsed-item" id="mi-proc-${i}">
-      <input type="checkbox" class="midia-proc-check" data-i="${i}" checked>
+      <input type="checkbox" class="midia-proc-check" data-i="${i}" checked aria-label="Importar ${escA(item.word || 'este item')}">
       <div class="parsed-item-body">
         <div class="kindle-sentence selectable-sentence" id="ms-${i}" onmouseup="handleSentenceMouseUp(event,${i},'midia')" title="Selecione com o mouse para adicionar ao estudo">${sentHTML}</div>
         ${item.context_pt ? `<div class="kindle-sentence-pt">${esc(item.context_pt)}</div>` : ''}
@@ -991,7 +991,7 @@ function renderMidiaDocItem(item, i) {
     ? `<span class="chip" style="opacity:.8;background:rgba(var(--primary-rgb),.14);color:var(--primary)">${senses.length} sentidos</span>` : ''
   return `
     <div class="parsed-item" id="mi-proc-${i}">
-      <input type="checkbox" class="midia-proc-check" data-i="${i}" checked>
+      <input type="checkbox" class="midia-proc-check" data-i="${i}" checked aria-label="Importar ${escA(item.word || 'este item')}">
       <div class="parsed-item-body">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-weight:700;font-size:var(--fs-base)">${esc(item.word || '')}</span>

@@ -260,7 +260,7 @@ function _dossieBarraHTML() {
     <div class="dos-barra-topo">
       <div class="dos-busca">
         ${ic('search','ic-sm')}
-        <input type="text" id="dossie-busca" placeholder="Buscar item, significado, obra ou capítulo…"
+        <input type="text" id="dossie-busca" aria-label="Buscar nos dossiês" placeholder="Buscar item, significado, obra ou capítulo…"
                value="${escA(_dosBusca)}" oninput="dossieBuscar(this.value)">
       </div>
       <div class="dos-fils" id="dossie-filtros"></div>

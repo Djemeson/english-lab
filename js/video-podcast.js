@@ -108,7 +108,7 @@ function _podRender() {
     const meus = _podLoadShows()
     corpo = `
       <div class="vid-sub-row">
-        <input type="text" id="pod-q" value="${escA(st.q)}" placeholder="Nome do podcast — ou cole a URL de um feed RSS"
+        <input type="text" id="pod-q" value="${escA(st.q)}" aria-label="Nome do podcast ou URL de um feed RSS" placeholder="Nome do podcast — ou cole a URL de um feed RSS"
           onkeydown="if(event.key==='Enter')podcastSearch(this.value)">
         <button class="btn btn-secondary btn-sm" onclick="podcastSearch(el('pod-q').value)">${ic('search','ic-sm')}Buscar</button>
       </div>
@@ -155,7 +155,7 @@ function _podRender() {
       ${st.carregando ? `<div class="vid-sub-info"><span class="gen-spinner"></span> Lendo o feed do programa...</div>` : ''}
       ${st.erro ? `<div class="vid-sub-info">${esc(st.erro)}</div>` : ''}
       ${!st.carregando && st.episodios.length ? `
-        <input type="text" class="pod-filter" placeholder="Filtrar episódios" value="${escA(st.filtro)}"
+        <input type="text" class="pod-filter" aria-label="Filtrar episódios" placeholder="Filtrar episódios" value="${escA(st.filtro)}"
           oninput="_podSt.filtro=this.value;_podRenderListaOnly()">
         <div class="pod-eps" id="pod-eps">${_podEpsHtml(lista)}</div>` : ''}`
   }

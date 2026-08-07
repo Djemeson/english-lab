@@ -277,7 +277,7 @@
       </button>
       <div class="asst-search">
         <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input type="text" id="asst-search-input" placeholder="Buscar conversas..." oninput="renderConversaList()">
+        <input type="text" id="asst-search-input" aria-label="Buscar conversas" placeholder="Buscar conversas..." oninput="renderConversaList()">
       </div>
       <div class="asst-conv-list" id="asst-conv-list"></div>
     </aside>
@@ -296,7 +296,7 @@
       </div>
       <div class="consulta-messages" id="consulta-messages"></div>
       <div class="consulta-input-row">
-        <textarea id="consulta-input" rows="1"
+        <textarea id="consulta-input" rows="1" aria-label="Sua pergunta para o Assistente"
           placeholder="Pergunte qualquer coisa — significado, uso, diferenças, gírias..."
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendConsulta()}"
           oninput="autoGrowConsulta(this)"></textarea>
@@ -330,11 +330,11 @@
       <div class="panel-eyebrow">1 · Item de estudo</div>
       <div class="form-row" style="margin-bottom:12px">
       <div class="form-group" style="margin:0">
-        <label>Palavra / Phrasal verb / Idiom <span class="label-note">(opcional)</span></label>
+        <label for="m-word">Palavra / Phrasal verb / Idiom <span class="label-note">(opcional)</span></label>
         <input type="text" id="m-word" placeholder="ex: give up · kick the bucket · serendipity" onkeydown="if(event.key==='Enter')addManual()" oninput="checkManualDup(this.value)">
       </div>
       <div class="form-group" style="margin:0">
-        <label>Frase de contexto <span class="label-note">(opcional)</span></label>
+        <label for="m-ctx">Frase de contexto <span class="label-note">(opcional)</span></label>
         <input type="text" id="m-ctx" placeholder="ex: She decided to give up on her dream." onkeydown="if(event.key==='Enter')addManual()">
       </div>
     </div>
@@ -353,7 +353,7 @@
         <span class="src-chip" data-val="website" onclick="setManualSource(this)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg>Website</span>
       </div>
       <div id="m-title-wrap" style="display:none;margin-bottom:14px">
-      <input type="text" id="m-title" placeholder="Título / origem (ex: Breaking Bad, Harry Potter...)" style="max-width:360px" onkeydown="if(event.key==='Enter')addManual()">
+      <input type="text" id="m-title" aria-label="Título ou origem do item" placeholder="Título / origem (ex: Breaking Bad, Harry Potter...)" style="max-width:360px" onkeydown="if(event.key==='Enter')addManual()">
     </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center">
@@ -370,7 +370,7 @@
     <div class="panel-group">
       <div class="panel-eyebrow">1 · Arquivo do Kindle</div>
       <div class="upload-area" id="kindle-drop" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="this.classList.remove('drag');handleKindleFile({files:event.dataTransfer.files})" onclick="document.getElementById('kindle-file').click()">
-      <input type="file" id="kindle-file" accept=".db,.html,.htm,.txt,.csv" onchange="handleKindleFile(this)">
+      <input type="file" id="kindle-file" aria-label="Arquivo do Kindle (vocab.db, HTML, TXT ou CSV)" accept=".db,.html,.htm,.txt,.csv" onchange="handleKindleFile(this)">
       <div class="upload-icon"><svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--primary)"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
       <p><strong>Clique</strong> ou arraste o arquivo aqui</p>
       <p>vocab.db (palavras consultadas) · My Clippings.txt (destaques) · .html (Notas e Destaques) · .csv</p>
@@ -416,11 +416,11 @@
       </div>
       <div class="midia-src-grid">
         <div>
-          <label>Título</label>
+          <label for="midia-title-new">Título</label>
           <input type="text" id="midia-title-new" placeholder="Survivor · Breaking Bad S01E03 · nome do artigo">
         </div>
         <div>
-          <label>Contexto / gênero <span style="font-weight:400;color:var(--text3)">(opcional)</span></label>
+          <label for="midia-context-new">Contexto / gênero <span style="font-weight:400;color:var(--text3)">(opcional)</span></label>
           <input type="text" id="midia-context-new" placeholder="reality de sobrevivência · drama policial…">
         </div>
       </div>
@@ -432,13 +432,13 @@
       <div class="midia-eyebrow">2 · Material</div>
       <div class="midia-input-grid">
         <div class="upload-area midia-drop-compact" id="midia-drop" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="event.preventDefault();this.classList.remove('drag');handleMidiaFile({files:event.dataTransfer.files})" onclick="document.getElementById('midia-file').click()">
-          <input type="file" id="midia-file" accept=".md,.markdown,.txt,.text,.pdf" onchange="handleMidiaFile(this)">
+          <input type="file" id="midia-file" aria-label="Documento a analisar (MD, TXT ou PDF)" accept=".md,.markdown,.txt,.text,.pdf" onchange="handleMidiaFile(this)">
           <div class="upload-icon"><svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--primary)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg></div>
           <p><strong>Arraste um documento</strong> ou clique</p>
           <p>.md · .txt · .pdf</p>
         </div>
         <div style="display:flex;flex-direction:column;min-width:0">
-          <textarea id="midia-text-new" rows="7" oninput="midiaUpdateModeHint()" placeholder="…ou cole aqui: um artigo inteiro (ex.: Mairo Vergara) OU uma palavra/frase por linha:&#10;ephemeral&#10;She decided to give up on her dream."></textarea>
+          <textarea id="midia-text-new" rows="7" aria-label="Texto a analisar: artigo inteiro ou uma palavra por linha" oninput="midiaUpdateModeHint()" placeholder="…ou cole aqui: um artigo inteiro (ex.: Mairo Vergara) OU uma palavra/frase por linha:&#10;ephemeral&#10;She decided to give up on her dream."></textarea>
           <div class="midia-smart-row">
             <button class="btn btn-primary" id="midia-smart-btn" onclick="midiaSmartRun()"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg> Analisar material</button>
             <span id="midia-mode-hint" style="font-size:var(--fs-xs);color:var(--text3)"></span>
@@ -507,7 +507,7 @@
         </div>
         <!-- Search -->
         <div class="review-search">
-          <input type="text" id="sidebar-search" placeholder="Buscar palavra..." oninput="filterSidebar(this.value)">
+          <input type="text" id="sidebar-search" aria-label="Buscar palavra na fila" placeholder="Buscar palavra..." oninput="filterSidebar(this.value)">
         </div>
         <!-- batch actions moved to wc-toolbar above card -->
         <div class="review-word-list" id="review-word-list"></div>
@@ -625,21 +625,21 @@
 
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
         <div style="min-width:200px">
-          <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Fornecedor (análise e chat)</label>
+          <label for="cfg-ai-provider" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Fornecedor (análise e chat)</label>
           <select id="cfg-ai-provider" onchange="providerMudou()" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
         </div>
         <div style="min-width:300px;flex:1">
-          <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Modelo</label>
+          <label for="cfg-ai-model" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Modelo</label>
           <select id="cfg-ai-model" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
         </div>
         <div style="min-width:210px">
           <!-- A regua da triagem por nivel do leitor: palavra abaixo deste
                nivel ja entra marcada como conhecida. -->
-          <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Seu nível de leitura</label>
+          <label for="cfg-nivel-aluno" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Seu nível de leitura</label>
           <select id="cfg-nivel-aluno" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
         </div>
         <div style="min-width:210px">
-          <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Transcrição (fala → texto)</label>
+          <label for="cfg-stt-provider" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Transcrição (fala → texto)</label>
           <select id="cfg-stt-provider" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)">
             <option value="auto">Automático (Groq se houver chave)</option>
             <option value="groq">Groq · whisper-large-v3-turbo (US$ 0,04/h)</option>
@@ -647,7 +647,7 @@
           </select>
         </div>
         <div style="min-width:170px">
-          <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Imagens (fornecedor)</label>
+          <label for="cfg-img-provider" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Imagens (fornecedor)</label>
           <select id="cfg-img-provider" onchange="imgProviderMudou()" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)">
             <!-- Vazio de proposito: as opcoes sao montadas por
                  updateImgProviderOptions() a partir do AI_IMG. Escritas a mao,
@@ -656,7 +656,7 @@
           </select>
         </div>
         <div style="min-width:230px">
-          <label style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Qualidade das imagens</label>
+          <label for="cfg-img-quality" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Qualidade das imagens</label>
           <select id="cfg-img-quality" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
         </div>
       </div>
@@ -706,7 +706,7 @@
       <div class="btn-group" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px;">
         <button class="btn btn-secondary btn-sm" onclick="exportData()" style="display: inline-flex; align-items: center; gap: 6px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg>Exportar backup JSON</button>
         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click()" style="display: inline-flex; align-items: center; gap: 6px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path d="M12 21V9"/><path d="m7 12 5-5 5 5"/><path d="M5 3h14"/></svg>Importar backup JSON</button>
-        <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(this)">
+        <input type="file" id="import-file" aria-label="Arquivo JSON de backup a importar" accept=".json" class="hidden" onchange="importData(this)">
         <button class="btn btn-secondary btn-sm" onclick="clearKindleSeen()" style="display: inline-flex; align-items: center; gap: 6px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Limpar histórico Kindle</button>
         <button class="btn btn-danger btn-sm" onclick="clearAllData()" style="display: inline-flex; align-items: center; gap: 6px; margin-left: auto;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Apagar todos os dados</button>
       </div>
@@ -853,35 +853,35 @@
 
     <div class="srs-cfg-section">Limites diários</div>
     <div class="form-row">
-      <div class="form-group" style="margin:0"><label>Novos por dia</label><input type="number" id="srs-cfg-new-day" min="0" max="9999" value="20"></div>
-      <div class="form-group" style="margin:0"><label>Revisões por dia</label><input type="number" id="srs-cfg-rev-day" min="0" max="99999" value="200"></div>
+      <div class="form-group" style="margin:0"><label for="srs-cfg-new-day">Novos por dia</label><input type="number" id="srs-cfg-new-day" min="0" max="9999" value="20"></div>
+      <div class="form-group" style="margin:0"><label for="srs-cfg-rev-day">Revisões por dia</label><input type="number" id="srs-cfg-rev-day" min="0" max="99999" value="200"></div>
     </div>
 
     <div class="srs-cfg-section">Novos cartões</div>
-    <div class="form-group"><label>Etapas de aprendizagem <span class="label-note">(min, separadas por espaço)</span></label><input type="text" id="srs-cfg-steps" placeholder="1 10" value="1 10"></div>
+    <div class="form-group"><label for="srs-cfg-steps">Etapas de aprendizagem <span class="label-note">(min, separadas por espaço)</span></label><input type="text" id="srs-cfg-steps" placeholder="1 10" value="1 10"></div>
     <div class="form-row">
-      <div class="form-group" style="margin:0"><label>Intervalo de graduação <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-grad-int" min="1" value="1"></div>
-      <div class="form-group" style="margin:0"><label>Intervalo fácil <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-easy-int" min="1" value="4"></div>
+      <div class="form-group" style="margin:0"><label for="srs-cfg-grad-int">Intervalo de graduação <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-grad-int" min="1" value="1"></div>
+      <div class="form-group" style="margin:0"><label for="srs-cfg-easy-int">Intervalo fácil <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-easy-int" min="1" value="4"></div>
     </div>
 
     <div class="srs-cfg-section">Falhas</div>
-    <div class="form-group"><label>Etapas de reaprendizagem <span class="label-note">(min)</span></label><input type="text" id="srs-cfg-relearn" placeholder="1 5 10" value="1 5 10"></div>
+    <div class="form-group"><label for="srs-cfg-relearn">Etapas de reaprendizagem <span class="label-note">(min)</span></label><input type="text" id="srs-cfg-relearn" placeholder="1 5 10" value="1 5 10"></div>
     <div class="form-row">
-      <div class="form-group" style="margin:0"><label>Novo intervalo <span class="label-note">(0–1, % ao errar)</span></label><input type="number" id="srs-cfg-lapse-int" min="0" max="1" step="0.05" value="0"></div>
-      <div class="form-group" style="margin:0"><label>Intervalo mínimo <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-min-int" min="1" value="1"></div>
+      <div class="form-group" style="margin:0"><label for="srs-cfg-lapse-int">Novo intervalo <span class="label-note">(0–1, % ao errar)</span></label><input type="number" id="srs-cfg-lapse-int" min="0" max="1" step="0.05" value="0"></div>
+      <div class="form-group" style="margin:0"><label for="srs-cfg-min-int">Intervalo mínimo <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-min-int" min="1" value="1"></div>
     </div>
-    <div class="form-group"><label>Limite sanguessuga <span class="label-note">(nº de falhas)</span></label><input type="number" id="srs-cfg-leech" min="1" value="50"></div>
+    <div class="form-group"><label for="srs-cfg-leech">Limite sanguessuga <span class="label-note">(nº de falhas)</span></label><input type="number" id="srs-cfg-leech" min="1" value="50"></div>
 
     <div class="srs-cfg-section">Avançado</div>
     <div class="form-row">
-      <div class="form-group" style="margin:0"><label>Facilidade inicial</label><input type="number" id="srs-cfg-ease" min="1.3" max="5" step="0.1" value="2.5"></div>
-      <div class="form-group" style="margin:0"><label>Bônus por ser fácil</label><input type="number" id="srs-cfg-easy-bonus" min="1" step="0.05" value="1.3"></div>
+      <div class="form-group" style="margin:0"><label for="srs-cfg-ease">Facilidade inicial</label><input type="number" id="srs-cfg-ease" min="1.3" max="5" step="0.1" value="2.5"></div>
+      <div class="form-group" style="margin:0"><label for="srs-cfg-easy-bonus">Bônus por ser fácil</label><input type="number" id="srs-cfg-easy-bonus" min="1" step="0.05" value="1.3"></div>
     </div>
     <div class="form-row">
-      <div class="form-group" style="margin:0"><label>Intervalo árduo <span class="label-note">(difícil)</span></label><input type="number" id="srs-cfg-hard-int" min="1" step="0.05" value="1.2"></div>
-      <div class="form-group" style="margin:0"><label>Modificador de intervalo</label><input type="number" id="srs-cfg-int-mod" min="0.1" step="0.05" value="1.0"></div>
+      <div class="form-group" style="margin:0"><label for="srs-cfg-hard-int">Intervalo árduo <span class="label-note">(difícil)</span></label><input type="number" id="srs-cfg-hard-int" min="1" step="0.05" value="1.2"></div>
+      <div class="form-group" style="margin:0"><label for="srs-cfg-int-mod">Modificador de intervalo</label><input type="number" id="srs-cfg-int-mod" min="0.1" step="0.05" value="1.0"></div>
     </div>
-    <div class="form-group"><label>Intervalo máximo <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-max-int" min="1" value="36500"></div>
+    <div class="form-group"><label for="srs-cfg-max-int">Intervalo máximo <span class="label-note">(dias)</span></label><input type="number" id="srs-cfg-max-int" min="1" value="36500"></div>
 
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="applyAnkiPreset()" data-tip="Preenche todos os campos com o preset padrão do Anki"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg> Preset do Anki</button>

@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-07 — **AS TRÊS ESCADAS DO CSS (91ª rodada)**. Rodada de
+> Última atualização: 2026-08-07 — **FOCO DE TECLADO E ALVO DE TOQUE (91ª rodada, parte B)**.
+> Segunda das três rodadas de design. Em 5.196 linhas de CSS havia **dois** `:focus-visible` e
+> nove `outline:none`, vários sem substituto — andar de Tab pelo app era às cegas, num app em
+> que se digita o tempo todo. Agora existe um anel de foco global (`outline`, não `box-shadow`;
+> `:focus-visible`, então **quem usa mouse não vê diferença nenhuma**) com `!important`
+> deliberado: sem ele qualquer `outline:none` antigo mais específico apaga o anel em silêncio,
+> que foi exatamente como o app chegou até aqui. **Os 34 campos do app agora têm nome
+> acessível** — 24 por `label for` (eram ZERO) e 10 por `aria-label`. A varredura do horizonte
+> achou o mesmo defeito **nos campos gerados por JS**: 13 arquivos corrigidos. Alvo de toque de
+> 44px em `(hover:none) and (pointer:coarse)` — pelo PONTEIRO, não pela largura de tela.
+> `sw.js` → `englab-v135`. Ver seção 8 (91ª rodada, B).
+>
+> Anterior: 2026-08-07 — **AS TRÊS ESCADAS DO CSS (91ª rodada)**. Rodada de
 > *design*, não de função: o pedido foi "passar o olho no layout e propor mudanças". A varredura
 > achou o CSS **já bem tokenizado em cor e tipografia** (1.451 `var(--…)`, só 7 `font-size` em
 > px) e **sem escada nenhuma** nas outras três dimensões: espaçamento (244 valores distintos,
@@ -782,6 +794,18 @@ maxInterval (36500), leechThreshold (50)
     rodadas escreveram regras assim e as duas eram código morto.
   - As escadas de espaço e camada moram em `:root` de propósito (como as famílias tipográficas):
     **não mudam com o tema**, só as cores mudam.
+- **Acessibilidade (91ª rodada, B).** Regras fixas, não sugestões:
+  - **Todo campo precisa de nome acessível.** `<label for="id">` quando há rótulo visível;
+    `aria-label` quando não há. **Placeholder NÃO é rótulo** — some ao digitar e leitor de tela
+    não o trata como nome. Vale igual para campo gerado por JS (foi lá que estava a maior parte
+    do problema). Em lista, o rótulo é específico do item: `aria-label="Selecionar ${escA(w.word)}"`,
+    nunca "selecionar este item" repetido vinte vezes. `escA` vive em `core.js` (não-lazy).
+  - **O anel de foco é global e usa `!important`** — de propósito, para que nenhum `outline:none`
+    futuro o apague em silêncio. Fica no fim de `css/styles.css`. **Não declare `border-radius`
+    no `:focus-visible`**: o outline já segue o raio do elemento, e declarar ali muda a FORMA do
+    elemento enquanto ele está focado.
+  - **Alvo de toque de 44px em `@media (hover:none) and (pointer:coarse)`** — pelo ponteiro,
+    nunca por largura de tela.
 - **⚠️ Mexeu em `css/styles.css`? Bumpe o `CACHE` do `sw.js`.** O shell é cache-first: sem o
   bump o aparelho continua servindo o CSS anterior mesmo depois do reload. Descoberto na
   verificação da 91ª rodada, quando o navegador insistia em mostrar o layout velho.
@@ -842,6 +866,64 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-07 (91ª rodada, parte B) — FOCO DE TECLADO E ALVO DE TOQUE
+
+**O pedido**: "pode fazer" — a rodada B que a parte A tinha deixado registrada na seção 9.
+
+**O diagnóstico da parte A confirmado no código**: em 5.196 linhas havia **dois**
+`:focus-visible` (`.seg-tab` e `.sb-signout`) contra **nove** `outline:none`, vários deles sem
+nada no lugar. `.asst-search input` desligava o contorno e não colocava substituto nenhum. E o
+`index.html` tinha **24 `<input>` e ZERO `<label for=>`**.
+
+**A camada nova fica no FIM de `css/styles.css`**, pela mesma razão que o reskin: vence a
+cascata sem editar as regras antigas.
+
+**As três decisões que valem registro:**
+
+1. **`:focus-visible`, não `:focus`.** O navegador só acende o anel para quem chegou de teclado.
+   **Quem usa mouse não vê diferença nenhuma** — zero regressão visual no uso normal.
+2. **`outline`, não `box-shadow`.** Outline não ocupa espaço (não empurra vizinho), acompanha
+   sozinho o `border-radius` do elemento e não é cortado pelo overflow do próprio elemento.
+3. **`!important` deliberado.** É a correção da CAUSA, não do sintoma: sem ele, qualquer
+   `outline:none` antigo com seletor mais específico apaga o anel em silêncio — que é
+   literalmente como o app chegou até aqui. Indicador de foco não pode depender de ordem de
+   arquivo para existir.
+
+**⚠️ Erro cometido e corrigido dentro da rodada** (registrado para não voltar): o primeiro
+rascunho declarava `border-radius:var(--radius-sm)` dentro do `:focus-visible`. Isso **muda a
+forma do elemento enquanto ele está focado** — um avatar redondo viraria quadrado arredondado ao
+receber Tab. O outline já segue o raio próprio do elemento; não se declara raio ali. Confirmado
+no navegador depois da correção: o elemento focado mantém o raio dele (11px), não um imposto.
+
+**Nome acessível em TODOS os campos.** Os 24 `<label>` do `index.html` ganharam `for=`, e os
+campos que não têm rótulo visível (buscas, upload de arquivo, caixa do Assistente) ganharam
+`aria-label` — *placeholder não é rótulo*: some quando a pessoa digita e leitor de tela não o
+trata como nome.
+
+**A varredura do horizonte achou o mesmo defeito nos campos GERADOS POR JS.** Onde o `index.html`
+tinha 24, o JS tinha mais 31 sem rótulo. **13 arquivos corrigidos**: `add.js`, `audio.js`,
+`core.js`, `dossie.js`, `known.js`, `lang.js`, `ler.js`, `review.js`, `settings.js`, `study.js`,
+`video-podcast.js`, `video-study.js`, `video-subs.js`. Em lista, o rótulo é **específico do item**
+(`aria-label="Selecionar ${escA(c.word)}"`) — vinte caixas dizendo "selecionar este card" não
+ajudam ninguém. Usa-se `escA` (definida em `core.js`, **não-lazy**, logo disponível em todos).
+Achado bom da varredura: **nem tudo estava errado** — o painel de playlist do `audio.js`, os
+campos de temporada/episódio do `video-subs.js` e o rádio de faixa do `video-sync.js` já usavam
+`<label for>` ou `<label>` envolvente. Só foi tocado o que faltava.
+
+**Alvo de toque de 44px** em `@media (hover:none) and (pointer:coarse)`: `--control-h` 40→44,
+`.btn`, `.tab`, `.seg-tab` e os botões só de ícone. **Pelo PONTEIRO, não pela largura de tela** —
+tablet com caneta e desktop com toque existem, e quem decide é o dedo. `.btn-sm` para em 40px de
+propósito: ele vive em fileiras densas e 44px ali quebraria a linha em duas (registrado na
+seção 9 para o dia em que essas fileiras virarem coluna no celular).
+
+**Verificado ao vivo**: `node --check` nos 13 JS (e confirmado que o bash estava lendo os
+arquivos certos, não as cópias defasadas do OneDrive); CSS com 1.715 regras, chaves 1.989/1.989,
+comentários 426/426; **Tab de verdade no navegador** (não `.focus()` por script, que não dispara
+`:focus-visible` e me deu um falso negativo na primeira medição) mostrando
+`outline: 2px solid #60A5FA` com offset 2px; **os 34 campos com nome acessível, nenhum sem**;
+`--control-h` em 40px no desktop e 44px no toque; sem overflow horizontal em 1280 e em 375;
+zero erro no console. `sw.js` → `englab-v135`.
 
 ### Sessão 2026-08-07 (91ª rodada) — AS TRÊS ESCADAS DO CSS (espaço, camada, breakpoint)
 
@@ -5347,16 +5429,13 @@ pela lição já paga do filtro de fonte do SRS — tela vazia sem explicação 
 ### Design / CSS — o que a 91ª rodada deixou aberto de propósito
 
 A revisão de design foi dividida em três rodadas, da mais barata e segura para a mais invasiva.
-**A rodada A saiu** (as escadas + o bug das camadas + o código morto). Faltam B e C:
+**As rodadas A e B saíram.** Falta a C:
 
-- [ ] **RODADA B — FOCO DE TECLADO E ALVO DE TOQUE.** Em 5.196 linhas de CSS há **dois**
-      `:focus-visible`, e o `index.html` tem **24 `<input>` com zero `<label for=>`**. Num app
-      onde ele digita palavra, frase e tradução o tempo todo, andar de Tab hoje é às cegas.
-      O material para consertar já existe: `--ring` está definido e é usado no `:focus` dos
-      inputs — falta um `:focus-visible` global usando o mesmo anel, e ligar cada `label` ao seu
-      campo. Junto: `--control-h` é 40px e só 5 regras no arquivo chegam a 44px — subir os
-      controles para 44px **só em `@media (hover:none) and (pointer:coarse)`**, sem tocar no
-      desktop (o leitor já faz isso certo nos seus botões; é o padrão a copiar).
+- [x] ~~**RODADA A — AS ESCADAS**~~ — feita (espaço, camada, breakpoint + o bug do modal
+      atravessado pela barra no celular + o código morto da sidebar).
+- [x] ~~**RODADA B — FOCO DE TECLADO E ALVO DE TOQUE**~~ — feita. Anel de foco global, os 34
+      campos com nome acessível (24 `label for` + 10 `aria-label`, incluindo os gerados por JS
+      em 13 arquivos) e 44px no ponteiro grosseiro. Ver seção 8 (91ª rodada, parte B).
 - [ ] **RODADA C — OS ESTILOS INLINE.** 136 `style="` no `index.html` e ~250 gerados nos JS
       (`audio.js` 66, `study.js` 57, `add.js` 39, `dashboard.js` 25, `review.js` 22). Cada um é
       um ponto onde o tema ativo pode não chegar — é a causa raiz típica de "no tema claro tal
@@ -5367,6 +5446,19 @@ A revisão de design foi dividida em três rodadas, da mais barata e segura para
       parte daquelas medidas é calibrada no olho e perde ao ser arredondada.
 - [ ] **DUAS REGRAS `@media (hover:none)` separadas** (uma esconde `.ler-seta`, a outra também).
       Sobreposição inofensiva, mas são o mesmo caso — vale unir quando alguém passar por ali.
+- [ ] **`.btn-sm` ficou em 40px no toque, não 44px** (rodada B). Foi decisão consciente: ele vive
+      em fileiras densas (ações do dossiê, linha do card, rodapé de lista) e 44px ali quebraria a
+      linha em duas. No dia em que essas fileiras virarem coluna no celular, sobe para 44 e o app
+      passa a cumprir o alvo de toque em todo botão.
+- [ ] **MOVIMENTO E CONTRASTE ainda não têm tratamento completo** (achado na rodada B, deixado
+      fora de propósito). Há só **duas** regras `prefers-reduced-motion` para um app cheio de
+      transição e animação, e **zero** `prefers-contrast`. Não é urgente, mas é o mesmo tipo de
+      lacuna que o foco de teclado era: invisível para quem não precisa, bloqueante para quem
+      precisa.
+- [ ] **O anel de foco pode ser cortado por ancestral com `overflow:hidden`** (ex.: `.card-box`).
+      O outline não é cortado pelo overflow do PRÓPRIO elemento, mas é pelo do pai. Não foi visto
+      acontecendo; se aparecer, a saída é `outline-offset` negativo naquele componente específico
+      — não mexer na regra global.
 
 - [x] ~~Ligar a seção dos dossiês, renomear as seções e decidir o portão~~ — **feito na 90ª
       rodada** (2026-08-07). Ver 8.1: está tudo lá, inclusive por que os arquivos NÃO foram

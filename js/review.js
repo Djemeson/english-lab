@@ -654,7 +654,7 @@ function renderSidebar(filter = '') {
           ? `<span class="rw-dot wait" data-tip="Aguardando análise da IA"></span>`
           : `<span class="rw-mean" data-tip="${nMean} significado${nMean !== 1 ? 's' : ''} prontos">${nMean}</span>`
         html += `<div class="rw-item ${isActive ? 'active' : ''} ${isChecked ? 'checked' : ''}" onclick="selectWord('${w.id}')">
-          <input type="checkbox" class="rw-cb" ${isChecked ? 'checked' : ''} onclick="toggleWordSelect(event,'${w.id}')" title="Selecionar esta palavra">
+          <input type="checkbox" class="rw-cb" ${isChecked ? 'checked' : ''} onclick="toggleWordSelect(event,'${w.id}')" title="Selecionar esta palavra" aria-label="Selecionar ${escA(w.word || 'esta frase')}">
           <div class="rw-word">${esc(w.word || '(frase)')}</div>
           <div class="rw-right">${!showGroups ? `<span class="rw-src" title="Fonte">${icon}</span>` : ''}${statusHtml}</div>
         </div>`
@@ -818,7 +818,7 @@ function renderWordCard(wordId) {
       <div class="wc-word" style="display:flex;align-items:center;gap:8px">
         <span id="wc-word-text-${w.id}">${esc(w.word || '(frase)')}</span>
         <button class="btn btn-ghost btn-xs" title="Editar" onclick="startEditWord('${w.id}')" id="wc-edit-btn-${w.id}" style="padding:2px 6px">${ic('pencil','ic-sm')}</button>
-        <input type="text" id="wc-word-input-${w.id}" value="${escA(w.word || '')}" style="display:none;font-size:var(--fs-lg);font-weight:700;background:var(--surface2);border:1px solid var(--primary);border-radius:var(--radius-xs);padding:2px 8px;color:var(--text);width:200px" onkeydown="handleEditWordKey(event,'${w.id}')" onblur="confirmEditWord('${w.id}')">
+        <input type="text" id="wc-word-input-${w.id}" value="${escA(w.word || '')}" aria-label="Editar a palavra" style="display:none;font-size:var(--fs-lg);font-weight:700;background:var(--surface2);border:1px solid var(--primary);border-radius:var(--radius-xs);padding:2px 8px;color:var(--text);width:200px" onkeydown="handleEditWordKey(event,'${w.id}')" onblur="confirmEditWord('${w.id}')">
       </div>
       <div class="wc-meta">
         ${langChip(wordLang(w))}

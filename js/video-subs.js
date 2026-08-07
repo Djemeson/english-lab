@@ -177,7 +177,7 @@ function _vidSubRender() {
   if (st.passo === 'busca') {
     corpo = `
       <div class="vid-sub-row">
-        <input type="text" id="vid-sub-q" value="${escA(st.query || '')}" placeholder="Nome da série ou filme"
+        <input type="text" id="vid-sub-q" value="${escA(st.query || '')}" aria-label="Nome da série ou filme para buscar legenda" placeholder="Nome da série ou filme"
           onkeydown="if(event.key==='Enter')videoSubSearch(this.value)">
         <button class="btn btn-secondary btn-sm" onclick="videoSubSearch(el('vid-sub-q').value)">${ic('search','ic-sm')}Buscar</button>
       </div>
@@ -218,7 +218,7 @@ function _vidSubRender() {
       <details class="vid-sub-addons">
         <summary>Addons de legenda (${_vidSubAddons().length})</summary>
         <p>Um por linha — qualquer addon de legendas do Stremio funciona (o protocolo é aberto).</p>
-        <textarea id="vid-sub-addons-ta" rows="3" placeholder="https://opensubtitles-v3.strem.io">${esc((cfg.subAddons || ''))}</textarea>
+        <textarea id="vid-sub-addons-ta" rows="3" aria-label="Addons de legenda, um por linha" placeholder="https://opensubtitles-v3.strem.io">${esc((cfg.subAddons || ''))}</textarea>
         <button class="btn btn-ghost btn-sm" onclick="cfg.subAddons=el('vid-sub-addons-ta').value.trim();saveCfg();autoSyncAfterChange();toast('Addons salvos','success')">Salvar addons</button>
       </details>
     </div>`

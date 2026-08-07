@@ -119,9 +119,9 @@ function _knPintar() {
           </button>`).join('')}
       </div>
       <div class="kn-tools">
-        <input class="kn-search" type="search" placeholder="Buscar palavra..." value="${escA(_knBusca)}"
+        <input class="kn-search" type="search" aria-label="Buscar palavra" placeholder="Buscar palavra..." value="${escA(_knBusca)}"
           oninput="knBuscar(this.value)">
-        <select class="kn-ord" onchange="knOrdenar(this.value)">
+        <select class="kn-ord" aria-label="Ordenar as palavras" onchange="knOrdenar(this.value)">
           <option value="freq"${_knOrdem === 'freq' ? ' selected' : ''}>Mais frequentes primeiro</option>
           <option value="alfa"${_knOrdem === 'alfa' ? ' selected' : ''}>Ordem alfabética</option>
         </select>
