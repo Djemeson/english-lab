@@ -587,7 +587,7 @@ function renderWcToolbarLeft() {
       <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()" data-tip="Gera significados, exemplos e nível com IA para as selecionadas">${ic('sparkles')}Analisar</button>
       <button class="btn btn-srs btn-sm" onclick="enviarSelecionadasParaEstudo()" data-tip="Tira daqui e põe no dossiê da obra, em Estudar. É lá que você lê o material — e marcar 'Estudei' é o que manda o item para a Revisão.">${ic('book')}Enviar para o Estudo</button>
       <button class="btn btn-ghost btn-sm wct-atalho" onclick="saveSelectedToSrs()" data-tip="Atalho: pula a leitura do dossiê e joga direto na repetição espaçada">${ic('arrowRight')}Pular para a Revisão</button>
-      <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()" data-tip="Remove as palavras selecionadas da fila">${ic('trash')}Excluir</button>`
+      <button class="btn btn-ghost btn-sm" style="color:var(--error)" onclick="deleteSelected()" data-tip="Remove as palavras selecionadas da fila">${ic('trash')}Excluir</button>`
   } else if (w) {
     if (w.status === 'pending_review' && w.meanings?.length > 0) {
       const selM = w.meanings.filter(m => m.selected !== false)

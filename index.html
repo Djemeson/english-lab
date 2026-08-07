@@ -338,7 +338,10 @@
         <input type="text" id="m-ctx" placeholder="ex: She decided to give up on her dream." onkeydown="if(event.key==='Enter')addManual()">
       </div>
     </div>
-      <div id="m-dup-warn" style="display:none;background:var(--warning-bg,rgba(234,179,8,.12));border:1px solid rgba(234,179,8,.35);border-radius:var(--radius-xs);padding:8px 12px;font-size:var(--fs-sm);color:#ca8a04;margin-bottom:12px;display:none;align-items:center;gap:8px">
+      <!-- Era o único aviso do app com a cor presa: fundo, borda e texto em
+           âmbar fixo, e apoiado num `--warning-bg` que NUNCA existiu (então o
+           fallback valia sempre). Agora os três saem de `--warning`. -->
+      <div id="m-dup-warn" style="display:none;background:color-mix(in srgb, var(--warning) 12%, transparent);border:1px solid color-mix(in srgb, var(--warning) 35%, transparent);border-radius:var(--radius-xs);padding:8px 12px;font-size:var(--fs-sm);color:var(--warning);margin-bottom:12px;align-items:center;gap:8px">
       <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg> "<strong id="m-dup-word"></strong>" já está na sua fila.
     </div>
     </div>
@@ -846,7 +849,11 @@
 </section>
 
 <!-- SRS Config Modal -->
-<div id="srs-cfg-modal" class="hidden" style="position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)">
+<!-- O `z-index` era 500 escrito à mão. Coincidia com `--z-modal` hoje, mas era
+     coincidência: no dia em que a escada de camadas mudar, este modal fica para
+     trás em silêncio. O véu preto continua literal de propósito — véu escuro
+     sobre a tela é o mesmo nos seis temas (igual ao `.srs-modal-overlay`). -->
+<div id="srs-cfg-modal" class="hidden" style="position:fixed;inset:0;z-index:var(--z-modal);display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 26px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow)">
     <h3 style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--primary)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações do SRS</h3>
     <p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:16px">Algoritmo SM-2 — parâmetros espelhando o Anki</p>

@@ -7,7 +7,21 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-07 — **FOCO DE TECLADO E ALVO DE TOQUE (91ª rodada, parte B)**.
+> Última atualização: 2026-08-07 — **A COR QUE NÃO SEGUIA O TEMA (91ª rodada, parte C)**.
+> **A medição desmentiu a premissa que a própria rodada A tinha registrado.** A pendência dizia
+> "390 estilos inline, cada um um ponto onde o tema pode não chegar". Falso: dos 403 estilos
+> inline, **236 são só layout, 157 já usam `var(--)` e apenas 6 prendiam uma cor**. Mover os
+> outros 397 para classes seria churn enorme sem mudar um pixel. **O defeito de verdade estava
+> no CSS**, não no inline: 51 cores literais fora dos blocos de tema. Achado mais concreto,
+> provado no navegador: `.stat-card` tinha borda `rgba(255,255,255,0.07)` — branco sobre
+> superfície BRANCA nos temas *light* e *papel*, **distância de cor ZERO**, ou seja, o cartão
+> ficava sem borda nenhuma em 2 dos 6 temas. Junto: três restos de paleta antiga (`#e67e22`,
+> `#1abc9c`, `#e74c3c`) que nenhum tema define, os botões success/danger com gradiente e hover
+> fixos ignorando `--success`/`--error`, e um aviso apoiado num `--warning-bg` **que nunca
+> existiu**. Tudo passou a sair dos tokens. `sw.js` → `englab-v136`.
+> Ver seção 8 (91ª rodada, C). **As três rodadas de design estão fechadas.**
+>
+> Anterior: 2026-08-07 — **FOCO DE TECLADO E ALVO DE TOQUE (91ª rodada, parte B)**.
 > Segunda das três rodadas de design. Em 5.196 linhas de CSS havia **dois** `:focus-visible` e
 > nove `outline:none`, vários sem substituto — andar de Tab pelo app era às cegas, num app em
 > que se digita o tempo todo. Agora existe um anel de foco global (`outline`, não `box-shadow`;
@@ -806,6 +820,15 @@ maxInterval (36500), leechThreshold (50)
     elemento enquanto ele está focado.
   - **Alvo de toque de 44px em `@media (hover:none) and (pointer:coarse)`** — pelo ponteiro,
     nunca por largura de tela.
+- **Cor literal: quando pode (91ª rodada, C).** A regra "toda cor via variável" tem exceções
+  legítimas, e elas estão marcadas no CSS para ninguém "consertar" por engano: **cor de marca**
+  (o botão do Google), **o que fica sobre imagem e não sobre o tema** (véu preto e legenda do
+  vídeo, lightbox), e **os 5 temas próprios do leitor** (`--ler-*`, mesma estrutura de tema, só
+  local). Fora disso, cor literal é bug — e o mais caro deles é **branco-alpha em borda**:
+  invisível nos temas `light` e `papel`, onde a superfície JÁ é branca. Use `--border`.
+  ⚠️ **Para conferir tema por script, desligue a `transition` antes de medir** — várias
+  superfícies têm 0,3s em `border-color`/`background`, e `getComputedStyle` no meio da animação
+  devolve o valor ANTIGO e faz parecer que o tema não pegou.
 - **⚠️ Mexeu em `css/styles.css`? Bumpe o `CACHE` do `sw.js`.** O shell é cache-first: sem o
   bump o aparelho continua servindo o CSS anterior mesmo depois do reload. Descoberto na
   verificação da 91ª rodada, quando o navegador insistia em mostrar o layout velho.
@@ -866,6 +889,77 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-07 (91ª rodada, parte C) — A COR QUE NÃO SEGUIA O TEMA
+
+**O pedido**: "sim" — a rodada C, a última das três de design.
+
+**⚠️ A MEDIÇÃO DESMENTIU A PREMISSA QUE A RODADA A TINHA REGISTRADO.** A pendência dizia: "136
+`style=` no index.html e ~250 nos JS; cada um é um ponto onde o tema pode não chegar". Classificar
+um a um mostrou outra coisa:
+
+| categoria | quantos | veredito |
+|---|---|---|
+| só layout (`display`, `margin`, `flex`) | 236 | inofensivo, tema não passa por ali |
+| já usa `var(--…)` | 157 | **já estava certo** |
+| prende uma cor literal | **6** | o defeito |
+
+Mover 397 estilos inocentes para classes seria um diff gigante, arriscado e **sem mudar um
+pixel**. A rodada foi reorientada para o que o inline só sintomatizava: **cor que não segue o
+tema, onde quer que esteja**. E o grosso estava no CSS — 51 literais fora dos blocos de tema.
+
+**O achado mais concreto, provado antes de mexer.** `.stat-card` tinha
+`border:1px solid rgba(255,255,255,0.07)`. Composta sobre o `--surface` de cada tema, a
+**distância de cor** era: midnight 22, violet 21, emerald 21 — e **light 0, papel 0**, sepia 4.
+Ou seja: **o cartão ficava literalmente sem borda em 2 dos 6 temas**, e quase sem borda no
+terceiro. `--border` existe para isso e já vira escuro nos temas claros.
+
+**O que foi corrigido** (tudo verificado nos seis temas depois):
+
+- `.stat-card` → `var(--border)`.
+- `.stat-card.orange/.teal/.red .stat-value` → `#e67e22`/`#1abc9c`/`#e74c3c` eram **restos de
+  uma paleta antiga que NENHUM tema define** — ficavam iguais nos seis, ao lado de irmãos
+  (`.blue`, `.green`, `.yellow`, `.purple`) que já seguiam o tema. Agora `--warning`/`--success`/
+  `--error`.
+- `.btn-success` e `.btn-danger`: gradiente E hover fixos (`#34D399→#059669`, `#F87171→#DC2626`)
+  ignoravam `--success`/`--error` nos seis temas. Agora derivam do token por `color-mix`.
+- `.chip.register-slang`, `.image-badge-ok`, `.sdt-learn`, `.srs-rate-btn.again .srb-label` e um
+  `#ef4444` que convivia com `color-mix(var(--error))` na MESMA regra.
+- `.pl-status.is-recall/.is-reveal`: o texto seguia o tema e o fundo não.
+- `.ler-tri-ok:hover{background:var(--success,#1f9d63)}` — fallback que nunca era usado e ainda
+  por cima com um verde que não é do projeto.
+- Os 6 inline: os chips do `add.js` tinham `rgba(59,130,246,.15)` (o azul do midnight) atrás de
+  um `color:var(--primary)` que mudava — o fundo ficava azul no tema roxo. Viraram
+  `rgba(var(--primary-rgb),.15)`. Mais `review.js`, `study.js` (onde a nota 1 usava `#F87171`
+  enquanto as notas 2, 3 e 4 já usavam tokens) e o aviso de duplicata do `index.html`, que se
+  apoiava num **`--warning-bg` que nunca existiu em token nenhum** — o fallback âmbar valia
+  sempre.
+- **`z-index:500` escrito à mão** no modal de configurações do SRS (único do projeto fora da
+  escada). Coincidia com `--z-modal` hoje; no dia em que a escada mudasse, ficaria para trás em
+  silêncio. Agora `var(--z-modal)`.
+
+**O que foi deixado fixo DE PROPÓSITO** (e por quê, para não "consertarem" depois):
+o botão do Google (`#3c4043` sobre `#fff` — cor de marca, contratual), os véus pretos e a legenda
+`#ffd98a` sobre vídeo (ficam sobre imagem, não sobre o tema), os 5 temas próprios do leitor
+(`--ler-*`, que é a mesma estrutura de tema, só local) e o `#ll-zoom` (lightbox de fundo escuro
+fixo).
+
+**Correção de rota registrada**: `.sb-brand` e `.sb-foot` também tinham borda branca literal na
+regra base — mas **já eram vencidas por regras posteriores** que usam `--border`. Foram medidas
+no navegador antes e não foram tocadas. Consertar regra morta é ruído no diff.
+
+**Armadilha de medição encontrada**: ao trocar `data-theme` por script e ler
+`getComputedStyle` na hora, a borda parecia não mudar em tema nenhum. Não era bug — `.stat-card`
+tem `transition` de 0,3s em `border-color`, e eu estava lendo o valor **no meio da animação**.
+Com `transition:none` no elemento de teste, os seis temas respondem certo. Fica o aviso: para
+conferir tema por script, desligue a transição antes de medir.
+
+**Verificado**: `node --check` nos 3 JS; CSS com 1.714 regras, chaves 1.989/1.989, comentários
+430/430; os oito seletores corrigidos medidos **nos seis temas** com transição desligada
+(`.stat-card` agora dá `rgba(15,23,42,0.1)` no light e `rgba(40,35,25,0.1)` no papel);
+`color-mix` dentro de `linear-gradient` resolvendo; modal do SRS lendo `--z-modal`; console
+limpo. **Sobrou 1 cor literal inline no projeto inteiro** — o véu preto do modal, que é
+proposital. `sw.js` → `englab-v136`.
 
 ### Sessão 2026-08-07 (91ª rodada, parte B) — FOCO DE TECLADO E ALVO DE TOQUE
 
@@ -5428,18 +5522,19 @@ pela lição já paga do filtro de fonte do SRS — tela vazia sem explicação 
 
 ### Design / CSS — o que a 91ª rodada deixou aberto de propósito
 
-A revisão de design foi dividida em três rodadas, da mais barata e segura para a mais invasiva.
-**As rodadas A e B saíram.** Falta a C:
+A revisão de design foi dividida em três rodadas. **As três estão fechadas.**
 
 - [x] ~~**RODADA A — AS ESCADAS**~~ — feita (espaço, camada, breakpoint + o bug do modal
       atravessado pela barra no celular + o código morto da sidebar).
 - [x] ~~**RODADA B — FOCO DE TECLADO E ALVO DE TOQUE**~~ — feita. Anel de foco global, os 34
       campos com nome acessível (24 `label for` + 10 `aria-label`, incluindo os gerados por JS
       em 13 arquivos) e 44px no ponteiro grosseiro. Ver seção 8 (91ª rodada, parte B).
-- [ ] **RODADA C — OS ESTILOS INLINE.** 136 `style="` no `index.html` e ~250 gerados nos JS
-      (`audio.js` 66, `study.js` 57, `add.js` 39, `dashboard.js` 25, `review.js` 22). Cada um é
-      um ponto onde o tema ativo pode não chegar — é a causa raiz típica de "no tema claro tal
-      caixa fica escura". Mexe em JS de várias telas, então é a de maior risco.
+- [x] ~~**RODADA C — OS ESTILOS INLINE**~~ — feita, **mas não como estava escrito aqui**. A
+      premissa ("390 estilos inline = 390 vazamentos de tema") era FALSA: 236 são só layout, 157
+      já usavam `var(--)` e só **6** prendiam cor. O defeito real estava no CSS (51 literais fora
+      dos blocos de tema) — inclusive `.stat-card` com borda invisível em 2 dos 6 temas. Ver
+      seção 8 (91ª rodada, parte C). **Lição registrada: medir antes de aceitar a própria
+      pendência da rodada anterior.**
 - [ ] **ESPAÇAMENTO NO RESTO DO ARQUIVO.** Os `--sp-*` foram aplicados na faixa compartilhada e
       na camada de reskin (113 usos). O CSS específico de cada seção (vídeo, leitor, dossiê,
       assistente) ainda usa literais. Não é urgente e **não deve ser feito em varredura cega**:

@@ -621,7 +621,7 @@ async function renderHistoryOrCurrent() {
   </div>
   <div style="text-align:center;margin-top:12px">
     <span style="font-size:var(--fs-sm);color:var(--text3)">avaliado como
-      <strong style="color:${{1:'#F87171',2:'var(--warning)',3:'var(--success)',4:'var(--primary)'}[entry.rating]}">${{1:'Errei',2:'Difícil',3:'Bom',4:'Fácil'}[entry.rating]}</strong>
+      <strong style="color:${{1:'var(--error)',2:'var(--warning)',3:'var(--success)',4:'var(--primary)'}[entry.rating]}">${{1:'Errei',2:'Difícil',3:'Bom',4:'Fácil'}[entry.rating]}</strong>
     </span>
   </div>`
 

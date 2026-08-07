@@ -432,7 +432,7 @@ function renderKindleList(skipped, total) {
     const vocabRefHTML = item.vocab_ref?.length
       ? `<div style="font-size:var(--fs-sm);color:var(--text2);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px">`
         + item.vocab_ref.map(v => v.expr
-          ? `<span>${ic('target','ic-sm')} ${v.expr}${v.type ? ` <span style="font-size:var(--fs-3xs);background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
+          ? `<span>${ic('target','ic-sm')} ${v.expr}${v.type ? ` <span style="font-size:var(--fs-3xs);background:rgba(var(--primary-rgb),.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
           : '').filter(Boolean).join(' ')
         + '</div>'
       : ''
@@ -871,7 +871,7 @@ function renderMidiaProcessed() {
     const vocabRefHTML = item.vocab_ref?.length
       ? `<div style="font-size:var(--fs-sm);color:var(--text2);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px">`
         + item.vocab_ref.map(v => v.expr
-          ? `<span>${ic('target','ic-sm')} ${v.expr}${v.type ? ` <span style="font-size:var(--fs-3xs);background:rgba(59,130,246,.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
+          ? `<span>${ic('target','ic-sm')} ${v.expr}${v.type ? ` <span style="font-size:var(--fs-3xs);background:rgba(var(--primary-rgb),.15);color:var(--primary);border-radius:3px;padding:1px 4px">${v.type}</span>` : ''}</span>`
           : '').filter(Boolean).join(' ')
         + '</div>'
       : ''

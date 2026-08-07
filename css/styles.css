@@ -195,7 +195,11 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 
 /* ===== STATS ===== */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-6);margin-bottom:var(--sp-8)}
-.stat-card{background:var(--surface);border:1px solid rgba(255,255,255,0.07);border-radius:var(--radius);padding:var(--sp-7)}
+/* A borda era `rgba(255,255,255,0.07)` — branco sobre superfície BRANCA nos
+   temas light e papel: distância de cor ZERO, ou seja, o cartão ficava sem
+   borda nenhuma em 2 dos 6 temas (e quase nenhuma no sepia). `--border` existe
+   exatamente para isto e já vira escuro nos temas claros. */
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:var(--sp-7)}
 .stat-label{font-size:var(--fs-sm);color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
 .stat-value{font-size:var(--fs-2xl);font-weight:700;margin-top:var(--sp-1);line-height:1}
 .stat-sub{font-size:var(--fs-sm);color:var(--text2);margin-top:var(--sp-2)}
@@ -203,9 +207,12 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .stat-card.green .stat-value{color:var(--success)}
 .stat-card.yellow .stat-value{color:var(--warning)}
 .stat-card.purple .stat-value{color:var(--purple)}
-.stat-card.orange .stat-value{color:#e67e22}
-.stat-card.teal .stat-value{color:#1abc9c}
-.stat-card.red .stat-value{color:#e74c3c}
+/* Estes três eram restos de uma paleta antiga: #e67e22, #1abc9c e #e74c3c não
+   são definidos por NENHUM dos seis temas, então ficavam iguais em todos —
+   laranja/verde-água/vermelho genéricos ao lado de irmãos que seguem o tema. */
+.stat-card.orange .stat-value{color:var(--warning)}
+.stat-card.teal .stat-value{color:var(--success)}
+.stat-card.red .stat-value{color:var(--error)}
 .stat-card.gray .stat-value{color:var(--text2)}
 .stats-section-label{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;
   color:var(--text3);margin:var(--sp-7) 0 var(--sp-4)}
@@ -292,9 +299,9 @@ select option{background:var(--surface)}
 .btn-primary{background:var(--primary-grad);color:#fff;box-shadow:0 4px 14px rgba(var(--primary-rgb),0.35)}
 .btn-primary:hover:not(:disabled){box-shadow:0 6px 20px rgba(var(--primary-rgb),0.5);transform:translateY(-1px)}
 .btn-success{background:var(--success);color:#fff}
-.btn-success:hover:not(:disabled){background:#059669}
+.btn-success:hover:not(:disabled){background:color-mix(in srgb, var(--success) 84%, black)}
 .btn-danger{background:var(--error);color:#fff}
-.btn-danger:hover:not(:disabled){background:#DC2626}
+.btn-danger:hover:not(:disabled){background:color-mix(in srgb, var(--error) 84%, black)}
 .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
 .btn-secondary:hover:not(:disabled){background:var(--surface3)}
 .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
@@ -508,7 +515,7 @@ select option{background:var(--surface)}
   background:var(--surface3);color:var(--text2);white-space:nowrap;
 }
 .chip.register-informal{background:color-mix(in srgb, var(--warning) 15%, transparent);color:var(--warning)}
-.chip.register-slang{background:color-mix(in srgb, var(--error) 12%, transparent);color:#FCA5A5}
+.chip.register-slang{background:color-mix(in srgb, var(--error) 12%, transparent);color:var(--error)}
 .chip.register-formal{background:color-mix(in srgb, var(--purple) 15%, transparent);color:var(--purple)}
 .chip.register-technical{background:color-mix(in srgb, var(--success) 12%, transparent);color:var(--success)}
 .chip.chip-lang{background:rgba(var(--primary-rgb),.14);color:var(--primary)}
@@ -961,7 +968,7 @@ select option{background:var(--surface)}
 }
 .bpp-label{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.06em;
   color:var(--text3);margin-bottom:8px}
-.image-badge-ok{font-size:var(--fs-sm);color:#9b59b6}
+.image-badge-ok{font-size:var(--fs-sm);color:var(--purple)}
 .image-badge-no{font-size:var(--fs-sm);color:var(--text3)}
 /* Generating spinner */
 .gen-spinner{display:inline-block;width:14px;height:14px;
@@ -987,7 +994,7 @@ select option{background:var(--surface)}
 .srs-deck-table td.sdt-name{padding-left:calc(14px + var(--indent,0px))}
 .sdt-name.root{font-weight:700}
 .sdt-new{color:var(--primary);text-align:right;font-weight:600}
-.sdt-learn{color:#e67e22;text-align:right;font-weight:600}
+.sdt-learn{color:var(--warning);text-align:right;font-weight:600}
 .sdt-review{color:var(--success);text-align:right;font-weight:600}
 .sdt-zero{color:var(--text3);text-align:right}
 .srs-deck-table-wrap{background:var(--surface);border:1px solid var(--border);
@@ -1017,7 +1024,7 @@ select option{background:var(--surface)}
 .srs-rate-btn.easy:hover{border-color:var(--primary);background:var(--primary-glow)}
 .srb-label{font-size:var(--fs-md);font-weight:600;color:var(--text);margin-bottom:3px}
 .srb-interval{font-size:var(--fs-2xs);color:var(--text3)}
-.srs-rate-btn.again .srb-label{color:#F87171}
+.srs-rate-btn.again .srb-label{color:var(--error)}
 .srs-rate-btn.hard  .srb-label{color:var(--warning)}
 .srs-rate-btn.good  .srb-label{color:var(--success)}
 .srs-rate-btn.easy  .srb-label{color:var(--primary)}
@@ -1354,9 +1361,9 @@ select option{background:var(--surface)}
 .btn-secondary{background:var(--surface2);border:1px solid var(--border-strong)}
 .btn-secondary:hover:not(:disabled){background:var(--surface3);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
 .btn-ghost:hover:not(:disabled){transform:translateY(-1px)}
-.btn-success{background:linear-gradient(135deg,#34D399,#059669);color:#fff;box-shadow:0 4px 14px color-mix(in srgb, var(--success) 30%, transparent)}
+.btn-success{background:linear-gradient(135deg, color-mix(in srgb, var(--success) 74%, white), var(--success));color:#fff;box-shadow:0 4px 14px color-mix(in srgb, var(--success) 30%, transparent)}
 .btn-success:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px color-mix(in srgb, var(--success) 45%, transparent)}
-.btn-danger{background:linear-gradient(135deg,#F87171,#DC2626);color:#fff}
+.btn-danger{background:linear-gradient(135deg, color-mix(in srgb, var(--error) 74%, white), var(--error));color:#fff}
 .btn-danger:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px color-mix(in srgb, var(--error) 40%, transparent)}
 .btn-srs{background:linear-gradient(135deg,color-mix(in srgb, var(--purple) 22%, transparent),color-mix(in srgb, var(--purple) 10%, transparent))}
 .btn-srs:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 14px color-mix(in srgb, var(--purple) 30%, transparent)}
@@ -1405,7 +1412,7 @@ select option{background:var(--surface)}
 .consulta-msg.ai .consulta-add-btn{
   display:inline-flex;align-items:center;gap:7px;margin-top:0;
   padding:8px 15px;border-radius:var(--radius-lg);cursor:pointer;border:none;
-  background:linear-gradient(135deg,#34D399,#059669);color:#fff;font-weight:600;font-size:var(--fs-sm);
+  background:linear-gradient(135deg, color-mix(in srgb, var(--success) 74%, white), var(--success));color:#fff;font-weight:600;font-size:var(--fs-sm);
   box-shadow:0 3px 12px color-mix(in srgb, var(--success) 32%, transparent);transition:transform .12s ease, box-shadow .15s ease;
 }
 .consulta-msg.ai .consulta-add-btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px color-mix(in srgb, var(--success) 45%, transparent)}
@@ -1595,7 +1602,7 @@ select option{background:var(--surface)}
 .srs-leech-chip{
   display:inline-flex;align-items:center;font-size:var(--fs-3xs);font-weight:700;border-radius:var(--radius-lg);
   padding:2px 8px;letter-spacing:.03em;text-transform:uppercase;
-  background:color-mix(in srgb, var(--error) 14%, transparent);color:#ef4444;border:1px solid color-mix(in srgb, var(--error) 30%, transparent);
+  background:color-mix(in srgb, var(--error) 14%, transparent);color:var(--error);border:1px solid color-mix(in srgb, var(--error) 30%, transparent);
 }
 
 /* Responsivo da biblioteca */
@@ -1810,7 +1817,7 @@ select option{background:var(--surface)}
 .asst-srs-head>span{font-size:var(--fs-xs);font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.03em}
 .asst-srs-all{
   font-size:var(--fs-xs);font-weight:600;cursor:pointer;border:none;color:#fff;
-  padding:5px 12px;border-radius:var(--radius);background:linear-gradient(135deg,#34D399,#059669);
+  padding:5px 12px;border-radius:var(--radius);background:linear-gradient(135deg, color-mix(in srgb, var(--success) 74%, white), var(--success));
   box-shadow:0 2px 8px color-mix(in srgb, var(--success) 30%, transparent);transition:transform .12s, box-shadow .15s;
 }
 .asst-srs-all:hover{transform:translateY(-1px);box-shadow:0 5px 14px color-mix(in srgb, var(--success) 42%, transparent)}
@@ -1818,7 +1825,7 @@ select option{background:var(--surface)}
 .asst-srs-btn{
   display:inline-flex;align-items:center;gap:6px;cursor:pointer;border:none;
   padding:7px 13px;border-radius:var(--radius-lg);font-size:var(--fs-sm);font-weight:600;color:#fff;
-  background:linear-gradient(135deg,#34D399,#059669);
+  background:linear-gradient(135deg, color-mix(in srgb, var(--success) 74%, white), var(--success));
   box-shadow:0 3px 10px color-mix(in srgb, var(--success) 28%, transparent);transition:transform .12s, box-shadow .15s;
 }
 .asst-srs-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px color-mix(in srgb, var(--success) 42%, transparent)}
@@ -2518,7 +2525,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
     right: calc(50% - 19px);
     margin: 0;
     display: inline-flex;
-    box-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--error) 50%, transparent);
   }
 
   /* Page Header Mobile Refinements */
@@ -2818,8 +2825,10 @@ body.sb-collapsed #fb-user-photo{margin:0}
 }
 .pl-status .ic { width: 14px; height: 14px }
 .pl-status.is-paused  { background: rgba(var(--primary-rgb), 0.08); color: var(--text2) }
-.pl-status.is-recall  { background: rgba(251, 191, 36, 0.12);      color: var(--warning) }
-.pl-status.is-reveal  { background: rgba(52, 211, 153, 0.12);      color: var(--success) }
+/* O texto já seguia o tema e o fundo não — âmbar e verde fixos atrás de uma
+   cor que muda. Agora os dois saem do mesmo token. */
+.pl-status.is-recall  { background: color-mix(in srgb, var(--warning) 12%, transparent); color: var(--warning) }
+.pl-status.is-reveal  { background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success) }
 .pl-word {
   font-size: var(--fs-2xl); font-weight: 700; color: var(--text);
   margin-bottom: 8px; font-family: var(--font-display);
@@ -4820,7 +4829,9 @@ body.ler-full .mobile-bottom-nav{display:none}
   border-left:1px solid rgba(128,128,128,.22) !important;
 }
 .ler-tri-ok svg,.ler-tri-no svg{width:13px;height:13px}
-.ler-tri-ok:hover{background:var(--success,#1f9d63);color:#fff}
+/* O fallback `#1f9d63` nunca era usado (o token existe em todos os temas) e
+   ainda por cima era um verde que não é do projeto. */
+.ler-tri-ok:hover{background:var(--success);color:#fff}
 .ler-tri-no:hover{background:rgba(128,128,128,.35);color:var(--ler-fg)}
 
 /* meta dos 95%: o alvo com fim, nao mais uma lista solta */
