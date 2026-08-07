@@ -1199,6 +1199,25 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+187. **COLUNA "CRIADO" + GERAR IMAGENS SÓ PARA QUEM NÃO TEM (91ª rodada, 2026-08-06)**.
+     - **A data sem migração nem campo novo**: `uid()` é `Date.now().toString(36)` + 5
+       aleatórios, então **os 8 primeiros caracteres do `id` JÁ SÃO o instante de criação**
+       (36⁸ cobre até 2059). `cardCriadoEm()` lê dali e dá ordenação **exata** para todos os
+       cards que já existem — sem migrar nada e sem depender de sync. `addedDate` (que sempre
+       existiu) é o segundo recurso: tem só granularidade de DIA, e ele quer justamente ver
+       "os que chegaram agora". Nova coluna, ordenável, com o texto curto ("hoje", "ontem",
+       "5d", "3mes", "2a") e a data completa no `title`. Ordena do mais novo para o mais velho
+       no primeiro clique, que é o que ele pediu.
+     - **Gerar imagens ignora quem já tem.** O `generateCardImage` já devolvia `'skip'` para
+       esses e **não gastava dinheiro** — mas eles entravam na CONTA do modal, que prometia
+       "476 imagens" quando a maioria já existia. Agora `refreshImageKeyCache()` roda antes e
+       o filtro tira os que já têm; o modal cota só o que falta e a linha de detalhe diz
+       quantos ficaram de fora. "Selecionar tudo → Gerar imagens" virou gesto seguro.
+     - Verificado: leitura da data em 7 formatos (incluindo id malformado caindo no
+       `addedDate` e card sem nada virando "—"); ordenação novos-primeiro; e o filtro de
+       imagens em 3 cenários (pula quem tem, deduplica significado repetido, não gera nada
+       quando todos já têm). `CACHE` → **v127**.
+
 186. **O SELETOR CONTINUAVA DIZENDO "gpt-image-1" (90ª rodada, 2026-08-06)**. Relato com
      print: a caixa de qualidade já mostrava US$ 0,006 (vem do catálogo), mas a de fornecedor
      insistia em "OpenAI · gpt-image-1".

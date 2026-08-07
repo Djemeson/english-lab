@@ -363,6 +363,35 @@ const ImageDB = {
 // Chave da imagem: por significado, compartilhada entre todos os cards com mesmo wordId+meaningIdx
 function imageKey(card) { return `img_${card.wordId}_${card.meaningIdx}` }
 
+// QUANDO O CARD NASCEU, em milissegundos.
+// Nenhum campo novo foi preciso: `uid()` é `Date.now().toString(36)` + 5
+// caracteres aleatórios, então os 8 primeiros caracteres do id JÁ SÃO o
+// instante de criação (36^8 cobre até 2059). Isso dá ordenação exata para
+// TODOS os cards que já existem, sem migração e sem depender de sync.
+// `addedDate` é o segundo recurso — existe desde sempre, mas só tem
+// granularidade de DIA, e ele quer ver "os que chegaram agora".
+function cardCriadoEm(c) {
+  if (!c) return 0
+  const id = String(c.id || '')
+  const t = parseInt(id.slice(0, 8), 36)
+  if (isFinite(t) && t > 946684800000 && t < Date.now() + 864e5) return t   // entre 2000 e amanhã
+  if (c.addedDate) { const d = Date.parse(c.addedDate + 'T12:00:00'); if (isFinite(d)) return d }
+  return 0
+}
+
+// Curto por design: a coluna é estreita e o que importa é "hoje / ontem / há
+// quanto tempo", não a data exata — essa fica no title.
+function cardCriadoTxt(c) {
+  const t = cardCriadoEm(c)
+  if (!t) return '—'
+  const dias = Math.floor((Date.now() - t) / 86400000)
+  if (dias <= 0) return 'hoje'
+  if (dias === 1) return 'ontem'
+  if (dias < 30) return dias + 'd'
+  if (dias < 365) return Math.floor(dias / 30) + 'mes'
+  return Math.floor(dias / 365) + 'a'
+}
+
 let _imageKeyCache = null
 async function refreshImageKeyCache() {
   const all = await ImageDB.getAll()
@@ -491,11 +520,30 @@ async function browserGenerateImagesSelected() {
   if (!aiImgKey()) { toast(`Configure a chave da ${AI_IMG[aiImgProvider()].nome} para gerar imagens (Configurações → IA)`, 'warning'); return }
   const ids = [..._browserSelected]
   const cards = srsCards.filter(c => ids.includes(c.id))
+  // QUEM JÁ TEM IMAGEM SAI ANTES DA CONTA. O `generateCardImage` já devolvia
+  // 'skip' para esses e não gastava nada — mas eles entravam no número do
+  // modal de custo, que então prometia "476 imagens" quando 300 já existiam.
+  // Selecionar tudo e mandar gerar vira um gesto seguro: só o que falta é
+  // cotado, e o resumo diz quantos foram poupados.
+  await refreshImageKeyCache()
+  const jaTem = _imageKeyCache || new Set()
   // Deduplica por chave de imagem (evita gerar a mesma imagem duas vezes)
   const seen = new Set()
-  const toGenerate = cards.filter(c => { const k = imageKey(c); if (seen.has(k)) return false; seen.add(k); return true })
-  if (!(await aiConfirmBatch('image', toGenerate.length, 'Gerar imagens'))) return
-  toast(`Gerando imagens para ${toGenerate.length} significado(s)...`, 'info')
+  const toGenerate = cards.filter(c => {
+    const k = imageKey(c)
+    if (jaTem.has(k) || seen.has(k)) return false
+    seen.add(k); return true
+  })
+  const comImagem = cards.length - toGenerate.length
+  if (!toGenerate.length) {
+    toast(comImagem === 1 ? 'O card selecionado já tem imagem'
+                          : `Todos os ${cards.length} selecionados já têm imagem`, 'info')
+    return
+  }
+  if (!(await aiConfirmBatch('image', toGenerate.length, 'Gerar imagens', {
+    detalhe: comImagem ? [`${comImagem} dos ${cards.length} selecionados já têm imagem e ficam de fora — só o que falta é cobrado.`] : null
+  }))) return
+  toast(`Gerando ${toGenerate.length} imagem(ns)` + (comImagem ? ` · ${comImagem} já tinham` : '') + '…', 'info')
   let feitos = 0, pulados = 0
   const falhas = []
   for (const card of toGenerate) {
@@ -579,6 +627,7 @@ function renderSrsAllCards() {
           <span style="width:75px;text-align:center" onclick="setBrowserSort('state')">Estado <span id="bsort-state"></span></span>
           <span style="width:60px;text-align:center" onclick="setBrowserSort('due')">Prazo <span id="bsort-due"></span></span>
           <span style="width:50px;text-align:center" onclick="setBrowserSort('ease')">Ease <span id="bsort-ease"></span></span>
+          <span style="width:54px;text-align:center" onclick="setBrowserSort('criado')" title="Quando o card entrou — clique para ver os mais novos primeiro">Criado <span id="bsort-criado"></span></span>
           <span style="width:52px"></span>
         </div>
         <div id="srs-browser-cards" class="srs-browser-cardlist">
@@ -1298,7 +1347,7 @@ function toggleBrowserDeck(deckId) {
 }
 
 function refreshSortIndicators() {
-  ;['word','state','due','ease'].forEach(c => {
+  ;['word','state','due','ease','criado'].forEach(c => {
     const s = el('bsort-' + c)
     if (!s) return
     s.textContent = _browserSort.col === c ? (_browserSort.dir === 1 ? ' ▲' : ' ▼') : ''
@@ -1406,6 +1455,8 @@ function buildBrowserRow(c, now) {
     <span style="font-size:var(--fs-2xs);color:${SC[c.state]};font-weight:600;white-space:nowrap;width:75px;text-align:center">${SL[c.state]}</span>
     <span style="font-size:var(--fs-2xs);color:var(--text3);white-space:nowrap;width:60px;text-align:center">${dueTxt}</span>
     <span style="font-size:var(--fs-2xs);color:var(--text3);white-space:nowrap;width:50px;text-align:center">ease ${c.ease.toFixed(1)}</span>
+    <span style="font-size:var(--fs-2xs);color:var(--text3);white-space:nowrap;width:54px;text-align:center"
+      title="${escA(cardCriadoEm(c) ? new Date(cardCriadoEm(c)).toLocaleString('pt-BR') : 'sem data')}">${cardCriadoTxt(c)}</span>
     <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();moveSrsCardDeck('${c.id}')" title="Mover">${ic('folder','ic-sm')}</button>
     <button class="btn btn-ghost btn-xs" style="color:var(--error)" onclick="event.stopPropagation();deleteSrsCard('${c.id}')">${ic('x','ic-sm')}</button>
   </div>`
@@ -1426,7 +1477,8 @@ async function renderBrowserCardList(deckId, query) {
     word:  (a,b) => (a.word||'').localeCompare(b.word||'') * _browserSort.dir,
     state: (a,b) => { const so={review:0,relearning:1,learning:2,new:3}; return ((so[a.state]??9)-(so[b.state]??9)) * _browserSort.dir },
     due:   (a,b) => (a.due - b.due) * _browserSort.dir,
-    ease:  (a,b) => (a.ease - b.ease) * _browserSort.dir
+    ease:  (a,b) => (a.ease - b.ease) * _browserSort.dir,
+    criado:(a,b) => (cardCriadoEm(b) - cardCriadoEm(a)) * _browserSort.dir
   }
   cards.sort(sortFns[_browserSort.col] || sortFns.state)
   _browserCurrentCards = cards
