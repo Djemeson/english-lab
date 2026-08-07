@@ -57,6 +57,62 @@
   --shadow-card: inset 0 1px 0 rgba(255,255,255,0.03), 0 10px 30px rgba(20,14,8,0.30);
   --shadow-up: 0 -6px 24px rgba(20,14,8,0.30);
   --ring: 0 0 0 3px rgba(var(--primary-rgb),0.25);
+
+  /* ===== ESCALA DE ESPAÇAMENTO =====
+     Mesmo problema que a escala tipográfica resolveu: o CSS tinha 244 valores
+     DISTINTOS de padding/gap/margin, com 5, 7, 9, 11, 13, 15 e 18px convivendo
+     com a escala par. Diferença de 1px é invisível sozinha e, somada, é o que
+     faz a página parecer "quase alinhada".
+     Os degraus abaixo NÃO foram inventados: são os valores que o arquivo já
+     mais usava (8px 73×, 6px 52×, 10px 40×, 12px 36×, 4px 25×, 16px 19×), para
+     que adotar a escala não redesenhe nada — só tire as sobras de 1px do meio.
+     Fora da escala ficam de propósito: 1-3px (borda, deslocamento óptico), o 0,
+     e as medidas de um componente só (a barra de legenda do vídeo e a
+     tipografia do leitor, que são calibradas no olho e não no grid). */
+  --sp-1: 4px;
+  --sp-2: 6px;
+  --sp-3: 8px;
+  --sp-4: 10px;
+  --sp-5: 12px;
+  --sp-6: 16px;
+  --sp-7: 20px;
+  --sp-8: 24px;
+  --sp-9: 32px;
+  --sp-10: 40px;
+
+  /* ===== CAMADAS (z-index) =====
+     Havia 18 valores inventados um a um, de 1 a 99999 — e o custo apareceu:
+     a navegação de baixo do celular estava em 999, ACIMA do overlay de modal
+     (600), então um modal aberto no celular nascia atravessado pela barra.
+     A escada abaixo é a ordem real da interface, de baixo para cima. Camada
+     nova entra AQUI, nomeada; nunca com um número solto na regra.
+     Valores 1-10 soltos no CSS são empilhamento LOCAL (dentro de um card, de
+     uma célula do heatmap, do palco do vídeo) e continuam literais de
+     propósito: não competem com nada global. */
+  --z-sticky:     60;  /* barras que grudam dentro do conteúdo */
+  --z-panel:     100;  /* painel que desliza sobre o conteúdo (histórico, leitor) */
+  --z-nav:       200;  /* chrome do app no celular: header + nav inferior */
+  --z-popover:   300;  /* menu ou balão ancorado a um botão */
+  --z-hover:     400;  /* glosa que segue o cursor — acima do menu, nunca clicável */
+  --z-modal:     500;  /* overlay de tela cheia */
+  --z-modal-pop: 550;  /* popup que nasce DENTRO do modal (seleção de texto) */
+  --z-lightbox:  600;  /* imagem em tela cheia / zoom */
+  --z-pill:      650;  /* pílula "Voltar para <obra>": sobrevive à navegação */
+  --z-gate:      700;  /* login — cobre o app inteiro */
+  --z-toast:     800;
+  --z-tooltip:   900;  /* o topo: explica tudo que está abaixo */
+
+  /* ===== BREAKPOINTS =====
+     CSS não tem variável em @media, então a escada é um CONTRATO escrito, não
+     um token. Havia 11 valores (400/480/600/640/700/768/860/900/980/1040/1280)
+     em 20 grafias diferentes. Só existem cinco degraus:
+       480px  — celular pequeno
+       640px  — celular
+       768px  — CORTE MOBILE: aqui a sidebar some e entram o header e a nav
+                inferior. É o degrau que mais importa; na dúvida, use este.
+       1040px — duas colunas viram uma
+       1280px — desktop largo (único min-width do arquivo)
+     Regra: sempre `@media (max-width:NNNpx)`, com espaço depois do @media. */
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 /* NAO trocar por token: rem e relativo a esta raiz, entao usar um token
@@ -86,7 +142,7 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
   position:sticky;top:0;height:100vh;overflow-y:auto;
 }
 .sb-brand{
-  padding:20px 16px 16px;
+  padding:var(--sp-7) var(--sp-6) var(--sp-6);
   border-bottom:1px solid rgba(255,255,255,0.05);
 }
 .sb-brand-name{
@@ -94,10 +150,10 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 }
 .sb-brand-name span{color:var(--accent-bright)}
 .sb-brand-sub{font-size:var(--fs-3xs);color:var(--text3);margin-top:2px;letter-spacing:.05em;text-transform:uppercase}
-.sb-nav{padding:8px 0;flex:1}
+.sb-nav{padding:var(--sp-3) 0;flex:1}
 .nav-item{
-  display:flex;align-items:center;gap:10px;
-  padding:10px 16px;cursor:pointer;
+  display:flex;align-items:center;gap:var(--sp-4);
+  padding:var(--sp-4) var(--sp-6);cursor:pointer;
   color:var(--text3);font-size:var(--fs-sm);font-weight:500;
   border-left:2px solid transparent;
   transition:color .12s,background .12s;
@@ -109,17 +165,17 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .nav-item svg{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
 .badge{
   display:inline-flex;align-items:center;justify-content:center;
-  min-width:18px;height:18px;padding:0 5px;
+  min-width:18px;height:18px;padding:0 var(--sp-1);
   background:var(--primary);color:#fff;border-radius:var(--radius-sm);
   font-size:var(--fs-2xs);font-weight:700;margin-left:auto;
 }
 .badge.red{background:var(--error)}
 .badge.hidden{display:none}
-.sb-foot{border-top:1px solid rgba(255,255,255,0.05);padding:8px 0}
+.sb-foot{border-top:1px solid rgba(255,255,255,0.05);padding:var(--sp-3) 0}
 /* Indicadores no rodapé da sidebar */
-.sb-indicators{padding:8px 16px 12px;display:flex;flex-direction:column;gap:6px}
+.sb-indicators{padding:var(--sp-3) var(--sp-6) var(--sp-5);display:flex;flex-direction:column;gap:var(--sp-2)}
 .anki-indicator{
-  display:flex;align-items:center;gap:6px;
+  display:flex;align-items:center;gap:var(--sp-2);
   font-size:var(--fs-xs);color:var(--text3);
 }
 .anki-dot{width:7px;height:7px;border-radius:50%;background:var(--error);flex-shrink:0}
@@ -133,16 +189,16 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
    junto com o fluxo — ver o mapa em core.js, acima de SECTIONS. */
 #section-revisar.active{display:block}
 #section-revisar .srs-library-wrap{margin:0 -28px;width:calc(100% + 56px)}
-.page-header{margin-bottom:24px}
+.page-header{margin-bottom:var(--sp-8)}
 .page-header h1{font-size:var(--fs-xl);font-weight:700;letter-spacing:-.3px}
-.page-header p{color:var(--text2);margin-top:4px;font-size:var(--fs-md)}
+.page-header p{color:var(--text2);margin-top:var(--sp-1);font-size:var(--fs-md)}
 
 /* ===== STATS ===== */
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-.stat-card{background:var(--surface);border:1px solid rgba(255,255,255,0.07);border-radius:var(--radius);padding:20px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-6);margin-bottom:var(--sp-8)}
+.stat-card{background:var(--surface);border:1px solid rgba(255,255,255,0.07);border-radius:var(--radius);padding:var(--sp-7)}
 .stat-label{font-size:var(--fs-sm);color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
-.stat-value{font-size:var(--fs-2xl);font-weight:700;margin-top:4px;line-height:1}
-.stat-sub{font-size:var(--fs-sm);color:var(--text2);margin-top:6px}
+.stat-value{font-size:var(--fs-2xl);font-weight:700;margin-top:var(--sp-1);line-height:1}
+.stat-sub{font-size:var(--fs-sm);color:var(--text2);margin-top:var(--sp-2)}
 .stat-card.blue .stat-value{color:var(--primary)}
 .stat-card.green .stat-value{color:var(--success)}
 .stat-card.yellow .stat-value{color:var(--warning)}
@@ -152,12 +208,12 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .stat-card.red .stat-value{color:#e74c3c}
 .stat-card.gray .stat-value{color:var(--text2)}
 .stats-section-label{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-  color:var(--text3);margin:20px 0 10px}
+  color:var(--text3);margin:var(--sp-7) 0 var(--sp-4)}
 /* Deck focus panel */
 .deck-focus-panel{background:var(--surface2);border:1px solid var(--primary);border-radius:var(--radius);
-  padding:20px 24px;margin:12px 0 8px;animation:srsReveal .2s ease}
-.deck-focus-title{font-size:var(--fs-base);font-weight:700;color:var(--text);margin-bottom:14px}
-.deck-focus-stats{display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap}
+  padding:var(--sp-7) var(--sp-8);margin:var(--sp-5) 0 var(--sp-3);animation:srsReveal .2s ease}
+.deck-focus-title{font-size:var(--fs-base);font-weight:700;color:var(--text);margin-bottom:var(--sp-5)}
+.deck-focus-stats{display:flex;gap:var(--sp-8);margin-bottom:var(--sp-6);flex-wrap:wrap}
 .dfs-item{display:flex;flex-direction:column;align-items:center;min-width:60px}
 .dfs-value{font-size:var(--fs-xl);font-weight:700;line-height:1}
 .dfs-label{font-size:var(--fs-2xs);color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
@@ -166,13 +222,13 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .srs-deck-table tr.deck-row-selected td{background:rgba(var(--primary-rgb),.12)}
 
 /* ===== RECENT LIST ===== */
-.card-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
-.card-box-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:var(--sp-7)}
+.card-box-header{padding:var(--sp-5) var(--sp-7);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .card-box-header h3{font-size:var(--fs-base);font-weight:600}
 .recent-list{max-height:260px;overflow-y:auto}
 .recent-item{
-  display:flex;align-items:center;gap:12px;
-  padding:11px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:var(--sp-5);
+  padding:var(--sp-4) var(--sp-7);border-bottom:1px solid var(--border);
   transition:background .15s;
 }
 .recent-item:last-child{border-bottom:none}
@@ -180,24 +236,24 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .ri-word{font-weight:600;font-size:var(--fs-md);min-width:130px}
 .ri-ctx{flex:1;font-size:var(--fs-sm);color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .status-chip{
-  font-size:var(--fs-2xs);padding:2px 8px;border-radius:4px;font-weight:600;white-space:nowrap;
+  font-size:var(--fs-2xs);padding:2px var(--sp-3);border-radius:4px;font-weight:600;white-space:nowrap;
 }
 .status-chip.pending_ai{background:color-mix(in srgb, var(--warning) 15%, transparent);color:var(--warning)}
 .status-chip.pending_review{background:rgba(var(--primary-rgb),.15);color:var(--primary)}
 .status-chip.in_anki{background:color-mix(in srgb, var(--success) 15%, transparent);color:var(--success)}
 .status-chip.skipped{background:rgba(100,116,139,.15);color:var(--text3)}
 .empty-state{padding:48px;text-align:center;color:var(--text3)}
-.empty-state .icon{font-size:var(--fs-3xl);margin-bottom:10px}
+.empty-state .icon{font-size:var(--fs-3xl);margin-bottom:var(--sp-4)}
 
 /* ===== QUICK ADD ===== */
-.quick-add{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px}
-.quick-add h3{font-size:var(--fs-md);font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
-.quick-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+.quick-add{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:var(--sp-7);margin-bottom:var(--sp-7)}
+.quick-add h3{font-size:var(--fs-md);font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:var(--sp-5)}
+.quick-row{display:grid;grid-template-columns:1fr 1fr auto;gap:var(--sp-4);align-items:end}
 
 /* ===== TABS ===== */
-.tabs{display:flex;gap:4px;background:var(--surface);padding:4px;border-radius:var(--radius-sm);margin-bottom:24px;width:fit-content;border-bottom:none}
+.tabs{display:flex;gap:var(--sp-1);background:var(--surface);padding:var(--sp-1);border-radius:var(--radius-sm);margin-bottom:var(--sp-8);width:fit-content;border-bottom:none}
 .tab{
-  padding:8px 18px;border:none;background:transparent;
+  padding:var(--sp-3) var(--sp-6);border:none;background:transparent;
   color:var(--text2);cursor:pointer;font-weight:500;font-size:var(--fs-md);
   border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;
 }
@@ -207,12 +263,12 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .tab-panel.active{display:block}
 
 /* ===== FORMS ===== */
-.form-group{margin-bottom:14px}
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-label{display:block;font-size:var(--fs-sm);font-weight:500;color:var(--text2);margin-bottom:5px}
+.form-group{margin-bottom:var(--sp-5)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-5);margin-bottom:var(--sp-5)}
+label{display:block;font-size:var(--fs-sm);font-weight:500;color:var(--text2);margin-bottom:var(--sp-1)}
 .label-note{font-size:var(--fs-xs);color:var(--text3);font-weight:400}
 input[type=text],input[type=url],input[type=password],input[type=number],textarea,select{
-  width:100%;padding:10px 13px;
+  width:100%;padding:var(--sp-4) var(--sp-5);
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--radius-sm);color:var(--text);transition:border-color .15s, box-shadow .15s;outline:none;
 }
@@ -222,12 +278,12 @@ select option{background:var(--surface)}
 
 /* ===== BUTTONS ===== */
 .btn{
-  display:inline-flex;align-items:center;gap:7px;
+  display:inline-flex;align-items:center;gap:var(--sp-2);
   /* Escala de 3 alturas (38/30/24). Antes havia CINCO alturas de botão
      visíveis ao mesmo tempo (26,28,35,36,38px) — o tipo de ruído que não
      se nota de propósito, mas tira a sensação de sofisticação. */
   min-height:38px;
-  padding:8px 18px;border:none;border-radius:var(--radius-sm);
+  padding:var(--sp-3) var(--sp-6);border:none;border-radius:var(--radius-sm);
   font-weight:600;font-size:var(--fs-md);cursor:pointer;white-space:nowrap;
   transition:transform .12s ease, box-shadow .15s ease, background .15s ease, color .15s ease, opacity .15s;
 }
@@ -243,10 +299,10 @@ select option{background:var(--surface)}
 .btn-secondary:hover:not(:disabled){background:var(--surface3)}
 .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
 .btn-ghost:hover:not(:disabled){background:var(--surface2);color:var(--text)}
-.btn-sm{padding:4px 12px;font-size:var(--fs-sm);min-height:30px}
-.btn-lg{min-height:44px;padding:10px 32px;font-size:var(--fs-base)}
+.btn-sm{padding:var(--sp-1) var(--sp-5);font-size:var(--fs-sm);min-height:30px}
+.btn-lg{min-height:44px;padding:var(--sp-4) var(--sp-9);font-size:var(--fs-base)}
 .btn-full{width:100%;justify-content:center}
-.btn-group{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.btn-group{display:flex;gap:var(--sp-4);flex-wrap:wrap;margin-top:var(--sp-6)}
 
 /* ===== UPLOAD AREA ===== */
 .upload-area{
@@ -255,13 +311,13 @@ select option{background:var(--surface)}
 }
 .upload-area:hover,.upload-area.drag{border-color:var(--primary);background:var(--primary-glow)}
 .upload-area input[type=file]{display:none}
-.upload-icon{font-size:var(--fs-2xl);margin-bottom:8px}
-.upload-area p{color:var(--text2);font-size:var(--fs-md);margin-top:4px}
+.upload-icon{font-size:var(--fs-2xl);margin-bottom:var(--sp-3)}
+.upload-area p{color:var(--text2);font-size:var(--fs-md);margin-top:var(--sp-1)}
 
 /* ===== PARSED LIST ===== */
-.parsed-header{display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px}
+.parsed-header{display:flex;align-items:center;justify-content:space-between;margin:var(--sp-6) 0 var(--sp-4)}
 .parsed-header h3{font-size:var(--fs-base);font-weight:600}
-.parsed-list{display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;padding-right:2px}
+.parsed-list{display:flex;flex-direction:column;gap:var(--sp-3);max-height:380px;overflow-y:auto;padding-right:2px}
 .parsed-list.kindle-list-expanded{max-height:600px}
 .parsed-item{
   display:flex;align-items:flex-start;gap:12px;
@@ -499,7 +555,7 @@ select option{background:var(--surface)}
 .model-row select{flex:1}
 
 /* ===== TOAST ===== */
-#toasts{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+#toasts{position:fixed;bottom:24px;right:24px;z-index:var(--z-toast);display:flex;flex-direction:column;gap:var(--sp-3)}
 .toast{
   display:flex;align-items:center;gap:10px;
   padding:12px 18px;border-radius:var(--radius);
@@ -555,12 +611,16 @@ select option{background:var(--surface)}
 .hidden{display:none!important}
 .mt-2{margin-top:8px}.mt-4{margin-top:16px}.mb-4{margin-bottom:16px}
 .text-muted{color:var(--text2)}.text-sm{font-size:var(--fs-md)}
-@media(max-width:900px){
+/* Era 900px, mas a regra irmã (`.srs-browser-grid`, mesma Biblioteca, mesmo
+   painel de preview) já colapsava em 1040. Duas telas do mesmo componente
+   trocando de forma em larguras diferentes é o tipo de coisa que ninguém
+   reporta e todo mundo sente. */
+@media (max-width:1040px){
   #section-revisar .srs-library-grid{grid-template-columns:180px 1fr !important}
   .browser-preview-panel{display:none}
 }
 /* ===== MOBILE SRS ===== */
-@media(max-width:640px){
+@media (max-width:640px){
   /* Sessão de estudo */
   .srs-session-wrap{padding:0 8px}
   .srs-card-face{padding:18px 16px;min-height:160px}
@@ -636,17 +696,22 @@ select option{background:var(--surface)}
   .card-box-header{padding:10px 14px}
   .page-header h1{font-size:var(--fs-xl)}
 }
-@media(max-width:700px){
+/* Era 700px. Virou o corte mobile (768) para colapsar junto com o resto da
+   interface — não havia motivo para estas grades esperarem mais 68px.
+   REMOVIDO daqui: `.sidebar{width:52px}`, `.nav-item{padding:12px}` e o
+   `display:none` nos rótulos. Era CÓDIGO MORTO desde que o corte mobile passou
+   a fazer `.sidebar{display:none}` em 768px: abaixo de 700 a sidebar não
+   encolhe para ícones, ela simplesmente não existe. Ficava no arquivo dando a
+   impressão de que existe um modo "só ícones" no celular — não existe.
+   O mesmo valia para `.main{padding:16px 12px}`, vencido pelo padding do
+   bloco de 768 (que reserva os 92px da navegação inferior). */
+@media (max-width:768px){
   .stats-grid{grid-template-columns:1fr 1fr}
   .review-layout{grid-template-columns:1fr}
   .settings-grid{grid-template-columns:1fr}
   .form-row{grid-template-columns:1fr}
   .quick-row{grid-template-columns:1fr}
   .review-sidebar{display:none}
-  .sidebar{width:52px}
-  .nav-item span,.sb-brand-name,.sb-brand-sub,.sb-indicators{display:none}
-  .nav-item{padding:12px;justify-content:center}
-  .main{padding:16px 12px}
 }
 
 /* ===== SRS STATUS CHIPS ===== */
@@ -936,7 +1001,7 @@ select option{background:var(--surface)}
    possível no meio de uma sessão. O gradiente evita texto vazando por baixo. */
 .srs-rate-buttons{
   display:flex;gap:10px;justify-content:center;
-  position:sticky;bottom:0;z-index:60;
+  position:sticky;bottom:0;z-index:var(--z-sticky);
   padding:14px 0 16px;margin-top:4px;
   background:linear-gradient(to top, var(--bg) 72%, transparent);
 }
@@ -1010,7 +1075,7 @@ select option{background:var(--surface)}
 .btn-xs{padding:2px 7px!important;font-size:var(--fs-2xs) !important;min-width:0}
 /* Lightbox de imagem */
 .img-lightbox{
-  position:fixed;inset:0;z-index:900;
+  position:fixed;inset:0;z-index:var(--z-lightbox);
   background:rgba(0,0,0,.85);backdrop-filter:blur(6px);
   display:flex;align-items:center;justify-content:center;cursor:zoom-out;
   animation:fadeIn .15s ease
@@ -1450,16 +1515,14 @@ select option{background:var(--surface)}
 .empty-state .ic-xl,.srs-empty .ic-xl,.review-empty-main .ic-xl{color:var(--text3);margin-bottom:12px}
 
 /* ---- Responsivo ---- */
-@media(max-width:700px){
-  .main{padding:18px 14px}
+/* Era um SEGUNDO bloco de 700px encolhendo a sidebar — e com medidas
+   diferentes do primeiro (60px contra 52px, padding 11 contra 12). Os dois
+   eram mortos pelo mesmo motivo (ver o bloco de 768 acima). Sobrou o que de
+   fato acontece: a grade de métricas vira duas colunas. */
+@media (max-width:768px){
   .metric-grid{grid-template-columns:1fr 1fr}
-  .sidebar{width:60px}
-  .sb-brand{justify-content:center;padding:16px 0}
-  .sb-brand-name,.sb-brand-sub,.sb-nav-label,.sb-account,.sb-brand > div:last-child{display:none}
-  .nav-item span{display:none}
-  .nav-item{padding:11px;justify-content:center}
 }
-@media(max-width:480px){ .metric-grid{grid-template-columns:1fr} }
+@media (max-width:480px){ .metric-grid{grid-template-columns:1fr} }
 
 /* ---- Contadores clicáveis + filtro da biblioteca ---- */
 .srs-dash-card.clickable{cursor:pointer;position:relative}
@@ -1512,7 +1575,7 @@ select option{background:var(--surface)}
 
 /* Modal "Mover card para deck" (e similares) */
 .srs-modal-overlay{
-  position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;
+  position:fixed;inset:0;z-index:var(--z-modal);display:flex;align-items:center;justify-content:center;
   background:rgba(0,0,0,.6);backdrop-filter:blur(3px);
 }
 .srs-modal-box{
@@ -1536,11 +1599,11 @@ select option{background:var(--surface)}
 }
 
 /* Responsivo da biblioteca */
-@media(max-width:1040px){
+@media (max-width:1040px){
   .srs-browser-grid{grid-template-columns:220px 1fr}
   .browser-preview-panel{display:none}
 }
-@media(max-width:640px){
+@media (max-width:640px){
   .srs-browser-grid{grid-template-columns:1fr}
   .srs-browser-decks{max-height:200px;border-right:none;border-bottom:1px solid var(--border)}
   .srs-browser-main{max-height:none;border-right:none}
@@ -1550,7 +1613,7 @@ select option{background:var(--surface)}
    TOOLTIPS premium
    ================================================================ */
 .el-tip{
-  position:fixed;z-index:99999;display:none;pointer-events:none;
+  position:fixed;z-index:var(--z-tooltip);display:none;pointer-events:none;
   background:var(--surface3);color:var(--text);border:1px solid var(--border-strong);
   padding:6px 10px;border-radius:var(--radius-xs);font-size:var(--fs-xs);font-weight:500;line-height:1.35;
   max-width:260px;box-shadow:var(--shadow);transition:opacity .12s ease;
@@ -1770,10 +1833,13 @@ select option{background:var(--surface)}
 .asst-srs-added .ic{width:14px;height:14px;color:var(--success)}
 
 /* ---- Responsivo ---- */
-@media(max-width:860px){
+/* Era 860px. Agora o histórico do Assistente vira gaveta exatamente quando o
+   app inteiro vira mobile — a gaveta É o padrão de celular, então acender os
+   dois no mesmo ponto é o que faz a tela parecer uma coisa só. */
+@media (max-width:768px){
   .asst-layout,.asst-layout.hist-collapsed{grid-template-columns:1fr;height:calc(100vh - 96px)}
   .asst-sidebar{
-    position:absolute;z-index:40;top:0;left:0;bottom:0;width:78%;max-width:300px;
+    position:absolute;z-index:var(--z-panel);top:0;left:0;bottom:0;width:78%;max-width:300px;
     transform:translateX(-105%);transition:transform .2s ease;border-radius:0;opacity:1;
   }
   .asst-sidebar.open{transform:translateX(0)}
@@ -1883,7 +1949,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   font-size:var(--fs-2xs);font-weight:700;opacity:.7;
   font-variant-numeric:tabular-nums;
 }
-@media(max-width:768px){
+@media (max-width:768px){
   .gloss-lang-filter{margin-left:0;width:100%;order:3}
 }
 .gloss-head-sub{font-size:var(--fs-sm);color:var(--text3);font-weight:500}
@@ -2050,8 +2116,10 @@ body.sb-collapsed #fb-user-photo{margin:0}
 .dhs-item span{font-size:var(--fs-2xs);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text2)}
 .dhs-item.streak b{color:var(--warning)}
 .dhs-item.streak .ic{width:15px;height:15px}
-@media(max-width:900px){
-  .dash-hero-split{padding-left:0;border-left:none;gap:20px;width:100%;order:3;margin-top:4px}
+/* Era 900px — mas o `.dash-grid` logo abaixo colapsa em 1040. O hero quebrava
+   depois da grade que ele encima. */
+@media (max-width:1040px){
+  .dash-hero-split{padding-left:0;border-left:none;gap:var(--sp-7);width:100%;order:3;margin-top:var(--sp-1)}
   .dash-action-card:not([style]) .btn-primary{margin-left:0;order:4;width:100%;justify-content:center}
   .dash-action-card{flex-wrap:wrap;row-gap:16px}
 }
@@ -2195,7 +2263,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-@media (max-width: 600px) {
+@media (max-width:640px){
   .dash-hm-stats {
     grid-template-columns: repeat(3, 1fr);
     gap: 14px 10px;
@@ -2254,11 +2322,11 @@ body.sb-collapsed #fb-user-photo{margin:0}
 .dash-badge.locked{opacity:.45}
 .dash-badge.locked .dash-badge-icon{background:var(--surface3);color:var(--text3)}
 
-@media(max-width:1040px){
+@media (max-width:1040px){
   .dash-grid{grid-template-columns:1fr}
   .dash-badge-grid{grid-template-columns:repeat(3,1fr)}
 }
-@media(max-width:480px){
+@media (max-width:480px){
   .dash-badge-grid{grid-template-columns:repeat(2,1fr)}
 }
 
@@ -2275,7 +2343,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   display: none; /* Hidden on desktop */
 }
 
-@media (max-width: 768px) {
+@media (max-width:768px){
   /* Layout adjustments & Ambient Canvas styling */
   .app-layout {
     display: flex;
@@ -2307,7 +2375,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
-    z-index: 500;
+    z-index: var(--z-nav);
     box-shadow: var(--shadow-sm);
   }
   
@@ -2379,7 +2447,10 @@ body.sb-collapsed #fb-user-photo{margin:0}
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-top: 1px solid var(--border);
-    z-index: 999;
+    /* Estava em 999 — ACIMA do overlay de modal (600). Um modal aberto no
+       celular nascia atravessado pela barra. Agora é chrome do app, e chrome
+       fica abaixo de modal, lightbox, toast e tooltip. */
+    z-index: var(--z-nav);
     justify-content: space-around;
     align-items: center;
     padding: 0 4px;
@@ -2674,7 +2745,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   #toasts .toast, #toasts .prog-aviso { max-width: none; min-width: 0 }
 }
 
-@media (max-width: 480px) {
+@media (max-width:480px){
   .metric-grid {
     grid-template-columns: 1fr !important;
   }
@@ -2714,8 +2785,8 @@ body.sb-collapsed #fb-user-photo{margin:0}
 }
 .srs-rate-btn:hover .srb-key { opacity: 0.9 }
 /* Em telas de toque o atalho de teclado não serve para nada */
-@media (hover: none) and (pointer: coarse) {
-  .srb-key, .srb-key-inline { display: none }
+@media (hover:none) and (pointer:coarse){
+  .srb-key, .srb-key-inline{display:none}
 }
 
 /* ================================================================
@@ -2783,7 +2854,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   gap: 12px; flex-wrap: wrap; font-size: var(--fs-sm); color: var(--text2);
 }
 .pl-hint { font-size: var(--fs-xs); color: var(--text3) }
-@media (max-width: 600px) {
+@media (max-width:640px){
   .pl-options-grid { grid-template-columns: 1fr }
   .pl-word { font-size: var(--fs-xl)}
 }
@@ -2797,7 +2868,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
    vocabulário como textura. Tudo em variáveis de tema (funciona nos 6).
    ================================================================ */
 .login-screen{
-  position:fixed;inset:0;z-index:4000;
+  position:fixed;inset:0;z-index:var(--z-gate);
   display:flex;align-items:center;justify-content:center;
   padding:24px;overflow-y:auto;
   background:var(--bg);background-image:var(--bg-grad);
@@ -2944,7 +3015,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
 @keyframes login-fade{from{opacity:0}to{opacity:1}}
 @keyframes login-rise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 
-@media(max-width:480px){
+@media (max-width:480px){
   .login-screen{padding:16px;align-items:flex-start}
   .login-card{padding:26px 20px 22px;border-radius:var(--radius)}
   .login-stage{height:166px}
@@ -2953,10 +3024,10 @@ body.sb-collapsed #fb-user-photo{margin:0}
   /* Menos palavras ao fundo em tela pequena: viram ruído atrás do cartão */
   .login-wordfield span:nth-child(n+6){display:none}
 }
-@media(max-height:680px){ .login-screen{align-items:flex-start} }
+@media (max-height:680px){ .login-screen{align-items:flex-start} }
 
 /* Sem movimento: mostra o primeiro card completo, com significado à vista */
-@media(prefers-reduced-motion:reduce){
+@media (prefers-reduced-motion:reduce){
   .login-screen,.login-card,.login-wordfield span,.lg-progress i{animation:none}
   .lg-card{animation:none;opacity:0}
   .lg-card[style*="--i:0"]{opacity:1}
@@ -3007,7 +3078,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
 }
 .seg-tab-flag.hidden{display:none}
 
-@media(max-width:768px){
+@media (max-width:768px){
   .seg-tabs{width:100%;justify-content:space-between}
   .seg-tab{flex:1;justify-content:center;padding:9px 8px;font-size:var(--fs-xs)}
   .seg-tab .ic{display:none}
@@ -3054,7 +3125,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
 .midia-drop-compact{margin:0;display:flex;flex-direction:column;justify-content:center;padding:18px 12px}
 .midia-drop-compact p{margin:2px 0;font-size:var(--fs-xs)}
 .midia-smart-row{display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
-@media(max-width:768px){
+@media (max-width:768px){
   .midia-src-grid,.midia-input-grid{grid-template-columns:1fr}
 }
 
@@ -3256,9 +3327,10 @@ body.sb-collapsed .sb-signout{display:none}
 body.sb-collapsed .sidebar .nav-item.active::before{left:-8px}
 body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 
-@media(max-width:700px){
-  .sb-today{display:none}
-}
+/* REMOVIDO: `@media (max-width:700px){ .sb-today{display:none} }`.
+   Código morto — o bloco "Hoje" mora dentro da `.sb-nav`, e a sidebar inteira
+   já é `display:none` no corte mobile (768px). Escondê-lo de novo 68px depois
+   nunca chegou a acontecer. */
 
 
 /* Controles de formulário numa altura única (token --control-h) */
@@ -3277,7 +3349,7 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
    ================================================================ */
 .lib-maint-wrap{position:relative}
 .lib-maint-menu{
-  position:absolute;right:0;top:calc(100% + 6px);z-index:500;
+  position:absolute;right:0;top:calc(100% + var(--sp-2));z-index:var(--z-popover);
   width:330px;max-width:90vw;
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--radius);box-shadow:var(--shadow);
@@ -3300,9 +3372,11 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .srs-card-front-sentence{max-width:70ch;margin-left:auto;margin-right:auto}
 
 /* ── Sessão no MOBILE ── */
-@media(max-width:768px){
-  /* A navegação inferior é fixa (68px, z-index 999): sem este offset a
-     barra de notas sticky (z-index 60) ficava ESCONDIDA atrás dela. */
+@media (max-width:768px){
+  /* A navegação inferior é fixa (68px, --z-nav): sem este offset a barra de
+     notas sticky (--z-sticky, que fica ABAIXO dela) some atrás da barra.
+     O offset é a solução certa aqui: subir o z-index da barra de notas
+     resolveria a sobreposição e criaria outra — ela taparia a navegação. */
   .srs-rate-buttons{bottom:76px;background:var(--bg);padding:10px 0 12px;border-bottom:1px solid var(--border)}
   /* Imagem empilhada abaixo do texto pode ser generosa */
   .srs-back-image-col img{max-width:340px}
@@ -3391,7 +3465,7 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 #section-dashboard{max-width:1336px}
 /* Com folga, a coluna do calendario cresce mais que a da tendencia:
    ela e a que converte largura em informacao (mais semanas de historico). */
-@media(min-width:1280px){
+@media (min-width:1280px){
   #section-dashboard .dash-grid{grid-template-columns:2fr 1fr}
 }
 
@@ -3459,13 +3533,13 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 /* A tabela rola dentro do proprio cartao. */
 .srs-deck-table-wrap{overflow-x:auto}
 
-@media(max-width:700px){
+@media (max-width:768px){
   /* Cabe em 3 colunas se o cartao parar de reservar 40px de padding e o
      rotulo usar o tamanho de rotulo, nao o de texto. */
-  .srs-dash-card{padding:12px 8px}
+  .srs-dash-card{padding:var(--sp-5) var(--sp-3)}
   .srs-dash-card .sdc-value{font-size:var(--fs-2xl)}
   .srs-dash-card .sdc-label{font-size:var(--fs-3xs);letter-spacing:.04em;line-height:1.25}
-  .srs-dashboard{gap:8px;margin-bottom:20px}
+  .srs-dashboard{gap:var(--sp-3);margin-bottom:var(--sp-7)}
 }
 
 /* ================================================================
@@ -3582,7 +3656,9 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .vid-prep-n{color:var(--text3);font-variant-numeric:tabular-nums;text-align:right}
 .vid-prep-ctx{color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic}
 
-@media(max-width:980px){
+/* Era 980px — o mesmo colapso de "duas colunas viram uma" que o Dashboard e a
+   Biblioteca fazem em 1040. */
+@media (max-width:1040px){
   .vid-layout{grid-template-columns:1fr}
   .vid-transcript-wrap{position:static;max-height:340px}
   .vid-prep-row{grid-template-columns:auto minmax(0,1fr) 44px}
@@ -3789,7 +3865,7 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 
 /* ---- Popup de selecao no Revisar (Explicar / mandar p/ Revisar) ---- */
 .sel-pop{
-  position:fixed;z-index:620;display:flex;align-items:center;gap:8px;
+  position:fixed;z-index:var(--z-modal-pop);display:flex;align-items:center;gap:var(--sp-3);
   padding:8px 12px;max-width:360px;flex-wrap:wrap;
   background:var(--surface);border:1px solid var(--border-strong);
   border-radius:var(--radius-sm);box-shadow:var(--shadow);font-size:var(--fs-sm);
@@ -4425,7 +4501,7 @@ mark.ler-w{
 
 /* ---- popup de selecao ---- */
 #ler-pop{
-  position:fixed;z-index:400;max-width:min(420px,92vw);
+  position:fixed;z-index:var(--z-popover);max-width:min(420px,92vw);
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
   box-shadow:0 10px 30px rgba(0,0,0,.4);padding:6px;
   font-size:var(--fs-sm);color:var(--text);
@@ -4496,7 +4572,7 @@ mark.ler-w{
   /* Paineis viram folha de baixo: nascem do rodape, sobem ate 62% da tela e
      rolam por dentro — mais perto do polegar do que do topo. */
   .ler-painel{
-    position:absolute;left:0;right:0;bottom:0;z-index:20;
+    position:absolute;left:0;right:0;bottom:0;z-index:var(--z-panel);
     max-height:62vh;max-height:62dvh;
     border-top:1px solid rgba(128,128,128,.28);border-bottom:0;
     border-radius:14px 14px 0 0;
@@ -4621,7 +4697,7 @@ mark.ler-w{
 
 /* ---- lupa em tela cheia ---- */
 #ll-zoom{
-  position:fixed;inset:0;z-index:900;
+  position:fixed;inset:0;z-index:var(--z-lightbox);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
   background:rgba(8,10,14,.92);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   padding:32px 20px calc(24px + env(safe-area-inset-bottom,0));
@@ -4790,7 +4866,7 @@ body.ler-full .mobile-bottom-nav{display:none}
    de acento, sombra curta — quem manda na tela continua sendo o livro.
    ================================================================ */
 .gloss-balao{
-  position:fixed;z-index:500;max-width:min(340px,88vw);
+  position:fixed;z-index:var(--z-hover);max-width:min(340px,88vw);
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,.34);
   padding:9px 11px;font-size:var(--fs-sm);color:var(--text);
@@ -5053,7 +5129,7 @@ body.ler-full .mobile-bottom-nav{display:none}
 #voltar-pill{
   position:fixed;left:50%;transform:translateX(-50%);
   bottom:calc(18px + env(safe-area-inset-bottom,0));
-  z-index:900;display:flex;align-items:center;gap:7px;cursor:pointer;
+  z-index:var(--z-pill);display:flex;align-items:center;gap:var(--sp-2);cursor:pointer;
   padding:11px 18px;border-radius:30px;
   background:rgba(var(--primary-rgb),.96);color:#fff;border:0;
   font-size:var(--fs-sm);font-weight:600;
@@ -5157,6 +5233,17 @@ body.ler-full .mobile-bottom-nav{display:none}
 /* Estudado continua legível — é material de releitura, não lixo. Só recua. */
 .dos-item.feito{opacity:.62;border-style:dashed}
 .dos-item.feito:hover{opacity:1}
+/* O atalho que pula o dossiê: continua à mão, mas discreto e separado das
+   ações do fluxo — era ele que estava ocupando o lugar da ação principal. */
+.wct-atalho{color:var(--text3)}
+.wct-atalho:hover{color:var(--text2)}
+
+/* "é este aqui" — quem chegou pelo "Ver em Estudar" do Preparar. Some sozinho. */
+.dos-item.alvo{
+  opacity:1;border-color:rgba(var(--primary-rgb),.75);
+  box-shadow:0 0 0 3px rgba(var(--primary-rgb),.16);
+  transition:box-shadow .4s,border-color .4s;
+}
 .dos-cab{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .dos-cab b{font-family:'Newsreader',serif;font-size:var(--fs-lg);font-weight:600}
 .dos-ipa{color:var(--text3);font-size:var(--fs-sm)}
@@ -5191,6 +5278,8 @@ body.ler-full .mobile-bottom-nav{display:none}
   .mobile-bottom-nav .nav-item{min-width:0;padding:6px 1px}
   .mobile-bottom-nav .nav-item span:not(.badge){white-space:nowrap;letter-spacing:0;max-width:100%}
 }
-@media (max-width:400px){
-  .mobile-bottom-nav .nav-item span:not(.badge){font-size:9px}
+/* Era 400px, um degrau só desta regra. Em 480 os cinco rótulos da navegação
+   já estão apertados — o alívio começa aqui. */
+@media (max-width:480px){
+  .mobile-bottom-nav .nav-item span:not(.badge){font-size:var(--fs-3xs)}
 }

@@ -328,6 +328,22 @@ function renderDossieSection() {
   const lista = dossieLista()
   _dossieListaCache = lista
 
+  // Veio do "Ver em Estudar", no Preparar: abre o dossiê DAQUELE item e para
+  // em cima dele. Chegar na grade e ter de caçar o item na mão seria mandar o
+  // aluno refazer o caminho que ele acabou de pedir para o app fazer.
+  let alvoId = null
+  if (typeof _dossiePedidoAbrir === 'string' && _dossiePedidoAbrir) {
+    const w = words.find(x => x.id === _dossiePedidoAbrir)
+    _dossiePedidoAbrir = null
+    if (w) {
+      alvoId = w.id
+      _dossieAberto = _dossieChave(w)
+      try { localStorage.setItem(SK_DOSSIE_ABERTO, _dossieAberto) } catch (e) {}
+      // Um filtro de antes não pode esconder justamente o item pedido.
+      _dosBusca = ''; _dosFiltro = 'todos'
+    }
+  }
+
   // A seção só existe depois da 1ª visita, mas o estado sobrevive a ela:
   // reabrir o app no dossiê onde parou é o mesmo cuidado do "continuar de
   // onde parou" do vídeo.
@@ -346,4 +362,14 @@ function renderDossieSection() {
   area.innerHTML = _dossieBarraHTML() + '<div id="dossie-corpo"></div>'
   _dossiePintarFiltros()
   _dossiePintarCorpo()
+  if (alvoId) _dossieDestacar(alvoId)     // depois de pintar: o item já existe
+}
+
+// Rola até o item e o marca por um instante. O destaque some sozinho: piscar
+// é para dizer "é este aqui", não para virar um estado que fica na tela.
+function _dossieDestacar(wordId) {
+  const alvo = el('dos-' + wordId); if (!alvo) return
+  alvo.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  alvo.classList.add('alvo')
+  setTimeout(() => alvo.classList.remove('alvo'), 2200)
 }

@@ -15,7 +15,9 @@
 > O portão virou uma verdade só: quem marca `estudadoEm` é o `saveToSrs`, então o atalho
 > "Mandar para a Revisão" do Preparar não deixa mais o dossiê mentir. Itens antigos
 > (`in_srs` sem `estudadoEm`) são costurados no primeiro render. A seção também nasceu com
-> **busca e filtro** (Todos / Com pendência / Concluídos). Ver seção 8 (90ª rodada) e a 8.1.
+> **busca e filtro** (Todos / Com pendência / Concluídos). Ainda na mesma rodada, o botão
+> principal do Preparar deixou de ser o atalho e virou **"Ver em Estudar"** (`CACHE` → `v132`).
+> Ver seção 8 (90ª rodada) e a 8.1.
 >
 > Anterior: 2026-08-06 — **"NÃO LEMBRO" — saindo do limbo sem perder o lugar
 > (89ª rodada)**. O balão dizia *"você marcou como conhecida"* para uma palavra que ele não
@@ -773,9 +775,10 @@ maxInterval (36500), leechThreshold (50)
     fonte**. Cada item vira palavra em `pending_review` (via `createDocWord`) já com significado +
     exemplo + IPA + nível — pronto para salvar no SRS, sem perdas na revisão.
 - **Preparar** (id `preparar`, `js/review.js`) — sidebar (filtros em pílula + busca + lista) e
-  card central com significados selecionáveis. Daqui o caminho normal é **Estudar**; o botão
-  **"Mandar para a Revisão"** é o atalho assumido que pula o dossiê. Badge de pendentes fica
-  NESTE item do menu.
+  card central com significados selecionáveis. Ação principal: **"Ver em Estudar"**, que abre o
+  dossiê daquele item (nada é "enviado" — ele já está lá desde que ganhou significado). O
+  **"Pular para a Revisão"** é o atalho assumido, discreto e no fim da fila. Badge de pendentes
+  fica NESTE item do menu.
 - **Estudar** (id `estudar`, `js/dossie.js`, LAZY) — os **dossiês**: tudo que foi captado de uma
   obra + capítulo, com o material que a IA montou (frase original com tradução, significados,
   definições e exemplos). Duas telas: grade de dossiês com barra de progresso e a leitura item
@@ -844,6 +847,14 @@ marcam o menu certo, sem erro no console; dossiês agrupados por obra+capítulo;
 criou os 3 cards, mudou os dois badges e moveu o item; desfazer preservou os cards e sobreviveu
 a um segundo render; a chave com `U+0001` sobreviveu ao recarregamento; busca acha por
 capítulo, por significado e sem acento; e o foco não se perde ao digitar.
+
+**Correção na mesma rodada, vinda do uso**: "estou na Preparar e tá dizendo que vai mandar pra
+Revisão ao invés do Estudar". O botão estava honesto (ele cria mesmo os cards), mas era o
+**principal** — a tela anunciava o atalho e não mostrava o caminho. Agora a ação principal do
+Preparar é **"Ver em Estudar"**, que abre o dossiê daquela obra no item e o destaca; o atalho
+virou "Pular para a Revisão", fantasma e no fim. Detalhes na 8.1. Lição de método: **rótulo
+correto não conserta hierarquia errada** — o que a tela ensina é o que ela põe em primeiro
+lugar. (`CACHE` → `v132`: sem o bump, o shell em cache continuava mostrando o botão antigo.)
 
 **O que NÃO foi feito e por quê**: os arquivos continuam `review.js`/`study.js`/`dossie.js` —
 renomeá-los custaria histórico do git e lista do SW sem ganho real; e a seção não ganhou áudio
@@ -5127,11 +5138,24 @@ e cada um dos três arquivos tem a nota no topo. **Não invente outro mapa em ou
 
 ### Como o portão foi resolvido (item que faltava decidir)
 
-O atalho **não sumiu**: "Salvar para estudo" no Preparar virou **"Mandar para a Revisão"**, com
-tooltip dizendo que ele pula a leitura do dossiê. O que mudou é que passou a existir **uma
-verdade só**: quem grava `estudadoEm` é o **`saveToSrs()`** (`js/srs.js`), não cada tela. Assim
-o Assistente, o card com áudio do vídeo e o atalho do Preparar deixam o dossiê coerente — item
-que está girando no SRS nunca aparece como "para estudar".
+Passou a existir **uma verdade só**: quem grava `estudadoEm` é o **`saveToSrs()`**
+(`js/srs.js`), não cada tela. Assim o Assistente, o card com áudio do vídeo e o atalho do
+Preparar deixam o dossiê coerente — item que está girando no SRS nunca aparece como
+"para estudar".
+
+⚠️ **CORREÇÃO no mesmo dia, achada pelo Djemeson usando a tela**: na primeira versão o botão
+principal do Preparar era o ATALHO ("Mandar N cards para a Revisão"). Estava rotulado com
+honestidade, mas **a tela ensinava o caminho errado** — anunciava a Revisão como próximo passo
+e a leitura do dossiê não tinha representação nenhuma ali. Corrigido assim:
+
+- **Ação principal do Preparar = "Ver em Estudar"** (`abrirNoEstudar(wordId)`, em `core.js`
+  porque `dossie.js` é lazy). Abre o dossiê **daquela obra/capítulo**, rola até o item e o
+  destaca por 2s. Note que nada é "enviado": **o item já está no dossiê** desde que ganhou
+  significado — o botão só leva até ele.
+- O atalho virou **"Pular para a Revisão"**, fantasma e no fim da fila (`.wct-atalho`).
+  Continua existindo; deixou de ser o protagonista.
+- O pedido reseta busca e filtro do dossiê: filtro de antes não pode esconder justamente o
+  item que ele pediu para ver.
 
 `dossieDesfazerEstudo()` **não apaga cards do SRS** (eles já podem ter histórico), mas **devolve
 o `status` para `pending_review`** — sem isso a costura do legado (abaixo) remarcaria o item no
@@ -5167,6 +5191,9 @@ pela lição já paga do filtro de fonte do SRS — tela vazia sem explicação 
   fonte (invisível no editor, some em copiar/colar). Mesmo cuidado no regex de acentos.
   A chave **não viaja dentro do `onclick`**: vai pelo índice, com o handler ligado em JS.
 - `CACHE` do `sw.js` bumpado para `v131` e `dossie.js` acrescentado à lista network-first.
+  **`v132` na correção do botão** — `review.js`, `core.js` e o CSS são SHELL (cache-first), e
+  sem o bump a tela continuaria mostrando os botões antigos. Foi exatamente o que aconteceu no
+  teste: o navegador serviu o `review.js` velho até a versão subir.
 
 ## 9. Pendências / a verificar
 

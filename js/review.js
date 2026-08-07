@@ -573,16 +573,23 @@ function renderWcToolbarLeft() {
     leftEl.innerHTML = `
       <span style="font-size:var(--fs-sm);font-weight:600;color:var(--primary);white-space:nowrap">${selCount} selecionada${selCount!==1?'s':''}</span>
       <button class="btn btn-secondary btn-sm" onclick="analyzeSelected()" data-tip="Gera significados, exemplos e nível com IA para as selecionadas">${ic('sparkles')}Analisar</button>
-      <button class="btn btn-srs btn-sm" onclick="saveSelectedToSrs()" data-tip="Atalho: pula a leitura do dossiê em Estudar e manda direto para a repetição espaçada">${ic('book')}Mandar para a Revisão</button>
+      <button class="btn btn-srs btn-sm" onclick="abrirNoEstudar()" data-tip="O material já está lá, reunido por obra e capítulo. É lendo e marcando 'Estudei' que o item vai para a Revisão.">${ic('book')}Ver em Estudar</button>
+      <button class="btn btn-ghost btn-sm" onclick="saveSelectedToSrs()" data-tip="Atalho: pula a leitura do dossiê e joga direto na repetição espaçada">${ic('arrowRight')}Pular para a Revisão</button>
       <button class="btn btn-ghost btn-sm" style="color:#F87171" onclick="deleteSelected()" data-tip="Remove as palavras selecionadas da fila">${ic('trash')}Excluir</button>`
   } else if (w) {
     if (w.status === 'pending_review' && w.meanings?.length > 0) {
       const selM = w.meanings.filter(m => m.selected !== false)
       const totalCards = selM.reduce((sum, m) => sum + ((m.examples?.length) || 1), 0)
+      // A AÇÃO PRINCIPAL DAQUI É O CAMINHO, NÃO O ATALHO. O material deste item
+      // JÁ está em Estudar — ele entra no dossiê no instante em que ganha
+      // significado, não é preciso "mandar". Anunciar a Revisão como ação
+      // principal ensinava o caminho errado: pulava a leitura, que é o motivo
+      // de a seção Estudar existir. O atalho continua ali, como atalho.
       leftEl.innerHTML = `
-        <button class="btn btn-srs btn-sm" onclick="saveToSrs('${w.id}')" data-tip="Atalho: pula a leitura do dossiê em Estudar e manda os cards direto para a repetição espaçada">${ic('book')}Mandar ${totalCards} card${totalCards!==1?'s':''} para a Revisão</button>
+        <button class="btn btn-srs btn-sm" onclick="abrirNoEstudar('${w.id}')" data-tip="Abre o dossiê desta obra neste item. É lendo e marcando 'Estudei' que ele vai para a Revisão.">${ic('book')}Ver em Estudar</button>
         <button class="btn btn-secondary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Roda a IA de novo PRESERVANDO o que já tem exemplos — completa o que falta">${ic('refresh')}Re-analisar</button>
-        <button class="btn btn-ghost btn-sm" onclick="refazerAnalise('${w.id}')" data-tip="A análise está errada? Descarta os significados atuais e refaz do zero">${ic('undo')}Refazer do zero</button>`
+        <button class="btn btn-ghost btn-sm" onclick="refazerAnalise('${w.id}')" data-tip="A análise está errada? Descarta os significados atuais e refaz do zero">${ic('undo')}Refazer do zero</button>
+        <button class="btn btn-ghost btn-sm wct-atalho" onclick="saveToSrs('${w.id}')" data-tip="Atalho: pula a leitura do dossiê e joga os ${totalCards} card${totalCards!==1?'s':''} direto na repetição espaçada">${ic('arrowRight')}Pular para a Revisão</button>`
     } else if (w.status === 'pending_ai') {
       leftEl.innerHTML = `
         <button class="btn btn-primary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Analisa esta palavra com IA: significados, exemplos, nível e registro">${ic('sparkles')}Analisar com IA</button>`

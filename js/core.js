@@ -542,6 +542,16 @@ function loadWords() {
   updateDossieBadge()
 }
 
+// ---- Ir do Preparar para o dossiê deste item -------------------------
+// Mora aqui pelo motivo de sempre: `js/dossie.js` é LAZY e quem chama é o
+// Preparar (review.js, do shell). O pedido fica guardado e a seção o consome
+// quando o módulo chega — mesmo padrão do `_pendingLibraryFilter`.
+let _dossiePedidoAbrir = null
+function abrirNoEstudar(wordId) {
+  _dossiePedidoAbrir = wordId || null
+  showSection('estudar')
+}
+
 // ---- Badge da seção ESTUDAR (os dossiês) -----------------------------
 // Mora aqui, e não em js/dossie.js, pelo motivo de sempre: dossie.js é LAZY
 // e o menu existe em todas as telas. Um item "pendente de estudo" é o que já
