@@ -1199,6 +1199,31 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+199. **CONTROLES DA NETFLIX SÓ PERTO DO RODAPÉ (103ª rodada, 2026-08-06)**.
+     Pedido: *"quando se move o mouse o painel aparece, mas o Reactor desabilitou isso — só
+     aparece quando o mouse passa em cima da barra de progresso. Quero isso."*
+     - **Isto fecha o mistério do "painel menor" das rodadas 99–101**: o Language Reactor não
+       encolhe o painel — ele **suprime a abertura automática**. O painel só sobe quando o
+       ponteiro desce até ele, então na maior parte do tempo simplesmente não existe.
+     - **Por evento, não por CSS**, e a diferença importa: esconder o painel exigiria o nome da
+       classe do container da Netflix — que eu tentei três vezes e não casou, e que muda sem
+       aviso. Interceptar `mousemove`/`pointermove` na **fase de captura** do `document` (antes
+       de a Netflix ver) e `stopPropagation()` quando o ponteiro está longe do rodapé **não
+       depende de nome nenhum**. É a razão de esta tentativa ter chance onde a outra falhou.
+     - **Zona de 140px** a partir do rodapé: dentro dela o evento passa e a Netflix abre o
+       painel normalmente.
+     - **Três travas de escopo**: só com a barra ligada, só no modo flutuante (na doca o player
+       já é redimensionado e o painel não atrapalha), e **nunca** engole o que tem alvo dentro
+       de `#englab-bar`, `#englab-pop` ou `#englab-transcript` — nossa própria UI depende de
+       mousemove para seleção, hover e arrastar.
+     - Verificado: engolido no meio da tela e no topo; passa no rodapé e na borda da zona;
+       engolido logo acima dela; **passa sobre uma palavra da nossa barra**; e não interfere na
+       doca nem com a extensão desligada.
+     - ⚠️ Duas medições do meu teste estavam erradas antes de acertar: contei eventos num
+       listener do *player* para julgar um clique na *nossa barra* — que não é descendente
+       dele, então o contador ficaria zerado de qualquer jeito. Medir `stopPropagation` exige
+       observar um **ancestral do alvo**. `manifest.json` → **3.10.0**.
+
 198. **INTERRUPTOR NA POPUP DA EXTENSÃO (102ª rodada, 2026-08-06)**.
      - O botão **"Religar a barra na Netflix"** só servia DEPOIS de ela já ter sumido, e não
        dizia o estado atual — não havia como saber se estava ligada, nem como desligar dali

@@ -444,6 +444,41 @@ function posicionarFlutuante() {
   barra.style.bottom = alvo == null ? '' : alvo + 'px'
 }
 
+// ================================================================
+// CONTROLES SÓ PERTO DA BARRA — não a cada movimento do mouse
+// ================================================================
+// A Netflix mostra o painel inteiro (barra de progresso + botões) a QUALQUER
+// mexida do mouse sobre o player. Assistindo com legenda de estudo isso é
+// ruído constante: o painel entra e sai o tempo todo, e era ele que tapava a
+// cena e obrigava a legenda a ficar mais alta.
+//
+// A técnica é interceptar o movimento ANTES de a Netflix vê-lo (fase de
+// captura no `document`) e engolir o evento quando o ponteiro está longe do
+// rodapé. Perto do rodapé o evento passa e ela abre o painel normalmente —
+// que é o comportamento do Language Reactor.
+//
+// POR QUE POR EVENTO E NÃO POR CSS: esconder o painel exigiria o nome da
+// classe do container dela, que muda sem aviso (já tentei, e não casou).
+// Interceptar o evento não depende de nome nenhum.
+const ZONA_CONTROLES = 140   // px a partir do rodapé onde o painel PODE abrir
+
+function _pertoDoRodape(y) { return y >= innerHeight - ZONA_CONTROLES }
+
+function _engolirMovimento(e) {
+  // Só quando a barra está ligada e flutuando: na doca o player é redimensionado
+  // e o painel dela não atrapalha a cena.
+  if (!cfgUI.ligada || cfgUI.doca) return
+  if (_pertoDoRodape(e.clientY)) return          // deixa a Netflix abrir
+  // Nunca engolir o que é NOSSO: a barra, o popup e o transcript precisam dos
+  // próprios eventos de mouse (seleção de palavra, hover, arrastar).
+  const t = e.target
+  if (t && t.closest && t.closest('#englab-bar, #englab-pop, #englab-transcript')) return
+  e.stopPropagation()
+}
+for (const tipo of ['mousemove', 'pointermove']) {
+  document.addEventListener(tipo, _engolirMovimento, true)
+}
+
 function aplicarDoca() {
   const on = !!(cfgUI.ligada && cfgUI.doca && idDoTitulo())
   document.documentElement.classList.toggle('englab-dock', on)
