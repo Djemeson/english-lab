@@ -261,8 +261,12 @@
    legenda que pula de lugar a cada movimento do mouse é pior de acompanhar
    do que legenda um pouco mais alta. Fica FIXA numa altura que já livra os
    controles, e a regra de subida é anulada aqui. */
+/* Encostada na barra de progresso, sem cobri-la. Em px com piso, não em %:
+   os controles da Netflix têm altura praticamente FIXA, então uma
+   porcentagem afasta demais em tela alta e encosta demais em tela baixa.
+   O piso de 104px é o que livra a barra de progresso e a fileira de botões. */
 #englab-bar.englab-flut,
-#englab-bar.englab-flut.englab-up { bottom: 18%; }
+#englab-bar.englab-flut.englab-up { bottom: max(104px, 11vh); }
 
 /* Com o modo PT ligado, a linha de traducao SEMPRE ocupa o lugar dela.
    ALTURA FIXA (2 linhas, como a do ingles): com min-height, a linha vazia
@@ -376,7 +380,12 @@ html.englab-dock #englab-pop { bottom: calc(var(--ll-dock) + 16px); }
 /* O PORTUGUÊS MANTÉM A CAIXA, e ela é o que separa os dois papéis: o inglês é
    a cena, a tradução é o apoio. Justa ao texto (inline-block sem esticar),
    cantos suaves e desfoque atrás — nunca uma faixa atravessando a tela. */
-#englab-bar.englab-flut .englab-pt {
+/* ⚠️ QUALIFICADO com `.englab-tem-pt`. Sem isso esta regra dava
+   `display:inline-block` ao português SEMPRE, ignorando o interruptor da
+   tradução — e produziu dois defeitos de uma vez: desligar o PT deixava a
+   última tradução congelada na tela, e com o PT ligado sem tradução aparecia
+   uma CAIXINHA ESCURA VAZIA (o fundo e o padding sem texto dentro). */
+#englab-bar.englab-flut.englab-tem-pt .englab-pt {
   display: inline-block; margin-top: 0;
   padding: 5px 15px; border-radius: 12px;
   background: rgba(8, 12, 18, .82); backdrop-filter: blur(10px) saturate(1.2);
@@ -388,8 +397,17 @@ html.englab-dock #englab-pop { bottom: calc(var(--ll-dock) + 16px); }
 }
 /* A palavra sob o cursor precisa de fundo próprio agora que a linha não tem
    caixa — sem isto o realce sumia contra cena clara. */
+/* Sem tradução, NADA — nem a caixa. `visibility:hidden` servia na doca, onde
+   o espaço reservado evita o painel pular; aqui a legenda flutua e não há
+   layout para preservar, então o certo é sumir. */
+#englab-bar.englab-flut .englab-pt.englab-vazia { display: none; }
 #englab-bar.englab-flut .englab-w:hover,
 #englab-bar.englab-flut .englab-w.englab-ok { text-shadow: none; }
+
+/* A RÉGUA DE FALAS não entra no flutuante. Ela é ferramenta de navegação e
+   pertence à doca; sobre a cena vira ruído — e era o que aparecia esmaecido
+   esperando um hover que ninguém dá enquanto assiste. */
+#englab-bar.englab-flut .englab-rule { display: none; }
 #englab-bar.englab-flut .englab-nav,
 #englab-bar.englab-flut .englab-tools {
   background: rgba(10, 14, 20, .72); border-radius: 10px; padding: 4px 8px;
@@ -397,8 +415,7 @@ html.englab-dock #englab-pop { bottom: calc(var(--ll-dock) + 16px); }
 }
 #englab-bar.englab-flut:hover .englab-nav,
 #englab-bar.englab-flut:hover .englab-tools { opacity: 1; }
-#englab-bar.englab-flut .englab-rule { opacity: 0; transition: opacity .18s; }
-#englab-bar.englab-flut:hover .englab-rule { opacity: 1; }
+/* (a régua no flutuante agora é `display:none` — ver o bloco do modo) */
 
 /* ---- silencio x SEM LEGENDA ----------------------------------------
    Silencio entre falas: area limpa, nenhuma caixa boiando.

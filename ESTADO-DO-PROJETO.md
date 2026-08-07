@@ -1199,6 +1199,31 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+194. **TRÊS DEFEITOS DO FLUTUANTE, DOIS DELES MEUS (98ª rodada, 2026-08-06)**.
+     - **Mais perto da barra de progresso**: de `18%` para `max(104px, 11vh)`. Em px com piso,
+       não em porcentagem: os controles da Netflix têm altura praticamente FIXA, então uma
+       porcentagem afasta demais em tela alta e encosta demais em tela baixa. O piso de 104px
+       livra a barra de progresso e a fileira de botões.
+     - **⚠️ A CAIXINHA ESCURA VAZIA e a TRADUÇÃO CONGELADA tinham a MESMA causa, e era minha**:
+       a regra `#englab-bar.englab-flut .englab-pt` da 97ª rodada não estava qualificada com
+       `.englab-tem-pt`. Ela dava `display` ao português **sempre**, ignorando o interruptor da
+       tradução. Daí (a) com PT ligado e sem tradução aparecia o fundo e o padding sem texto —
+       uma caixinha escura sem sentido; e (b) desligar o PT deixava a última tradução parada na
+       tela. Uma qualificação faltando, dois sintomas que pareciam problemas distintos.
+     - **Cinto e suspensório no JS**: `pintarPT` passou a **esvaziar** o elemento ao desligar,
+       em vez de confiar que o CSS o esconde. Basta uma regra de modo esquecer a qualificação
+       para o texto voltar a congelar; limpar o conteúdo torna isso impossível.
+     - **A régua de falas saiu do flutuante** (`display: none`). Ela é ferramenta de navegação
+       e pertence à doca; sobre a cena era ruído — e estava em `opacity: 0` esperando um hover
+       que ninguém dá enquanto assiste.
+     - Verificado no flutuante: altura 110px do chão numa viewport de 1000px, régua escondida,
+       caixa presente com tradução, **sumindo por completo sem tradução**, e **sumindo ao
+       desligar o PT**. A caixa continua abraçando o texto (404px em 1284px disponíveis) —
+       o abraço vem do `align-items:center` do flex, não do `inline-block`, então o
+       `display:block` que a cascata resolve ali é inócuo. `manifest.json` → **3.5.0**.
+     - 📖 **Nome da peça**, que ele perguntou: **régua de falas** — cada bloco é uma fala, o vão
+       entre eles é silêncio, e clicar leva até lá.
+
 193. **O FLUTUANTE: parou de pular e ganhou o desenho de legenda de verdade
      (97ª rodada, 2026-08-06)**. Pedido com duas imagens — a nossa e a referência
      (Language Reactor), *"exceto as cores"*.

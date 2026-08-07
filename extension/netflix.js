@@ -248,7 +248,16 @@ function pintarPT() {
   barra.classList.toggle('englab-tem-pt', !!cfgUI.pt)
   if (tinhaPT !== !!cfgUI.pt) medirDoca()
   el.style.display = ''
-  if (!cfgUI.pt) return
+  if (!cfgUI.pt) {
+    // ESVAZIA ao desligar. Só tirar a classe bastava enquanto o CSS escondia
+    // o elemento — mas basta uma regra de modo esquecer a qualificação para a
+    // última tradução ficar congelada na tela. Limpar o texto torna isso
+    // impossível, venha o CSS que vier.
+    el.textContent = ''
+    el.classList.remove('englab-esperando', 'englab-fog')
+    el.classList.add('englab-vazia')
+    return
+  }
   const pt = ptDe(ultimoTexto)
   // Sem traducao ainda: reticencias — da para ver que a IA esta trabalhando
   // (o DeepSeek leva alguns segundos).
