@@ -328,7 +328,65 @@ function _aiTokenParam(model, maxTokens) {
 // Retenta em 429/5xx/queda de rede (2 vezes, backoff 1s→3s, respeitando
 // Retry-After). NUNCA retenta 4xx de verdade (chave errada não melhora
 // tentando de novo). O corpo do erro da OpenAI vira a mensagem do Error.
+// ================================================================
+// FREIO GLOBAL — não estourar o limite de requisições por minuto
+// ================================================================
+// O erro que motivou isto: "Rate limit reached for gpt-5.6-luna … RPM:
+// Limit 500, Used 500". O `_aiFetch` JÁ tentava de novo em 429 — o problema
+// era anterior: vários caminhos disparam em `Promise.all` (a sincronia de
+// legenda é um deles) e mandam dezenas de chamadas de uma vez. Repetir não
+// resolve, porque as tentativas colidem com a mesma rajada.
+//
+// Duas travas, e as duas precisam existir:
+//  1. TETO DE SIMULTÂNEAS — impede a rajada nascer. `Promise.all` continua
+//     escrito do mesmo jeito nos chamadores; a fila é que segura.
+//  2. FREIO COMPARTILHADO — quando UMA chamada leva 429, TODAS as outras
+//     esperam. Sem isso, só a que apanhou desacelera e as demais continuam
+//     batendo na parede, mantendo o limite estourado.
+const AI_MAX_SIMULT = 4
+let _aiEmVoo = 0
+const _aiFila = []
+let _aiFreioAte = 0        // timestamp até quando todo mundo espera
+
+function _aiLiberarVaga() {
+  _aiEmVoo--
+  const proximo = _aiFila.shift()
+  if (proximo) proximo()
+}
+
+async function _aiPegarVaga() {
+  if (_aiEmVoo >= AI_MAX_SIMULT) {
+    await new Promise(res => _aiFila.push(res))
+  }
+  _aiEmVoo++
+  // O freio é checado DEPOIS de pegar a vaga e em laço: um 429 que chegue
+  // enquanto esta chamada esperava na fila também vale para ela.
+  while (Date.now() < _aiFreioAte) {
+    await new Promise(r => setTimeout(r, Math.min(2000, _aiFreioAte - Date.now() + 20)))
+  }
+}
+
+// A própria mensagem da OpenAI diz quanto esperar ("Please try again in
+// 120ms") — é mais preciso que qualquer palpite nosso, e às vezes vem sem o
+// cabeçalho `retry-after`.
+function _aiEsperaDoErro(msg, cab) {
+  const h = parseFloat(cab) * 1000
+  if (h > 0) return h
+  const m = /try again in ([\d.]+)\s*(ms|s)\b/i.exec(String(msg || ''))
+  if (m) return parseFloat(m[1]) * (m[2].toLowerCase() === 's' ? 1000 : 1)
+  return 0
+}
+
 async function _aiFetch(url, body, { timeoutMs = 90000, retries = 2, key } = {}) {
+  await _aiPegarVaga()
+  try {
+    return await _aiFetchBruto(url, body, { timeoutMs, retries, key })
+  } finally {
+    _aiLiberarVaga()
+  }
+}
+
+async function _aiFetchBruto(url, body, { timeoutMs = 90000, retries = 2, key } = {}) {
   let lastErr = null
   for (let tent = 0; tent <= retries; tent++) {
     const ctl = new AbortController()
@@ -348,8 +406,16 @@ async function _aiFetch(url, body, { timeoutMs = 90000, retries = 2, key } = {})
       lastErr = new Error(msg)
       lastErr.status = res.status
       if (!retryavel || tent === retries) throw lastErr
-      const after = parseFloat(res.headers.get('retry-after')) * 1000
-      await new Promise(r => setTimeout(r, after > 0 ? after : (tent + 1) * 1500))
+      // 429 é limite de TAXA, não falha desta chamada: quem espera é o app
+      // inteiro. Piso de 1,2s mesmo quando a API pede 120ms — o que ela mede
+      // é a janela dela, e voltar em 120ms com a fila cheia só reestoura.
+      let espera = _aiEsperaDoErro(msg, res.headers.get('retry-after')) || (tent + 1) * 1500
+      if (res.status === 429) {
+        espera = Math.max(espera, 1200)
+        _aiFreioAte = Math.max(_aiFreioAte, Date.now() + espera)
+        console.warn('[ai] limite de taxa — segurando todas as chamadas por ' + Math.round(espera) + 'ms')
+      }
+      await new Promise(r => setTimeout(r, espera))
     } catch (e) {
       clearTimeout(timer)
       if (e === lastErr) throw e                       // HTTP não-retryável já decidido acima
