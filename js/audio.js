@@ -484,6 +484,12 @@ async function generateCardImage(cardId, callerEl, force = true) {
     ? `Digital illustration, editorial style. ${scene} ${PROIBIDO} ${ESTILO}`
     : `Digital illustration, editorial style. ${promptLangName(cardLang(card))} vocabulary flashcard image for the word "${word}". Meaning: "${meaning}". ${context ? 'Example sentence: "' + context + '".' : ''} ${PROIBIDO} ${ESTILO}`
 
+  // PROGRESSO ATÉ NO ITEM ÚNICO. Gerar uma imagem leva 10–30 segundos: sem
+  // aviso, o único sinal era o botão desabilitado — invisível se ele rolou a
+  // tela ou disparou de outro lugar. Vai para a pilha, ao lado dos demais.
+  const pid = 'img-' + cardId
+  const nomeCard = (srsCards.find(c => c.id === cardId) || {}).word || 'card'
+  if (typeof progressoItem === 'function') progressoItem(pid, 'Gerando imagem · ' + nomeCard)
   try {
     const b64 = await aiImage(prompt)
     await ImageDB.set(key, b64)
@@ -493,7 +499,10 @@ async function generateCardImage(cardId, callerEl, force = true) {
 
     // Conta cards irmãos (mesmo significado)
     const siblings = srsCards.filter(c => c.wordId === card.wordId && c.meaningIdx === card.meaningIdx).length
-    toast(`Imagem gerada${siblings > 1 ? ` · aplicada a ${siblings} cards` : ''}`, 'success')
+    // No LOTE quem avisa é o resumo do lote — um toast por imagem se atropela.
+    if (typeof progressoFechar === 'function') {
+      progressoFechar(pid, callerEl ? `Imagem de "${nomeCard}" pronta${siblings > 1 ? ` · aplicada a ${siblings} cards` : ''}` : '')
+    }
 
     // Atualiza visualizações ativas
     if (window._srsCurrentCard?.id === cardId) renderSrsCardBack()
@@ -507,8 +516,10 @@ async function generateCardImage(cardId, callerEl, force = true) {
     // chamou em lote (callerEl nulo) recebe o erro no retorno e mostra um
     // resumo no fim — antes a falha voltava `undefined` e era contada como
     // sucesso, então o app dizia "10 geradas" com 3 faltando.
-    if (callerEl) toast('Erro ao gerar imagem: ' + e.message, 'error')
-    return { erro: e.message, word: (srsCards.find(c => c.id === cardId) || {}).word || '' }
+    if (typeof progressoFechar === 'function') {
+      progressoFechar(pid, callerEl ? 'Não deu para gerar a imagem de "' + nomeCard + '": ' + e.message : '', 'error')
+    }
+    return { erro: e.message, word: nomeCard }
   } finally {
     if (callerEl) { callerEl.disabled = false; callerEl.innerHTML = ic('image','ic-sm') + ' Gerar imagem' }
   }
@@ -543,10 +554,20 @@ async function browserGenerateImagesSelected() {
   if (!(await aiConfirmBatch('image', toGenerate.length, 'Gerar imagens', {
     detalhe: comImagem ? [`${comImagem} dos ${cards.length} selecionados já têm imagem e ficam de fora — só o que falta é cobrado.`] : null
   }))) return
-  toast(`Gerando ${toGenerate.length} imagem(ns)` + (comImagem ? ` · ${comImagem} já tinham` : '') + '…', 'info')
+  const PID = 'img-lote'
+  if (typeof progressoAbrir === 'function') {
+    progressoAbrir(PID, 'Gerando imagens',
+      comImagem ? comImagem + ' já tinham imagem e ficaram de fora' : '')
+  }
   let feitos = 0, pulados = 0
   const falhas = []
   for (const card of toGenerate) {
+    // A palavra da vez no aviso: numa fila de dezenas, saber ONDE está é o que
+    // diferencia "trabalhando" de "travado".
+    if (typeof progressoAtualizar === 'function') {
+      progressoAtualizar(PID, feitos + pulados + falhas.length, toGenerate.length,
+        'agora: ' + (card.word || '—'))
+    }
     const r = await generateCardImage(card.id, null, false)
     if (r === 'skip') pulados++
     else if (r && r.erro) falhas.push(r)
@@ -557,8 +578,15 @@ async function browserGenerateImagesSelected() {
   // sucesso para todas e o motivo real morria num toast atropelado.
   const partes = [`${feitos} gerada${feitos !== 1 ? 's' : ''}`]
   if (pulados) partes.push(`${pulados} já existia${pulados !== 1 ? 'm' : ''} (não re-cobradas)`)
+  if (comImagem) partes.push(`${comImagem} pulada${comImagem !== 1 ? 's' : ''} por já ter imagem`)
   if (falhas.length) partes.push(`${falhas.length} falhou${falhas.length !== 1 ? 'ram' : ''}`)
-  toast(partes.join(' · '), falhas.length ? 'warning' : 'info')
+  // Fecha a barra COM a mensagem final: a pilha nunca fica com aviso órfão, e
+  // o fim da operação é informação — não silêncio.
+  if (typeof progressoFechar === 'function') {
+    progressoFechar(PID, partes.join(' · '), falhas.length ? 'warning' : 'success')
+  } else {
+    toast(partes.join(' · '), falhas.length ? 'warning' : 'info')
+  }
   if (falhas.length) {
     console.warn('[img] falhas do lote:', falhas.map(f => `${f.word}: ${f.erro}`).join('\n'))
     const lista = falhas.slice(0, 8).map(f => `<li><b>${esc(f.word || '(sem palavra)')}</b> — ${esc(f.erro)}</li>`).join('')

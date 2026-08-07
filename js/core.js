@@ -983,3 +983,83 @@ function estudoNaoLembro(alvo, ctx, origem) {
   }, 80)
   toast('"' + termo + '" saiu das conhecidas e está aqui — analise e volte', 'success')
 }
+
+// ================================================================
+// PILHA DE AVISOS — toasts e progressos no MESMO empilhamento
+// ================================================================
+// O bug que motivou isto: `#toasts` e `#audio-gen-banner` eram os dois
+// `position:fixed` no canto inferior direito, com o MESMO z-index. Salvar uma
+// palavra para estudo dispara os dois (o toast dos cards e o banner da
+// pré-geração de áudio), e eles apareciam LITERALMENTE um sobre o outro.
+//
+// Consertar só o banner adiaria o problema: a regra do projeto agora é que
+// TUDO que gera algo mostra progresso, então vão nascer mais desses. Logo o
+// conserto é estrutural — existe UMA pilha, `#toasts`, e todo aviso entra
+// nela. O flex-column com gap cuida do empilhamento, e nada mais precisa
+// saber de coordenadas.
+//
+// A API é de três funções porque uma geração tem três momentos, e cada um
+// precisa aparecer: começou, está em N de M, terminou. `id` identifica a
+// operação — chamar `progressoAtualizar` com o mesmo id não empilha, atualiza.
+function _pilhaAvisos() {
+  let p = document.getElementById('toasts')
+  if (!p) {
+    p = document.createElement('div')
+    p.id = 'toasts'
+    document.body.appendChild(p)
+  }
+  return p
+}
+
+function progressoAbrir(id, titulo, sub) {
+  const pilha = _pilhaAvisos()
+  let box = document.getElementById('prog-' + id)
+  if (!box) {
+    box = document.createElement('div')
+    box.id = 'prog-' + id
+    box.className = 'prog-aviso'
+    pilha.appendChild(box)
+  }
+  box.innerHTML =
+    '<div class="prog-topo"><span class="gen-spinner"></span>' +
+      '<b>' + esc(titulo || 'Gerando…') + '</b>' +
+      '<span class="prog-n" id="prog-n-' + id + '"></span></div>' +
+    '<div class="prog-barra"><i id="prog-bar-' + id + '" style="width:0%"></i></div>' +
+    '<div class="prog-sub" id="prog-sub-' + id + '">' + esc(sub || '') + '</div>'
+  return box
+}
+
+function progressoAtualizar(id, feito, total, sub) {
+  const box = document.getElementById('prog-' + id)
+  if (!box) return
+  const bar = document.getElementById('prog-bar-' + id)
+  const n = document.getElementById('prog-n-' + id)
+  const s = document.getElementById('prog-sub-' + id)
+  if (bar) bar.style.width = (total ? Math.round((feito / total) * 100) : 0) + '%'
+  if (n) n.textContent = total > 1 ? feito + '/' + total : ''
+  if (s && sub !== undefined) s.textContent = String(sub || '')
+}
+
+// `msg` fecha com uma mensagem final em vez de sumir calado — o fim de uma
+// operação é informação, não silêncio.
+function progressoFechar(id, msg, tipo) {
+  const box = document.getElementById('prog-' + id)
+  if (box) box.remove()
+  if (msg) toast(msg, tipo || 'success')
+}
+
+// Progresso de item ÚNICO (uma imagem, um áudio). Não tem barra: não há
+// fração a mostrar, e barra falsa que anda sozinha é pior que spinner honesto.
+function progressoItem(id, titulo) {
+  const pilha = _pilhaAvisos()
+  let box = document.getElementById('prog-' + id)
+  if (!box) {
+    box = document.createElement('div')
+    box.id = 'prog-' + id
+    box.className = 'prog-aviso prog-item'
+    pilha.appendChild(box)
+  }
+  box.innerHTML = '<div class="prog-topo"><span class="gen-spinner"></span><b>' +
+    esc(titulo || 'Gerando…') + '</b></div>'
+  return box
+}

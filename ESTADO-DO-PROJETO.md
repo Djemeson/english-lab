@@ -1199,6 +1199,34 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+188. **PILHA ÚNICA DE AVISOS + PROGRESSO EM TUDO QUE GERA (92ª rodada, 2026-08-06)**.
+     Duas coisas num pedido: *"qualquer coisa que for gerada tem que ter informação de
+     progresso"* (regra permanente) e *"quando mando uma palavra da revisão pro estudo aparecem
+     duas informações uma sobre a outra"*.
+     - **O bug era literal**: `#toasts` (bottom 24 / right 24) e `#audio-gen-banner`
+       (bottom 16 / right 16) eram os DOIS `position:fixed` no mesmo canto, mesmo z-index.
+       Salvar para estudo dispara os dois — o toast dos cards e o banner da pré-geração de
+       áudio — e eles se sobrepunham. **E havia uma segunda regra, só no celular** (media
+       query, linha ~2660), que reintroduzia o `fixed`: consertar só a primeira não resolvia,
+       e foi o que o primeiro teste pegou.
+     - **Conserto estrutural, não pontual**: existe UMA pilha (`#toasts`) e todo aviso entra
+       nela; o flex-column com gap cuida do empilhamento e ninguém mais precisa saber de
+       coordenadas. O banner de áudio passou a `position:static` e é movido para dentro da
+       pilha no `init.js`. Consertar só o banner adiaria o problema, porque a regra nova do
+       projeto garante que vão nascer mais avisos.
+     - **API de progresso compartilhada** (core.js), porque uma geração tem três momentos e
+       todos precisam aparecer: `progressoAbrir(id,titulo,sub)` · `progressoAtualizar(id,
+       feito,total,sub)` · `progressoFechar(id,msg,tipo)`. Mais `progressoItem()` para
+       operação de peça única — **sem barra de propósito**: não há fração a mostrar, e barra
+       falsa que anda sozinha é pior que spinner honesto.
+     - **Aplicado às imagens**: a individual (10–30 s, cujo único sinal era um botão
+       desabilitado que some da vista se ele rolar a tela) ganhou aviso próprio; o lote ganhou
+       barra com **a palavra da vez** — numa fila de dezenas, saber ONDE está é o que
+       diferencia "trabalhando" de "travado" — e fecha com o resumo, sem deixar aviso órfão.
+     - Verificado: banner dentro da pilha e `static`; quatro avisos simultâneos com topos
+       distintos e **nenhuma sobreposição**; barra em 40% com "2/5" e a palavra no subtítulo;
+       fechar remove e vira toast; item único sem barra. `CACHE` → **v129**.
+
 187. **COLUNA "CRIADO" + GERAR IMAGENS SÓ PARA QUEM NÃO TEM (91ª rodada, 2026-08-06)**.
      - **A data sem migração nem campo novo**: `uid()` é `Date.now().toString(36)` + 5
        aleatórios, então **os 8 primeiros caracteres do `id` JÁ SÃO o instante de criação**
@@ -4649,6 +4677,22 @@ muda isso. O que existe são três portas, e o projeto passou a usar as três:
     os que já têm origem. **A REMOVER depois do backfill** (botão + função).
 
 ---
+
+### Regra permanente: tudo que gera, mostra progresso
+
+Pedido explícito do Djemeson (92ª rodada): **qualquer operação que gere algo neste projeto tem
+de informar o progresso** — imagem individual, imagem em lote, áudio, classificação, leitura de
+capítulo, análise. O padrão é a API de `core.js`:
+
+- `progressoAbrir(id, titulo, sub)` ao começar — **antes do primeiro `await`**, porque abrir
+  arquivo e ler IndexedDB já demoram e clique sem resposta é indistinguível de app travado;
+- `progressoAtualizar(id, feito, total, sub)` a cada passo, e **antes** de cada lote também:
+  a primeira chamada é a mais longa e barra parada em zero é o silêncio que se está corrigindo;
+- `progressoFechar(id, msg, tipo)` ao terminar, **com mensagem** — o fim é informação;
+- `progressoItem(id, titulo)` para peça única, sem barra.
+
+Tudo entra na pilha `#toasts`. **Nunca criar outro elemento `position:fixed` num canto da
+tela** — foi exatamente isso que fez o banner de áudio sobrepor os toasts.
 
 ## 9. Pendências / a verificar
 

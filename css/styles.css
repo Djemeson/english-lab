@@ -522,12 +522,31 @@ select option{background:var(--surface)}
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 /* Audio generation progress banner */
+/* ⚠️ NÃO voltar a `position:fixed` aqui. Este banner e o #toasts eram os dois
+   fixos no canto inferior direito, com o mesmo z-index — salvar uma palavra
+   para estudo dispara os dois (toast dos cards + banner do áudio) e eles
+   apareciam LITERALMENTE um sobre o outro. Agora ele vive DENTRO do #toasts e
+   o flex-column da pilha cuida do empilhamento. */
 #audio-gen-banner{
-  position:fixed;bottom:16px;right:16px;z-index:9999;
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
   padding:12px 16px;min-width:260px;max-width:320px;
   box-shadow:var(--shadow-card);display:flex;flex-direction:column;gap:8px;
 }
+
+/* Progresso genérico — mesma pilha, mesma linguagem visual do toast */
+.prog-aviso{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px 16px;min-width:260px;max-width:380px;
+  box-shadow:var(--shadow-card);display:flex;flex-direction:column;gap:8px;
+  animation:tin .2s ease;
+}
+.prog-topo{display:flex;align-items:center;gap:9px;font-size:var(--fs-sm);color:var(--text)}
+.prog-n{margin-left:auto;font-size:var(--fs-xs);color:var(--text2);font-variant-numeric:tabular-nums}
+.prog-barra{background:var(--surface2);border-radius:4px;height:6px;overflow:hidden}
+.prog-barra i{display:block;height:6px;background:rgba(var(--primary-rgb),.9);border-radius:4px;transition:width .25s}
+.prog-sub{font-size:var(--fs-3xs);color:var(--text2);line-height:1.35}
+.prog-sub:empty{display:none}
+.prog-item{min-width:220px}
 #audio-gen-banner.hidden{display:none!important}
 #audio-gen-bar-wrap{background:var(--surface2);border-radius:4px;height:6px;overflow:hidden}
 #audio-gen-bar{height:6px;background:var(--primary);border-radius:4px;transition:width .3s}
@@ -2637,17 +2656,20 @@ body.sb-collapsed #fb-user-photo{margin:0}
     border-radius: var(--radius-lg);
   }
   
-  /* Audio banner adjustments */
+  /* ⚠️ SEM `position` aqui. Esta regra reintroduzia o `fixed` só no celular —
+     e foi ela que manteve o banner sobrepondo os toasts mesmo depois de ele
+     entrar na pilha. Quem posiciona é o #toasts; o banner só se estica. */
   #audio-gen-banner {
-    position: fixed;
-    bottom: 78px;
-    left: 12px;
-    right: 12px;
-    z-index: 450;
     width: auto;
+    max-width: none;
     border-radius: var(--radius);
     box-shadow: var(--shadow-card);
   }
+  /* A pilha inteira sobe acima da barra de navegação do celular */
+  #toasts {
+    left: 12px; right: 12px; bottom: 78px;
+  }
+  #toasts .toast, #toasts .prog-aviso { max-width: none; min-width: 0 }
 }
 
 @media (max-width: 480px) {

@@ -78,3 +78,12 @@ if ('serviceWorker' in navigator) {
     location.reload()
   })
 }
+
+// O banner de áudio nasce solto no index.html; aqui ele entra na PILHA DE
+// AVISOS, que é quem empilha. Sem isto ele voltava a competir com os toasts
+// pelo mesmo canto da tela.
+;(function _moverBannerParaPilha() {
+  const b = document.getElementById('audio-gen-banner')
+  const pilha = document.getElementById('toasts')
+  if (b && pilha && b.parentElement !== pilha) pilha.appendChild(b)
+})()
