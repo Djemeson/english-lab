@@ -75,10 +75,41 @@ async function abrirOuEntregar() {
 
 document.getElementById('abrir').onclick = abrirOuEntregar
 document.getElementById('limpar').onclick = () => chrome.storage.local.set({ pend: [] }).then(render)
-document.getElementById('religar').onclick = () => {
-  chrome.tabs.query({ url: 'https://www.netflix.com/*' }).then(tabs => {
-    for (const t of tabs) chrome.tabs.sendMessage(t.id, { type: 'englab-religar' }).catch(() => {})
-  }).catch(() => {})
+// ---- interruptor da barra na Netflix --------------------------------
+// A fonte da verdade é `llui.ligada` no storage — o MESMO objeto que o
+// content script lê e grava. Assim os dois nunca discordam: desligar pelo
+// botão "esconder" da própria barra reflete aqui, e vice-versa.
+const swEl = document.getElementById('sw-ligada')
+const swTxt = document.getElementById('sw-estado')
+
+function pintarSwitch(ligada, temAba) {
+  swEl.checked = !!ligada
+  swTxt.textContent = !temAba ? (ligada ? 'ligada — abra a Netflix para ver' : 'desligada')
+                     : ligada ? 'aparecendo sobre o vídeo' : 'escondida'
 }
+
+async function lerEstado() {
+  const [r, tabs] = await Promise.all([
+    chrome.storage.local.get('llui').catch(() => ({})),
+    chrome.tabs.query({ url: 'https://www.netflix.com/*' }).catch(() => [])
+  ])
+  // `ligada` só é falso quando gravado explicitamente: a barra nasce ligada.
+  const ligada = !(r && r.llui && r.llui.ligada === false)
+  pintarSwitch(ligada, tabs.length > 0)
+}
+
+swEl.onchange = async () => {
+  const ligada = swEl.checked
+  const r = await chrome.storage.local.get('llui').catch(() => ({}))
+  const llui = { ...((r && r.llui) || {}), ligada }
+  await chrome.storage.local.set({ llui }).catch(() => {})
+  // Avisa as abas abertas para reagirem AGORA, sem esperar recarregar.
+  const tabs = await chrome.tabs.query({ url: 'https://www.netflix.com/*' }).catch(() => [])
+  for (const t of tabs) {
+    chrome.tabs.sendMessage(t.id, { type: ligada ? 'englab-religar' : 'englab-desligar' }).catch(() => {})
+  }
+  pintarSwitch(ligada, tabs.length > 0)
+}
+lerEstado()
 chrome.storage.onChanged.addListener(render)
 render()

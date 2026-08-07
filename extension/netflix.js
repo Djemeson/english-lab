@@ -778,6 +778,15 @@ document.addEventListener('keydown', e => {
 
 // religar pela popup da extensão
 try { chrome.runtime.onMessage.addListener(msg => {
+  // Desligar pela popup: o interruptor de lá manda os dois lados, e sem este
+  // ramo só dava para RELIGAR — desligar exigia achar o botão na própria
+  // barra, que é justamente o que o switch veio resolver.
+  if (msg && msg.type === 'englab-desligar') {
+    cfgUI.ligada = false; salvarUI()
+    if (barra) barra.style.display = 'none'
+    aplicarNativa(); aplicarDoca()
+    return
+  }
   if (msg && msg.type === 'englab-religar') {
     cfgUI.ligada = true; salvarUI()
     if (barra) barra.style.display = 'flex'

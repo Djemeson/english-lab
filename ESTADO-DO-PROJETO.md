@@ -1199,6 +1199,25 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+198. **INTERRUPTOR NA POPUP DA EXTENSÃO (102ª rodada, 2026-08-06)**.
+     - O botão **"Religar a barra na Netflix"** só servia DEPOIS de ela já ter sumido, e não
+       dizia o estado atual — não havia como saber se estava ligada, nem como desligar dali
+       (só pelo botão dentro da própria barra). Virou **switch**, que mostra E muda.
+     - **A fonte da verdade é a mesma dos dois lados**: `llui.ligada` no `chrome.storage.local`,
+       o objeto que o content script já lia e gravava. Assim popup e barra nunca discordam —
+       esconder pelo botão da barra reflete no switch, e vice-versa. O switch grava com
+       *spread* do objeto existente para não apagar as outras preferências (`doca`, `pt`,
+       `fog`…).
+     - **O content script ganhou o ramo `englab-desligar`**: ele só sabia RELIGAR, então um
+       interruptor de dois estados não teria como desligar nada.
+     - O rótulo diz o estado real e distingue os casos: *"aparecendo sobre o vídeo"*,
+       *"escondida"* e *"ligada — abra a Netflix para ver"* quando não há aba da Netflix aberta.
+     - ⚠️ **Não verifiquei o visual do switch.** A maquete roda DENTRO da página do app, com a
+       folha de estilo dele competindo, e o `:checked` não pintou ali — o popup é documento
+       isolado, então o resultado do teste não vale para ele. O CSS é o padrão
+       `input:checked + span`, conferido no arquivo. **Confirmar abrindo a popup.**
+       `manifest.json` → **3.9.0**.
+
 197. **A LEGENDA PAROU DE SEGUIR OS CONTROLES (101ª rodada, 2026-08-06)**.
      - **Efeito colateral do conserto anterior**: passei a medir o topo dos controles A CADA
        QUADRO, e eles aparecem e somem conforme o mouse. A legenda passou a subir e descer

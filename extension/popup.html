@@ -16,6 +16,24 @@
   button.pri { background: #23beaa; border-color: #23beaa; color: #06231f; font-weight: 600; }
   .st { color: #23beaa; font-size: 12px; margin: 6px 0 0; min-height: 14px; }
   .dica { color: #7c8896; font-size: 11px; margin-top: 10px; line-height: 1.5; }
+
+  /* Interruptor da barra na Netflix. Era um botão "Religar", que só servia
+     depois de ela já ter sumido e não dizia o estado atual — o usuário não
+     tinha como saber se estava ligada. Um switch mostra E muda. */
+  .sw-linha { display: flex; align-items: center; gap: 10px; margin-top: 12px;
+    padding: 9px 11px; border-radius: 8px; background: #17202e; border: 1px solid #2a3646; }
+  .sw-txt { flex: 1; min-width: 0; }
+  .sw-txt b { display: block; font-size: 12.5px; }
+  .sw-txt i { font-style: normal; font-size: 11px; color: #7c8896; }
+  .sw { position: relative; width: 42px; height: 24px; flex-shrink: 0; cursor: pointer; }
+  .sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .sw span { position: absolute; inset: 0; border-radius: 999px; background: #2a3646;
+    transition: background .18s; pointer-events: none; }
+  .sw span::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
+    border-radius: 50%; background: #8b98a8; transition: transform .18s, background .18s; }
+  .sw input:checked + span { background: #23beaa; }
+  .sw input:checked + span::after { transform: translateX(18px); background: #06231f; }
+  .sw input:focus-visible + span { outline: 2px solid #23beaa; outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -23,7 +41,13 @@
   <ul id="lista"></ul>
   <button class="pri" id="abrir">Entregar no Lab</button>
   <p class="st" id="status"></p>
-  <button id="religar">Religar a barra na Netflix</button>
+  <div class="sw-linha">
+    <div class="sw-txt">
+      <b>Barra na Netflix</b>
+      <i id="sw-estado">verificando…</i>
+    </div>
+    <label class="sw"><input type="checkbox" id="sw-ligada" aria-label="Ligar ou desligar a barra na Netflix"><span></span></label>
+  </div>
   <button id="limpar">Descartar capturas pendentes</button>
   <p class="dica"><b>Netflix:</b> clique numa palavra da legenda; "+ frase" salva a fala inteira.<br>
   <b>read.amazon.com:</b> selecione a palavra e clique em "Revisar" — ou ligue o "auto" e toda
