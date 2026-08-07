@@ -482,17 +482,31 @@ function _engolirMovimento(e) {
   e.stopPropagation()
 }
 
-// Cacheado por elemento: `elementFromPoint` + `getComputedStyle` a cada pixel
-// de movimento seria caro, e o alvo muda pouco enquanto se assiste.
-let _cursorArrumado = null
+// ⚠️ NÃO cachear por elemento. A primeira versão guardava "já arrumei este" e
+// saía cedo — mas a Netflix esconde o cursor por TEMPO DE OCIOSIDADE, não por
+// movimento: quando ele para, ela some com o painel E com o ponteiro, e
+// nenhum evento acontece para nós reagirmos. O cache fazia a checagem
+// seguinte desistir no mesmo elemento, então o cursor ficava sumido.
+// Agora a decisão é sempre pelo valor COMPUTADO — e só há escrita quando ele
+// está de fato `none`, então repetir a checagem não custa nada.
+let _ultimoX = 0, _ultimoY = 0
 function _garantirCursor(x, y) {
-  const alvo = document.elementFromPoint(x, y)
-  if (!alvo || alvo === _cursorArrumado) return
+  if (x != null) { _ultimoX = x; _ultimoY = y }
+  const alvo = document.elementFromPoint(_ultimoX, _ultimoY)
+  if (!alvo) return
   if (getComputedStyle(alvo).cursor === 'none') {
     alvo.style.setProperty('cursor', 'auto', 'important')
-    _cursorArrumado = alvo
   }
 }
+
+// A VIGIA. É ela que cobre o caso do ponteiro PARADO, que é justamente quando
+// a Netflix o esconde. 400ms é imperceptível para o olho e barato: um
+// `elementFromPoint` e um `getComputedStyle` por ciclo, e só enquanto a barra
+// está ligada no modo flutuante.
+setInterval(() => {
+  if (!cfgUI.ligada || cfgUI.doca) return
+  _garantirCursor(null)
+}, 400)
 for (const tipo of ['mousemove', 'pointermove']) {
   document.addEventListener(tipo, _engolirMovimento, true)
 }

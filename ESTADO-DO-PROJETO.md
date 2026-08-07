@@ -1199,6 +1199,23 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+201. **O CURSOR SUMIA DE NOVO: reagir não bastava, era preciso VIGIAR
+     (105ª rodada, 2026-08-06)**.
+     - **Por que a correção anterior era incompleta**: ela rodava dentro de
+       `_engolirMovimento`, ou seja, **só ao mover o mouse**. Mas a Netflix esconde o ponteiro
+       por **tempo de ociosidade** — exatamente quando ele está PARADO e não há evento nenhum
+       para reagirmos. Corrigi o gatilho errado.
+     - **E o cache piorava**: eu guardava "já arrumei este elemento" e saía cedo. Quando ela
+       reaplicava o `cursor: none`, a checagem seguinte desistia no mesmo elemento e o ponteiro
+       ficava sumido de vez. Agora a decisão é sempre pelo valor **computado**, e só há escrita
+       quando ele está de fato `none` — repetir a checagem não custa nada.
+     - **A vigia**: `setInterval` de 400ms, ativo só com a barra ligada no modo flutuante. Um
+       `elementFromPoint` e um `getComputedStyle` por ciclo. A última posição do ponteiro fica
+       guardada, então a vigia funciona **sem** movimento novo.
+     - Verificado: arruma na primeira vez; **arruma de novo depois de a Netflix reaplicar, sem
+       nenhum movimento**; arruma numa terceira; lembra a posição; e não toca em elemento que
+       já tem cursor válido. `manifest.json` → **3.10.2**.
+
 200. **O CURSOR SUMIU — efeito colateral direto da supressão (104ª rodada, 2026-08-06)**.
      - **Causa**: a Netflix esconde o ponteiro junto com o painel quando conclui que o usuário
        parou de mexer. Como passamos a **engolir** o movimento, para ela ele parou **para
