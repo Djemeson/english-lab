@@ -1010,6 +1010,7 @@ function renderWordCard(wordId) {
       ${_familiaHtml(w)}
       ${ctxHtml ? `<div class="wc-context">"${ctxHtml}"</div>` : ''}
       ${ctxHtml ? `<div class="wc-context-pt" id="wc-ctx-pt-${w.id}">${_ptComNegrito(w.context_pt)}</div>` : ''}
+      ${_fraseAlheiaHtml(w)}
     </div>
     ${bodyHtml}
   </div>`
@@ -1029,12 +1030,51 @@ function unidadeDoSentido(w, m) {
   if (!w || !m || m.moved_to) return null
   const base = (w.word || '').trim()
   if (!base) return null
+  let achado = null
   if (m.requires) {
     const extra = String(m.requires).trim()
-    return { extra, unidade: (m.unit || `${base} ${extra}`).trim(), fonte: 'ia' }
+    achado = { extra, unidade: (m.unit || `${base} ${extra}`).trim(), fonte: 'ia' }
+  } else {
+    const a = unidadeFixaDoSentido(m, base)
+    achado = a ? { ...a, fonte: 'detector' } : null
   }
-  const achado = unidadeFixaDoSentido(m, base)
-  return achado ? { ...achado, fonte: 'detector' } : null
+  if (!achado) return null
+  // ⚠️ O ITEM PODE JÁ SER A UNIDADE. Depois de separar, "fall in love" é um
+  // item — e ao ser analisado a IA responde, com toda a razão, que aquele
+  // sentido exige "in love". Sem esta guarda o app avisava o item contra ele
+  // mesmo ("não fall in love sozinho") e oferecia separar o que já está
+  // separado. A pergunta do teste do apagamento é sobre o ITEM COMO ELE É,
+  // não sobre a primeira palavra dele.
+  const baseN = ' ' + _ufNormTxt(base) + ' '
+  if (_ufNormTxt(achado.unidade) === _ufNormTxt(base)) return null
+  if (achado.extra && baseN.includes(' ' + _ufNormTxt(achado.extra) + ' ')) return null
+  return achado
+}
+
+// A FRASE QUE NÃO É DESTE ITEM. Conserto de código não limpa dado já gravado
+// (a lição da 50ª, de novo): as expressões separadas ANTES da guarda acima já
+// nasceram com a frase do pai colada nelas. Em vez de apagar por conta
+// própria — a frase pode ser a única pista de onde ele viu aquilo —, o app
+// mostra o que está errado e deixa a tesoura na mão dele.
+function _fraseAlheiaHtml(w) {
+  if (!w || !w.from || !(w.context || '').trim()) return ''
+  if (typeof _fraseServeParaExpressao !== 'function') return ''
+  if (_fraseServeParaExpressao(w.context, w.word)) return ''
+  return `<div class="mi-unidade" style="margin-top:var(--sp-3)">
+    <div class="miu-txt">${ic('alert','ic-sm')}<span>Esta frase veio de <b>${esc(w.from.word || 'outro item')}</b> e não usa <b>${esc(w.word)}</b> — ela ilustra outro sentido.</span></div>
+    <button class="btn btn-secondary btn-sm" onclick="removerFraseAlheia('${w.id}')"
+      data-tip="Tira a frase deste item. Os exemplos que a IA gerou continuam intactos.">${ic('trash','ic-sm')}Remover a frase</button>
+  </div>`
+}
+
+function removerFraseAlheia(id) {
+  const w = words.find(x => x.id === id); if (!w) return
+  delete w.context; delete w.context_pt
+  w.updated_at = new Date().toISOString()
+  saveWords()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  renderWordCard(w.id)
+  toast('Frase removida', 'info')
 }
 
 // A FAMÍLIA NA TELA. Sem isto, separar um sentido faz o material sumir sem
@@ -1177,10 +1217,17 @@ function _separarSentidoExec(wordId, mi, nomeRaw) {
   // do mesmo jeito. Duplicar "fall in love" seria criar duas filas de revisão
   // para a mesma expressão.
   const ja = words.find(x => x.id !== w.id && igual(x.word) === igual(nome))
+  // ⚠️ A FRASE DO PAI SÓ VEM JUNTO SE FOR MESMO DESTA EXPRESSÃO. O item "fall"
+  // pode ter sido capturado de uma frase sobre o OUTONO ("in the late fall,
+  // the sky is a clear blue…") e um dos sentidos que a IA listou ser
+  // "apaixonar-se": herdar a frase às cegas deixava o card de "fall in love"
+  // ilustrado por uma citação sobre patos e musgo-espanhol. O teste é o mesmo
+  // do aviso de captura: a frase contém o material da expressão?
+  const ctxServe = _fraseServeParaExpressao(w.context, nome)
   const alvo = ja || createWord({
     word: nome,
-    context: w.context || '',
-    context_pt: w.context_pt || '',
+    context: ctxServe ? (w.context || '') : '',
+    context_pt: ctxServe ? (w.context_pt || '') : '',
     source_type: w.source_type || 'manual',
     source_title: w.source_title || '',
     source_context: w.source_context || '',
@@ -1588,6 +1635,18 @@ function unidadeJaEstudada(w) {
 function _ufNormTxt(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z'’\- ]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+// A frase ilustra esta expressão? Olha o RESTO dela ("in love"), nunca a
+// primeira palavra: a frase traz o verbo flexionado ("fell", "falling") e
+// comparar forma com forma erra em todo verbo irregular. Item de uma palavra
+// só não tem resto — qualquer frase serve.
+function _fraseServeParaExpressao(frase, expressao) {
+  const txt = String(frase || '').trim()
+  if (!txt) return false
+  const resto = String(expressao || '').trim().split(/\s+/).slice(1).join(' ')
+  if (!resto) return true
+  return (' ' + _ufNormTxt(txt) + ' ').includes(' ' + _ufNormTxt(resto) + ' ')
 }
 
 const _revExprCache = new Map()   // wordId → [{expr, gloss, type}]

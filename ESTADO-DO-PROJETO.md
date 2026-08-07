@@ -7,7 +7,20 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-07 — **FECHANDO O QUE A 92ª DEIXOU ABERTO (93ª rodada)**.
+> Última atualização: 2026-08-07 — **O ITEM AVISANDO CONTRA ELE MESMO (94ª rodada)**. Print
+> dele: o item **"fall in love"** — já separado — exibia *"este sentido só existe com **in love**
+> … não fall in love sozinho"* e oferecia separar o que já estava separado. **Causa:** ao
+> analisar a expressão, a IA responde (com razão) `requires: "in love"`, e nada checava se o
+> **item já contém** aquele material. O teste do apagamento vale sobre o ITEM COMO ELE É, não
+> sobre a primeira palavra dele — corrigido nos dois lugares: guarda em `unidadeDoSentido` e a
+> regra explícita no prompt. **Segundo erro no mesmo card:** a expressão herdava a frase do pai
+> às cegas, e "fall" tinha sido capturado numa frase sobre o **outono** — o card de "fall in
+> love" ficou ilustrado por patos e musgo-espanhol. Agora a frase só vem junto se contiver o
+> material da expressão (`_fraseServeParaExpressao`), e os itens que já nasceram com a frase
+> errada mostram um aviso com **"Remover a frase"** — conserto de código não limpa dado gravado.
+> `sw.js` → `englab-v140`. Ver seção 8 (94ª rodada).
+>
+> Anterior: 2026-08-07 — **FECHANDO O QUE A 92ª DEIXOU ABERTO (93ª rodada)**.
 > As seis pendências da rodada anterior, todas entregues. **A regra "de quem é o sentido" virou
 > fonte única** em `lang.js` (`promptUnidadeDoSentido`, modos `analise`/`curto`/`curto-pt`) e
 > alcançou os **cinco** prompts que produzem significado — análise, reanálise em lote,
@@ -963,6 +976,46 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-07 (94ª rodada) — O ITEM AVISANDO CONTRA ELE MESMO
+
+**O print**: o item **"fall in love"** (já separado de "fall", com a fileira de família mostrando
+"< fall") exibia o aviso âmbar *"Este sentido só existe com **in love** — parece ser a expressão
+**fall in love**, não fall in love sozinho"*, com o botão "Separar em item próprio" logo ao lado.
+Frase sem sentido, botão que não podia funcionar, e o item contado na varredura como se houvesse
+o que fazer.
+
+**Erro 1 — nada verificava se o item JÁ É a unidade.** Ao analisar "fall in love", a IA preencheu
+`requires: "in love"` — e ela **não está errada**: aquele sentido exige mesmo aquelas palavras. O
+que faltava era a pergunta seguinte, do lado do app: *essas palavras já estão no item?* O
+detector local não teria disparado ali (com o item de 3 palavras a barra exige 2+ palavras em
+comum e sobrava só "with"), então o defeito entrou pelo caminho que o código **confia**: o campo
+da IA. Corrigido nos dois lados, como manda o padrão da 49ª:
+- **Guarda em `unidadeDoSentido`**: descarta quando `unidade` normalizada é igual ao item, ou
+  quando o próprio item já contém `extra`. Vale para o campo da IA e para o detector.
+- **Regra no prompt** (`promptUnidadeDoSentido`, modos `analise` e `curto-pt`): *"o teste é sobre
+  o item EXATAMENTE COMO DADO, não sobre a primeira palavra dele — se ele já contém o material
+  fixo, `requires` e `unit` ficam vazios"*, com "fall in love" nomeado como o caso.
+
+**Erro 2, no mesmo card — a frase que não era daquele item.** O cabeçalho mostrava *"Morning on
+the Lady of the Lake Plantation… particularly in the late **fall** when the sky is a clear blue…
+thousands of ducks quacking"*. Era a frase do PAI: "fall" foi capturado num trecho sobre o
+**outono**, e "apaixonar-se" era apenas um dos sentidos que a IA lista para a palavra. A
+separação herdava `context`/`context_pt` às cegas, então o card de "fall in love" nasceu
+ilustrado por uma citação sobre patos.
+- **`_fraseServeParaExpressao(frase, expressao)`**: a frase só vem junto se contiver o RESTO da
+  expressão ("in love") — olhando o resto, nunca o verbo, porque a frase traz "fell"/"falling" e
+  comparar forma com forma erra em todo irregular (mesmo raciocínio de `unidadeJaEstudada`).
+- **O dado já gravado não se conserta sozinho** (a lição da 50ª, terceira vez): os itens
+  separados ANTES desta rodada continuam com a frase alheia colada. Em vez de apagar por conta
+  própria — a frase pode ser a única pista de onde ele viu aquilo —, o card mostra o aviso
+  *"Esta frase veio de fall e não usa fall in love"* com o botão **"Remover a frase"**. Só
+  aparece em item com `from` cuja frase realmente não serve.
+
+**Verificado ao vivo** reproduzindo o print: o aviso contra si mesmo sumiu e a varredura zerou;
+o caso legítimo (o pai "fall" com o sentido "apaixonar-se") **continua** avisando e aparecendo na
+varredura; separar a partir da frase do outono cria o item **sem contexto**; "Remover a frase"
+limpa os dois campos e o aviso some. Console limpo. `CACHE`: `v139` → **`v140`**.
 
 ### Sessão 2026-08-07 (93ª rodada) — FECHANDO AS SEIS PENDÊNCIAS DA 92ª
 

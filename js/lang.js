@@ -246,6 +246,7 @@ function promptUnidadeDoSentido(alvo, modo) {
   const A = alvo ? `"${alvo}"` : 'the item'
   if (modo === 'curto-pt') {
     return `DE QUEM É O SENTIDO (teste do apagamento): quando um sentido só existe junto de palavras FIXAS, ele é da expressão inteira, não da palavra sozinha. O termo a extrair é a expressão COMPLETA: "fall in love" (apaixonar-se), nunca "fall" com o significado "apaixonar-se" — apague "in love" e o sentido some.
+- O teste é sobre o termo COMO ELE É: se o termo já contém o material fixo (o próprio "fall in love"), não há nada a separar — o sentido é dele mesmo.
 - Complemento que VARIA não forma unidade nova: "fall silent / asleep / ill" é "fall + adjetivo", sentido legítimo de "fall".
 - Os 3 exemplos de um item nunca podem repetir as mesmas palavras extras depois do termo: se repetem, o termo certo era a expressão inteira.`
   }
@@ -256,6 +257,7 @@ function promptUnidadeDoSentido(alvo, modo) {
   }
   return `WHOSE SENSE IS IT — the item alone, or a bigger unit? (decide this for EVERY meaning)
 The tests above ask whether two senses are different. This one asks something else: does the sense belong to ${A} by itself, or only to a larger fixed expression? Apply the DELETION TEST: strip everything else away and keep ${A} alone. Does the meaning survive?
+⚠️ THE TEST IS ABOUT THE ITEM EXACTLY AS GIVEN, not about its first word. If ${A} ALREADY CONTAINS the fixed material, there is nothing to split: "requires" and "unit" stay EMPTY. For the item "fall in love", the sense "apaixonar-se" IS the sense of the item — answering "requires": "in love" there is wrong, because those words are already part of it.
 - (a) SENSE OF THE ITEM — it survives; whatever follows is free and varies. "fall" = cair, diminuir, desabar. → "requires": "", "unit": "".
 - (b) SEPARATE UNIT — the meaning needs FIXED accompanying words, always the same ones. "fall in love" (apaixonar-se), "fall short", "fall through", "fall behind". Delete "in love" and "apaixonar-se" is gone, so the sense belongs to "fall in love", not to "fall". → still RETURN the meaning (the learner met it and must be able to study it), but set "requires": "in love" and "unit": "fall in love". The app turns it into its own study item.
 - (c) OPEN PATTERN — the item takes a complement, but the complement is a whole CLASS, not one fixed word: "fall silent / fall asleep / fall ill" is "fall + adjective". That IS a sense of the item. → "requires": "", "unit": "", and every one of its 3 examples must use a DIFFERENT complement from that class.
