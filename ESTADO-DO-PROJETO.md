@@ -1222,8 +1222,15 @@ palavra virar card no mesmo segundo em que você tropeça nela.
      - Verificado no modo flutuante: fundo do inglês transparente, sombra presente, caixa do
        português presente e justa, inglês não estica, vão de 6px, fontes 27/20, e a posição
        **idêntica com e sem a classe de controles à mostra** (180px nos dois).
-     - Lembrete que agora tem precedente: esta extensão tem **três** aparências — doca,
-       flutuante e a barra normal. Conferir na que o relato menciona. `manifest.json` → **3.4.0**.
+     - Lembrete que agora tem precedente: conferir sempre no modo que o relato menciona.
+       ⚠️ **Correção do que escrevi aqui antes**: eu disse "três aparências — doca, flutuante e
+       a barra normal". **São DUAS.** `aplicarDoca()` é um interruptor binário
+       (`barra.classList.toggle('englab-flut', !cfgUI.doca)`), e o estilo base do `#englab-bar`
+       não é um modo — é o alicerce que os dois herdam. O Djemeson apontou, e conferir a
+       afirmação achou um bug de verdade: o caminho de **religar pela popup** mostrava a barra
+       chamando só `aplicarNativa()`, **sem `aplicarDoca()`**, então ela reaparecia sem nenhuma
+       das duas classes e caía no estilo base — uma aparência que o usuário nunca escolheu.
+       Corrigido. `manifest.json` → **3.4.0**, depois **3.4.1**.
 
 192. **EU ARRUMEI A MODALIDADE ERRADA — o modo DOCA (96ª rodada, 2026-08-06)**.
      Resposta ao ajuste anterior: *"ainda tá longe… as barrinhas você não mexeu, ainda tá

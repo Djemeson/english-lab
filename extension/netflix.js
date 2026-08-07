@@ -697,6 +697,12 @@ try { chrome.runtime.onMessage.addListener(msg => {
     cfgUI.ligada = true; salvarUI()
     if (barra) barra.style.display = 'flex'
     aplicarNativa()
+    // `aplicarDoca()` FALTAVA aqui. Só existem dois modos — doca e flutuante —
+    // e é ela que aplica a classe de um ou de outro. Religando pela popup, a
+    // barra reaparecia SEM nenhuma das duas e caía no estilo base, que não é
+    // um modo: é o alicerce que os dois herdam. Dava uma aparência que o
+    // usuário nunca escolheu.
+    aplicarDoca()
   }
 }) } catch (e) { morrer() }
 
