@@ -1199,6 +1199,30 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        é tratado como recusa, e a contagem do lote passou de "4 geradas" para
        "2 geradas · 1 já existia · 2 falharam". `CACHE` → **v108**.
 
+190. **A EXTENSÃO NÃO ACOMPANHOU AS DUAS LIÇÕES DE IA DO DIA (94ª rodada, 2026-08-06)**.
+     Erro na tela durante o episódio: *"Unsupported parameter: 'max_tokens' is not supported
+     with this model. Use 'max_completion_tokens' instead."*
+     - **`extension/background.js` fala com a OpenAI POR CONTA PRÓPRIA** — o service worker não
+       enxerga `js/ai.js`. Então ele ficou de fora de duas correções feitas horas antes:
+       · **84ª rodada** (`_aiTokenParam`): a família `gpt-5`/`o*` rejeita `max_tokens`. Com o
+         Luna selecionado, TODA chamada da extensão falhava. E, junto, a folga de 25.000 para
+         o raciocínio — sem ela o orçamento some pensando e volta resposta vazia, cobrada.
+       · **93ª rodada** (freio de taxa): a extensão **não tinha repetição nenhuma**. Um 429
+         virava erro na cara do aluno no meio do episódio. Aquele
+         *"[openai] Rate limit reached…"* do print anterior era DAQUI, não do app — o prefixo
+         `[openai]` é o formato desta função.
+     - Agora ela tem: escolha correta do parâmetro por modelo, folga de raciocínio, repetição
+       com o tempo que a própria mensagem da OpenAI informa, freio compartilhado entre chamadas
+       e mensagem específica para o caso de o raciocínio esgotar o teto.
+     - **A lição de manutenção**: `extension/` é cópia deliberada de partes do app e **não
+       recebe conserto por tabela**. Toda mudança em `js/ai.js` que altere o CONTRATO da API
+       (parâmetro, retry, orçamento) tem de ser replicada ali no mesmo dia. Já valia para os
+       prompts (`promptRegrasLexicais`, 80ª rodada) e agora vale explicitamente para a chamada.
+     - ⚠️ **Armadilha de ferramenta, pela SEGUNDA vez na sessão**: o `` da regex virou
+       caractere de BACKSPACE literal ao escrever o arquivo por script, exatamente como na 93ª.
+       Conferido com contagem de `chr(8)` depois de gravar — passou a ser passo obrigatório.
+       `manifest.json` → **3.1.0** (a extensão precisa ser recarregada à mão).
+
 189. **LEGENDA INCOMPLETA NA NETFLIX — o parser de TTML perdia a segunda linha
      (93ª rodada, 2026-08-06)**. Relato com print: a legenda oficial da Netflix mostrava
      *"Well, if you hadn't meddled / to start with,"* e a nossa, embaixo, só a primeira metade.
