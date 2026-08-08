@@ -73,6 +73,96 @@ function lexaFormatar(txt) {
 }
 
 // ================================================================
+// CONVERSA COM A LEXA DENTRO DO BALÃO
+// ================================================================
+// A explicação respondia UMA pergunta e fechava o assunto. Mas a dúvida real
+// raramente acaba na primeira resposta — "e por que não X?", "isso é comum?",
+// "me dá outro exemplo" — e para perguntar isso ele tinha de sair do livro,
+// ir ao Assistente e recontar o contexto todo do zero.
+//
+// Aqui a linha continua: a explicação vira a PRIMEIRA MENSAGEM de uma conversa
+// que já nasce sabendo o livro, a frase e o termo. Componente compartilhado de
+// propósito — o leitor, o Preparar e o vídeo têm popups diferentes e a mesma
+// necessidade; cada um só precisa chamar `lexaChatMontar` no corpo dele.
+//
+// O histórico vive NO ELEMENTO (`_lexaMsgs`), não numa variável global: dois
+// popups abertos em telas diferentes não podem misturar conversa, e quando o
+// popup morre a conversa morre com ele — é dúvida de passagem, não sessão.
+function lexaChatHTML() {
+  return `
+    <div class="lexa-chat">
+      <div class="lexa-chat-msgs"></div>
+      <form class="lexa-chat-form" autocomplete="off">
+        <input type="text" class="lexa-chat-inp" placeholder="Pergunte mais sobre isto…"
+               aria-label="Pergunte mais sobre este trecho">
+        <button type="submit" class="lexa-chat-env" aria-label="Enviar">${ic('send', 'ic-sm')}</button>
+      </form>
+    </div>`
+}
+
+// `contexto` descreve o que a conversa já sabe: {sistema, primeira, resposta}.
+function lexaChatMontar(caixa, contexto) {
+  if (!caixa) return
+  caixa.insertAdjacentHTML('beforeend', lexaChatHTML())
+  const chat = caixa.querySelector('.lexa-chat')
+  const msgs = chat.querySelector('.lexa-chat-msgs')
+  const form = chat.querySelector('.lexa-chat-form')
+  const inp = chat.querySelector('.lexa-chat-inp')
+  // A conversa nasce com a explicação já dada: sem isto a segunda pergunta
+  // chegaria à IA sem o livro, sem a frase e sem o que ela mesma respondeu —
+  // e ele teria de recontar tudo, que é justamente o atrito que isto remove.
+  chat._lexaMsgs = [
+    { role: 'system', content: contexto.sistema },
+    { role: 'user', content: contexto.primeira },
+    { role: 'assistant', content: contexto.resposta }
+  ]
+  // O clique dentro do chat não pode borbulhar: os popups que o hospedam
+  // fecham ao clique de fora, e digitar fecharia a própria conversa. No leitor
+  // isso também impede o `preventDefault` do popup, que existe para não
+  // colapsar a seleção — e que impediria o campo de receber foco.
+  chat.addEventListener('mousedown', e => e.stopPropagation())
+  chat.addEventListener('click', e => e.stopPropagation())
+  // Gancho para a tela se proteger enquanto ele digita. O leitor precisa dele:
+  // clicar no campo desfaz a seleção de texto, e o vigia de seleção fecharia o
+  // popup 350ms depois, no meio da pergunta. O componente não sabe disso — só
+  // avisa que entrou e saiu do campo.
+  if (typeof contexto.aoFoco === 'function') {
+    inp.addEventListener('focus', () => contexto.aoFoco(true))
+    inp.addEventListener('blur', () => contexto.aoFoco(false))
+  }
+
+  form.onsubmit = async e => {
+    e.preventDefault(); e.stopPropagation()
+    const q = String(inp.value || '').trim()
+    if (!q || chat._ocupado) return
+    chat._ocupado = true
+    inp.value = ''
+    msgs.insertAdjacentHTML('beforeend',
+      `<div class="lexa-msg eu">${esc(q)}</div><div class="lexa-msg ela pensando"><span class="spinner"></span></div>`)
+    msgs.scrollTop = msgs.scrollHeight
+    const pendente = msgs.lastElementChild
+    chat._lexaMsgs.push({ role: 'user', content: q })
+    try {
+      const t = await aiTextSeguro(chat._lexaMsgs, { maxTokens: 600 })
+      chat._lexaMsgs.push({ role: 'assistant', content: t })
+      pendente.classList.remove('pensando')
+      pendente.innerHTML = lexaFormatar(t)
+    } catch (err) {
+      pendente.classList.remove('pensando')
+      pendente.classList.add('erro')
+      pendente.textContent = 'Não deu: ' + (err.message || 'erro')
+      // Pergunta que não foi respondida sai do histórico: senão a próxima
+      // chamada mandaria duas perguntas seguidas do aluno e a IA responderia
+      // só a última, deixando a primeira sem resposta para sempre.
+      chat._lexaMsgs.pop()
+    }
+    chat._ocupado = false
+    msgs.scrollTop = msgs.scrollHeight
+    inp.focus()
+  }
+}
+
+// ================================================================
 // "O QUE É AQUI?" — a checagem sob demanda, no CLIQUE
 // ================================================================
 // O buraco que isto fecha: `knownWords` guarda PALAVRA, não sentido. Marcar

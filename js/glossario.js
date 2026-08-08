@@ -167,7 +167,15 @@ function _glossDoCard(w) {
   // `moved_to`: sentido que virou item próprio (ex.: "apaixonar-se" saiu de
   // "fall" e virou "fall in love"). Continua no array só para não mover o
   // índice dos cards já criados — mas não é mais sentido DESTA palavra.
-  const ms = Array.isArray(w.meanings) ? w.meanings.filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em) : []
+  // O MATERIAL SÓ VALE DEPOIS DE ENVIADO. Sentido em `pronto` ainda está na
+  // fila do Preparar: é rascunho da IA que ele nem conferiu, e nenhum rascunho
+  // pode responder por ele no balão que aparece por cima do livro. Depois do
+  // envio — `estudo`, `revisao` ou `saber` — passa a valer, inclusive o
+  // `saber`, que existe justamente para ser consulta.
+  // O item continua no ÍNDICE mesmo sem sentido válido (com `pt` vazio): o
+  // balão precisa poder dizer "já está no Preparar" para ele não recapturar.
+  const dos = Array.isArray(w.meanings) ? w.meanings.filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em) : []
+  const ms = dos.filter(m => (typeof sentidoEstado === 'function' ? sentidoEstado(m) : 'pronto') !== 'pronto')
   if (!ms.length) return null
   const m = ms.find(x => x.context_match && x.selected !== false)
       || ms.find(x => x.context_match)
@@ -208,8 +216,11 @@ function _glossConstruir() {
     const alvo = String(w.word || '').trim()
     if (!alvo) continue
     const g = _glossDoCard(w)
+    // Tem material montado mas ainda não enviado: o balão precisa saber para
+    // dizer a coisa certa (ver `glossLinhaHTML`).
+    const analisado = !g && (w.meanings || []).some(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em)
     põe(alvo, {
-      termo: alvo, fonte: 'card', id: w.id,
+      termo: alvo, fonte: 'card', id: w.id, analisado,
       pt: g ? g.pt : '', def: g ? g.def : '', tipo: g ? g.tipo : '',
       gramatical: g ? g.gramatical : false,
       doContexto: g ? g.doContexto : false,
@@ -456,8 +467,14 @@ function glossLinhaHTML(achado, opts = {}) {
     // meio é o que aparecia errado: palavra que ele MANDOU para o Preparar mas
     // que a IA ainda não analisou entrava aqui e recebia "você marcou como
     // conhecida" — exatamente o contrário do que ele fez com ela.
+    // O caso do meio tem DUAS versões desde que o material passou a valer só
+    // depois do envio: sem análise ainda, ou analisado e esperando o envio.
+    // Dizer "ainda sem análise" para o segundo seria mentir sobre o trabalho
+    // que já foi feito — e ele acharia que a IA não rodou.
     const rotulo = achado.fonte === 'ignored' ? 'você marcou como ignorada'
-                 : achado.fonte === 'card'    ? 'já está no Preparar, ainda sem análise'
+                 : achado.fonte === 'card'    ? (achado.analisado
+                     ? 'já está no Preparar — envie para o Estudo e o material aparece aqui'
+                     : 'já está no Preparar, ainda sem análise')
                  : 'você marcou como conhecida'
     const icn = achado.fonte === 'card' ? 'clock' : 'check'
     return `<div class="gloss-corpo"><div class="gloss-vazio">${icone(icn)} ${rotulo}</div></div>`

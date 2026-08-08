@@ -5070,6 +5070,35 @@ body.ler-full .mobile-bottom-nav{display:none}
   font-size:var(--fs-xs);color:var(--text3);
 }
 
+/* ================================================================
+   CONVERSA COM A LEXA dentro do popup de seleção (leitor, Preparar, vídeo).
+   A explicação deixa de ser resposta única e vira o começo de uma linha.
+   ================================================================ */
+.lexa-chat{margin-top:var(--sp-4);padding-top:var(--sp-3);border-top:1px dashed var(--border)}
+.lexa-chat-msgs{display:flex;flex-direction:column;gap:var(--sp-3);max-height:230px;overflow-y:auto}
+.lexa-chat-msgs:not(:empty){margin-bottom:var(--sp-3)}
+.lexa-msg{font-size:var(--fs-sm);line-height:1.55;border-radius:var(--radius-sm);padding:var(--sp-3) var(--sp-4)}
+/* A pergunta dele encosta à direita e a resposta à esquerda: a mesma gramática
+   visual do Assistente, para não ter de reaprender a ler a tela. */
+.lexa-msg.eu{align-self:flex-end;max-width:85%;background:rgba(var(--primary-rgb),.14);color:var(--text)}
+.lexa-msg.ela{align-self:flex-start;background:var(--surface2);color:var(--text2)}
+.lexa-msg.ela.erro{color:var(--error);background:transparent;padding-left:0}
+.lexa-msg.pensando{display:flex;align-items:center;gap:var(--sp-2)}
+.lexa-msg.pensando .spinner{width:13px;height:13px;border-width:2px}
+.lexa-chat-form{display:flex;gap:var(--sp-2);align-items:center}
+.lexa-chat-inp{
+  flex:1;min-width:0;padding:var(--sp-3) var(--sp-4);font-size:var(--fs-sm);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text);outline:none;
+}
+.lexa-chat-inp:focus{border-color:rgba(var(--primary-rgb),.55)}
+.lexa-chat-env{
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  width:34px;height:34px;border:0;border-radius:var(--radius-sm);cursor:pointer;
+  background:rgba(var(--primary-rgb),.9);color:#fff;
+}
+.lexa-chat-env:hover{background:rgba(var(--primary-rgb),1)}
+
 /* "O QUE É AQUI?" — a checagem sob demanda. O balão fica PRESO enquanto
    espera: ganha borda de foco para dizer que não vai sumir sozinho. */
 .gloss-balao.preso{border-color:rgba(var(--primary-rgb),.5);box-shadow:0 0 0 3px rgba(var(--primary-rgb),.14),var(--shadow)}

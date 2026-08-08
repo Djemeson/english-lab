@@ -726,7 +726,8 @@ function openBiblioteca() {
   // nada tem verbete cheio e ZERO cards. Enquanto esta trava olhava só o
   // `srsCards`, a Biblioteca respondia "vazia" com o conteúdo pronto do lado.
   const temVerbete = Array.isArray(words) && words.some(w =>
-    (w.meanings || []).some(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em))
+    (w.meanings || []).some(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em &&
+      (typeof sentidoEstado === 'function' ? sentidoEstado(m) : 'pronto') !== 'pronto'))
   const vazio = _libMode === 'words' ? !temVerbete : !srsCards.length
   if (vazio) {
     if (area) area.innerHTML = ''
@@ -791,7 +792,12 @@ function renderWordsGlossary(query) {
   // é a vitrine e o `words[]` é o estoque.
   const byWord = new Map()
   for (const w of words) {
-    const ms = (w.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em)
+    // SÓ ENTRA O QUE FOI ENVIADO. Sentido em `pronto` ainda está na fila do
+    // Preparar — é rascunho da IA esperando conferência, e o verbete é o
+    // material que ele adotou. Depois do envio (`estudo`, `revisao`, `saber`)
+    // passa a valer; o `saber` inclusive existe para ser consulta.
+    const ms = (w.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em &&
+      (typeof sentidoEstado === 'function' ? sentidoEstado(m) : 'pronto') !== 'pronto')
     if (!ms.length) continue
     const g = { wordId: w.id, word: w.word || '', ipa: w.ipa || '', type: w.type || '',
                 type_label: w.type_label || '', lang: wordLang(w),

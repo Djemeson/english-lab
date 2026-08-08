@@ -2226,16 +2226,21 @@ async function revSelExplain() {
     ? wikiIlustracao(txt, (w && w.lang) || 'en').then(i => { figura = wikiFiguraHTML(i) }).catch(() => {})
     : Promise.resolve()
   try {
-    const resp = await aiTextSeguro([
-      { role: 'system', content: lexaExplicar() },
-      { role: 'user', content:
+    const sistema = lexaExplicar()
+    const pergunta =
 `No item de estudo "${w ? w.word : ''}" (contexto: "${window._revSelCtx || (w && w.context) || ''}"), o aluno selecionou: "${txt}".
-Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado nesta expressão, explique a imagem.` }
+Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado nesta expressão, explique a imagem.`
+    const resp = await aiTextSeguro([
+      { role: 'system', content: sistema },
+      { role: 'user', content: pergunta }
     ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
     await pFig   // a figura já veio (é mais rápida que a IA); só junta
     const html = figura + lexaFormatar(resp)
     _revExplainCache.set(chave, html)   // aiTextSeguro nunca devolve vazio: não cacheia silêncio
     corpo.innerHTML = html
+    // A conversa continua daqui — o chat NÃO entra no cache: ele é da sessão,
+    // e reabrir a explicação tem de trazer a caixa vazia, não a conversa velha.
+    if (typeof lexaChatMontar === 'function') lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
   } catch (e) {
     corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)} — clique em Explicar para tentar de novo.</span>`
   }

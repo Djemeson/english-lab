@@ -1171,15 +1171,28 @@ function _lerAoSelecionar() {
     }
 
     try {
+      const sistema = lexaPrompt()
+      const pergunta = `O aluno está lendo "${_lerLivro.title}"${_lerLivro.author ? ', de ' + _lerLivro.author : ''}. A frase é: "${ctx}". Ele selecionou: "${alvo}".\nExplique o que "${alvo}" significa AQUI, nesta passagem.`
       const t = await aiTextSeguro([
-        { role: 'system', content: lexaPrompt() },
-        { role: 'user', content: `O aluno está lendo "${_lerLivro.title}"${_lerLivro.author ? ', de ' + _lerLivro.author : ''}. A frase é: "${ctx}". Ele selecionou: "${alvo}".\nExplique o que "${alvo}" significa AQUI, nesta passagem.` }
+        { role: 'system', content: sistema },
+        { role: 'user', content: pergunta }
       ], { maxTokens: 600 })
-      const txtEl = el('ler-pop-corpo') && el('ler-pop-corpo').querySelector('.ler-pop-txt')
+      const corpoAtual = el('ler-pop-corpo')
+      const txtEl = corpoAtual && corpoAtual.querySelector('.ler-pop-txt')
       // innerHTML com `lexaFormatar`, não textContent: a resposta vem em
       // markdown e o `textContent` a mostrava crua — `**pals** = "amigos"`,
       // com os asteriscos na cara do aluno.
       if (txtEl) txtEl.innerHTML = t ? lexaFormatar(t) : esc(`${lexaNome()} devolveu uma resposta vazia`)
+      // A conversa continua daqui: a explicação vira a primeira mensagem, então
+      // a pergunta seguinte já sabe o livro, a frase e o termo.
+      if (t && corpoAtual && typeof lexaChatMontar === 'function' && !corpoAtual.querySelector('.lexa-chat')) {
+        lexaChatMontar(corpoAtual, { sistema, primeira: pergunta, resposta: t,
+          // Enquanto o campo tem foco, o vigia de seleção não fecha o popup:
+          // clicar ali desfaz a seleção do texto, e sem isto a conversa sumia
+          // 350ms depois de ele começar a escrever. Reusa a trava que o
+          // duplo-clique já usava.
+          aoFoco: on => { _lerIgnoraSel = on } })
+      }
     } catch (e) {
       const txtEl = el('ler-pop-corpo') && el('ler-pop-corpo').querySelector('.ler-pop-txt')
       if (txtEl) txtEl.textContent = 'Não deu: ' + e.message

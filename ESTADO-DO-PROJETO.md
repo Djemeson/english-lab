@@ -6041,6 +6041,50 @@ pré-análise no capítulo** (a glosa que ele mostra é a do contexto antigo). O
 já respondeu, ou já acusou divergência, o botão não aparece — seria pagar por resposta que
 existe.
 
+### O MATERIAL SÓ VALE DEPOIS DO ENVIO (2026-08-08)
+
+*"O material só deve ir pra Biblioteca, ou glossário, depois que eu mandar pro Estudo."*
+
+Regra fechada, e ela completa a Fase 3: sentido em **`pronto` é rascunho da IA esperando
+conferência**, não material adotado — não pode responder por ele no balão que aparece por cima
+do livro nem ocupar linha no verbete. Depois do envio (`estudo`, `revisao` **ou `saber`**)
+passa a valer; o `saber` inclusive existe exatamente para ser consulta.
+
+Três pontos filtrados: `_glossDoCard` (glossário), o construtor do verbete e a trava do vazio
+da Biblioteca (`temVerbete`) — os três com a mesma regra.
+
+⚠️ **O item continua no ÍNDICE do glossário mesmo sem sentido válido**, com `pt` vazio. É o que
+permite ao balão dizer "já está no Preparar" e evitar a recaptura. E o rótulo ganhou duas
+versões, porque agora há dois motivos para não ter glosa: *"ainda sem análise"* e
+*"envie para o Estudo e o material aparece aqui"* — dizer o primeiro para um item já analisado
+seria mentir sobre trabalho que já foi feito.
+
+### CONVERSA COM A LEXA NO BALÃO (2026-08-08)
+
+*"Quando a Lexa analisar um item, quero uma caixa de texto pra conversar com ela sobre aquilo,
+tudo no balãozinho."*
+
+A explicação respondia UMA pergunta e fechava o assunto — e a dúvida real raramente acaba na
+primeira resposta. Para perguntar "e por que não X?" ele tinha de sair do livro, ir ao
+Assistente e recontar o contexto do zero.
+
+`lexaChatHTML` / `lexaChatMontar` em `ai.js`, componente compartilhado, ligado nas **três**
+telas que explicam: leitor, Preparar e vídeo. A explicação vira a **primeira mensagem** da
+conversa, então a pergunta seguinte já nasce sabendo o livro/episódio, a frase e o termo.
+
+Cuidados que o teste cobriu:
+- **O histórico vive no elemento** (`chat._lexaMsgs`), não numa global: dois popups em telas
+  diferentes não misturam conversa, e quando o popup morre a conversa morre junto — é dúvida
+  de passagem, não sessão. Pelo mesmo motivo o chat **não entra no cache de explicação**.
+- **Pergunta que falhou sai do histórico**, senão a chamada seguinte mandaria duas perguntas
+  do aluno em sequência e a IA responderia só a última.
+- **Dois bloqueios do leitor tiveram de ser contornados**, e nenhum era óbvio:
+  (a) `pop.onmousedown = preventDefault` (existe para não colapsar a seleção) impediria o
+  campo de receber foco — resolvido pelo `stopPropagation` do próprio chat, que roda antes;
+  (b) clicar no campo desfaz a seleção de texto, e `_lerSelecaoMudou` fecharia o popup 350 ms
+  depois, no meio da pergunta — resolvido por um gancho `aoFoco` que a tela usa para segurar
+  a trava `_lerIgnoraSel` que o duplo-clique já tinha.
+
 ### COESÃO ENTRE AS TELAS — o "mine" que virou "mina" (2026-08-08)
 
 *"O sentido do contexto aqui é 'explorar', mas quando fui na opção de o que significava

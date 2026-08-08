@@ -691,11 +691,13 @@ async function videoOvExplain() {
   if (!aiChatCfg().key) { toast('Configure uma chave de IA em Configurações', 'warning'); return }
   corpo.innerHTML = '<span class="gen-spinner"></span> a IA está explicando...'
   try {
-    const resp = await aiTextSeguro([
-      { role: 'system', content: lexaExplicar() },
-      { role: 'user', content:
+    const sistema = lexaExplicar()
+    const pergunta =
 `Na cena de "${_vidCur ? _vidCur.title : ''}", a fala é: "${contexto}". O aluno selecionou: "${txt}".
-Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado, explique a imagem.` }
+Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado, explique a imagem.`
+    const resp = await aiTextSeguro([
+      { role: 'system', content: sistema },
+      { role: 'user', content: pergunta }
     ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
     // resposta vazia (DeepSeek faz isso às vezes) NÃO pode virar cache — senão
     // a seleção fica muda para sempre; trata como erro e oferece re-tentar
@@ -703,6 +705,8 @@ Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultur
     const html = lexaFormatar(resp)
     if (typeof _revExplainCache !== 'undefined') _revExplainCache.set(chave, html)
     corpo.innerHTML = html
+    // A conversa continua sobre a CENA: a caixa já sabe o episódio e a fala.
+    if (typeof lexaChatMontar === 'function') lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
   } catch (e) {
     // erro DENTRO do popup (um toast some antes de o aluno entender o que houve)
     corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)} — clique em Explicar para tentar de novo.</span>`
