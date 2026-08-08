@@ -6041,6 +6041,30 @@ pré-análise no capítulo** (a glosa que ele mostra é a do contexto antigo). O
 já respondeu, ou já acusou divergência, o botão não aparece — seria pagar por resposta que
 existe.
 
+### A ORDEM DO DOSSIÊ (2026-08-08)
+
+*"Aqui sempre os mais novos aparecem em cima. Não tem problema, mas deve haver um
+classificador… assim eu estudo na ordem que vi primeiro nas fontes."*
+
+O topo era efeito colateral: `createWord` faz `words.unshift(w)`, então o último capturado fica
+no índice 0 e o dossiê herdava isso. Agora tem seletor: **"Mais recentes primeiro"** (o de
+sempre, mantido como padrão para nada mudar sem ele pedir) e **"Ordem da fonte"**, que é a
+sequência em que ele encontrou no livro — o dossiê passa a recontar o capítulo em vez de
+embaralhá-lo.
+
+Três decisões que valem registro:
+
+- **A ordem É persistida; o filtro NÃO.** Parece incoerente com a regra escrita acima, mas a
+  diferença é de natureza: filtro **esconde** (e some sem explicar — a lição do filtro de fonte
+  do SRS), ordenação só reorganiza. Nada desaparece, então não há como abrir o app e achar que
+  ele quebrou. Re-escolher a ordem toda vez é que seria atrito à toa.
+- **O desempate é o ÍNDICE do array, não o `created_at`.** Importação em lote (o Kindle cria
+  dezenas no mesmo segundo) empata a data, e aí o índice é o único sinal que sobra da ordem
+  real de captura. Testado com quatro itens de `created_at` idêntico: a ordem da fonte saiu
+  correta.
+- **A ordem vale DENTRO de cada grupo**: o que falta continua vindo antes do que já foi
+  estudado. Inverter isso obrigaria a rolar por cima do que já terminou.
+
 ### UM SENTIDO POR ENCONTRO — a análise para de despejar o verbete (2026-08-08)
 
 A pergunta dele fechou a incoerência que sobrava: *"mandar até mesmo os sentidos que eu não vou

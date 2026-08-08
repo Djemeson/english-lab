@@ -65,12 +65,17 @@ function _dossieSentidos() {
   const out = []
   const dos = typeof sentidosDe === 'function' ? sentidosDe : (w => (w.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em))
   const est = typeof sentidoEstado === 'function' ? sentidoEstado : (m => m.estado || 'pronto')
-  for (const w of words) {
+  words.forEach((w, i) => {
     for (const m of dos(w)) {
       const e = est(m)
-      if (e === 'estudo' || e === 'revisao') out.push({ w, m, feito: e === 'revisao' })
+      // `i` é a posição no `words`, e ela é o sinal MAIS confiável da ordem de
+      // captura: `createWord` faz `unshift`, então quem entrou por último está
+      // no índice 0. O `created_at` sozinho empata em importação de lote (o
+      // Kindle cria dezenas no mesmo segundo) — por isso o índice é o critério
+      // de desempate, e não enfeite.
+      if (e === 'estudo' || e === 'revisao') out.push({ w, m, feito: e === 'revisao', i })
     }
-  }
+  })
   return out
 }
 
@@ -182,6 +187,27 @@ function _dossieCardHTML(s) {
 let _dosBusca = ''
 let _dosFiltro = 'todos'     // todos | pendentes | feitos
 
+// A ORDEM, AO CONTRÁRIO, É PERSISTIDA — e a diferença é de natureza, não de
+// gosto: filtro ESCONDE (e some sem explicar), ordenação só reorganiza. Nada
+// desaparece, então não há como abrir o app e achar que ele quebrou. Re-
+// escolher a ordem toda vez é que seria atrito à toa.
+let _dosOrdem = (typeof loadUiPrefs === 'function' && loadUiPrefs().dosOrdem) || 'recentes'
+
+// 'recentes' = o mais novo em cima (é o que o `unshift` do createWord já dava)
+// 'fonte'    = a ordem em que ele ENCONTROU no livro — estudar na sequência da
+//              leitura faz o dossiê recontar o capítulo em vez de embaralhá-lo.
+function _dosComparar(a, b) {
+  const t = s => Date.parse(s.w.created_at || '') || 0
+  const dir = _dosOrdem === 'fonte' ? 1 : -1
+  return (t(a) - t(b)) * dir || (a.i - b.i) * -dir
+}
+
+function dossieOrdenar(v) {
+  _dosOrdem = (v === 'fonte') ? 'fonte' : 'recentes'
+  if (typeof saveUiPref === 'function') saveUiPref('dosOrdem', _dosOrdem)
+  _dossiePintarCorpo()
+}
+
 // Comparação sem acento e sem caixa: quem busca "cogumelos" no capítulo
 // "Um atalho para cogumelos" também digita "COGUMELOS" e "cogumêlos".
 function _dosNorm(s) {
@@ -264,6 +290,13 @@ function _dossieBarraHTML() {
                value="${escA(_dosBusca)}" oninput="dossieBuscar(this.value)">
       </div>
       <div class="dos-fils" id="dossie-filtros"></div>
+      <label class="dos-ordem">
+        ${ic('layers','ic-sm')}
+        <select onchange="dossieOrdenar(this.value)" aria-label="Ordem dos itens">
+          <option value="recentes"${_dosOrdem === 'recentes' ? ' selected' : ''}>Mais recentes primeiro</option>
+          <option value="fonte"${_dosOrdem === 'fonte' ? ' selected' : ''}>Ordem da fonte (mais antigos)</option>
+        </select>
+      </label>
     </div>`
 }
 
@@ -310,8 +343,11 @@ function _dossiePintarCorpo() {
     return
   }
 
-  const falta = aberto.itens.filter(s => !s.feito)
-  const feitos = aberto.itens.filter(s => s.feito)
+  // A ordem escolhida vale DENTRO de cada grupo. O que falta continua vindo
+  // antes do que já foi feito: é o que ele veio fazer aqui, e inverter isso
+  // seria fazê-lo rolar por cima do que já terminou.
+  const falta = aberto.itens.filter(s => !s.feito).sort(_dosComparar)
+  const feitos = aberto.itens.filter(s => s.feito).sort(_dosComparar)
   // Não estudados primeiro: é o que ele veio fazer.
   const visiveis = [...falta, ...feitos].filter(_dosItemCasa)
   const filtrando = !!_dosBusca || _dosFiltro !== 'todos'

@@ -5410,6 +5410,19 @@ body.ler-full .mobile-bottom-nav{display:none}
   border-radius:var(--radius-xs);font-size:var(--fs-3xs);font-weight:700;
   background:rgba(var(--primary-rgb),.16);color:var(--primary);
 }
+/* Ordem dos itens do dossiê — ao lado dos filtros, e discreta: é ajuste de
+   leitura, não decisão do fluxo. */
+.dos-ordem{
+  display:inline-flex;align-items:center;gap:var(--sp-2);white-space:nowrap;
+  padding:0 var(--sp-3);border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--surface2);color:var(--text3);
+}
+.dos-ordem select{
+  border:0;background:transparent;color:var(--text2);cursor:pointer;outline:none;
+  font-size:var(--fs-xs);font-weight:600;padding:var(--sp-3) 0;
+}
+.dos-ordem:hover{border-color:var(--border-strong)}
+
 .dos-vazio-filtro{text-align:center;padding:56px 20px;color:var(--text3)}
 .dos-vazio-filtro p{margin:10px 0 14px;font-size:var(--fs-md)}
 
