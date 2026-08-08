@@ -5804,7 +5804,146 @@ pela lição já paga do filtro de fonte do SRS — tela vazia sem explicação 
   sem o bump a tela continuaria mostrando os botões antigos. Foi exatamente o que aconteceu no
   teste: o navegador serviu o `review.js` velho até a versão subir.
 
+## 8.2 O ITEM QUE CRESCE — plano do reencontro (FASE 1 feita em 2026-08-07)
+
+> **Leia antes de mexer em `words[].meanings[]`, no glossário ou na captura.**
+> Desenho aprovado pelo Djemeson em 2026-08-07, depois de três rodadas de análise.
+> A Fase 1 está implementada; as Fases 2 e 3 estão desenhadas e NÃO foram executadas.
+
+### O problema
+
+A IA devolve **todos** os sentidos de um item, e o `saveToSrs` cria um card por
+(sentido × exemplo) — com 3 exemplos por sentido, um item de 3 sentidos vira **9 cards**.
+Projetado sobre os 108 itens de *Flags on the Bayou*: **600 a 900 cards** de um livro só, ou
+30-45 dias de cards novos a `newPerDay: 20`. E, nas palavras dele, **~10% era o sentido do
+livro**. O resto não é lixo — é consulta — mas estava cobrando tempo de revisão.
+
+### A decisão
+
+**Capturar só o sentido do contexto.** Os outros não são gerados de véspera: chegam quando
+você os encontra. O item **cresce por reencontro**, e é assim que ele vira um verbete pessoal
+— um dicionário escrito pelo seu histórico de leitura, com a cena de cada sentido.
+
+Isso exige a mudança conceitual que organiza tudo:
+
+> **A unidade de estudo desce de ITEM para SENTIDO.** O item vira o verbete (o continente);
+> o sentido é o que se captura, se estuda e vira card. O SRS já funcionava assim
+> (card por `meaningIdx`) — era o resto que estava desalinhado.
+
+E a regra que destrava o caso central:
+
+> **Palavra conhecida ≠ sentido conhecido.**
+
+### Os dois eixos (por que Estudar e Biblioteca são telas diferentes)
+
+| Eixo | Pergunta que responde | Onde vive |
+|---|---|---|
+| **Fonte** | "o que este capítulo me ensinou?" | **Estudar** — dossiê por obra + capítulo |
+| **Item** | "tudo que eu sei sobre *fall*" | **Biblioteca → Palavras** — o verbete |
+
+Um verbete não pertence a fonte nenhuma: pertence a **todas as fontes onde você esbarrou
+nele**. Por isso ele não cabe em Estudar — foi o próprio Djemeson quem apontou.
+
+### FASE 1 — o reencontro deixa de ser beco (FEITA)
+
+Antes, o cenário "leio `fall`, já existe, mas aqui é outro sentido" produzia **três erros ao
+mesmo tempo**, e todos por uma premissa velha (*1 palavra = 1 item*):
+
+1. o balão mostrava **o sentido antigo** (o card ganhava da pré-análise, sempre);
+2. o botão de capturar **sumia** (`achado.fonte !== 'card'`);
+3. e a captura era **recusada** ("já está na sua fila").
+
+O que passou a valer:
+
+- **As duas camadas param de competir e passam a se compor** (`_glossComReencontro`, em
+  `glossario.js`). Quando a pré-análise discorda de **todos** os sentidos do item, a
+  divergência não é ruído — é o sinal de que apareceu sentido novo. O balão mostra
+  *"fracassar, ruir"* como resposta principal e, no rodapé, *"sentido novo — aqui não é
+  'cair', que é o que você estuda"*. **Sem chamada de IA no hover**: a pré-análise do capítulo
+  já leu tudo antes, e é por isso que cabe nos ~50 ms (o segundo do Wiktionary foi recusado
+  por este mesmo motivo).
+- A comparação é contra **todos** os sentidos (`todosPt`), não só o exibido — senão
+  reencontrar o sentido nº 2 seria anunciado como novo. E usa *contém*, não *igual*: "cair" e
+  "cair em desgraça" são o mesmo sentido dito com mais palavras. Erra para o lado de "já
+  tenho", que é o lado seguro (no máximo não avisa; o botão continua lá).
+- **O botão nunca some** — troca de rótulo: `Estudar` para palavra nova, `Outro sentido` para
+  quem já é card, com destaque quando há divergência.
+- **A semente**: o leitor passava `aoEstudar: (alvo, ctx) => …` e **descartava o terceiro
+  argumento**, onde vinha a glosa que a pré-análise já pagou para descobrir. Agora ela viaja
+  como `_seedMeaning` — mecanismo que já existia e era usado por outros dois caminhos
+  (`add.js` da Mídia e o Raio-X). Sem isso o Preparar **redescobria** o sentido vendo só uma
+  frase, quando ele foi decidido vendo o capítulo inteiro. Era provavelmente a origem do
+  desencontro "o balão diz uma coisa, o card sai com outra".
+- **A captura aceita palavra existente** — `prepAcharItem()` acha o item inclusive
+  **flexionado** (`fell` → `fall`), reusando `glossLemas`, que já cobre irregular por tabela e
+  cuja qualidade já foi medida (os 91,5% da 83ª rodada foram medidos com ele).
+- **`prepararNovoSentido()`** põe o sentido novo NO MESMO item: volta o item para
+  `pending_ai` com a frase nova e a glosa como semente. Os sentidos antigos sobrevivem — o
+  merge da análise preserva todo significado já curado, e os cards nem são tocados (card se
+  liga ao sentido pelo `meaningId`, não pela posição).
+- **Migração preguiçosa e ADITIVA** (`_prepDescerContexto`): antes de a frase nova
+  sobrescrever a antiga, cada sentido que ainda não tem a sua recebe `context`, `context_pt` e
+  `source_*` do item. Sem isso, a origem do primeiro sentido se perderia **no exato instante
+  do segundo encontro**. Aditiva: os campos do item continuam lá e todo código que lê
+  `w.context` segue funcionando.
+
+**Limitação conhecida da Fase 1, a ser resolvida na Fase 2:** o `status` ainda é do ITEM.
+Então um item em reencontro volta inteiro para o Preparar e **some do dossiê enquanto é
+re-analisado** — inclusive os sentidos já estudados. Os cards continuam intactos e na
+Revisão; é só a listagem do dossiê. É honesto ("está em preparação"), mas é sintoma de que o
+estado precisa descer para o sentido.
+
+### FASE 2 — o estado desce para o sentido (NÃO feita)
+
+1. `status` e `estudadoEm` por **sentido** (aditivo: `m.status`, `m.estudadoEm`).
+   O status do item passa a ser **derivado** (tem sentido pendente ⇒ aparece no Preparar).
+2. **Dossiê por sentido**: `_dossieChave()` passa a ler `m.source_*` com queda para `w.*`;
+   cada sentido é uma linha, no dossiê da fonte **onde aquele sentido foi encontrado**.
+3. `dossieEstudei` cria card **daquele sentido**, não de todos os selecionados.
+4. **Migração** (computável, sem chute): sentido com card ⇒ estudado; sentido sem
+   `context_match` de item antigo nasce **`saber`** — fica no verbete, fora da lista do
+   dossiê. É isto que faz o dossiê de *Flags on the Bayou* nascer com os ~10% que o livro
+   ensinou, em vez de 8 linhas de `fall`.
+
+### FASE 3 — o verbete e as saídas (NÃO feita)
+
+5. **`lemma` no item** e **verbete agrupado por lema** na Biblioteca → Palavras (que já monta
+   verbete, mas **a partir dos cards** — precisa passar a ler `words[]`, senão o que foi
+   guardado sem estudar fica invisível).
+   ⚠️ Agrupar na VISTA, **não aninhar no dado**: `fall down` continua item próprio (IPA
+   próprio, agenda própria) — o projeto já tentou o contrário e desfez, e a cicatriz é o
+   campo `moved_to`.
+6. **Reencontro com IA**: em vez da comparação textual da Fase 1, mandar os sentidos
+   existentes do lema junto na análise que **já acontece** (zero chamada nova) e receber
+   `casa_com: <meaningId>` ou `novo: true`. É casamento contra lista fechada — muito mais
+   confiável que geração aberta, que é onde a IA errou nas rodadas 163-167.
+7. **Fundir / separar**: os dois desfazeres. Sem eles, o primeiro erro de reconhecimento vira
+   dado torto para sempre.
+
+### Onde a captura ainda NÃO leva a semente
+
+Só o leitor foi ligado. Faltam **vídeo/legenda** e **a extensão (Netflix/Kindle)** — e o
+caminho é o mesmo: generalizar "pré-análise do capítulo" para **pré-análise do lote**. A
+legenda de um episódio é o análogo direto (o app já tem a trilha inteira e já faz chamada em
+lote nela, em "Traduzir legenda inteira"); para a extensão, o app glosa **em lote quando as
+capturas chegarem** — padrão que o `add.js` já usa no Kindle e na Mídia. A chave fica num
+lugar só.
+
 ## 9. Pendências / a verificar
+
+- [x] ~~Medir a pré-análise com IA de verdade (`barrel` → "cano"?)~~ — **FEITO e PASSOU**
+      (confirmado pelo Djemeson em 2026-08-07). ⚠️ **Não refazer este teste.** É o que
+      autorizou a glosa da pré-análise a virar semente do sentido (ver 8.2, Fase 1).
+- [ ] **FASE 2 DO REENCONTRO — o estado desce para o sentido.** Está desenhada por inteiro na
+      seção 8.2. Enquanto não for feita, vale a limitação conhecida: item em reencontro volta
+      inteiro para o Preparar e some do dossiê até ser reenviado (os cards seguem intactos).
+- [ ] **LEVAR A SEMENTE PARA O VÍDEO E PARA A EXTENSÃO** — só o leitor foi ligado. Ver o fim
+      da 8.2 para o caminho (pré-análise do LOTE, não do capítulo).
+- [ ] **USAR O REENCONTRO COM DADO REAL.** A Fase 1 foi exercitada ao vivo, mas com item
+      sintético e pré-análise injetada na mão. Falta o teste de verdade: ler um capítulo com a
+      pré-análise ligada, esbarrar numa palavra que você já estuda com outro sentido, e ver
+      (a) se o balão acusa, (b) se "Outro sentido" leva ao Preparar com a semente certa e
+      (c) se a análise **preserva** o sentido antigo em vez de trocá-lo.
 
 ### De quem é o sentido (92ª + 93ª) — o que fechou e o que sobrou
 

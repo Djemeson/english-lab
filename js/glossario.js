@@ -179,7 +179,11 @@ function _glossDoCard(w) {
     tipo: String(m.type_label || '').trim(),
     gramatical: !!m.gramatical,
     doContexto: !!m.context_match,
-    outros: ms.length - 1
+    outros: ms.length - 1,
+    // TODOS os sentidos do item, para a comparação do reencontro. Sem isto a
+    // divergência seria medida só contra o sentido em exibição, e reencontrar
+    // o sentido nº 2 seria anunciado como "sentido novo".
+    todosPt: ms.map(x => String(x.meaning_pt || '').trim()).filter(Boolean)
   }
 }
 
@@ -210,6 +214,7 @@ function _glossConstruir() {
       gramatical: g ? g.gramatical : false,
       doContexto: g ? g.doContexto : false,
       outros: g ? g.outros : 0,
+      todosPt: g ? g.todosPt : [],
       contexto: String(w.context || '').trim(),
       contexto_pt: String(w.context_pt || '').trim()
     })
@@ -319,9 +324,40 @@ function glossBuscar(palavra, seguinte, seguinte2) {
   for (const l of [palavra, ...glossLemas(palavra)]) {
     const k = norm(l)
     const h = ix.get(k) || (pre && pre.get(k))
-    if (h) return { ...h, casou: l, original: palavra, viaLema: k !== norm(palavra) }
+    if (h) return _glossComReencontro({ ...h, casou: l, original: palavra, viaLema: k !== norm(palavra) },
+                                       pre && pre.get(k))
   }
   return null
+}
+
+// ---- O REENCONTRO ----------------------------------------------
+// PALAVRA CONHECIDA NÃO É SENTIDO CONHECIDO. As duas camadas competiam: o card
+// vencia sempre, e o balão dizia "barril" para um `barrel` que ali é cano — a
+// resposta errada, no lugar mais visível do app, justamente quando o aluno
+// esbarra num sentido que ele AINDA NÃO TEM.
+//
+// Quando o card e a pré-análise DISCORDAM, a discordância não é ruído: é o
+// sinal de que apareceu um sentido novo. Então elas param de competir e passam
+// a se compor — `aqui` carrega a leitura desta passagem, e o card continua
+// respondendo pelo que ele já estuda. Sem chamada de IA: a pré-análise já leu
+// o capítulo inteiro antes, e é por isso que isto cabe no hover (o segundo de
+// espera do Wiktionary foi recusado por este mesmo motivo).
+function _glossComReencontro(achado, hitPre) {
+  if (!achado || achado.fonte !== 'card' || !hitPre || !hitPre.pt) return achado
+  const norm = s => String(s || '').toLowerCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+  const nova = norm(hitPre.pt)
+  if (!nova) return achado
+  // Compara contra TODOS os sentidos do item, não só o que está em exibição.
+  const jaTem = (achado.todosPt || [achado.pt]).some(pt => {
+    const a = norm(pt)
+    // Contém em vez de igual: "cair" vs "cair em desgraça" é o mesmo sentido
+    // sendo dito com mais palavras. Errar para o lado de "já tenho" é o lado
+    // seguro — no máximo você não é avisado; o botão continua ali.
+    return a && (a === nova || a.includes(nova) || nova.includes(a))
+  })
+  if (jaTem) return achado
+  return { ...achado, aqui: { pt: hitPre.pt, def: hitPre.def || '', tipo: hitPre.tipo || '' } }
 }
 
 // ---- LEITURA DA PALAVRA SOB O PONTO ----------------------------
@@ -430,6 +466,22 @@ function glossLinhaHTML(achado, opts = {}) {
     ? `<b class="gloss-termo">${e(achado.casou)}</b><span class="gloss-sel">expressão</span>`
     : `<b class="gloss-termo">${e(achado.termo)}</b>${
         achado.viaLema && achado.original ? `<span class="gloss-sel">você viu "${e(achado.original)}"</span>` : ''}`
+
+  // REENCONTRO: a leitura DESTA passagem não bate com nenhum sentido que ele
+  // tem. Aqui o principal é o sentido daqui — é o que responde à pergunta que
+  // fez o mouse parar. O que ele estuda vira nota de rodapé, não some: é dela
+  // que sai o "ah, eu conhecia esta palavra com outro sentido".
+  if (achado.aqui) {
+    return `
+    <div class="gloss-corpo">
+      <div class="gloss-cab">${cabeca}${
+        achado.aqui.tipo ? `<span class="gloss-tipo">${e(achado.aqui.tipo)}</span>` : ''}</div>
+      <div class="gloss-pt">${e(achado.aqui.pt)}</div>
+      ${achado.aqui.def && !opts.curto ? `<div class="gloss-def">${e(achado.aqui.def)}</div>` : ''}
+      <div class="gloss-rodape gloss-novo">${icone('sparkles')} sentido novo — aqui não é "${e(achado.pt)}", que é o que você estuda</div>
+    </div>`
+  }
+
   return `
     <div class="gloss-corpo">
       <div class="gloss-cab">${cabeca}${
@@ -452,10 +504,16 @@ function _glossMostrar(achado, x, y, opts, pos) {
   b.className = 'gloss-balao'
   b.setAttribute('role', 'tooltip')
   const podeLexa = !!(opts && opts.aoExplicar)
-  // "Estudar" só aparece quando a palavra AINDA NÃO é card: oferecê-lo para
-  // algo que já está no Preparar convidaria ao item duplicado — o mesmo cuidado
-  // que fez o painel do toque longo avisar "já está no Preparar".
-  const podeEstudar = !!(opts && opts.aoEstudar) && achado.fonte !== 'card'
+  // PALAVRA CONHECIDA NÃO É SENTIDO CONHECIDO. Antes o botão sumia assim que a
+  // palavra virava card — e era isso que transformava o reencontro num beco:
+  // o balão dava o sentido antigo e fechava a única porta de capturar o novo.
+  // O medo de duplicata continua válido, mas agora ele é resolvido no destino:
+  // capturar palavra que já existe ANEXA um sentido ao item, não cria outro.
+  const podeEstudar = !!(opts && opts.aoEstudar)
+  // O rótulo é que muda: "Estudar" para palavra nova; "Outro sentido" para
+  // quem já é card — e quando a pré-análise discorda, ele fica em destaque,
+  // porque naquele instante é a ação certa.
+  const rotuloEstudar = achado.fonte !== 'card' ? 'Estudar' : 'Outro sentido'
   // "NÃO LEMBRO": exclusivo de palavra que ele já declarou conhecer (ou
   // ignorou). É o beco que o balão criava — dizia "você marcou como
   // conhecida" para uma palavra que ele não reconhece, e não havia saída
@@ -467,7 +525,7 @@ function _glossMostrar(achado, x, y, opts, pos) {
   const botoes = (podeLexa || podeEstudar || podeEsqueci)
     ? `<div class="gloss-acoes">
         ${podeEsqueci ? `<button class="gloss-btn gloss-esqueci" type="button">${icn('undo')} Não lembro</button>` : ''}
-        ${podeEstudar && !esqueceu ? `<button class="gloss-btn gloss-estudar" type="button">${icn('plus')} Estudar</button>` : ''}
+        ${podeEstudar && !esqueceu ? `<button class="gloss-btn gloss-estudar${achado.aqui ? ' destaque' : ''}" type="button">${icn('plus')} ${rotuloEstudar}</button>` : ''}
         ${podeLexa ? `<button class="gloss-btn gloss-lexa" type="button">${icn('sparkles')} Lexa</button>` : ''}
        </div>`
     : ''

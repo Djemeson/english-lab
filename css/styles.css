@@ -4989,6 +4989,14 @@ body.ler-full .mobile-bottom-nav{display:none}
   border-color:rgba(var(--primary-rgb),.9);
 }
 .gloss-estudar:hover{background:rgba(var(--primary-rgb),1)}
+/* REENCONTRO: a passagem tem um sentido que ele ainda não tem. O rodapé
+   avisa e o botão pulsa uma vez — chamar atenção sem virar alarme. */
+.gloss-novo{color:var(--warning);font-weight:600}
+.gloss-estudar.destaque{
+  box-shadow:0 0 0 3px rgba(var(--primary-rgb),.22);
+  animation:glossNovo .5s ease-out;
+}
+@keyframes glossNovo{from{box-shadow:0 0 0 0 rgba(var(--primary-rgb),.45)}to{box-shadow:0 0 0 3px rgba(var(--primary-rgb),.22)}}
 
 /* Dentro de um painel que já existe (o caminho do celular, sem gesto novo):
    sem posição fixa, sem sombra — é só mais um bloco do painel. */

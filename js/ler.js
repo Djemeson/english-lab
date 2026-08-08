@@ -372,7 +372,11 @@ function renderLeitor() {
       // neste aparelho. Card é o que persiste, entra no SRS e sincroniza — é
       // esta a resposta para "tem como salvar essas palavras". Vai com a frase
       // do livro, então a análise nasce com o contexto certo.
-      aoEstudar: (alvo, ctx) => { _lerCapturar(alvo, ctx || '') },
+      // O TERCEIRO ARGUMENTO era descartado, e nele vinha a glosa que a
+      // pré-análise já pagou para descobrir: sem ela, o Preparar redescobria o
+      // sentido vendo só uma frase, quando aqui ele foi decidido vendo o
+      // capítulo. Agora ela viaja junto, como semente.
+      aoEstudar: (alvo, ctx, achado) => { _lerCapturar(alvo, ctx || '', null, achado) },
       // "Não lembro" numa palavra que ele já marcara como conhecida. O leitor
       // só descreve DE ONDE se veio e COMO se volta; desmarcar, criar o card e
       // navegar é do mecanismo compartilhado, que serve a vídeo, podcast e
@@ -993,7 +997,7 @@ function _lerFraseEmVolta(sel, alvo) {
 // de card, e quem quebra em itens é o Raio-X da triagem, no Preparar.
 const LER_MAX_ALVO = 4
 
-function _lerCapturar(selecao, frase, alvoDOM) {
+function _lerCapturar(selecao, frase, alvoDOM, achado) {
   const bruto = String(selecao || '').replace(/\s+/g, ' ').trim()
   if (!bruto) return
   const nPalavras = bruto.split(' ').filter(Boolean).length
@@ -1020,15 +1024,33 @@ function _lerCapturar(selecao, frase, alvoDOM) {
 
   const limpa = bruto.replace(/^[^A-Za-zÀ-ÿ']+|[^A-Za-zÀ-ÿ']+$/g, '')
   if (!limpa) return
-  const jaTem = words.some(w => (w.word || '').toLowerCase() === limpa.toLowerCase())
-  if (jaTem) { toast(`"${limpa}" já está na sua fila`, 'info'); return }
-  const w = createWord({
-    word: limpa, context: frase,
+
+  // A leitura DESTA passagem, paga pela pré-análise do capítulo. Vai como
+  // semente do sentido — tanto para item novo quanto para reencontro.
+  const glosa = achado ? (achado.aqui ? achado.aqui.pt : (achado.fonte === 'pre' ? achado.pt : '')) : ''
+  const lang = _lerLivro.lang || 'en'
+  const fonte = {
     source_type: 'kindle',
     source_title: _lerLivro.title,
-    source_context: _lerLivro.chapters[_lerCap]?.titulo || '',
-    lang: _lerLivro.lang || 'en'
-  })
+    source_context: _lerLivro.chapters[_lerCap]?.titulo || ''
+  }
+
+  // REENCONTRO: a palavra já existe (inclusive flexionada — "fell" acha
+  // "fall"). Antes isto era recusado com "já está na sua fila", e era aí que o
+  // segundo sentido morria. Agora ele entra NO MESMO item.
+  const ja = typeof prepAcharItem === 'function' ? prepAcharItem(limpa, lang) : null
+  if (ja) {
+    if (typeof prepararNovoSentido !== 'function') { toast(`"${limpa}" já está na sua fila`, 'info'); return }
+    prepararNovoSentido(ja.id, { contexto: frase, glosa, ...fonte })
+    ;(_lerLivro.notes = _lerLivro.notes || []).push({
+      id: uid(), cap: _lerCap, word: limpa, text: frase, wordId: ja.id, created_at: Date.now()
+    })
+    _lerPersistirCaptura()
+    return
+  }
+
+  const w = createWord({ word: limpa, context: frase, lang, ...fonte })
+  if (glosa) w._seedMeaning = glosa
   ;(_lerLivro.notes = _lerLivro.notes || []).push({
     id: uid(), cap: _lerCap, word: limpa, text: frase, wordId: w && w.id, created_at: Date.now()
   })

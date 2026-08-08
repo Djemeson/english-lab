@@ -1287,6 +1287,95 @@ function capFirst(s) {
 }
 
 // ================================================================
+// REENCONTRO — o mesmo item, um sentido novo
+// ================================================================
+// O caso: você lê `fall` num livro, estuda "cair". Uma semana depois esbarra
+// em `fall` de novo, e ali é "fracassar". Até aqui o app dizia "já está na sua
+// fila" e fechava a porta — a palavra era conhecida, então o SENTIDO era dado
+// como conhecido. São coisas diferentes, e essa confusão custava justamente o
+// encontro mais valioso: o segundo.
+//
+// Agora o novo sentido entra NO MESMO item. A progressão do item passa a ser
+// natural: ele cresce conforme você esbarra nele, em vez de virar itens
+// soltos que não conversam.
+
+// MIGRAÇÃO PREGUIÇOSA E ADITIVA — roda no instante em que passa a ser
+// necessária, item por item, como a costura do legado no dossiê.
+// O item guarda UMA frase e UMA fonte. A partir do reencontro ele passa a ter
+// sentidos de origens diferentes, então cada sentido precisa levar a SUA.
+// Sem isto, a frase nova sobrescreveria a antiga e a origem do primeiro
+// sentido se perderia para sempre — no exato instante do segundo encontro.
+// Aditiva de propósito: os campos do item continuam onde estavam, e todo
+// código que lê `w.context` segue funcionando igual.
+function _prepDescerContexto(w) {
+  let n = 0
+  for (const m of (w.meanings || [])) {
+    if (!m || m.context) continue
+    m.context       = w.context || ''
+    m.context_pt    = w.context_pt || ''
+    m.source_type   = w.source_type || ''
+    m.source_title  = w.source_title || ''
+    m.source_context = w.source_context || ''
+    n++
+  }
+  return n
+}
+
+// Chamada por quem captura (leitor, e depois vídeo/legenda) quando a palavra
+// JÁ existe. `glosa` é a leitura da pré-análise para esta passagem: entra como
+// semente, então a análise nasce sabendo qual sentido procurar em vez de
+// redescobri-lo com menos contexto do que quem o descobriu.
+function prepararNovoSentido(wordId, dados = {}) {
+  const w = words.find(x => x.id === wordId)
+  if (!w) return false
+  _prepDescerContexto(w)
+  w.context    = String(dados.contexto || '').replace(/\s+/g, ' ').trim().slice(0, 400)
+  w.context_pt = ''
+  if (dados.source_type)  w.source_type  = dados.source_type
+  if (dados.source_title) w.source_title = dados.source_title
+  w.source_context = dados.source_context || ''
+  if (dados.glosa) w._seedMeaning = String(dados.glosa).trim()
+  // Volta para a fila da IA: há material novo a montar. Os sentidos antigos
+  // sobrevivem — o merge da análise preserva todo significado já curado (o que
+  // tem exemplos), e os cards deles nem são tocados: card se liga ao sentido
+  // pelo `meaningId`, não pela posição no array.
+  w.status = 'pending_ai'
+  delete w.estudadoEm
+  w.updated_at = new Date().toISOString()
+  saveWords()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  if (typeof updateDossieBadge === 'function') updateDossieBadge()
+  if (typeof renderSidebar === 'function') { try { renderSidebar(); _prepAtualizarCabecalho() } catch (e) {} }
+  if (typeof renderDashboard === 'function') { try { renderDashboard() } catch (e) {} }
+  toast(`"${w.word || '(frase)'}" — sentido novo foi para o Preparar`, 'success')
+  analyzeWordDirect(w.id)
+    .then(() => { try { renderSidebar(); _prepAtualizarCabecalho() } catch (e) {} })
+    .catch(e => console.warn('[reencontro] análise:', e.message))
+  return true
+}
+
+// Acha o item existente de uma palavra, aceitando FLEXÃO: quem lê "fell" está
+// reencontrando o "fall" que já estuda. Reusa o lematizador do glossário, que
+// já foi medido (a cobertura de 91,5% da 83ª rodada foi medida com ele) e já
+// cobre irregular por tabela.
+function prepAcharItem(palavra, lang) {
+  const alvo = String(palavra || '').trim()
+  if (!alvo) return null
+  const norm = s => (typeof knownNorm === 'function' ? knownNorm(s) : String(s || '').toLowerCase().trim())
+  const formas = [alvo]
+  if (typeof glossLemas === 'function') {
+    for (const l of glossLemas(alvo, { estrito: true })) if (!formas.includes(l)) formas.push(l)
+  }
+  const mesmoIdioma = w => !lang || !w.lang || w.lang === lang
+  for (const f of formas) {
+    const k = norm(f)
+    const achado = words.find(w => mesmoIdioma(w) && norm(w.word || '') === k)
+    if (achado) return achado
+  }
+  return null
+}
+
+// ================================================================
 // ENVIAR PARA O ESTUDO — o item SAI daqui
 // ================================================================
 // A fila do Preparar é uma fila: ela tem de esvaziar. Enquanto o item
