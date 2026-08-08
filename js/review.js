@@ -107,8 +107,20 @@ function applyAiResult(w, result) {
     if (fora) console.log(`[unidade] sentido "${m.meaning_pt}" ignorado: já é o item "${bloqueados.find(s => nm(s.meaning_pt) === nm(m.meaning_pt) || (m.unit && nm(m.unit) === nm(s.word))).word}"`)
     return !fora
   })
+  // QUEM NASCE MARCADO É SÓ O SENTIDO DO CONTEXTO.
+  // O item veio de uma passagem, e é ELA que decide o que você tem de estudar
+  // agora. `mine` num texto sobre garimpar dados devolveu 5 sentidos — todos
+  // marcados, 15 cards — quando o livro só ensinou um. Os outros não somem:
+  // no envio viram `saber` e seguem no verbete e no glossário, sem cobrar
+  // tempo de revisão. Marcar de volta é um clique, aqui mesmo.
+  //
+  // Rede de segurança: se a IA não marcar `context_match` em nenhum (acontece
+  // com item sem frase de contexto), o primeiro nasce marcado — o prompt já
+  // manda pôr o do contexto em primeiro lugar. Sem isto o item chegaria sem
+  // nada selecionado e o botão de enviar nasceria desabilitado.
+  const temContexto = rawFiltradas.some(m => m && m.context_match === true)
   const freshMeanings = rawFiltradas.map((m, i) => ({
-    id: uid(), selected: true, idx: i,
+    id: uid(), selected: temContexto ? (m.context_match === true) : (i === 0), idx: i,
     meaning_pt:    m.meaning_pt    || '',
     definition_pt: m.definition_pt || '',
     origin_pt:     m.origin_pt     || '',
@@ -1021,6 +1033,8 @@ function renderWordCard(wordId) {
           <span>${selCount} selecionado${selCount !== 1 ? 's' : ''} · ${totalCards} card${totalCards !== 1 ? 's' : ''}</span>
         </div>
         <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="selectContextMeaning('${w.id}')"
+            data-tip="Deixa marcado só o sentido da frase de onde este item saiu — os outros viram consulta ao enviar">${ic('check','ic-sm')}Só o do contexto</button>
           <button class="btn btn-ghost btn-sm" onclick="selectAllMeanings('${w.id}',true)">Todos</button>
           <button class="btn btn-ghost btn-sm" onclick="selectAllMeanings('${w.id}',false)">Nenhum</button>
         </div>
@@ -1227,7 +1241,30 @@ function toggleMeaning(wordId, mi) {
 
 function selectAllMeanings(wordId, val) {
   const w = words.find(x => x.id === wordId); if (!w) return
-  w.meanings.forEach(m => { if (!m.moved_to) m.selected = val })
+  // Sentido que já saiu desta fila não se remarca daqui (ver toggleMeaning):
+  // ele está em Estudar ou na Revisão, e o desfazer daquele estado mora lá.
+  w.meanings.forEach(m => {
+    if (m.moved_to || m.fundido_em) return
+    if (typeof sentidoEstado === 'function' && sentidoEstado(m) !== 'pronto') return
+    m.selected = val
+  })
+  saveWords()
+  renderWordCard(wordId)
+}
+
+// O ATALHO PARA O QUE JÁ FOI ANALISADO COM TUDO MARCADO. O padrão novo só vale
+// para análise nova; item que já estava na fila continua com os 5 sentidos
+// marcados, e desmarcar um a um seria o atrito que este projeto inteiro tenta
+// tirar do caminho.
+function selectContextMeaning(wordId) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const vivos = (w.meanings || []).filter(m => m && !m.moved_to && !m.fundido_em)
+  const alvo = vivos.find(m => m.context_match === true) || vivos[0]
+  if (!alvo) return
+  vivos.forEach(m => {
+    if (typeof sentidoEstado === 'function' && sentidoEstado(m) !== 'pronto') return
+    m.selected = (m === alvo)
+  })
   saveWords()
   renderWordCard(wordId)
 }

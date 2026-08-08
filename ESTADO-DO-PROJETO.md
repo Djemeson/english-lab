@@ -6041,6 +6041,36 @@ pré-análise no capítulo** (a glosa que ele mostra é a do contexto antigo). O
 já respondeu, ou já acusou divergência, o botão não aparece — seria pagar por resposta que
 existe.
 
+### O PADRÃO DE SELEÇÃO — a peça que faltava (2026-08-08)
+
+Ele mandou o print de `mine`: **5 significados · 5 selecionados · 15 cards**, num item captado
+de um texto onde `mine` era "explorar (dados)". *"Acredito que isso não era pra acontecer."*
+Não era mesmo — e o buraco era meu: as Fases 1-4 construíram o mecanismo (`estado: 'saber'`,
+o envio por sentido, o verbete que guarda tudo) e **nunca inverteram o padrão**.
+`review.js` seguia com `selected: true` para todos os sentidos, que é de onde saem os 15 cards.
+
+Agora **nasce marcado só o sentido do `context_match`**. Os outros não somem: no envio viram
+`saber`, aparecem no verbete com o selo *"só consulta"* e continuam alimentando o glossário.
+Marcar de volta é um clique.
+Rede de segurança: se a IA não marcar `context_match` em nenhum (acontece em item sem frase de
+contexto), o primeiro nasce marcado — senão o item chegaria sem nada selecionado e o botão de
+enviar nasceria desabilitado.
+
+**Atalho para o que já foi analisado** (`selectContextMeaning`, botão *"Só o do contexto"* ao
+lado de Todos/Nenhum): o padrão novo só vale para análise nova, e desmarcar 4 sentidos a um
+por item, vezes 97 itens, seria exatamente o atrito que este projeto tenta tirar do caminho.
+Os dois botões antigos também passaram a respeitar o estado: sentido que já está em Estudar ou
+na Revisão não se remarca daqui.
+
+**Medido no caso dele**: `mine` foi de **15 cards para 3**, o dossiê do capítulo passou a
+listar **um** sentido, e os outros quatro seguem no verbete como consulta.
+
+⚠️ **O que NÃO foi mexido, e por quê**: reduzir os 3 exemplos por sentido. É tentador (seriam
+3 cards → 1), mas os 3 exemplos são **load-bearing no prompt**: a verificação "leia os 3
+exemplos lado a lado; se as mesmas palavras aparecerem depois do item nos três, é unidade
+fixa" é o que detecta `requires`/`unit` e evitou o `fall in love` colado em `fall`. Cortar
+exemplo enfraqueceria essa checagem para economizar card — troca ruim.
+
 ### O markdown da Lexa (2026-08-08)
 
 Ele viu `*Archie*` e `**pals**` **crus** no balão do leitor. Causa: o modelo escreve em
