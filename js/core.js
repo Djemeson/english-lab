@@ -309,6 +309,32 @@ let activeConversaId = null
 function loadConversas() { try { conversas = JSON.parse(localStorage.getItem(SK.conversas) || '[]') } catch { conversas = [] } }
 function saveConversas() { try { localStorage.setItem(SK.conversas, JSON.stringify(conversas)) } catch(e) { console.warn('[conversas] save falhou:', e.message) } }
 
+// ── NOME DA OBRA: o que o autor chamou, não o que veio no arquivo ──
+// O `source_title` é o que a fonte deu — e a fonte traz lixo: o EPUB devolve
+// "Billy Summers (US Edition)", o vídeo devolve o nome do arquivo, o podcast
+// devolve o título do episódio com o número do programa colado.
+//
+// A CHAVE DE AGRUPAMENTO CONTINUA SENDO O TÍTULO BRUTO. Reescrever
+// `w.source_title` reagruparia todo o acervo e quebraria os dossiês já
+// abertos, o `_dossieChave` gravado e a origem de cada sentido. Isto aqui é
+// uma CAMADA DE EXIBIÇÃO: bruto → { titulo, autor }, resolvido uma vez por
+// obra e guardado. Uma chamada por OBRA, nunca por item.
+const SK_OBRAS = 'el-obras-nome'
+let obrasNome = {}   // titulo bruto (minúsculo) → { titulo, autor, at }
+function loadObrasNome() { try { obrasNome = JSON.parse(localStorage.getItem(SK_OBRAS) || '{}') } catch { obrasNome = {} } }
+function saveObrasNome() { try { localStorage.setItem(SK_OBRAS, JSON.stringify(obrasNome)) } catch (e) {} }
+function obraChaveNome(bruto) { return String(bruto || '').trim().toLowerCase() }
+// Nome para MOSTRAR. Sem resolução guardada, devolve o bruto — a tela nunca
+// fica esperando IA para desenhar.
+function obraNome(bruto) {
+  const r = obrasNome[obraChaveNome(bruto)]
+  return (r && r.titulo) || String(bruto || '')
+}
+function obraAutor(bruto) {
+  const r = obrasNome[obraChaveNome(bruto)]
+  return (r && r.autor) || ''
+}
+
 // ── Preferências de interface (recolher sidebar/histórico) ─────────
 const SK_UI = 'el-ui-prefs'
 function loadUiPrefs() { try { return JSON.parse(localStorage.getItem(SK_UI) || '{}') } catch { return {} } }

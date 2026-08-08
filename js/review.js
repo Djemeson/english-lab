@@ -603,6 +603,68 @@ Return ONLY this JSON:
 }
 
 // ================================================================
+// O NOME DA OBRA — o que o autor chamou, não o que veio no arquivo
+// ================================================================
+// Pedido dele: *"o título deve ser não o que veio do original, pois pode ter
+// lixo junto, mas o que de fato se chama assim como o autor"*. O EPUB devolve
+// "Billy Summers (US Edition)"; o vídeo devolve o nome do arquivo.
+//
+// UMA CHAMADA PARA TODAS AS OBRAS PENDENTES, não uma por obra: são poucas
+// (dezenas no acervo inteiro), a resposta é minúscula e a lista completa dá à
+// IA o contexto de que se trata de uma estante — o que a ajuda a reconhecer
+// título mutilado. Resolvido uma vez, fica guardado.
+//
+// ⚠️ NÃO TOCA em `w.source_title`. Aquilo é a chave de agrupamento dos
+// dossiês e a origem gravada em cada sentido; reescrevê-la reagruparia o
+// acervo inteiro. Isto grava só o mapa de exibição.
+async function resolverNomesDeObra(brutos) {
+  const pend = [...new Set((brutos || []).map(t => String(t || '').trim()).filter(Boolean))]
+    .filter(t => !obrasNome[obraChaveNome(t)])
+  if (!pend.length) return 0
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error')
+    showSection('configuracoes'); return 0
+  }
+  try {
+    const r = await aiJSON(`These are titles as they came out of files — EPUB metadata, video file names, podcast episode strings. They carry noise: edition markers, format tags, file extensions, release groups, episode numbering.
+
+For each one, identify the WORK and give its title as the author/publisher actually titled it.
+
+${pend.map((t, i) => `${i + 1}. ${t}`).join('\n')}
+
+Return ONLY this JSON, one entry per input, in the SAME order:
+{"obras":[{"bruto":"the input string, copied exactly","titulo":"the real title of the work, nothing else","autor":"the author, director or show creator — \\"\\" if you do not know"}]}
+
+Rules:
+- STRIP the noise: "(US Edition)", "(Unabridged)", "- Kindle Edition", ".epub", "1080p", "S01E03", "WEBRip", "[eng]", the publisher's name, the narrator's name.
+- KEEP what belongs to the title: a subtitle after a colon, a series number that is part of the name ("Dune Messiah"), an article ("The Shining").
+- If you RECOGNIZE the work, use the canonical title even when the input is mangled or abbreviated.
+- If you DO NOT recognize it, just clean the noise off the string you were given. NEVER invent a different work.
+- "autor" only when you are sure. A wrong author is worse than none.
+- Titles stay in their ORIGINAL language — do not translate.`, { maxTokens: 1200 })
+
+    const arr = Array.isArray(r && r.obras) ? r.obras : []
+    let n = 0
+    for (const o of arr) {
+      const bruto = String(o && o.bruto || '').trim()
+      const titulo = String(o && o.titulo || '').trim()
+      if (!bruto || !titulo) continue
+      // Só aceita resolução para um título que ESTAVA na lista: o modelo às
+      // vezes devolve entradas a mais, e uma obra inventada aqui viraria um
+      // dossiê com nome que não corresponde a nada no acervo.
+      if (!pend.some(t => obraChaveNome(t) === obraChaveNome(bruto))) continue
+      obrasNome[obraChaveNome(bruto)] = { titulo, autor: String(o.autor || '').trim(), at: Date.now() }
+      n++
+    }
+    if (n) saveObrasNome()
+    return n
+  } catch (e) {
+    toast(`Não deu para limpar os títulos: ${e.message}`, 'error')
+    return 0
+  }
+}
+
+// ================================================================
 // A FAMÍLIA COMPLETA — tudo que existe COM aquele item
 // ================================================================
 // Pedido dele: *"uma seção de tempos verbais, e uma seção com TODOS os phrasal

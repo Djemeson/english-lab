@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O ITEM NUNCA SAI DE VISTA**. O cabeçalho subia com a rolagem
+> Última atualização: 2026-08-08 — **OBRA → CAPÍTULO → ITENS, E O TÍTULO LIMPO**. A lista do
+> Estudar era plana (um cartão por obra+capítulo), então um livro de doze capítulos virava doze
+> cartões repetindo o mesmo título e o progresso da OBRA não existia. Agora a obra é o contêiner e
+> os capítulos são linhas dentro dela. E o título passou a ser **o que o autor chamou**, não o que
+> veio do arquivo: `Billy Summers (US Edition)` → `Billy Summers · Stephen King`, numa chamada
+> para TODAS as obras pendentes. ⚠️ **A chave de agrupamento continua sendo o título bruto** —
+> reescrever `source_title` reagruparia o acervo inteiro; o que entrou é uma camada de exibição
+> (`obrasNome`), e a busca aceita os dois nomes.
+> `sw.js` → `englab-v171`. Ver seção 8.2 ("Obra → capítulo → itens").
+>
+> Anterior: 2026-08-08 — **O ITEM NUNCA SAI DE VISTA**. O cabeçalho subia com a rolagem
 > e a página virava seções sem dono. Ele passou a ficar **preso no topo, encolhendo** de 115px
 > para 62px — sobram palavra, pronúncia e o botão de ouvir. ⚠️ O recuo do topo teve de sair do
 > corpo e ir para o cabeçalho: com ele no corpo, o texto **escorria por uma faixa de 20px e
@@ -7247,6 +7257,54 @@ O `top` dos rótulos das seções desceu para 60px, senão eles deslizariam por 
 pinado e sumiriam justamente nas seções longas — que é quando servem.
 
 **Arquivos**: `css/styles.css`, `js/dossie.js`. `sw.js` → `englab-v170`.
+
+### OBRA → CAPÍTULO → ITENS, E O TÍTULO LIMPO (2026-08-08)
+
+Dois pedidos sobre a lista do Estudar: *"a hierarquia aqui deve ser Obra → capítulo/episódio →
+itens"* e *"o título deve ser não o que veio do original, pois pode ter lixo junto, mas o que de
+fato se chama assim como o autor"*.
+
+#### A hierarquia
+
+A lista era **plana**: um cartão por (obra, capítulo). Um livro de doze capítulos virava doze
+cartões soltos repetindo o mesmo título, e o progresso do LIVRO não existia em lugar nenhum.
+Agora a obra é o contêiner e os capítulos são linhas dentro dela — o título aparece uma vez, com o
+progresso da obra inteira ao lado do de cada capítulo. Capítulo é **linha, não cartão**: cartão
+dentro de cartão é a moldura dupla que já tinha apertado o painel de estudo.
+
+#### O título limpo
+
+O `source_title` é o que a fonte deu, e a fonte traz lixo: `Billy Summers (US Edition)`,
+`Flags on the Bayou - Unabridged.epub`, `Better.Call.Saul.S01E03.1080p.WEBRip`.
+
+> ⚠️ **A chave de agrupamento continua sendo o título BRUTO.** Reescrever `w.source_title`
+> reagruparia o acervo inteiro e quebraria os dossiês já abertos, o `_dossieChave` gravado e a
+> origem de cada sentido. O que entrou é uma **camada de exibição**: `obrasNome` mapeia bruto →
+> `{titulo, autor}`, e `obraNome()` cai no bruto quando não há resolução — a tela nunca fica
+> esperando IA para desenhar.
+
+**Uma chamada para TODAS as obras pendentes**, não uma por obra: são poucas, a resposta é
+minúscula, e a lista completa dá à IA o contexto de que se trata de uma estante — o que a ajuda a
+reconhecer título mutilado. O botão diz "1 chamada" porque o custo é dele. Some depois de
+resolvido.
+
+O prompt separa o que é ruído (`(US Edition)`, `.epub`, `1080p`, `S01E03`, editora, narrador) do
+que é título (subtítulo depois de dois-pontos, número de série, artigo), e proíbe inventar: sem
+reconhecer a obra, apenas limpa a string recebida. **Resolução para obra que não estava na lista é
+descartada** — o modelo às vezes devolve entradas a mais, e uma obra inventada aqui viraria um
+dossiê com nome que não corresponde a nada.
+
+O nome limpo vale em toda parte: lista, cabeçalho do dossiê aberto e procedência do modo foco. **A
+busca aceita os dois** — ele pode procurar por "Billy Summers" (o que a tela mostra) ou por "us
+edition" (o que lembra do arquivo).
+
+Provado com um acervo de três obras e cinco capítulos: Billy Summers virou UMA obra com dois
+capítulos; a chamada listou os 3 títulos pendentes de uma vez; a obra inventada foi recusada; o
+convite sumiu; e a busca achou pelos dois nomes. No celular, a linha do capítulo tem 44px de
+toque e nada estoura.
+
+**Arquivos**: `js/core.js`, `js/init.js`, `js/review.js`, `js/dossie.js`, `css/styles.css`.
+`sw.js` → `englab-v171`.
 
 ### Onde a captura ainda NÃO leva a semente
 

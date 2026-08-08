@@ -5964,6 +5964,51 @@ body.dos-focando #voltar-pill{bottom:auto;top:calc(14px + env(safe-area-inset-to
 .dos-vazio .btn{margin-top:18px}
 
 /* ---- grade de dossiês ---- */
+/* ---- OBRA → CAPÍTULO → ITENS ----
+   Era uma grade plana de cartões (obra, capítulo), e um livro de doze
+   capítulos virava doze cartões repetindo o mesmo título. Agora a OBRA é o
+   contêiner e os capítulos são linhas dentro dela: o título aparece uma vez,
+   e o progresso do livro inteiro fica visível ao lado do de cada capítulo. */
+.dos-obras{display:flex;flex-direction:column;gap:var(--sp-6)}
+.dos-obra{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;
+}
+.dos-obra-cab{
+  display:flex;align-items:center;gap:var(--sp-4);flex-wrap:wrap;
+  padding:var(--sp-5) var(--sp-6);border-bottom:1px solid var(--border);
+}
+.dos-obra-ic{color:var(--text3);display:flex;flex-shrink:0}
+.dos-obra-nome{display:flex;flex-direction:column;margin-right:auto;min-width:0}
+.dos-obra-nome b{font-size:var(--fs-lg);font-weight:650;line-height:1.25}
+.dos-obra-nome span{font-size:var(--fs-xs);color:var(--text3)}
+.dos-obra-n{display:flex;flex-direction:column;align-items:flex-end;gap:1px;font-size:var(--fs-sm);color:var(--text2)}
+.dos-obra-n b{color:rgba(var(--primary-rgb),1);font-size:var(--fs-base);font-weight:700}
+.dos-obra-n i{font-style:normal;color:var(--text3);font-size:var(--fs-xs)}
+.dos-obra-cab .dos-barra{width:100%;order:9}
+
+/* O capítulo é uma LINHA, não um cartão: cartão dentro de cartão é a moldura
+   dupla que já apertou o painel de estudo. */
+.dos-caps{display:flex;flex-direction:column}
+.dos-cap{
+  display:flex;align-items:center;gap:var(--sp-4);width:100%;
+  padding:var(--sp-4) var(--sp-6);cursor:pointer;text-align:left;
+  background:transparent;border:0;border-top:1px solid var(--border);
+  font:inherit;font-size:var(--fs-sm);color:var(--text2);
+  transition:background .12s;
+}
+.dos-cap:first-child{border-top:0}
+.dos-cap:hover{background:var(--surface2);color:var(--text)}
+.dos-cap-nome{flex:1;min-width:0;font-weight:600;color:var(--text)}
+.dos-cap-n b{color:rgba(var(--primary-rgb),1);font-weight:700}
+.dos-cap-tot{color:var(--text3);font-size:var(--fs-xs);min-width:52px;text-align:right}
+.dos-cap .ic{color:var(--text3);flex-shrink:0}
+.dos-cap:hover .ic{color:var(--primary)}
+
+/* O convite a limpar os títulos: informativo, não alarmante. */
+.dos-limpar{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
+.dos-limpar .btn{flex-shrink:0}
+
 .dos-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
 .dos-card{
   display:flex;flex-direction:column;align-items:flex-start;gap:6px;
@@ -6046,6 +6091,10 @@ body.dos-focando #voltar-pill{bottom:auto;top:calc(14px + env(safe-area-inset-to
 
 @media (max-width:640px){
   .dos-grade{grid-template-columns:1fr}
+  .dos-obra-cab{padding:var(--sp-4) var(--sp-5)}
+  .dos-obra-n{align-items:flex-start;flex-direction:row;gap:var(--sp-2);align-self:flex-start}
+  .dos-cap{padding:var(--sp-4) var(--sp-5);min-height:44px}
+  .dos-cap-tot{min-width:0}
   .dos-item{padding:15px 15px}
   .dos-contagem{margin-left:0;width:100%}
 }

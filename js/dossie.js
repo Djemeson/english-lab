@@ -242,6 +242,39 @@ function _dossieCardHTML(s) {
     </article>`
 }
 
+// O convite a limpar os títulos. Só aparece quando há obra sem nome resolvido
+// — some sozinho depois, e não fica pedindo dinheiro para sempre.
+// É UMA chamada para TODAS as pendentes, e isso vai dito no botão: o custo é
+// dele, e ele decide sabendo o tamanho.
+let _dosNomesBusy = false
+function _dosObrasSujasHTML(obras) {
+  if (typeof resolverNomesDeObra !== 'function') return ''
+  const sujas = obras.filter(o => !obrasNome[obraChaveNome(o.obra)])
+  if (!sujas.length) return ''
+  return `<p class="dos-intro dos-limpar">
+    ${ic('sparkles','ic-sm')} ${sujas.length === 1
+      ? 'Uma obra ainda está com o título como veio do arquivo'
+      : `${sujas.length} obras ainda estão com o título como veio do arquivo`}
+    — coisas como <i>(US Edition)</i>, nome de arquivo ou numeração de episódio.
+    <button class="btn btn-ghost btn-sm" ${_dosNomesBusy ? 'disabled' : ''} onclick="dossieLimparTitulos()">${
+      _dosNomesBusy ? '<span class="spinner"></span> limpando…'
+                    : ic('sparkles','ic-sm') + ' Limpar com IA (1 chamada)'}</button></p>`
+}
+
+async function dossieLimparTitulos() {
+  if (_dosNomesBusy || typeof resolverNomesDeObra !== 'function') return
+  const brutos = [...new Set(_dossieListaCache.map(d => d.obra).filter(Boolean))]
+  _dosNomesBusy = true; _dossiePintarCorpo()
+  try {
+    const n = await resolverNomesDeObra(brutos)
+    if (n) toast(`${n} ${n === 1 ? 'título limpo' : 'títulos limpos'}`, 'success')
+    else toast('Nada a limpar — os títulos já estão como o autor os chamou', 'info')
+  } finally {
+    _dosNomesBusy = false
+    renderDossieSection()
+  }
+}
+
 // ---- busca e filtro --------------------------------------------------
 // NÃO são persistidos, de propósito. A lição já paga do projeto (o filtro de
 // fonte do SRS) é que filtro salvo produz tela vazia sem explicação numa
@@ -301,7 +334,9 @@ function _dosDossieCasa(d) {
   if (_dosFiltro === 'pendentes' && falta === 0) return false
   if (_dosFiltro === 'feitos' && falta > 0) return false
   if (!_dosBusca) return true
-  if (_dosNorm(d.obra + ' ' + d.cap).includes(_dosBusca)) return true
+  // Busca pelos DOIS nomes: ele pode procurar por "Billy Summers" (o limpo,
+  // que e o que a tela mostra) ou pelo que estiver lembrando do arquivo.
+  if (_dosNorm(d.obra + ' ' + obraNome(d.obra) + ' ' + d.cap).includes(_dosBusca)) return true
   return d.itens.some(s => _dosItemTexto(s).includes(_dosBusca))
 }
 
@@ -380,24 +415,58 @@ function _dossiePintarCorpo() {
   if (!aberto) {
     const visiveis = lista.filter(_dosDossieCasa)
     if (!visiveis.length) { corpo.innerHTML = _dossieNadaHTML('dossiê'); return }
+    // OBRA → CAPÍTULO → ITENS.
+    // A lista era plana: um cartão por (obra, capítulo), então um livro de
+    // doze capítulos virava doze cartões soltos repetindo o mesmo título. A
+    // obra é o que se lê; o capítulo é onde se está DENTRO dela.
+    // O agrupamento é pelo título BRUTO (a chave de verdade); o que aparece
+    // na tela é `obraNome`, que limpa o lixo da fonte.
+    const obras = new Map()
+    for (const d of visiveis) {
+      const k = obraChaveNome(d.obra) + '' + d.tipo
+      if (!obras.has(k)) obras.set(k, { obra: d.obra, tipo: d.tipo, caps: [], itens: 0, feitos: 0 })
+      const o = obras.get(k)
+      o.caps.push(d); o.itens += d.itens.length; o.feitos += d.estudados
+    }
+    // Obra com pendência primeiro — é para lá que ele quer ir.
+    const ordenadas = [...obras.values()].sort((a, b) =>
+      ((b.itens - b.feitos) - (a.itens - a.feitos)) || obraNome(a.obra).localeCompare(obraNome(b.obra)))
+
     corpo.innerHTML = `
-      <p class="dos-intro">Cada dossiê reúne <b>tudo que você captou de uma obra e capítulo</b>, com o material
+      <p class="dos-intro">Cada obra reúne <b>tudo que você captou dela</b>, separado por capítulo, com o material
       que a IA montou. Leia à vontade — marcar um item como estudado é o que o manda para a <b>Revisão</b>.</p>
-      <div class="dos-grade">${visiveis.map(d => {
-        const falta = d.itens.length - d.estudados
-        const pct = d.itens.length ? Math.round((d.estudados / d.itens.length) * 100) : 0
-        return `<button class="dos-card" data-k="${lista.indexOf(d)}">
-          <span class="dos-card-ic">${srcIcon(d.tipo)}</span>
-          <span class="dos-card-obra">${esc(d.obra)}</span>
-          ${d.cap ? `<span class="dos-card-cap">${esc(d.cap)}</span>` : ''}
-          <span class="dos-card-n"><b>${falta}</b> para estudar<i>${d.estudados} de ${d.itens.length} feitos</i></span>
-          <span class="dos-barra"><i style="width:${pct}%"></i></span>
-        </button>`
+      ${_dosObrasSujasHTML(ordenadas)}
+      <div class="dos-obras">${ordenadas.map(o => {
+        const falta = o.itens - o.feitos
+        const pct = o.itens ? Math.round((o.feitos / o.itens) * 100) : 0
+        const autor = obraAutor(o.obra)
+        return `<section class="dos-obra">
+          <header class="dos-obra-cab">
+            <span class="dos-obra-ic">${srcIcon(o.tipo)}</span>
+            <div class="dos-obra-nome">
+              <b>${esc(obraNome(o.obra))}</b>
+              ${autor ? `<span>${esc(autor)}</span>` : ''}
+            </div>
+            <span class="dos-obra-n"><b>${falta}</b> para estudar<i>${o.feitos} de ${o.itens} feitos</i></span>
+            <span class="dos-barra"><i style="width:${pct}%"></i></span>
+          </header>
+          <div class="dos-caps">${o.caps
+            .sort((a, b) => (b.itens.length - b.estudados) - (a.itens.length - a.estudados) || a.cap.localeCompare(b.cap))
+            .map(d => {
+              const f = d.itens.length - d.estudados
+              return `<button class="dos-cap" data-k="${lista.indexOf(d)}">
+                <span class="dos-cap-nome">${esc(d.cap || 'sem capítulo')}</span>
+                <span class="dos-cap-n">${f ? `<b>${f}</b> para estudar` : 'tudo estudado'}</span>
+                <span class="dos-cap-tot">${d.estudados}/${d.itens.length}</span>
+                ${ic('chevronRight','ic-sm')}
+              </button>`
+            }).join('')}</div>
+        </section>`
       }).join('')}</div>`
     // A chave viaja pelo ÍNDICE do render, não dentro do onclick: ela carrega
     // um caractere de controle e o título do livro, e enfiar isso num atributo
     // HTML é convite para aspas, & e acentos quebrarem o clique.
-    corpo.querySelectorAll('.dos-card').forEach(b => {
+    corpo.querySelectorAll('.dos-cap').forEach(b => {
       b.onclick = () => {
         const d = lista[+b.dataset.k]
         if (d) dossieAbrir(d.chave)
@@ -421,7 +490,7 @@ function _dossiePintarCorpo() {
     <div class="dos-topo">
       <button class="btn btn-ghost btn-sm" onclick="dossieVoltar()">${ic('chevronLeft','ic-sm')} Todos os dossiês</button>
       <div class="dos-titulo">
-        <b>${esc(aberto.obra)}</b>${aberto.cap ? `<span>${esc(aberto.cap)}</span>` : ''}
+        <b>${esc(obraNome(aberto.obra))}</b>${aberto.cap ? `<span>${esc(aberto.cap)}</span>` : ''}
       </div>
       ${visiveis.length ? `<button class="btn btn-secondary btn-sm" onclick="dossieFoco()"
         data-tip="Um item por vez, tela cheia — as setas do teclado andam">${ic('expand','ic-sm')} Modo foco</button>` : ''}
@@ -1110,7 +1179,9 @@ async function dossieCompletar(wordId, meaningId, refazer) {
 // A procedência vira UM CRÉDITO no topo: obra, capítulo, e um clique que rola
 // até a passagem lá embaixo. Nota de rodapé de dicionário, não manchete.
 function _dosFocoCabecalho(w, m, feito, ctx) {
-  const obra = m.source_title || w.source_title || ''
+  // O nome LIMPO: a procedencia mostra a obra como o autor a chamou, nao o
+  // que veio no arquivo. O bruto continua sendo a chave, so nao aparece.
+  const obra = obraNome(m.source_title || w.source_title || '')
   const cap  = m.source_context || w.source_context || ''
   return `
     <header class="dosf-cab">
@@ -1304,7 +1375,7 @@ function _dosFocoPintar() {
     <div class="dosf-topo">
       <button class="btn btn-ghost btn-sm" onclick="dossieFocoSair()">${ic('x','ic-sm')} Sair do foco <span class="dosf-tecla">Esc</span></button>
       <span class="dosf-pos">${_dosFoco.i + 1} de ${_dosFocoLista.length}</span>
-      <span class="dosf-obra">${esc(w.source_title || m.source_title || '')}</span>
+      <span class="dosf-obra">${esc(obraNome(w.source_title || m.source_title || ''))}</span>
     </div>
     <div class="dosf-palco">
       <nav class="dosf-indice" aria-label="Seções deste item">${blocos.map(b =>
@@ -1352,7 +1423,7 @@ function _dosFocoPintar() {
       return {
         frase: p.m.context || p.w.context || '',
         lang: wordLang(p.w),
-        fonte: [p.m.source_title || p.w.source_title, p.m.source_context || p.w.source_context].filter(Boolean).join(' · '),
+        fonte: [obraNome(p.m.source_title || p.w.source_title), p.m.source_context || p.w.source_context].filter(Boolean).join(' · '),
         origem: { source_type: p.m.source_type || p.w.source_type || 'manual',
                   source_title: p.m.source_title || p.w.source_title || '',
                   source_context: p.m.source_context || p.w.source_context || '' }
