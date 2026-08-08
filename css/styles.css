@@ -5070,6 +5070,25 @@ body.ler-full .mobile-bottom-nav{display:none}
   font-size:var(--fs-xs);color:var(--text3);
 }
 
+/* "O QUE É AQUI?" — a checagem sob demanda. O balão fica PRESO enquanto
+   espera: ganha borda de foco para dizer que não vai sumir sozinho. */
+.gloss-balao.preso{border-color:rgba(var(--primary-rgb),.5);box-shadow:0 0 0 3px rgba(var(--primary-rgb),.14),var(--shadow)}
+.gloss-checando{
+  display:flex;align-items:center;gap:var(--sp-2);
+  font-size:var(--fs-xs);color:var(--text2);padding:var(--sp-1) 0;
+}
+.gloss-checando.erro{color:var(--error)}
+.gloss-checando .spinner{width:12px;height:12px;border-width:2px}
+.gloss-aqui{
+  margin-top:var(--sp-3);padding-top:var(--sp-3);
+  border-top:1px dashed var(--border);
+}
+.gloss-aqui-cab{
+  display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;
+  font-size:var(--fs-3xs);color:var(--text3);margin-bottom:3px;
+}
+.gloss-aqui-cab b{color:var(--text);font-size:var(--fs-xs)}
+
 /* REENCONTRO: a passagem tem um sentido que ele ainda não tem. O rodapé
    avisa e o botão pulsa uma vez — chamar atenção sem virar alarme. */
 .gloss-novo{color:var(--warning);font-weight:600}

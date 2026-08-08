@@ -39,6 +39,76 @@ TAREFA AGORA: explicar um trecho para o aluno, em português do Brasil.
 }
 
 // ================================================================
+// "O QUE É AQUI?" — a checagem sob demanda, no CLIQUE
+// ================================================================
+// O buraco que isto fecha: `knownWords` guarda PALAVRA, não sentido. Marcar
+// "cover" como conhecida tira a palavra da triagem, da cobertura e da
+// pré-análise — para sempre e em todo livro. Aí, quando ela reaparece como
+// "cobrir o turno de alguém", o balão diz "você marcou como conhecida", que é
+// o app informando que você sabe uma coisa que não sabe. A detecção de
+// reencontro não salva: ela compara a glosa da pré-análise com os sentidos que
+// você tem, e para palavra conhecida não existe glosa nenhuma.
+//
+// Por que NO CLIQUE e nunca no hover: o hover tem orçamento de ~50 ms (foi por
+// isso que o Wiktionary, de 772 a 1234 ms, foi recusado). Uma chamada de IA
+// jamais cabe ali. No clique cabe — e só acontece quando você desconfia, que é
+// a única hora em que vale pagar.
+//
+// A UNIDADE É O QUE IMPORTA. Perguntar "o que 'cover' significa aqui" e
+// responder pela palavra solta seria repetir o erro do "tire of" partido em
+// pneu + cansar. A resposta tem de vir na UNIDADE DE ESTUDO real da passagem:
+// se for phrasal verb, idiom ou colocação, é ela que volta — em forma de
+// citação (`cover for`, nunca `covered for`), pronta para virar item.
+const _checkCache = new Map()
+
+async function aiChecarAqui(alvo, frase, lang) {
+  const termo = String(alvo || '').trim()
+  const ctx = String(frase || '').replace(/\s+/g, ' ').trim()
+  if (!termo) throw new Error('sem termo')
+  const chave = (lang || 'en') + '|' + termo.toLowerCase() + '|' + ctx.toLowerCase()
+  if (_checkCache.has(chave)) return _checkCache.get(chave)
+
+  const L = (typeof getLangDef === 'function') ? getLangDef(lang || 'en') : { nameEn: 'English' }
+  const PROMPT = `In the passage below, decide what the learner should actually study around "${termo}".
+
+Passage: "${ctx || termo}"
+Target word: "${termo}"
+
+STEP 1 — FIND THE UNIT. Look at what "${termo}" is doing in this passage. It may be:
+- part of a PHRASAL VERB ("cover for him", "get up his quills") — the unit is the verb + particle(s)
+- part of an IDIOM ("under the weather", "fall by the wayside") — the unit is the whole idiom
+- part of a fixed COLLOCATION ("take a ride", "make a decision") — the unit is the collocation
+- or just the word by itself.
+Always prefer the LARGEST unit that is genuinely fixed. "look forward to" beats "look forward", which beats "look".
+Return the unit in CITATION form: bare verb, no inflection ("cover for", never "covered for"; "fall by the wayside", never "fell by the wayside"). Keep the learner's word inside it.
+
+STEP 2 — SAY WHAT IT MEANS HERE. The sense IN THIS PASSAGE, in Brazilian Portuguese, max 6 words. Decide WHAT the thing IS in this scene and use the Portuguese word for THAT — "barrel" of a rifle is "cano", never "barril". Never a dictionary list, never two domains hedged together.
+
+Return ONLY this JSON:
+{"expr":"the study unit in citation form","tipo":"word|phrasal_verb|idiom|collocation","gloss":"o sentido nesta passagem, português do Brasil, máx 6 palavras","nivel":"A1|A2|B1|B2|C1|C2","mesma":true}
+"mesma": true when the unit is just the word itself, false when it is a larger expression.`
+
+  const r = await aiJSON([
+    { role: 'system', content: `You analyze ${L.nameEn} for a Brazilian Portuguese-speaking learner. Return only valid JSON.` },
+    { role: 'user', content: PROMPT }
+  ], { maxTokens: 300 })
+
+  const expr = String(r && r.expr || termo).replace(/\s+/g, ' ').trim() || termo
+  const out = {
+    expr,
+    tipo: ['word', 'phrasal_verb', 'idiom', 'collocation'].includes(r && r.tipo) ? r.tipo : 'word',
+    gloss: String(r && r.gloss || '').trim(),
+    nivel: String(r && r.nivel || '').trim().toUpperCase(),
+    // Não confia no booleano do modelo: compara os textos. Com DeepSeek o JSON
+    // vem por texto livre e booleano volta como "true"/"sim"/1 conforme o humor.
+    mesma: expr.toLowerCase() === termo.toLowerCase()
+  }
+  if (!out.gloss) throw new Error('resposta sem significado')
+  _checkCache.set(chave, out)
+  return out
+}
+
+// ================================================================
 // ILUSTRAÇÃO DA WIKIPÉDIA — a foto que acompanha a explicação
 // ================================================================
 // De graça, sem chave e sem CORS: a API da Wikipédia responde a qualquer

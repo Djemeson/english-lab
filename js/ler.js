@@ -1051,6 +1051,10 @@ function _lerCapturar(selecao, frase, alvoDOM, achado) {
 
   const w = createWord({ word: limpa, context: frase, lang, ...fonte })
   if (glosa) w._seedMeaning = glosa
+  // O tipo vem junto quando a checagem "o que é aqui?" descobriu que a unidade
+  // é uma expressão. Sem ele, `cover for` nasceria classificado como palavra e
+  // o lema/verbete o poriam no lugar errado até a análise corrigir.
+  if (achado && achado.tipo && achado.tipo !== 'word') w.type = achado.tipo
   ;(_lerLivro.notes = _lerLivro.notes || []).push({
     id: uid(), cap: _lerCap, word: limpa, text: frase, wordId: w && w.id, created_at: Date.now()
   })

@@ -495,6 +495,78 @@ function glossLinhaHTML(achado, opts = {}) {
     </div>`
 }
 
+// ---- "O QUE É AQUI?" -------------------------------------------
+// A checagem dura ~1-2 s, e nesse tempo o mouse sai do balão. Por isso ele
+// vira PRESO no primeiro clique: deixa de fechar sozinho e passa a fechar por
+// clique fora ou Esc. Sem isso a resposta chegaria e não teria onde pousar —
+// e o aluno teria pago a chamada para ver o balão sumir.
+function _glossPrender(b) {
+  if (b._preso) return
+  b._preso = true
+  b.classList.add('preso')
+  clearTimeout(_glossFecharTimer)
+  const fora = ev => { if (!b.contains(ev.target)) { document.removeEventListener('mousedown', fora, true); document.removeEventListener('keydown', esc, true); glossFechar() } }
+  const esc = ev => { if (ev.key === 'Escape') { document.removeEventListener('mousedown', fora, true); document.removeEventListener('keydown', esc, true); glossFechar() } }
+  setTimeout(() => { document.addEventListener('mousedown', fora, true); document.addEventListener('keydown', esc, true) }, 0)
+}
+
+async function _glossChecar(b, achado, pos, opts) {
+  _glossPrender(b)
+  const alvo = achado.frase ? achado.casou : (pos ? pos.palavra : achado.termo)
+  const frase = glossFraseEmVolta(pos)
+  const acoes = b.querySelector('.gloss-acoes')
+  const corpo = b.querySelector('.gloss-corpo') || b
+  const antes = acoes ? acoes.innerHTML : ''
+  if (acoes) acoes.innerHTML = `<span class="gloss-checando"><span class="spinner"></span> lendo esta passagem…</span>`
+
+  let r = null
+  try {
+    r = await aiChecarAqui(alvo, frase, (typeof activeLang === 'function' ? activeLang() : 'en'))
+  } catch (e) {
+    if (acoes) acoes.innerHTML = `<span class="gloss-checando erro">${ic('alert','ic-sm')} ${esc(e.message || 'não deu para checar')}</span>`
+    return
+  }
+  if (!b.isConnected) return
+
+  const TIPOS = { word: '', phrasal_verb: 'phrasal verb', idiom: 'expressão', collocation: 'colocação' }
+  const rotTipo = TIPOS[r.tipo] || ''
+  // A UNIDADE vem primeiro: se o que se estuda ali é `cover for`, é isso que o
+  // balão anuncia — mostrar "cover" seria repetir o erro do "tire of" partido.
+  corpo.insertAdjacentHTML('beforeend', `
+    <div class="gloss-aqui">
+      <div class="gloss-aqui-cab">${ic('search','ic-sm')} aqui${r.mesma ? '' : `, a unidade é <b>${esc(r.expr)}</b>`}${
+        rotTipo ? `<span class="gloss-tipo">${esc(rotTipo)}</span>` : ''}${
+        r.nivel ? `<span class="gloss-tipo">${esc(r.nivel)}</span>` : ''}</div>
+      <div class="gloss-pt">${esc(r.gloss)}</div>
+    </div>`)
+
+  if (acoes) {
+    acoes.innerHTML = `<button class="gloss-btn gloss-estudar destaque" type="button">${
+      ic('plus','ic-sm')} Estudar ${r.mesma ? 'este sentido' : esc(r.expr)}</button>`
+    acoes.querySelector('.gloss-estudar').onclick = ev => {
+      ev.stopPropagation()
+      // Marcada como conhecida e a unidade É a própria palavra ⇒ o "conheço"
+      // estava errado e sai. Se a unidade for MAIOR (`cover for`), o "conheço"
+      // de `cover` continua valendo: quem ele não conhecia era a expressão.
+      if (r.mesma && (achado.fonte === 'known' || achado.fonte === 'ignored')) {
+        if (typeof markKnownWord === 'function') markKnownWord(alvo, false)
+        if (typeof ignoredWords === 'object' && ignoredWords && ignoredWords[knownNorm(alvo)]) {
+          delete ignoredWords[knownNorm(alvo)]
+          if (typeof saveIgnoredLocal === 'function') saveIgnoredLocal()
+        }
+        glossInvalidar()
+      }
+      glossFechar()
+      // Reusa o caminho de captura da tela: ele já sabe a fonte (livro,
+      // capítulo, episódio), já acha item existente por lema e já manda a
+      // glosa como semente pelo `achado.aqui`.
+      try {
+        opts.aoEstudar(r.expr, frase, { aqui: { pt: r.gloss }, tipo: r.tipo, fonte: 'check' })
+      } catch (e) {}
+    }
+  }
+}
+
 function _glossMostrar(achado, x, y, opts, pos) {
   // Remove o balão anterior SEM chamar glossFechar(): ele limparia também o
   // fechamento agendado, e aí um balão criado depois de o mouse já ter saído
@@ -521,9 +593,22 @@ function _glossMostrar(achado, x, y, opts, pos) {
   // ele; a volta ao ponto exato é do mecanismo compartilhado (core.js).
   const esqueceu = (achado.fonte === 'known' || achado.fonte === 'ignored')
   const podeEsqueci = esqueceu && !!(opts && opts.aoNaoLembro)
+  // "O QUE É AQUI?" — a checagem sob demanda. Aparece exatamente onde o app
+  // NÃO tem resposta para esta passagem:
+  //   · palavra marcada como conhecida ou ignorada → não tem glosa nenhuma, e
+  //     a pré-análise nem chega a olhar para ela (`isKnownWord` a tira de
+  //     `novas`), então a detecção de reencontro nunca dispara;
+  //   · card sem pré-análise no capítulo → a glosa que ele mostra é a do
+  //     contexto ANTIGO, e ninguém conferiu se vale aqui.
+  // Onde a pré-análise já respondeu (`fonte:'pre'`) ou já acusou divergência
+  // (`achado.aqui`), o botão não aparece: seria pagar por resposta que existe.
+  const temPre = typeof glossPreChave === 'function' && !!glossPreChave()
+  const podeChecar = !!(typeof aiChecarAqui === 'function' && !achado.aqui &&
+    achado.fonte !== 'pre' && (esqueceu || (achado.fonte === 'card' && !temPre)))
   const icn = n => (typeof ic === 'function' ? ic(n, 'ic-sm') : '')
-  const botoes = (podeLexa || podeEstudar || podeEsqueci)
+  const botoes = (podeLexa || podeEstudar || podeEsqueci || podeChecar)
     ? `<div class="gloss-acoes">
+        ${podeChecar ? `<button class="gloss-btn gloss-checar" type="button">${icn('search')} O que é aqui?</button>` : ''}
         ${podeEsqueci ? `<button class="gloss-btn gloss-esqueci" type="button">${icn('undo')} Não lembro</button>` : ''}
         ${podeEstudar && !esqueceu ? `<button class="gloss-btn gloss-estudar${achado.aqui ? ' destaque' : ''}" type="button">${icn('plus')} ${rotuloEstudar}</button>` : ''}
         ${podeLexa ? `<button class="gloss-btn gloss-lexa" type="button">${icn('sparkles')} Lexa</button>` : ''}
@@ -531,6 +616,12 @@ function _glossMostrar(achado, x, y, opts, pos) {
     : ''
   b.innerHTML = glossLinhaHTML(achado) + botoes
   document.body.appendChild(b)
+  if (podeChecar) {
+    b.querySelector('.gloss-checar').onclick = ev => {
+      ev.stopPropagation()
+      _glossChecar(b, achado, pos, opts)
+    }
+  }
   if (podeEsqueci) {
     b.querySelector('.gloss-esqueci').onclick = ev => {
       ev.stopPropagation()
@@ -554,7 +645,10 @@ function _glossMostrar(achado, x, y, opts, pos) {
   // O balão é território seguro: enquanto o mouse estiver nele, nada fecha.
   // Sair dele fecha na hora — aí a intenção é clara.
   b.addEventListener('pointerenter', () => clearTimeout(_glossFecharTimer))
-  b.addEventListener('pointerleave', glossFechar)
+  // Balão preso não fecha ao sair o mouse: ele está esperando (ou mostrando) a
+  // resposta de uma chamada que o aluno mandou fazer. Fecha por clique fora
+  // ou Esc, ligados em `_glossPrender`.
+  b.addEventListener('pointerleave', () => { if (!b._preso) glossFechar() })
   if (podeLexa) {
     b.querySelector('.gloss-lexa').onclick = ev => {
       ev.stopPropagation()

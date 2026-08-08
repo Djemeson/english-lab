@@ -5999,6 +5999,48 @@ tinha. Com dois sentidos não há pergunta (o destino é o outro); com três ou 
 6 arquivos. O primeiro teste pegou exatamente isso: o sentido fundido sumia do verbete mas
 continuava no dossiê e na contagem.
 
+### FASE 4 — "O que é aqui?": a checagem sob demanda (FEITA em 2026-08-08)
+
+**O buraco, achado por ele olhando a tela de triagem**: *"se eu marcar `cover` aqui como
+conhecida ela não vai aparecer futuramente pra mim se tiver outro sentido?"*
+
+Sim, não aparecia. `knownWords` guarda **palavra**, não sentido — é a premissa que as Fases
+1-3 derrubaram para os cards, viva numa camada que não tínhamos tocado. E o efeito é maior do
+que a tela de triagem: `isKnownWord()` tira a palavra de `novas` ([ler.js:1494](js/ler.js:1494)),
+e `novas` alimenta **três** coisas — a triagem, a cobertura e **a pré-análise**. Como a
+pré-análise nunca glosa `cover`, a detecção de reencontro da Fase 1 **não tinha o que comparar**
+e jamais dispararia para ela. O balão dizia só *"você marcou como conhecida"*.
+
+**A saída é no CLIQUE, nunca no hover.** O hover tem orçamento de ~50 ms (foi por isso que o
+Wiktionary, de 772-1234 ms, foi recusado); IA não cabe. No clique cabe, e só acontece quando
+ele desconfia — que é a única hora em que vale pagar.
+
+`aiChecarAqui()` (ai.js) — **uma chamada pequena, com cache** — e a pergunta é feita na ordem
+certa:
+
+1. **Qual é a UNIDADE?** Phrasal verb, idiom, colocação ou a palavra sozinha — sempre a
+   MAIOR unidade genuinamente fixa, em forma de citação (`cover for`, nunca `covered for`).
+   Responder pela palavra solta repetiria o erro do `tire of` partido em pneu + cansar.
+2. **O que ela significa AQUI** — com a regra de sempre: decidir o que a coisa É na cena e
+   usar a palavra portuguesa daquilo.
+
+No balão (`_glossChecar`), com três cuidados que o teste cobriu:
+- **O balão fica PRESO** no clique (`_glossPrender`): a chamada leva 1-2 s e o mouse sai nesse
+  tempo — sem isso a resposta chegaria e não teria onde pousar, depois de paga. Fecha por
+  clique fora ou Esc.
+- **O "conheço" só cai quando a unidade é a própria palavra.** Se a resposta foi `cover for`,
+  o `cover` **continua conhecido** — quem ele não conhecia era a expressão. Verificado nos dois
+  ramos.
+- **O envio reusa o caminho da tela** (`opts.aoEstudar`), que já sabe a fonte, já acha item
+  existente por lema e já manda a glosa como semente. `w.type` vai junto, senão `cover for`
+  nasceria como palavra e o verbete o poria na família errada até a análise corrigir.
+
+**Onde o botão aparece** — só onde o app não tem resposta para aquela passagem: palavra
+`known`/`ignored` (não tem glosa nenhuma, e a pré-análise nem olhou para ela) e card **sem
+pré-análise no capítulo** (a glosa que ele mostra é a do contexto antigo). Onde a pré-análise
+já respondeu, ou já acusou divergência, o botão não aparece — seria pagar por resposta que
+existe.
+
 ### Onde a captura ainda NÃO leva a semente
 
 Só o leitor foi ligado. Faltam **vídeo/legenda** e **a extensão (Netflix/Kindle)** — e o
@@ -6015,6 +6057,18 @@ lugar só.
       autorizou a glosa da pré-análise a virar semente do sentido (ver 8.2, Fase 1).
 - [x] ~~FASE 2 (estado por sentido) e FASE 3 (lema, verbete, reencontro por IA, fundir)~~ —
       **FEITAS em 2026-08-08**. O plano das três fases está inteiro na 8.2.
+- [ ] **PROVAR O "O QUE É AQUI?" COM IA DE VERDADE** (Fase 4). O fluxo inteiro foi exercitado
+      com a `aiJSON` mockada — o ambiente de teste não tem chave. O teste que vale: marcar
+      `cover` como conhecida, achar no livro um `cover for` e conferir (a) se a IA devolve a
+      EXPRESSÃO e não a palavra, (b) se a glosa é a da passagem e (c) o custo real da chamada.
+      ⚠️ Com DeepSeek o `aiJSON` cai para texto livre — vale ver se `expr`/`tipo` sobrevivem.
+      Note que o `mesma` do modelo é ignorado de propósito: quem decide é a comparação dos
+      textos, justamente porque booleano volta como `"true"`/`"sim"`/`1` conforme o fornecedor.
+- [ ] **O BOTÃO SÓ EXISTE NO GLOSSÁRIO** (Fase 4). Vale no leitor, na legenda do vídeo, no
+      Assistente e no Preparar — em toda tela que chama `glossAtivar`. **Não** vale na tela de
+      triagem por nível (a do print), onde ele marca as 421 de uma vez: lá não há frase sob o
+      cursor, então não há passagem para checar. Se incomodar, o caminho é outro — desmarcar
+      pelo grupo, que já existe.
 - [ ] **PROVAR O `same_as` COM IA DE VERDADE** (Fase 3). O bloco do reencontro entrou no
       prompt e o merge já prefere o campo, mas nada disso rodou com chave: o ambiente de teste
       não tem. O teste: ter `fall` = "cair", reencontrar `fall` num contexto de "fracassar" e
