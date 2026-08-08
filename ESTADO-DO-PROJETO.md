@@ -16,8 +16,11 @@
 > captura, e agora vai no ITEM, copiado por `createSrsCard`. **Buraco achado de brinde:** vídeo e
 > Assistente criavam sentido **sem `id`**, então o card voltava a depender da posição e nem
 > "Estudei" nem "Completar material" funcionavam neles — corrigido, com rede que carimba id em
-> dado antigo e religa o card órfão pela posição.
-> `sw.js` → `englab-v157`. Ver seção 8.2 ("O vídeo entra na fila").
+> dado antigo e religa o card órfão pela posição. **E o Assistente entrou junto**, a pedido dele:
+> agora **TODA fonte para no Preparar** — leitor, Netflix, Kindle, documento, mídia, vídeo,
+> podcast e Assistente. Os termos da Lexa passaram a ter origem (`Assistente · <conversa>`),
+> senão caíam todos num dossiê "(sem título)".
+> `sw.js` → `englab-v158`. Ver seção 8.2 ("O vídeo entra na fila").
 >
 > Anterior: 2026-08-08 — **O ITEM COMO PÁGINA DE ESTUDO** (4 fatias). A frase do livro
 > dominava a tela sendo só referência: virou o **exemplo #0** dentro de "Em uso" (é o único
@@ -6633,6 +6636,21 @@ curados mantém o exemplo intacto na re-análise.
 > sobrevive a qualquer caminho até o SRS (o "Estudei" do dossiê e o atalho do Preparar, ambos
 > provados).
 
+#### O Assistente também entrou na fila (2026-08-08)
+
+Ele mandou corrigir logo em seguida, e é o mesmo raciocínio: **perguntar à Lexa é triagem, não
+estudo.** O termo saía dali com significado e exemplos, mas ninguém tinha lido nada — e ia direto
+para a repetição espaçada. Agora para no Preparar, e o material da Lexa vira a semente.
+
+Uma consequência que só apareceu porque o Assistente passou a alimentar o dossiê: os itens dele
+não tinham origem nenhuma, então caíam todos num dossiê **"(sem título)"** — toda conversa no
+mesmo balaio. A conversa É a fonte, então virou `Assistente · <título da conversa>`. Provado com
+duas conversas: cada uma virou o seu dossiê.
+
+A cópia da tela acompanhou: *"já no estudo"* virou *"já é seu"* (o termo pode estar em qualquer
+etapa, e mandar procurá-lo no Estudar seria mentira), e *"Adicionar todos"* virou *"Mandar todos
+para o Preparar"*.
+
 #### O buraco que eu não estava procurando: sentido sem `id`
 
 Vídeo e Assistente criavam `w.meanings = [{ … }]` **sem `id`** — e `meaningId` é a identidade
@@ -6648,7 +6666,7 @@ exato (dois sentidos sem id, dois cards com `meaningId: ''`): os dois ids nascem
 religam ao sentido certo, o `clipId` antigo sobrevive e a religação persiste no IndexedDB.
 
 **Arquivos**: `js/video-study.js`, `js/consulta.js`, `js/review.js` (migração), `js/srs.js`
-(`clipId` no card). `sw.js` → `englab-v157`.
+(`clipId` no card). `sw.js` → `englab-v158`.
 
 ### Onde a captura ainda NÃO leva a semente
 
@@ -6661,12 +6679,9 @@ lugar só.
 
 ## 9. Pendências / a verificar
 
-- [ ] **O ASSISTENTE AINDA PULA O PREPARAR** (2026-08-08). `consulta.js` chama `saveToSrs` direto
-      nos dois botões (item a item e "adicionar todos"), igual ao que o vídeo fazia. O `id` do
-      sentido já foi corrigido lá, mas o **fluxo** não: ele foi deixado de fora de propósito
-      porque a decisão foi tomada para vídeo/podcast, e mudar o Assistente sem pedir seria
-      esticar o escopo. A pergunta para ele: no Assistente, pedir palavras à Lexa e mandar direto
-      para a Revisão é atalho desejado ou o mesmo furo?
+- [x] ~~O Assistente pula o Preparar~~ — **corrigido em 2026-08-08**, a pedido dele, logo depois
+      da varredura. Ver 8.2 ("O Assistente também entrou na fila"). **Agora TODA fonte para no
+      Preparar**: leitor, Netflix, Kindle, documento, mídia, vídeo, podcast e Assistente.
 - [ ] **CAPTURA REPETIDA NO VÍDEO ainda duplica o item** (2026-08-08, visto ao ler o código).
       `videoCreateCard` pergunta *"Palavra já existe — criar mesmo assim?"* e, se sim, cria um
       item novo. O leitor já resolveu isso com `prepararNovoSentido` (o reencontro entra no MESMO

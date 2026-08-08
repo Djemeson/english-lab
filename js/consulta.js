@@ -107,7 +107,7 @@ function asstEmptyState() {
   return `<div class="consulta-empty" id="consulta-empty">
     ${ic('sparkles','ic-xl')}
     <p style="font-weight:700;font-size:var(--fs-lg)">Pergunte qualquer coisa em ${esc(L.name.toLowerCase())}</p>
-    <p style="font-size:var(--fs-md);max-width:440px">Significados, pronúncia, diferenças de uso, gírias, origem de expressões — e mande os termos direto para o seu estudo.</p>
+    <p style="font-size:var(--fs-md);max-width:440px">Significados, pronúncia, diferenças de uso, gírias, origem de expressões — e mande os termos para o Preparar, onde a sua fila começa.</p>
     <div class="asst-suggestions">
       ${sugg.map(s => `<button class="asst-sugg" onclick="askSuggestion(${escA(JSON.stringify(s))})">${esc(s)}</button>`).join('')}
     </div>
@@ -146,12 +146,16 @@ function renderSrsItemsHTML(items, msgIdx) {
     const _tl = it.type_label || (it.type && it.type !== 'word' ? String(it.type).replace('_',' ') : '')
     const typeLbl = _tl ? ` <span class="asst-srs-type">${esc(_tl)}</span>` : ''
     if (inStudy) {
-      return `<span class="asst-srs-added">${ic('check','ic-sm')}<span>${esc(it.word)} <em>já no estudo</em></span></span>`
+      // "já no seu vocabulário", não "já no estudo": o termo pode estar em
+      // qualquer etapa do fluxo, e dizer "no estudo" mandaria procurá-lo numa
+      // tela onde ele talvez ainda não esteja.
+      return `<span class="asst-srs-added">${ic('check','ic-sm')}<span>${esc(it.word)} <em>já é seu</em></span></span>`
     }
-    return `<button class="asst-srs-btn" onclick="addConsultaItemToSrs(${msgIdx},${i})">${ic('plus','ic-sm')}<span>${esc(it.word)}${typeLbl}</span></button>`
+    return `<button class="asst-srs-btn" onclick="addConsultaItemToSrs(${msgIdx},${i})"
+      data-tip="Manda para o Preparar — de lá você envia para o Estudar">${ic('plus','ic-sm')}<span>${esc(it.word)}${typeLbl}</span></button>`
   }).join('')
   const pending = valid.filter(it => !isWordInStudy(it.word)).length
-  const head = `<div class="asst-srs-head"><span>${valid.length} termo${valid.length !== 1 ? 's' : ''} desta resposta</span>${pending > 1 ? `<button class="asst-srs-all" onclick="addAllConsultaItems(${msgIdx})">Adicionar todos (${pending})</button>` : ''}</div>`
+  const head = `<div class="asst-srs-head"><span>${valid.length} termo${valid.length !== 1 ? 's' : ''} desta resposta</span>${pending > 1 ? `<button class="asst-srs-all" onclick="addAllConsultaItems(${msgIdx})">Mandar todos para o Preparar (${pending})</button>` : ''}</div>`
   return `<div class="asst-srs-items">${head}<div class="asst-srs-chips">${chips}</div></div>`
 }
 
@@ -471,15 +475,32 @@ function formatConsultaReply(text) {
   return t
 }
 
-// ── Adicionar itens ao estudo (SRS) ───────────────────────────────
-function _consultaItemToWord(item) {
+// ── Mandar itens para o PREPARAR ──────────────────────────────────
+// Aqui havia `saveToSrs`: o termo ia do Assistente direto para a repetição
+// espaçada, pulando Preparar E Estudar. Era o mesmo furo do vídeo, e pelo
+// mesmo motivo tinha de acabar: o material vive em UM lugar de cada vez, e a
+// Revisão só recebe o que foi estudado. Perguntar à Lexa é uma triagem, não
+// um estudo — o item que sai daqui traz significado e exemplos, mas ninguém
+// leu nada ainda.
+//
+// O material que a Lexa devolveu continua todo aqui e vira a SEMENTE: no
+// Preparar ele escolhe mandar assim para o Estudar ou analisar antes, ganhando
+// forma, padrão, colocações e o resto. Se quiser mesmo o atalho, o Preparar
+// tem "Pular para a Revisão" — lá pular é um clique consciente.
+function _consultaItemToWord(item, conversa) {
   const exs = (Array.isArray(item.examples) && item.examples.length)
     ? item.examples.filter(e => e && e.en).map(e => ({ en: e.en, pt: e.pt || '' }))
     : (item.example_en ? [{ en: item.example_en, pt: item.example_pt || '' }] : [])
   const w = createWord({
     word: item.word,
     context: (exs[0] && exs[0].en ? exs[0].en : item.example_en || '').replace(/<\/?b>/gi, '').trim(),
+    // A ORIGEM PRECISA TER NOME. Enquanto o Assistente pulava para a Revisão
+    // isso não aparecia; agora que ele alimenta o dossiê, item sem origem cai
+    // num dossiê chamado "(sem título)" e TODA conversa vira o mesmo balaio.
+    // A conversa é a fonte, e o título dela é o que separa uma da outra.
     source_type: 'manual',
+    source_title: 'Assistente',
+    source_context: String((conversa && conversa.title) || '').slice(0, 80),
     lang: item.lang || activeLang()
   })
   w.meanings = [{
@@ -500,8 +521,11 @@ function _consultaItemToWord(item) {
   w.ipa = item.ipa || ''
   w.type = item.type || 'word'
   w.type_label = item.type_label || ''
-  w.status = 'pending_review'
   w.ai_processed = true
+  // O status é DERIVADO desde a Fase 2 — cravá-lo aqui seria o mesmo defeito
+  // que quebrou a volta ao Preparar. O sentido nasce sem `estado`, o que vale
+  // 'pronto', e a derivação devolve 'pending_review' sozinha.
+  sincronizarStatusItem(w)
   w.updated_at = new Date().toISOString()
   return w
 }
@@ -512,13 +536,14 @@ function addConsultaItemToSrs(msgIdx, itemIdx) {
     const msg = c.messages[msgIdx]; if (!msg || !Array.isArray(msg.srsItems)) return
     const item = msg.srsItems[itemIdx]
     if (!item || !item.word) { toast('Item não encontrado', 'warning'); return }
-    if (isWordInStudy(item.word)) { toast(`"${item.word}" já está no estudo`, 'info'); renderActiveConversa(); return }
-    const w = _consultaItemToWord(item)
+    if (isWordInStudy(item.word)) { toast(`"${item.word}" já está no seu vocabulário`, 'info'); renderActiveConversa(); return }
+    const w = _consultaItemToWord(item, c)
     saveWords()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
     renderDashboard()
-    updateSrsBadge()
-    saveToSrs(w.id)   // mostra o toast com a contagem de cards
+    if (typeof renderSidebar === 'function') { try { renderSidebar() } catch (e) {} }
     renderActiveConversa()
+    toast(`"${w.word}" foi para o Preparar`, 'success')
   } catch (e) { toast('Erro ao adicionar: ' + e.message, 'error') }
 }
 
@@ -527,14 +552,15 @@ function addAllConsultaItems(msgIdx) {
     const c = getActiveConversa(); if (!c) return
     const msg = c.messages[msgIdx]; if (!msg || !Array.isArray(msg.srsItems)) return
     const pending = msg.srsItems.filter(it => it && it.word && !isWordInStudy(it.word))
-    if (!pending.length) { toast('Todos já estão no estudo', 'info'); return }
+    if (!pending.length) { toast('Todos já estão no seu vocabulário', 'info'); return }
     let n = 0
-    pending.forEach(item => { const w = _consultaItemToWord(item); saveToSrs(w.id); n++ })
+    pending.forEach(item => { _consultaItemToWord(item, c); n++ })
     saveWords()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
     renderDashboard()
-    updateSrsBadge()
+    if (typeof renderSidebar === 'function') { try { renderSidebar() } catch (e) {} }
     renderActiveConversa()
-    toast(`${n} termo${n !== 1 ? 's' : ''} adicionado${n !== 1 ? 's' : ''} ao estudo`, 'success')
+    toast(`${n} termo${n !== 1 ? 's' : ''} ${n !== 1 ? 'foram' : 'foi'} para o Preparar`, 'success')
   } catch (e) { toast('Erro ao adicionar: ' + e.message, 'error') }
 }
 
