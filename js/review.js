@@ -61,16 +61,45 @@ function _ehSim(v) {
 // e as colocações paravam na sexta mesmo quando a IA sabia mais. Pedido dele,
 // explícito: *"não quero que você limite caracteres, o que quero é a
 // organização das informações"*. Quem organiza é a tela; o dado vem inteiro.
-// O que sobrou é o guarda de resposta enlouquecida (parágrafo inteiro no lugar
-// de uma colocação, ou centenas de itens repetidos).
+// O que sobrou é o guarda de resposta enlouquecida e de item repetido.
+//
+// ⚠️⚠️ HÁ DUAS NATUREZAS DE LISTA AQUI, e tratá-las igual quebrou uma delas.
+// Caso real relatado por ele: "digest-sized" TINHA curiosidade, e depois de
+// "Refazer o material" não veio nenhuma. A IA devolveu — quem jogou fora foi
+// este normalizador, por dois motivos que só aparecem em campo de PROSA:
+//   1. o teto de 140 caracteres. Serve para colocação (2-4 palavras); mas
+//      curiosidade é 1-2 FRASES, que passam disso com facilidade, e TODAS
+//      caíam;
+//   2. a quebra por vírgula, quando o modelo devolve string em vez de array.
+//      Numa lista curta isso é o certo ("get up, get over"); numa frase é
+//      destruição — "O formato digest, de 14 × 21 cm, barateou a impressão"
+//      viraria três fragmentos sem sentido.
+// Por isso são duas funções. Escolher a errada volta a perder conteúdo.
+
+// CURTA: itens de poucas palavras (formas, colocações). String separada por
+// vírgula ou ponto e vírgula é lista de verdade e pode ser quebrada.
 function _listaCurta(v, teto) {
   let arr = []
   if (Array.isArray(v)) arr = v
   else if (typeof v === 'string' && v.trim()) arr = v.split(/[;,]|\s·\s/)
+  return _listaLimpa(arr, teto, 140)
+}
+
+// PROSA: cada entrada é uma frase inteira (curiosidade, armadilha, régua).
+// String NÃO é quebrada — é uma entrada só. O teto de tamanho existe apenas
+// contra a resposta que devolveu um artigo inteiro num campo.
+function _listaTexto(v, teto) {
+  let arr = []
+  if (Array.isArray(v)) arr = v
+  else if (typeof v === 'string' && v.trim()) arr = [v]
+  return _listaLimpa(arr, teto, 900)
+}
+
+function _listaLimpa(arr, teto, maxLen) {
   const vistos = new Set()
   return arr.map(x => String(x == null ? '' : x).replace(/\s+/g, ' ').trim())
     .filter(x => {
-      if (!x || x.length > 140) return false
+      if (!x || x.length > maxLen) return false
       const k = x.toLowerCase()
       if (vistos.has(k)) return false     // repetido é ruído, não conteúdo
       vistos.add(k); return true
@@ -222,14 +251,16 @@ function applyAiResult(w, result) {
     // Sem teto de quantidade: quem organiza é a tela, o dado vem inteiro.
     forms:         _listaCurta(m.forms),        // gal → gals; fall → fell, fallen
     collocations:  _listaCurta(m.collocations), // as palavras que andam junto
-    confusoes:     _listaCurta(m.confusoes),    // o vizinho + a régua que os separa
+    // PROSA: "girl — neutro, mas infantiliza uma adulta" tem virgula e passa
+    // de 140 caracteres com facilidade. Quebrar ou cortar aqui destroi a regua.
+    confusoes:     _listaTexto(m.confusoes),    // o vizinho + a régua que os separa
     grammar:       String(m.grammar || '').trim(),      // o padrão: "fall + adjetivo"
     // LISTAS, nao texto unico: uma palavra pode ter duas armadilhas e quatro
     // curiosidades, e guardar em string obrigava a IA a escolher uma e jogar o
     // resto fora. `_listaCurta` aceita string tambem, entao item ja gravado
     // continua legivel sem migracao.
-    armadilha:     _listaCurta(m.armadilha),    // falsos amigos para lusofono
-    curiosidade:   _listaCurta(m.curiosidade),  // as notas que grudam, sem ser etimologia
+    armadilha:     _listaTexto(m.armadilha),    // falsos amigos para lusofono
+    curiosidade:   _listaTexto(m.curiosidade),  // as notas que grudam, sem ser etimologia
     registro_uso:  String(m.registro_uso || '').trim(), // onde usar e onde NÃO usar
     context_match: m.context_match !== false
   }))
@@ -499,6 +530,33 @@ Return ONLY this JSON:
       if (vazio && veio) { m[campo] = valor; return 1 }
       return 0
     }
+    const novos = {
+      forms:        _listaCurta(r.forms),
+      collocations: _listaCurta(r.collocations),
+      confusoes:    _listaTexto(r.confusoes),
+      grammar:      String(r.grammar || '').trim(),
+      armadilha:    _listaTexto(r.armadilha),
+      curiosidade:  _listaTexto(r.curiosidade),
+      registro_uso: String(r.registro_uso || '').trim()
+    }
+    // ⚠️ REFAZER COM RESPOSTA VAZIA NÃO ESCREVE NADA.
+    // O refazer sobrescreve de propósito — é assim que uma curiosidade ruim
+    // sai. Mas isso o torna capaz de DESTRUIR material bom quando a resposta
+    // chega quebrada, e foi o que aconteceu: um teto de 140 caracteres no
+    // normalizador derrubava toda curiosidade (que é 1-2 frases), o item
+    // ficava sem nenhuma, e nada na tela dizia por quê.
+    // Um item que TINHA material nunca volta com todos os campos vazios de
+    // verdade. Quando isso acontece, o problema é a resposta — e a resposta
+    // não pode apagar o que está no aparelho.
+    const temAlgumNovo = Object.values(novos).some(v => Array.isArray(v) ? v.length : v)
+    const tinhaAlgum = ['forms','collocations','confusoes','armadilha','curiosidade']
+      .some(c => (Array.isArray(m[c]) ? m[c].length : String(m[c] || '').trim())) || m.grammar || m.registro_uso
+    if (refazer && !temAlgumNovo && tinhaAlgum) {
+      console.warn('[ia] refazer devolveu tudo vazio — material preservado', r)
+      toast('A IA voltou sem material desta vez. Nada foi apagado — tente de novo.', 'warning')
+      return false
+    }
+
     let n = 0
     // A forma de citação conserta o TÍTULO do item já gravado — "Gals" vira
     // "gal". Passa pela mesma guarda da análise: muda flexão e caixa, nunca a
@@ -509,22 +567,31 @@ Return ONLY this JSON:
       if (_mesmoItemCanonico(w.word, canon)) { w.word = canon; n++ }
       else console.warn(`[ia] citação recusada: "${w.word}" → "${canon}" não é o mesmo item`)
     }
-    n += põe('forms',        _listaCurta(r.forms))
-    n += põe('collocations', _listaCurta(r.collocations))
-    n += põe('confusoes',    _listaCurta(r.confusoes))
-    n += põe('grammar',      String(r.grammar || '').trim())
-    n += põe('armadilha',    _listaCurta(r.armadilha))
-    n += põe('curiosidade',  _listaCurta(r.curiosidade))
-    n += põe('registro_uso', String(r.registro_uso || '').trim())
+    // Quais blocos ESVAZIARAM: perder conteúdo tem de ser dito, não descoberto
+    // depois. É o que faltava quando "digest-sized" ficou sem curiosidade.
+    const ROT = { forms:'forma', collocations:'colocações', confusoes:'régua',
+                  grammar:'padrão', armadilha:'cuidado', curiosidade:'curiosidade',
+                  registro_uso:'registro' }
+    const esvaziou = []
+    for (const campo of Object.keys(novos)) {
+      const tinha = Array.isArray(m[campo]) ? m[campo].length : !!String(m[campo] || '').trim()
+      const vem = Array.isArray(novos[campo]) ? novos[campo].length : !!novos[campo]
+      if (refazer && tinha && !vem) esvaziou.push(ROT[campo])
+      n += põe(campo, novos[campo])
+    }
     // Carimbo mesmo com n=0: sem ele, item que legitimamente não tem nada a
     // acrescentar ofereceria o botão para sempre e ele pagaria de novo.
     m.material_at = Date.now()
     w.updated_at = new Date().toISOString()
     saveWords()
     if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
-    toast(n ? `Material ${refazer ? 'refeito' : 'completado'} (${n} ${n === 1 ? 'bloco' : 'blocos'})`
-            : (refazer ? 'A IA devolveu o mesmo material' : 'A IA não achou o que acrescentar para este sentido'),
-          n ? 'success' : 'info')
+    if (esvaziou.length) {
+      toast(`Material refeito — a IA não devolveu ${esvaziou.join(', ')} desta vez`, 'warning')
+    } else {
+      toast(n ? `Material ${refazer ? 'refeito' : 'completado'} (${n} ${n === 1 ? 'bloco' : 'blocos'})`
+              : (refazer ? 'A IA devolveu o mesmo material' : 'A IA não achou o que acrescentar para este sentido'),
+            n ? 'success' : 'info')
+    }
     return true
   } catch (e) {
     toast(`Não deu para completar: ${e.message}`, 'error')

@@ -22,8 +22,12 @@
 > LIXO, não contra quantidade. E o último teto era de FORMATO: `curiosidade` e `armadilha` eram
 > texto único, o que obrigava a IA a escolher uma e jogar o resto fora — viraram **listas**, com
 > rótulo no plural quando há várias. ⚠️ `[]` é truthy em JS, e isso teria feito o "Completar
-> material" sumir de quem mais precisa dele. `sw.js` → `englab-v168`. Ver seção 8.2 ("O ritmo do
-> painel de estudo").
+> material" sumir de quem mais precisa dele. **E a lista criou um bug que ele pegou na hora**:
+> "digest-sized" perdeu a curiosidade no refazer, porque o guarda de 140 caracteres derrubava
+> qualquer texto de 1-2 frases (a real tem 170). Virou **duas funções** — `_listaCurta` para itens
+> de poucas palavras, `_listaTexto` para prosa —, e o refazer ganhou **duas redes**: resposta
+> inteiramente vazia não escreve nada, e bloco que esvaziou é nomeado no aviso.
+> `sw.js` → `englab-v169`. Ver seção 8.2 ("O ritmo do painel de estudo").
 >
 > Anterior: 2026-08-08 — **A FORMA NEUTRA E A FAMÍLIA COMPLETA**. O item aparecia como
 > "Gals" (a forma do livro): o prompt passou a pedir a **forma de citação**, com a guarda
@@ -7173,6 +7177,40 @@ Provado nos quatro casos: várias (3 de 3 e 2 de 2 na tela, com os rótulos no p
 de completar continua de pé).
 
 **Arquivos**: `js/review.js`, `js/dossie.js`, `css/styles.css`. `sw.js` → `englab-v168`.
+
+#### O bug que a lista criou: "digest-sized" perdeu a curiosidade
+
+Relato dele, uma rodada depois: *"digest-sized antes tinha curiosidade e depois que recarreguei e
+cliquei em refazer o material não veio nenhuma, ao invés de vir mais."*
+
+Duas falhas no MESMO normalizador, e as duas só aparecem em campo de **prosa**:
+
+1. **O teto de 140 caracteres.** Ele foi escrito como guarda contra lixo pensando em colocação
+   (2-4 palavras). Curiosidade é **1-2 frases** — a real de "digest-sized" tem **170 caracteres**,
+   e TODAS caíam. Reproduzido no teste: `_listaCurta([texto de 170]) → 0 entradas`.
+2. **A quebra por vírgula.** Quando o modelo devolve string em vez de array, quebrar em vírgulas é
+   o certo para uma lista curta ("get up, get over") e é destruição numa frase — a mesma
+   curiosidade virava três fragmentos sem sentido.
+
+Viraram **duas funções, porque são duas naturezas**: `_listaCurta` (itens de poucas palavras;
+quebra string; teto 140) e `_listaTexto` (uma frase por entrada; string é UMA entrada; teto 900).
+`confusoes` foi junto — *"girl — neutro, mas infantiliza uma adulta"* tem vírgula e passa de 140.
+
+> ⚠️ **Mas o pior não foi o corte: foi o SILÊNCIO.** O refazer sobrescreve de propósito (é assim
+> que uma curiosidade ruim sai), e isso o torna capaz de **destruir material bom quando a resposta
+> chega quebrada** — sem nada na tela dizendo por quê. Duas redes:
+>
+> - **Refazer com resposta inteiramente vazia não escreve nada.** Um item que TINHA material nunca
+>   volta com todos os campos vazios de verdade; quando isso acontece, o problema é a resposta, e
+>   resposta quebrada não pode apagar o que está no aparelho. Avisa e pede para tentar de novo.
+> - **Bloco que esvaziou é NOMEADO no aviso**: *"Material refeito — a IA não devolveu curiosidade
+>   desta vez"*. Perder conteúdo tem de ser dito, não descoberto depois.
+
+Provado nos três casos: curiosidades de 170 caracteres agora são guardadas (eram 0); resposta
+vazia preserva o que existia e devolve `false`; e perda parcial legítima acontece **com aviso
+nomeando o bloco**.
+
+**Arquivos**: `js/review.js`. `sw.js` → `englab-v169`.
 
 ### Onde a captura ainda NÃO leva a semente
 
