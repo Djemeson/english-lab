@@ -245,14 +245,28 @@ function applyAiResult(w, result) {
   sincronizarStatusItem(w)
 }
 
+// ================================================================
+// QUEM ESTÁ EM ANÁLISE — o estado mora AQUI, não no DOM
+// ================================================================
+// O "Analisando com IA..." era escrito direto no `innerHTML` do card. Bastava
+// clicar noutro item para o render apagar o aviso, e ao voltar a tela mostrava
+// o botão "Analisar com IA" como se nada estivesse acontecendo — ele não tinha
+// como saber que já mandara analisar, e o caminho natural era mandar de novo,
+// pagando a chamada duas vezes.
+// Com o id num Set, quem responde "está analisando?" é o estado, e o card e a
+// lista podem ser repintados quantas vezes for.
+const _emAnalise = new Set()
+function estaEmAnalise(wordId) { return _emAnalise.has(wordId) }
+
 async function analyzeWordDirect(wordId) {
   const w = words.find(x => x.id === wordId)
   if (!w || !aiChatCfg().key) return false
+  // Clique repetido não vira chamada repetida: o item já está na fila.
+  if (_emAnalise.has(wordId)) { toast(`"${w.word || 'item'}" já está sendo analisada`, 'info'); return false }
+  _emAnalise.add(wordId)
 
-  const main = el('review-main')
-  if (activeWordId === wordId) {
-    main.innerHTML = `<div class="review-empty-main"><span class="spinner" style="width:32px;height:32px;border-width:3px"></span><p style="margin-top:16px">Analisando com IA...</p></div>`
-  }
+  if (activeWordId === wordId) renderWordCard(wordId)
+  renderSidebar()
 
   const target = w.word || w.context
   const ctx    = w.context || ''
@@ -443,6 +457,13 @@ Return ONLY this JSON (no markdown, no explanation):
     toast(`Erro na análise: ${e.message}`, 'error')
     if (activeWordId === wordId) renderWordCard(wordId)
     return false
+  } finally {
+    // FINALLY, não no fim do try: erro, timeout ou chave inválida também têm
+    // de soltar o item. Um item preso em "analisando" para sempre seria pior
+    // que o problema original — ele ficaria esperando algo que já morreu.
+    _emAnalise.delete(wordId)
+    renderSidebar()
+    if (activeWordId === wordId) renderWordCard(wordId)
   }
 }
 
@@ -863,7 +884,12 @@ function renderSidebar(filter = '') {
         const nMean = (w.meanings || []).filter(m => !m.moved_to && !m.fundido_em).length
         // Marie Kondo: o chip "Pendente IA" repetido em toda linha era ruído —
         // virou um ponto discreto (âmbar = aguardando; nº = significados prontos)
-        const statusHtml = w.status === 'pending_ai'
+        // O que está EM ANÁLISE ganha o giro no lugar do ponto: é o sinal que
+        // permite mandar analisar, ir cuidar de outro item e voltar sabendo o
+        // que está acontecendo — sem isso a lista mentia por omissão.
+        const statusHtml = estaEmAnalise(w.id)
+          ? `<span class="spinner rw-spin" data-tip="Analisando com IA agora"></span>`
+          : w.status === 'pending_ai'
           ? `<span class="rw-dot wait" data-tip="Aguardando análise da IA"></span>`
           : `<span class="rw-mean" data-tip="${nMean} significado${nMean !== 1 ? 's' : ''} prontos">${nMean}</span>`
         html += `<div class="rw-item ${isActive ? 'active' : ''} ${isChecked ? 'checked' : ''}" onclick="selectWord('${w.id}')">
@@ -948,6 +974,22 @@ function renderWordCard(wordId) {
   const w = words.find(x => x.id === wordId)
   if (!w) return
   const main = el('review-main')
+
+  // EM ANÁLISE: o estado vem do Set, não do DOM — então sobrevive a sair do
+  // item e voltar, que era exatamente a queixa. Mostra a palavra e a frase
+  // (para ele reconhecer onde está) em vez de um spinner anônimo.
+  if (estaEmAnalise(wordId)) {
+    main.innerHTML = `
+      <div class="wc-analisando">
+        <span class="spinner"></span>
+        <div>
+          <b>${esc(w.word || '(frase)')}</b>
+          <span>${esc(aiChatCfg().P.nome)} está analisando — pode navegar, o resultado aparece aqui</span>
+        </div>
+      </div>
+      ${w.context ? `<div class="wc-analisando-ctx">“${esc(w.context)}”</div>` : ''}`
+    return
+  }
 
   // Context with word highlighted
   const ctxHtml = w.context ? (() => {

@@ -6041,6 +6041,37 @@ pré-análise no capítulo** (a glosa que ele mostra é a do contexto antigo). O
 já respondeu, ou já acusou divergência, o botão não aparece — seria pagar por resposta que
 existe.
 
+### "EM ANÁLISE" SOBREVIVE À NAVEGAÇÃO (2026-08-08)
+
+*"Essa frase está sendo analisada com IA, mas eu cliquei em outro item e quando voltei aqui
+não dá pra saber que está."*
+
+O aviso era escrito **direto no `innerHTML`** do card (`main.innerHTML = spinner`), e só quando
+o item era o ativo. Clicar noutro item repintava a área e apagava o aviso; ao voltar, a tela
+mostrava o botão "Analisar com IA" como se nada estivesse acontecendo. O caminho natural dali
+era **mandar analisar de novo, pagando a chamada duas vezes**.
+
+`_emAnalise` (Set de ids) em `review.js` + `estaEmAnalise()`. Quem responde "está analisando?"
+passou a ser o estado, então card e lista podem ser repintados quantas vezes for:
+- **No card**: nome do item, a frase, e "…está analisando — pode navegar, o resultado aparece
+  aqui". Mostrar a palavra e a frase, e não um spinner anônimo, é o que deixa ele reconhecer
+  onde está ao voltar.
+- **Na lista lateral**: o giro toma o lugar do ponto âmbar (`.rw-spin`) — é o que permite
+  mandar analisar, cuidar de outro item e voltar sabendo o que aconteceu.
+
+Três detalhes que o teste cobriu:
+- **`finally`, não fim do `try`**: erro, timeout ou chave inválida também soltam o item. Item
+  preso em "analisando" para sempre seria pior que o problema original.
+- **Clique repetido não vira chamada repetida** — medido: 3 cliques = **1 chamada**. Ganho de
+  custo que veio de graça com o estado.
+- O lote (`analyzeSelected`/`analyzeAll`) herda tudo, porque passa pelo mesmo
+  `analyzeWordDirect`.
+
+⚠️ **Varri os vizinhos com o mesmo padrão** (estado de progresso vivendo no DOM): a geração de
+áudio e a reanálise da Biblioteca usam **banner global**, que sobrevive ao render; o card com
+áudio do vídeo já usava flag em memória (`_vidCapturing`). O `analyzeWordDirect` era o único
+fora do padrão.
+
 ### O PRONOME SEM ANTECEDENTE — "shakes it" virou "dançar" (2026-08-08)
 
 Ele mandou o print: *"Macintosh holds out his hand. **Billy rises and shakes it.**"* e a Lexa
