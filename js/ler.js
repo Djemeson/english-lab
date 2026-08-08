@@ -967,16 +967,28 @@ function _lerDuploClique(ev) {
   _lerFecharPopup()
 }
 
-function _lerFraseEmVolta(sel, alvo) {
-  let no = sel.anchorNode
+// O PARÁGRAFO em volta da seleção. A frase sozinha não basta para a IA:
+// pronome responde ao que veio ANTES dele, e cortar na fronteira da frase joga
+// fora justamente o antecedente. Caso real: "Macintosh holds out his hand.
+// Billy rises and shakes it." — mandando só a segunda frase, o "it" fica sem
+// referente e a explicação virou "começa a dançar".
+// A FRASE continua sendo o que vai para o card (contexto enxuto, do tamanho
+// certo para virar exemplo); o parágrafo é só para a IA entender.
+function _lerBlocoEmVolta(sel) {
+  let no = sel && sel.anchorNode
   if (no && no.nodeType === 3) no = no.parentElement
   let bloco = ''
   for (let i = 0; i < 6 && no && no.id !== 'ler-conteudo'; i++) {
     const t = (no.textContent || '').replace(/\s+/g, ' ').trim()
     if (t.length > bloco.length) bloco = t
-    if (bloco.length > 500) break
+    if (bloco.length > 700) break
     no = no.parentElement
   }
+  return bloco.slice(0, 700)
+}
+
+function _lerFraseEmVolta(sel, alvo) {
+  const bloco = _lerBlocoEmVolta(sel)
   if (!bloco) return ''
   const i = bloco.toLowerCase().indexOf(String(alvo).toLowerCase())
   if (i < 0) return bloco.slice(0, 400)
@@ -1070,7 +1082,7 @@ function _lerPersistirCaptura() {
 }
 
 // ---- popup de seleção: Explicar / Estudar / Ouvir ----
-let _lerPopAlvo = '', _lerPopCtx = ''
+let _lerPopAlvo = '', _lerPopCtx = '', _lerPopTrecho = ''
 function _lerFecharPopup() { const p = el('ler-pop'); if (p) p.remove(); _lerPopAlvo = '' }
 
 function _lerAoSelecionar() {
@@ -1094,6 +1106,9 @@ function _lerAoSelecionar() {
   _lerFecharPopup()
   _lerPopAlvo = txt
   _lerPopCtx = _lerFraseEmVolta(sel, txt)
+  // O parágrafo vai junto, só para a IA: é ele que carrega o antecedente dos
+  // pronomes. O card continua recebendo a frase.
+  _lerPopTrecho = _lerBlocoEmVolta(sel)
 
   // O botão diz o que VAI acontecer: palavra/expressão vira item de estudo;
   // trecho longo entra como frase, para a triagem quebrar depois.
@@ -1172,7 +1187,11 @@ function _lerAoSelecionar() {
 
     try {
       const sistema = lexaPrompt()
-      const pergunta = `O aluno está lendo "${_lerLivro.title}"${_lerLivro.author ? ', de ' + _lerLivro.author : ''}. A frase é: "${ctx}". Ele selecionou: "${alvo}".\nExplique o que "${alvo}" significa AQUI, nesta passagem.`
+      // O TRECHO INTEIRO vai primeiro, e a frase depois. Sem o parágrafo, um
+      // pronome no começo da seleção fica órfão e a IA inventa o referente.
+      const trecho = (_lerPopTrecho && _lerPopTrecho.length > ctx.length) ? _lerPopTrecho : ''
+      const pergunta = `O aluno está lendo "${_lerLivro.title}"${_lerLivro.author ? ', de ' + _lerLivro.author : ''}.${
+        trecho ? `\nTrecho em volta (use para resolver pronomes e referências): "${trecho}"` : ''}\nA frase é: "${ctx}". Ele selecionou: "${alvo}".\nExplique o que "${alvo}" significa AQUI, nesta passagem.`
       const t = await aiTextSeguro([
         { role: 'system', content: sistema },
         { role: 'user', content: pergunta }

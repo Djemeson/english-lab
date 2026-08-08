@@ -534,12 +534,19 @@ function _glossPrender(b) {
 function _glossFraseParaChecar(pos, achado) {
   const f = glossFraseEmVolta(pos)
   if (f && f.split(/\s+/).length > 2) return f
-  const bloco = pos && pos.no && pos.no.parentElement
-    ? String(pos.no.parentElement.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 400)
-    : ''
+  const bloco = _glossBlocoEmVolta(pos)
   if (bloco && bloco.split(/\s+/).length > 2) return bloco
   // Último recurso: a frase que o próprio card guardou da captura.
   return String((achado && achado.contexto) || '').trim()
+}
+
+// O parágrafo em volta — vai JUNTO com a frase, não no lugar dela. É ele que
+// carrega o antecedente do pronome ("Macintosh holds out his hand. Billy rises
+// and shakes it." — sem a primeira frase, "it" não tem dono).
+function _glossBlocoEmVolta(pos) {
+  const alvo = pos && pos.no && pos.no.parentElement
+  if (!alvo) return ''
+  return String(alvo.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 700)
 }
 
 async function _glossChecar(b, achado, pos, opts) {
@@ -557,7 +564,8 @@ async function _glossChecar(b, achado, pos, opts) {
 
   let r = null
   try {
-    r = await aiChecarAqui(alvo, frase, (typeof activeLang === 'function' ? activeLang() : 'en'), jaTem)
+    r = await aiChecarAqui(alvo, frase, (typeof activeLang === 'function' ? activeLang() : 'en'),
+                           jaTem, _glossBlocoEmVolta(pos))
   } catch (e) {
     if (acoes) acoes.innerHTML = `<span class="gloss-checando erro">${ic('alert','ic-sm')} ${esc(e.message || 'não deu para checar')}</span>`
     return

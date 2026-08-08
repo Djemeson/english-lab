@@ -684,6 +684,14 @@ async function videoOvExplain() {
   if (p && !p.paused) p.pause()   // vai ler a explicação: congela a cena (e a fala não troca por baixo)
   const i = _vidCueIdx >= 0 ? _vidCueIdx : _vidCueAt(p ? p.currentTime : 0)
   const contexto = (_vidCues[i] && _vidCues[i].t) || ''
+  // AS FALAS EM VOLTA. Diálogo é ainda mais dependente do que veio antes que
+  // um livro: "Do it." / "I already did" só faz sentido em par. Mandando uma
+  // fala só, o pronome fica sem referente e a IA inventa — o mesmo erro do
+  // "shakes it" no leitor. Duas antes e uma depois cobrem a troca de turno
+  // sem inchar a chamada.
+  const trecho = _vidCues.slice(Math.max(0, i - 2), i + 2)
+    .map((c, k) => (Math.max(0, i - 2) + k === i ? '>> ' : '   ') + c.t)
+    .join('\n').slice(0, 700)
   let corpo = pop.querySelector('.sel-pop-exp')
   if (!corpo) { corpo = document.createElement('div'); corpo.className = 'sel-pop-exp'; pop.appendChild(corpo) }
   const chave = 'vid|' + contexto + '|' + txt
@@ -693,7 +701,10 @@ async function videoOvExplain() {
   try {
     const sistema = lexaExplicar()
     const pergunta =
-`Na cena de "${_vidCur ? _vidCur.title : ''}", a fala é: "${contexto}". O aluno selecionou: "${txt}".
+`Na cena de "${_vidCur ? _vidCur.title : ''}", estas são as falas em volta (a marcada com >> é a atual — use as outras para resolver pronomes e referências):
+${trecho}
+
+A fala é: "${contexto}". O aluno selecionou: "${txt}".
 Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado, explique a imagem.`
     const resp = await aiTextSeguro([
       { role: 'system', content: sistema },

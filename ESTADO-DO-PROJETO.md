@@ -6041,6 +6041,45 @@ pré-análise no capítulo** (a glosa que ele mostra é a do contexto antigo). O
 já respondeu, ou já acusou divergência, o botão não aparece — seria pagar por resposta que
 existe.
 
+### O PRONOME SEM ANTECEDENTE — "shakes it" virou "dançar" (2026-08-08)
+
+Ele mandou o print: *"Macintosh holds out his hand. **Billy rises and shakes it.**"* e a Lexa
+respondeu **"Billy se levanta e começa a dançar"**, explicando que *shake it* é gíria de dançar.
+O "it" é **a mão** — Billy se levanta e aperta a mão dele.
+
+**A culpa não era do modelo, era do que a gente mandava.** `_lerFraseEmVolta` calcula o
+parágrafo inteiro e depois **corta na fronteira da frase**: o que chegava à IA era exatamente
+`"Billy rises and shakes it."`, sem o `Macintosh holds out his hand.`. Sem antecedente, "it"
+não tem dono, e o modelo escolheu a leitura idiomática — que, sem contexto, é até a mais
+provável.
+
+É a mesma família do `barrel`→barril: **contexto estreito demais produz erro com cara de
+acerto**. Só que ali a frase bastava, e para anáfora não basta nunca.
+
+Corrigido em três frentes, porque as três tinham o mesmo estreitamento:
+- **Leitor** — `_lerBlocoEmVolta()` (extraído do que o `_lerFraseEmVolta` já calculava e
+  jogava fora) guarda o **parágrafo**, e ele vai ao prompt como "trecho em volta". ⚠️ A FRASE
+  continua sendo o que vai para o card: contexto enxuto é o tamanho certo para virar exemplo;
+  o parágrafo é só para a IA entender.
+- **Vídeo** — mandava **uma fala só**, e diálogo depende ainda mais do turno anterior
+  ("Do it." / "I already did"). Agora vão duas antes e uma depois, com a atual marcada `>>`.
+- **"O que é aqui?"** — mesmo tratamento (`_glossBlocoEmVolta`), passando o parágrafo **junto**
+  com a frase, não no lugar dela.
+
+E a regra entrou no **prompt compartilhado** (`lexaExplicar`), então vale para as três telas de
+uma vez: *"pronome responde ao que veio antes; ache o antecedente no texto em volta e use ESSA
+coisa. Se o antecedente estiver no texto, a leitura idiomática só vale se a literal não fizer
+sentido ali."* — com o caso do `shakes it` escrito como exemplo.
+
+**Medido**: para a seleção "Billy rises and shakes it", a frase devolvia
+`"Billy rises and shakes it."` (sem antecedente) e o bloco devolve
+`"Macintosh holds out his hand. Billy rises and shakes it."` (com).
+
+⚠️ **Fica de fora, e é limite conhecido**: a **pré-análise do capítulo** manda uma frase por
+palavra, em lote. Alargar para parágrafo multiplicaria os tokens de uma chamada que já é a mais
+cara do app. Enquanto isso, a glosa dela pode errar em palavra cuja leitura dependa da frase
+anterior — e o conserto no caso concreto é o "O que é aqui?", que agora manda o parágrafo.
+
 ### O MATERIAL SÓ VALE DEPOIS DO ENVIO (2026-08-08)
 
 *"O material só deve ir pra Biblioteca, ou glossário, depois que eu mandar pro Estudo."*

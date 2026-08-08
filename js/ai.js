@@ -35,7 +35,8 @@ TAREFA AGORA: explicar um trecho para o aluno, em português do Brasil.
 - 2 a 4 frases. Sem introdução, sem repetir a pergunta, sem despedida.
 - Traduza o SENTIDO na cena, nunca palavra por palavra.
 - Decida O QUE a coisa É nesta cena e use a palavra portuguesa DAQUILO ("barrel" de fuzil é "cano", nunca "barril") — sem ficar em cima do muro entre dois domínios.
-- Gíria, marca, referência cultural ou nome próprio: diga o que é no mundo real.`)
+- Gíria, marca, referência cultural ou nome próprio: diga o que é no mundo real.
+- PRONOME RESPONDE AO QUE VEIO ANTES. Antes de decidir o sentido, ache no texto em volta a que "it/this/that/them/one" se refere, e use ESSA coisa na explicação. Caso real: "Macintosh holds out his hand. Billy rises and shakes it." — "it" é a MÃO, então é apertar a mão; ler "shake it" como a gíria de dançar é ignorar a frase anterior. Se o antecedente estiver no texto, a leitura idiomática só vale se a literal não fizer sentido ali.`)
 }
 
 // ================================================================
@@ -189,9 +190,12 @@ const _checkCache = new Map()
 // FORA da conversa: perguntava do zero e podia responder "mina" para um item
 // cujo sentido do contexto o app já tinha decidido ser "explorar" — duas telas
 // do mesmo app dando respostas diferentes para a mesma palavra.
-async function aiChecarAqui(alvo, frase, lang, jaTem) {
+// `trecho` = o parágrafo em volta. A frase sozinha não resolve pronome, e
+// pronome sem antecedente é o que fez "shakes it" virar "dançar".
+async function aiChecarAqui(alvo, frase, lang, jaTem, trecho) {
   const termo = String(alvo || '').trim()
   const ctx = String(frase || '').replace(/\s+/g, ' ').trim()
+  const volta = String(trecho || '').replace(/\s+/g, ' ').trim()
   if (!termo) throw new Error('sem termo')
   // SEM A FRASE NÃO HÁ O QUE CHECAR. Responder assim mesmo seria devolver o
   // sentido mais comum do dicionário — exatamente o "dicionário cego ao
@@ -204,7 +208,10 @@ async function aiChecarAqui(alvo, frase, lang, jaTem) {
 
   const L = (typeof getLangDef === 'function') ? getLangDef(lang || 'en') : { nameEn: 'English' }
   const PROMPT = `In the passage below, decide what the learner should actually study around "${termo}".
-
+${volta && volta.length > ctx.length ? `
+Surrounding text (use it to resolve pronouns and references — "it/this/that/them" answers to what came BEFORE):
+"${volta}"
+` : ''}
 Passage: "${ctx || termo}"
 Target word: "${termo}"
 
