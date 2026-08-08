@@ -215,9 +215,25 @@ function _selMenuFechar() {
   _selMenuCtx = null
 }
 
-// `obterContexto()` devolve { frase, lang, origem } do que estiver em foco no
-// contêiner naquele instante — é função, e não valor, porque o painel troca de
-// item embaixo do ouvinte.
+// Onde o balão se ancora. Fica guardado porque a resposta nasce DENTRO dele:
+// quando o texto chega o balão cresce, e sem o retângulo da seleção não haveria
+// como recolocá-lo sem tapar justamente o que ele acabou de selecionar.
+function _selMenuPor(p, r) {
+  if (!p || !r) return
+  const larg = p.offsetWidth, alt = p.offsetHeight
+  p.style.left = Math.round(Math.max(8, Math.min(r.left + r.width / 2 - larg / 2, innerWidth - larg - 8))) + 'px'
+  const acima = r.top - alt - 8
+  p.style.top = Math.round(acima > 8 ? acima : Math.min(r.bottom + 8, innerHeight - alt - 8)) + 'px'
+}
+
+// `obterContexto(no)` devolve { frase, lang, origem } — e recebe o NÓ onde a
+// seleção caiu.
+// ⚠️ O `no` não é enfeite, é o conserto de um defeito real: sem ele o dono do
+// menu só sabia dizer o que estava "em foco" na tela, e respondia sempre a
+// mesma coisa. Selecionando "cramped" dentro do exemplo #2, o balão abria com a
+// passagem do livro do OUTRO item e a Lexa respondia "cramped não aparece nessa
+// frase". Pior: mandado ao Preparar, o item nascia com a fonte do livro — uma
+// palavra que ele nunca leu lá. Fonte de avô virando fonte de neto.
 function selMenuAtivar(container, obterContexto) {
   if (!container || container._selMenu) return
   container._selMenu = true
@@ -231,10 +247,13 @@ function selMenuAtivar(container, obterContexto) {
       _selMenuFechar()
       if (!txt || txt.length < 2 || txt.length > 120) return
       if (!sel.rangeCount) return
-      const r = sel.getRangeAt(0).getBoundingClientRect()
+      const rng = sel.getRangeAt(0)
+      const r = rng.getBoundingClientRect()
       if (!r.width && !r.height) return
-      const ctx = (typeof obterContexto === 'function' ? obterContexto() : null) || {}
-      _selMenuCtx = { txt, ...ctx }
+      const ctx = (typeof obterContexto === 'function' ? obterContexto(rng.commonAncestorContainer) : null) || {}
+      // O retângulo é copiado: o vivo morre junto com a seleção, e a seleção é
+      // desfeita no instante em que ele clica "Explicar".
+      _selMenuCtx = { txt, rect: { top: r.top, bottom: r.bottom, left: r.left, width: r.width }, ...ctx }
       const p = document.createElement('div')
       p.id = 'sel-menu'
       p.innerHTML = `
@@ -242,13 +261,15 @@ function selMenuAtivar(container, obterContexto) {
         <button onclick="selMenuExplicar()">${ic('sparkles','ic-sm')} Explicar</button>
         <button onclick="selMenuPreparar()">${ic('plus','ic-sm')} Preparar</button>`
       // `mousedown` no menu não pode desfazer a seleção nem borbulhar para o
-      // fundo dos painéis, que fecham ao clique de fora.
-      p.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation() })
+      // fundo dos painéis, que fecham ao clique de fora. Depois que a resposta
+      // entra, porém, o balão vira TEXTO — e texto tem de poder ser selecionado,
+      // então o `preventDefault` sai de cena.
+      p.addEventListener('mousedown', e => {
+        e.stopPropagation()
+        if (!p.classList.contains('sel-exp')) e.preventDefault()
+      })
       document.body.appendChild(p)
-      const larg = p.offsetWidth, alt = p.offsetHeight
-      p.style.left = Math.round(Math.max(8, Math.min(r.left + r.width / 2 - larg / 2, innerWidth - larg - 8))) + 'px'
-      const acima = r.top - alt - 8
-      p.style.top = Math.round(acima > 8 ? acima : Math.min(r.bottom + 8, innerHeight - alt - 8)) + 'px'
+      _selMenuPor(p, r)
     }, 10)   // depois do navegador fechar a seleção do clique simples
   })
   container.addEventListener('mousedown', ev => {
@@ -266,17 +287,37 @@ function selMenuPreparar() {
   if (typeof _dosFocoPintar === 'function') { try { _dosFocoPintar() } catch (e) {} }
 }
 
+// Selecionar e perguntar é gesto de PASSAGEM: ele está lendo um exemplo, tropeça
+// numa palavra, quer saber e voltar para onde estava. O painel inteiro cobre a
+// página e tira da vista exatamente a frase que motivou a pergunta — "não ficou
+// no modo suspenso, que é o que eu queria nesse caso, igual acontece quando
+// marco uma palavra no livro".
+// Então a resposta nasce no balão, em cima do texto, com a frase à vista. O
+// painel continua existindo para quem quiser mais espaço, a um clique — e sem
+// gastar uma segunda chamada, porque a resposta viaja junto.
 async function selMenuExplicar() {
   const c = _selMenuCtx; if (!c) return
-  _selMenuFechar()
+  const p = document.getElementById('sel-menu'); if (!p) return
   try { window.getSelection().removeAllRanges() } catch (e) {}
   if (!aiChatCfg().key) {
+    _selMenuFechar()
     toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return
   }
   const L = getLangDef(c.lang || 'en')
-  const corpo = lexaPainelAbrir({ titulo: LEXA_NOME, frase: c.frase || c.txt, fonte: c.fonte || '' })
-  const vivo = () => el('lexa-painel-corpo') === corpo
-  corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(LEXA_NOME)} está explicando…`
+  // Vivo = este balão ainda é o balão, e ainda é desta seleção. Uma seleção nova
+  // troca os dois, e a resposta velha não pode aterrissar por cima da nova.
+  const vivo = () => document.getElementById('sel-menu') === p && _selMenuCtx === c
+  p.classList.add('sel-exp')
+  p.innerHTML = `
+    <header class="sel-exp-cab">
+      <b>"${esc(c.txt)}"</b>
+      <button class="sel-exp-btn" onclick="selMenuPreparar()" data-tip="Mandar para o Preparar">${ic('plus','ic-sm')}</button>
+      <button class="sel-exp-btn" onclick="selMenuExpandir()" data-tip="Abrir no painel, com espaço para conversar">${ic('expand','ic-sm')}</button>
+      <button class="sel-exp-btn" onclick="_selMenuFechar()" data-tip="Fechar">${ic('x','ic-sm')}</button>
+    </header>
+    <div class="sel-exp-corpo"><span class="gen-spinner"></span> ${esc(lexaNome())} está explicando…</div>`
+  _selMenuPor(p, c.rect)
+  const corpo = p.querySelector('.sel-exp-corpo')
   try {
     const sistema = lexaExplicar()
     const pergunta = `${c.frase ? `A frase é: "${c.frase}".\n` : ''}O aluno selecionou: "${c.txt}".
@@ -286,17 +327,51 @@ Explique o que "${c.txt}" significa AQUI, em ${L.nameEn}. Se for gíria, marca, 
       { role: 'user', content: pergunta }
     ], { maxTokens: 600 })
     if (!vivo()) return
+    // Guardado no contexto: é o que deixa "abrir no painel" ser instantâneo.
+    c.sistema = sistema; c.pergunta = pergunta; c.resposta = resp
     corpo.innerHTML = lexaFormatar(resp)
     if (typeof lexaChipsMontar === 'function' && c.frase) {
       lexaChipsMontar(corpo, { trecho: c.frase, lang: c.lang || 'en', fonte: c.fonte || '',
         origem: c.origem || {} })
     }
-    if (typeof lexaChatMontar === 'function') {
-      lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
-    }
+    _selMenuPor(p, c.rect)
   } catch (e) {
-    if (vivo()) corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)}</span>`
+    if (vivo()) { corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)}</span>`; _selMenuPor(p, c.rect) }
   }
+}
+
+// O balão apertou? O painel recebe a MESMA resposta — mais espaço, mais os
+// chips e a conversa, que no balão não caberiam.
+function selMenuExpandir() {
+  const c = _selMenuCtx; if (!c || !c.resposta) return
+  _selMenuFechar()
+  const corpo = lexaPainelAbrir({ titulo: LEXA_NOME, frase: c.frase || c.txt, fonte: c.fonte || '', lang: c.lang })
+  corpo.innerHTML = lexaFormatar(c.resposta)
+  if (typeof lexaChipsMontar === 'function' && c.frase) {
+    lexaChipsMontar(corpo, { trecho: c.frase, lang: c.lang || 'en', fonte: c.fonte || '',
+      origem: c.origem || {} })
+  }
+  if (typeof lexaChatMontar === 'function') {
+    lexaChatMontar(corpo, { sistema: c.sistema, primeira: c.pergunta, resposta: c.resposta })
+  }
+}
+
+// Aberto, o balão passa a ser conteúdo — e conteúdo precisa das duas saídas de
+// sempre: Esc e clique fora. O ouvinte do contêiner só cobre cliques DENTRO
+// dele; um clique na barra lateral deixaria o balão pendurado na tela.
+if (!window._selMenuTeclas) {
+  window._selMenuTeclas = true
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !document.getElementById('sel-menu')) return
+    // Para antes do Esc do foco de estudo: fechar a pergunta não pode fechar
+    // junto a tela onde ele estava estudando.
+    e.preventDefault(); e.stopPropagation()
+    _selMenuFechar()
+  }, true)
+  document.addEventListener('mousedown', e => {
+    const p = document.getElementById('sel-menu')
+    if (p && !e.target.closest('#sel-menu')) _selMenuFechar()
+  })
 }
 
 // ================================================================

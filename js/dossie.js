@@ -249,7 +249,7 @@ function _dossieCardHTML(s) {
 let _dosNomesBusy = false
 function _dosObrasSujasHTML(obras) {
   if (typeof resolverNomesDeObra !== 'function') return ''
-  const sujas = obras.filter(o => !obrasNome[obraChaveNome(o.obra)])
+  const sujas = obras.filter(o => o.obra !== OBRA_ESTUDO && !obrasNome[obraChaveNome(o.obra)])
   if (!sujas.length) return ''
   return `<p class="dos-intro dos-limpar">
     ${ic('sparkles','ic-sm')} ${sujas.length === 1
@@ -1044,13 +1044,15 @@ function dossieFamiliaPreparar(wordId, expr) {
   const { w, it } = _dosFamAchar(wordId, expr)
   if (!w || !it || typeof lexaChipParaPreparar !== 'function') return
   // Reusa a peça dos chips da frase: mesma criação, mesma semente, mesma
-  // proteção contra duplicar. A cena vai a do item — é a passagem onde ele
-  // encontrou a palavra-raiz, que é o contexto que este membro da família tem.
+  // proteção contra duplicar.
+  // ⚠️ A PROCEDÊNCIA É O ESTUDO, não a obra. "booklet" saiu da família de
+  // "digest-sized"; ele nunca a leu em Billy Summers, e mandá-la para lá com a
+  // passagem do livro por contexto é o mesmo defeito da seleção — fonte de avô
+  // virando fonte de neto. O botão erra tão fácil quanto o selecionar errava.
   lexaChipParaPreparar(
     { expr: it.expr, gloss: it.gloss, type: it.tipo === 'derivada' ? 'word' : it.tipo },
-    { contexto: w.context || '', lang: wordLang(w),
-      source_type: w.source_type || 'manual', source_title: w.source_title || '',
-      source_context: w.source_context || '' })
+    { contexto: '', lang: wordLang(w),
+      source_type: 'manual', source_title: OBRA_ESTUDO, source_context: w.word || '' })
   _dosFocoPintar()
 }
 
@@ -1448,20 +1450,68 @@ function _dosFocoPintar() {
   // na hora (função, não valor) porque o painel troca de item embaixo do
   // ouvinte, e o ouvinte é ligado UMA vez por caixa.
   if (typeof selMenuAtivar === 'function') {
-    selMenuAtivar(box, () => {
+    selMenuAtivar(box, no => {
       const s = _dosFoco && _dosFocoLista[_dosFoco.i]
       const p = s && _dossiePar(s.w.id, s.m.id)
-      if (!p) return {}
-      return {
-        frase: p.m.context || p.w.context || '',
-        lang: wordLang(p.w),
-        fonte: [obraNome(p.m.source_title || p.w.source_title), p.m.source_context || p.w.source_context].filter(Boolean).join(' · '),
-        origem: { source_type: p.m.source_type || p.w.source_type || 'manual',
-                  source_title: p.m.source_title || p.w.source_title || '',
-                  source_context: p.m.source_context || p.w.source_context || '' }
-      }
+      return p ? _dosSelContexto(p.w, p.m, no) : {}
     })
   }
+}
+
+// DE ONDE veio o que eu selecionei. A página é toda selecionável, mas ela NÃO É
+// FEITA DE UMA COISA SÓ — e tratá-la como se fosse produziu dois defeitos de
+// uma vez:
+//   • selecionei "cramped" no exemplo #2 e a Lexa abriu com a passagem do livro
+//     do outro item, respondendo "cramped não aparece nessa frase";
+//   • mandado ao Preparar, "cramped" nasceu como item de Billy Summers, com a
+//     passagem do digest-sized por contexto — palavra que ele nunca leu ali.
+//     Nas palavras dele: *"ta pegando fontes ancestrais pra novas fontes"*.
+//
+// A regra é uma linha: A PASSAGEM É O ÚNICO PEDAÇO AUTÊNTICO DA PÁGINA. Ela
+// veio mesmo da obra. Todo o resto — exemplos inventados pela IA para ESTE
+// item, definição, colocações, família, conjugação — é material do estudo. Quem
+// nasce dali tem a procedência do estudo, e o "capítulo" é o item que o gerou.
+function _dosSelContexto(w, m, no) {
+  const lang = wordLang(w)
+  const bloco = no && (no.nodeType === 1 ? no : no.parentElement)
+  const perto = sel => (bloco && bloco.closest) ? bloco.closest(sel) : null
+  const limpo = t => String(t || '').replace(/\s+/g, ' ').trim()
+  // `textContent` cola irmãos sem espaço: a linha da família, que é
+  // `<b>booklet</b><span>livrinho</span>`, virava "bookletlivrinho" e ia assim
+  // para a IA como se fosse a frase. Os filhos entram separados por espaço.
+  const textoDe = e => e ? limpo([...e.childNodes].map(n => n.textContent || '').join(' ')) : ''
+  const ex = perto('.dosf-ex')
+
+  // A PASSAGEM: aqui, e só aqui, a fonte do item é a fonte da seleção.
+  if (ex && ex.id === 'dosf-passagem') {
+    const origem = {
+      source_type: m.source_type || w.source_type || 'manual',
+      source_title: m.source_title || w.source_title || '',
+      source_context: m.source_context || w.source_context || ''
+    }
+    return {
+      frase: m.context || w.context || '',
+      lang,
+      fonte: [obraNome(origem.source_title), origem.source_context].filter(Boolean).join(' · '),
+      origem
+    }
+  }
+
+  const item = w.word || ''
+  const origem = { source_type: 'manual', source_title: OBRA_ESTUDO, source_context: item }
+  let frase = ''
+  // Num exemplo, a frase é a LINHA EM INGLÊS — mesmo que ele tenha selecionado
+  // na tradução embaixo: é o inglês que dá o sentido da palavra ali.
+  if (ex) frase = textoDe(ex.querySelector('.dosf-ex-en'))
+  if (!frase) {
+    // Fora dos exemplos: vale a LINHA em volta, não o bloco. Uma seção inteira
+    // não é frase, e mandar um parágrafo como "contexto" recria o defeito de
+    // origem por outro caminho — a Lexa procuraria a palavra no lugar errado.
+    const linha = perto('.dosf-coloc, .dosf-fam-txt, .dosf-forma, .dosf-conj, .dosf-sig, .dosf-def, .dosf-texto, .dosf-nota, .dosf-padrao, li, p')
+    const t = textoDe(linha)
+    if (t && t.length <= 300) frase = t
+  }
+  return { frase, lang, fonte: [OBRA_ESTUDO, item].filter(Boolean).join(' · '), origem }
 }
 
 // UM listener só, ligado uma vez. Ligar/desligar a cada abertura do foco é

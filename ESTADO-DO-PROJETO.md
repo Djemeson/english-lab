@@ -7,7 +7,24 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **OBRA → CAPÍTULO → ITENS, E O TÍTULO LIMPO**. A lista do
+> Última atualização: 2026-08-08 — **A FONTE ANCESTRAL, E O BALÃO QUE VOLTOU**. Três defeitos
+> num PDF dele, dois com a mesma raiz. Selecionando **"cramped"** dentro do exemplo #2 do item
+> *digest-sized*, a Lexa abria falando da passagem de **Billy Summers** e respondia *"cramped não
+> aparece nessa frase"*; mandada ao Preparar, a palavra nascia como item **do livro**, com a
+> passagem do digest-sized por contexto — *"ta pegando fontes ancestrais pra novas fontes"*. A
+> raiz: `obterContexto()` devolvia sempre a cena do ITEM EM FOCO, sem saber ONDE na página a
+> seleção caiu. Agora `selMenuAtivar` passa o nó da seleção e vale a regra **a passagem é o único
+> pedaço autêntico da página** — exemplos da IA, definição, colocações, família e conjugação são
+> material do estudo, e quem nasce dali tem `source_title = OBRA_ESTUDO` ("Do seu estudo") com o
+> item por capítulo. **O mesmo defeito estava em mais dois lugares** e foi corrigido junto: o botão
+> "Preparar" da família (`dossieFamiliaPreparar`, que dava ao membro a cena do livro da raiz) e os
+> chips do Preparar (`revSelExplain`). **E o "Explicar" voltou ao modo suspenso**: a resposta nasce
+> DENTRO do balão, em cima do texto, com a frase à vista — o painel inteiro cobria justamente a
+> frase que motivou a pergunta. O painel continua a um clique no botão de expandir, **reaproveitando
+> a resposta já paga** (sem 2ª chamada) e levando junto os chips e a conversa. `sw.js` →
+> `englab-v175`. ⚠️ O LEITOR continua abrindo o painel — ver pendência.
+>
+> Anterior: 2026-08-08 — **OBRA → CAPÍTULO → ITENS, E O TÍTULO LIMPO**. A lista do
 > Estudar era plana (um cartão por obra+capítulo), então um livro de doze capítulos virava doze
 > cartões repetindo o mesmo título e o progresso da OBRA não existia. Agora a obra é o contêiner e
 > os capítulos são linhas dentro dela. E o título passou a ser **o que o autor chamou**, não o que
@@ -7396,6 +7413,73 @@ erro nenhum** — que é onde o "already been declared" apareceria.
 
 **Arquivos**: `js/core.js`, `js/ai.js`, `js/ler.js`. `sw.js` → `englab-v174`.
 
+### A fonte ancestral (2026-08-08) — e o balão que voltou
+
+Ele mandou um PDF com três defeitos. Dois eram o mesmo defeito.
+
+**O que aconteceu.** Estudando *digest-sized*, ele selecionou **"cramped"** dentro do exemplo #2
+(*"Maya chose a digest-sized cookbook for her cramped kitchen."*). A Lexa abriu mostrando a
+passagem de **Billy Summers** como sendo "a frase", respondeu *"cramped não aparece nessa frase"*,
+e os chips listaram as unidades da passagem do livro. Mandada ao Preparar, "cramped" nasceu com
+`source_title = Billy Summers (US Edition)` e a passagem do digest-sized por contexto. Nas
+palavras dele: ***"ta pegando fontes ancestrais pra novas fontes"***.
+
+**A raiz.** `obterContexto()` era chamado **sem argumento nenhum**. O dono do menu só sabia
+responder *"o que está em foco na tela"* — e o que está em foco é o ITEM. Onde na página a seleção
+caiu, ninguém perguntava. Selecionar em qualquer lugar dava a mesma resposta.
+
+**A regra que entrou** (`_dosSelContexto`, em `js/dossie.js`):
+
+> **A passagem é o único pedaço autêntico da página.**
+
+Ela veio mesmo da obra. Todo o resto — exemplos inventados pela IA **para este item**, definição,
+colocações, família, conjugação — é material do estudo. Então:
+
+| Onde a seleção caiu | frase | procedência |
+|---|---|---|
+| `#dosf-passagem` | `m.context` | a obra (livro, cena, episódio) |
+| `.dosf-ex` (exemplo da IA) | a linha `.dosf-ex-en` daquele exemplo | `OBRA_ESTUDO` · o item |
+| colocação, família, forma, definição… | a LINHA em volta, se ≤ 300 caracteres | `OBRA_ESTUDO` · o item |
+
+`OBRA_ESTUDO` (`"Do seu estudo"`) mora em **`js/core.js`**, junto de `obraNome`. É excluída da
+limpeza de títulos com IA em **dois** pontos — `resolverNomesDeObra` e `_dosObrasSujasHTML` —
+porque o nome já nasce limpo e mandá-lo à IA a faria "reconhecer" um livro inexistente.
+
+Detalhes que só aparecem testando: a frase do exemplo sai da linha em **inglês** mesmo quando ele
+seleciona na tradução (é o inglês que dá o sentido); e a leitura do texto **não** usa `textContent`
+puro — a linha da família é `<b>booklet</b><span>livrinho</span>` e virava `"bookletlivrinho"`
+indo assim para o prompt.
+
+**⚠️ O mesmo defeito estava em mais dois lugares**, achados na varredura e corrigidos junto:
+
+- **`dossieFamiliaPreparar`** — o botão "Preparar" da família dava ao membro (`booklet`) a cena e a
+  obra da raiz. O botão errava tão fácil quanto o selecionar errava.
+- **`revSelExplain`** (Preparar) — os chips herdavam sempre `w.source_*`, e o cartão do Preparar
+  também mostra exemplos da IA. Entrou `_revOrigemDaFrase(w, frase)`, que compara a frase lida do
+  DOM com o `w.context` guardado (tolerante nos dois sentidos, porque o bloco do DOM pode trazer um
+  pedaço a mais ou a menos).
+
+**O terceiro defeito: o modo suspenso.** *"Ao clicar em explicar abriu um novo painel, não ficou no
+modo suspenso, que é o que eu queria nesse caso."* Faz sentido: perguntar durante a leitura é gesto
+de passagem, e o painel inteiro cobre justamente a frase que motivou a pergunta. Agora o **balão
+cresce no lugar** (`#sel-menu.sel-exp`, ~480px, corpo com rolagem própria) e traz a resposta ali
+mesmo, com três botões: **Preparar**, **expandir** e **fechar**.
+
+O painel não morreu — ele fica a um clique, e **reaproveita a resposta já paga** (`c.resposta`
+viaja no contexto; não há segunda chamada), levando junto os chips e a caixa de conversa, que no
+balão não caberiam. Duas saídas de sempre: **Esc** e clique fora. ⚠️ O Esc do balão usa **captura +
+`stopPropagation`** para não fechar junto o modo foco do Estudar, e o `preventDefault` do
+`mousedown` só vale enquanto o balão é menu — depois que vira texto, texto precisa poder ser
+selecionado e copiado.
+
+**Provado no navegador** (com a IA dublada, sem gastar chamada): as 5 regiões da página devolvendo
+frase e procedência certas; o balão abrindo, pintando, cabendo na tela e guardando a resposta; o
+"expandir" abrindo o painel com o mesmo texto e a conversa; Esc e clique fora fechando; e o modo
+foco sobrevivendo ao Esc do balão.
+
+**Arquivos**: `js/ai.js`, `js/dossie.js`, `js/review.js`, `js/core.js`, `css/styles.css`.
+`sw.js` → `englab-v175`.
+
 ### Onde a captura ainda NÃO leva a semente
 
 Só o leitor foi ligado. Faltam **vídeo/legenda** e **a extensão (Netflix/Kindle)** — e o
@@ -7407,6 +7491,24 @@ lugar só.
 
 ## 9. Pendências / a verificar
 
+- [x] ~~Fonte ancestral: item nascido de exemplo herdava a obra~~ — **corrigido em 2026-08-08**.
+      `selMenuAtivar` passa o nó da seleção; `_dosSelContexto` (dossie.js) decide pela REGIÃO da
+      página. Varrido e corrigido nos outros dois lugares com o mesmo defeito:
+      `dossieFamiliaPreparar` e `revSelExplain`. Ver o topo deste arquivo.
+- [x] ~~"Explicar" abria painel em vez do modo suspenso~~ — **corrigido em 2026-08-08**: a resposta
+      nasce no próprio balão (`#sel-menu.sel-exp`), com botões de Preparar, expandir e fechar.
+- [ ] **O LEITOR AINDA ABRE O PAINEL no "Explicar"** (2026-08-08). Ele descreveu o modo suspenso
+      como *"igual acontece quando marco uma palavra no livro"* — mas o `#ler-pop` foi migrado para
+      `lexaPainelAbrir` numa rodada anterior, e ele mesmo disse *"não sei se tu mudou, eu não testei
+      depois das mudanças gerais"*. **Ficou de fora de propósito**: o popup do leitor tem máquina
+      própria (ilustração da Wikipédia, chips, conversa) e trazê-lo para o balão é cirurgia, não
+      ganho de graça. Mesma pergunta vale para `video-study.js`. **Decidir com ele** se os dois
+      seguem o Estudar.
+- [ ] **`OBRA_ESTUDO` cria um grupo novo no Estudar** (2026-08-08). Itens pescados de exemplos e da
+      família passam a se juntar sob a pasta *"Do seu estudo"*, com o item de origem por capítulo.
+      É o desenho pretendido (procedência honesta), mas só o uso dirá se essa pasta vira um
+      depósito grande demais. Ela é excluída da limpeza de títulos com IA nos dois pontos
+      (`resolverNomesDeObra` e `_dosObrasSujasHTML`).
 - [x] ~~O Assistente pula o Preparar~~ — **corrigido em 2026-08-08**, a pedido dele, logo depois
       da varredura. Ver 8.2 ("O Assistente também entrou na fila"). **Agora TODA fonte para no
       Preparar**: leitor, Netflix, Kindle, documento, mídia, vídeo, podcast e Assistente.

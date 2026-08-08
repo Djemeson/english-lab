@@ -332,6 +332,12 @@ function lexaNome() { return (typeof LEXA_NOME === 'string' ? LEXA_NOME : 'Lexa'
 // uma CAMADA DE EXIBIÇÃO: bruto → { titulo, autor }, resolvido uma vez por
 // obra e guardado. Uma chamada por OBRA, nunca por item.
 const SK_OBRAS = 'el-obras-nome'
+// A "obra" de quem nasceu ESTUDANDO. Uma palavra pescada num exemplo inventado
+// pela IA, numa colocação ou na família de outro item não veio de livro nenhum
+// — e herdar o livro do item onde ela apareceu é mentira de procedência: a
+// palavra passa a jurar que estava numa página que ele nunca leu. Aqui ela diz
+// a verdade: veio do estudo de tal item, e o item vira o "capítulo".
+const OBRA_ESTUDO = 'Do seu estudo'
 let obrasNome = {}   // titulo bruto (minúsculo) → { titulo, autor, at }
 function loadObrasNome() { try { obrasNome = JSON.parse(localStorage.getItem(SK_OBRAS) || '{}') } catch { obrasNome = {} } }
 function saveObrasNome() { try { localStorage.setItem(SK_OBRAS, JSON.stringify(obrasNome)) } catch (e) {} }

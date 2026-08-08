@@ -5121,6 +5121,39 @@ body.ler-full .mobile-bottom-nav{display:none}
 }
 #sel-menu button:hover{background:var(--primary);border-color:var(--primary);color:#fff}
 
+/* O MESMO BALÃO, JÁ COM A RESPOSTA — "modo suspenso".
+   Perguntar durante a leitura é gesto de passagem: a resposta aparece por cima
+   do texto, com a frase ainda à vista, e some quando ele volta a ler. Por isso
+   ele CRESCE no lugar em vez de virar painel: é o mesmo objeto, só que agora
+   com conteúdo. O painel continua a um clique, no botão de expandir. */
+#sel-menu.sel-exp{
+  display:block;padding:0;width:min(30rem,calc(100vw - 16px));
+  max-height:min(26rem,60vh);overflow:hidden;
+  border-radius:var(--radius);border-color:var(--border);
+}
+.sel-exp-cab{
+  display:flex;align-items:center;gap:6px;padding:8px 8px 8px 12px;
+  border-bottom:1px solid var(--border);background:var(--surface2);
+  border-radius:var(--radius) var(--radius) 0 0;
+}
+.sel-exp-cab b{
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--text);font-size:var(--fs-sm);font-weight:600;padding:0;
+}
+#sel-menu.sel-exp .sel-exp-btn{
+  flex:none;padding:5px;background:transparent;border:1px solid transparent;color:var(--text3);
+}
+#sel-menu.sel-exp .sel-exp-btn:hover{background:var(--surface);border-color:var(--border);color:var(--text)}
+.sel-exp-corpo{
+  padding:12px 14px 14px;overflow-y:auto;max-height:calc(min(26rem,60vh) - 42px);
+  font-size:var(--fs-sm);line-height:1.6;color:var(--text);
+  /* O texto aqui é para ser lido e, às vezes, copiado — ao contrário do menu
+     de dois botões, onde selecionar não faria sentido nenhum. */
+  user-select:text;
+}
+.sel-exp-corpo>*:first-child{margin-top:0}
+.sel-exp-corpo>*:last-child{margin-bottom:0}
+
 /* ================================================================
    O PAINEL DA LEXA — dois tamanhos, o mesmo conteúdo
    ================================================================

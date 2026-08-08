@@ -618,8 +618,10 @@ Return ONLY this JSON:
 // dossiês e a origem gravada em cada sentido; reescrevê-la reagruparia o
 // acervo inteiro. Isto grava só o mapa de exibição.
 async function resolverNomesDeObra(brutos) {
+  // O estudo não é obra de ninguém: o nome dele já nasceu limpo, e mandá-lo
+  // junto faria a IA "reconhecer" um livro que não existe.
   const pend = [...new Set((brutos || []).map(t => String(t || '').trim()).filter(Boolean))]
-    .filter(t => !obrasNome[obraChaveNome(t)])
+    .filter(t => t !== OBRA_ESTUDO && !obrasNome[obraChaveNome(t)])
   if (!pend.length) return 0
   if (!aiChatCfg().key) {
     toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error')
@@ -3023,6 +3025,21 @@ function _revShowSelPop(txt, sel) {
   pop.style.top = (acima ? r.top - 52 : r.bottom + 10) + 'px'
 }
 
+// A MESMA REGRA DO ESTUDAR, aqui no Preparar: só a passagem de verdade carrega
+// a obra. O cartão também mostra exemplos inventados pela IA, e selecionar
+// dentro de um deles fazia o item novo nascer jurando que veio do livro.
+// A comparação é tolerante nos dois sentidos porque o bloco lido do DOM pode
+// trazer um pedaço a mais ou a menos que o `context` guardado.
+function _revOrigemDaFrase(w, frase) {
+  const n = t => String(t || '').replace(/\s+/g, ' ').trim()
+  const a = n(frase), b = n(w && w.context)
+  const daObra = !!b && !!a && (a === b || a.includes(b) || b.includes(a))
+  return daObra
+    ? { source_type: (w && w.source_type) || 'manual', source_title: (w && w.source_title) || '',
+        source_context: (w && w.source_context) || '' }
+    : { source_type: 'manual', source_title: OBRA_ESTUDO, source_context: (w && w.word) || '' }
+}
+
 async function revSelExplain() {
   const txt = window._revSelText
   const pop = el('rev-sel-pop')
@@ -3053,8 +3070,7 @@ async function revSelExplain() {
       // entendeu a frase precisa ver de que ela é feita.
       lexaChipsMontar(corpo, {
         trecho: fraseDoItem, lang: (w && wordLang(w)) || 'en', fonte: (w && w.source_title) || '',
-        origem: { source_type: (w && w.source_type) || 'manual', source_title: (w && w.source_title) || '',
-                  source_context: (w && w.source_context) || '' }
+        origem: _revOrigemDaFrase(w, fraseDoItem)
       })
     }
     // A conversa nasce sabendo a explicação, mas NÃO herda a conversa velha:
