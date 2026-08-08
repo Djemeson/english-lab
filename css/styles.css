@@ -5100,6 +5100,27 @@ body.ler-full .mobile-bottom-nav{display:none}
    CONVERSA COM A LEXA dentro do popup de seleção (leitor, Preparar, vídeo).
    A explicação deixa de ser resposta única e vira o começo de uma linha.
    ================================================================ */
+/* Menu da seleção — vive ACIMA do painel (que já é z-modal), senão nasceria
+   atrás justamente da tela onde ele seleciona. */
+#sel-menu{
+  position:fixed;z-index:var(--z-modal-pop);display:flex;align-items:center;gap:5px;
+  padding:5px;border-radius:var(--radius-sm);
+  background:var(--surface);border:1px solid var(--border-strong);
+  box-shadow:0 10px 30px rgba(0,0,0,.45);
+  animation:selMenuEntra .12s ease-out;
+}
+@keyframes selMenuEntra{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+#sel-menu b{
+  max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--text3);font-weight:500;font-size:var(--fs-xs);padding:0 5px;
+}
+#sel-menu button{
+  display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;
+  padding:5px 10px;border-radius:6px;font:inherit;font-size:var(--fs-xs);
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+}
+#sel-menu button:hover{background:var(--primary);border-color:var(--primary);color:#fff}
+
 /* ================================================================
    O PAINEL DA LEXA — dois tamanhos, o mesmo conteúdo
    ================================================================

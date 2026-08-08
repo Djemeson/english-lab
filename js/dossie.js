@@ -926,7 +926,7 @@ async function dossieFamiliaExplicar(wordId, expr) {
     toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return
   }
   const corpo = lexaPainelAbrir({ titulo: lexaNome(), frase: it.expr,
-    fonte: `da família de "${w.word}"` })
+    fonte: `da família de "${w.word}"`, lang: wordLang(w) })
   const vivo = () => el('lexa-painel-corpo') === corpo
   corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(lexaNome())} está explicando…`
   try {
@@ -1292,6 +1292,26 @@ function _dosFocoPintar() {
     if (campo) { campo.focus(); try { campo.setSelectionRange(cursor, cursor) } catch (e) {} }
   }
   _dosFocoObservar(box)
+  // SELECIONAR VALE NA PÁGINA INTEIRA, não só nas linhas da família: a dúvida
+  // cai em qualquer lugar — uma palavra dentro de um exemplo, um pedaço da
+  // definição, duas palavras no meio da passagem do livro. O contexto é lido
+  // na hora (função, não valor) porque o painel troca de item embaixo do
+  // ouvinte, e o ouvinte é ligado UMA vez por caixa.
+  if (typeof selMenuAtivar === 'function') {
+    selMenuAtivar(box, () => {
+      const s = _dosFoco && _dosFocoLista[_dosFoco.i]
+      const p = s && _dossiePar(s.w.id, s.m.id)
+      if (!p) return {}
+      return {
+        frase: p.m.context || p.w.context || '',
+        lang: wordLang(p.w),
+        fonte: [p.m.source_title || p.w.source_title, p.m.source_context || p.w.source_context].filter(Boolean).join(' · '),
+        origem: { source_type: p.m.source_type || p.w.source_type || 'manual',
+                  source_title: p.m.source_title || p.w.source_title || '',
+                  source_context: p.m.source_context || p.w.source_context || '' }
+      }
+    })
+  }
 }
 
 // UM listener só, ligado uma vez. Ligar/desligar a cada abertura do foco é

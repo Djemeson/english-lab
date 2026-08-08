@@ -1182,7 +1182,8 @@ function _lerAoSelecionar() {
     const corpo = lexaPainelAbrir({
       titulo: lexaNome(),
       frase: ctx,
-      fonte: [_lerLivro.title, (_lerLivro.chapters[_lerCap] || {}).titulo].filter(Boolean).join(' · ')
+      fonte: [_lerLivro.title, (_lerLivro.chapters[_lerCap] || {}).titulo].filter(Boolean).join(' · '),
+      lang: _lerLivro.lang || 'en'
     })
     corpo.innerHTML = `<div class="ler-pop-txt">${esc(lexaNome())} está lendo o trecho…</div>`
     const vivo = () => el('lexa-painel-corpo') === corpo

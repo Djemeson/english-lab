@@ -754,7 +754,8 @@ async function videoOvExplain() {
   const corpo = lexaPainelAbrir({
     titulo: lexaNome(),
     frase: contexto,
-    fonte: (_vidCur && _vidCur.title) || ''
+    fonte: (_vidCur && _vidCur.title) || '',
+    lang: (_vidCur && _vidCur.lang) || 'en'
   })
   const vivo = () => el('lexa-painel-corpo') === corpo
   const chave = 'vid|' + contexto + '|' + txt

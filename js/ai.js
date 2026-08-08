@@ -145,7 +145,7 @@ function lexaPainelFechar() {
 
 // Abre (ou reaproveita) o painel e devolve o CORPO, onde quem chamou escreve.
 // `fonte` é a linha de procedência do topo: livro e capítulo, episódio, item.
-function lexaPainelAbrir({ titulo, frase, fonte }) {
+function lexaPainelAbrir({ titulo, frase, fonte, lang }) {
   lexaPainelFechar()
   const modo = lexaPainelModoAtual()
   const box = document.createElement('div')
@@ -171,6 +171,9 @@ function lexaPainelAbrir({ titulo, frase, fonte }) {
   box.addEventListener('mousedown', e => { if (e.target === box) lexaPainelFechar() })
   document.body.appendChild(box)
   document.body.classList.add('lexa-painel-aberto')
+  // Selecionar vale aqui também: a explicação costuma trazer uma palavra que
+  // ele também não conhece, e parar ali para perguntar é o uso natural.
+  selMenuAtivar(box, () => ({ frase, fonte, lang: lang || (typeof activeLang === 'function' ? activeLang() : 'en') }))
   return box.querySelector('.lexa-painel-corpo')
 }
 
@@ -185,6 +188,110 @@ if (!window._lexaPainelTeclas) {
     e.preventDefault()
     lexaPainelFechar()
   })
+}
+
+// ================================================================
+// SELECIONAR DENTRO DO ESTUDO — Explicar / Preparar em qualquer texto
+// ================================================================
+// A família ganhou um botão por linha, e ele corrigiu o alvo: *"um clique é
+// modo de falar, deve aceitar o selecionar, que é mais abrangente"*. E é
+// mesmo: o botão só serve as linhas que EU previ. A dúvida real cai em
+// qualquer lugar — uma palavra dentro de um exemplo, um pedaço da definição,
+// duas palavras no meio da passagem do livro. Selecionar cobre tudo isso sem
+// eu ter de adivinhar onde.
+//
+// Peça ÚNICA e genérica: qualquer contêiner liga o menu passando um jeito de
+// descrever o que está em volta. O leitor e o Preparar já têm os popups deles,
+// nascidos antes e presos às telas; este é o que serve daqui para frente.
+let _selMenuCtx = null
+
+function _selMenuFechar() {
+  const p = document.getElementById('sel-menu'); if (p) p.remove()
+  _selMenuCtx = null
+}
+
+// `obterContexto()` devolve { frase, lang, origem } do que estiver em foco no
+// contêiner naquele instante — é função, e não valor, porque o painel troca de
+// item embaixo do ouvinte.
+function selMenuAtivar(container, obterContexto) {
+  if (!container || container._selMenu) return
+  container._selMenu = true
+  container.addEventListener('mouseup', ev => {
+    // Clique num botão não é seleção: sem isto, soltar o mouse em cima de
+    // "Preparar" abriria o menu por cima do próprio botão.
+    if (ev.target.closest('button, a, input, textarea')) return
+    setTimeout(() => {
+      const sel = window.getSelection()
+      const txt = String(sel || '').replace(/\s+/g, ' ').trim()
+      _selMenuFechar()
+      if (!txt || txt.length < 2 || txt.length > 120) return
+      if (!sel.rangeCount) return
+      const r = sel.getRangeAt(0).getBoundingClientRect()
+      if (!r.width && !r.height) return
+      const ctx = (typeof obterContexto === 'function' ? obterContexto() : null) || {}
+      _selMenuCtx = { txt, ...ctx }
+      const p = document.createElement('div')
+      p.id = 'sel-menu'
+      p.innerHTML = `
+        <b>"${esc(txt.length > 28 ? txt.slice(0, 28) + '…' : txt)}"</b>
+        <button onclick="selMenuExplicar()">${ic('sparkles','ic-sm')} Explicar</button>
+        <button onclick="selMenuPreparar()">${ic('plus','ic-sm')} Preparar</button>`
+      // `mousedown` no menu não pode desfazer a seleção nem borbulhar para o
+      // fundo dos painéis, que fecham ao clique de fora.
+      p.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation() })
+      document.body.appendChild(p)
+      const larg = p.offsetWidth, alt = p.offsetHeight
+      p.style.left = Math.round(Math.max(8, Math.min(r.left + r.width / 2 - larg / 2, innerWidth - larg - 8))) + 'px'
+      const acima = r.top - alt - 8
+      p.style.top = Math.round(acima > 8 ? acima : Math.min(r.bottom + 8, innerHeight - alt - 8)) + 'px'
+    }, 10)   // depois do navegador fechar a seleção do clique simples
+  })
+  container.addEventListener('mousedown', ev => {
+    if (!ev.target.closest('#sel-menu')) _selMenuFechar()
+  })
+}
+
+function selMenuPreparar() {
+  const c = _selMenuCtx; if (!c) return
+  _selMenuFechar()
+  try { window.getSelection().removeAllRanges() } catch (e) {}
+  if (typeof lexaChipParaPreparar !== 'function') return
+  lexaChipParaPreparar({ expr: c.txt, gloss: '', type: 'word' },
+    { contexto: c.frase || '', lang: c.lang || 'en', ...(c.origem || {}) })
+  if (typeof _dosFocoPintar === 'function') { try { _dosFocoPintar() } catch (e) {} }
+}
+
+async function selMenuExplicar() {
+  const c = _selMenuCtx; if (!c) return
+  _selMenuFechar()
+  try { window.getSelection().removeAllRanges() } catch (e) {}
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return
+  }
+  const L = getLangDef(c.lang || 'en')
+  const corpo = lexaPainelAbrir({ titulo: lexaNome(), frase: c.frase || c.txt, fonte: c.fonte || '' })
+  const vivo = () => el('lexa-painel-corpo') === corpo
+  corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(lexaNome())} está explicando…`
+  try {
+    const sistema = lexaExplicar()
+    const pergunta = `${c.frase ? `A frase é: "${c.frase}".\n` : ''}O aluno selecionou: "${c.txt}".
+Explique o que "${c.txt}" significa AQUI, em ${L.nameEn}. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real.`
+    const resp = await aiTextSeguro([
+      { role: 'system', content: sistema },
+      { role: 'user', content: pergunta }
+    ], { maxTokens: 600 })
+    if (!vivo()) return
+    corpo.innerHTML = lexaFormatar(resp)
+    if (typeof lexaChipsMontar === 'function' && c.frase) {
+      lexaChipsMontar(corpo, { trecho: c.frase, lang: c.lang || 'en', fonte: c.fonte || '',
+        origem: c.origem || {} })
+    }
+    if (typeof lexaChatMontar === 'function') {
+      lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
+    }
+  } catch (e) {
+    if (vivo()) corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)}</span>`
+  }
 }
 
 // ================================================================

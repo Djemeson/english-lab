@@ -2886,7 +2886,8 @@ async function revSelExplain() {
   const corpo = lexaPainelAbrir({
     titulo: lexaNome(),
     frase: fraseDoItem,
-    fonte: [(w && w.word) || '', (w && w.source_title) || ''].filter(Boolean).join(' · ')
+    fonte: [(w && w.word) || '', (w && w.source_title) || ''].filter(Boolean).join(' · '),
+    lang: (w && wordLang(w)) || 'en'
   })
   const vivo = () => el('lexa-painel-corpo') === corpo
   // Os chips e a conversa se montam do mesmo jeito, tendo a explicação vindo

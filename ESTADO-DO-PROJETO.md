@@ -14,8 +14,11 @@
 > no ITEM: **tempos verbais** e **tudo que existe com aquele item** (phrasal verbs, idioms,
 > colocações, blocos fixos e derivadas), com **Preparar a um clique** e explicar ao lado. ⚠️ Dois
 > filtros que o teste corrigiu: o item voltava como membro da própria família, e o conserto disso
-> engoliu as **derivadas** — que são, por definição, da mesma família de lema.
-> `sw.js` → `englab-v164`. Ver seção 8.2 ("A forma neutra e a família completa").
+> engoliu as **derivadas** — que são, por definição, da mesma família de lema. E a correção dele
+> logo depois: *"um clique é modo de falar, deve aceitar o selecionar"* — **selecionar qualquer
+> texto** no painel de estudo (e no da Lexa) abre Explicar / Preparar, peça genérica
+> (`selMenuAtivar`) que cobre o que eu não previ.
+> `sw.js` → `englab-v165`. Ver seção 8.2 ("A forma neutra e a família completa").
 >
 > Anterior: 2026-08-08 — **CURIOSIDADE NÃO É REGISTRO**. A "curiosidade" de *gals* era
 > uma observação de TOM ("leve, amistoso e um pouco retrô") — ou seja, `registro_uso` disfarçado.
@@ -7023,7 +7026,30 @@ semente, cena herdada, **zero cards** (parou no Preparar), e a linha vira "já �
 > de lema — sumia justamente a categoria pedida. Para `derivada` basta não ser a mesma palavra
 > escrita igual.
 
-**Arquivos**: `js/review.js`, `js/dossie.js`, `css/styles.css`. `sw.js` → `englab-v164`.
+#### E então: SELECIONAR, que é mais abrangente
+
+Correção dele assim que a família ficou pronta: *"um clique é modo de falar, deve aceitar o
+selecionar, que é mais abrangente"*. E é mesmo — o botão por linha só serve as linhas que EU
+previ. A dúvida real cai em qualquer lugar: uma palavra dentro de um exemplo, um pedaço da
+definição, duas palavras no meio da passagem do livro.
+
+`selMenuAtivar(container, obterContexto)` é a peça, e é **genérica**: qualquer contêiner liga o
+menu passando um jeito de descrever o que está em volta. Ligada no **painel de estudo** e no
+**painel da Lexa** (a explicação costuma trazer outra palavra que ele também não conhece, e parar
+ali para perguntar é o uso natural). O leitor e o Preparar mantêm os popups deles, nascidos antes
+e presos às telas; este é o que serve daqui para frente.
+
+`obterContexto` é **função, não valor**: o painel troca de item embaixo do ouvinte, e o ouvinte é
+ligado uma vez por caixa. Provado: selecionar "the hang of it" dentro da passagem do livro abriu o
+menu, e Preparar criou o item em `pending_ai` **com a cena e a origem herdadas**, sem card.
+
+Detalhes que o comportamento exigiu: soltar o mouse em cima de um botão não conta como seleção
+(senão o menu nasceria por cima do próprio botão), o `mousedown` no menu não desfaz a seleção nem
+borbulha para o fundo dos painéis (que fecham ao clique de fora), e o menu vive em `--z-modal-pop`
+— acima do painel, senão nasceria atrás da tela onde ele está selecionando.
+
+**Arquivos**: `js/review.js`, `js/dossie.js`, `js/ai.js`, `js/ler.js`, `js/video-study.js`,
+`css/styles.css`. `sw.js` → `englab-v165`.
 
 ### Onde a captura ainda NÃO leva a semente
 
