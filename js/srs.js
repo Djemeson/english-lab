@@ -210,7 +210,14 @@ function createSrsCard(wordId, meaningIdx, exampleIdx) {
     definition_pt: m.definition_pt || '',
     origin_pt: m.origin_pt || '',
     example_en: ex ? ex.en : (m.example_en || ''),
-    example_pt: ex ? ex.pt : (m.example_pt || '')
+    example_pt: ex ? ex.pt : (m.example_pt || ''),
+    // A CENA DE ORIGEM viaja com o card. Antes o `clipId` era carimbado nos
+    // cards logo depois da captura no vídeo (`srsCards.forEach(...)`) — o que
+    // só funcionava porque a captura criava o card na hora. Assim que o vídeo
+    // passou a parar no Preparar, o card nasce muito depois e não haveria mais
+    // ninguém para carimbar: o "Rever a cena" sumiria. Guardado no item, ele
+    // sobrevive a qualquer caminho até o SRS.
+    clipId: m.clipId || w.clipId || ''
   }
 }
 

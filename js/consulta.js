@@ -483,6 +483,11 @@ function _consultaItemToWord(item) {
     lang: item.lang || activeLang()
   })
   w.meanings = [{
+    // ⚠️ `id` é a identidade card↔sentido desde a 93ª rodada, e este caminho
+    // nascia sem ele — o card saía com `meaningId: ''` e voltava a depender da
+    // POSIÇÃO. Sem id, `_dossiePar` não acha o sentido e nem "Estudei" nem
+    // "Completar material" funcionam neste item.
+    id: uid(),
     meaning_pt: item.meaning_pt || '',
     definition_pt: item.definition_pt || '',
     origin_pt: item.origin_pt || '',

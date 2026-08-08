@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O ITEM COMO PÁGINA DE ESTUDO** (4 fatias). A frase do livro
+> Última atualização: 2026-08-08 — **O VÍDEO ENTRA NA FILA**. Ele perguntou se vídeo, podcast e
+> Netflix seguiam o padrão novo. **Netflix, Kindle, leitor e documento seguem** (param no
+> Preparar). **Vídeo e podcast não**: prompt próprio reduzido e `saveToSrs` direto — iam para a
+> Revisão pulando Preparar E Estudar, enchendo a fila de item nunca estudado. Decisão dele: o
+> vídeo passa a parar no Preparar, e a captura (sentido na cena + áudio real) vira a SEMENTE.
+> ⚠️ O `clipId` do "Rever a cena" teria sumido em silêncio — era carimbado nos cards logo após a
+> captura, e agora vai no ITEM, copiado por `createSrsCard`. **Buraco achado de brinde:** vídeo e
+> Assistente criavam sentido **sem `id`**, então o card voltava a depender da posição e nem
+> "Estudei" nem "Completar material" funcionavam neles — corrigido, com rede que carimba id em
+> dado antigo e religa o card órfão pela posição.
+> `sw.js` → `englab-v157`. Ver seção 8.2 ("O vídeo entra na fila").
+>
+> Anterior: 2026-08-08 — **O ITEM COMO PÁGINA DE ESTUDO** (4 fatias). A frase do livro
 > dominava a tela sendo só referência: virou o **exemplo #0** dentro de "Em uso" (é o único
 > exemplo autêntico da página), e no topo ficou um crédito de procedência. Correção dele que
 > inverteu meu plano: **nada é recolhido no Estudar** — *"o item pode ficar grande, o estudo é pra
@@ -6588,6 +6600,56 @@ viajar para a nuvem e sujar o backup.
 
 **Arquivos**: `js/dossie.js`, `js/review.js`, `css/styles.css`. `sw.js` → `englab-v156`.
 
+### O VÍDEO ENTRA NA FILA — a varredura das fontes (2026-08-08)
+
+Pergunta dele depois das quatro fatias: *"o mesmo padrão é seguido em vídeo, podcast e netflix?"*
+A varredura respondeu **não**, e achou três buracos.
+
+**Seguem o padrão** (param no Preparar e ganham a análise principal, com os campos novos):
+Netflix e Kindle pela extensão (`core.js:284`, nasce `pending_ai`), o leitor, e o `add.js`
+(vocab.db, documento, mídia — traz material próprio mas para em `pending_review`; a preservação
+mantém o que foi curado e os campos novos entram, porque **não** estão na lista de preservados).
+
+**Não seguia:** o **vídeo** (`video-study.js`) tinha prompt próprio e reduzido (7 campos, sem
+`origin_pt`, sem vizinhos, sem `sense_audit`) e chamava `saveToSrs(w.id)` — ia do vídeo **direto
+para a Revisão, pulando Preparar E Estudar**. O **podcast** é uma entrada de `videos[]` com
+`source_type: 'podcast'`, ou seja, o mesmo caminho e o mesmo problema. O **Assistente**
+(`consulta.js`) também manda direto.
+
+**Decisão dele: o vídeo passa a parar no Preparar, como todo o resto.** Era a única fonte que
+pulava, e pulava sem dar escolha — o Preparar já tem um botão *"Pular para a Revisão"* explícito,
+onde pular é um clique consciente. Na prática a Revisão enchia de item nunca estudado, que é
+exatamente o que o fluxo de 4 etapas veio acabar.
+
+O material da captura (sentido na cena, frase traduzida, **áudio real do trecho**) continua todo
+lá e vira a **semente**: no Preparar ele escolhe mandar assim para o Estudar ou analisar antes.
+O áudio sobrevive porque a chave é o `example_en` com as tags `<b>`, e a preservação de sentidos
+curados mantém o exemplo intacto na re-análise.
+
+> ⚠️ **O `clipId` teria sumido em silêncio.** Ele era carimbado nos cards logo depois da captura
+> (`srsCards.forEach(c => …)`), o que só funcionava porque a captura criava o card na hora. Sem o
+> `saveToSrs`, o card nasce muito depois e não haveria ninguém para carimbar — o **"Rever a cena"
+> sumiria** sem erro nenhum. Agora o carimbo vai no ITEM e `createSrsCard` o copia, então
+> sobrevive a qualquer caminho até o SRS (o "Estudei" do dossiê e o atalho do Preparar, ambos
+> provados).
+
+#### O buraco que eu não estava procurando: sentido sem `id`
+
+Vídeo e Assistente criavam `w.meanings = [{ … }]` **sem `id`** — e `meaningId` é a identidade
+card↔sentido desde a 93ª rodada. Consequências reais:
+
+- o card nascia com `meaningId: ''` e **voltava a depender da POSIÇÃO**, o defeito que a 93ª matou;
+- `_dossiePar` casa por `m.id`, então **"Estudei" nunca funcionaria** para item de vídeo;
+- `completarMaterial` também usa `m.id` — o botão "Completar material" não funcionaria neles.
+
+Corrigido nos dois, mais uma **rede na migração**: sentido já gravado sem id ganha um, e o card
+órfão é religado **pela posição**, que é o único vínculo que lhe restava. Provado com o cenário
+exato (dois sentidos sem id, dois cards com `meaningId: ''`): os dois ids nascem, os dois cards
+religam ao sentido certo, o `clipId` antigo sobrevive e a religação persiste no IndexedDB.
+
+**Arquivos**: `js/video-study.js`, `js/consulta.js`, `js/review.js` (migração), `js/srs.js`
+(`clipId` no card). `sw.js` → `englab-v157`.
+
 ### Onde a captura ainda NÃO leva a semente
 
 Só o leitor foi ligado. Faltam **vídeo/legenda** e **a extensão (Netflix/Kindle)** — e o
@@ -6599,6 +6661,16 @@ lugar só.
 
 ## 9. Pendências / a verificar
 
+- [ ] **O ASSISTENTE AINDA PULA O PREPARAR** (2026-08-08). `consulta.js` chama `saveToSrs` direto
+      nos dois botões (item a item e "adicionar todos"), igual ao que o vídeo fazia. O `id` do
+      sentido já foi corrigido lá, mas o **fluxo** não: ele foi deixado de fora de propósito
+      porque a decisão foi tomada para vídeo/podcast, e mudar o Assistente sem pedir seria
+      esticar o escopo. A pergunta para ele: no Assistente, pedir palavras à Lexa e mandar direto
+      para a Revisão é atalho desejado ou o mesmo furo?
+- [ ] **CAPTURA REPETIDA NO VÍDEO ainda duplica o item** (2026-08-08, visto ao ler o código).
+      `videoCreateCard` pergunta *"Palavra já existe — criar mesmo assim?"* e, se sim, cria um
+      item novo. O leitor já resolveu isso com `prepararNovoSentido` (o reencontro entra no MESMO
+      item, como sentido novo). O vídeo deveria usar o mesmo caminho — hoje ele racha a família.
 - [ ] **PROVAR OS CAMPOS NOVOS COM IA DE VERDADE** (2026-08-08). Todo o fluxo das 4 fatias foi
       exercitado com `aiJSON` mockado — o ambiente de teste não tem chave. Falta o que só a chave
       diz: **(a) o tamanho real da resposta** (o teto é 5000 e o comentário no código diz que 2800

@@ -1883,6 +1883,23 @@ function migrarEstadosDeSentido() {
   let n = 0
   for (const w of words) {
     let mudou = false
+    // SENTIDO SEM `id` GANHA UM, e o card que já aponta para ele por POSIÇÃO
+    // é religado pelo id novo. Dois caminhos criavam sentido sem id (o vídeo e
+    // o Assistente), e `meaningId` é a identidade card↔sentido desde a 93ª
+    // rodada — sem ele, `_dossiePar` não acha o sentido e nem "Estudei" nem
+    // "Completar material" funcionam. A ordem importa: o id é atribuído ANTES
+    // de religar, e a religação usa a POSIÇÃO, que é o único vínculo que o
+    // card órfão ainda tem.
+    ;(w.meanings || []).forEach((m, mi) => {
+      if (!m || m.id) return
+      m.id = uid()
+      if (Array.isArray(typeof srsCards !== 'undefined' ? srsCards : null)) {
+        for (const c of srsCards) {
+          if (c && c.wordId === w.id && !c.meaningId && c.meaningIdx === mi) c.meaningId = m.id
+        }
+      }
+      mudou = true; n++
+    })
     ;(w.meanings || []).forEach((m, mi) => {
       if (!m || m.estado) return
       const temCard = comCard.has(w.id + '|' + (m.id || mi)) || comCard.has(w.id + '|' + mi)
@@ -1897,6 +1914,9 @@ function migrarEstadosDeSentido() {
   }
   if (n) {
     saveWords()
+    // Os cards podem ter sido religados acima — sem isto o `meaningId` novo
+    // viveria só em memória e sumiria no recarregamento.
+    if (typeof saveSrsCards === 'function') saveSrsCards()
     if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   }
   return n

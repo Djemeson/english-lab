@@ -48,7 +48,7 @@ function renderVidSelPanel() {
           ? `Alvo: <b>${esc(alvo)}</b>`
           : `Clique na(s) palavra(s) que quer estudar`}</span>
         <button class="btn btn-primary btn-sm" id="vid-card-btn" ${alvo && !_vidCapturing ? '' : 'disabled'} onclick="videoCreateCard()">
-          ${ic('zap','ic-sm')}Salvar no estudo com áudio da cena</button>
+          ${ic('zap','ic-sm')}Mandar para o Preparar com o áudio</button>
       </div>
     </div>`
 }
@@ -124,10 +124,11 @@ function captureClipAudio(start, end) {
 }
 
 // ================================================================
-// CARD A PARTIR DA CENA
+// ITEM A PARTIR DA CENA
 // 1 chamada de chat (centavos) + captura local do áudio (grátis).
-// O exemplo do card É a fala da cena — por isso o áudio real casa com
+// O exemplo do item É a fala da cena — por isso o áudio real casa com
 // o card sem tocar em study.js (mesma chave audioKey do texto).
+// O item PARA NO PREPARAR: esta análise é a semente, não a palavra final.
 // ================================================================
 async function videoCreateCard(alvoOverride) {
   if (_vidCapturing) return
@@ -170,15 +171,22 @@ Responda:
  "frase_pt":"tradução natural da fala inteira, com o equivalente do termo entre <b></b>"}` }
     ], { maxTokens: 400 })
 
-    // 3) Monta a palavra no formato do app e salva no SRS
+    // 3) Monta a palavra no formato do app. O item PARA NO PREPARAR, como
+    //    tudo o mais — ver o bloco "O vídeo entra na fila" abaixo.
     const boldEn = frase.replace(new RegExp(`(${escR(alvo)})`, 'i'), '<b>$1</b>')
-    const w = createWord({ word: alvo, context: frase, source_type: _vidCur.source_type || 'series', source_title: _vidCur.title, lang: _vidCur.lang })
+    const w = createWord({ word: alvo, context: frase, context_pt: (r.frase_pt || '').replace(/<\/?b>/gi, ''), source_type: _vidCur.source_type || 'series', source_title: _vidCur.title, lang: _vidCur.lang })
     w.status = 'pending_review'
     w.ipa = r.ipa || ''
     w.type = r.type || 'word'
     w.type_label = r.type_label || ''
     w.ai_processed = true
     w.meanings = [{
+      // ⚠️ `id` NÃO É OPCIONAL. Ele é a identidade card↔sentido desde a 93ª
+      // rodada, e este caminho nascia sem ele: o card saía com `meaningId: ''`
+      // e voltava a depender da POSIÇÃO — o defeito que aquela rodada matou.
+      // Sem id, `_dossiePar` nunca acha o sentido, então nem "Estudei" nem
+      // "Completar material" funcionariam para item vindo do vídeo.
+      id: uid(),
       meaning_pt: r.meaning_pt || alvo, definition_pt: r.definition_pt || '',
       level: r.level || '', selected: true,
       examples: [{ en: boldEn, pt: r.frase_pt || '' }]
@@ -197,20 +205,34 @@ Responda:
     }
     ensureSrsAudio(alvo).catch(() => {})
 
-    saveToSrs(w.id)
-
-    // 5) Registra o corte e liga os cards à cena ("rever a cena")
+    // 5) O VÍDEO ENTRA NA FILA, não pula para a Revisão.
+    // Aqui havia `saveToSrs(w.id)`: a captura criava o card na hora e o item
+    // ia do vídeo direto para a repetição espaçada, pulando Preparar E
+    // Estudar. Era a única fonte que fazia isso (leitor, Netflix, Kindle e
+    // documento todos param no Preparar), e contradizia a regra que organiza
+    // o app inteiro — o material vive em UM lugar de cada vez, e a fila
+    // esvazia. Na prática, a Revisão enchia de item que ele nunca estudou.
+    // Decisão do Djemeson depois da varredura: o vídeo passa a parar aqui.
+    // O material desta captura (sentido na cena, frase traduzida, áudio real)
+    // continua todo aqui — vira a SEMENTE. No Preparar ele escolhe: mandar
+    // assim para o Estudar, ou analisar antes e ganhar forma, padrão,
+    // colocações e o resto.
     const clip = { id: uid(), videoId: _vidCur.id, start: +_vidSel.s.toFixed(2), end: +_vidSel.e.toFixed(2), text: frase, wordId: w.id, created_at: new Date().toISOString() }
     clips.push(clip); saveClips()
-    srsCards.forEach(c => { if (c.wordId === w.id) c.clipId = clip.id })
-    saveSrsCards(); autoSyncAfterChange()
+    // O carimbo vai no ITEM, não nos cards: não há card ainda, e quem os criar
+    // (o "Estudei" do dossiê, o atalho do Preparar) copia daqui — ver o
+    // `clipId` em `createSrsCard`.
+    w.clipId = clip.id
+    w.meanings[0].clipId = clip.id
+    saveWords(); autoSyncAfterChange()
+    if (typeof updateDossieBadge === 'function') updateDossieBadge()
 
-    toast(`"${alvo}" salvo no estudo com o áudio da cena`, 'success')
+    toast(`"${alvo}" foi para o Preparar com o áudio da cena`, 'success')
     _vidSelWords = new Set()
     if (!_vidFocus) { _vidSel = null }   // no estudo focado, o trecho continua aberto
     renderVidTranscript(); renderVidSelPanel()
   } catch (e) {
-    toast('Erro ao criar o card: ' + e.message, 'error')
+    toast('Erro ao capturar: ' + e.message, 'error')
   } finally {
     _vidCapturing = false
     renderVidSelPanel()
@@ -527,7 +549,7 @@ function _vidRenderFocus(panel) {
         <div class="vid-sel-row2">
           <span class="vid-sel-alvo">${alvo ? `Alvo: <b>${esc(alvo)}</b>` : 'Clique na(s) palavra(s) que quer estudar'}</span>
           <button class="btn btn-primary btn-sm" id="vid-card-btn" ${alvo && !_vidCapturing ? '' : 'disabled'} onclick="videoCreateCard()">
-            ${ic('zap','ic-sm')}Salvar no estudo com áudio da cena</button>
+            ${ic('zap','ic-sm')}Mandar para o Preparar com o áudio</button>
         </div>` : (f.dit ? '' : `
         <div class="vid-focus-blind">Ouça sem ler. Entendeu? Tente repetir. Depois revele a fala — ou prove no Ditado.</div>`)}
     </div>`
