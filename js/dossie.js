@@ -423,7 +423,12 @@ function _dossiePintarCorpo() {
     // na tela é `obraNome`, que limpa o lixo da fonte.
     const obras = new Map()
     for (const d of visiveis) {
-      const k = obraChaveNome(d.obra) + '' + d.tipo
+      // ⚠️ AGRUPA PELO NOME RESOLVIDO, nao pelo bruto: item capturado ANTES
+      // da limpeza ("Billy Summers (US Edition)") e item capturado DEPOIS
+      // ("Billy Summers") virariam dois grupos exibindo o MESMO nome na tela --
+      // o pior resultado possivel, porque parece defeito sem dar como entender.
+      // Pelo resolvido, os dois convergem sozinhos e nada precisa ser reescrito.
+      const k = obraChaveNome(obraNome(d.obra)) + '' + d.tipo
       if (!obras.has(k)) obras.set(k, { obra: d.obra, tipo: d.tipo, caps: [], itens: 0, feitos: 0 })
       const o = obras.get(k)
       o.caps.push(d); o.itens += d.itens.length; o.feitos += d.estudados

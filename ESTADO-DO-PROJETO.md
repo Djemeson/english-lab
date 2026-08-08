@@ -14,8 +14,11 @@
 > veio do arquivo: `Billy Summers (US Edition)` → `Billy Summers · Stephen King`, numa chamada
 > para TODAS as obras pendentes. ⚠️ **A chave de agrupamento continua sendo o título bruto** —
 > reescrever `source_title` reagruparia o acervo inteiro; o que entrou é uma camada de exibição
-> (`obrasNome`), e a busca aceita os dois nomes.
-> `sw.js` → `englab-v171`. Ver seção 8.2 ("Obra → capítulo → itens").
+> (`obrasNome`), e a busca aceita os dois nomes. **E a pergunta dele fechou o buraco**: *"ao trazer
+> da fonte um item já vem limpo?"* — não vinha, e isso faria item antigo e novo virarem **dois
+> grupos com o mesmo nome na tela**. Agora o agrupamento é pelo nome RESOLVIDO (convergem sozinhos)
+> e a resolução acontece **na entrada** do livro, vídeo ou episódio, uma chamada por obra.
+> `sw.js` → `englab-v172`. Ver seção 8.2 ("Obra → capítulo → itens").
 >
 > Anterior: 2026-08-08 — **O ITEM NUNCA SAI DE VISTA**. O cabeçalho subia com a rolagem
 > e a página virava seções sem dono. Ele passou a ficar **preso no topo, encolhendo** de 115px
@@ -7305,6 +7308,31 @@ toque e nada estoura.
 
 **Arquivos**: `js/core.js`, `js/init.js`, `js/review.js`, `js/dossie.js`, `css/styles.css`.
 `sw.js` → `englab-v171`.
+
+#### E aí veio a pergunta certa: por que não já vem limpo da fonte?
+
+*"Mas ao trazer da fonte um item já vem assim limpo? É isso que quero."*
+
+O conserto anterior estava pela metade: eu limpava na EXIBIÇÃO, mas quem chegava novo continuava
+entrando com o nome sujo. E havia um defeito escondido nisso — item capturado ANTES da limpeza e
+item capturado DEPOIS teriam títulos diferentes e virariam **dois grupos exibindo o MESMO nome na
+tela**. O pior resultado possível: parece defeito sem dar como entender.
+
+Duas correções:
+
+1. **O agrupamento passou a ser pelo nome RESOLVIDO**, não pelo bruto. Assim as duas versões
+   convergem sozinhas e nenhum dado precisa ser reescrito. Provado: "Billy Summers (US Edition)" e
+   "Billy Summers" viram um grupo só, com os dois capítulos juntos.
+2. **A resolução acontece na ENTRADA**, não num botão lá adiante: ao importar um livro, um vídeo
+   ou um episódio de podcast, o título é resolvido em segundo plano. Uma chamada por OBRA — não
+   por item —, e daí em diante tudo que sair dali já nasce com o nome certo. A estante de livros
+   também passou a mostrar o nome limpo.
+
+O botão manual continua, mas agora só para o acervo antigo — some quando não há mais o que limpar.
+E resolver o mesmo livro duas vezes não custa nada: o mapa é consultado antes.
+
+**Arquivos**: `js/ler.js`, `js/video.js`, `js/video-podcast.js`, `js/dossie.js`.
+`sw.js` → `englab-v172`.
 
 ### Onde a captura ainda NÃO leva a semente
 

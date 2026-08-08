@@ -435,6 +435,12 @@ async function podcastImport(i) {
       created_at: new Date().toISOString(), updated_at: new Date().toISOString()
     }
     videos.unshift(v); saveVideos(); autoSyncAfterChange()
+    // Mesmo motivo do livro: o nome limpo se resolve NA ENTRADA, para que
+    // tudo capturado daqui ja nasca com o nome certo na tela. Uma chamada
+    // por episodio, em segundo plano.
+    if (typeof resolverNomesDeObra === 'function' && aiChatCfg().key) {
+      resolverNomesDeObra([v.title]).catch(e => console.warn('[obra]', e && e.message))
+    }
   } else {
     // Feed pode ter trocado a URL do arquivo (CDN novo) — mantém em dia.
     v.podcast.audioUrl = ep.url

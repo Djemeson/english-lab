@@ -201,6 +201,12 @@ async function videoAcceptFile(file, handle) {
       created_at: new Date().toISOString(), updated_at: new Date().toISOString()
     }
     videos.unshift(v); saveVideos(); autoSyncAfterChange()
+    // Mesmo motivo do livro: o nome limpo se resolve NA ENTRADA, para que
+    // tudo capturado daqui ja nasca com o nome certo na tela. Uma chamada
+    // por episodio, em segundo plano.
+    if (typeof resolverNomesDeObra === 'function' && aiChatCfg().key) {
+      resolverNomesDeObra([v.title]).catch(e => console.warn('[obra]', e && e.message))
+    }
   }
   if (handle) VideoDB.set('handles', v.id, handle)
   _vidFile = file

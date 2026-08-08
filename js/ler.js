@@ -89,13 +89,13 @@ function renderLerSection() {
       const pct = Math.round((l.progress || 0) * 100)
       const capa = l.cover
         ? `<img class="ler-capa-img" src="${l.cover}" alt="">`
-        : `<div class="ler-capa-fake"><span>${esc((l.title || '?').slice(0, 28))}</span></div>`
+        : `<div class="ler-capa-fake"><span>${esc((obraNome(l.title) || '?').slice(0, 28))}</span></div>`
       return `
       <div class="ler-card" onclick="lerAbrir('${l.id}')" data-tip="${escA(l.author || '')}">
         <div class="ler-capa">${capa}
           ${pct > 0 ? `<span class="ler-capa-pct">${pct}%</span>` : ''}
         </div>
-        <div class="ler-card-nome">${esc(l.title || 'Sem título')}</div>
+        <div class="ler-card-nome">${esc(obraNome(l.title) || 'Sem título')}</div>
         <div class="ler-card-autor">${esc(l.author || '')}</div>
         <div class="ler-card-barra"><i style="width:${pct}%"></i></div>
         <button class="ler-card-x" title="Remover da estante"
@@ -179,6 +179,17 @@ async function _lerImportarUm(file) {
     minutos: 0, addedAt: Date.now(), updatedAt: Date.now(), lastOpen: 0
   })
   toast(`"${meta.title}" entrou na estante`, 'success')
+  // O NOME LIMPO SE RESOLVE NA ENTRADA, não num botão lá adiante.
+  // O metadado do EPUB traz "(US Edition)", "Unabridged", o nome do arquivo —
+  // e a captura carimba esse título em CADA item. Resolvendo aqui, tudo que
+  // sair deste livro já nasce com o nome certo na tela, e a estante também.
+  // Uma chamada por LIVRO, não por item, e em segundo plano: a estante já
+  // apareceu, e nada na tela espera por isto.
+  if (typeof resolverNomesDeObra === 'function' && aiChatCfg().key) {
+    resolverNomesDeObra([meta.title])
+      .then(n => { if (n) renderLerSection() })
+      .catch(e => console.warn('[obra] não resolvi o título:', e && e.message))
+  }
 }
 
 function _lerContaPalavras(t) {
