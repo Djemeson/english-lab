@@ -39,6 +39,40 @@ TAREFA AGORA: explicar um trecho para o aluno, em português do Brasil.
 }
 
 // ================================================================
+// MARKDOWN DA LEXA — o modelo escreve em markdown, sempre
+// ================================================================
+// Pedir "não use markdown" no prompt não resolve: o modelo escorrega de volta,
+// e o preço do escorregão é o aluno lendo `**pals** = "amigos"` com os
+// asteriscos na cara. Então em vez de proibir, RENDERIZA — o ênfase que ele
+// quis dar é informação, não sujeira, e jogá-la fora empobreceria a explicação.
+//
+// Ordem obrigatória: escapar SEMPRE primeiro (a resposta é texto de fora),
+// depois `**` antes de `*` (senão o negrito vira dois itálicos vazios).
+function lexaInline(t) {
+  return String(t || '')
+    // HTML que a IA às vezes manda de propósito: volta a valer, só nas tags de
+    // ênfase. Tudo o mais continua escapado.
+    .replace(/&lt;(\/?(?:b|strong|i|em))&gt;/gi, '<$1>')
+    // O asterisco precisa COLAR no texto dos dois lados, como no markdown de
+    // verdade — senão "3 * 4 * 5" vira "3 <i> 4 </i> 5". Sem lookbehind, que
+    // não existe em Safari antigo: o próprio grupo proíbe espaço nas pontas.
+    .replace(/\*\*([^\s*][^*\n]*?[^\s*]|[^\s*])\*\*/g, '<b>$1</b>')
+    .replace(/\*([^\s*][^*\n]*?[^\s*]|[^\s*])\*/g, '<i>$1</i>')
+    // Sublinhado só com fronteira de palavra: `snake_case_assim` não é itálico.
+    .replace(/(^|[\s(["'])_([^_\n]+?)_(?=[\s.,;:!?)\]"']|$)/g, '$1<i>$2</i>')
+    .replace(/`([^`\n]+?)`/g, '<code>$1</code>')
+}
+
+// Texto curto da Lexa (leitor, vídeo, Preparar) já pronto para innerHTML.
+function lexaFormatar(txt) {
+  const escapado = (typeof esc === 'function' ? esc(txt) : String(txt || ''))
+  // Marcador de lista ANTES do itálico: "* item" não é ênfase, e sem isto o
+  // asterisco solto engoliria o resto da linha.
+  return lexaInline(escapado.replace(/^\s*\*\s+/gm, '• '))
+    .replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>')
+}
+
+// ================================================================
 // "O QUE É AQUI?" — a checagem sob demanda, no CLIQUE
 // ================================================================
 // O buraco que isto fecha: `knownWords` guarda PALAVRA, não sentido. Marcar

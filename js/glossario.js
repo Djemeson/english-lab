@@ -537,7 +537,7 @@ async function _glossChecar(b, achado, pos, opts) {
       <div class="gloss-aqui-cab">${ic('search','ic-sm')} aqui${r.mesma ? '' : `, a unidade é <b>${esc(r.expr)}</b>`}${
         rotTipo ? `<span class="gloss-tipo">${esc(rotTipo)}</span>` : ''}${
         r.nivel ? `<span class="gloss-tipo">${esc(r.nivel)}</span>` : ''}</div>
-      <div class="gloss-pt">${esc(r.gloss)}</div>
+      <div class="gloss-pt">${typeof lexaFormatar === 'function' ? lexaFormatar(r.gloss) : esc(r.gloss)}</div>
     </div>`)
 
   if (acoes) {

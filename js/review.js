@@ -2196,7 +2196,7 @@ async function revSelExplain() {
 Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado nesta expressão, explique a imagem.` }
     ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
     await pFig   // a figura já veio (é mais rápida que a IA); só junta
-    const html = figura + esc(resp).replace(/\n+/g, '<br>')
+    const html = figura + lexaFormatar(resp)
     _revExplainCache.set(chave, html)   // aiTextSeguro nunca devolve vazio: não cacheia silêncio
     corpo.innerHTML = html
   } catch (e) {

@@ -1176,7 +1176,10 @@ function _lerAoSelecionar() {
         { role: 'user', content: `O aluno está lendo "${_lerLivro.title}"${_lerLivro.author ? ', de ' + _lerLivro.author : ''}. A frase é: "${ctx}". Ele selecionou: "${alvo}".\nExplique o que "${alvo}" significa AQUI, nesta passagem.` }
       ], { maxTokens: 600 })
       const txtEl = el('ler-pop-corpo') && el('ler-pop-corpo').querySelector('.ler-pop-txt')
-      if (txtEl) txtEl.textContent = t || `${lexaNome()} devolveu uma resposta vazia`
+      // innerHTML com `lexaFormatar`, não textContent: a resposta vem em
+      // markdown e o `textContent` a mostrava crua — `**pals** = "amigos"`,
+      // com os asteriscos na cara do aluno.
+      if (txtEl) txtEl.innerHTML = t ? lexaFormatar(t) : esc(`${lexaNome()} devolveu uma resposta vazia`)
     } catch (e) {
       const txtEl = el('ler-pop-corpo') && el('ler-pop-corpo').querySelector('.ler-pop-txt')
       if (txtEl) txtEl.textContent = 'Não deu: ' + e.message

@@ -453,10 +453,17 @@ function formatConsultaReply(text) {
   text = String(text || '').replace(/\/\/([^\/\n]{2,80}?)\/\//g, '/$1/')
 
   let t = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  t = t.replace(/&lt;(\/?(?:b|strong|i|em))&gt;/gi, '<$1>')
   t = t.replace(/^\s*#{1,6}\s*(.+?)\s*$/gm, '<div class="cs-h">$1</div>')
-  t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-       .replace(/`(.+?)`/g, '<code class="cs-code">$1</code>')
+  // Marcadores de lista com `*` viram bullet ANTES da ênfase — senão o
+  // asterisco do marcador emparelha com o da linha seguinte e vira itálico
+  // engolindo o meio do texto.
+  t = t.replace(/^\s*\*\s+/gm, '• ')
+  // Ênfase pelo formatador compartilhado (ai.js): aqui faltava o ITÁLICO de
+  // asterisco simples, e por isso "*Archie*" chegava cru na tela — o mesmo
+  // vazamento que aparecia no balão do leitor.
+  t = (typeof lexaInline === 'function') ? lexaInline(t)
+    : t.replace(/&lt;(\/?(?:b|strong|i|em))&gt;/gi, '<$1>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  t = t.replace(/`(.+?)`/g, '<code class="cs-code">$1</code>')
   t = t.replace(/^\s*[-•]\s+(.+)$/gm, '<li>$1</li>')
   t = t.replace(/(<li>[\s\S]*?<\/li>)/, '<ul class="cs-ul">$1</ul>')
   t = t.replace(/<\/div>\n/g, '</div>').replace(/<\/ul>\n/g, '</ul>')

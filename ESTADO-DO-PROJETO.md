@@ -6041,6 +6041,26 @@ pré-análise no capítulo** (a glosa que ele mostra é a do contexto antigo). O
 já respondeu, ou já acusou divergência, o botão não aparece — seria pagar por resposta que
 existe.
 
+### O markdown da Lexa (2026-08-08)
+
+Ele viu `*Archie*` e `**pals**` **crus** no balão do leitor. Causa: o modelo escreve em
+markdown sempre, e as telas de explicação curta jogavam o texto na tela sem formatar —
+`ler.js` com `textContent`, `review.js` e `video-study.js` com `esc()+<br>`. **As três
+vazavam.** O Assistente tinha formatador, mas só de `**negrito**`: itálico de asterisco
+simples passava cru lá também.
+
+`lexaInline()` / `lexaFormatar()` em `ai.js`, e as quatro telas passaram a usar.
+Decisão: **renderizar, não proibir.** Pedir "não use markdown" no prompt não resolve (o
+modelo escorrega de volta), e a ênfase que ele deu é informação — jogá-la fora empobrece a
+explicação. Detalhes que o teste cobriu:
+- escapar **sempre primeiro** (é texto de fora), e só depois devolver as tags de ênfase;
+- `**` antes de `*`, senão o negrito vira dois itálicos vazios;
+- o asterisco tem de **colar no texto** dos dois lados — sem isso `3 * 4 * 5` virava
+  `3 <i> 4 </i> 5`. Feito sem lookbehind, que não existe em Safari antigo;
+- `_snake_case_` não vira itálico (sublinhado só com fronteira de palavra);
+- `* item` no começo da linha é marcador de lista, não ênfase — tratado antes;
+- `<script>` continua escapado; só `b/strong/i/em` voltam a valer.
+
 ### Onde a captura ainda NÃO leva a semente
 
 Só o leitor foi ligado. Faltam **vídeo/legenda** e **a extensão (Netflix/Kindle)** — e o

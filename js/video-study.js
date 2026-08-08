@@ -700,7 +700,7 @@ Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultur
     // resposta vazia (DeepSeek faz isso às vezes) NÃO pode virar cache — senão
     // a seleção fica muda para sempre; trata como erro e oferece re-tentar
     if (!resp || !resp.trim()) throw new Error('a IA devolveu uma resposta vazia')
-    const html = esc(resp).replace(/\n+/g, '<br>')
+    const html = lexaFormatar(resp)
     if (typeof _revExplainCache !== 'undefined') _revExplainCache.set(chave, html)
     corpo.innerHTML = html
   } catch (e) {
