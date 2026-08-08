@@ -5927,20 +5927,44 @@ tem card ⇒ `revisao`; item `in_study` ⇒ `estudo`; item já no SRS com sentid
 **Verificado ao vivo** com `barrel` de 3 sentidos e 1 card: "cano" → `revisao`, "barril" e
 "tambor" → `saber`, e o dossiê do Capítulo 3 nasceu com **um** sentido em vez de três.
 
-### FASE 3 — o verbete e as saídas (NÃO feita)
+### FASE 3 — o verbete e as saídas (FEITA em 2026-08-08)
 
-5. **`lemma` no item** e **verbete agrupado por lema** na Biblioteca → Palavras (que já monta
-   verbete, mas **a partir dos cards** — precisa passar a ler `words[]`, senão o que foi
-   guardado sem estudar fica invisível).
-   ⚠️ Agrupar na VISTA, **não aninhar no dado**: `fall down` continua item próprio (IPA
-   próprio, agenda própria) — o projeto já tentou o contrário e desfez, e a cicatriz é o
-   campo `moved_to`.
-6. **Reencontro com IA**: em vez da comparação textual da Fase 1, mandar os sentidos
-   existentes do lema junto na análise que **já acontece** (zero chamada nova) e receber
-   `casa_com: <meaningId>` ou `novo: true`. É casamento contra lista fechada — muito mais
-   confiável que geração aberta, que é onde a IA errou nas rodadas 163-167.
-7. **Fundir / separar**: os dois desfazeres. Sem eles, o primeiro erro de reconhecimento vira
-   dado torto para sempre.
+**5. Lema e verbete por família.** `lemaDoItem()` (core.js) deriva a chave do verbete: pega a
+**cabeça** da expressão (a primeira palavra de conteúdo — artigo e preposição na frente não
+mandam, senão "a piece of cake" viraria família de "a"), passa pela tabela de irregulares do
+glossário (`fell` → `fall`) e, se algum item existente casar com um candidato, **é ele que
+manda** — a família se mantém junta conforme cresce. Fica em cache no `w.lemma`.
+
+A Biblioteca → Palavras passou a montar o verbete **a partir de `words[]`, não dos cards**.
+Antes ela só enxergava o que virou card, e por isso todo sentido guardado como `saber` ficava
+invisível **justamente na tela que existe para consultar**. Agora a Biblioteca é a vitrine e o
+`words[]` é o estoque. Cada sentido mostra o estado (`na revisão` / `em estudo` / `só
+consulta`) — é a prova visível de que o verbete guarda tudo e só uma parte pede tempo.
+
+Famílias com 2+ entradas ganham moldura, com seções por tipo. Verificado ao vivo:
+`fall` + `fell` + **phrasal verb** `fall down` + **expressão idiomática** `fall by the wayside`
+debaixo do mesmo teto, cada um item próprio.
+⚠️ Agrupar é da VISTA. **Não aninhar no dado**: `fall down` tem IPA e agenda próprios — o
+projeto já tentou o contrário e desfez, e a cicatriz é o campo `moved_to`.
+
+**6. Reencontro com IA — custo ZERO.** Os sentidos que ele já tem entram na análise **que já
+ia acontecer**, com os ids, e cada significado devolvido traz `same_as: "<id>"` ou `null`. O
+merge passou a preferir o `same_as` ao casamento por texto normalizado, que continua como rede
+para modelo que ignore o campo. Casar contra **lista fechada** é tarefa muito mais fácil que
+geração aberta — é por isso que dá para confiar aqui e não dava nas rodadas 163-167.
+
+**7. Fundir — o desfazer que faltava** (`fundirSentidos`, `fundirSentidoPerguntar`). O par do
+"separar", que já existia. O sentido de origem **não sai do array**: ganha `fundido_em`, do
+mesmo jeito que o `moved_to` — remover deslocaria os índices e os cards antigos passariam a
+apontar para o sentido errado. O que acontece na fusão:
+os exemplos que faltavam entram no destino; os cards são **repontados** (`meaningId` e
+`meaningIdx`); card repetido é resolvido **ficando o que tem mais história** (estado, intervalo
+e lapsos), porque jogar fora agendamento real numa fusão seria o mesmo erro que o "não estudei
+ainda" evita; e `estado`/`estudadoEm`/`context_match` são herdados quando o destino não os
+tinha. Com dois sentidos não há pergunta (o destino é o outro); com três ou mais, rádio.
+⚠️ **`fundido_em` teve de ser filtrado em TODO lugar que já filtrava `moved_to`** — 9 pontos em
+6 arquivos. O primeiro teste pegou exatamente isso: o sentido fundido sumia do verbete mas
+continuava no dossiê e na contagem.
 
 ### Onde a captura ainda NÃO leva a semente
 
@@ -5956,9 +5980,19 @@ lugar só.
 - [x] ~~Medir a pré-análise com IA de verdade (`barrel` → "cano"?)~~ — **FEITO e PASSOU**
       (confirmado pelo Djemeson em 2026-08-07). ⚠️ **Não refazer este teste.** É o que
       autorizou a glosa da pré-análise a virar semente do sentido (ver 8.2, Fase 1).
-- [x] ~~FASE 2 DO REENCONTRO — o estado desce para o sentido~~ — **FEITA em 2026-08-08**
-      (ver 8.2). Falta só a FASE 3: verbete por lema na Biblioteca, reconhecimento por IA e
-      os desfazeres fundir/separar.
+- [x] ~~FASE 2 (estado por sentido) e FASE 3 (lema, verbete, reencontro por IA, fundir)~~ —
+      **FEITAS em 2026-08-08**. O plano das três fases está inteiro na 8.2.
+- [ ] **PROVAR O `same_as` COM IA DE VERDADE** (Fase 3). O bloco do reencontro entrou no
+      prompt e o merge já prefere o campo, mas nada disso rodou com chave: o ambiente de teste
+      não tem. O teste: ter `fall` = "cair", reencontrar `fall` num contexto de "fracassar" e
+      conferir (a) que a IA devolve `same_as: null` para o novo e o id certo para o antigo, e
+      (b) que o sentido velho **não é duplicado**. ⚠️ Com DeepSeek o `aiJSON` cai para texto
+      livre — vale medir se o campo sobrevive; se não, a rede do casamento por texto assume.
+- [ ] **O LEMA NÃO COBRE TUDO, e isso é esperado.** A cabeça é a primeira palavra de conteúdo,
+      o que acerta phrasal e idiom verbal ("fall by the wayside" → `fall`) e erra quando o
+      núcleo é outro ("piece of cake" cai em `piece`, que é razoável; "under the weather" cai
+      em `under`, que não é). Só vale mexer se incomodar de verdade — e aí o caminho é a IA
+      devolver o lema na análise que já acontece, não uma tabela nova.
 - [ ] **ZONA DE PERIGO — conferir num aparelho com dado real.** O "apagar tudo" ganhou o que
       faltava (bases `english-lab-books` e `el-video-db` inteiras, as chaves soltas do
       localStorage e recarregamento no fim). Foi exercitado com dado sintético; num aparelho

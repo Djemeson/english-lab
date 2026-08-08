@@ -422,7 +422,7 @@ async function buildImageScene(card) {
   const outros = (w?.meanings || [])
     // Sentido que virou item próprio não é "outro sentido desta palavra" — a
     // imagem não deve se afastar dele, ele nem mora mais aqui.
-    .map((m, i) => (i === card.meaningIdx || m.moved_to) ? null : (m.meaning_pt || '').trim())
+    .map((m, i) => (i === card.meaningIdx || m.moved_to || m.fundido_em) ? null : (m.meaning_pt || '').trim())
     .filter(Boolean)
 
   const r = await aiJSON([
@@ -776,26 +776,31 @@ function renderWordsGlossary(query) {
   const area = el('srs-all-cards-area'); if (!area) return
   const q = (query != null ? query : (el('gloss-search')?.value || '')).toLowerCase().trim()
 
-  // Agrupa por palavra → sentidos (meaningIdx) → exemplos (deduplicados)
+  // FASE 3 — O VERBETE VEM DE `words[]`, NÃO DOS CARDS.
+  // Antes ele era montado a partir do `srsCards`, e por isso só enxergava o
+  // que virou card: todo sentido guardado como consulta ('saber') ficava
+  // invisível justamente na tela que existe para consultar. Agora a Biblioteca
+  // é a vitrine e o `words[]` é o estoque.
   const byWord = new Map()
-  for (const c of srsCards) {
-    let g = byWord.get(c.wordId)
-    if (!g) {
-      g = { wordId: c.wordId, word: c.word || '', ipa: c.ipa || '', type: c.type || '',
-            type_label: c.type_label || '', lang: cardLang(c),
-            source_type: c.source_type || '', senses: new Map() }
-      byWord.set(c.wordId, g)
-    }
-    let s = g.senses.get(c.meaningIdx)
-    if (!s) {
-      s = { idx: c.meaningIdx, meaning_pt: c.meaning_pt || '', definition_pt: c.definition_pt || '',
-            origin_pt: c.origin_pt || '', variety: c.variety, register: c.register, examples: [], _seen: new Set() }
-      g.senses.set(c.meaningIdx, s)
-    }
-    if (c.example_en && !s._seen.has(c.example_en)) {
-      s._seen.add(c.example_en)
-      s.examples.push({ en: c.example_en, pt: c.example_pt || '' })
-    }
+  for (const w of words) {
+    const ms = (w.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em)
+    if (!ms.length) continue
+    const g = { wordId: w.id, word: w.word || '', ipa: w.ipa || '', type: w.type || '',
+                type_label: w.type_label || '', lang: wordLang(w),
+                source_type: w.source_type || '', lema: lemaDoItem(w), senses: new Map() }
+    ms.forEach((m, i) => {
+      const vistos = new Set()
+      const ex = []
+      for (const e of (m.examples || [])) {
+        if (e && e.en && !vistos.has(e.en)) { vistos.add(e.en); ex.push({ en: e.en, pt: e.pt || '' }) }
+      }
+      g.senses.set(m.id || i, {
+        idx: i, meaning_pt: m.meaning_pt || '', definition_pt: m.definition_pt || '',
+        origin_pt: m.origin_pt || '', variety: m.variety, register: m.register,
+        estado: (typeof sentidoEstado === 'function' ? sentidoEstado(m) : 'pronto'), examples: ex
+      })
+    })
+    byWord.set(w.id, g)
   }
 
   let groups = [...byWord.values()].sort((a, b) =>
@@ -814,19 +819,55 @@ function renderWordsGlossary(query) {
         (s.meaning_pt || '').toLowerCase().includes(q) || (s.definition_pt || '').toLowerCase().includes(q)))
   }
 
-  const cards = groups.map(g => glossWordHtml(g, {
-    word: 'vocabulário',
+  // FAMÍLIAS POR LEMA (Fase 3). `fall`, `fall down` e `fall by the wayside`
+  // ficam debaixo do mesmo teto, cada um com as características próprias —
+  // que é exatamente o que ele pediu. Continuam itens separados no dado.
+  const familias = new Map()
+  for (const g of groups) {
+    const k = g.lema || (g.word || '').toLowerCase()
+    if (!familias.has(k)) familias.set(k, [])
+    familias.get(k).push(g)
+  }
+  const ORDEM_TIPO = { word: 0, phrasal_verb: 1, idiom: 2, collocation: 3 }
+  const rotuloSecao = g => ({
     phrasal_verb: typeLabel('phrasal_verb', g.lang, g.type_label),
     idiom: typeLabel('idiom', g.lang),
-    collocation: 'collocation'
-  })).join('')
+    collocation: 'colocações'
+  })[g.type] || ''
+
+  const cards = [...familias.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0], 'en', { sensitivity: 'base' }))
+    .map(([lema, itens]) => {
+      // A cabeça primeiro; depois phrasal verbs, idioms e colocações.
+      itens.sort((a, b) => (ORDEM_TIPO[a.type] ?? 9) - (ORDEM_TIPO[b.type] ?? 9) ||
+        (a.word || '').localeCompare(b.word || '', 'en', { sensitivity: 'base' }))
+      let tipoAtual = null
+      const corpo = itens.map(g => {
+        const html = glossWordHtml(g, {
+          word: 'vocabulário',
+          phrasal_verb: typeLabel('phrasal_verb', g.lang, g.type_label),
+          idiom: typeLabel('idiom', g.lang),
+          collocation: 'collocation'
+        })
+        // Separador de seção só quando o tipo MUDA, e nunca antes da cabeça:
+        // repetir "phrasal verbs" a cada item viraria ruído.
+        const rot = (itens.length > 1 && g.type !== 'word' && g.type !== tipoAtual) ? rotuloSecao(g) : ''
+        tipoAtual = g.type
+        return (rot ? `<div class="gloss-fam-sec">${esc(rot)}</div>` : '') + html
+      }).join('')
+      // Família de um item só não ganha moldura: seria caixa em volta de nada.
+      if (itens.length < 2) return corpo
+      return `<div class="gloss-familia">
+        <div class="gloss-fam-cab">${ic('layers','ic-sm')}<b>${esc(lema)}</b>
+          <span>${itens.length} entradas</span></div>${corpo}</div>`
+    }).join('')
 
   area.innerHTML = `
   <div class="card-box gloss-box" style="margin-bottom:0">
     <div class="card-box-header gloss-header">
       <div class="gloss-head-info">
-        <h3>${totalWords} palavra${totalWords !== 1 ? 's' : ''}</h3>
-        <span class="gloss-head-sub">${totalSenses} sentido${totalSenses !== 1 ? 's' : ''} em estudo${
+        <h3>${totalWords} ${totalWords !== 1 ? 'entradas' : 'entrada'}</h3>
+        <span class="gloss-head-sub">${totalSenses} sentido${totalSenses !== 1 ? 's' : ''}${
           _libLang !== 'all' ? ' · ' + esc(getLangDef(_libLang).name) : ''}</span>
       </div>
       ${libLangChipsHtml()}
@@ -876,10 +917,15 @@ function glossWordHtml(g, TYPE) {
         ${ex.pt ? `<span class="gloss-ex-pt">${escB(ex.pt)}</span>` : ''}
       </div>` : ''
     const originHtml = s.origin_pt ? `<div class="gloss-origin">${ic('sparkles', 'ic-sm')} ${esc(String(s.origin_pt).replace(/<[^>]*>/g, ''))}</div>` : ''
+    // O estado do sentido (Fase 2/3) aparece aqui: é a prova visível de que o
+    // verbete guarda TUDO, mas só uma parte pede tempo de revisão.
+    const selo = s.estado === 'revisao' ? `<span class="gloss-est feito">na revisão</span>`
+               : s.estado === 'estudo'  ? `<span class="gloss-est">em estudo</span>`
+               : s.estado === 'saber'   ? `<span class="gloss-est saber">só consulta</span>` : ''
     return `<div class="gloss-sense">
       <span class="gloss-sense-no">${i + 1}</span>
       <div class="gloss-sense-body">
-        <div class="gloss-sense-meaning">${esc(s.meaning_pt || '—')}</div>
+        <div class="gloss-sense-meaning">${esc(s.meaning_pt || '—')}${selo}</div>
         ${s.definition_pt ? `<div class="gloss-sense-def">${esc(String(s.definition_pt).replace(/<[^>]*>/g, ''))}</div>` : ''}
         ${chips ? `<div class="gloss-sense-chips">${chips}</div>` : ''}
         ${exHtml}

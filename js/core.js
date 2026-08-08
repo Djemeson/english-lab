@@ -542,6 +542,41 @@ function loadWords() {
   updateDossieBadge()
 }
 
+// ---- LEMA: a chave do verbete (Fase 3) -------------------------------
+// `fall down` e `fall by the wayside` moram no verbete debaixo de `fall`, mas
+// continuam ITENS PRÓPRIOS — IPA próprio, exemplos próprios, agenda própria.
+// Agrupar é da VISTA; aninhar no dado seria refazer o erro que o `moved_to`
+// desfez (o sentido "apaixonar-se" que teve de sair de `fall`).
+//
+// A cabeça de uma expressão é a primeira palavra de conteúdo: o verbo do
+// phrasal, o substantivo do idiom. Artigo e preposição na frente não mandam —
+// senão "a piece of cake" viraria família de "a".
+const _LEMA_VAZIAS = new Set(['a','an','the','to','in','on','at','of','for','be','get'])
+
+function lemaDoItem(w) {
+  if (!w) return ''
+  if (w.lemma) return w.lemma
+  const bruto = String(w.word || '').trim().toLowerCase()
+  if (!bruto) return ''
+  const toks = bruto.split(/\s+/).filter(Boolean)
+  const cabeca = toks.find(t => !_LEMA_VAZIAS.has(t)) || toks[0] || ''
+  // Flexão vira base: quem leu "fell" e quem leu "fall" está na mesma família.
+  // A tabela de irregulares do glossário já foi medida e cobre o que regra de
+  // sufixo não alcança.
+  let lema = (typeof GLOSS_IRREG === 'object' && GLOSS_IRREG && GLOSS_IRREG[cabeca]) || cabeca
+  // Se algum item que já existe casa com um candidato de lema, é ELE que manda:
+  // a família se mantém junta conforme cresce, em vez de rachar por grafia.
+  if (typeof glossLemas === 'function' && Array.isArray(words)) {
+    const cands = [lema, ...glossLemas(cabeca, { estrito: true })]
+    for (const c of cands) {
+      const dono = words.find(x => x !== w && String(x.word || '').trim().toLowerCase() === c)
+      if (dono) { lema = String(dono.lemma || dono.word || c).toLowerCase(); break }
+    }
+  }
+  w.lemma = lema
+  return lema
+}
+
 // ---- Badge da seção ESTUDAR (os dossiês) -----------------------------
 // Mora aqui, e não em js/dossie.js, pelo motivo de sempre: dossie.js é LAZY
 // e o menu existe em todas as telas. Um item "pendente de estudo" é o que já
@@ -554,7 +589,7 @@ function dossiePendentes() {
   let n = 0
   for (const w of words) {
     for (const m of (w.meanings || [])) {
-      if (m && m.meaning_pt && !m.moved_to && m.estado === 'estudo') n++
+      if (m && m.meaning_pt && !m.moved_to && !m.fundido_em && m.estado === 'estudo') n++
     }
   }
   return n

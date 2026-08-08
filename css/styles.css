@@ -5016,6 +5016,41 @@ body.ler-full .mobile-bottom-nav{display:none}
 .dz-corpo .dz-nota{margin-top:var(--sp-2);color:var(--error);font-weight:600}
 .dz-corpo .btn{margin-top:var(--sp-5)}
 
+/* FASE 3 — a FAMÍLIA no verbete: `fall`, `fall down` e `fall by the wayside`
+   debaixo do mesmo teto, cada um com as características próprias. */
+.gloss-familia{
+  border:1px solid var(--border);border-radius:var(--radius);
+  padding:var(--sp-5) var(--sp-5) var(--sp-3);margin-bottom:var(--sp-5);
+  background:var(--surface2);
+}
+.gloss-fam-cab{
+  display:flex;align-items:center;gap:var(--sp-2);margin-bottom:var(--sp-4);
+  color:var(--text2);font-size:var(--fs-sm);
+}
+.gloss-fam-cab b{color:var(--text);font-family:'Newsreader',serif;font-size:var(--fs-base)}
+.gloss-fam-cab span{margin-left:auto;color:var(--text3);font-size:var(--fs-xs)}
+.gloss-fam-sec{
+  margin:var(--sp-4) 0 var(--sp-2);font-size:var(--fs-3xs);font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--text3);
+}
+/* O estado do sentido dentro do verbete: a prova de que ele guarda tudo, mas
+   só uma parte pede tempo de revisão. */
+.gloss-est{
+  margin-left:var(--sp-2);padding:1px 6px;border-radius:var(--radius-xs);
+  font-size:var(--fs-3xs);font-weight:700;letter-spacing:.02em;
+  background:var(--surface2);color:var(--text3);vertical-align:middle;
+}
+.gloss-est.feito{background:color-mix(in srgb, var(--success) 16%, transparent);color:var(--success)}
+.gloss-est.saber{background:transparent;border:1px solid var(--border);color:var(--text3)}
+/* Escolha do destino da fusão */
+.fundir-opcoes{display:flex;flex-direction:column;gap:var(--sp-2);margin-top:var(--sp-4)}
+.fundir-op{
+  display:flex;align-items:center;gap:var(--sp-3);cursor:pointer;
+  padding:var(--sp-3) var(--sp-4);border:1px solid var(--border);
+  border-radius:var(--radius-sm);font-size:var(--fs-sm);
+}
+.fundir-op:hover{border-color:rgba(var(--primary-rgb),.5)}
+
 /* FASE 2 — o estado de cada sentido dentro do card do Preparar. Sentido que
    já saiu desta fila não pode parecer clicável: recua e diz onde está. */
 .mi-estado{

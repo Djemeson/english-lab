@@ -396,8 +396,8 @@ function saveToSrs(wordId, meaningId) {
   const w = words.find(x => x.id === wordId)
   if (!w || !w.meanings || !w.meanings.length) { toast('Sem significados para salvar', 'warning'); return }
   const selected = meaningId
-    ? w.meanings.filter(m => m && (m.id === meaningId) && !m.moved_to)
-    : w.meanings.filter(m => m.selected !== false && !m.moved_to)
+    ? w.meanings.filter(m => m && (m.id === meaningId) && !m.moved_to && !m.fundido_em)
+    : w.meanings.filter(m => m.selected !== false && !m.moved_to && !m.fundido_em)
   if (!selected.length) { toast('Selecione ao menos um significado', 'warning'); return }
 
   let added = 0, skipped = 0

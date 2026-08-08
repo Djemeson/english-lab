@@ -147,7 +147,14 @@ function applyAiResult(w, result) {
   const curated = w._refazer ? [] : oldMeanings.filter(om => Array.isArray(om.examples) && om.examples.length > 0)
   const usedOld = new Set()
   w.meanings = freshMeanings.map(nm => {
-    let match = curated.find(om => !usedOld.has(om.id) && norm(om.meaning_pt) === norm(nm.meaning_pt))
+    // FASE 3 — `same_as` primeiro: é a IA dizendo "este é aquele sentido que
+    // ele já tem", olhando o SENTIDO e não a grafia. O casamento por texto
+    // normalizado continua logo abaixo, como rede: modelo que ignora o campo
+    // (ou fornecedor que devolve texto livre) cai no comportamento antigo.
+    let match = nm.same_as
+      ? curated.find(om => !usedOld.has(om.id) && om.id === nm.same_as)
+      : null
+    if (!match) match = curated.find(om => !usedOld.has(om.id) && norm(om.meaning_pt) === norm(nm.meaning_pt))
     // Casamento POR CONTEXTO (sem título igual) é o último recurso e vinha
     // sendo cego: bastava os dois serem "o do contexto" para o significado
     // antigo voltar por cima do novo. Foi ele que fez "Re-analisar" devolver
@@ -259,6 +266,20 @@ CURATED MEANING — ALREADY DECIDED, DO NOT DROP IT:
 - The learner already has a meaning for this item: "${w._seedMeaning}". Keep THIS as the primary sense ("context_match": true, first in the array); refine its Portuguese only if it is clearly wrong, and make sure its examples illustrate it.${w._seedFrom ? `
 - This item was split out of "${w._seedFrom}": the learner decided that this meaning belongs to the whole expression "${target}", not to "${w._seedFrom}" alone. Every example MUST contain the complete expression "${target}", and the <b> bold MUST wrap ALL of its words, not just the verb.` : ''}` : ''
 
+  // RECONHECIMENTO DO REENCONTRO (Fase 3). Custo: ZERO chamada nova — os
+  // sentidos que ele já tem entram na análise que já ia acontecer, e voltam
+  // com um id. Casar contra LISTA FECHADA é tarefa muito mais fácil que
+  // geração aberta, que é onde o modelo errou nas rodadas 163–167; por isso dá
+  // para confiar aqui e não dava lá.
+  const jaTem = (typeof sentidosDe === 'function' ? sentidosDe(w) : [])
+    .filter(m => m.id && m.meaning_pt)
+  const reencontroBlock = jaTem.length ? `
+SENSES THE LEARNER ALREADY HAS FOR THIS ITEM (do not lose them, do not duplicate them):
+${jaTem.map(m => `- id "${m.id}": ${m.meaning_pt}${m.definition_pt ? ` (${m.definition_pt})` : ''}`).join('\n')}
+- For EVERY meaning you return, add "same_as": "<id>" when it is the SAME sense as one listed above (even if you word the Portuguese differently), or "same_as": null when it is a genuinely NEW sense.
+- Judge by the SENSE, not by the wording: "cair" and "cair em desgraça" describing the same use are the SAME sense.
+- The context sentence decides which sense is "context_match": true — it may well be one the learner already has.` : ''
+
   const L = getLangDef(wordLang(w))
   const PROMPT = `Analyze this ${L.nameEn} vocabulary item for a Brazilian Portuguese-speaking learner and return ONLY valid JSON.
 
@@ -270,6 +291,7 @@ LANGUAGE CHECK:
 ${ctx ? `Context sentence: "${ctx}"` : ''}
 ${sourceBlock}
 ${seedBlock}
+${reencontroBlock}
 
 ${promptRegrasLexicais(wordLang(w), 'analise')}
 
@@ -410,7 +432,7 @@ Return ONLY this JSON (no markdown, no explanation):
 // aluno diz explicitamente "joga fora e faz de novo".
 async function refazerAnalise(wordId) {
   const w = words.find(x => x.id === wordId); if (!w) return
-  const n = (w.meanings || []).filter(m => !m.moved_to).length
+  const n = (w.meanings || []).filter(m => !m.moved_to && !m.fundido_em).length
   const nSep = (Array.isArray(w.spun_off) ? w.spun_off : []).filter(s => words.some(x => x.id === s.wordId)).length
   if (!(await confirmModal({
     title: 'Refazer a análise do zero', icon: 'refresh', confirmText: 'Refazer',
@@ -817,7 +839,7 @@ function renderSidebar(filter = '') {
       for (const w of group.words) {
         const isActive  = w.id === activeWordId
         const isChecked = selectedWordIds.has(w.id)
-        const nMean = (w.meanings || []).filter(m => !m.moved_to).length
+        const nMean = (w.meanings || []).filter(m => !m.moved_to && !m.fundido_em).length
         // Marie Kondo: o chip "Pendente IA" repetido em toda linha era ruído —
         // virou um ponto discreto (âmbar = aguardando; nº = significados prontos)
         const statusHtml = w.status === 'pending_ai'
@@ -919,7 +941,7 @@ function renderWordCard(wordId) {
   // Sentido que virou item próprio continua NO ARRAY (o `meaningIdx` dos cards
   // já criados é posicional — ver ESTADO, seção 9), mas está fora desta tela e
   // fora de qualquer contagem. Quem o exclui do SRS é o `selected:false`.
-  const vivos = (w.meanings || []).filter(m => !m.moved_to)
+  const vivos = (w.meanings || []).filter(m => !m.moved_to && !m.fundido_em)
   const selMeanings = vivos.filter(m => m.selected !== false)
   const selCount = selMeanings.length
   const totalCards = selMeanings.reduce((sum, m) => sum + ((m.examples && m.examples.length) || 1), 0)
@@ -1147,6 +1169,9 @@ function renderMeaningItem(wordId, m, mi) {
           ${un ? '' : `<button class="btn btn-ghost btn-xs mi-sep" title="Separar em item próprio"
             data-tip="Se este sentido pertence a uma expressão maior, separe: vira item próprio, com baralho e agendamento dele"
             onclick="event.stopPropagation();separarSentido('${wordId}',${mi})">${ic('layers','ic-sm')}</button>`}
+          ${(typeof sentidosDe === 'function' && sentidosDe(w).length > 1) ? `<button class="btn btn-ghost btn-xs mi-sep" title="Fundir com outro sentido"
+            data-tip="Este sentido é o mesmo que outro daqui? Funda os dois: os exemplos e os cards, com o agendamento, passam para o que ficar"
+            onclick="event.stopPropagation();fundirSentidoPerguntar('${wordId}',${mi})">${ic('shrink','ic-sm')}</button>` : ''}
         </div>
       </div>
       ${avisoUnidade}
@@ -1209,6 +1234,120 @@ function selectAllMeanings(wordId, val) {
 // O nome passa pelo aluno antes de virar item: o detector acerta muito, mas
 // "fall to the ground" e "fall in love" chegam aqui pelo mesmo caminho e só
 // ele sabe qual das duas vale um item.
+// ================================================================
+// FUNDIR — o desfazer que faltava (Fase 3)
+// ================================================================
+// O par do "separar". O reconhecimento do reencontro erra nas duas direções, e
+// sem os dois desfazeres o primeiro erro vira dado torto para sempre: aqui a
+// IA achou que era sentido novo e não era, então dois sentidos iguais passaram
+// a disputar a mesma revisão.
+//
+// O sentido de origem NÃO é removido do array — ganha `fundido_em`, do mesmo
+// jeito que o `moved_to` faz com quem virou item próprio. Remover deslocaria os
+// índices e os cards antigos passariam a apontar para o sentido errado.
+function fundirSentidos(wordId, miOrigem, idDestino) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const origem = w.meanings && w.meanings[miOrigem]
+  const destino = (w.meanings || []).find(m => m && m.id === idDestino)
+  if (!origem || !destino || origem === destino) return
+
+  // 1) Exemplos que o destino ainda não tem entram nele — material curado não
+  //    se joga fora numa fusão.
+  const tem = new Set((destino.examples || []).map(e => String(e.en || '').trim()))
+  for (const ex of (origem.examples || [])) {
+    const k = String(ex.en || '').trim()
+    if (k && !tem.has(k)) { (destino.examples = destino.examples || []).push(ex); tem.add(k) }
+  }
+
+  // 2) Os cards da origem passam a ser do destino. O que decide a identidade do
+  //    card é `meaningId`; o `meaningIdx` vai junto porque ainda é a chave da
+  //    imagem e do agrupamento de irmãos.
+  const idxDest = w.meanings.indexOf(destino)
+  const cards = (typeof srsCards !== 'undefined' ? srsCards : [])
+  let movidos = 0
+  for (const c of cards) {
+    if (c.wordId !== w.id) continue
+    if (c.meaningId !== origem.id && c.meaningIdx !== miOrigem) continue
+    c.meaningId = destino.id; c.meaningIdx = idxDest
+    c.meaning_pt = destino.meaning_pt || c.meaning_pt
+    movidos++
+  }
+
+  // 3) Card repetido depois da mudança: fica o que tem MAIS história. Jogar
+  //    fora o agendamento real por causa de uma fusão seria o mesmo erro que o
+  //    "não estudei ainda" evita ao não apagar cards.
+  const porFrente = new Map()
+  const peso = c => (c.state === 'new' ? 0 : 1) * 1e6 + (c.interval || 0) * 1e3 + (c.lapses || 0)
+  let removidos = 0
+  for (const c of cards.filter(x => x.wordId === w.id && x.meaningId === destino.id)) {
+    const k = String(c.example_en || '')
+    const velho = porFrente.get(k)
+    if (!velho) { porFrente.set(k, c); continue }
+    const perdedor = peso(c) > peso(velho) ? velho : c
+    if (peso(c) > peso(velho)) porFrente.set(k, c)
+    perdedor._remover = true; removidos++
+  }
+  if (removidos) {
+    const restantes = cards.filter(c => !c._remover)
+    srsCards.length = 0; srsCards.push(...restantes)
+  }
+
+  // 4) A origem some da vista, sem sair do array.
+  origem.fundido_em = destino.id
+  destino.estado = (sentidoEstado(destino) === 'pronto' && sentidoEstado(origem) !== 'pronto')
+    ? sentidoEstado(origem) : sentidoEstado(destino)
+  if (!destino.estudadoEm && origem.estudadoEm) destino.estudadoEm = origem.estudadoEm
+  if (origem.context_match) destino.context_match = true
+
+  sincronizarStatusItem(w)
+  w.updated_at = new Date().toISOString()
+  saveWords(); saveSrsCards()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  if (typeof updateSrsBadge === 'function') updateSrsBadge()
+  if (typeof updateDossieBadge === 'function') updateDossieBadge()
+  renderWordCard(wordId); renderSidebar(); renderDashboard()
+  toast(`Sentidos fundidos${movidos ? ` — ${movidos} card${movidos !== 1 ? 's' : ''} passaram para "${destino.meaning_pt}"` : ''}${
+    removidos ? `, ${removidos} duplicado${removidos !== 1 ? 's' : ''} removido${removidos !== 1 ? 's' : ''}` : ''}`, 'success')
+}
+
+// Pergunta COM QUAL sentido fundir. Só faz sentido com dois ou mais.
+// Com exatamente dois, não há o que perguntar: o destino é o outro, e a
+// pergunta viraria um clique a mais para responder o óbvio.
+let _fundirEscolha = null
+async function fundirSentidoPerguntar(wordId, mi) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const origem = w.meanings && w.meanings[mi]; if (!origem) return
+  const outros = sentidosDe(w).filter(m => m !== origem)
+  if (!outros.length) { toast('Não há outro sentido para fundir', 'info'); return }
+
+  const aviso = `<p style="font-size:var(--fs-sm);color:var(--text2)">
+      "<b>${esc(origem.meaning_pt)}</b>" deixa de existir por conta própria: os exemplos e os cards dele
+      — com o agendamento que já têm — passam para o outro sentido.</p>`
+
+  if (outros.length === 1) {
+    const ok = await confirmModal({
+      title: 'Fundir sentidos', icon: 'layers', confirmText: 'Fundir',
+      html: aviso + `<p style="font-size:var(--fs-sm);margin-top:8px">Vai para: <b>${esc(outros[0].meaning_pt)}</b>.</p>`
+    })
+    if (ok) fundirSentidos(wordId, mi, outros[0].id)
+    return
+  }
+
+  // Três ou mais: o rádio escolhe o destino, e o botão do modal confirma.
+  _fundirEscolha = outros[0].id
+  const ok = await confirmModal({
+    title: 'Fundir com qual sentido?', icon: 'layers', confirmText: 'Fundir',
+    html: aviso + `<div class="fundir-opcoes">${outros.map((m, i) => `
+      <label class="fundir-op">
+        <input type="radio" name="fundir-dest" value="${escA(m.id)}" ${i === 0 ? 'checked' : ''}
+          onchange="_fundirEscolha=this.value">
+        <span>${esc(m.meaning_pt)}</span>
+      </label>`).join('')}</div>`
+  })
+  if (ok && _fundirEscolha) fundirSentidos(wordId, mi, _fundirEscolha)
+  _fundirEscolha = null
+}
+
 function separarSentido(wordId, mi) {
   const w = words.find(x => x.id === wordId); if (!w) return
   const m = w.meanings && w.meanings[mi]; if (!m || m.moved_to) return
@@ -1364,11 +1503,14 @@ const SENT_ESTADOS = ['pronto', 'estudo', 'revisao', 'saber']
 function sentidoEstado(m) {
   return (m && SENT_ESTADOS.includes(m.estado)) ? m.estado : 'pronto'
 }
-// Sentidos que contam. `moved_to` é sentido que virou item próprio: fica no
-// array só para não mover o índice dos cards antigos, mas não é mais daqui.
+// Sentidos que contam. Dois campos tiram um sentido de circulação sem removê-lo
+// do array — remover deslocaria os índices e os cards antigos passariam a
+// apontar para o sentido errado:
+//   `moved_to`   — virou item próprio (o "separar")
+//   `fundido_em` — virou o mesmo que outro sentido daqui (o "fundir")
 function sentidosDe(w) {
   return (w && Array.isArray(w.meanings) ? w.meanings : [])
-    .filter(m => m && m.meaning_pt && !m.moved_to)
+    .filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em)
 }
 
 // O status do ITEM passa a ser DERIVADO. É isto que permite trocar o modelo

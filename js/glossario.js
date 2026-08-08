@@ -167,7 +167,7 @@ function _glossDoCard(w) {
   // `moved_to`: sentido que virou item próprio (ex.: "apaixonar-se" saiu de
   // "fall" e virou "fall in love"). Continua no array só para não mover o
   // índice dos cards já criados — mas não é mais sentido DESTA palavra.
-  const ms = Array.isArray(w.meanings) ? w.meanings.filter(m => m && m.meaning_pt && !m.moved_to) : []
+  const ms = Array.isArray(w.meanings) ? w.meanings.filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em) : []
   if (!ms.length) return null
   const m = ms.find(x => x.context_match && x.selected !== false)
       || ms.find(x => x.context_match)

@@ -63,7 +63,7 @@ function _dossiePartes(chave) {
 // reencontrado no 9 aparece nos DOIS dossiês, sem virar dois itens.
 function _dossieSentidos() {
   const out = []
-  const dos = typeof sentidosDe === 'function' ? sentidosDe : (w => (w.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to))
+  const dos = typeof sentidosDe === 'function' ? sentidosDe : (w => (w.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em))
   const est = typeof sentidoEstado === 'function' ? sentidoEstado : (m => m.estado || 'pronto')
   for (const w of words) {
     for (const m of dos(w)) {
