@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A VOLTA QUE NÃO VOLTAVA**. Ele pediu para devolver tudo ao
+> Última atualização: 2026-08-08 — **O ITEM COMO PÁGINA DE ESTUDO** (4 fatias). A frase do livro
+> dominava a tela sendo só referência: virou o **exemplo #0** dentro de "Em uso" (é o único
+> exemplo autêntico da página), e no topo ficou um crédito de procedência. Correção dele que
+> inverteu meu plano: **nada é recolhido no Estudar** — *"o item pode ficar grande, o estudo é pra
+> isso"*. No lugar da regra de recolher entrou o **ARCO** de 11 blocos, terminando em **Produza**.
+> Régua nova e permanente: **o que ajuda a LEMBRAR pode estar no card; o que ajuda a CONSTRUIR
+> vive só no Estudar**. Campos novos: forma, padrão, colocações, régua, armadilha, curiosidade,
+> registro na prática — todos com "vazio é resposta válida" no prompt. De graça: o `sense_audit`
+> parou de morrer no console, e o EPUB guardado permite **contar quantas vezes a palavra aparece
+> no seu livro**. **"Completar material"** enriquece o acervo antigo sem devolver nada e sem
+> apagar card. `sw.js` → `englab-v156`. Ver seção 8.2 ("O item como página de estudo").
+>
+> Anterior: 2026-08-08 — **A VOLTA QUE NÃO VOLTAVA**. Ele pediu para devolver tudo ao
 > Preparar e o mutirão revelou um defeito silencioso desde a Fase 2: `voltarParaPreparar` só
 > trocava `w.status`, mas quem tem estado é o **SENTIDO** e o status é **derivado** — a volta não
 > voltava (a primeira re-derivação desfazia). A regra virou peça única (`desfazerSentido`), os
@@ -6451,6 +6463,131 @@ devolveria ao Preparar. Corrigidos com a peça `_marcarSentidoNaRevisao`.
 **Arquivos**: `js/review.js`, `js/settings.js`, `index.html`, `css/styles.css`. `sw.js` →
 `englab-v155`.
 
+### O ITEM COMO PÁGINA DE ESTUDO — as quatro fatias (2026-08-08)
+
+Print do card de "Gals" com três observações dele: (1) a frase do livro estava mais em destaque
+que todo o resto, sendo só referência de onde veio; (2) *"o que mais aqui seria importante pra um
+estudante de línguas? Por exemplo Curiosidades"*; (3) o Estudar tinha o mesmo material do card de
+erro — *"não acredito que tem que reduzir mais no card, mas sim enriquecer mais o Estudar"*.
+
+E uma correção dele que inverteu o meu plano: eu tinha proposto recolher metade dos blocos com
+medo da "parede". **"O item pode ficar grande. O estudo é pra isso, se derramar sobre o item."**
+Ele está certo — recolher é a lógica do REVISAR aplicada na tela errada. **Nada é recolhido no
+Estudar. Rolar a página é o estudo.**
+
+**A régua que separa as duas telas**, e ela vale para as próximas rodadas:
+
+> **O que ajuda a LEMBRAR pode estar no card. O que ajuda a CONSTRUIR vive só no Estudar.**
+
+Nada do material novo vai para o SRS — não por poda, mas porque forma, padrão e colocação só
+fazem diferença no primeiro contato.
+
+#### FATIA 1 — a hierarquia
+
+O problema não era só tamanho de fonte: eram **massa** (3 linhas em itálico, largura inteira),
+**posição** (primeiro bloco depois do título) e **moldura** (barra de acento + rótulo em caixa
+alta). A tela anunciava a citação como texto principal enquanto o significado vinha depois, em
+uma linha.
+
+A passagem tem outro papel: **é o único exemplo autêntico da página** (os outros três são
+fabricados). Então virou o **exemplo #0**, dentro de "Em uso", marcada *"do seu livro"*, com o
+termo em negrito. No topo ficou só um crédito de procedência clicável, que rola até ela e pisca.
+
+Escala medida ao vivo: palavra (y=88) → procedência (y=151, 11px) → **significado (y=227, peso
+700)** → definição → passagem (y=393).
+
+#### O ARCO — o que substituiu a regra de recolher
+
+Página longa não morre de tamanho, morre de falta de ordem. Os blocos contam uma história:
+
+`O que é → A forma → Como se comporta → Com quem anda → Em uso → A régua → Também quer dizer →
+De onde vem → Curiosidade → Na sua vida → Produza`
+
+Reconhecer → entender → analisar a forma → ver em uso → distinguir do vizinho → aprofundar →
+ligar ao histórico → **produzir**. Termina em produção porque é o único ato que sai dele.
+**Bloco sem conteúdo não existe** — a lista é filtrada, e o índice sai da mesma lista, então
+nunca aponta para seção vazia.
+
+Índice fino à esquerda (some abaixo de 1100px) com marcador "você está aqui".
+
+> ⚠️ **Duas armadilhas do navegador de teste, e a decisão que elas forçaram.** O
+> `IntersectionObserver` seria a ferramenta certa para o marcador, e `requestAnimationFrame` o
+> limitador certo para a rolagem. **Nenhum dos dois dispara na aba de teste** — ela não compõe
+> frames (é a mesma causa de `screenshot` falhar e de `scroll-behavior: smooth` nunca completar).
+> Sem conseguir medir, não entra: o marcador virou ouvinte de `scroll` com limitador por TEMPO,
+> que eu consigo provar. Ler oito retângulos a cada 80ms não custa nada. De brinde, a rolagem
+> suave passou a viver em `@media (prefers-reduced-motion: no-preference)`, que é o certo de
+> acessibilidade e ainda tira a dependência de animação.
+
+#### FATIA 2 — o que o app já sabia e nunca contou (zero IA)
+
+- **`sense_audit` deixou de morrer no console.** A IA já delibera sobre todos os sentidos em toda
+  análise — é isso que a faz escolher certo — e o resultado ia para `console.log` e acabava ali.
+  **Já está pago.** Agora é guardado e vira "Também quer dizer", sem criar card para nenhum.
+  ⚠️ O texto bruto é raciocínio interno (`"lei/regra: esvazia — SPLIT, test 2"`), então passa por
+  limpeza. **Dois defeitos que o teste pegou:** a comparação era por string, e "moça/garota
+  informal" não batia com "garota, moça" só por causa da ORDEM — agora é por conjunto de
+  palavras; e a linha era comparada só com o sentido da tela, então "namorada" (que ele já tinha
+  como `saber`) reaparecia como novidade — agora compara com TODOS os sentidos do item.
+- **Os outros sentidos deste item**, cada um com o capítulo de onde veio e onde está no fluxo.
+- **A família do lema** (Fase 3), com clique que leva ao parente.
+- **📊 Quantas vezes aparece no seu livro.** O EPUB inteiro está guardado (`BookDB.set(id, blob)`
+  em ler.js), então dá para contar as ocorrências do lema no livro todo — com as flexões vindas do
+  mesmo gerador do glossário, senão "gals" não acharia "gal". Sob demanda e com cache: abrir e
+  descomprimir custa décimos de segundo e ninguém deve pagar isso só por abrir um item.
+
+#### FATIA 3 — os campos novos
+
+Descoberta que ancorou tudo: **havia cinco gavetas mortas no modelo de dados** — `notes`,
+`word_family`, `grammar`, `context_note`, `tags`. O normalizador salvava todas, a IA nunca era
+solicitada a preenchê-las e nenhuma tela as mostrava. `grammar` passou a ser ocupada.
+
+Novos: **`forms`** (gal → gals; a informação que mais faltava — o item foi capturado flexionado e
+nada dizia a forma de dicionário), **`grammar`** (o padrão: "fall + adjetivo", "give up + -ing"),
+**`collocations`**, **`confusoes`** (o vizinho COM a régua — sinônimo em lista nunca diz a
+diferença, e a diferença é a informação toda), **`armadilha`** (falso amigo para lusófono),
+**`curiosidade`** (nota cultural — etimologia continua em `origin_pt`, sem sobreposição) e
+**`registro_uso`** (onde usar e onde NÃO — a leitura prática do chip "informal").
+
+Regras que os tornam confiáveis:
+- **"Vazio é resposta válida e frequente"**, escrito no prompt. Armadilha inventada é pior que
+  campo vazio, porque ele memorizaria algo falso.
+- **`_listaCurta`** aceita array, string com vírgulas ou array com buracos. Provado no teste com
+  `collocations` vindo como string — o modelo barato faz isso, e um `.map` direto quebraria a
+  análise inteira por causa de um campo secundário.
+- **Nenhum deles entra na lista de preservados do merge.** Lá o valor ANTIGO ganha, e como o item
+  antigo não tem nenhum destes campos o vazio venceria para sempre.
+
+**"Completar material"** — a resposta à pergunta dele (*"devolver pro Preparar e re-analisar já
+entra tudo isso?"*). Entra, mas não é preciso devolver: este botão pede **só o que falta**, sobre
+o sentido que já está escrito. Resposta menor, mais barata, sem chance de mexer no que ele curou,
+e **sem apagar card nenhum**. Só aparece para item do acervo antigo e some depois — inclusive
+quando a IA responde que não há o que acrescentar, graças ao carimbo `material_at`, sem o qual o
+botão pediria dinheiro para sempre.
+
+#### FATIA 4 — Produza
+
+Campo de escrita no fim: ele escreve uma frase própria e a Lexa devolve veredito, frase corrigida
+(**só quando é diferente da dele** — devolver a mesma faria parecer que houve conserto),
+comentário e leitura do registro. Uma chamada por resposta, só ao clicar.
+
+O rascunho vive em memória, **não em `words`**: é exercício, não vocabulário — gravar faria isso
+viajar para a nuvem e sujar o backup.
+
+#### O que o teste ao vivo cobrou
+
+- **Repintar jogava a página para o topo.** Completar material, contar no livro e pedir correção
+  repintam o item inteiro — numa página longa isso é perder o lugar da leitura a cada ação, justo
+  no fim dela. Agora a rolagem e o cursor do campo são preservados, e só voltam a zero quando o
+  ITEM muda. Medido: rolagem 829 → 829.
+- **Esc passou a valer dentro do campo de texto.** Setas e espaço continuam bloqueados enquanto
+  ele escreve (senão a página andaria de item), mas Esc é o "me tira daqui" universal — e o
+  rascunho sobrevive, porque vive fora do DOM.
+- **O botão de contar estourava a coluna no celular** (400px numa tela de 372). Botão dentro de
+  bloco de texto agora quebra linha.
+
+**Arquivos**: `js/dossie.js`, `js/review.js`, `css/styles.css`. `sw.js` → `englab-v156`.
+
 ### Onde a captura ainda NÃO leva a semente
 
 Só o leitor foi ligado. Faltam **vídeo/legenda** e **a extensão (Netflix/Kindle)** — e o
@@ -6462,6 +6599,18 @@ lugar só.
 
 ## 9. Pendências / a verificar
 
+- [ ] **PROVAR OS CAMPOS NOVOS COM IA DE VERDADE** (2026-08-08). Todo o fluxo das 4 fatias foi
+      exercitado com `aiJSON` mockado — o ambiente de teste não tem chave. Falta o que só a chave
+      diz: **(a) o tamanho real da resposta** (o teto é 5000 e o comentário no código diz que 2800
+      truncava com 2-3 sentidos × 3 exemplos; desde "um sentido por encontro" sobrou orçamento,
+      mas 7 campos novos ainda não foram medidos); **(b) se `armadilha` e `curiosidade` respeitam
+      o "vazio é resposta válida"** ou viram enchimento — são os dois mais fáceis de um modelo
+      barato encher de conversa fiada; **(c) o DeepSeek**, onde o `aiJSON` cai para texto livre e
+      cada campo novo é superfície nova para quebrar.
+- [ ] **CONTAR NO LIVRO com um EPUB de verdade** (2026-08-08). A leitura do `BookDB`, as flexões e
+      o cache foram exercitados, mas o caminho feliz (livro presente) só foi provado pelo erro
+      tratado ("o arquivo do livro não está mais neste aparelho"). Testar com *Flags on the Bayou*
+      aberto na estante e conferir se a contagem bate com a busca do leitor.
 - [ ] **USAR O MODO FOCO COM UM CAPÍTULO DE VERDADE** (2026-08-08). O percurso foi provado no
       navegador com 4 itens semeados: retrato estável, setas sem pular, "Estudei" mandando para a
       revisão, pausa do erro, atalho e volta. Falta o que só o uso diz — se **os três exemplos**

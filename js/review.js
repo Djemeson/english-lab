@@ -51,6 +51,19 @@ function _ehSim(v) {
   return /^(true|sim|yes|1)$/i.test(String(v || '').trim())
 }
 
+// Lista curta vinda da IA, blindada. Um modelo barato devolve isto como array,
+// como string separada por vírgula, ou como array com buracos — e um `.map`
+// direto num não-array quebra a análise inteira por causa de um campo
+// secundário. Aceita as três formas, limpa e corta.
+function _listaCurta(v, teto) {
+  let arr = []
+  if (Array.isArray(v)) arr = v
+  else if (typeof v === 'string' && v.trim()) arr = v.split(/[;,]|\s·\s/)
+  return arr.map(x => String(x == null ? '' : x).replace(/\s+/g, ' ').trim())
+    .filter(x => x && x.length <= 90)
+    .slice(0, teto || 6)
+}
+
 function applyAiResult(w, result) {
   w.word = result.word || w.word
   // Campos de nível-palavra: preserva o que já existir (não apaga dado curado de uma
@@ -149,9 +162,29 @@ function applyAiResult(w, result) {
     word_family:   m.word_family   || [],
     synonyms:      m.synonyms      || [],
     antonyms:      m.antonyms      || [],
-    grammar:       m.grammar       || '',
     context_note:  m.context_note  || '',
     tags:          m.tags          || [],
+    // ---- O MATERIAL DE CONSTRUÇÃO -------------------------------------
+    // A régua que separa estas peças do card de revisão: **o que ajuda a
+    // LEMBRAR pode estar no card; o que ajuda a CONSTRUIR vive só no
+    // Estudar**. Nada daqui vai para o SRS — são coisas que só fazem
+    // diferença no primeiro contato com o item.
+    //
+    // Todos OPCIONais e tolerantes: com DeepSeek o `aiJSON` cai para texto
+    // livre, e campo novo é superfície nova para quebrar. Campo ausente vira
+    // vazio, e vazio simplesmente não aparece na tela.
+    //
+    // ⚠️ NENHUM deles pode entrar na lista de preservados do merge (mais
+    // abaixo): lá o valor ANTIGO ganha do novo, e como o item antigo não tem
+    // nenhum destes campos, o vazio venceria para sempre e "Completar
+    // material" nunca completaria nada.
+    forms:         _listaCurta(m.forms, 6),        // gal → gals; fall → fell, fallen
+    collocations:  _listaCurta(m.collocations, 6), // as palavras que andam junto
+    confusoes:     _listaCurta(m.confusoes, 4),    // o vizinho + a régua que os separa
+    grammar:       String(m.grammar || '').trim(),      // o padrão: "fall + adjetivo"
+    armadilha:     String(m.armadilha || '').trim(),    // falso amigo para lusófono
+    curiosidade:   String(m.curiosidade || '').trim(),  // a nota que gruda, sem ser etimologia
+    registro_uso:  String(m.registro_uso || '').trim(), // onde usar e onde NÃO usar
     context_match: m.context_match !== false
   }))
 
@@ -346,6 +379,89 @@ Return ONLY this JSON:
 }
 
 // ================================================================
+// COMPLETAR MATERIAL — a riqueza nova para o item que já existe
+// ================================================================
+// Os campos de construção (forma, padrão, colocações, régua, armadilha,
+// curiosidade, registro na prática) nasceram depois do acervo. Nenhum item já
+// analisado os tem, e disparar re-análise em massa queimaria crédito sem ele
+// pedir — a lição da 50ª, terceira vez: conserto de código não conserta dado
+// já gravado, e completar é decisão de quem paga.
+//
+// Por que não "Re-analisar": aquela chamada refaz o sentido inteiro (título,
+// definição, três exemplos) e passa pela preservação. Esta pede SÓ o que
+// falta, sobre o sentido que já está escrito — resposta menor, mais barata, e
+// sem chance de mexer no que ele já curou.
+//
+// É por SENTIDO, não por item: cada sentido tem a própria forma, o próprio
+// padrão e as próprias colocações.
+async function completarMaterial(wordId, meaningId) {
+  const w = words.find(x => x.id === wordId); if (!w) return false
+  const m = (w.meanings || []).find(x => x && x.id === meaningId); if (!m) return false
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error')
+    showSection('configuracoes'); return false
+  }
+  const marca = wordId + '|' + meaningId
+  if (_emAnalise.has(marca)) { toast('Este sentido já está sendo completado', 'info'); return false }
+  const alvo = w.word || ''
+  if (!alvo) { toast('Item sem palavra — não dá para completar', 'warning'); return false }
+
+  const L = getLangDef(wordLang(w))
+  _emAnalise.add(marca)
+  if (typeof _dosFocoPintar === 'function') { try { _dosFocoPintar() } catch (e) {} }
+  try {
+    const PROMPT = `For the ${L.nameEn} item "${alvo}", in the specific sense "${m.meaning_pt}"${
+      m.definition_pt ? ` (${m.definition_pt})` : ''}, produce ONLY the building material a Brazilian Portuguese-speaking learner needs in order to USE it.
+
+Everything is about THAT sense — never the item's other senses.
+⚠️ EMPTY IS A VALID AND FREQUENT ANSWER. An invented false friend or a made-up collocation is worse than an empty field, because the learner would memorize something false. If unsure, return "" or [].
+
+Return ONLY this JSON:
+{
+ "forms": ["inflected forms to recognize, each as \\"form = short PT label\\" (verb: past/participle/3rd person/-ing; noun: plural, especially irregular; adjective: comparative/superlative). Give the citation form first when "${alvo}" is itself inflected. [] for invariable items."],
+ "grammar": "the PATTERN this sense takes, PT-BR, one short line — what must come around it (e.g. \\"fall + adjetivo (asleep, silent)\\", \\"give up + verbo em -ing\\", \\"substantivo contável, quase sempre no plural\\"). \\"\\" only if there is genuinely no pattern.",
+ "collocations": ["words that habitually travel with THIS sense, 2-4 words each. Fixed or strongly preferred pairings only, never free combinations. []"],
+ "confusoes": ["words a learner mixes up with this one, each as \\"word — what makes it DIFFERENT\\", in PT-BR. State the difference, never just name the neighbour. []"],
+ "armadilha": "false friend or systematic trap for a BRAZILIAN PORTUGUESE speaker (1-2 sentences, PT-BR). \\"\\" for the vast majority of items.",
+ "curiosidade": "one genuinely interesting NON-etymological note in PT-BR (cultural fact, famous use, why it is spelled that way). \\"\\" when there is nothing. Never filler.",
+ "registro_uso": "one line in PT-BR: where this sense is used and where it must NOT be. \\"\\" when it is plainly neutral."
+}`
+    const r = await aiJSON(PROMPT, { maxTokens: 1200 })
+    if (!r || typeof r !== 'object') throw new Error('resposta vazia')
+    // Só PREENCHE o que está faltando: se ele já tem material (de uma análise
+    // nova), esta chamada não pode passar por cima.
+    const põe = (campo, valor) => {
+      const vazio = Array.isArray(m[campo]) ? !m[campo].length : !String(m[campo] || '').trim()
+      if (vazio && (Array.isArray(valor) ? valor.length : String(valor || '').trim())) { m[campo] = valor; return 1 }
+      return 0
+    }
+    let n = 0
+    n += põe('forms',        _listaCurta(r.forms, 6))
+    n += põe('collocations', _listaCurta(r.collocations, 6))
+    n += põe('confusoes',    _listaCurta(r.confusoes, 4))
+    n += põe('grammar',      String(r.grammar || '').trim())
+    n += põe('armadilha',    String(r.armadilha || '').trim())
+    n += põe('curiosidade',  String(r.curiosidade || '').trim())
+    n += põe('registro_uso', String(r.registro_uso || '').trim())
+    // Carimbo mesmo com n=0: sem ele, item que legitimamente não tem nada a
+    // acrescentar ofereceria o botão para sempre e ele pagaria de novo.
+    m.material_at = Date.now()
+    w.updated_at = new Date().toISOString()
+    saveWords()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+    toast(n ? `Material completado (${n} ${n === 1 ? 'bloco novo' : 'blocos novos'})`
+            : 'A IA não achou o que acrescentar para este sentido', n ? 'success' : 'info')
+    return true
+  } catch (e) {
+    toast(`Não deu para completar: ${e.message}`, 'error')
+    return false
+  } finally {
+    _emAnalise.delete(marca)
+    if (typeof _dosFocoPintar === 'function') { try { _dosFocoPintar() } catch (e) {} }
+  }
+}
+
+// ================================================================
 // QUEM ESTÁ EM ANÁLISE — o estado mora AQUI, não no DOM
 // ================================================================
 // O "Analisando com IA..." era escrito direto no `innerHTML` do card. Bastava
@@ -480,6 +596,13 @@ ${ctx ? '' : `- THERE IS NO CONTEXT SENTENCE for this item, so there is no sense
 - The meaning you return MUST reflect how the expression is USED in that scene — its function there — never its most literal dictionary reading (cheap-model trap: for "get you in" at a hotel desk, the context sense is "encaixar (na agenda)", not "colocar dentro")
 - "context_match": true on the single object you return.
 
+THE BUILDING MATERIAL — "forms", "grammar", "collocations", "confusoes", "armadilha", "curiosidade", "registro_uso":
+These exist so the learner can PRODUCE the item, not merely recognize it, and they describe THE SENSE YOU RETURNED — never the item's other senses.
+- ⚠️ EMPTY IS A VALID AND FREQUENT ANSWER. An invented false friend, a made-up collocation or a "curiosity" that says nothing are worse than leaving the field empty: the learner would memorize something false. If you are not reasonably sure, return "" or [].
+- Expect most ordinary words to have "armadilha": "" and "curiosidade": "". Expect almost every item to have "forms" and "grammar" filled — those two are the ones a learner misses most.
+- "forms" is about SHAPE (inflection), never about meaning. "collocations" is about COMPANY (which words come next), never a definition. "confusoes" is about the BORDER with a neighbour word, and each entry must state the difference, not just name the neighbour.
+- Never repeat the same content in two of these fields, and never repeat in "curiosidade" what "origin_pt" already says.
+
 Example of CORRECT behavior for "take off" with context "his startup took off overnight":
 sense_audit: [
   "decolar (avião) — considered, not the context",
@@ -523,6 +646,13 @@ Return ONLY this JSON (no markdown, no explanation):
       "context_match": true,
       "synonyms": ["syn1", "syn2", "syn3"],
       "antonyms": ["ant1", "ant2"],
+      "forms": ["the inflected forms a learner must recognize, each as \\"form = short PT label\\". Verb: past, past participle, 3rd person, -ing (e.g. \\"fell = passado\\", \\"fallen = particípio\\"). Noun: the plural, ESPECIALLY when irregular (\\"feet = plural\\"). Adjective: comparative/superlative when they exist. Give the CITATION form first when the item was captured inflected (for the item \\"gals\\": [\\"gal = singular\\", \\"gals = plural\\"]). Empty array for invariable items."],
+      "grammar": "the PATTERN this sense takes, in Brazilian Portuguese, ONE short line — what has to come around it for the sense to work. E.g. \\"fall + adjetivo (asleep, silent, ill)\\", \\"give up + verbo em -ing\\", \\"remind someone OF something\\", \\"substantivo contável, quase sempre no plural\\". This is what lets the learner PRODUCE the word instead of only recognizing it. Empty string only when there is genuinely no pattern worth naming.",
+      "collocations": ["the words that habitually travel with this sense — fixed or strongly preferred pairings, in the target language, 2-4 words each (e.g. for \\"rain\\": \\"heavy rain\\", \\"pouring rain\\"). NOT free combinations that merely happen to be possible. Empty array when the item has no notable partners."],
+      "confusoes": ["near words a learner mixes up with this one, each as \\"word — what makes it DIFFERENT\\", in Brazilian Portuguese (e.g. \\"girl — neutro, mas infantiliza uma adulta\\", \\"chick — gíria, pode ofender\\"). A synonym list alone never says the difference, and the difference is the whole information. Empty array when nothing is genuinely confusable."],
+      "armadilha": "FALSE FRIEND or systematic trap for a BRAZILIAN PORTUGUESE speaker, 1-2 sentences in PT-BR (e.g. \\"pretend\\" não é \\"pretender\\"; \\"actually\\" não é \\"atualmente\\"; \\"push\\" não é \\"puxar\\"). Fill ONLY when a Portuguese speaker really does fall for it. EMPTY STRING for the vast majority of items — a fake trap is worse than none.",
+      "curiosidade": "one genuinely interesting NON-ETYMOLOGICAL note in PT-BR (1-2 sentences): a cultural fact, a famous use, why it is spelled that way, where it is heard. Etymology belongs to \\"origin_pt\\" — do NOT repeat it here. EMPTY STRING when there is nothing genuinely interesting. NEVER filler like \\"é uma palavra muito usada\\".",
+      "registro_uso": "one line in PT-BR saying WHERE this sense is used and where it must NOT be — the practical reading of \\"register\\" (e.g. \\"entre amigos e no sul dos EUA; num e-mail de trabalho soa datado\\"). Empty string when the sense is plainly neutral everywhere.",
       "examples": [
         {"en": "Sentence with <b>word</b> in present tense.", "pt": "Tradução natural com o <b>equivalente</b> em português."},
         {"en": "Sentence with <b>word</b> in past tense.", "pt": "Tradução natural com o <b>equivalente</b> em português."},
@@ -541,10 +671,15 @@ Return ONLY this JSON (no markdown, no explanation):
     // confere a classe de erro conhecida e repete UMA vez quando a resposta
     // vem errada (padrão da 49ª rodada).
     result = await _redeGramatical(target, ctx, PROMPT, result)
-    // A auditoria de sentidos não vai para a tela — serve para conferir a
-    // decisão da IA quando um card volta com menos sentidos do que devia.
+    // A AUDITORIA DEIXA DE MORRER NO CONSOLE. A IA já delibera sobre TODOS os
+    // sentidos do item em toda análise — é isso que a faz escolher certo — e o
+    // resultado ia para `console.log` e acabava ali. Já está pago: guardar
+    // custa zero token e é o que permite dizer, no Estudar, quais sentidos
+    // existem além deste, sem criar card para nenhum deles.
     if (Array.isArray(result.sense_audit) && result.sense_audit.length) {
       console.log(`[ia] sentidos de "${target}":`, result.sense_audit)
+      w.sense_audit = result.sense_audit.map(l => String(l || '').trim()).filter(Boolean).slice(0, 12)
+      w.sense_audit_at = Date.now()
     }
     applyAiResult(w, result)
     w.ai_provider = aiChatCfg().prov

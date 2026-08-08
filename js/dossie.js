@@ -528,6 +528,529 @@ function dossieAbrirItem(wordId, meaningId) {
   return true
 }
 
+// ================================================================
+// O ITEM COMO PÁGINA DE ESTUDO
+// ================================================================
+// Decisão do Djemeson, e ela inverte o que eu tinha proposto: **nada é
+// recolhido aqui**. Recolher é a lógica do REVISAR (onde material demais
+// convida a reler em vez de lembrar) aplicada na tela errada. No Estudar o
+// item está sozinho na tela justamente para ele se derramar em cima — rolar
+// a página É o estudo. "O item pode ficar grande. O estudo é pra isso."
+//
+// O que substitui a regra de recolher é o ARCO. Uma página longa não morre de
+// tamanho, morre de falta de ordem — então os blocos contam uma história:
+//   reconhecer → entender → analisar a forma → ver em uso →
+//   distinguir do vizinho → aprofundar → ligar ao histórico → PRODUZIR
+// Termina em produção porque é o único ato da página que sai DELE.
+//
+// Bloco sem conteúdo não existe (não é economia de espaço: rótulo com nada
+// embaixo é ruído). Por isso cada peça devolve '' quando não tem o que dizer,
+// e a lista é filtrada — o índice lateral sai da mesma lista, então ele nunca
+// aponta para uma seção vazia.
+
+// A PASSAGEM DO LIVRO DESCE PARA CÁ. Ela vinha logo abaixo do título, em
+// itálico, largura inteira, com moldura e rótulo em caixa alta — três linhas
+// que a tela anunciava como o texto principal, enquanto o significado (o
+// centro de verdade) vinha depois e em uma linha só.
+// O papel dela é outro: é o ÚNICO exemplo autêntico da página. Os outros três
+// são fabricados pela IA. Então ela é o exemplo #0, marcada como do livro, e
+// no topo fica apenas um crédito de procedência.
+function _dosExemplosHTML(w, m, ctx, ctxPt) {
+  const exs = m.examples || []
+  if (!ctx && !exs.length) return ''
+  let out = '<div class="dosf-exs">'
+  if (ctx) {
+    out += `<div class="dosf-ex dosf-ex-livro" id="dosf-passagem">
+      <span class="dosf-ex-n">${ic('bookOpen','ic-sm')}</span>
+      <div>
+        <div class="dosf-ex-en">${buildSrsFrente({ example_en: ctx, word: w.word })}</div>
+        ${ctxPt ? `<div class="dosf-ex-pt">${escB(ctxPt)}</div>` : ''}
+        <span class="dosf-ex-selo">do seu livro</span>
+      </div>
+    </div>`
+  }
+  out += exs.map((ex, k) => `
+    <div class="dosf-ex"><span class="dosf-ex-n">#${k + 1}</span>
+      <div>
+        <div class="dosf-ex-en">${buildSrsFrente({ example_en: ex.en || '', word: w.word })}</div>
+        ${ex.pt ? `<div class="dosf-ex-pt">${escB(ex.pt)}</div>` : ''}
+      </div>
+    </div>`).join('')
+  return out + '</div>'
+}
+
+// O QUE É — o centro da página, e agora ele parece o centro.
+function _dosOqueHTML(m) {
+  return `<div class="dosf-sig">${esc(m.meaning_pt)}</div>${
+    m.definition_pt ? `<div class="dosf-def">${esc(m.definition_pt)}</div>` : ''}`
+}
+
+// A RÉGUA — sinônimo em lista não diz a DIFERENÇA, e a diferença é a
+// informação toda. Por isso `confusoes` (o vizinho COM a régua) vem primeiro e
+// os sinônimos/antônimos ficam embaixo, como referência rápida.
+function _dosReguaHTML(m) {
+  const conf = m.confusoes || [], sin = m.synonyms || [], ant = m.antonyms || []
+  if (!conf.length && !sin.length && !ant.length) return ''
+  let out = ''
+  if (conf.length) {
+    out += `<ul class="dosf-lista dosf-conf">${conf.map(c => {
+      // "girl — neutro, mas infantiliza uma adulta": a palavra em negrito, a
+      // régua em texto. Se a IA não usar o travessão, mostra a linha inteira.
+      const p = String(c).split(/\s+[—–-]\s+/)
+      return p.length > 1
+        ? `<li><b>${esc(p[0])}</b> <span>${esc(p.slice(1).join(' — '))}</span></li>`
+        : `<li>${esc(c)}</li>`
+    }).join('')}</ul>`
+  }
+  if (sin.length || ant.length) {
+    out += `<div class="dosf-vizinhos">${
+      sin.length ? `<div class="dosf-viz"><span class="dosf-viz-cab">↔ parecidos</span>
+        <span>${sin.map(esc).join(' · ')}</span></div>` : ''}${
+      ant.length ? `<div class="dosf-viz ant"><span class="dosf-viz-cab">✕ opostos</span>
+        <span>${ant.map(esc).join(' · ')}</span></div>` : ''}</div>`
+  }
+  return out
+}
+
+// A FORMA — a informação que mais falta hoje. O item foi capturado como
+// "Gals" e nada na tela dizia que o dicionário arquiva isso como "gal".
+// Sem isto se aprende uma flexão e não se reconhece a outra.
+function _dosFormasHTML(m) {
+  const fs = m.forms || []
+  if (!fs.length) return ''
+  return `<div class="dosf-formas">${fs.map(f => {
+    const p = String(f).split(/\s*=\s*/)
+    return `<span class="dosf-forma"><b>${esc(p[0])}</b>${p[1] ? `<i>${esc(p[1])}</i>` : ''}</span>`
+  }).join('')}</div>`
+}
+
+// COM QUEM ANDA — para produção, o item de maior retorno da página inteira.
+function _dosColocacoesHTML(m) {
+  const cs = m.collocations || []
+  if (!cs.length) return ''
+  return `<div class="dosf-colocacoes">${cs.map(c =>
+    `<span class="dosf-coloc">${esc(c)}</span>`).join('')}</div>`
+}
+
+// COMO SE COMPORTA — o padrão gramatical (ocupa `grammar`, que era campo morto
+// no modelo de dados desde sempre) mais a leitura prática do registro.
+function _dosPadraoHTML(m) {
+  const partes = []
+  if (m.grammar) partes.push(`<p class="dosf-padrao">${esc(m.grammar)}</p>`)
+  if (m.registro_uso) partes.push(`<p class="dosf-texto">${esc(m.registro_uso)}</p>`)
+  return partes.join('')
+}
+
+// ================================================================
+// NA SUA VIDA — o que o app já sabe, sem gastar um token
+// ================================================================
+// Tudo daqui sai do aparelho: `words[]`, o lema da Fase 3 e o EPUB guardado
+// em `BookDB`. É a parte do verbete que NENHUM dicionário tem, porque depende
+// da sua história de leitura — e é o que dá sentido à ideia do item que cresce.
+
+// OS OUTROS SENTIDOS DESTE MESMO ITEM. Não é o mesmo que a régua: ali são
+// palavras vizinhas, aqui é a MESMA palavra querendo dizer outra coisa — e
+// cada um traz a cena de onde veio, que é o que os separa na memória.
+function _dosIrmaosHTML(w, m) {
+  const irmaos = sentidosDe(w).filter(x => x !== m)
+  if (!irmaos.length) return ''
+  const ONDE = { pronto:'no Preparar', estudo:'no Estudar', revisao:'na Revisão', saber:'só consulta' }
+  return `<ul class="dosf-lista">${irmaos.map(x => {
+    const cap = x.source_context || ''
+    return `<li><b>${esc(x.meaning_pt)}</b>
+      <span class="dosf-nota">${cap ? esc(cap) + ' · ' : ''}${ONDE[sentidoEstado(x)] || ''}</span></li>`
+  }).join('')}</ul>`
+}
+
+// OS SENTIDOS QUE VOCÊ AINDA NÃO ENCONTROU (`w.sense_audit`).
+// A IA já pensa em todos os sentidos do item a cada análise — é isso que a faz
+// escolher o certo — e essa deliberação ia inteira para o console. Guardada,
+// ela responde de graça a pergunta que o dicionário responderia: "o que mais
+// essa palavra quer dizer?". Sem criar card para nenhum: eles chegam quando
+// você os encontrar, que é a ideia do item que cresce.
+//
+// ⚠️ O texto bruto é raciocínio interno ("lei/regra: esvazia — SPLIT, test 2"),
+// não conteúdo de aluno. Por isso passa por uma limpeza antes de aparecer, e
+// qualquer linha que sobre parecida com o sentido que ele já tem é descartada.
+function _dosAuditLimpo(w, m) {
+  const bruto = Array.isArray(w.sense_audit) ? w.sense_audit : []
+  if (!bruto.length) return []
+  const norm = s => String(s || '').toLowerCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g, '').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim()
+  // Comparação por CONJUNTO de palavras, não por texto corrido: a auditoria
+  // escreve na ordem dela ("moça/garota informal") e o sentido está na ordem
+  // do verbete ("garota, moça"). Comparando string, os dois passavam como
+  // diferentes e o mesmo sentido aparecia duas vezes na tela — foi o que o
+  // teste mostrou.
+  const conj = s => new Set(norm(s).split(' ').filter(p => p.length > 2))
+  const cobre = (a, b) => {
+    if (!a.size || !b.size) return false
+    const menor = a.size <= b.size ? a : b, maior = a.size <= b.size ? b : a
+    return [...menor].every(p => maior.has(p))
+  }
+  // Contra TODOS os sentidos que ele já tem, não só o desta tela: 'namorada'
+  // já existe como sentido 'saber' do item, e reaparecia aqui como novidade.
+  const jaTem = sentidosDe(w).map(x => conj(x.meaning_pt))
+  const out = []
+  for (const linha of bruto) {
+    let t = String(linha || '').trim()
+    // A linha final ("SELECIONADO: …") é o sentido que ele JÁ tem na tela.
+    if (/^(selecionad|selected)/i.test(t)) continue
+    // O veredito e o número do teste são jargão do prompt, não informação.
+    t = t.replace(/\s*[—-]\s*(SPLIT|MERGED)\b.*$/i, '').trim()
+    if (!t || t.length < 3) continue
+    const c = conj(t)
+    if (!c.size) continue
+    if (jaTem.some(j => cobre(c, j))) continue
+    if (out.some(x => cobre(c, conj(x)))) continue
+    out.push(t)
+  }
+  return out.slice(0, 8)
+}
+
+function _dosMaisSentidosHTML(w, m) {
+  const linhas = _dosAuditLimpo(w, m)
+  if (!linhas.length) return ''
+  return `<ul class="dosf-lista">${linhas.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
+    <p class="dosf-nota">Nenhum destes virou card. Eles entram quando você os encontrar
+    numa leitura — é assim que o verbete cresce.</p>`
+}
+
+// A FAMÍLIA DO LEMA (Fase 3): `fall` mora debaixo do mesmo teto que
+// `fall in love` e `fall behind`. Já existia no verbete da Biblioteca e
+// faltava aqui, que é onde ele estuda.
+function _dosFamiliaHTML(w) {
+  if (typeof lemaDoItem !== 'function' || !Array.isArray(words)) return ''
+  const lema = lemaDoItem(w)
+  if (!lema) return ''
+  const parentes = words.filter(x => x !== w && x.status !== 'skipped' && lemaDoItem(x) === lema)
+  if (!parentes.length) return ''
+  return `<p class="dosf-texto">${ic('layers','ic-sm')} Debaixo de <b>${esc(lema)}</b> você também estuda:
+    ${parentes.map(x => `<a href="#" onclick="return _dosIrParaItem(event,'${x.id}')">${esc(x.word)}</a>`).join(' · ')}</p>`
+}
+
+function _dosIrParaItem(ev, wordId) {
+  ev.preventDefault()
+  const w = words.find(x => x.id === wordId)
+  const m = w && sentidosDe(w).find(x => ['estudo','revisao'].includes(sentidoEstado(x)))
+  if (m) dossieAbrirItem(w.id, m.id)
+  else if (typeof openWordGlossary === 'function') openWordGlossary(wordId)
+  return false
+}
+
+// QUANTAS VEZES APARECE NO SEU LIVRO. Isto ninguém tem, e é de graça: o EPUB
+// inteiro está guardado (`BookDB.set(id, blob)` em ler.js), então dá para
+// contar as ocorrências do item no livro todo e dizer se vale a pena decorar.
+// Sob demanda e com cache: abrir e descomprimir um livro custa alguns décimos
+// de segundo, e ninguém deve pagar isso ao simplesmente abrir um item.
+const _dosFreqCache = new Map()     // livroId|termo → { n, caps }
+
+function _dosFreqHTML(w) {
+  const livro = _dosLivroDoItem(w)
+  if (!livro) return ''
+  const chave = livro.id + '|' + String(w.word || '').toLowerCase()
+  const pronto = _dosFreqCache.get(chave)
+  if (pronto) {
+    if (!pronto.n) return ''
+    return `<p class="dosf-texto">${ic('search','ic-sm')} <b>${esc(w.word)}</b> aparece
+      <b>${pronto.n}×</b> em <i>${esc(livro.title)}</i>${
+      pronto.caps ? ` — em ${pronto.caps} ${pronto.caps === 1 ? 'trecho' : 'trechos'} do livro` : ''}.</p>`
+  }
+  return `<p class="dosf-texto" id="dosf-freq"><button class="btn btn-ghost btn-sm"
+    onclick="dossieContarNoLivro('${w.id}')">${ic('search','ic-sm')} Contar quantas vezes aparece em "${escA(livro.title)}"</button></p>`
+}
+
+function _dosLivroDoItem(w) {
+  if (!Array.isArray(livros) || !livros.length) return null
+  const t = String(w.source_title || '').trim().toLowerCase()
+  if (!t) return null
+  return livros.find(l => String(l.title || '').trim().toLowerCase() === t) || null
+}
+
+async function dossieContarNoLivro(wordId) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const livro = _dosLivroDoItem(w); if (!livro) return
+  const alvo = el('dosf-freq')
+  if (alvo) alvo.innerHTML = `<span class="dosf-nota"><span class="spinner"></span> lendo o livro…</span>`
+  try {
+    const blob = await BookDB.get(livro.id)
+    if (!blob) throw new Error('o arquivo do livro não está mais neste aparelho')
+    const ep = await epubAbrir(await blob.arrayBuffer())
+    // As flexões vêm do MESMO gerador do glossário — senão "gals" não acharia
+    // "gal" e a conta sairia menor do que a verdade.
+    const termos = (typeof glossLemas === 'function')
+      ? [...new Set([String(w.word).toLowerCase(), ...glossLemas(String(w.word).toLowerCase())])]
+      : [String(w.word).toLowerCase()]
+    const rx = new RegExp('\\b(' + termos.map(escR).join('|') + ')\\b', 'gi')
+    let n = 0, caps = 0
+    for (const c of ep.capitulos) {
+      const html = await ep.zip.texto(c.href)
+      const txt = html ? epubTextoLimpo(html) : ''
+      const achou = txt ? (txt.match(rx) || []).length : 0
+      if (achou) { n += achou; caps++ }
+    }
+    _dosFreqCache.set(livro.id + '|' + String(w.word || '').toLowerCase(), { n, caps })
+    _dosFocoPintar()
+    if (!n) toast(`"${w.word}" não foi encontrada no texto do livro`, 'info')
+  } catch (e) {
+    console.error(e)
+    if (alvo) alvo.innerHTML = `<span class="dosf-nota">não deu para ler o livro: ${esc(e.message || 'erro')}</span>`
+  }
+}
+
+// O CONVITE A COMPLETAR — só aparece para item do acervo ANTIGO, que foi
+// analisado antes destes campos existirem. Some sozinho depois de completar
+// (inclusive quando a IA responde que não há nada a acrescentar: o carimbo
+// `material_at` é o que impede o botão de ficar pedindo dinheiro para sempre).
+function _dosCompletarHTML(w, m) {
+  const temAlgo = (m.forms || []).length || (m.collocations || []).length ||
+                  (m.confusoes || []).length || m.grammar || m.armadilha ||
+                  m.curiosidade || m.registro_uso
+  if (temAlgo || m.material_at) return ''
+  if (typeof completarMaterial !== 'function') return ''
+  const rodando = typeof estaEmAnalise === 'function' && estaEmAnalise(w.id + '|' + m.id)
+  return `<p class="dosf-texto">Este sentido foi analisado antes de o app aprender a guardar
+      forma, padrão, colocações e régua. Uma chamada de IA busca só o que falta —
+      seu significado, definição e exemplos não são tocados.</p>
+    <button class="btn btn-secondary btn-sm" ${rodando ? 'disabled' : ''}
+      onclick="dossieCompletar('${w.id}','${m.id}')">${
+      rodando ? '<span class="spinner"></span> completando…' : ic('sparkles','ic-sm') + ' Completar material'}</button>`
+}
+
+// ================================================================
+// PRODUZA — o único ato da página que sai DELE
+// ================================================================
+// Tudo acima é consumo: ler, comparar, entender. Aqui ele escreve uma frase
+// própria e a Lexa devolve a correção. É o pulo de reconhecer para produzir, e
+// é por isso que este é o ÚLTIMO bloco: fecha o estudo com o aluno usando o
+// item, não relendo sobre ele.
+//
+// Custa uma chamada de IA POR RESPOSTA e só quando ele clica — nada acontece
+// ao simplesmente abrir o item.
+const _dosProduzir = new Map()   // wordId|meaningId → { texto, resposta, erro, rodando }
+
+function _dosProduzirHTML(w, m) {
+  if (typeof aiJSON !== 'function') return ''
+  const k = w.id + '|' + m.id
+  const st = _dosProduzir.get(k) || {}
+  return `
+    <p class="dosf-texto">Escreva uma frase sua com <b>${esc(w.word)}</b> no sentido
+      “${esc(m.meaning_pt)}”. A Lexa corrige e diz se o registro ficou certo.</p>
+    <textarea class="dosf-escrita" id="dosf-escrita" rows="2" spellcheck="false"
+      placeholder="Sua frase em ${esc((getLangDef(wordLang(w)) || {}).name || 'inglês')}…"
+      oninput="_dosProduzirGuardar('${w.id}','${m.id}',this.value)">${esc(st.texto || '')}</textarea>
+    <div class="dosf-escrita-acoes">
+      <button class="btn btn-primary btn-sm" ${st.rodando ? 'disabled' : ''}
+        onclick="dossieProduzir('${w.id}','${m.id}')">${
+        st.rodando ? '<span class="spinner"></span> conferindo…' : ic('send','ic-sm') + ' Pedir correção'}</button>
+      ${st.resposta ? `<button class="btn btn-ghost btn-sm" onclick="_dosProduzirLimpar('${w.id}','${m.id}')">${ic('x','ic-sm')} limpar</button>` : ''}
+    </div>
+    ${st.erro ? `<p class="dosf-nota">${esc(st.erro)}</p>` : ''}
+    ${st.resposta ? `<div class="dosf-correcao">${st.resposta}</div>` : ''}`
+}
+
+// O texto fica em memória, NÃO em `words`: é rascunho de exercício, não
+// vocabulário. Gravar em `words` faria isso viajar para a nuvem e para os
+// outros aparelhos, e sujaria o backup com rabisco.
+function _dosProduzirGuardar(wordId, meaningId, v) {
+  const k = wordId + '|' + meaningId
+  _dosProduzir.set(k, { ..._dosProduzir.get(k), texto: v })
+}
+function _dosProduzirLimpar(wordId, meaningId) {
+  _dosProduzir.delete(wordId + '|' + meaningId)
+  _dosFocoPintar()
+}
+
+async function dossieProduzir(wordId, meaningId) {
+  const w = words.find(x => x.id === wordId); if (!w) return
+  const m = (w.meanings || []).find(x => x && x.id === meaningId); if (!m) return
+  const k = wordId + '|' + meaningId
+  const st = _dosProduzir.get(k) || {}
+  const frase = String(st.texto || '').trim()
+  if (frase.length < 3) { toast('Escreva a frase primeiro', 'info'); return }
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error')
+    showSection('configuracoes'); return
+  }
+  _dosProduzir.set(k, { ...st, rodando: true, erro: '', resposta: '' })
+  _dosFocoPintar()
+  // O foco repinta e o campo nasce de novo: sem devolver o cursor, escrever a
+  // segunda frase obrigaria a clicar no campo outra vez.
+  const L = getLangDef(wordLang(w))
+  try {
+    const PROMPT = `A Brazilian learner is practising the ${L.nameEn} item "${w.word}" in the sense "${m.meaning_pt}"${
+      m.definition_pt ? ` (${m.definition_pt})` : ''}${m.grammar ? `, whose pattern is: ${m.grammar}` : ''}.
+
+The sentence he wrote:
+"""${frase}"""
+
+Judge ONLY this sentence. Answer in Brazilian Portuguese, warmly and briefly, as a teacher who wants him to keep writing.
+
+Return ONLY this JSON:
+{
+ "ok": true or false — true if the sentence uses "${w.word}" correctly IN THAT SENSE and is natural ${L.nameEn},
+ "corrigida": "the corrected sentence in ${L.nameEn}. If nothing needs changing, repeat his sentence unchanged.",
+ "comentario": "1-3 sentences in PT-BR. Say what he got right FIRST — always find something. Then, only if there is a real problem, name it plainly (wrong sense, wrong pattern, unnatural word order, wrong register). Never invent an error just to have something to say.",
+ "registro": "one short line in PT-BR on whether the register fits where he would use this sentence, or \\"\\" if it is fine and unremarkable."
+}`
+    const r = await aiJSON(PROMPT, { maxTokens: 700 })
+    if (!r || typeof r !== 'object') throw new Error('resposta vazia')
+    const fmt = t => (typeof lexaInline === 'function') ? lexaInline(String(t || '')) : esc(String(t || ''))
+    const ok = (r.ok === true || /^(true|sim|yes|1)$/i.test(String(r.ok || '')))
+    const corr = String(r.corrigida || '').trim()
+    let html = `<div class="dosf-veredito ${ok ? 'ok' : 'ajuste'}">${
+      ic(ok ? 'checkCircle' : 'pencil','ic-sm')} ${ok ? 'Está certo' : 'Dá para melhorar'}</div>`
+    // A frase corrigida só aparece quando é DIFERENTE da dele: devolver a
+    // mesma frase como "corrigida" faria parecer que houve conserto.
+    if (corr && corr.replace(/\s+/g,' ') !== frase.replace(/\s+/g,' ')) {
+      html += `<p class="dosf-corrigida">${esc(corr)}</p>`
+    }
+    if (r.comentario) html += `<p class="dosf-texto">${fmt(r.comentario)}</p>`
+    if (r.registro)   html += `<p class="dosf-nota">${fmt(r.registro)}</p>`
+    _dosProduzir.set(k, { texto: frase, resposta: html, rodando: false, erro: '' })
+  } catch (e) {
+    _dosProduzir.set(k, { texto: frase, rodando: false, erro: 'Não deu para conferir: ' + (e.message || 'erro'), resposta: '' })
+  }
+  _dosFocoPintar()
+}
+
+async function dossieCompletar(wordId, meaningId) {
+  if (typeof completarMaterial !== 'function') return
+  await completarMaterial(wordId, meaningId)
+  _dosFocoPintar()
+}
+
+// A procedência vira UM CRÉDITO no topo: obra, capítulo, e um clique que rola
+// até a passagem lá embaixo. Nota de rodapé de dicionário, não manchete.
+function _dosFocoCabecalho(w, m, feito, ctx) {
+  const obra = m.source_title || w.source_title || ''
+  const cap  = m.source_context || w.source_context || ''
+  return `
+    <header class="dosf-cab">
+      <div class="dosf-cab-linha">
+        <b>${esc(w.word || '(frase)')}</b>
+        ${w.ipa ? `<span class="dosf-ipa">${esc(w.ipa)}</span>` : ''}
+        ${_dosAudioHTML(w, m)}
+        ${feito ? `<span class="dos-selo">${ic('check','ic-sm')} estudado</span>` : ''}
+      </div>
+      <div class="dos-chips">${_dosChips(w, m)}</div>
+      ${obra ? `<div class="dosf-fonte">${ic('bookOpen','ic-sm')}
+        ${ctx ? `<a href="#dosf-passagem" onclick="return _dosFocoIrPassagem(event)">` : '<span>'}
+        ${esc(obra)}${cap ? ' · ' + esc(cap) : ''}
+        ${ctx ? '</a>' : '</span>'}</div>` : ''}
+    </header>`
+}
+
+// O ARCO. A ordem é a tese da tela — mexer aqui é mexer no que se estuda antes
+// do quê. Peça que devolve '' some, e some também do índice.
+function _dosFocoBlocos(w, m, ctx, ctxPt) {
+  return [
+    { id:'oque',    rotulo:'O que é',           icone:'target',   html:_dosOqueHTML(m) },
+    { id:'forma',   rotulo:'A forma',           icone:'shrink',   html:_dosFormasHTML(m) },
+    { id:'padrao',  rotulo:'Como se comporta',  icone:'wrench',   html:_dosPadraoHTML(m) },
+    { id:'anda',    rotulo:'Com quem anda',     icone:'zap',      html:_dosColocacoesHTML(m) },
+    { id:'uso',     rotulo:'Em uso',            icone:'message',  html:_dosExemplosHTML(w, m, ctx, ctxPt) },
+    { id:'regua',   rotulo:'A régua',           icone:'layers',   html:_dosReguaHTML(m) },
+    { id:'cuidado', rotulo:'Cuidado',           icone:'alert',
+      html: m.armadilha ? `<p class="dosf-texto dosf-alerta">${esc(m.armadilha)}</p>` : '' },
+    { id:'mais',    rotulo:'Também quer dizer', icone:'book',     html:_dosMaisSentidosHTML(w, m) },
+    // Aqui o texto vai NU: quem rotula é o cabeçalho da seção. A versão com
+    // rótulo próprio (`_dosOrigemHTML`) continua servindo o cartão da lista,
+    // que não tem seções.
+    // Origem ANTES de curiosidade: primeiro de onde a palavra veio, depois o
+    // que ela virou. Ao contrário, a nota cultural chega sem chão.
+    { id:'origem',  rotulo:'De onde vem',  icone:'sparkles',
+      html: m.origin_pt ? `<p class="dosf-texto">${esc(m.origin_pt)}</p>` : '' },
+    { id:'curiosidade', rotulo:'Curiosidade',   icone:'flame',
+      html: m.curiosidade ? `<p class="dosf-texto">${esc(m.curiosidade)}</p>` : '' },
+    { id:'completar', rotulo:'Falta material', icone:'sparkles', html:_dosCompletarHTML(w, m) },
+    // O último bloco antes de produzir: a palavra dentro da SUA história de
+    // leitura. Tudo local, nenhuma chamada de IA.
+    { id:'vida',    rotulo:'Na sua vida', icone:'clock',
+      html: [_dosIrmaosHTML(w, m), _dosFamiliaHTML(w), _dosFreqHTML(w)].filter(Boolean).join('') },
+    // O ÚLTIMO, sempre — fecha o estudo com ele usando o item, não relendo
+    // sobre ele. É o único bloco que não some por falta de conteúdo, porque o
+    // conteúdo é o que ele vai escrever.
+    { id:'produzir', rotulo:'Produza',   icone:'pencil',    html:_dosProduzirHTML(w, m) }
+  ].filter(b => b.html)
+}
+
+// O "você está aqui" do índice. Sem ele, numa página de doze blocos, o índice
+// vira uma lista de links que não diz onde você está — metade da utilidade.
+//
+// Por que rolagem e não `IntersectionObserver`, que seria a ferramenta certa:
+// o observador é a escolha melhor no papel (quem calcula é o navegador), mas
+// ele NÃO dispara no navegador de teste desta sessão — a aba não compõe frames
+// e nenhum callback chega, nem com root na janela. Sem conseguir provar, não
+// entra. Isto aqui eu consigo medir, e o custo é irrisório: um ouvinte, preso
+// a `requestAnimationFrame`, sobre uma dúzia de seções.
+// O limitador é por TEMPO e não por `requestAnimationFrame` pelo mesmo motivo
+// do parágrafo acima: rAF também não roda no navegador de teste, e um marcador
+// que eu não consigo medir é um marcador que eu não sei se funciona. Ler oito
+// retângulos a cada 80ms não custa nada.
+let _dosFocoUltimo = 0
+function _dosFocoObservar(box) {
+  const corpo = box.querySelector('.dosf-corpo')
+  const nav = box.querySelector('.dosf-indice')
+  if (!corpo || !nav || !nav.children.length) return
+  // O ouvinte morre junto com o nó a cada repintura (o innerHTML troca o
+  // corpo inteiro), então não há como sobrar órfão.
+  corpo.addEventListener('scroll', () => {
+    const agora = Date.now()
+    if (agora - _dosFocoUltimo < 80) return
+    _dosFocoUltimo = agora
+    _dosFocoMarcarAqui(box)
+  })
+  _dosFocoMarcarAqui(box)
+}
+
+function _dosFocoMarcarAqui(box) {
+  const corpo = box.querySelector('.dosf-corpo')
+  const nav = box.querySelector('.dosf-indice')
+  if (!corpo || !nav) return
+  const blocos = [...box.querySelectorAll('.dosf-bloco')]
+  if (!blocos.length) return
+  // "Onde estou" = o último bloco cujo topo já passou pelo cursor de leitura,
+  // uma faixa a 25% da altura do corpo. Pegar o bloco mais próximo do topo
+  // absoluto acenderia o seguinte cedo demais; pegar o que "está visível"
+  // acenderia dois ao mesmo tempo, porque as seções têm alturas diferentes.
+  const cursor = corpo.getBoundingClientRect().top + corpo.clientHeight * 0.25
+  let atual = blocos[0]
+  for (const b of blocos) { if (b.getBoundingClientRect().top <= cursor) atual = b }
+  // No fim da rolagem manda o ÚLTIMO: a última seção costuma ser curta demais
+  // para alcançar o cursor, e ficaria eternamente apagada.
+  if (corpo.scrollTop + corpo.clientHeight >= corpo.scrollHeight - 4) atual = blocos[blocos.length - 1]
+  const alvo = '#' + atual.id
+  nav.querySelectorAll('a').forEach(a => a.classList.toggle('aqui', a.getAttribute('href') === alvo))
+}
+
+// Rolagem dentro do CORPO do foco — é ele que rola, não a janela.
+// `scrollTop` calculado na mão em vez de `scrollIntoView`: assim o topo da
+// seção para logo abaixo da borda, e não colado nela.
+function _dosFocoIr(ev, id) {
+  ev.preventDefault()
+  const box = el('dos-foco'); if (!box) return false
+  const corpo = box.querySelector('.dosf-corpo')
+  const alvo = document.getElementById('dosf-s-' + id)
+  if (corpo && alvo) {
+    corpo.scrollTop += alvo.getBoundingClientRect().top - corpo.getBoundingClientRect().top - 12
+  }
+  return false
+}
+function _dosFocoIrPassagem(ev) {
+  ev.preventDefault()
+  const box = el('dos-foco')
+  const corpo = box && box.querySelector('.dosf-corpo')
+  const alvo = document.getElementById('dosf-passagem')
+  if (corpo && alvo) {
+    corpo.scrollTop += alvo.getBoundingClientRect().top - corpo.getBoundingClientRect().top - 60
+    // Um pisca curto: sem ele o clique parece não ter feito nada quando a
+    // passagem já estava visível na tela.
+    alvo.classList.remove('pisca'); void alvo.offsetWidth; alvo.classList.add('pisca')
+  }
+  return false
+}
+
 function _dosFocoPintar() {
   if (!_dosFoco) return
   if (!_dosFocoLista.length) { dossieFocoSair(); return }
@@ -544,7 +1067,7 @@ function _dosFocoPintar() {
   const feito = sentidoEstado(m) === 'revisao'
   const ctx = m.context || w.context || ''
   const ctxPt = m.context_pt || (m.context ? '' : w.context_pt) || ''
-  const irmaos = sentidosDe(w).filter(x => x !== m)
+  const blocos = _dosFocoBlocos(w, m, ctx, ctxPt)
 
   let box = el('dos-foco')
   if (!box) {
@@ -553,37 +1076,32 @@ function _dosFocoPintar() {
     document.body.appendChild(box)
     document.body.classList.add('dos-focando')
   }
+  // REPINTURA NÃO PODE JOGAR A PÁGINA PARA O TOPO. Completar material, contar
+  // no livro e pedir correção repintam o item inteiro — e numa página longa
+  // isso significaria perder o lugar da leitura a cada ação, justo quando ele
+  // está no fim dela. A rolagem só volta a zero quando o ITEM muda, que é
+  // quando começar de cima é o certo.
+  const chaveAtual = w.id + '|' + (m.id || '')
+  const mesmo = box.dataset.item === chaveAtual
+  const rolagem = mesmo ? (box.querySelector('.dosf-corpo') || {}).scrollTop || 0 : 0
+  const escrevendo = mesmo && document.activeElement && document.activeElement.id === 'dosf-escrita'
+  const cursor = escrevendo ? document.activeElement.selectionStart : null
+  box.dataset.item = chaveAtual
   box.innerHTML = `
     <div class="dosf-topo">
       <button class="btn btn-ghost btn-sm" onclick="dossieFocoSair()">${ic('x','ic-sm')} Sair do foco <span class="dosf-tecla">Esc</span></button>
       <span class="dosf-pos">${_dosFoco.i + 1} de ${_dosFocoLista.length}</span>
       <span class="dosf-obra">${esc(w.source_title || m.source_title || '')}</span>
     </div>
-    <div class="dosf-corpo">
-      <div class="dosf-cab">
-        <b>${esc(w.word || '(frase)')}</b>
-        ${w.ipa ? `<span class="dos-ipa">${esc(w.ipa)}</span>` : ''}
-        ${_dosAudioHTML(w, m)}
-        ${feito ? `<span class="dos-selo">${ic('check','ic-sm')} estudado</span>` : ''}
+    <div class="dosf-palco">
+      <nav class="dosf-indice" aria-label="Seções deste item">${blocos.map(b =>
+        `<a href="#dosf-s-${b.id}" onclick="return _dosFocoIr(event,'${b.id}')">${esc(b.rotulo)}</a>`).join('')}</nav>
+      <div class="dosf-corpo">
+        ${_dosFocoCabecalho(w, m, feito, ctx)}
+        ${blocos.map(b => `<section class="dosf-bloco" id="dosf-s-${b.id}">
+          <h3 class="dosf-rot">${b.icone ? ic(b.icone,'ic-sm') : ''}${esc(b.rotulo)}</h3>
+          ${b.html}</section>`).join('')}
       </div>
-      <div class="dos-chips">${_dosChips(w, m)}</div>
-      ${ctx ? `<div class="dosf-cena">
-        <span class="dosf-cena-cab">${ic('bookOpen','ic-sm')} onde você encontrou</span>
-        <div class="dosf-cena-en">“${esc(ctx)}”</div>
-        ${ctxPt ? `<div class="dosf-cena-pt">${esc(ctxPt)}</div>` : ''}
-      </div>` : ''}
-      <div class="dosf-sig">${esc(m.meaning_pt)}</div>
-      ${m.definition_pt ? `<div class="dos-sig-def">${esc(m.definition_pt)}</div>` : ''}
-      ${_dosVizinhosHTML(m)}
-      ${_dosOrigemHTML(m)}
-      <div class="dosf-exs">
-        ${(m.examples || []).map((ex, k) => `
-          <div class="dos-ex"><span class="dosf-ex-n">#${k + 1}</span>
-            <div>${buildSrsFrente({ example_en: ex.en || '', word: w.word })}
-            ${ex.pt ? `<span>${escB(ex.pt)}</span>` : ''}</div></div>`).join('')}
-      </div>
-      ${irmaos.length ? `<div class="dos-irmaos">${ic('layers','ic-sm')} ${esc(w.word)} também é: ${
-        irmaos.map(x => esc(x.meaning_pt)).join(' · ')}</div>` : ''}
     </div>
     <div class="dosf-rodape">
       <button class="btn btn-ghost" onclick="dossieFocoAndar(-1)" ${_dosFoco.i === 0 ? 'disabled' : ''}>
@@ -594,6 +1112,20 @@ function _dosFocoPintar() {
       <button class="btn btn-ghost" onclick="dossieFocoAndar(1)" ${_dosFoco.i >= _dosFocoLista.length - 1 ? 'disabled' : ''}>
         <span class="dosf-tecla">→</span> ${ic('chevronRight','ic-sm')}</button>
     </div>`
+  const corpoNovo = box.querySelector('.dosf-corpo')
+  if (corpoNovo && rolagem) {
+    // 'auto' na mão: com `scroll-behavior: smooth` valendo, devolver a posição
+    // viraria uma animação visível de cima para baixo a cada repintura.
+    const antes = corpoNovo.style.scrollBehavior
+    corpoNovo.style.scrollBehavior = 'auto'
+    corpoNovo.scrollTop = rolagem
+    corpoNovo.style.scrollBehavior = antes
+  }
+  if (escrevendo) {
+    const campo = el('dosf-escrita')
+    if (campo) { campo.focus(); try { campo.setSelectionRange(cursor, cursor) } catch (e) {} }
+  }
+  _dosFocoObservar(box)
 }
 
 // UM listener só, ligado uma vez. Ligar/desligar a cada abertura do foco é
@@ -602,8 +1134,11 @@ if (!window._dosFocoTeclas) {
   window._dosFocoTeclas = true
   document.addEventListener('keydown', e => {
     if (!_dosFoco) return
-    if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return
+    // Esc ANTES da guarda de digitação: é o "me tira daqui" universal e não
+    // significa outra coisa dentro de um campo de texto. O rascunho não se
+    // perde — ele vive em `_dosProduzir`, que sobrevive a sair e voltar.
     if (e.key === 'Escape') { e.preventDefault(); dossieFocoSair(); return }
+    if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return
     if (e.key === 'ArrowRight') { e.preventDefault(); dossieFocoAndar(1); return }
     if (e.key === 'ArrowLeft')  { e.preventDefault(); dossieFocoAndar(-1); return }
     // Enter/espaço = marcar estudado e seguir: a mão fica na mesma tecla do
