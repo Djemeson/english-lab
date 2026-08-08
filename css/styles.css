@@ -5016,6 +5016,15 @@ body.ler-full .mobile-bottom-nav{display:none}
 .dz-corpo .dz-nota{margin-top:var(--sp-2);color:var(--error);font-weight:600}
 .dz-corpo .btn{margin-top:var(--sp-5)}
 
+/* VARIANTE SUAVE — "devolver tudo ao Preparar" é destrutivo (os cards saem),
+   mas não é apagar o acervo: nenhuma palavra, nem uma linha do material da IA
+   se perde. Pintar as duas com o mesmo vermelho ensinaria que o vermelho não
+   quer dizer nada. Mesma discrição, aviso em âmbar. */
+.dz-suave{margin-top:var(--sp-5);border-top:0;padding-top:0}
+.dz-suave summary:hover,.dz-suave[open] summary{color:var(--warning)}
+.dz-suave .dz-corpo{border-color:rgba(231,186,83,.35);background:rgba(231,186,83,.06)}
+.dz-suave .dz-corpo .dz-nota{color:var(--warning)}
+
 /* FASE 3 — a FAMÍLIA no verbete: `fall`, `fall down` e `fall by the wayside`
    debaixo do mesmo teto, cada um com as características próprias. */
 .gloss-familia{

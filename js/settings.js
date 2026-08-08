@@ -407,6 +407,91 @@ async function generateMissingAudio() {
   checkMissingAudio()
 }
 
+// ================================================================
+// DEVOLVER TUDO AO PREPARAR — recomeçar o acervo pelo fluxo de 4 etapas
+// ================================================================
+// Pedido do Djemeson depois que Estudar e Revisar mudaram de forma: o acervo
+// dele foi montado no fluxo ANTIGO e ele quer que tudo passe pelo novo.
+//
+// A regra da reversão é a mesma de `voltarParaPreparar` — literalmente a mesma
+// função (`desfazerSentido`), porque duas cópias da mesma regra viram duas
+// regras diferentes na primeira vez que uma delas for corrigida.
+//
+// OS CARDS SÃO APAGADOS, e essa é a decisão dele. Mantê-los deixaria o item no
+// Preparar E cobrando revisão ao mesmo tempo — o material vivendo em dois
+// lugares, exatamente o que o fluxo de 4 etapas veio acabar.
+//
+// `saber` não é tocado: o sentido que ele marcou como "conheço, não quero
+// drilar" nunca esteve na fila, então não há de onde devolvê-lo.
+function _devolverContagem() {
+  let itens = 0, sentidos = 0, cards = 0
+  if (!Array.isArray(words)) return { itens, sentidos, cards }
+  for (const w of words) {
+    if (w.status === 'skipped') continue
+    const alvos = sentidosDe(w).filter(m => ['estudo','revisao'].includes(sentidoEstado(m)))
+    if (!alvos.length) continue
+    itens++
+    sentidos += alvos.length
+    cards += alvos.reduce((s, m) => s + cardsDoSentido(w, m).length, 0)
+  }
+  return { itens, sentidos, cards }
+}
+
+async function devolverTudoParaPreparar() {
+  if (typeof desfazerSentido !== 'function') { toast('Recarregue a página e tente de novo', 'warning'); return }
+  const c = _devolverContagem()
+  if (!c.sentidos) { toast('Nada para devolver — Estudar e Revisar já estão vazios', 'info'); return }
+  const pl = (n, s, p) => `${n} ${n === 1 ? s : p}`
+  const ok = await confirmModal({
+    title: 'Devolver tudo ao Preparar', icon: 'refresh', danger: true, confirmText: 'Devolver tudo',
+    html: `<ul class="cost-bullets danger">
+        <li>${pl(c.itens, 'item volta', 'itens voltam')} para a fila do Preparar (${pl(c.sentidos, 'sentido', 'sentidos')})</li>
+        <li>${pl(c.cards, 'card sai', 'cards saem')} da Revisão — o progresso de revisão ${c.cards === 1 ? 'dele' : 'deles'} se perde</li>
+        <li>Estudar e Revisar ficam vazios até você reenviar</li>
+      </ul>
+      <p class="cost-note">Nada do material da IA é apagado: significados, exemplos, áudios e imagens
+      continuam onde estão. O que volta é a <b>posição no fluxo</b>.<br>
+      <b>Sem volta.</b> Exporte o backup JSON (logo acima) antes, se houver dúvida.</p>`
+  })
+  if (!ok) return
+
+  const mortos = new Set()
+  let itens = 0, sentidos = 0
+  for (const w of words) {
+    if (w.status === 'skipped') continue
+    let mexeu = false
+    for (const m of sentidosDe(w)) {
+      if (!['estudo','revisao'].includes(sentidoEstado(m))) continue
+      cardsDoSentido(w, m).forEach(x => mortos.add(x.id))
+      if (desfazerSentido(m)) { sentidos++; mexeu = true }
+    }
+    if (!mexeu) continue
+    itens++
+    delete w.enviadoEm
+    delete w.estudadoEm
+    sincronizarStatusItem(w)
+    w.updated_at = new Date().toISOString()   // bump p/ vencer o merge do fbPull
+  }
+  if (mortos.size) { srsCards = srsCards.filter(x => !mortos.has(x.id)); saveSrsCards() }
+  saveWords()
+
+  // A sessão de revisão em curso apontaria para cards que não existem mais.
+  if (typeof srsSession !== 'undefined' && srsSession && typeof endSrsSession === 'function') endSrsSession()
+
+  // PUSH IMEDIATO, não o debounce de 1,2s: o merge do `fbPull` traz de volta
+  // todo card que ainda estiver na nuvem (`if (!local) return cc`). Apagar
+  // centenas e deixar a janela aberta seria pedir para eles ressuscitarem.
+  if (typeof fbPushData === 'function' && typeof _fbUser !== 'undefined' && _fbUser) {
+    try { await fbPushData() } catch (e) { console.error(e) }
+  }
+
+  ;['updateDossieBadge','updateSrsBadge','renderSidebar','renderDashboard','fillSettings']
+    .forEach(f => { if (typeof window[f] === 'function') { try { window[f]() } catch (e) {} } })
+  if (typeof renderReview === 'function') renderReview()
+  toast(`${pl(itens, 'item voltou', 'itens voltaram')} para o Preparar${
+    mortos.size ? ` · ${pl(mortos.size, 'card removido', 'cards removidos')}` : ''}`, 'success')
+}
+
 async function clearAllData() {
   const loggedIn = !!(typeof _fbUser !== 'undefined' && _fbUser)
   const cloudWarn = loggedIn ? '\n• TUDO na nuvem (Firebase) também será apagado' : ''

@@ -7,7 +7,18 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O PESO NA TELA CERTA**. O insight dele: *"o card de Revisão
+> Última atualização: 2026-08-08 — **A VOLTA QUE NÃO VOLTAVA**. Ele pediu para devolver tudo ao
+> Preparar e o mutirão revelou um defeito silencioso desde a Fase 2: `voltarParaPreparar` só
+> trocava `w.status`, mas quem tem estado é o **SENTIDO** e o status é **derivado** — a volta não
+> voltava (a primeira re-derivação desfazia). A regra virou peça única (`desfazerSentido`), os
+> cards do sentido saem junto (única forma coerente com a fila que esvazia) e o push ao Firebase
+> é imediato, senão o merge do `fbPull` ressuscita card apagado. **Configurações → Devolver tudo
+> ao Preparar**, recolhido e em âmbar — devolver não apaga nenhuma palavra, só a posição no
+> fluxo. A varredura pela mesma raiz achou mais dois (`saveAllToSrs`, `saveSelectedToSrs`) **e um
+> bug de índice**: o card nascia apontando para o sentido errado quando havia sentido desmarcado.
+> `sw.js` → `englab-v155`. Ver seção 8.2 ("A volta que não voltava").
+>
+> Anterior: 2026-08-08 — **O PESO NA TELA CERTA**. O insight dele: *"o card de Revisão
 > é mais robusto e poderoso do que o Estudar de fato"* — e estava invertido. **Revisar ficou
 > enxuto** (definição, origem, vizinhos e a cena do livro desceram para um `<details>` recolhido)
 > e **o material certeiro abre sozinho ao errar**, segurando o card seguinte até ele dizer
@@ -6384,6 +6395,61 @@ justo sobre o ← / Estudei / →.
 
 **Arquivos**: `js/study.js`, `js/dossie.js`, `js/core.js` (`_activateSection`), `css/styles.css`.
 `sw.js` → `englab-v154`.
+
+### A VOLTA QUE NÃO VOLTAVA — devolver ao Preparar (2026-08-08)
+
+*"Tem itens na revisão e no estudar. Tem como devolver tudo isso pro Preparar? Assim tudo entra
+no que vc fez."*
+
+O pedido era de mutirão, mas ao abrir o `voltarParaPreparar` (o "Corrigir em Preparar" do dossiê)
+apareceu um **defeito silencioso desde a Fase 2**: a função só trocava `w.status`. Só que depois
+da Fase 2 quem tem estado é o **SENTIDO**, e `w.status` é **derivado** — então o item aparecia no
+Preparar e a primeira re-derivação (`sincronizarStatusItem`, que roda em meia dúzia de caminhos)
+o mandava de volta. Provado ao vivo antes de mexer:
+
+```
+antes:               status=in_srs         sentido=revisao
+voltarParaPreparar:  status=pending_review sentido=revisao   ← só a casca mudou
+após re-derivar:     status=in_srs         sentido=revisao   ← voltou sozinho
+```
+
+**A regra da reversão virou peça única** (`desfazerSentido`), usada pelo botão individual e pelo
+mutirão — regra duplicada é regra que diverge na primeira correção. Ela devolve `estudo`/`revisao`
+para `pronto`, limpa `estudadoEm`/`enviadoEm` e remarca `selected`. **`saber` não é tocado**: é a
+escolha dele ("conheço, não quero drilar"), e aquele sentido nunca esteve na fila.
+
+**Os cards saem junto** — decisão dele, e é a única coerente: mantê-los deixaria o item no
+Preparar **e** cobrando revisão ao mesmo tempo, o material vivendo em dois lugares, que é
+exatamente o que o fluxo de 4 etapas veio acabar.
+
+- **`cardsDoSentido(w, m)` casa pelo `meaningId`** e só cai na posição para card antigo que não o
+  tem. Cair no `wordId` puro arrastaria os cards dos IRMÃOS — provado o isolamento: devolvendo só
+  "fracassar", os 3 cards de "cair" ficaram de pé e o sentido continuou `revisao`.
+- **Push imediato ao Firebase**, não o debounce de 1,2s: o merge do `fbPull` faz
+  `if (!local) return cc`, ou seja, **card apagado que ainda esteja na nuvem ressuscita**. Apagar
+  centenas e deixar a janela aberta seria pedir por isso.
+- **A sessão de revisão em curso é encerrada** — ela apontaria para cards que não existem mais.
+
+**Onde fica:** Configurações → Dados, recolhido como a zona de perigo, mas em **âmbar** e não em
+vermelho (`.dz-suave`). Pintar as duas iguais ensinaria que o vermelho não quer dizer nada:
+devolver não apaga uma palavra sequer — significados, exemplos, áudios e imagens ficam intactos.
+O que volta é a **posição no fluxo**. O modal diz a conta exata antes (itens, sentidos, cards).
+
+**A varredura pela mesma raiz achou mais dois** (`saveAllToSrs` e `saveSelectedToSrs`, os atalhos
+"Salvar todos"/"Salvar selecionadas"): criavam card e cravavam `w.status = 'in_srs'` **sem tocar
+no sentido** — item com card na Revisão e sentido ainda `pronto`, que a primeira re-derivação
+devolveria ao Preparar. Corrigidos com a peça `_marcarSentidoNaRevisao`.
+
+> **Bug de índice achado de brinde no `saveSelectedToSrs`**: era
+> `w.meanings.filter(...).forEach((m, mi) => …)` — `mi` é a posição no array **filtrado**. Com
+> qualquer sentido desmarcado as posições se deslocavam e o card nascia **apontando para o
+> sentido errado** (o mesmo defeito posicional que a 93ª rodada matou no `meaningIdx`). Provado
+> com 3 sentidos e o primeiro desmarcado: antes o card de "B" apontava para "A"; agora
+> `meaningIdx` sai 1 e 2, certos. E o item continua `pending_review` porque "A" segue por
+> decidir — antes o `in_srs` cravado escondia esse sentido do Preparar para sempre.
+
+**Arquivos**: `js/review.js`, `js/settings.js`, `index.html`, `css/styles.css`. `sw.js` →
+`englab-v155`.
 
 ### Onde a captura ainda NÃO leva a semente
 

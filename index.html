@@ -717,6 +717,27 @@
       <!-- Espaço em disco (renderizado por renderEspacoLocal() em settings.js) -->
       <div id="set-espaco"></div>
 
+      <!-- DEVOLVER TUDO AO PREPARAR — fica AQUI, e não no Preparar, porque é
+           manutenção do acervo, não estudo: o acervo foi montado no fluxo
+           antigo e passa inteiro pelo novo uma vez só. Recolhido pelo mesmo
+           motivo da zona de perigo — ninguém deve encontrá-la sob o dedo. -->
+      <details class="danger-zone dz-suave" id="dz-devolver">
+        <summary>
+          <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+          Devolver tudo ao Preparar
+        </summary>
+        <div class="dz-corpo">
+          <p>Manda de volta para a fila do Preparar <b>todo item que está em Estudar ou na Revisão</b>,
+             para o acervo antigo passar inteiro pelo fluxo novo. Os <b>cards saem da Revisão</b> e o
+             progresso de revisão deles se perde — sem isso o mesmo item ficaria no Preparar e cobrando
+             revisão ao mesmo tempo.</p>
+          <p class="dz-nota">O material da IA fica intacto: significados, exemplos, áudios e imagens
+             continuam onde estão. O que volta é a posição no fluxo. Sem volta — exporte o backup acima
+             se houver dúvida.</p>
+          <button class="btn btn-secondary btn-sm" onclick="devolverTudoParaPreparar()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>Devolver tudo ao Preparar</button>
+        </div>
+      </details>
+
       <!-- ZONA DE PERIGO — discreta de propósito. Estava como um botão
            vermelho no meio da fileira de backup, do mesmo tamanho de
            "Exportar": a ação mais destrutiva do app tinha o mesmo peso visual

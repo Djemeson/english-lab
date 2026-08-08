@@ -642,7 +642,10 @@ async function saveAllToSrs() {
         if (card) { srsCards.push(card); added++; totalCards++ }
       })
     })
-    if (added > 0) { w.status = 'in_srs'; w.updated_at = new Date().toISOString(); ok++ }
+    // MESMO DEFEITO DA VOLTA QUEBRADA: cravar `w.status` sem mexer no SENTIDO
+    // deixa o item com card na Revisão e sentido ainda 'pronto' — a primeira
+    // re-derivação o jogaria de volta ao Preparar. Quem manda é o sentido.
+    if (added > 0) { selected.forEach(_marcarSentidoNaRevisao); sincronizarStatusItem(w); w.updated_at = new Date().toISOString(); ok++ }
   }
   window._batchMode = false
   saveSrsCards(); saveWords(); autoSyncAfterChange()
@@ -1039,7 +1042,13 @@ async function saveSelectedToSrs() {
   for (const id of ids) {
     const w = words.find(x => x.id === id)
     if (!w?.meanings?.length) continue
-    w.meanings.filter(m => m.selected !== false).forEach((m, mi) => {
+    const selecionados = w.meanings.filter(m => m.selected !== false)
+    selecionados.forEach(m => {
+      // ⚠️ `mi` vinha do índice do array FILTRADO. Com qualquer sentido
+      // desmarcado as posições se deslocam, e o card nascia apontando para o
+      // sentido errado — o mesmo defeito posicional que a 93ª rodada matou no
+      // `meaningIdx`. A posição verdadeira é sempre em `w.meanings`.
+      const mi = w.meanings.indexOf(m)
       const examples = m.examples?.length ? m.examples : [null]
       examples.forEach((ex, ei) => {
         const exIdx = ex ? ei : -1
@@ -1049,7 +1058,8 @@ async function saveSelectedToSrs() {
         if (card) { srsCards.push(card); totalCards++ }
       })
     })
-    w.status = 'in_srs'; w.updated_at = new Date().toISOString(); ok++
+    selecionados.forEach(_marcarSentidoNaRevisao)
+    sincronizarStatusItem(w); w.updated_at = new Date().toISOString(); ok++
   }
   saveSrsCards(); saveWords(); autoSyncAfterChange()
   toast(`${ok} palavra${ok!==1?'s':''} (${totalCards} cards) salvas`, ok > 0 ? 'success' : 'info')
@@ -1888,19 +1898,90 @@ function enviarSelecionadasParaEstudo() {
 // A volta. Chamada pelo dossiê (js/dossie.js, lazy) quando a análise saiu
 // errada: sem ela, enviar seria uma porta de mão única e o item ficaria preso
 // com material ruim — o mesmo beco que o "Não lembro" resolveu no glossário.
-function voltarParaPreparar(id) {
+// ---- A VOLTA PARA O PREPARAR -----------------------------------------
+// ⚠️ ESTAVA QUEBRADO DESDE A FASE 2 e foi provado ao vivo: a função só trocava
+// `w.status`, mas depois da Fase 2 o dono do estado é o SENTIDO e o status do
+// item é DERIVADO. O item aparecia no Preparar e a primeira re-derivação
+// (`sincronizarStatusItem`, que roda em meia dúzia de caminhos) o mandava de
+// volta — a volta não voltava.
+//
+// `desfazerSentido` é a peça única dessa reversão. Ela existe separada porque a
+// volta em massa (Configurações) precisa exatamente da mesma regra, e regra
+// duplicada é regra que diverge.
+//   estudo/revisao → 'pronto'   (volta para a fila do Preparar)
+//   'saber'        → intocado   (é escolha dele: "conheço, não quero drilar")
+// O par de `desfazerSentido`: o sentido ENTROU na revisão. Existe porque os
+// atalhos em lote ("Salvar todos", "Salvar selecionadas") criavam card e
+// cravavam `w.status = 'in_srs'` sem tocar no sentido — item com card na
+// Revisão e sentido ainda 'pronto', que a primeira re-derivação mandava de
+// volta ao Preparar. Mesma raiz da volta quebrada, dois lugares diferentes.
+function _marcarSentidoNaRevisao(m) {
+  if (!m) return
+  m.estado = 'revisao'
+  if (!m.estudadoEm) m.estudadoEm = Date.now()
+}
+
+function desfazerSentido(m) {
+  const e = sentidoEstado(m)
+  if (e !== 'estudo' && e !== 'revisao') return false
+  m.estado = 'pronto'
+  delete m.estudadoEm
+  delete m.enviadoEm
+  // Volta marcado: quem devolve quer reavaliar, e um sentido desmarcado viraria
+  // 'saber' no próximo envio sem ninguém ter decidido isso.
+  m.selected = true
+  return true
+}
+
+// Os cards nascem daquele sentido — deixá-los girando na Revisão enquanto o
+// sentido volta para o Preparar é o material vivendo em dois lugares, que é
+// justamente o que o fluxo de 4 etapas veio acabar.
+// A identidade boa é o `meaningId` (93ª rodada). Cards antigos podem não
+// tê-lo — para esses, e SÓ para esses, vale a posição. Cair no `wordId` puro
+// arrastaria os cards dos IRMÃOS junto, apagando sentido que ninguém mandou
+// devolver.
+function cardsDoSentido(w, m) {
+  if (typeof srsCards === 'undefined' || !Array.isArray(srsCards)) return []
+  const mi = (w.meanings || []).indexOf(m)
+  return srsCards.filter(c => c && c.wordId === w.id &&
+    (c.meaningId ? c.meaningId === m.id : c.meaningIdx === mi))
+}
+
+async function voltarParaPreparar(id) {
   const w = words.find(x => x.id === id)
   if (!w) return
-  w.status = 'pending_review'
+  const alvos = sentidosDe(w).filter(m => ['estudo','revisao'].includes(sentidoEstado(m)))
+  if (!alvos.length) { toast('Este item já está no Preparar', 'info'); return }
+  const cards = alvos.flatMap(m => cardsDoSentido(w, m))
+  if (cards.length && typeof confirmModal === 'function') {
+    const ok = await confirmModal({
+      title: 'Devolver ao Preparar', icon: 'refresh', danger: true, confirmText: 'Devolver',
+      html: `<p style="font-size:var(--fs-sm);color:var(--text2)"><b>"${esc(w.word || '(frase)')}"</b>
+        volta para o Preparar. <b>${cards.length} card${cards.length !== 1 ? 's' : ''}</b>
+        ${cards.length !== 1 ? 'saem' : 'sai'} da Revisão e o progresso de revisão
+        ${cards.length !== 1 ? 'deles' : 'dele'} se perde.</p>`
+    })
+    if (!ok) return
+  }
+  const mortos = new Set(cards.map(c => c.id))
+  if (mortos.size) {
+    srsCards = srsCards.filter(c => !mortos.has(c.id))
+    saveSrsCards()
+  }
+  alvos.forEach(desfazerSentido)
   delete w.enviadoEm
+  delete w.estudadoEm
+  sincronizarStatusItem(w)
   w.updated_at = new Date().toISOString()
   saveWords()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   if (typeof updateDossieBadge === 'function') updateDossieBadge()
+  if (typeof updateSrsBadge === 'function') updateSrsBadge()
   activeWordId = w.id
   showSection('preparar')
   setTimeout(() => { try { selectWord(w.id) } catch (e) {} }, 80)
-  toast(`"${w.word || '(frase)'}" voltou para o Preparar`, 'info')
+  toast(`"${w.word || '(frase)'}" voltou para o Preparar${
+    mortos.size ? ` (${mortos.size} card${mortos.size !== 1 ? 's removidos' : ' removido'})` : ''}`, 'info')
 }
 
 function skipWord(id) {
