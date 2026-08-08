@@ -5974,10 +5974,23 @@ body.dos-focando #voltar-pill{bottom:auto;top:calc(14px + env(safe-area-inset-to
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
   overflow:hidden;
 }
+/* A obra é uma PASTA: fechada, mostra só a si mesma; clicada, revela os
+   capítulos. Com 40 capítulos por livro e vários livros, abrir tudo seria a
+   parede que a hierarquia veio desfazer. */
 .dos-obra-cab{
-  display:flex;align-items:center;gap:var(--sp-4);flex-wrap:wrap;
-  padding:var(--sp-5) var(--sp-6);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:var(--sp-4);flex-wrap:wrap;width:100%;
+  padding:var(--sp-5) var(--sp-6);text-align:left;cursor:pointer;
+  background:transparent;border:0;font:inherit;color:inherit;
+  transition:background .12s;
 }
+.dos-obra-cab:hover{background:var(--surface2)}
+/* A borda só existe quando há algo embaixo dela. */
+.dos-obra.aberta .dos-obra-cab{border-bottom:1px solid var(--border)}
+.dos-obra-seta{display:flex;color:var(--text3);flex-shrink:0;transition:transform .16s}
+.dos-obra.aberta .dos-obra-seta{transform:rotate(180deg);color:var(--primary)}
+.dos-obra-cab:hover .dos-obra-seta{color:var(--primary)}
+.dos-caps{animation:dosCapsAbre .16s ease-out}
+@keyframes dosCapsAbre{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .dos-obra-ic{color:var(--text3);display:flex;flex-shrink:0}
 .dos-obra-nome{display:flex;flex-direction:column;margin-right:auto;min-width:0}
 .dos-obra-nome b{font-size:var(--fs-lg);font-weight:650;line-height:1.25}

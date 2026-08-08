@@ -17,8 +17,11 @@
 > (`obrasNome`), e a busca aceita os dois nomes. **E a pergunta dele fechou o buraco**: *"ao trazer
 > da fonte um item já vem limpo?"* — não vinha, e isso faria item antigo e novo virarem **dois
 > grupos com o mesmo nome na tela**. Agora o agrupamento é pelo nome RESOLVIDO (convergem sozinhos)
-> e a resolução acontece **na entrada** do livro, vídeo ou episódio, uma chamada por obra.
-> `sw.js` → `englab-v172`. Ver seção 8.2 ("Obra → capítulo → itens").
+> e a resolução acontece **na entrada** do livro, vídeo ou episódio, uma chamada por obra. **E a
+> obra virou PASTA**: nasce fechada e diz quantos capítulos tem — escancarar 12 linhas por livro
+> era a parede que a hierarquia veio desfazer. Buscando, tudo abre; voltando de um capítulo, a
+> pasta continua como ele deixou.
+> `sw.js` → `englab-v173`. Ver seção 8.2 ("Obra → capítulo → itens").
 >
 > Anterior: 2026-08-08 — **O ITEM NUNCA SAI DE VISTA**. O cabeçalho subia com a rolagem
 > e a página virava seções sem dono. Ele passou a ficar **preso no topo, encolhendo** de 115px
@@ -7333,6 +7336,33 @@ E resolver o mesmo livro duas vezes não custa nada: o mapa é consultado antes.
 
 **Arquivos**: `js/ler.js`, `js/video.js`, `js/video-podcast.js`, `js/dossie.js`.
 `sw.js` → `englab-v172`.
+
+#### A obra é uma PASTA, não uma gaveta escancarada
+
+*"Quer dizer que todos os capítulos vão aparecer aqui? Imagina isso cheio e vários livros. Os
+capítulos têm que aparecer somente quando eu clicar no card da fonte, tipo como acontece em
+pastas."*
+
+Certo — a hierarquia resolveu a repetição do título, mas escancarava tudo: um livro de 12
+capítulos despejava 12 linhas, e com a estante cheia a tela virava a parede que a hierarquia veio
+desfazer. Agora a obra nasce **fechada** e diz quantos capítulos tem; eles aparecem ao clique.
+
+Medido com 3 obras (uma de 12 capítulos): **381px fechado, 876px com uma aberta** — e 0 linhas de
+capítulo na tela até ele pedir.
+
+Três comportamentos que a pasta exigiu:
+
+- **Buscando, tudo abre.** O resultado de uma busca é justamente a linha lá dentro; escondê-la
+  faria a busca parecer quebrada. Provado: buscar "capítulo 2" abre só a obra que tem, com 1 linha.
+- **A obra fica aberta para a volta.** Ele estuda um capítulo, volta, e encontra a pasta como
+  deixou — fechá-la o obrigaria a reabrir a cada capítulo, que é o atrito que a pasta veio remover.
+- **O estado é da SESSÃO**, como a busca e o filtro: abrir o app com doze pastas escancaradas seria
+  o problema de novo.
+
+O cabeçalho virou `<button>` com `aria-expanded`, e a seta gira. No celular, 120px de toque e nada
+estoura.
+
+**Arquivos**: `js/dossie.js`, `css/styles.css`. `sw.js` → `englab-v173`.
 
 ### Onde a captura ainda NÃO leva a semente
 

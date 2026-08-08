@@ -280,6 +280,10 @@ async function dossieLimparTitulos() {
 // fonte do SRS) é que filtro salvo produz tela vazia sem explicação numa
 // sessão futura. Aqui eles nascem limpos a cada abertura do app, e enquanto
 // estiverem valendo a tela DIZ que estão — com um botão de limpar à mão.
+// Quais OBRAS estão abertas. Da sessão, como a busca e o filtro: abrir o app
+// mostrando doze pastas escancaradas seria a parede que a pasta veio evitar.
+const _dosObrasAbertas = new Set()
+
 let _dosBusca = ''
 let _dosFiltro = 'todos'     // todos | pendentes | feitos
 
@@ -441,21 +445,31 @@ function _dossiePintarCorpo() {
       <p class="dos-intro">Cada obra reúne <b>tudo que você captou dela</b>, separado por capítulo, com o material
       que a IA montou. Leia à vontade — marcar um item como estudado é o que o manda para a <b>Revisão</b>.</p>
       ${_dosObrasSujasHTML(ordenadas)}
-      <div class="dos-obras">${ordenadas.map(o => {
+      <div class="dos-obras">${ordenadas.map((o, oi) => {
         const falta = o.itens - o.feitos
         const pct = o.itens ? Math.round((o.feitos / o.itens) * 100) : 0
         const autor = obraAutor(o.obra)
-        return `<section class="dos-obra">
-          <header class="dos-obra-cab">
+        // COMPORTAMENTO DE PASTA: fechada por padrão.
+        // Aberta, uma obra de 40 capítulos despeja 40 linhas — e com vários
+        // livros na estante a tela vira uma parede antes de ele escolher onde
+        // quer entrar. A obra diz QUANTOS capítulos tem; os capítulos só
+        // aparecem quando ele pede.
+        // ⚠️ Buscando, tudo abre: o resultado de uma busca é justamente a
+        // linha lá dentro, e escondê-la faria a busca parecer quebrada.
+        const chaveO = obraChaveNome(obraNome(o.obra))
+        const aberta = !!_dosBusca || _dosObrasAbertas.has(chaveO)
+        return `<section class="dos-obra${aberta ? ' aberta' : ''}">
+          <button class="dos-obra-cab" data-o="${oi}" aria-expanded="${aberta}">
             <span class="dos-obra-ic">${srcIcon(o.tipo)}</span>
             <div class="dos-obra-nome">
               <b>${esc(obraNome(o.obra))}</b>
-              ${autor ? `<span>${esc(autor)}</span>` : ''}
+              <span>${autor ? esc(autor) + ' · ' : ''}${o.caps.length} ${o.caps.length === 1 ? 'capítulo' : 'capítulos'}</span>
             </div>
             <span class="dos-obra-n"><b>${falta}</b> para estudar<i>${o.feitos} de ${o.itens} feitos</i></span>
+            <span class="dos-obra-seta">${ic('chevronDown','ic-sm')}</span>
             <span class="dos-barra"><i style="width:${pct}%"></i></span>
-          </header>
-          <div class="dos-caps">${o.caps
+          </button>
+          ${aberta ? `<div class="dos-caps">${o.caps
             .sort((a, b) => (b.itens.length - b.estudados) - (a.itens.length - a.estudados) || a.cap.localeCompare(b.cap))
             .map(d => {
               const f = d.itens.length - d.estudados
@@ -465,16 +479,29 @@ function _dossiePintarCorpo() {
                 <span class="dos-cap-tot">${d.estudados}/${d.itens.length}</span>
                 ${ic('chevronRight','ic-sm')}
               </button>`
-            }).join('')}</div>
+            }).join('')}</div>` : ''}
         </section>`
       }).join('')}</div>`
     // A chave viaja pelo ÍNDICE do render, não dentro do onclick: ela carrega
     // um caractere de controle e o título do livro, e enfiar isso num atributo
     // HTML é convite para aspas, & e acentos quebrarem o clique.
+    corpo.querySelectorAll('.dos-obra-cab').forEach(b => {
+      b.onclick = () => {
+        const o = ordenadas[+b.dataset.o]; if (!o) return
+        const k = obraChaveNome(obraNome(o.obra))
+        _dosObrasAbertas.has(k) ? _dosObrasAbertas.delete(k) : _dosObrasAbertas.add(k)
+        _dossiePintarCorpo()
+      }
+    })
     corpo.querySelectorAll('.dos-cap').forEach(b => {
       b.onclick = () => {
         const d = lista[+b.dataset.k]
-        if (d) dossieAbrir(d.chave)
+        if (!d) return
+        // Deixa a obra ABERTA para a volta: ele estuda um capítulo, volta, e
+        // encontra a pasta como deixou. Fechá-la aqui o obrigaria a reabrir a
+        // cada capítulo — que é o atrito que a pasta veio remover.
+        _dosObrasAbertas.add(obraChaveNome(obraNome(d.obra)))
+        dossieAbrir(d.chave)
       }
     })
     return
