@@ -137,9 +137,17 @@ async function videoCreateCard(alvoOverride) {
   if (!cfg.openaiKey) { toast('Configure a chave OpenAI em Configurações', 'warning'); return }
 
   const frase = _vidSelText().replace(/\s+/g, ' ').trim()
-  const jaExiste = words.find(w => (w.word || '').toLowerCase() === alvo.toLowerCase())
-  if (jaExiste && !(await confirmModal({ title: 'Palavra já existe', icon: 'info', confirmText: 'Criar mesmo assim',
-    html: `<p style="font-size:var(--fs-sm);color:var(--text2)"><b>${esc(alvo)}</b> já está no seu vocabulário. Criar um novo sentido a partir desta cena?</p>` }))) return
+  // REENCONTRO, não item duplicado.
+  // Aqui a pergunta era "criar mesmo assim?" e o sim criava um item NOVO com a
+  // mesma palavra — dois `fall` na biblioteca, a família rachada e o verbete
+  // partido em dois. O leitor já tinha resolvido isso: o reencontro entra no
+  // MESMO item, como sentido novo (`prepararNovoSentido`). O vídeo era a
+  // última fonte que ainda duplicava.
+  // `prepAcharItem` acha inclusive flexionado ("fell" acha "fall"), então o
+  // reencontro é reconhecido mesmo quando a legenda traz outra forma.
+  const jaExiste = (typeof prepAcharItem === 'function')
+    ? prepAcharItem(alvo, _vidCur.lang || 'en')
+    : words.find(w => (w.word || '').toLowerCase() === alvo.toLowerCase())
 
   const btn = el('vid-card-btn')
   _vidCapturing = true
@@ -174,31 +182,48 @@ Responda:
     // 3) Monta a palavra no formato do app. O item PARA NO PREPARAR, como
     //    tudo o mais — ver o bloco "O vídeo entra na fila" abaixo.
     const boldEn = frase.replace(new RegExp(`(${escR(alvo)})`, 'i'), '<b>$1</b>')
-    const w = createWord({ word: alvo, context: frase, context_pt: (r.frase_pt || '').replace(/<\/?b>/gi, ''), source_type: _vidCur.source_type || 'series', source_title: _vidCur.title, lang: _vidCur.lang })
-    w.status = 'pending_review'
-    w.ipa = r.ipa || ''
-    w.type = r.type || 'word'
-    w.type_label = r.type_label || ''
-    w.ai_processed = true
-    w.meanings = [{
-      // ⚠️ `id` NÃO É OPCIONAL. Ele é a identidade card↔sentido desde a 93ª
-      // rodada, e este caminho nascia sem ele: o card saía com `meaningId: ''`
-      // e voltava a depender da POSIÇÃO — o defeito que aquela rodada matou.
-      // Sem id, `_dossiePar` nunca acha o sentido, então nem "Estudei" nem
-      // "Completar material" funcionariam para item vindo do vídeo.
-      id: uid(),
-      meaning_pt: r.meaning_pt || alvo, definition_pt: r.definition_pt || '',
-      level: r.level || '', selected: true,
-      examples: [{ en: boldEn, pt: r.frase_pt || '' }]
-    }]
-    w.updated_at = new Date().toISOString()
-    saveWords()
+    const fonte = { source_type: _vidCur.source_type || 'series', source_title: _vidCur.title }
+    let w
+    if (jaExiste) {
+      // O REENCONTRO ENTRA NO MESMO ITEM. `prepararNovoSentido` desce o
+      // contexto do sentido anterior, põe a cena nova como contexto do item,
+      // deixa os sentidos já estudados onde estão e dispara a análise — que
+      // nasce sabendo qual sentido procurar, porque a glosa desta cena vai
+      // como semente. Uma chamada, não duas.
+      w = jaExiste
+      prepararNovoSentido(w.id, { contexto: frase, glosa: r.meaning_pt || '', ...fonte })
+    } else {
+      w = createWord({ word: alvo, context: frase, context_pt: (r.frase_pt || '').replace(/<\/?b>/gi, ''), ...fonte, lang: _vidCur.lang })
+      w.ipa = r.ipa || ''
+      w.type = r.type || 'word'
+      w.type_label = r.type_label || ''
+      w.ai_processed = true
+      w.meanings = [{
+        // ⚠️ `id` NÃO É OPCIONAL. Ele é a identidade card↔sentido desde a 93ª
+        // rodada, e este caminho nascia sem ele: o card saía com `meaningId: ''`
+        // e voltava a depender da POSIÇÃO — o defeito que aquela rodada matou.
+        // Sem id, `_dossiePar` nunca acha o sentido, então nem "Estudei" nem
+        // "Completar material" funcionariam para item vindo do vídeo.
+        id: uid(),
+        meaning_pt: r.meaning_pt || alvo, definition_pt: r.definition_pt || '',
+        level: r.level || '', selected: true,
+        examples: [{ en: boldEn, pt: r.frase_pt || '' }]
+      }]
+      sincronizarStatusItem(w)
+      w.updated_at = new Date().toISOString()
+      saveWords()
+    }
 
-    // 4) Áudio da cena sob a chave que o estudo REALMENTE usa: o example_en
-    //    COM as tags <b> (playSrsTTS/preGenerateAudio passam o texto cru —
-    //    verificado; a chave do texto limpo nunca seria encontrada).
+    // 4) Áudio da cena. Vai sob DUAS chaves de propósito:
+    //    - `boldEn`: é o `example_en` do card, e é essa a chave que
+    //      playSrsTTS/preGenerateAudio procuram no estudo;
+    //    - `frase` (texto limpo): é o que a passagem "do seu livro" mostra no
+    //      modo foco, e é por ela que o botão de ouvir a cena pergunta.
+    //    No reencontro a análise reescreve os exemplos, então só a segunda
+    //    sobreviveria — e sem ela a gravação real da cena viraria lixo.
     if (b64) {
       await AudioDB.set(audioKey(boldEn), b64)
+      await AudioDB.set(audioKey(frase), b64)
       if (typeof autoSyncAudioAfterChange === 'function') autoSyncAudioAfterChange()
     } else {
       ensureSrsAudio(boldEn).catch(() => {})
@@ -223,11 +248,19 @@ Responda:
     // (o "Estudei" do dossiê, o atalho do Preparar) copia daqui — ver o
     // `clipId` em `createSrsCard`.
     w.clipId = clip.id
-    w.meanings[0].clipId = clip.id
+    // No item NOVO dá para carimbar o sentido também. No REENCONTRO não: o
+    // sentido desta cena ainda não existe (a análise disparada por
+    // `prepararNovoSentido` é assíncrona), e `meanings[0]` é o sentido ANTIGO
+    // — carimbá-lo mandaria o card do encontro passado para a cena errada.
+    // O sentido novo herda pelo `w.clipId`, que é justamente a cena mais
+    // recente.
+    if (!jaExiste && w.meanings[0]) w.meanings[0].clipId = clip.id
     saveWords(); autoSyncAfterChange()
     if (typeof updateDossieBadge === 'function') updateDossieBadge()
 
-    toast(`"${alvo}" foi para o Preparar com o áudio da cena`, 'success')
+    toast(jaExiste
+      ? `"${alvo}" já era seu — esta cena virou um sentido novo, no Preparar`
+      : `"${alvo}" foi para o Preparar com o áudio da cena`, 'success')
     _vidSelWords = new Set()
     if (!_vidFocus) { _vidSel = null }   // no estudo focado, o trecho continua aberto
     renderVidTranscript(); renderVidSelPanel()
@@ -738,6 +771,15 @@ Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultur
     const html = lexaFormatar(resp)
     if (typeof _revExplainCache !== 'undefined') _revExplainCache.set(chave, html)
     corpo.innerHTML = html
+    // Os chips da FALA inteira, não só do que ele marcou.
+    if (typeof lexaChipsMontar === 'function') {
+      lexaChipsMontar(corpo, {
+        trecho: contexto, contexto: trecho || '', lang: (_vidCur && _vidCur.lang) || 'en',
+        fonte: (_vidCur && _vidCur.title) || '',
+        origem: { source_type: (_vidCur && _vidCur.source_type) || 'series',
+                  source_title: (_vidCur && _vidCur.title) || '' }
+      })
+    }
     // A conversa continua sobre a CENA: a caixa já sabe o episódio e a fala.
     if (typeof lexaChatMontar === 'function') lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
   } catch (e) {

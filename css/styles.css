@@ -5100,6 +5100,43 @@ body.ler-full .mobile-bottom-nav{display:none}
    CONVERSA COM A LEXA dentro do popup de seleção (leitor, Preparar, vídeo).
    A explicação deixa de ser resposta única e vira o começo de uma linha.
    ================================================================ */
+/* ---- O QUE TEM NESTA FRASE: as unidades como chips ----
+   Ficam ENTRE a explicação e a caixa de conversa: a explicação resolve a
+   frase, os chips dizem de que ela é feita, e a conversa é para o que sobrar.
+   Um chip por unidade — palavra, phrasal verb, idiom, colocação, bloco fixo. */
+.lexa-chips{margin-top:var(--sp-4);padding-top:var(--sp-3);border-top:1px dashed var(--border)}
+.lexa-chips-carregando{
+  margin-top:var(--sp-4);padding-top:var(--sp-3);border-top:1px dashed var(--border);
+  display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-xs);color:var(--text3);
+}
+.lexa-chips-carregando .spinner{width:13px;height:13px;border-width:2px}
+.lexa-chips-cab{
+  display:flex;align-items:center;gap:5px;flex-wrap:wrap;
+  font-size:var(--fs-3xs);color:var(--text3);text-transform:uppercase;
+  letter-spacing:.08em;font-weight:700;margin-bottom:var(--sp-3);
+}
+.lexa-chips-cab span{text-transform:none;letter-spacing:0;font-weight:400;opacity:.75}
+.lexa-chips-lista{display:flex;flex-direction:column;gap:var(--sp-2)}
+.lexa-chip{
+  display:flex;align-items:baseline;gap:var(--sp-2);flex-wrap:wrap;width:100%;
+  text-align:left;padding:var(--sp-2) var(--sp-3);cursor:pointer;
+  border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--surface2);color:var(--text2);font:inherit;font-size:var(--fs-sm);
+}
+.lexa-chip:hover{border-color:rgba(var(--primary-rgb),.5);background:rgba(var(--primary-rgb),.08)}
+.lexa-chip b{color:var(--text);font-weight:600}
+/* A categoria é o que o aluno não enxerga sozinho na frase: que aquilo ali é
+   um phrasal verb, e não duas palavras soltas. */
+.lexa-chip i{
+  font-style:normal;font-size:var(--fs-3xs);color:var(--primary);
+  background:rgba(var(--primary-rgb),.14);padding:0 5px;border-radius:var(--radius-xs);
+  text-transform:uppercase;letter-spacing:.05em;font-weight:700;
+}
+.lexa-chip span{color:var(--text3);font-size:var(--fs-xs)}
+.lexa-chip.meu{cursor:default;opacity:.55}
+.lexa-chip.meu:hover{border-color:var(--border);background:var(--surface2)}
+.lexa-chip.meu .ic{margin-left:auto;color:var(--success);flex-shrink:0}
+
 .lexa-chat{margin-top:var(--sp-4);padding-top:var(--sp-3);border-top:1px dashed var(--border)}
 .lexa-chat-msgs{display:flex;flex-direction:column;gap:var(--sp-3);max-height:230px;overflow-y:auto}
 .lexa-chat-msgs:not(:empty){margin-bottom:var(--sp-3)}
@@ -5518,8 +5555,10 @@ body.dos-focando{overflow:hidden}
   background:rgba(var(--primary-rgb),.06);border-left:2px solid rgba(var(--primary-rgb),.4);
 }
 .dosf-ex-livro .dosf-ex-en{font-style:italic}
-.dosf-ex-selo{display:inline-block;margin-top:var(--sp-2);font-size:var(--fs-3xs);color:var(--text3);
+.dosf-ex-rodape{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;margin-top:var(--sp-2)}
+.dosf-ex-selo{font-size:var(--fs-3xs);color:var(--text3);
   text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+.dosf-ex-rodape .btn{padding:2px var(--sp-3);font-size:var(--fs-2xs);min-height:0}
 .dosf-ex-livro.pisca{animation:dosfPisca .9s ease-out}
 @keyframes dosfPisca{
   0%,100%{background:rgba(var(--primary-rgb),.06)}

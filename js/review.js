@@ -2245,12 +2245,36 @@ function _revGuardarTrad(w, trad) {
 // palavras por unidade. O levantamento profundo só acontece depois, para as
 // unidades que o aluno marcar.
 async function _revBreakFetch(w) {
-  const alvo = (w.word || w.context || '').trim()
-  const ctx = (w.context || '').trim()
-  const L = getLangDef(wordLang(w))
+  const r = await quebrarTrecho({
+    trecho: (w.word || w.context || '').trim(),
+    contexto: (w.context || '').trim(),
+    lang: wordLang(w),
+    fonte: w.source_title || ''
+  })
+  // No raio-X, "nada encontrado" É erro: ele foi pedido de propósito e a tela
+  // precisa dizer por que ficou vazia.
+  if (!r.items.length) throw new Error('a IA não encontrou unidades de estudo')
+  return r
+}
+
+// ================================================================
+// QUEBRAR UM TRECHO EM UNIDADES — a peça, e ela é UMA só
+// ================================================================
+// Este prompt nasceu preso ao raio-X do Preparar, mas o que ele faz — "quais
+// unidades existem nesta frase e o que cada uma quer dizer AQUI" — é a mesma
+// pergunta que a explicação da Lexa precisa responder em qualquer tela.
+// Escrever um segundo prompt para isso seria a receita conhecida: duas regras
+// que divergem na primeira correção. Ele carrega dez armadilhas já pagas (o
+// "the mud" que virava colocação, a tradução literal, o objeto inteiro voltando
+// como unidade) e nenhuma delas precisa ser reaprendida.
+async function quebrarTrecho({ trecho, contexto = '', lang = 'en', fonte = '' }) {
+  const alvo = String(trecho || '').trim()
+  if (!alvo) return { items: [], trad: '' }
+  const ctx = String(contexto || '').trim()
+  const L = getLangDef(lang)
   const r = await aiJSON(`Break down this ${L.nameEn} snippet for a Brazilian learner who is deciding WHAT to study in it. This is a quick TRIAGE, not a deep analysis. Return ONLY JSON.
 
-Snippet to break down (ONLY this): "${alvo}"${ctx && ctx !== alvo ? `\nSurrounding sentence (context to understand the MEANING only — NEVER take units from it): "${ctx}"` : ''}${w.source_title ? `\nSource: "${w.source_title}"` : ''}
+Snippet to break down (ONLY this): "${alvo}"${ctx && ctx !== alvo ? `\nSurrounding sentence (context to understand the MEANING only — NEVER take units from it): "${ctx}"` : ''}${fonte ? `\nSource: "${fonte}"` : ''}
 
 {"trad":"the whole snippet translated into natural Brazilian Portuguese — what it SAYS, never word by word","items":[{"expr":"exact text as it appears in the snippet","type":"word|phrasal_verb|idiom|collocation|chunk","gloss":"what it means IN THIS context, Brazilian Portuguese, max 6 words","nivel":"A1|A2|B1|B2|C1|C2"}]}
 
@@ -2259,13 +2283,14 @@ Rules:
 - THEN list the remaining notable single words NOT already inside a unit.
 - Every "expr" MUST be text that appears INSIDE the snippet — never from the surrounding sentence. Units that are not part of the snippet are discarded.
 - NEVER return the whole snippet itself as one unit — only its PARTS (smaller units inside it).
+- A UNIT MUST SURVIVE OUTSIDE THIS SENTENCE. The test, and apply it to every multi-word candidate: could the learner meet these exact words, in this exact order, in a completely different text? "let the cat out of the bag" yes; "ruining the ethos of the whole thing" no — that is an arbitrary slice of this sentence dressed up as a unit. If you cannot picture it elsewhere, return the notable WORD inside it instead.
 - A free adjective+noun combination is NOT a collocation: if the pair is compositional, return the notable WORD alone ("Japanese ethos" → return "ethos" as a word, C1 — NOT the pair). Only return a pair when it is genuinely fixed ("heavy rain", "make a difference").
 - NEVER return trivial contractions or fillers as units ("it's", "I'm", "don't", "you know").
 - SKIP trivial function words (articles, pronouns, auxiliaries, basic prepositions) unless they belong to a unit.
 - SKIP A1 words the learner certainly knows ("began", "day", "house", "good") UNLESS they carry a non-obvious meaning right here.
 - "gloss" is the meaning HERE, not a dictionary list.
 
-${promptRegrasLexicais(wordLang(w), 'glosa')}
+${promptRegrasLexicais(lang, 'glosa')}
 - LITERAL-TRANSLATION TRAP — avoid it explicitly: FIRST work out what the unit DOES in this scene, THEN write the gloss for that function. "We'll get you in for that" said at a hotel desk → gloss "a gente te encaixa (na agenda)", NEVER "colocar você dentro". If a gloss reads like word-by-word substitution, redo it before returning.
 - "nivel" is the CEFR difficulty of that unit for a learner.
 - "trad" must AGREE with the glosses: it is the same reading of the same sentence. If your translation of the whole snippet contradicts a gloss, one of them is wrong — fix it before returning.
@@ -2276,11 +2301,53 @@ ${promptRegrasLexicais(wordLang(w), 'glosa')}
   const normB = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[.,!?;:"""''()\[\]…]/g, ' ').replace(/\s+/g, ' ').trim()
   const alvoNorm = ' ' + normB(alvo) + ' '
+  const palavrasAlvo = normB(alvo).split(' ').filter(Boolean)
+
+  // A UNIDADE PODE ESTAR FLEXIONADA NA FRASE. Este filtro nasceu para trechos
+  // curtos, onde o modelo copia o texto tal e qual. Sobre uma FRASE INTEIRA
+  // (o uso novo, dos chips da explicação) ele passou a derrubar justamente o
+  // que mais importa: a IA devolve o phrasal verb na forma de citação
+  // ("end up") e a frase traz a forma flexionada ("ended up") — e o chip
+  // sumia em silêncio. Visto no teste: "end up" descartado numa frase que o
+  // continha.
+  // A tolerância é estreita de propósito: só o PRIMEIRO termo da unidade pode
+  // aparecer flexionado (é o verbo, que é onde a flexão mora), e o resto tem
+  // de bater literal e na ordem. Afrouxar mais deixaria passar unidade montada
+  // com palavras espalhadas pela frase.
+  const dentro = expr => {
+    const e = normB(expr)
+    if (!e) return false
+    if (alvoNorm.includes(' ' + e + ' ')) return true
+    const p = e.split(' ').filter(Boolean)
+    if (p.length < 2 || typeof glossLemas !== 'function') return false
+    const resto = p.slice(1).join(' ')
+    return palavrasAlvo.some(cand => {
+      if (cand === p[0]) return false            // já testado acima
+      const familia = glossLemas(cand, { estrito: true })
+      if (!familia.includes(p[0]) && cand !== p[0]) return false
+      return alvoNorm.includes(' ' + cand + ' ' + resto + ' ')
+    })
+  }
+
   const items = (Array.isArray(r.items) ? r.items : [])
     .map(it => ({ expr: String(it.expr || '').trim(), type: _RVB_CATS.some(c => c[0] === it.type) ? it.type : 'word',
                   gloss: String(it.gloss || '').trim(), nivel: String(it.nivel || '').trim() }))
     // dentro do objeto de estudo, mas nunca o objeto INTEIRO repetido como chip
-    .filter(it => it.expr && alvoNorm.includes(' ' + normB(it.expr) + ' ') && normB(it.expr) !== normB(alvo))
+    .filter(it => it.expr && dentro(it.expr) && normB(it.expr) !== normB(alvo))
+    // NEM QUASE O TRECHO INTEIRO. A regra acima só barrava a cópia exata; numa
+    // frase longa o modelo devolve um "chunk" que é a frase menos o ponto
+    // final, e isso não é unidade de estudo — é a frase de novo, fingindo ser
+    // peça dela. Rede GROSSA de propósito: metade do trecho, com teto de 8
+    // palavras. O que separa "let the cat out of the bag" de "ruining the
+    // ethos of the whole thing" é se a expressão sobrevive FORA desta frase —
+    // isso é julgamento, e mora no prompt (regra "A UNIT MUST SURVIVE OUTSIDE
+    // THIS SENTENCE"). Contar palavras aqui só barra o caso grosseiro; apertar
+    // mais mataria idiom legítimo e longo.
+    .filter(it => {
+      const n = normB(it.expr).split(' ').filter(Boolean).length
+      if (n > 8) return false
+      return palavrasAlvo.length < 4 || n <= Math.max(3, Math.floor(palavrasAlvo.length / 2))
+    })
     // Segundo cinto: "the mud" chegou como COLOCAÇÃO mesmo com a regra no
     // prompt. Determinante + substantivo é gramática, não vocabulário — o
     // modelo barato não segura isso sozinho, então o código descarta.
@@ -2291,7 +2358,11 @@ ${promptRegrasLexicais(wordLang(w), 'glosa')}
       const m = it.expr.match(_RVB_DET_PAR)
       return m ? { ...it, expr: m[1], type: 'word' } : it
     })
-  if (!items.length) throw new Error('a IA não encontrou unidades de estudo')
+  // Devolve vazio em vez de lançar: para o raio-X "não achei nada" é erro (ele
+  // foi pedido de propósito), mas para os chips da explicação é uma resposta
+  // legítima — frase simples não tem unidade a destacar, e um erro ali viraria
+  // uma faixa vermelha em cima de uma explicação que deu certo. Quem precisa
+  // do erro o levanta (ver `_revBreakFetch`).
   return { items, trad: String(r.trad || '').trim() }
 }
 // Determinantes que nunca formam unidade de estudo com o substantivo seguinte.
@@ -2622,6 +2693,16 @@ Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultur
     const html = figura + lexaFormatar(resp)
     _revExplainCache.set(chave, html)   // aiTextSeguro nunca devolve vazio: não cacheia silêncio
     corpo.innerHTML = html
+    // Os chips saem da FRASE do item, não do pedaço selecionado: quem não
+    // entendeu a frase precisa ver de que ela é feita.
+    const fraseDoItem = window._revSelCtx || (w && w.context) || txt
+    if (typeof lexaChipsMontar === 'function') {
+      lexaChipsMontar(corpo, {
+        trecho: fraseDoItem, lang: (w && wordLang(w)) || 'en', fonte: (w && w.source_title) || '',
+        origem: { source_type: (w && w.source_type) || 'manual', source_title: (w && w.source_title) || '',
+                  source_context: (w && w.source_context) || '' }
+      })
+    }
     // A conversa continua daqui — o chat NÃO entra no cache: ele é da sessão,
     // e reabrir a explicação tem de trazer a caixa vazia, não a conversa velha.
     if (typeof lexaChatMontar === 'function') lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })

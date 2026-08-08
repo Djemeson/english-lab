@@ -1204,6 +1204,15 @@ function _lerAoSelecionar() {
       if (txtEl) txtEl.innerHTML = t ? lexaFormatar(t) : esc(`${lexaNome()} devolveu uma resposta vazia`)
       // A conversa continua daqui: a explicação vira a primeira mensagem, então
       // a pergunta seguinte já sabe o livro, a frase e o termo.
+      // Os chips da FRASE (não do que ele selecionou): é a frase inteira que
+      // ele não entendeu, e a peça que derrubou a leitura pode ser outra.
+      if (t && corpoAtual && typeof lexaChipsMontar === 'function' && !corpoAtual.querySelector('.lexa-chips-slot')) {
+        lexaChipsMontar(corpoAtual, {
+          trecho: ctx, contexto: trecho || '', lang: _lerLivro.lang || 'en', fonte: _lerLivro.title,
+          origem: { source_type: 'kindle', source_title: _lerLivro.title,
+                    source_context: (_lerLivro.chapters[_lerCap] || {}).titulo || '' }
+        })
+      }
       if (t && corpoAtual && typeof lexaChatMontar === 'function' && !corpoAtual.querySelector('.lexa-chat')) {
         lexaChatMontar(corpoAtual, { sistema, primeira: pergunta, resposta: t,
           // Enquanto o campo tem foco, o vigia de seleção não fecha o popup:

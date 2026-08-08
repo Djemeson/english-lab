@@ -560,12 +560,26 @@ function _dosExemplosHTML(w, m, ctx, ctxPt) {
   if (!ctx && !exs.length) return ''
   let out = '<div class="dosf-exs">'
   if (ctx) {
+    // "do seu livro" só quando veio de livro. Vídeo, série e podcast têm cena,
+    // não página — e no vídeo essa cena tem a GRAVAÇÃO REAL, capturada na hora
+    // (guardada sob a chave do texto limpo da fala). Sem este botão a gravação
+    // existia e não havia como tocá-la fora do card.
+    const clip = m.clipId || w.clipId || ''
+    const ORIG = { kindle:'do seu livro', website:'do que você leu', series:'da cena',
+                   movie:'da cena', youtube:'do vídeo', podcast:'do episódio', manual:'de onde veio' }
+    const selo = ORIG[m.source_type || w.source_type] || 'de onde você encontrou'
     out += `<div class="dosf-ex dosf-ex-livro" id="dosf-passagem">
       <span class="dosf-ex-n">${ic('bookOpen','ic-sm')}</span>
       <div>
         <div class="dosf-ex-en">${buildSrsFrente({ example_en: ctx, word: w.word })}</div>
         ${ctxPt ? `<div class="dosf-ex-pt">${escB(ctxPt)}</div>` : ''}
-        <span class="dosf-ex-selo">do seu livro</span>
+        <div class="dosf-ex-rodape">
+          <span class="dosf-ex-selo">${selo}</span>
+          <button class="btn btn-ghost btn-sm" onclick="playSrsTTS(${escA(JSON.stringify(ctx.replace(/<[^>]*>/g,'')))})"
+            data-tip="Ouvir a passagem">${ic('volume','ic-sm')} Ouvir</button>
+          ${clip ? `<button class="btn btn-ghost btn-sm" onclick="reverCena('${clip}')"
+            data-tip="Abrir o vídeo no ponto exato desta fala">${ic('film','ic-sm')} Rever a cena</button>` : ''}
+        </div>
       </div>
     </div>`
   }

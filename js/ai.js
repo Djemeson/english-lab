@@ -101,6 +101,123 @@ function lexaChatHTML() {
     </div>`
 }
 
+// ================================================================
+// O QUE TEM NESTA FRASE — os chips das unidades
+// ================================================================
+// Pedido do Djemeson, e o motivo dele é o desenho inteiro: *"quando eu não
+// entendo uma frase, pode se dar por ter elementos que não entendo ou que
+// tenham significado diferente do que sei"*. A explicação da Lexa resolve a
+// frase; ela não diz DE QUE a frase é feita. Um phrasal verb que você lê como
+// duas palavras soltas, uma colocação que parece livre, um idiom tomado ao pé
+// da letra — nada disso aparece numa explicação corrida, e é justamente o que
+// derruba a leitura.
+//
+// Então: toda explicação passa a listar as unidades da frase — palavras,
+// phrasal verbs, idioms, colocações e blocos fixos —, cada uma com o que
+// significa ALI. Clicar manda para o Preparar.
+//
+// A quebra usa `quebrarTrecho`, a MESMA peça do raio-X: dez armadilhas já
+// pagas (o "the mud" que virava colocação, a tradução literal, o trecho
+// inteiro voltando como unidade) que não precisam ser reaprendidas aqui.
+const _LEXA_CHIP_CATS = {
+  phrasal_verb: 'phrasal verb', idiom: 'idiom', collocation: 'colocação',
+  chunk: 'bloco fixo', word: ''
+}
+const _lexaChipsCache = new Map()   // trecho|lang → items
+
+function lexaChipsHTML(items, jaTenho) {
+  if (!items || !items.length) return ''
+  return `
+    <div class="lexa-chips">
+      <div class="lexa-chips-cab">${ic('layers','ic-sm')} o que tem nesta frase
+        <span>clique para mandar ao Preparar</span></div>
+      <div class="lexa-chips-lista">${items.map((it, i) => {
+        const cat = _LEXA_CHIP_CATS[it.type] || ''
+        const meu = jaTenho.has(i)
+        return `<button class="lexa-chip${meu ? ' meu' : ''}" data-i="${i}" ${meu ? 'disabled' : ''}
+          data-tip="${escA(it.gloss || '')}${it.nivel ? ' · ' + escA(it.nivel) : ''}">
+          <b>${esc(it.expr)}</b>${cat ? `<i>${esc(cat)}</i>` : ''}
+          ${it.gloss ? `<span>${esc(it.gloss)}</span>` : ''}
+          ${meu ? ic('check','ic-sm') : ''}
+        </button>`
+      }).join('')}</div>
+    </div>`
+}
+
+// `origem` leva o que o item precisa para nascer inteiro no Preparar: a frase
+// de onde veio, a obra e o idioma. Sem isso o chip viraria item órfão, sem
+// cena e sem dossiê — o mesmo furo do Assistente antes de ter origem.
+async function lexaChipsMontar(caixa, { trecho, contexto, lang, fonte, origem }) {
+  if (!caixa || !trecho) return
+  const chave = trecho + '|' + (lang || 'en')
+  let items = _lexaChipsCache.get(chave)
+  const slot = document.createElement('div')
+  slot.className = 'lexa-chips-slot'
+  caixa.appendChild(slot)
+  if (!items) {
+    slot.innerHTML = `<div class="lexa-chips-carregando"><span class="spinner"></span> vendo o que tem na frase…</div>`
+    try {
+      const r = await quebrarTrecho({ trecho, contexto: contexto || '', lang: lang || 'en', fonte: fonte || '' })
+      items = r.items || []
+      _lexaChipsCache.set(chave, items)
+    } catch (e) {
+      // Falhar aqui NÃO pode estragar a explicação, que é o que ele pediu e já
+      // está na tela. Some em silêncio — o console guarda o motivo.
+      console.warn('[lexa] quebra da frase falhou:', e.message)
+      slot.remove(); return
+    }
+  }
+  if (!items.length) { slot.remove(); return }
+  const jaTenho = new Set()
+  items.forEach((it, i) => {
+    if (typeof prepAcharItem === 'function' && prepAcharItem(it.expr, lang || 'en')) jaTenho.add(i)
+  })
+  slot.innerHTML = lexaChipsHTML(items, jaTenho)
+  // Delegação num pai só: os chips são repintados a cada clique, e um ouvinte
+  // por botão viraria ouvinte órfão a cada repintura.
+  slot.addEventListener('click', ev => {
+    const btn = ev.target.closest('.lexa-chip'); if (!btn || btn.disabled) return
+    ev.stopPropagation(); ev.preventDefault()
+    const i = +btn.dataset.i
+    const it = items[i]; if (!it) return
+    if (lexaChipParaPreparar(it, { contexto: contexto || trecho, lang, ...(origem || {}) })) {
+      jaTenho.add(i)
+      slot.innerHTML = lexaChipsHTML(items, jaTenho)
+    }
+  })
+  // Os popups que hospedam isto fecham ao clique de fora — o mesmo cuidado do
+  // chat vale aqui, senão clicar num chip fecharia a explicação.
+  slot.addEventListener('mousedown', e => e.stopPropagation())
+}
+
+function lexaChipParaPreparar(item, origem) {
+  const termo = String(item.expr || '').trim()
+  if (!termo) return false
+  if (typeof prepAcharItem === 'function' && prepAcharItem(termo, origem.lang || 'en')) {
+    toast(`"${termo}" já é seu`, 'info'); return true
+  }
+  const w = createWord({
+    word: termo,
+    context: String(origem.contexto || '').slice(0, 400),
+    source_type: origem.source_type || 'manual',
+    source_title: origem.source_title || '',
+    source_context: origem.source_context || '',
+    lang: origem.lang || 'en'
+  })
+  // A glosa desta passagem vira SEMENTE: a análise nasce sabendo qual sentido
+  // procurar, em vez de redescobri-lo com menos contexto do que quem o achou.
+  if (item.gloss) w._seedMeaning = item.gloss
+  // O tipo vem junto: sem ele "get you in" nasceria como palavra e o lema o
+  // poria debaixo do teto errado até a análise corrigir.
+  if (item.type && item.type !== 'word') w.type = item.type === 'chunk' ? 'collocation' : item.type
+  saveWords()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  if (typeof renderSidebar === 'function') { try { renderSidebar() } catch (e) {} }
+  if (typeof renderDashboard === 'function') { try { renderDashboard() } catch (e) {} }
+  toast(`"${termo}" foi para o Preparar`, 'success')
+  return true
+}
+
 // `contexto` descreve o que a conversa já sabe: {sistema, primeira, resposta}.
 function lexaChatMontar(caixa, contexto) {
   if (!caixa) return

@@ -7,7 +7,20 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O VÍDEO ENTRA NA FILA**. Ele perguntou se vídeo, podcast e
+> Última atualização: 2026-08-08 — **O QUE TEM NESTA FRASE**. *"Quando eu não entendo uma frase,
+> pode se dar por ter elementos que não entendo ou que tenham significado diferente do que sei."*
+> Toda explicação da Lexa passa a listar as **unidades da frase** — palavra, phrasal verb, idiom,
+> colocação, bloco fixo — com a categoria à vista e o sentido ALI; clicar manda para o Preparar
+> com a cena, a origem e a glosa como semente. Vale no leitor, no vídeo e no Preparar, e usa a
+> **mesma peça do raio-X** (`quebrarTrecho`), não um segundo prompt. ⚠️ Dois defeitos que só
+> aparecem com frase inteira: o **phrasal verb flexionado sumia** (`"end up"` da IA × `"ended up"`
+> da frase) e a **frase quase inteira passava como bloco**. No mesmo commit, o **reencontro no
+> vídeo**: era a última fonte que duplicava o item, e agora a cena nova vira sentido novo no MESMO
+> item — com o áudio da cena guardado sob duas chaves, senão a gravação real viraria lixo na
+> re-análise. A passagem no modo foco ganhou **Ouvir** e **Rever a cena**.
+> `sw.js` → `englab-v159`. Ver seção 8.2 ("O que tem nesta frase" e "O reencontro no vídeo").
+>
+> Anterior: 2026-08-08 — **O VÍDEO ENTRA NA FILA**. Ele perguntou se vídeo, podcast e
 > Netflix seguiam o padrão novo. **Netflix, Kindle, leitor e documento seguem** (param no
 > Preparar). **Vídeo e podcast não**: prompt próprio reduzido e `saveToSrs` direto — iam para a
 > Revisão pulando Preparar E Estudar, enchendo a fila de item nunca estudado. Decisão dele: o
@@ -6668,6 +6681,66 @@ religam ao sentido certo, o `clipId` antigo sobrevive e a religação persiste n
 **Arquivos**: `js/video-study.js`, `js/consulta.js`, `js/review.js` (migração), `js/srs.js`
 (`clipId` no card). `sw.js` → `englab-v158`.
 
+### O QUE TEM NESTA FRASE — os chips da explicação (2026-08-08)
+
+*"Quando eu não entendo uma frase, pode se dar por ter elementos que não entendo ou que tenham
+significado diferente do que sei."*
+
+A explicação da Lexa resolve a frase; ela não diz **de que a frase é feita**. Um phrasal verb lido
+como duas palavras soltas, uma colocação que parece livre, um idiom tomado ao pé da letra — nada
+disso aparece numa explicação corrida, e é exatamente o que derruba a leitura.
+
+Agora **toda explicação lista as unidades da frase** — palavra, phrasal verb, idiom, colocação e
+bloco fixo —, cada uma com a categoria à vista e o que significa ALI. Clicar manda para o
+Preparar, com a cena, a origem e a **glosa como semente** (a análise nasce sabendo qual sentido
+procurar). O que ele já tem aparece marcado e não é clicável.
+
+Vale nas três telas que explicam: leitor, vídeo/podcast e Preparar. **Os chips saem da FRASE, não
+do pedaço selecionado** — quem não entendeu a frase precisa ver a frase inteira desmontada.
+
+**A quebra é a MESMA peça do raio-X.** `_revBreakFetch` foi partido em `quebrarTrecho({trecho,
+contexto, lang, fonte})`, e os chips chamam a mesma função. Escrever um segundo prompt seria a
+receita conhecida — duas regras que divergem na primeira correção —, e aquele já carrega dez
+armadilhas pagas (o "the mud" que virava colocação, a tradução literal, o trecho inteiro voltando
+como unidade). Diferença única: `quebrarTrecho` devolve vazio em vez de lançar, porque "não achei
+nada" é erro no raio-X (foi pedido) e resposta legítima nos chips; `_revBreakFetch` levanta o erro
+por conta própria.
+
+> ⚠️ **Dois defeitos que SÓ aparecem com frase inteira**, achados no teste:
+> - **O phrasal verb flexionado sumia.** O filtro exigia o texto literal, o que funciona num
+>   trecho curto (o modelo copia tal e qual) mas não numa frase: a IA devolve `"end up"` e a
+>   frase traz `"ended up"`. O chip mais importante desaparecia em silêncio. Agora o **primeiro**
+>   termo da unidade pode vir flexionado (é onde a flexão mora), com o resto batendo literal e na
+>   ordem — tolerância estreita para não montar unidade com palavras espalhadas.
+> - **A frase quase inteira passava como "bloco".** A regra antiga só barrava a cópia exata; num
+>   trecho longo o modelo devolve a frase menos o ponto final. Rede grossa no código (metade do
+>   trecho, teto de 8 palavras) e o julgamento no prompt: *"a unidade tem de sobreviver FORA desta
+>   frase"* — `let the cat out of the bag` sim, `ruining the ethos of the whole thing` não.
+
+Falhar na quebra **não estraga a explicação**: os chips somem em silêncio e o console guarda o
+motivo. A explicação é o que ele pediu e já está na tela.
+
+### O REENCONTRO NO VÍDEO (2026-08-08)
+
+O vídeo era a última fonte que **duplicava o item**: perguntava *"palavra já existe, criar mesmo
+assim?"* e o sim criava um `fall` novo ao lado do antigo — família rachada, verbete partido em
+dois. Agora usa `prepAcharItem` + `prepararNovoSentido`, como o leitor: **a cena nova vira sentido
+novo no MESMO item**, e o reconhecimento pega inclusive a forma flexionada da legenda.
+
+Duas coisas que o caminho longo exigiu:
+
+- **O áudio da cena vai sob DUAS chaves** — `boldEn` (o `example_en`, que é o que o estudo procura)
+  e o texto limpo da fala (o que a passagem mostra no modo foco). No reencontro a análise reescreve
+  os exemplos, então só a segunda sobreviveria — e sem ela a **gravação real da cena viraria lixo**.
+- **O `clipId` do sentido só é carimbado em item NOVO.** No reencontro o sentido desta cena ainda
+  não existe (a análise é assíncrona) e `meanings[0]` é o sentido ANTIGO — carimbá-lo mandaria o
+  card do encontro passado para a cena errada. O sentido novo herda pelo `w.clipId`, que é
+  justamente a cena mais recente.
+
+De brinde, a passagem no modo foco ganhou **"Ouvir"** e, quando há cena de vídeo, **"Rever a
+cena"**: a gravação real existia e não havia como tocá-la fora do card. E o selo deixou de dizer
+"do seu livro" para tudo — série, podcast e YouTube têm cena, não página.
+
 ### Onde a captura ainda NÃO leva a semente
 
 Só o leitor foi ligado. Faltam **vídeo/legenda** e **a extensão (Netflix/Kindle)** — e o
@@ -6682,10 +6755,14 @@ lugar só.
 - [x] ~~O Assistente pula o Preparar~~ — **corrigido em 2026-08-08**, a pedido dele, logo depois
       da varredura. Ver 8.2 ("O Assistente também entrou na fila"). **Agora TODA fonte para no
       Preparar**: leitor, Netflix, Kindle, documento, mídia, vídeo, podcast e Assistente.
-- [ ] **CAPTURA REPETIDA NO VÍDEO ainda duplica o item** (2026-08-08, visto ao ler o código).
-      `videoCreateCard` pergunta *"Palavra já existe — criar mesmo assim?"* e, se sim, cria um
-      item novo. O leitor já resolveu isso com `prepararNovoSentido` (o reencontro entra no MESMO
-      item, como sentido novo). O vídeo deveria usar o mesmo caminho — hoje ele racha a família.
+- [x] ~~Captura repetida no vídeo duplica o item~~ — **corrigido em 2026-08-08**: usa
+      `prepAcharItem` + `prepararNovoSentido`, como o leitor. Ver 8.2 ("O reencontro no vídeo").
+- [ ] **PROVAR OS CHIPS DA FRASE COM IA DE VERDADE** (2026-08-08). A quebra, os filtros (flexão,
+      determinante, tamanho) e o clique foram exercitados com `aiJSON` mockado. Falta ver, com
+      chave: **(a)** se a IA respeita *"a unidade tem de sobreviver FORA desta frase"* ou continua
+      devolvendo fatia de frase como bloco; **(b)** se ela escreve a unidade na forma que aparece
+      no texto ou na de citação (o filtro cobre o segundo caso, mas só no primeiro termo);
+      **(c)** o custo real — é uma chamada a mais por explicação.
 - [ ] **PROVAR OS CAMPOS NOVOS COM IA DE VERDADE** (2026-08-08). Todo o fluxo das 4 fatias foi
       exercitado com `aiJSON` mockado — o ambiente de teste não tem chave. Falta o que só a chave
       diz: **(a) o tamanho real da resposta** (o teto é 5000 e o comentário no código diz que 2800
