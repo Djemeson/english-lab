@@ -197,12 +197,25 @@ function applyAiResult(w, result) {
       level:         match.level || nm.level,
       synonyms:      (match.synonyms && match.synonyms.length) ? match.synonyms : nm.synonyms,
       antonyms:      (match.antonyms && match.antonyms.length) ? match.antonyms : nm.antonyms,
-      selected:      match.selected !== false
+      selected:      match.selected !== false,
+      // FASE 2 — o que o sentido CONQUISTOU não pode morrer numa re-análise:
+      // o estado (já estudado? já enviado?), quando foi estudado e a origem
+      // dele. Sem isto, "Re-analisar" jogaria fora o progresso de estudo e a
+      // cena de onde o sentido veio, que é o que o dossiê usa para agrupar.
+      estado:        match.estado,
+      estudadoEm:    match.estudadoEm,
+      context:       match.context,
+      context_pt:    match.context_pt,
+      source_type:   match.source_type,
+      source_title:  match.source_title,
+      source_context: match.source_context
     }
   })
-  w.status = 'pending_review'
   w.ai_processed = true
   w.updated_at = new Date().toISOString()
+  // Sentido novo nasce sem `estado` (= 'pronto'), então o item cai sozinho em
+  // `pending_review`; os já estudados mantêm o deles.
+  sincronizarStatusItem(w)
 }
 
 async function analyzeWordDirect(wordId) {
@@ -1111,14 +1124,23 @@ function renderMeaningItem(wordId, m, mi) {
         <button class="btn btn-secondary btn-sm" onclick="separarSentido('${wordId}',${mi})"
           data-tip="Cria um item próprio para a expressão, com baralho e agendamento dele — e tira este sentido daqui">${ic('layers','ic-sm')}Separar em item próprio</button>
       </div>` : ''
+  // FASE 2 — o sentido tem estado próprio. Já enviado ou já estudado não pode
+  // ser reenviado nem desmarcado aqui: ele saiu desta fila. Mostrar onde ele
+  // está é o que evita a pergunta "por que este não vai?".
+  const estado = typeof sentidoEstado === 'function' ? sentidoEstado(m) : 'pronto'
+  const naFila = estado === 'pronto'
+  const selo = estado === 'estudo'  ? `<span class="mi-estado">${ic('bookOpen','ic-sm')} em Estudar</span>`
+             : estado === 'revisao' ? `<span class="mi-estado feito">${ic('check','ic-sm')} na Revisão</span>`
+             : estado === 'saber'   ? `<span class="mi-estado saber">${ic('eye','ic-sm')} só consulta</span>` : ''
   return `
-  <div class="meaning-item ${sel ? 'selected' : ''} ${isMatch ? 'context-match' : ''}"
-       onclick="toggleMeaning('${wordId}',${mi})" id="mi-${wordId}-${mi}">
+  <div class="meaning-item ${sel && naFila ? 'selected' : ''} ${isMatch ? 'context-match' : ''} ${naFila ? '' : 'mi-fora'}"
+       ${naFila ? `onclick="toggleMeaning('${wordId}',${mi})"` : ''} id="mi-${wordId}-${mi}">
     <div class="mi-checkbox"></div>
     <div class="mi-body">
       <div class="mi-top">
         <div class="mi-meaning">${esc(m.meaning_pt)}</div>
         <div class="mi-chips">
+          ${selo}
           ${isMatch ? `<span class="context-match-badge">${ic('check','ic-sm')} contexto</span>` : ''}
           ${m.register ? `<span class="chip register-${m.register}">${m.register}</span>` : ''}
           ${m.level ? `<span class="chip level-${m.level.toLowerCase()}">${m.level}</span>` : ''}
@@ -1148,6 +1170,9 @@ function renderMeaningItem(wordId, m, mi) {
 
 function toggleMeaning(wordId, mi) {
   const w = words.find(x => x.id === wordId); if (!w) return
+  // Sentido que já saiu desta fila não se desmarca aqui: ele está em Estudar
+  // ou na Revisão, e o desfazer daquele estado mora lá.
+  if (sentidoEstado(w.meanings[mi]) !== 'pronto') return
   w.meanings[mi].selected = !(w.meanings[mi].selected !== false)
   saveWords()
   // Update just this item and actions bar
@@ -1321,6 +1346,81 @@ function _prepDescerContexto(w) {
   return n
 }
 
+// ================================================================
+// O ESTADO É DO SENTIDO, NÃO DO ITEM (Fase 2)
+// ================================================================
+// A unidade de estudo desceu de ITEM para SENTIDO. O card já era assim (um por
+// `meaningIdx`); era o resto que estava desalinhado — e essa costura torta era
+// a origem de metade da confusão: um item podia estar estudado e ter um
+// sentido novo esperando análise ao mesmo tempo, e `w.status` só sabia dizer
+// uma das duas coisas.
+//
+//   'pronto'  — material montado, esperando envio     → aparece no Preparar
+//   'estudo'  — enviado ao dossiê                     → aparece em Estudar
+//   'revisao' — estudado, virou card                  → Revisão (segue legível no dossiê)
+//   'saber'   — só consulta: verbete e glossário, nunca fila nenhuma
+const SENT_ESTADOS = ['pronto', 'estudo', 'revisao', 'saber']
+
+function sentidoEstado(m) {
+  return (m && SENT_ESTADOS.includes(m.estado)) ? m.estado : 'pronto'
+}
+// Sentidos que contam. `moved_to` é sentido que virou item próprio: fica no
+// array só para não mover o índice dos cards antigos, mas não é mais daqui.
+function sentidosDe(w) {
+  return (w && Array.isArray(w.meanings) ? w.meanings : [])
+    .filter(m => m && m.meaning_pt && !m.moved_to)
+}
+
+// O status do ITEM passa a ser DERIVADO. É isto que permite trocar o modelo
+// sem reescrever o app: a lista do Preparar, os contadores do Dashboard, os
+// badges e o glossário continuam lendo `w.status` e continuam certos.
+function sincronizarStatusItem(w) {
+  if (!w || w.status === 'skipped') return w && w.status
+  const ms = sentidosDe(w)
+  if (!ms.length) { w.status = 'pending_ai'; return w.status }
+  const est = ms.map(sentidoEstado)
+  w.status = est.includes('pronto')  ? 'pending_review'
+           : est.includes('estudo')  ? 'in_study'
+           : 'in_srs'
+  return w.status
+}
+
+// MIGRAÇÃO — derivável, sem chute nenhum:
+//   tem card                          ⇒ 'revisao'
+//   item marcado in_study             ⇒ 'estudo'
+//   item já no SRS, sentido sem card  ⇒ 'saber'  (era o 90% que só enchia fila)
+//   resto                             ⇒ 'pronto'
+// Idempotente: só toca em sentido que ainda não tem estado. Roda no boot e de
+// novo na abertura do dossiê, então também cura aparelho que receber dado
+// antigo pela nuvem.
+function migrarEstadosDeSentido() {
+  if (!Array.isArray(words)) return 0
+  const comCard = new Set()
+  if (Array.isArray(typeof srsCards !== 'undefined' ? srsCards : null)) {
+    for (const c of srsCards) if (c && c.wordId) comCard.add(c.wordId + '|' + (c.meaningId || c.meaningIdx))
+  }
+  let n = 0
+  for (const w of words) {
+    let mudou = false
+    ;(w.meanings || []).forEach((m, mi) => {
+      if (!m || m.estado) return
+      const temCard = comCard.has(w.id + '|' + (m.id || mi)) || comCard.has(w.id + '|' + mi)
+      m.estado = temCard ? 'revisao'
+               : w.status === 'in_study' ? 'estudo'
+               : w.status === 'in_srs'   ? 'saber'
+               : 'pronto'
+      if (m.estado === 'revisao' && !m.estudadoEm) m.estudadoEm = w.estudadoEm || Date.now()
+      mudou = true; n++
+    })
+    if (mudou) { _prepDescerContexto(w); sincronizarStatusItem(w) }
+  }
+  if (n) {
+    saveWords()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  }
+  return n
+}
+
 // Chamada por quem captura (leitor, e depois vídeo/legenda) quando a palavra
 // JÁ existe. `glosa` é a leitura da pré-análise para esta passagem: entra como
 // semente, então a análise nasce sabendo qual sentido procurar em vez de
@@ -1335,13 +1435,14 @@ function prepararNovoSentido(wordId, dados = {}) {
   if (dados.source_title) w.source_title = dados.source_title
   w.source_context = dados.source_context || ''
   if (dados.glosa) w._seedMeaning = String(dados.glosa).trim()
-  // Volta para a fila da IA: há material novo a montar. Os sentidos antigos
-  // sobrevivem — o merge da análise preserva todo significado já curado (o que
-  // tem exemplos), e os cards deles nem são tocados: card se liga ao sentido
-  // pelo `meaningId`, não pela posição no array.
-  w.status = 'pending_ai'
-  delete w.estudadoEm
+  // FASE 2: o item NÃO volta inteiro para a fila. Os sentidos já estudados
+  // continuam com o estado deles ('revisao'/'estudo') e seguem no dossiê e na
+  // Revisão; só o sentido novo nasce 'pronto'. Era esta a limitação declarada
+  // da Fase 1 — o reencontro puxava o item todo para trás.
+  // O merge da análise preserva os sentidos curados, e os cards nem são
+  // tocados: card se liga ao sentido pelo `meaningId`, não pela posição.
   w.updated_at = new Date().toISOString()
+  sincronizarStatusItem(w)
   saveWords()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   if (typeof updateDossieBadge === 'function') updateDossieBadge()
@@ -1385,15 +1486,31 @@ function prepAcharItem(palavra, lang) {
 // Estudar"). Agora o caminho é uma passagem de estado, não uma navegação:
 //   pending_ai → pending_review → IN_STUDY (dossiê) → in_srs (repetição)
 // Volta existe (`voltarParaPreparar`): análise errada não pode virar beco.
+// Só pode enviar quem tem sentido PRONTO E MARCADO: desmarcar tudo e mandar
+// não é envio, é decidir que nada vale a pena — e isso precisa de clique
+// próprio, não pode acontecer de raspão pelo botão de enviar.
 function _prepPodeEnviar(w) {
-  return !!(w && w.status === 'pending_review' &&
-    Array.isArray(w.meanings) && w.meanings.some(m => m && m.selected !== false && m.meaning_pt))
+  return !!(w && sentidosDe(w).some(m => sentidoEstado(m) === 'pronto' && m.selected !== false))
 }
 
+// O ENVIO É POR SENTIDO. E a caixinha de seleção, que já existia, ganha o
+// sentido exato que faltava a ela: marcada = vai estudar; desmarcada = você
+// conhece, mas não quer drilar — vira 'saber', continua no verbete e no
+// glossário e nunca mais pede tempo de revisão. É o que resolve os ~90% de um
+// livro que não são o sentido daquela obra.
 function _prepMarcarEnviado(w) {
-  w.status = 'in_study'
+  let n = 0
+  for (const m of sentidosDe(w)) {
+    if (sentidoEstado(m) !== 'pronto') continue
+    if (m.selected === false) { m.estado = 'saber'; continue }
+    m.estado = 'estudo'
+    m.enviadoEm = Date.now()
+    n++
+  }
   w.enviadoEm = Date.now()
   w.updated_at = new Date().toISOString()   // bump p/ vencer o merge do fbPull
+  sincronizarStatusItem(w)
+  return n
 }
 
 function enviarParaEstudo(id) {
@@ -1403,7 +1520,8 @@ function enviarParaEstudo(id) {
     toast('Selecione ao menos um significado com material antes de enviar', 'warning')
     return
   }
-  _prepMarcarEnviado(w)
+  const n = _prepMarcarEnviado(w)
+  if (!n) { toast('Nenhum significado marcado — nada foi enviado', 'warning'); sincronizarStatusItem(w); saveWords(); return }
   saveWords()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   toast(`"${w.word || '(frase)'}" foi para o Estudo`, 'success')

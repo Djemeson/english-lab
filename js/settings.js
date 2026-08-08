@@ -421,12 +421,37 @@ async function clearAllData() {
   localStorage.removeItem('el-kindle-seen')
   localStorage.removeItem(SK.kindleQueue)
   localStorage.removeItem('englab_cfg')
+  // Chaves soltas, fora do SK — ficavam para trás e o "zerado" não era zerado:
+  // o app reabria no dossiê antigo, com o filtro de fonte de antes e as
+  // preferências de tela de um projeto que não existe mais.
+  ;['el-ui-prefs', 'el-srs-backup', 'el-dossie-aberto', 'el-srs-fonte',
+    'el-login-skipped', 'el-lex-cache'].forEach(k => localStorage.removeItem(k))
 
   // 2) IndexedDB — áudio, imagens, cards e backup de configurações
   try { await AudioDB.setAll({}) } catch {}
   try { await ImageDB.setAll({}) } catch {}
   try { await CardsDB.clear() } catch {}
   try { await SettingsDB.set('cfg', {}) } catch {}
+
+  // 2b) AS BASES INTEIRAS que ficavam de fora — e eram as mais pesadas:
+  // `english-lab-books` guarda os EPUB da estante e as pré-análises de
+  // capítulo; `el-video-db` guarda legendas, áudio consertado e o mp3 dos
+  // podcasts baixados. Sem isto, "apagar tudo" deixava os livros e os
+  // episódios no aparelho, e o app voltava com uma estante órfã.
+  for (const base of ['english-lab-books', 'el-video-db']) {
+    await new Promise(resolve => {
+      let pronto = false
+      const fim = () => { if (!pronto) { pronto = true; resolve() } }
+      try {
+        const req = indexedDB.deleteDatabase(base)
+        req.onsuccess = fim; req.onerror = fim
+        // `onblocked` acontece quando outra aba tem a base aberta. Não trava a
+        // limpeza por isso: o recarregamento no fim conclui o serviço.
+        req.onblocked = fim
+      } catch { fim() }
+      setTimeout(fim, 1500)
+    })
+  }
 
   // 3) Reset do estado em memória (decks voltam ao padrão)
   // ⚠️ Tem de zerar TUDO o que o fbPushData do passo 4 envia: ele grava a
@@ -460,7 +485,11 @@ async function clearAllData() {
   fillSettings()
   updateSrsBadge()
   toast('Tudo zerado — local e nuvem, em todos os dispositivos.', 'success')
-  setTimeout(() => showSection('dashboard'), 900)
+  // RECARREGA de propósito. Zerar deixa muita coisa viva na memória que não é
+  // estado de dados: índice do glossário, caches de áudio/imagem, o livro
+  // aberto no leitor, a pré-análise do capítulo, o handle do arquivo de vídeo.
+  // Começar do zero de verdade é começar do boot.
+  setTimeout(() => location.reload(), 1200)
 }
 
 function togglePasswordVisibility(id) {

@@ -548,10 +548,16 @@ function loadWords() {
 // tem material montado e ainda não foi marcado como estudado.
 function dossiePendentes() {
   if (!Array.isArray(words)) return 0
-  // `in_study` = foi ENVIADO para o dossiê e ainda não foi estudado. Contar
-  // "tem material" contaria também o que ainda está na fila do Preparar — o
-  // badge diria que há trabalho numa tela em que não há.
-  return words.filter(w => w.status === 'in_study' && !w.estudadoEm).length
+  // FASE 2: conta SENTIDOS, não itens — a unidade de estudo desceu para o
+  // sentido, e um item pode ter um sentido esperando estudo e outro já na
+  // revisão. `estado: 'estudo'` = foi enviado ao dossiê e ainda não estudado.
+  let n = 0
+  for (const w of words) {
+    for (const m of (w.meanings || [])) {
+      if (m && m.meaning_pt && !m.moved_to && m.estado === 'estudo') n++
+    }
+  }
+  return n
 }
 function updateDossieBadge() {
   const n = dossiePendentes()

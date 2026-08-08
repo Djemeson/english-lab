@@ -33,13 +33,16 @@ const SEP = '\u0001'
 let _dossieAberto = null      // chave do dossiê em foco (null = lista)
 let _dossieListaCache = []    // a lista do último render (a chave sai daqui)
 
-// Chave estável de um dossiê: a OBRA e o CAPÍTULO. `source_context` guarda o
-// título do capítulo desde a captura (o leitor grava; Kindle e Mídia também),
-// então nada precisou ser migrado para isto existir.
-function _dossieChave(w) {
-  const obra = String(w.source_title || '').trim() || '(sem título)'
-  const cap = String(w.source_context || '').trim()
-  return (w.source_type || 'manual') + SEP + obra + SEP + cap
+// Chave estável de um dossiê: a OBRA e o CAPÍTULO.
+// FASE 2 — lê a origem do SENTIDO, com queda para a do item. É isto que põe
+// cada sentido no dossiê da fonte ONDE AQUELE SENTIDO foi encontrado: o "cair"
+// de `fall` fica no Capítulo 3, o "fracassar" no Capítulo 9, no mesmo item.
+function _dossieChave(w, m) {
+  const g = (c, f) => String((m && m[c]) || w[f] || '').trim()
+  const obra = g('source_title', 'source_title') || '(sem título)'
+  const cap = g('source_context', 'source_context')
+  const tipo = g('source_type', 'source_type') || 'manual'
+  return tipo + SEP + obra + SEP + cap
 }
 function _dossiePartes(chave) {
   const p = String(chave).split(SEP)
@@ -52,45 +55,37 @@ function _dossiePartes(chave) {
 // que esvazia a fila do Preparar.
 //   in_study → está no dossiê, ainda não estudado
 //   in_srs   → já foi estudado, continua legível aqui para releitura
-function _dossieItens() {
-  return words.filter(w =>
-    (w.status === 'in_study' || w.status === 'in_srs') &&
-    // `moved_to` = sentido que virou item próprio; não conta como material
-    // deste item (ver "separar sentido" em review.js).
-    Array.isArray(w.meanings) && w.meanings.some(m => m && m.meaning_pt && !m.moved_to))
-}
-
-// O DADO ANTIGO. Quem já usava o app tem centenas de itens com `status:
-// 'in_srs'` e nenhum `estudadoEm` — o campo nasceu com esta seção. Sem esta
-// costura, o primeiro dossiê abriria dizendo "300 para estudar" sobre coisas
-// que ele já revisa há semanas. Roda a cada render e só grava se mudou algo,
-// então também cura o aparelho que receber esses itens pela nuvem.
-function _dossieCosturarLegado() {
-  let mudou = 0
+// FASE 2 — O DOSSIÊ É UMA LISTA DE SENTIDOS, não de itens.
+//   'estudo'  → no dossiê, ainda não estudado
+//   'revisao' → já estudado, continua legível aqui para releitura
+//   'saber'   → só verbete e glossário; NUNCA aparece aqui
+// Cada linha é um par {w, m}: é assim que um `fall` estudado no Capítulo 3 e
+// reencontrado no 9 aparece nos DOIS dossiês, sem virar dois itens.
+function _dossieSentidos() {
+  const out = []
+  const dos = typeof sentidosDe === 'function' ? sentidosDe : (w => (w.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to))
+  const est = typeof sentidoEstado === 'function' ? sentidoEstado : (m => m.estado || 'pronto')
   for (const w of words) {
-    if (w.status === 'in_srs' && !w.estudadoEm) {
-      w.estudadoEm = Date.parse(w.updated_at || w.created_at || '') || Date.now()
-      mudou++
+    for (const m of dos(w)) {
+      const e = est(m)
+      if (e === 'estudo' || e === 'revisao') out.push({ w, m, feito: e === 'revisao' })
     }
   }
-  if (mudou) {
-    saveWords()
-    // Sem sync os outros aparelhos refariam a mesma costura com datas
-    // diferentes — inofensivo, mas é escrita à toa em todo dispositivo.
-    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
-  }
-  return mudou
+  return out
 }
 
 function dossieLista() {
-  _dossieCosturarLegado()
+  // A migração roda aqui também (além do boot): assim o aparelho que receber
+  // dado antigo pela nuvem se cura sozinho ao abrir a seção. É idempotente e
+  // só grava quando muda algo.
+  if (typeof migrarEstadosDeSentido === 'function') migrarEstadosDeSentido()
   const mapa = new Map()
-  for (const w of _dossieItens()) {
-    const k = _dossieChave(w)
+  for (const s of _dossieSentidos()) {
+    const k = _dossieChave(s.w, s.m)
     if (!mapa.has(k)) mapa.set(k, { chave: k, ..._dossiePartes(k), itens: [], estudados: 0 })
     const d = mapa.get(k)
-    d.itens.push(w)
-    if (w.estudadoEm) d.estudados++
+    d.itens.push(s)
+    if (s.feito) d.estudados++
   }
   // Dossiê com pendência primeiro: é para lá que ele quer ir.
   return [...mapa.values()].sort((a, b) => {
@@ -99,42 +94,40 @@ function dossieLista() {
   })
 }
 
-// ---- marcar estudado = mandar para a revisão espaçada ----------------
-function dossieEstudei(wordId) {
-  const w = words.find(x => x.id === wordId)
-  if (!w || w.estudadoEm) return
-  // A ORDEM IMPORTA: quem marca `estudadoEm` é o `saveToSrs` (a única verdade
-  // sobre "entrou na revisão"). Marcar antes deixaria o item como estudado
-  // mesmo quando o salvamento recusa — por exemplo, com todos os significados
-  // desmarcados, caso em que ele só mostra um aviso e volta.
-  if (typeof saveToSrs === 'function') {
-    saveToSrs(w.id)
-    if (!w.estudadoEm) return           // saveToSrs recusou: o aviso já foi dado
-  } else {
-    w.estudadoEm = Date.now()
-    w.updated_at = new Date().toISOString()
-    saveWords()
-    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
-  }
+// ---- marcar estudado = mandar AQUELE SENTIDO para a revisão ----------
+// FASE 2: a marcação é por sentido. Estudar "cair" não pode arrastar
+// "fracassar" junto só porque os dois moram no mesmo item.
+function _dossiePar(wordId, meaningId) {
+  const w = words.find(x => x.id === wordId); if (!w) return null
+  const m = (w.meanings || []).find(x => x && x.id === meaningId)
+  return m ? { w, m } : null
+}
+
+function dossieEstudei(wordId, meaningId) {
+  const p = _dossiePar(wordId, meaningId); if (!p) return
+  if (sentidoEstado(p.m) === 'revisao') return
+  // A ORDEM IMPORTA: quem marca o sentido como estudado é o `saveToSrs` (a
+  // única verdade sobre "entrou na revisão"). Marcar antes deixaria como
+  // estudado um sentido cujo salvamento foi recusado.
+  saveToSrs(p.w.id, meaningId)
+  if (sentidoEstado(p.m) !== 'revisao') return   // recusou: o aviso já foi dado
   renderDossieSection()
 }
 
-function dossieDesfazerEstudo(wordId) {
-  const w = words.find(x => x.id === wordId)
-  if (!w) return
+function dossieDesfazerEstudo(wordId, meaningId) {
+  const p = _dossiePar(wordId, meaningId); if (!p) return
   // NÃO apaga os cards do SRS: eles já podem ter histórico de revisão, e
   // jogar fora progresso real por causa de um clique errado seria pior que o
-  // clique errado. Desmarcar só devolve o item ao dossiê para reler.
-  delete w.estudadoEm
-  // O status volta para IN_STUDY, não para o Preparar: desmarcar é "quero
-  // reler", não "quero refazer a análise" (para isso existe o `voltarParaPreparar`).
-  // Sem esta troca a costura do legado (que trata `in_srs` como estudado)
-  // remarcaria o item no render seguinte — o desfazer duraria uma fração de segundo.
-  if (w.status === 'in_srs') w.status = 'in_study'
-  w.updated_at = new Date().toISOString()
+  // clique errado. Desmarcar só devolve o sentido ao dossiê para reler.
+  delete p.m.estudadoEm
+  // Volta para 'estudo', não para o Preparar: desmarcar é "quero reler", não
+  // "quero refazer a análise" (para isso existe o "Corrigir em Preparar").
+  p.m.estado = 'estudo'
+  p.w.updated_at = new Date().toISOString()
+  sincronizarStatusItem(p.w)
   saveWords()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
-  toast('Item volta para o dossiê — os cards já criados continuam na revisão', 'info')
+  toast('Sentido volta para o dossiê — os cards já criados continuam na revisão', 'info')
   renderDossieSection()
 }
 
@@ -146,30 +139,35 @@ function dossieAbrir(chave) {
 function dossieVoltar() { dossieAbrir(null) }
 
 // ---- telas -----------------------------------------------------------
-function _dossieCardHTML(w) {
-  const feito = !!w.estudadoEm
-  const ms = (w.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to)
-  const sig = ms.map(m => `
-    <div class="dos-sig${m.context_match ? ' ctx' : ''}">
-      <div class="dos-sig-pt">${esc(m.meaning_pt)}${m.type_label ? `<i>${esc(m.type_label)}</i>` : ''}</div>
-      ${m.definition_pt ? `<div class="dos-sig-def">${esc(m.definition_pt)}</div>` : ''}
-      ${(m.examples || []).slice(0, 2).map(ex => `
-        <div class="dos-ex">${buildSrsFrente({ example_en: ex.en || '', word: w.word })}${ex.pt ? `<span>${escB(ex.pt)}</span>` : ''}</div>`).join('')}
-    </div>`).join('')
+function _dossieCardHTML(s) {
+  const { w, m, feito } = s
+  // A frase é a DAQUELE sentido (Fase 2), com queda para a do item: é a cena
+  // em que ESTE sentido foi encontrado, não a do último encontro do item.
+  const ctx = m.context || w.context || ''
+  const ctxPt = m.context_pt || (m.context ? '' : w.context_pt) || ''
+  // Os outros sentidos do mesmo item viram uma linha discreta: dizem que a
+  // palavra tem mais vida sem competir com o que ele veio estudar aqui.
+  const irmaos = sentidosDe(w).filter(x => x !== m)
   return `
-    <article class="dos-item${feito ? ' feito' : ''}" id="dos-${w.id}">
+    <article class="dos-item${feito ? ' feito' : ''}" id="dos-${w.id}-${m.id || ''}">
       <header class="dos-cab">
         <b>${esc(w.word || '(frase)')}</b>
         ${w.ipa ? `<span class="dos-ipa">${esc(w.ipa)}</span>` : ''}
         ${feito ? `<span class="dos-selo">${ic('check','ic-sm')} estudado</span>` : ''}
       </header>
-      ${w.context ? `<div class="dos-ctx">“${esc(w.context)}”${
-        w.context_pt ? `<span>${esc(w.context_pt)}</span>` : ''}</div>` : ''}
-      ${sig}
+      ${ctx ? `<div class="dos-ctx">“${esc(ctx)}”${ctxPt ? `<span>${esc(ctxPt)}</span>` : ''}</div>` : ''}
+      <div class="dos-sig${m.context_match ? ' ctx' : ''}">
+        <div class="dos-sig-pt">${esc(m.meaning_pt)}${m.type_label ? `<i>${esc(m.type_label)}</i>` : ''}</div>
+        ${m.definition_pt ? `<div class="dos-sig-def">${esc(m.definition_pt)}</div>` : ''}
+        ${(m.examples || []).slice(0, 2).map(ex => `
+          <div class="dos-ex">${buildSrsFrente({ example_en: ex.en || '', word: w.word })}${ex.pt ? `<span>${escB(ex.pt)}</span>` : ''}</div>`).join('')}
+      </div>
+      ${irmaos.length ? `<div class="dos-irmaos">${ic('layers','ic-sm')} ${esc(w.word)} também é: ${
+        irmaos.map(x => esc(x.meaning_pt)).join(' · ')}</div>` : ''}
       <footer class="dos-acoes">
         ${feito
-          ? `<button class="btn btn-ghost btn-sm" onclick="dossieDesfazerEstudo('${w.id}')">${ic('undo','ic-sm')} não estudei ainda</button>`
-          : `<button class="btn btn-primary btn-sm" onclick="dossieEstudei('${w.id}')">${ic('check','ic-sm')} Estudei — mandar para a Revisão</button>`}
+          ? `<button class="btn btn-ghost btn-sm" onclick="dossieDesfazerEstudo('${w.id}','${m.id || ''}')">${ic('undo','ic-sm')} não estudei ainda</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="dossieEstudei('${w.id}','${m.id || ''}')">${ic('check','ic-sm')} Estudei — mandar para a Revisão</button>`}
         <button class="btn btn-ghost btn-sm dos-corrigir" onclick="voltarParaPreparar('${w.id}')"
           data-tip="A análise saiu errada? Devolve o item ao Preparar para re-analisar ou refazer do zero.">${ic('refresh','ic-sm')} Corrigir em Preparar</button>
       </footer>
@@ -190,32 +188,32 @@ function _dosNorm(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
-// Todo o texto pesquisável de um item: o termo, a frase de onde ele saiu e o
-// material que a IA montou. Buscar só pelo termo obrigaria a lembrar a grafia
-// exata — e o valor do dossiê está justamente no material.
-function _dosItemTexto(w) {
-  const ms = (w.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to)
+// Todo o texto pesquisável de um SENTIDO: o termo, a frase de onde ele saiu e
+// o material que a IA montou para ele. Buscar só pelo termo obrigaria a
+// lembrar a grafia exata — e o valor do dossiê está justamente no material.
+function _dosItemTexto(s) {
+  const { w, m } = s
   return _dosNorm([
-    w.word, w.context, w.context_pt,
-    ...ms.map(m => [m.meaning_pt, m.definition_pt, m.type_label,
-      ...(m.examples || []).map(ex => (ex.en || '') + ' ' + (ex.pt || ''))].join(' '))
+    w.word, m.context || w.context, m.context_pt || w.context_pt,
+    m.meaning_pt, m.definition_pt, m.type_label,
+    ...(m.examples || []).map(ex => (ex.en || '') + ' ' + (ex.pt || ''))
   ].join(' '))
 }
-function _dosItemCasa(w) {
-  if (_dosFiltro === 'pendentes' && w.estudadoEm) return false
-  if (_dosFiltro === 'feitos' && !w.estudadoEm) return false
+function _dosItemCasa(s) {
+  if (_dosFiltro === 'pendentes' && s.feito) return false
+  if (_dosFiltro === 'feitos' && !s.feito) return false
   if (!_dosBusca) return true
-  return _dosItemTexto(w).includes(_dosBusca)
+  return _dosItemTexto(s).includes(_dosBusca)
 }
-// Na grade, a busca também entra NOS itens: "onde foi que eu vi 'barrel'?" é
-// exatamente a pergunta que traz alguém a esta tela.
+// Na grade, a busca também entra NOS sentidos: "onde foi que eu vi 'barrel'?"
+// é exatamente a pergunta que traz alguém a esta tela.
 function _dosDossieCasa(d) {
   const falta = d.itens.length - d.estudados
   if (_dosFiltro === 'pendentes' && falta === 0) return false
   if (_dosFiltro === 'feitos' && falta > 0) return false
   if (!_dosBusca) return true
   if (_dosNorm(d.obra + ' ' + d.cap).includes(_dosBusca)) return true
-  return d.itens.some(w => _dosItemTexto(w).includes(_dosBusca))
+  return d.itens.some(s => _dosItemTexto(s).includes(_dosBusca))
 }
 
 function dossieBuscar(v) {
@@ -236,7 +234,7 @@ function dossieLimparFiltros() {
 function _dossieContagens() {
   const aberto = _dossieListaCache.find(d => d.chave === _dossieAberto)
   if (aberto) {
-    const feitos = aberto.itens.filter(w => w.estudadoEm).length
+    const feitos = aberto.itens.filter(s => s.feito).length
     return { todos: aberto.itens.length, pendentes: aberto.itens.length - feitos, feitos }
   }
   const l = _dossieListaCache
@@ -312,8 +310,8 @@ function _dossiePintarCorpo() {
     return
   }
 
-  const falta = aberto.itens.filter(w => !w.estudadoEm)
-  const feitos = aberto.itens.filter(w => w.estudadoEm)
+  const falta = aberto.itens.filter(s => !s.feito)
+  const feitos = aberto.itens.filter(s => s.feito)
   // Não estudados primeiro: é o que ele veio fazer.
   const visiveis = [...falta, ...feitos].filter(_dosItemCasa)
   const filtrando = !!_dosBusca || _dosFiltro !== 'todos'

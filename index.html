@@ -713,10 +713,26 @@
         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click()" style="display: inline-flex; align-items: center; gap: 6px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path d="M12 21V9"/><path d="m7 12 5-5 5 5"/><path d="M5 3h14"/></svg>Importar backup JSON</button>
         <input type="file" id="import-file" aria-label="Arquivo JSON de backup a importar" accept=".json" class="hidden" onchange="importData(this)">
         <button class="btn btn-secondary btn-sm" onclick="clearKindleSeen()" style="display: inline-flex; align-items: center; gap: 6px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Limpar histórico Kindle</button>
-        <button class="btn btn-danger btn-sm" onclick="clearAllData()" style="display: inline-flex; align-items: center; gap: 6px; margin-left: auto;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 15px; height: 15px;"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Apagar todos os dados</button>
       </div>
       <!-- Espaço em disco (renderizado por renderEspacoLocal() em settings.js) -->
       <div id="set-espaco"></div>
+
+      <!-- ZONA DE PERIGO — discreta de propósito. Estava como um botão
+           vermelho no meio da fileira de backup, do mesmo tamanho de
+           "Exportar": a ação mais destrutiva do app tinha o mesmo peso visual
+           da mais inofensiva. Aqui ela fica fechada, cinza, e só se abre por
+           intenção — quem chega sem querer não encontra um botão sob o dedo. -->
+      <details class="danger-zone">
+        <summary>
+          <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          Zona de perigo
+        </summary>
+        <div class="dz-corpo">
+          <p>Apaga <b>tudo</b>: palavras, cards e progresso, áudios e imagens, livros da estante, legendas e episódios baixados, e as configurações. Estando conectado, zera <b>também a nuvem</b> — e a exclusão propaga para os outros aparelhos.</p>
+          <p class="dz-nota">Sem volta. Exporte o backup JSON acima antes, se houver qualquer dúvida.</p>
+          <button class="btn btn-danger btn-sm" onclick="clearAllData()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>Apagar todos os dados</button>
+        </div>
+      </details>
     </div>
     </div>
   </div>

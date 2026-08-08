@@ -4989,6 +4989,52 @@ body.ler-full .mobile-bottom-nav{display:none}
   border-color:rgba(var(--primary-rgb),.9);
 }
 .gloss-estudar:hover{background:rgba(var(--primary-rgb),1)}
+/* ================================================================
+   ZONA DE PERIGO — fechada, cinza, e só abre por intenção.
+   ================================================================ */
+.danger-zone{margin-top:var(--sp-7);border-top:1px solid var(--border);padding-top:var(--sp-5)}
+.danger-zone summary{
+  display:inline-flex;align-items:center;gap:var(--sp-2);cursor:pointer;
+  color:var(--text3);font-size:var(--fs-sm);font-weight:600;
+  list-style:none;user-select:none;padding:var(--sp-1) 0;
+}
+.danger-zone summary::-webkit-details-marker{display:none}
+.danger-zone summary:hover{color:var(--error)}
+.danger-zone[open] summary{color:var(--error);margin-bottom:var(--sp-4)}
+.danger-zone summary .ic{opacity:.7}
+/* EXPLÍCITO de propósito: alguma regra do projeto vence o `display:none` que
+   o navegador aplica sozinho ao conteúdo de um <details> fechado, e o corpo
+   aparecia mesmo com a zona recolhida — ou seja, o botão de apagar tudo ficava
+   à mostra, que é exatamente o que esta zona existe para evitar. Verificado no
+   app: com [open] ausente, o computed display vinha `block`. */
+.danger-zone:not([open]) .dz-corpo{display:none}
+.dz-corpo{
+  border:1px solid rgba(220,38,38,.35);border-radius:var(--radius-sm);
+  padding:var(--sp-5);background:rgba(220,38,38,.05);max-width:70ch;
+}
+.dz-corpo p{font-size:var(--fs-sm);color:var(--text2);line-height:1.55}
+.dz-corpo .dz-nota{margin-top:var(--sp-2);color:var(--error);font-weight:600}
+.dz-corpo .btn{margin-top:var(--sp-5)}
+
+/* FASE 2 — o estado de cada sentido dentro do card do Preparar. Sentido que
+   já saiu desta fila não pode parecer clicável: recua e diz onde está. */
+.mi-estado{
+  display:inline-flex;align-items:center;gap:4px;white-space:nowrap;
+  font-size:var(--fs-3xs);font-weight:600;color:var(--text3);
+}
+.mi-estado.feito{color:var(--success)}
+.mi-estado.saber{color:var(--text3);opacity:.85}
+.meaning-item.mi-fora{cursor:default;opacity:.72}
+.meaning-item.mi-fora:hover{opacity:1}
+.meaning-item.mi-fora .mi-checkbox{visibility:hidden}
+
+/* Os outros sentidos do mesmo item, no rodapé do cartão do dossiê: dizem que
+   a palavra tem mais vida sem competir com o que ele veio estudar aqui. */
+.dos-irmaos{
+  margin-top:var(--sp-3);display:flex;align-items:center;gap:var(--sp-2);
+  font-size:var(--fs-xs);color:var(--text3);
+}
+
 /* REENCONTRO: a passagem tem um sentido que ele ainda não tem. O rodapé
    avisa e o botão pulsa uma vez — chamar atenção sem virar alarme. */
 .gloss-novo{color:var(--warning);font-weight:600}

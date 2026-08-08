@@ -389,10 +389,15 @@ function srsStreak() {
 }
 
 // ---- Save word to SRS ----
-function saveToSrs(wordId) {
+// `meaningId` (opcional) restringe a UM sentido — é como o dossiê manda um
+// item para a revisão sem arrastar os irmãos dele junto. Sem ele, o
+// comportamento antigo: todos os significados marcados.
+function saveToSrs(wordId, meaningId) {
   const w = words.find(x => x.id === wordId)
   if (!w || !w.meanings || !w.meanings.length) { toast('Sem significados para salvar', 'warning'); return }
-  const selected = w.meanings.filter(m => m.selected !== false)
+  const selected = meaningId
+    ? w.meanings.filter(m => m && (m.id === meaningId) && !m.moved_to)
+    : w.meanings.filter(m => m.selected !== false && !m.moved_to)
   if (!selected.length) { toast('Selecione ao menos um significado', 'warning'); return }
 
   let added = 0, skipped = 0
@@ -419,8 +424,17 @@ function saveToSrs(wordId) {
   // `skipped > 0` entra junto: cards que já existiam também são item que já
   // está girando lá.
   if (added > 0 || skipped > 0) {
-    if (!w.estudadoEm) w.estudadoEm = Date.now()
-    w.status = 'in_srs'
+    // FASE 2: quem passa a estar estudado é o SENTIDO. O `estudadoEm` do item
+    // continua sendo gravado só por compatibilidade com o dado antigo.
+    const agora = Date.now()
+    for (const m of selected) {
+      if (!m) continue
+      m.estado = 'revisao'
+      if (!m.estudadoEm) m.estudadoEm = agora
+    }
+    if (!w.estudadoEm) w.estudadoEm = agora
+    if (typeof sincronizarStatusItem === 'function') sincronizarStatusItem(w)
+    else w.status = 'in_srs'
     w.updated_at = new Date().toISOString()  // bump p/ vencer o merge do fbPull
     saveWords()
   }

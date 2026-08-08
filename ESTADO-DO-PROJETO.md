@@ -5887,23 +5887,45 @@ O que passou a valer:
   do segundo encontro**. Aditiva: os campos do item continuam lá e todo código que lê
   `w.context` segue funcionando.
 
-**Limitação conhecida da Fase 1, a ser resolvida na Fase 2:** o `status` ainda é do ITEM.
-Então um item em reencontro volta inteiro para o Preparar e **some do dossiê enquanto é
-re-analisado** — inclusive os sentidos já estudados. Os cards continuam intactos e na
-Revisão; é só a listagem do dossiê. É honesto ("está em preparação"), mas é sintoma de que o
-estado precisa descer para o sentido.
+**Limitação da Fase 1 — RESOLVIDA na Fase 2.** Enquanto o `status` era do ITEM, um item em
+reencontro voltava inteiro para o Preparar e sumia do dossiê. Com `m.estado`, cada sentido
+guarda o seu e nada é arrastado junto.
 
-### FASE 2 — o estado desce para o sentido (NÃO feita)
+### FASE 2 — o estado desce para o sentido (FEITA em 2026-08-08)
 
-1. `status` e `estudadoEm` por **sentido** (aditivo: `m.status`, `m.estudadoEm`).
-   O status do item passa a ser **derivado** (tem sentido pendente ⇒ aparece no Preparar).
-2. **Dossiê por sentido**: `_dossieChave()` passa a ler `m.source_*` com queda para `w.*`;
-   cada sentido é uma linha, no dossiê da fonte **onde aquele sentido foi encontrado**.
-3. `dossieEstudei` cria card **daquele sentido**, não de todos os selecionados.
-4. **Migração** (computável, sem chute): sentido com card ⇒ estudado; sentido sem
-   `context_match` de item antigo nasce **`saber`** — fica no verbete, fora da lista do
-   dossiê. É isto que faz o dossiê de *Flags on the Bayou* nascer com os ~10% que o livro
-   ensinou, em vez de 8 linhas de `fall`.
+**`m.estado`**, com quatro valores, e é o eixo de tudo:
+
+| estado | significa | aparece em |
+|---|---|---|
+| `pronto` | material montado, esperando envio | Preparar |
+| `estudo` | enviado ao dossiê | Estudar |
+| `revisao` | estudado, virou card | Revisão (e legível no dossiê) |
+| `saber` | só consulta | verbete e glossário — **fila nenhuma** |
+
+- **`w.status` virou DERIVADO** (`sincronizarStatusItem`). É o truque que permitiu trocar o
+  modelo sem reescrever o app: a lista do Preparar, os contadores do Dashboard, os badges e o
+  glossário continuam lendo `w.status` e continuam certos.
+- **O dossiê é uma lista de SENTIDOS** (`_dossieSentidos` devolve pares `{w, m}`).
+  `_dossieChave(w, m)` lê a origem do sentido com queda para a do item — é isto que faz o
+  `fall` estudado no Capítulo 3 e reencontrado no 9 aparecer **nos dois dossiês, sem virar
+  dois itens**. No cartão, os outros sentidos viram uma linha discreta ("fall também é: cair").
+- **`saveToSrs(wordId, meaningId)`** — o segundo argumento restringe a UM sentido. É como o
+  dossiê manda um sentido para a revisão sem arrastar os irmãos.
+- **A caixinha de seleção ganhou o sentido que faltava a ela**: marcada = vai estudar;
+  desmarcada, no envio, vira **`saber`** — conhecido, no verbete, nunca mais pedindo tempo de
+  revisão. É o que resolve os ~90% de um livro que não são o sentido daquela obra.
+- **O merge da análise preserva** `estado`, `estudadoEm`, `context` e `source_*`. Sem isso,
+  "Re-analisar" jogaria fora o progresso de estudo e a cena de origem de cada sentido.
+- **A limitação declarada da Fase 1 morreu**: o reencontro não puxa mais o item inteiro para
+  trás. Os sentidos já estudados ficam com o estado deles e seguem no dossiê e na Revisão.
+
+**Migração** (`migrarEstadosDeSentido`, roda no boot depois do `loadSrsAsync` — a ordem
+importa, ela deriva "estudado" da existência do card — e de novo ao abrir o dossiê, para curar
+aparelho que receber dado antigo pela nuvem). É idempotente e derivável, sem chute:
+tem card ⇒ `revisao`; item `in_study` ⇒ `estudo`; item já no SRS com sentido sem card ⇒
+**`saber`**; resto ⇒ `pronto`.
+**Verificado ao vivo** com `barrel` de 3 sentidos e 1 card: "cano" → `revisao`, "barril" e
+"tambor" → `saber`, e o dossiê do Capítulo 3 nasceu com **um** sentido em vez de três.
 
 ### FASE 3 — o verbete e as saídas (NÃO feita)
 
@@ -5934,9 +5956,14 @@ lugar só.
 - [x] ~~Medir a pré-análise com IA de verdade (`barrel` → "cano"?)~~ — **FEITO e PASSOU**
       (confirmado pelo Djemeson em 2026-08-07). ⚠️ **Não refazer este teste.** É o que
       autorizou a glosa da pré-análise a virar semente do sentido (ver 8.2, Fase 1).
-- [ ] **FASE 2 DO REENCONTRO — o estado desce para o sentido.** Está desenhada por inteiro na
-      seção 8.2. Enquanto não for feita, vale a limitação conhecida: item em reencontro volta
-      inteiro para o Preparar e some do dossiê até ser reenviado (os cards seguem intactos).
+- [x] ~~FASE 2 DO REENCONTRO — o estado desce para o sentido~~ — **FEITA em 2026-08-08**
+      (ver 8.2). Falta só a FASE 3: verbete por lema na Biblioteca, reconhecimento por IA e
+      os desfazeres fundir/separar.
+- [ ] **ZONA DE PERIGO — conferir num aparelho com dado real.** O "apagar tudo" ganhou o que
+      faltava (bases `english-lab-books` e `el-video-db` inteiras, as chaves soltas do
+      localStorage e recarregamento no fim). Foi exercitado com dado sintético; num aparelho
+      com livros e podcasts baixados, vale confirmar que a estante e os episódios somem mesmo
+      e que o app volta limpo.
 - [ ] **LEVAR A SEMENTE PARA O VÍDEO E PARA A EXTENSÃO** — só o leitor foi ligado. Ver o fim
       da 8.2 para o caminho (pré-análise do LOTE, não do capítulo).
 - [ ] **USAR O REENCONTRO COM DADO REAL.** A Fase 1 foi exercitada ao vivo, mas com item
