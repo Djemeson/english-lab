@@ -15,7 +15,12 @@
 > contra 10px) e a **decoração interna diminuiu** — com separação de verdade, borda dentro de
 > seção é terceiro nível de moldura, e redundância lê como aperto. ⚠️ A coluna do rótulo não pode
 > somar-se à largura de leitura: a 56rem o texto ficou com 78 caracteres por linha; a 48rem voltou
-> a 64. `sw.js` → `englab-v166`. Ver seção 8.2 ("O ritmo do painel de estudo").
+> a 64. E a correção dele logo depois — *"não quero que você limite caracteres"* — derrubou os
+> **tetos de quantidade** que eu tinha criado antes: forms/colocações (6), régua (4), conjugação
+> (10), família (60), e os cortes de EXIBIÇÃO de sinônimos e antônimos, que eram os piores (o
+> dado estava gravado e pago, e a tela escondia parte dele em silêncio). O teto que ficou é contra
+> LIXO, não contra quantidade. `sw.js` → `englab-v167`. Ver seção 8.2 ("O ritmo do painel de
+> estudo").
 >
 > Anterior: 2026-08-08 — **A FORMA NEUTRA E A FAMÍLIA COMPLETA**. O item aparecia como
 > "Gals" (a forma do livro): o prompt passou a pedir a **forma de citação**, com a guarda
@@ -7101,6 +7106,42 @@ separação importa MAIS, porque sem a coluna do rótulo o espaço e o filete s�
 Corrigido para 44px de conteúdo a conteúdo.
 
 **Arquivos**: `css/styles.css`. `sw.js` → `englab-v166`.
+
+#### E aí veio a correção: NÃO LIMITE O CONTEÚDO
+
+*"Atenção, não quero que você limite caracteres, se é o que fez. O que quero é a organização das
+informações somente."*
+
+A palavra que eu usei ("64 caracteres") era largura de LINHA — onde ela quebra —, e o CSS foi
+conferido: **não há `ellipsis`, `line-clamp` nem altura fixa** em nenhum ponto do painel; nada
+estava sendo cortado ali. Mas a preocupação dele estava certa no geral, porque **eu tinha criado
+tetos de QUANTIDADE em rodadas anteriores**, e esses cortavam de verdade:
+
+| onde | era | virou |
+|---|---|---|
+| `forms`, `collocations` | 6 | sem teto |
+| `confusoes` | 4 | sem teto |
+| conjugação | 10 | 24 |
+| família | 60 | 200 |
+| `sense_audit` | 12 | 30 |
+| sinônimos na tela | 5 (foco) / 4 (card) | todos |
+| antônimos na tela | 4 (foco) / 3 (card) | todos |
+| "Também quer dizer" | 8 | todos |
+
+> **A regra que ficou:** o teto existe contra LIXO, não contra quantidade — resposta enlouquecida
+> (parágrafo inteiro no lugar de uma colocação) e item repetido. Quem organiza é a tela; o dado
+> vem inteiro. O pior dos cortes era o de EXIBIÇÃO: o dado estava gravado e pago, e a tela
+> escondia parte dele sem dizer nada.
+
+Os prompts também pediam pouco por omissão — `collocations` e `confusoes` ganharam *"seja
+COMPLETO, 4–10 é o normal para uma palavra comum, não pare em três"*.
+
+Medido depois, com um item inflado de propósito: forma 9/9, colocações 12/12, régua 8/8,
+conjugação 14/14, família 75/75, sentidos 13/13, sinônimos 11/11 — **tudo inteiro**, sem estouro
+horizontal. E o normalizador continua barrando o que deve: string de 200 caracteres e entrada
+repetida.
+
+**Arquivos**: `js/review.js`, `js/dossie.js`, `js/study.js`. `sw.js` → `englab-v167`.
 
 ### Onde a captura ainda NÃO leva a semente
 

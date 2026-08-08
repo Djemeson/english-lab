@@ -891,8 +891,8 @@ function buildSrsVerso(card, imgData, imageBelow) {
   if (card.origin_pt) material += `<div class="srs-back-origin" style="margin-top:10px;padding:9px 12px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:var(--fs-md);line-height:1.45;color:var(--text2)"><span style="display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--text);font-size:var(--fs-sm);margin-bottom:3px">${ic('sparkles','ic-sm')} Origem</span><div>${esc(strip(card.origin_pt))}</div></div>`
   if (sin.length || ant.length) {
     material += `<div class="srs-back-vizinhos">${
-      sin.length ? `<span>↔ ${sin.slice(0,4).map(esc).join(', ')}</span>` : ''}${
-      ant.length ? `<span class="ant">✕ ${ant.slice(0,3).map(esc).join(', ')}</span>` : ''}</div>`
+      sin.length ? `<span>↔ ${sin.map(esc).join(', ')}</span>` : ''}${
+      ant.length ? `<span class="ant">✕ ${ant.map(esc).join(', ')}</span>` : ''}</div>`
   }
   if (material) {
     text += `<details class="srs-material${window._srsErrou ? ' erro' : ''}"${window._srsErrou ? ' open' : ''}>

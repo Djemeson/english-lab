@@ -185,12 +185,15 @@ function _dosOrigemHTML(m) {
   return `<div class="dos-origem">${ic('sparkles','ic-sm')}<div><b>Origem</b><span>${esc(m.origin_pt)}</span></div></div>`
 }
 
+// Sem `.slice`: a tela mostra o que o item TEM. Cortar aqui era o pior tipo de
+// corte — o dado estava gravado e pago, e a tela escondia parte dele sem dizer
+// nada. Quem organiza é o layout; a quantidade é do dado.
 function _dosVizinhosHTML(m) {
   const sin = m.synonyms || [], ant = m.antonyms || []
   if (!sin.length && !ant.length) return ''
   return `<div class="dos-vizinhos">${
-    sin.length ? `<span>↔ ${sin.slice(0,5).map(esc).join(', ')}</span>` : ''}${
-    ant.length ? `<span class="ant">✕ ${ant.slice(0,4).map(esc).join(', ')}</span>` : ''}</div>`
+    sin.length ? `<span>↔ ${sin.map(esc).join(', ')}</span>` : ''}${
+    ant.length ? `<span class="ant">✕ ${ant.map(esc).join(', ')}</span>` : ''}</div>`
 }
 
 // ---- telas -----------------------------------------------------------
@@ -719,7 +722,9 @@ function _dosAuditLimpo(w, m) {
     if (out.some(x => cobre(c, conj(x)))) continue
     out.push(t)
   }
-  return out.slice(0, 8)
+  // Sem teto: se a IA deliberou sobre doze sentidos, os doze são o verbete
+  // que ele ainda vai encontrar. Cortar em oito escondia parte do mapa.
+  return out
 }
 
 function _dosMaisSentidosHTML(w, m) {

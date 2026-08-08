@@ -51,17 +51,31 @@ function _ehSim(v) {
   return /^(true|sim|yes|1)$/i.test(String(v || '').trim())
 }
 
-// Lista curta vinda da IA, blindada. Um modelo barato devolve isto como array,
-// como string separada por vírgula, ou como array com buracos — e um `.map`
-// direto num não-array quebra a análise inteira por causa de um campo
-// secundário. Aceita as três formas, limpa e corta.
+// Lista vinda da IA, blindada. Um modelo barato devolve isto como array, como
+// string separada por vírgula, ou como array com buracos — e um `.map` direto
+// num não-array quebra a análise inteira por causa de um campo secundário.
+// Aceita as três formas e limpa.
+//
+// ⚠️ O TETO AQUI É CONTRA LIXO, NÃO CONTRA QUANTIDADE. Ele nasceu em 6 e isso
+// estava errado: cortava material legítimo — um verbo com 8 formas perdia 2,
+// e as colocações paravam na sexta mesmo quando a IA sabia mais. Pedido dele,
+// explícito: *"não quero que você limite caracteres, o que quero é a
+// organização das informações"*. Quem organiza é a tela; o dado vem inteiro.
+// O que sobrou é o guarda de resposta enlouquecida (parágrafo inteiro no lugar
+// de uma colocação, ou centenas de itens repetidos).
 function _listaCurta(v, teto) {
   let arr = []
   if (Array.isArray(v)) arr = v
   else if (typeof v === 'string' && v.trim()) arr = v.split(/[;,]|\s·\s/)
+  const vistos = new Set()
   return arr.map(x => String(x == null ? '' : x).replace(/\s+/g, ' ').trim())
-    .filter(x => x && x.length <= 90)
-    .slice(0, teto || 6)
+    .filter(x => {
+      if (!x || x.length > 140) return false
+      const k = x.toLowerCase()
+      if (vistos.has(k)) return false     // repetido é ruído, não conteúdo
+      vistos.add(k); return true
+    })
+    .slice(0, teto || 40)
 }
 
 // A FORMA DE CITAÇÃO SÓ ENTRA SE FOR O MESMO ITEM.
@@ -205,9 +219,10 @@ function applyAiResult(w, result) {
     // abaixo): lá o valor ANTIGO ganha do novo, e como o item antigo não tem
     // nenhum destes campos, o vazio venceria para sempre e "Completar
     // material" nunca completaria nada.
-    forms:         _listaCurta(m.forms, 6),        // gal → gals; fall → fell, fallen
-    collocations:  _listaCurta(m.collocations, 6), // as palavras que andam junto
-    confusoes:     _listaCurta(m.confusoes, 4),    // o vizinho + a régua que os separa
+    // Sem teto de quantidade: quem organiza é a tela, o dado vem inteiro.
+    forms:         _listaCurta(m.forms),        // gal → gals; fall → fell, fallen
+    collocations:  _listaCurta(m.collocations), // as palavras que andam junto
+    confusoes:     _listaCurta(m.confusoes),    // o vizinho + a régua que os separa
     grammar:       String(m.grammar || '').trim(),      // o padrão: "fall + adjetivo"
     armadilha:     String(m.armadilha || '').trim(),    // falso amigo para lusófono
     curiosidade:   String(m.curiosidade || '').trim(),  // a nota que gruda, sem ser etimologia
@@ -455,8 +470,8 @@ Return ONLY this JSON:
  "citacao": "the item in CITATION FORM — the shape a dictionary files it under, lowercase unless a proper noun ("Gals" → "gal", "fell in love" → "fall in love", "ran by" → "run by"). ⚠️ Only the INFLECTION and the CASE change: keep every word of the unit, never shorten it. Repeat "${alvo}" unchanged when it is already in citation form.",
  "forms": ["inflected forms to recognize, each as \\"form = short PT label\\" (verb: past/participle/3rd person/-ing; noun: plural, especially irregular; adjective: comparative/superlative). Give the citation form first when "${alvo}" is itself inflected. [] for invariable items."],
  "grammar": "the PATTERN this sense takes, PT-BR, one short line — what must come around it (e.g. \\"fall + adjetivo (asleep, silent)\\", \\"give up + verbo em -ing\\", \\"substantivo contável, quase sempre no plural\\"). \\"\\" only if there is genuinely no pattern.",
- "collocations": ["words that habitually travel with THIS sense, 2-4 words each. Fixed or strongly preferred pairings only, never free combinations. []"],
- "confusoes": ["words a learner mixes up with this one, each as \\"word — what makes it DIFFERENT\\", in PT-BR. State the difference, never just name the neighbour. []"],
+ "collocations": ["words that habitually travel with THIS sense, 2-4 words each. Fixed or strongly preferred pairings only, never free combinations. BE COMPLETE: 4-10 for a common word, do not stop at three. []"],
+ "confusoes": ["words a learner mixes up with this one, each as \\"word — what makes it DIFFERENT\\", in PT-BR. State the difference, never just name the neighbour. List every neighbour that really gets mixed up — 3 to 6 is normal. []"],
  "armadilha": "false friend or systematic trap for a BRAZILIAN PORTUGUESE speaker (1-2 sentences, PT-BR). \\"\\" for the vast majority of items.",
  "curiosidade": "ONE CONCRETE FACT the learner did not know, PT-BR, 1-2 sentences. A fact ABOUT THE WORLD — datable, nameable, checkable — never an impression about how the word feels. GOOD: a real work/brand/person and its date; an event that spread the word; a famous line; a completely different meaning in another field. REJECT (wrong field or nothing): tone, style, register, where it is heard — that is \\"registro_uso\\"; \\"é muito usada\\", \\"aparece em títulos\\", \\"soa informal\\"; restating meaning or etymology. THE TEST: if the same sentence would work for hundreds of other words by swapping the word, it is NOT a curiosity — return \\"\\". Empty is the right answer for most ordinary words.",
  "registro_uso": "one line in PT-BR on the TONE and the PLACE of this sense: how it soa (leve, afetuoso, datado, técnico…), onde se usa e onde NÃO se usa. THIS is the home of everything about tone and style — never put that in \\"curiosidade\\". \\"\\" when it is plainly neutral."
@@ -490,9 +505,9 @@ Return ONLY this JSON:
       if (_mesmoItemCanonico(w.word, canon)) { w.word = canon; n++ }
       else console.warn(`[ia] citação recusada: "${w.word}" → "${canon}" não é o mesmo item`)
     }
-    n += põe('forms',        _listaCurta(r.forms, 6))
-    n += põe('collocations', _listaCurta(r.collocations, 6))
-    n += põe('confusoes',    _listaCurta(r.confusoes, 4))
+    n += põe('forms',        _listaCurta(r.forms))
+    n += põe('collocations', _listaCurta(r.collocations))
+    n += põe('confusoes',    _listaCurta(r.confusoes))
     n += põe('grammar',      String(r.grammar || '').trim())
     n += põe('armadilha',    String(r.armadilha || '').trim())
     n += põe('curiosidade',  String(r.curiosidade || '').trim())
@@ -596,7 +611,10 @@ Return ONLY this JSON:
       .filter(it => it.tipo === 'derivada'
         ? it.expr.toLowerCase() !== alvo.toLowerCase()
         : !_mesmoItemCanonico(alvo, it.expr))
-      .slice(0, 60)
+      // Teto ALTO e so contra resposta enlouquecida: "get" tem dezenas de
+      // expressoes de verdade, e a lista existe justamente para ele descobrir
+      // o que ainda nao sabe.
+      .slice(0, 200)
     const conjugacao = (Array.isArray(r.conjugacao) ? r.conjugacao : [])
       .map(it => ({
         rotulo: String(it && it.rotulo || '').trim(),
@@ -604,7 +622,7 @@ Return ONLY this JSON:
         exemplo: String(it && it.exemplo || '').trim()
       }))
       .filter(it => it.forma)
-      .slice(0, 10)
+      .slice(0, 24)   // guarda contra paradigma de seis pessoas, nao contra conteudo
     w.familia = familia
     w.conjugacao = conjugacao
     w.classe = String(r.classe || '').trim()
@@ -813,8 +831,8 @@ Return ONLY this JSON (no markdown, no explanation):
       "antonyms": ["ant1", "ant2"],
       "forms": ["the inflected forms a learner must recognize, each as \\"form = short PT label\\". Verb: past, past participle, 3rd person, -ing (e.g. \\"fell = passado\\", \\"fallen = particípio\\"). Noun: the plural, ESPECIALLY when irregular (\\"feet = plural\\"). Adjective: comparative/superlative when they exist. Give the CITATION form first when the item was captured inflected (for the item \\"gals\\": [\\"gal = singular\\", \\"gals = plural\\"]). Empty array for invariable items."],
       "grammar": "the PATTERN this sense takes, in Brazilian Portuguese, ONE short line — what has to come around it for the sense to work. E.g. \\"fall + adjetivo (asleep, silent, ill)\\", \\"give up + verbo em -ing\\", \\"remind someone OF something\\", \\"substantivo contável, quase sempre no plural\\". This is what lets the learner PRODUCE the word instead of only recognizing it. Empty string only when there is genuinely no pattern worth naming.",
-      "collocations": ["the words that habitually travel with this sense — fixed or strongly preferred pairings, in the target language, 2-4 words each (e.g. for \\"rain\\": \\"heavy rain\\", \\"pouring rain\\"). NOT free combinations that merely happen to be possible. Empty array when the item has no notable partners."],
-      "confusoes": ["near words a learner mixes up with this one, each as \\"word — what makes it DIFFERENT\\", in Brazilian Portuguese (e.g. \\"girl — neutro, mas infantiliza uma adulta\\", \\"chick — gíria, pode ofender\\"). A synonym list alone never says the difference, and the difference is the whole information. Empty array when nothing is genuinely confusable."],
+      "collocations": ["the words that habitually travel with this sense — fixed or strongly preferred pairings, in the target language, 2-4 words each (e.g. for \\"rain\\": \\"heavy rain\\", \\"pouring rain\\"). NOT free combinations that merely happen to be possible. BE COMPLETE: list every one you are sure of, normally 4-10 for a common word — do not stop at three. Empty array when the item has no notable partners."],
+      "confusoes": ["near words a learner mixes up with this one, each as \\"word — what makes it DIFFERENT\\", in Brazilian Portuguese (e.g. \\"girl — neutro, mas infantiliza uma adulta\\", \\"chick — gíria, pode ofender\\"). A synonym list alone never says the difference, and the difference is the whole information. List every neighbour that really does get mixed up, not only the first — 3 to 6 is normal for a common word. Empty array when nothing is genuinely confusable."],
       "armadilha": "FALSE FRIEND or systematic trap for a BRAZILIAN PORTUGUESE speaker, 1-2 sentences in PT-BR (e.g. \\"pretend\\" não é \\"pretender\\"; \\"actually\\" não é \\"atualmente\\"; \\"push\\" não é \\"puxar\\"). Fill ONLY when a Portuguese speaker really does fall for it. EMPTY STRING for the vast majority of items — a fake trap is worse than none.",
       "curiosidade": "ONE CONCRETE FACT the learner did not know, in PT-BR (1-2 sentences). A fact ABOUT THE WORLD — datable, nameable, checkable — never an impression about how the word feels or where it is used.\\nGOOD: a real work, brand or person the word is tied to, with the date (\\"Archie's Pals 'n' Gals foi uma revista da Archie Comics publicada de 1952 a 1991\\"); a historical event that created or spread it; a famous line or scene; a technical or legal definition that surprises; a COMPLETELY different meaning in another field (\\"gal\\" também é a abreviação de \\"gallon\\"); the story behind a false friend.\\nREJECT — these are not weak answers, they are the WRONG FIELD or nothing at all: anything about tone, style, register or where it is heard (that is \\"registro_uso\\"); \\"é muito usada\\", \\"aparece em títulos\\", \\"soa informal\\", \\"tem um ar retrô\\"; restating the meaning or the etymology in other words (etymology is \\"origin_pt\\").\\nTHE TEST, apply it before returning: could this same sentence be written about HUNDREDS of other words just by swapping the word? Then it is NOT a curiosity — return \\"\\".\\nEMPTY STRING is the right answer for most ordinary words, and returning it is better than inventing.",
       "registro_uso": "one line in PT-BR on the TONE and the PLACE of this sense: how it soa (leve, afetuoso, datado, técnico, agressivo…), onde se usa e onde NÃO se usa — the practical reading of \\"register\\" (e.g. \\"entre amigos e no sul dos EUA; num e-mail de trabalho soa datado e caricato\\"). THIS is the home of everything about tone and style — never put that in \\"curiosidade\\". Empty string when the sense is plainly neutral everywhere.",
@@ -843,7 +861,7 @@ Return ONLY this JSON (no markdown, no explanation):
     // existem além deste, sem criar card para nenhum deles.
     if (Array.isArray(result.sense_audit) && result.sense_audit.length) {
       console.log(`[ia] sentidos de "${target}":`, result.sense_audit)
-      w.sense_audit = result.sense_audit.map(l => String(l || '').trim()).filter(Boolean).slice(0, 12)
+      w.sense_audit = result.sense_audit.map(l => String(l || '').trim()).filter(Boolean).slice(0, 30)
       w.sense_audit_at = Date.now()
     }
     applyAiResult(w, result)
@@ -1659,7 +1677,7 @@ function renderMeaningItem(wordId, m, mi) {
       ${m.definition_pt ?`<div class="mi-note" style="font-style:italic;opacity:0.8;margin-top:4px">${esc(m.definition_pt)}</div>` : ''}
       ${m.origin_pt ? `<div class="mi-note" style="margin-top:6px;padding:7px 10px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:var(--fs-sm)"><b>Origem:</b> ${esc(m.origin_pt)}</div>` : ''}
       ${m.context_note ? `<div class="mi-note">${esc(m.context_note)}</div>` : ''}
-      ${m.synonyms && m.synonyms.length ? `<div class="mi-note" style="font-size:var(--fs-sm);color:var(--text3)">↔ ${m.synonyms.slice(0,4).map(esc).join(', ')}</div>` : ''}
+      ${m.synonyms && m.synonyms.length ? `<div class="mi-note" style="font-size:var(--fs-sm);color:var(--text3)">↔ ${m.synonyms.map(esc).join(', ')}</div>` : ''}
       ${(m.examples && m.examples.length ? m.examples : (m.example_en ? [{en:m.example_en, pt:m.example_pt||''}] : [])).map((ex, ei) => ex.en ? `
       <div class="mi-example">
         <div style="display:flex;gap:8px;align-items:baseline">
