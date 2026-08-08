@@ -5410,6 +5410,115 @@ body.ler-full .mobile-bottom-nav{display:none}
   border-radius:var(--radius-xs);font-size:var(--fs-3xs);font-weight:700;
   background:rgba(var(--primary-rgb),.16);color:var(--primary);
 }
+/* ================================================================
+   ESTUDAR PODEROSO — o material rico que estava no card de revisão.
+   Na LISTA entra a versão compacta; o pesado fica no modo foco.
+   ================================================================ */
+.dos-audio{display:inline-flex;gap:var(--sp-1);margin-left:auto}
+.dos-audio .btn{padding:var(--sp-1) var(--sp-3);font-size:var(--fs-xs);color:var(--text3)}
+.dos-audio .btn:hover{color:var(--text)}
+.dos-chips{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center;margin:var(--sp-2) 0}
+.dos-chip{
+  display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:var(--radius-xs);
+  font-size:var(--fs-3xs);font-weight:700;background:var(--surface2);color:var(--text3);
+}
+.dos-chip.nivel{background:rgba(var(--primary-rgb),.16);color:var(--primary)}
+.dos-chip.sentido{cursor:pointer}
+.dos-chip.sentido:hover{background:rgba(var(--primary-rgb),.2);color:var(--primary)}
+.dos-vizinhos{display:flex;flex-wrap:wrap;gap:var(--sp-4);margin-top:var(--sp-2);font-size:var(--fs-xs);color:var(--text3)}
+.dos-vizinhos .ant{opacity:.8}
+.dos-origem{
+  display:flex;gap:var(--sp-2);margin-top:var(--sp-3);padding:var(--sp-3) var(--sp-4);
+  border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);
+  border-left:3px solid rgba(var(--primary-rgb),.5);font-size:var(--fs-sm);
+}
+.dos-origem b{display:block;color:var(--text);font-size:var(--fs-xs)}
+.dos-origem span{color:var(--text2);line-height:1.5}
+
+/* ---- MODO FOCO: um item, a tela inteira ---- */
+body.dos-focando{overflow:hidden}
+#dos-foco{
+  position:fixed;inset:0;z-index:var(--z-modal);display:flex;flex-direction:column;
+  background:var(--bg);padding:var(--sp-6);animation:dosFocoEntra .16s ease-out;
+}
+@keyframes dosFocoEntra{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
+.dosf-topo{
+  display:flex;align-items:center;gap:var(--sp-4);flex-shrink:0;
+  padding-bottom:var(--sp-4);border-bottom:1px solid var(--border);
+}
+.dosf-pos{margin-left:auto;color:var(--text3);font-size:var(--fs-sm);font-weight:600}
+.dosf-obra{color:var(--text3);font-size:var(--fs-sm)}
+.dosf-tecla{
+  display:inline-block;padding:0 5px;border:1px solid var(--border);border-radius:4px;
+  font-size:var(--fs-3xs);color:var(--text3);margin-left:4px;
+}
+.dosf-corpo{flex:1;overflow-y:auto;max-width:70ch;width:100%;margin:0 auto;padding:var(--sp-7) 0}
+.dosf-cab{display:flex;align-items:baseline;gap:var(--sp-3);flex-wrap:wrap}
+.dosf-cab b{font-family:'Newsreader',serif;font-size:var(--fs-2xl);font-weight:600}
+.dosf-cena{
+  margin:var(--sp-5) 0;padding-left:var(--sp-5);border-left:3px solid rgba(var(--primary-rgb),.45);
+}
+.dosf-cena-cab{display:flex;align-items:center;gap:5px;font-size:var(--fs-3xs);color:var(--text3);
+  text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:var(--sp-2)}
+.dosf-cena-en{font-size:var(--fs-lg);line-height:1.5;font-style:italic}
+.dosf-cena-pt{color:var(--text2);font-size:var(--fs-md);margin-top:var(--sp-1)}
+.dosf-sig{
+  font-size:var(--fs-xl);font-weight:700;color:rgba(var(--primary-rgb),1);
+  margin-top:var(--sp-6);
+}
+.dosf-exs{margin-top:var(--sp-5);display:flex;flex-direction:column;gap:var(--sp-3)}
+.dosf-exs .dos-ex{display:flex;gap:var(--sp-3);margin:0}
+.dosf-ex-n{color:var(--text3);font-size:var(--fs-2xs);font-weight:700;flex-shrink:0;padding-top:2px}
+.dosf-rodape{
+  display:flex;align-items:center;justify-content:center;gap:var(--sp-4);flex-shrink:0;
+  padding-top:var(--sp-4);border-top:1px solid var(--border);
+}
+/* As setas nunca esticam: quem manda no espaço é o botão do meio, que carrega
+   o texto. Sem isto, `flex:1` nos três estoura a largura no celular. */
+.dosf-rodape .btn:first-child,.dosf-rodape .btn:last-child{flex:0 0 auto}
+/* A pílula "Voltar para a revisão" mora no rodapé da tela e cairia justo em
+   cima do ← / Estudei / →. No foco ela sobe para o topo — continua clicável e
+   para de disputar espaço com os controles de andar. */
+body.dos-focando #voltar-pill{bottom:auto;top:calc(14px + env(safe-area-inset-top,0))}
+@media (max-width:768px){
+  #dos-foco{padding:var(--sp-4)}
+  .dosf-corpo{padding:var(--sp-5) 0}
+  .dosf-cab b{font-size:var(--fs-xl)}
+  .dosf-cena-en{font-size:var(--fs-base)}
+  .dosf-rodape{gap:var(--sp-2);padding-bottom:calc(var(--sp-2) + env(safe-area-inset-bottom,0))}
+  .dosf-rodape .btn{flex:1 1 auto;min-width:0;justify-content:center}
+  .dosf-longo{display:none}   /* "Estudei" basta: o resto não cabe em 375px */
+  .dosf-tecla{display:none}   /* não há setas de teclado no celular */
+  .dosf-obra{display:none}
+}
+
+/* ---- REVISAR ENXUTO: o material recolhido, aberto no erro ---- */
+.srs-material{margin-top:var(--sp-4);border-top:1px dashed var(--border);padding-top:var(--sp-3)}
+.srs-material summary{
+  display:inline-flex;align-items:center;gap:var(--sp-2);cursor:pointer;list-style:none;
+  font-size:var(--fs-xs);font-weight:600;color:var(--text3);
+}
+.srs-material summary::-webkit-details-marker{display:none}
+.srs-material summary:hover{color:var(--text2)}
+.srs-material.erro summary{color:var(--warning)}
+.srs-material-body{margin-top:var(--sp-3)}
+.srs-back-cena{
+  padding-left:var(--sp-4);border-left:3px solid rgba(var(--primary-rgb),.45);margin-bottom:var(--sp-3);
+}
+.srs-cena-cab{display:block;font-size:var(--fs-3xs);color:var(--text3);text-transform:uppercase;
+  letter-spacing:.08em;font-weight:700;margin-bottom:3px}
+.srs-cena-en{font-style:italic;line-height:1.5}
+.srs-cena-pt{color:var(--text2);font-size:var(--fs-sm);margin-top:2px}
+.srs-back-vizinhos{display:flex;flex-wrap:wrap;gap:var(--sp-4);margin-top:var(--sp-3);
+  font-size:var(--fs-xs);color:var(--text3)}
+.srs-seguir{margin-top:var(--sp-5);display:flex;gap:var(--sp-3);flex-wrap:wrap;scroll-margin-bottom:16px}
+.srs-seguir .btn{flex:1;justify-content:center;min-width:150px}
+/* No celular a barra de navegação é FIXA e come 68px do rodapé: sem esta
+   folga, o `scrollIntoView` da pausa do erro para com o botão embaixo dela. */
+@media (max-width:768px){
+  .srs-seguir{scroll-margin-bottom:calc(84px + env(safe-area-inset-bottom,0))}
+}
+
 /* Ordem dos itens do dossiê — ao lado dos filtros, e discreta: é ajuste de
    leitura, não decisão do fluxo. */
 .dos-ordem{

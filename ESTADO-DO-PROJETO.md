@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-07 — **O ITEM AVISANDO CONTRA ELE MESMO (94ª rodada)**. Print
+> Última atualização: 2026-08-08 — **O PESO NA TELA CERTA**. O insight dele: *"o card de Revisão
+> é mais robusto e poderoso do que o Estudar de fato"* — e estava invertido. **Revisar ficou
+> enxuto** (definição, origem, vizinhos e a cena do livro desceram para um `<details>` recolhido)
+> e **o material certeiro abre sozinho ao errar**, segurando o card seguinte até ele dizer
+> "Entendi". ⚠️ **A nota é aplicada na hora; só o avanço espera** — segurar a avaliação junto com
+> a tela perderia o "Errei" se ele fechasse o app. **Estudar virou o painel cheio**: chips,
+> pronúncia, frase falada, origem e vizinhos no cartão, mais um **MODO FOCO** de tela cheia com
+> ← / Estudei / → nas setas do teclado. A fila do foco é um **retrato tirado na entrada** — sobre
+> a lista viva, marcar "Estudei" reordenava tudo e o avanço pulava o vizinho. E há **atalho com
+> volta**: da pausa do erro para o painel cheio e de volta à mesma tela, sessão intacta.
+> `sw.js` → `englab-v154`. Ver seção 8.2 ("O peso na tela certa").
+>
+> Anterior: 2026-08-07 — **O ITEM AVISANDO CONTRA ELE MESMO (94ª rodada)**. Print
 > dele: o item **"fall in love"** — já separado — exibia *"este sentido só existe com **in love**
 > … não fall in love sozinho"* e oferecia separar o que já estava separado. **Causa:** ao
 > analisar a expressão, a IA responde (com razão) `requires: "in love"`, e nada checava se o
@@ -6300,6 +6312,79 @@ explicação. Detalhes que o teste cobriu:
 - `* item` no começo da linha é marcador de lista, não ênfase — tratado antes;
 - `<script>` continua escapado; só `b/strong/i/em` voltam a valer.
 
+### O PESO NA TELA CERTA — Estudar poderoso, Revisar enxuto (2026-08-08)
+
+*"O card de Revisão atualmente é mais robusto e poderoso do que o Estudar de fato. O correto não
+seria o Estudar ter todo esse poder e o Revisar somente itens realmente necessários?"*
+
+Ele estava certo, e a inversão tinha nome: **Estudar é o primeiro contato** (é ali que se
+constrói o vínculo forma–significado, e é ali que ouvir a pronúncia, ver a origem e ler os três
+exemplos muda o que fica), enquanto **Revisar é recuperação** — e material demais no verso
+convida a **reler em vez de lembrar**, que é o jeito clássico de sentir que aprendeu sem ter
+fortalecido nada.
+
+**Revisar ficou enxuto.** Frase, palavra, IPA, áudio, chips e o significado continuam à vista.
+Definição, origem, sinônimos/antônimos e a cena do livro desceram para um `<details class=
+"srs-material">` recolhido. Confirmado ao vivo que fechado ele não ocupa a tela
+(`checkVisibility() === false`, altura do `<details>` = 34px, só o resumo).
+
+**O material certeiro aparece sozinho ao errar.** Apertou "Errei" e o card seguinte não entra:
+o verso repinta com o material aberto, os quatro botões de nota saem de cena e surge
+"Entendi — próximo". A ordem do Anki é frente → verso → nota, então sem essa pausa o único
+instante em que reler vale alguma coisa passava batido.
+
+> ⚠️ **A nota é aplicada NA HORA; só o avanço espera.** O primeiro desenho desta rodada segurava
+> a avaliação junto com a tela — se ele fechasse o app na pausa, o "Errei" evaporava. Perder
+> progresso real por causa de uma tela é exatamente o erro que este projeto vem evitando desde o
+> "não estudei ainda". Provado no teste: `state=learning`, `histórico=1`, `done=1` **antes** de
+> qualquer clique em "Entendi".
+
+**No celular a pausa nascia sem saída visível**: abrir o material estica o verso e o
+"Entendi — próximo" caía em y=815, com a tela terminando em 812. Rolar sozinho também não
+bastava — a barra fixa de navegação come os 68px de baixo e engolia o botão. Agora a pausa rola
+o mínimo (`block:'nearest'`) e a folga vem de `scroll-margin-bottom` no CSS, que é quem sabe da
+barra. Medido: botão em 632→728, barra em 744, cena do livro inteira na tela.
+
+Durante a pausa o teclado só sabe seguir (Espaço/Enter/→/1-4 = "Entendi"), senão a segunda
+batida cairia como nota **no card seguinte, que ele nem viu**. Olhar o histórico encerra a pausa
+(`navigateHistory` zera `_srsErrou`), senão o card antigo apareceria com um botão que ali não
+significa nada.
+
+**Estudar virou o painel cheio.** O cartão da lista ganhou chips (nível, variedade, registro,
+tipo, "sentido N de M" clicável para o verbete), botões de **Pronúncia** e **Frase**, os
+vizinhos e a origem — as mesmas peças do card, agora do lado onde se aprende.
+
+**MODO FOCO** (`#dos-foco`, tela cheia fora de `.section`): um item sozinho, com a cena onde ele
+encontrou, o significado grande, **os três exemplos** (a lista mostra dois), origem, vizinhos e
+irmãos. Rodapé com ← / **Estudei** / →, e as **setas do teclado** fazendo o mesmo; Esc sai;
+Espaço/Enter marca estudado e segue.
+
+Três armadilhas que o teste ao vivo pegou:
+
+- **A fila do foco é um RETRATO, tirado na entrada — não a lista viva.** Andando sobre a lista
+  viva, marcar "Estudei" reordenava tudo (o estudado desce para os concluídos) e o avanço `+1`
+  **pulava o vizinho**: shake → *fall/fracassar*, com *fall/cair* passando na frente sem ser
+  visto. Congelado o retrato, o percurso saiu 1→2→3 sem buraco e o contador parou de saltar.
+  O **estado** continua lido ao vivo — o retrato guarda a ordem, nunca os dados.
+- **O par é reancorado por id a cada pintura.** Um sync da nuvem troca os objetos de `words`, e o
+  retrato passaria a segurar cópias órfãs: a tela mostraria dado velho e o `sentidoEstado` do
+  órfão nunca viraria `revisao`, travando o avanço para sempre.
+- **`saveToSrs` pode recusar** (limite diário, sentido sem material). Se recusar, não se anda —
+  avançar ali faria o item sumir da tela **sem ter entrado na revisão**.
+
+**O atalho com volta**, fechando o ciclo: na pausa do erro há **"Estudar de novo"**, que leva ao
+painel cheio daquele item (`dossieAbrirItem` acha o dossiê pela chave, derruba busca e filtro —
+o item vindo da revisão está *concluído* e sumiria no filtro "para estudar" — e cai no foco em
+cima dele). A sessão sobrevive à troca de seção, então a **pílula "Voltar para a revisão"**
+devolve a tela idêntica, com a pausa de pé. Provado ponta a ponta no navegador.
+
+`_activateSection` passou a fechar o foco ao trocar de seção — ele mora no `body`, fora de
+`.section`, e ficaria por cima da tela nova. No foco a pílula sobe para o topo, senão cairia
+justo sobre o ← / Estudei / →.
+
+**Arquivos**: `js/study.js`, `js/dossie.js`, `js/core.js` (`_activateSection`), `css/styles.css`.
+`sw.js` → `englab-v154`.
+
 ### Onde a captura ainda NÃO leva a semente
 
 Só o leitor foi ligado. Faltam **vídeo/legenda** e **a extensão (Netflix/Kindle)** — e o
@@ -6311,6 +6396,21 @@ lugar só.
 
 ## 9. Pendências / a verificar
 
+- [ ] **USAR O MODO FOCO COM UM CAPÍTULO DE VERDADE** (2026-08-08). O percurso foi provado no
+      navegador com 4 itens semeados: retrato estável, setas sem pular, "Estudei" mandando para a
+      revisão, pausa do erro, atalho e volta. Falta o que só o uso diz — se **os três exemplos**
+      no foco são leitura boa ou parede, se o rodapé fica à mão no celular, e se a lista compacta
+      (dois exemplos) já basta ou também quer os três.
+- [ ] **DECIDIR: 3 exemplos = 3 CARDS?** (aberto desde a rodada do "um sentido por encontro").
+      Um sentido com 3 exemplos vira **3 cards** no SRS — confirmado de novo neste teste
+      (2 sentidos estudados → 6 cards). Com a captura já enxugada para um sentido por encontro,
+      talvez o multiplicador que sobra seja este. É **uma linha** na criação do card; o que falta
+      é ele decidir se quer um card com 3 exemplos ou 3 cards com um exemplo cada.
+- [x] ~~A pausa do erro no celular~~ — **medido e corrigido na mesma rodada** (2026-08-08): em
+      375×812 o "Entendi — próximo" nascia em y=815 (fora da tela) e, depois de rolar, ficava
+      embaixo da barra fixa de navegação. Resolvido com `scrollIntoView({block:'nearest'})` na
+      pausa + `scroll-margin-bottom: 84px` no celular. Medido de novo: botão em 632→728, barra
+      começa em 744, e a cena do livro continua inteira na tela.
 - [x] ~~Medir a pré-análise com IA de verdade (`barrel` → "cano"?)~~ — **FEITO e PASSOU**
       (confirmado pelo Djemeson em 2026-08-07). ⚠️ **Não refazer este teste.** É o que
       autorizou a glosa da pré-análise a virar semente do sentido (ver 8.2, Fase 1).

@@ -143,6 +143,56 @@ function dossieAbrir(chave) {
 }
 function dossieVoltar() { dossieAbrir(null) }
 
+// ---- O MATERIAL RICO -------------------------------------------------
+// O dossiê era a versão pobre do card de revisão: sem áudio, sem origem, sem
+// nível/registro, sem os vizinhos. Estava invertido — Estudar é o PRIMEIRO
+// CONTATO (é aqui que se constrói o vínculo forma-significado, e é aqui que
+// ouvir a pronúncia e entender a origem muda o que fica), enquanto Revisar é
+// RECUPERAÇÃO, onde material demais convida a reler em vez de lembrar.
+// Estas peças são compartilhadas entre o cartão da lista (compacto) e o modo
+// foco (completo) — a lista continua legível em série, o foco é onde o poder
+// aparece inteiro.
+function _dosChips(w, m) {
+  let out = ''
+  const nivel = m.level || ''
+  if (nivel) out += `<span class="dos-chip nivel">${esc(nivel)}</span>`
+  if (typeof varietyChip === 'function') out += varietyChip(m.variety || w.variety, wordLang(w))
+  if (typeof registerChip === 'function') out += registerChip(m.register)
+  if (m.type_label) out += `<span class="dos-chip">${esc(m.type_label)}</span>`
+  // Sentido N de M — e o clique abre o verbete daquele item, que é onde a
+  // pergunta "quais são os outros?" tem resposta completa.
+  const irmaos = sentidosDe(w)
+  if (irmaos.length > 1) {
+    const pos = irmaos.indexOf(m) + 1
+    out += `<span class="dos-chip sentido" onclick="event.stopPropagation();openWordGlossary('${w.id}')"
+      data-tip="Sentido ${pos} de ${irmaos.length} — clique para ver o verbete">${ic('layers','ic-sm')}${pos}/${irmaos.length}</span>`
+  }
+  return out
+}
+
+function _dosAudioHTML(w, m) {
+  const frase = (m.examples && m.examples[0] && m.examples[0].en) || ''
+  return `<span class="dos-audio">
+    <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();playSrsTTS(${escA(JSON.stringify(w.word || ''))})"
+      data-tip="Ouvir a pronúncia">${ic('volume','ic-sm')} Pronúncia</button>
+    ${frase ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();playSrsTTS(${escA(JSON.stringify(frase.replace(/<[^>]*>/g,'')))})"
+      data-tip="Ouvir a frase inteira">${ic('volume','ic-sm')} Frase</button>` : ''}
+  </span>`
+}
+
+function _dosOrigemHTML(m) {
+  if (!m.origin_pt) return ''
+  return `<div class="dos-origem">${ic('sparkles','ic-sm')}<div><b>Origem</b><span>${esc(m.origin_pt)}</span></div></div>`
+}
+
+function _dosVizinhosHTML(m) {
+  const sin = m.synonyms || [], ant = m.antonyms || []
+  if (!sin.length && !ant.length) return ''
+  return `<div class="dos-vizinhos">${
+    sin.length ? `<span>↔ ${sin.slice(0,5).map(esc).join(', ')}</span>` : ''}${
+    ant.length ? `<span class="ant">✕ ${ant.slice(0,4).map(esc).join(', ')}</span>` : ''}</div>`
+}
+
 // ---- telas -----------------------------------------------------------
 function _dossieCardHTML(s) {
   const { w, m, feito } = s
@@ -158,21 +208,27 @@ function _dossieCardHTML(s) {
       <header class="dos-cab">
         <b>${esc(w.word || '(frase)')}</b>
         ${w.ipa ? `<span class="dos-ipa">${esc(w.ipa)}</span>` : ''}
+        ${_dosAudioHTML(w, m)}
         ${feito ? `<span class="dos-selo">${ic('check','ic-sm')} estudado</span>` : ''}
       </header>
       ${ctx ? `<div class="dos-ctx">“${esc(ctx)}”${ctxPt ? `<span>${esc(ctxPt)}</span>` : ''}</div>` : ''}
       <div class="dos-sig${m.context_match ? ' ctx' : ''}">
-        <div class="dos-sig-pt">${esc(m.meaning_pt)}${m.type_label ? `<i>${esc(m.type_label)}</i>` : ''}</div>
+        <div class="dos-sig-pt">${esc(m.meaning_pt)}</div>
+        <div class="dos-chips">${_dosChips(w, m)}</div>
         ${m.definition_pt ? `<div class="dos-sig-def">${esc(m.definition_pt)}</div>` : ''}
+        ${_dosVizinhosHTML(m)}
         ${(m.examples || []).slice(0, 2).map(ex => `
           <div class="dos-ex">${buildSrsFrente({ example_en: ex.en || '', word: w.word })}${ex.pt ? `<span>${escB(ex.pt)}</span>` : ''}</div>`).join('')}
       </div>
+      ${_dosOrigemHTML(m)}
       ${irmaos.length ? `<div class="dos-irmaos">${ic('layers','ic-sm')} ${esc(w.word)} também é: ${
         irmaos.map(x => esc(x.meaning_pt)).join(' · ')}</div>` : ''}
       <footer class="dos-acoes">
         ${feito
           ? `<button class="btn btn-ghost btn-sm" onclick="dossieDesfazerEstudo('${w.id}','${m.id || ''}')">${ic('undo','ic-sm')} não estudei ainda</button>`
           : `<button class="btn btn-primary btn-sm" onclick="dossieEstudei('${w.id}','${m.id || ''}')">${ic('check','ic-sm')} Estudei — mandar para a Revisão</button>`}
+        <button class="btn btn-secondary btn-sm" onclick="dossieFoco('${w.id}','${m.id || ''}')"
+          data-tip="Abre só este item na tela, sem distração — setas do teclado passam para o próximo">${ic('expand','ic-sm')} Foco</button>
         <button class="btn btn-ghost btn-sm dos-corrigir" onclick="voltarParaPreparar('${w.id}')"
           data-tip="A análise saiu errada? Devolve o item ao Preparar para re-analisar ou refazer do zero.">${ic('refresh','ic-sm')} Corrigir em Preparar</button>
       </footer>
@@ -348,8 +404,11 @@ function _dossiePintarCorpo() {
   // seria fazê-lo rolar por cima do que já terminou.
   const falta = aberto.itens.filter(s => !s.feito).sort(_dosComparar)
   const feitos = aberto.itens.filter(s => s.feito).sort(_dosComparar)
+  // O foco anda sobre a MESMA lista que a tela mostra — por isso ela é
+  // guardada aqui, depois do filtro, da busca e da ordem.
   // Não estudados primeiro: é o que ele veio fazer.
   const visiveis = [...falta, ...feitos].filter(_dosItemCasa)
+  _dosVisiveis = visiveis
   const filtrando = !!_dosBusca || _dosFiltro !== 'todos'
   corpo.innerHTML = `
     <div class="dos-topo">
@@ -357,6 +416,8 @@ function _dossiePintarCorpo() {
       <div class="dos-titulo">
         <b>${esc(aberto.obra)}</b>${aberto.cap ? `<span>${esc(aberto.cap)}</span>` : ''}
       </div>
+      ${visiveis.length ? `<button class="btn btn-secondary btn-sm" onclick="dossieFoco()"
+        data-tip="Um item por vez, tela cheia — as setas do teclado andam">${ic('expand','ic-sm')} Modo foco</button>` : ''}
       <span class="dos-contagem">${feitos.length}/${aberto.itens.length} estudados${
         filtrando ? ` · <i>${visiveis.length} na tela</i>` : ''}</span>
     </div>
@@ -365,6 +426,197 @@ function _dossiePintarCorpo() {
     ${visiveis.length
       ? `<div class="dos-lista">${visiveis.map(_dossieCardHTML).join('')}</div>`
       : _dossieNadaHTML('item')}`
+}
+
+// ================================================================
+// MODO FOCO — um item por vez, a tela inteira
+// ================================================================
+// A lista serve para percorrer o capítulo; o foco serve para ESTUDAR um item.
+// São leituras diferentes, e é por isso que o material pesado (origem,
+// vizinhos, exemplos todos) mora aqui e não lá: 14 itens com tudo aberto viram
+// uma parede e ninguém lê a segunda metade.
+//
+// A FILA DO FOCO É UM RETRATO, TIRADO NA ENTRADA — e isto foi aprendido
+// errando: a lista da tela se reordena sozinha (o estudado desce para o fim
+// dos "concluídos"), então andar por índice sobre a lista VIVA pulava o
+// vizinho e fazia o contador saltar de "2 de 3" para "3 de 3" no mesmo item.
+// Congelando a ordem na entrada, o percurso é o que ele viu quando entrou:
+// busca, filtro e ordem valem — mas valem uma vez, não a cada clique.
+// O estado de cada sentido continua LIVE (lido do objeto, não do retrato),
+// porque marcar estudado precisa aparecer na hora.
+let _dosFoco = null            // { i } índice em _dosFocoLista, ou null
+let _dosFocoLista = []         // o retrato: [{w, m}] na ordem da entrada
+let _dosVisiveis = []          // a lista viva do último render (fonte do retrato)
+
+function dossieFoco(wordId, meaningId) {
+  _dosFocoLista = _dosVisiveis.slice()
+  if (!_dosFocoLista.length) { toast('Nada para focar nesta tela', 'info'); return }
+  const i = _dosFocoLista.findIndex(s => s.w.id === wordId && (s.m.id || '') === (meaningId || ''))
+  _dosFoco = { i: i >= 0 ? i : 0 }
+  _dosFocoPintar()
+}
+
+function dossieFocoSair() {
+  _dosFoco = null
+  _dosFocoLista = []
+  document.body.classList.remove('dos-focando')
+  const box = el('dos-foco'); if (box) box.remove()
+  renderDossieSection()
+}
+
+// `dir` = +1 / -1. Sem circular de propósito: chegar ao fim é informação
+// ("acabou o capítulo"), e voltar ao começo em silêncio esconderia isso.
+function dossieFocoAndar(dir) {
+  if (!_dosFoco) return
+  const novo = _dosFoco.i + dir
+  if (novo < 0 || novo >= _dosFocoLista.length) {
+    toast(dir > 0 ? 'Último item deste dossiê' : 'Primeiro item deste dossiê', 'info')
+    return
+  }
+  _dosFoco.i = novo
+  _dosFocoPintar()
+}
+
+function dossieFocoEstudei() {
+  if (!_dosFoco) return
+  const s = _dosFocoLista[_dosFoco.i]; if (!s) return
+  dossieEstudei(s.w.id, s.m.id)
+  // `saveToSrs` pode RECUSAR (limite diário, sentido sem material). Nesse caso
+  // o aviso já apareceu e não se anda: avançar aqui faria o item sumir da tela
+  // sem ter entrado na revisão — o pior tipo de erro silencioso.
+  // A leitura é pelo par VIVO, nunca pelo do retrato: um sync da nuvem troca os
+  // objetos de `words`, e o retrato passaria a segurar cópias órfãs — o estado
+  // ficaria eternamente 'estudo' e o foco nunca mais andaria.
+  const vivo = _dossiePar(s.w.id, s.m.id)
+  if (!vivo || sentidoEstado(vivo.m) !== 'revisao') { _dosFocoPintar(); return }
+  // O retrato não mudou de tamanho, então o próximo é literalmente o próximo.
+  if (_dosFoco.i >= _dosFocoLista.length - 1) { _dosFocoPintar(); toast('Último item deste dossiê', 'info'); return }
+  dossieFocoAndar(+1)
+}
+
+// Desmarcar não mexe no retrato — só no estado do sentido, que é lido live.
+// (Não apaga os cards já criados: essa decisão mora em `dossieDesfazerEstudo`.)
+function dossieFocoDesfazer() {
+  if (!_dosFoco) return
+  const s = _dosFocoLista[_dosFoco.i]; if (!s) return
+  dossieDesfazerEstudo(s.w.id, s.m.id)
+  _dosFocoPintar()
+}
+
+// PORTA DE ENTRADA VINDA DE FORA (hoje: o atalho da Revisão).
+// Quem chama sabe QUAL sentido quer, não em que dossiê ele mora nem que filtro
+// está ligado — então aqui se arruma tudo: acha o dossiê pela chave, abre,
+// derruba busca e filtro (o item vindo da revisão está 'feito' e sumiria no
+// filtro "para estudar") e cai no foco em cima dele.
+function dossieAbrirItem(wordId, meaningId) {
+  const p = _dossiePar(wordId, meaningId)
+  const e = p ? sentidoEstado(p.m) : ''
+  if (!p || (e !== 'estudo' && e !== 'revisao')) {
+    toast('Este item não está no Estudar', 'info'); return false
+  }
+  _dosBusca = ''
+  _dosFiltro = 'todos'
+  const inp = el('dossie-busca'); if (inp) inp.value = ''
+  dossieAbrir(_dossieChave(p.w, p.m))
+  _dossiePintarFiltros()
+  // `dossieAbrir` já repintou o corpo, então `_dosVisiveis` é a lista deste
+  // dossiê — e é dela que o retrato do foco vai sair.
+  if (!_dosVisiveis.some(s => s.w.id === wordId && (s.m.id || '') === (meaningId || ''))) {
+    toast('Item não encontrado neste dossiê', 'info'); return false
+  }
+  dossieFoco(wordId, meaningId)
+  return true
+}
+
+function _dosFocoPintar() {
+  if (!_dosFoco) return
+  if (!_dosFocoLista.length) { dossieFocoSair(); return }
+  _dosFoco.i = Math.max(0, Math.min(_dosFoco.i, _dosFocoLista.length - 1))
+  const s = _dosFocoLista[_dosFoco.i]
+  // Reancora pelo id a cada pintura: o retrato guarda a ORDEM do percurso, não
+  // os dados. Se um sync trocou os objetos de `words`, é o par vivo que aparece
+  // na tela; se o item sumiu de vez, sai do foco em vez de pintar um fantasma.
+  const par = _dossiePar(s.w.id, s.m.id)
+  if (!par) { toast('Este item saiu do dossiê', 'info'); dossieFocoSair(); return }
+  const { w, m } = par
+  // `feito` LIVE, não o do retrato: marcar estudado tem que aparecer no mesmo
+  // instante, e o retrato guarda a ordem — não o estado.
+  const feito = sentidoEstado(m) === 'revisao'
+  const ctx = m.context || w.context || ''
+  const ctxPt = m.context_pt || (m.context ? '' : w.context_pt) || ''
+  const irmaos = sentidosDe(w).filter(x => x !== m)
+
+  let box = el('dos-foco')
+  if (!box) {
+    box = document.createElement('div')
+    box.id = 'dos-foco'
+    document.body.appendChild(box)
+    document.body.classList.add('dos-focando')
+  }
+  box.innerHTML = `
+    <div class="dosf-topo">
+      <button class="btn btn-ghost btn-sm" onclick="dossieFocoSair()">${ic('x','ic-sm')} Sair do foco <span class="dosf-tecla">Esc</span></button>
+      <span class="dosf-pos">${_dosFoco.i + 1} de ${_dosFocoLista.length}</span>
+      <span class="dosf-obra">${esc(w.source_title || m.source_title || '')}</span>
+    </div>
+    <div class="dosf-corpo">
+      <div class="dosf-cab">
+        <b>${esc(w.word || '(frase)')}</b>
+        ${w.ipa ? `<span class="dos-ipa">${esc(w.ipa)}</span>` : ''}
+        ${_dosAudioHTML(w, m)}
+        ${feito ? `<span class="dos-selo">${ic('check','ic-sm')} estudado</span>` : ''}
+      </div>
+      <div class="dos-chips">${_dosChips(w, m)}</div>
+      ${ctx ? `<div class="dosf-cena">
+        <span class="dosf-cena-cab">${ic('bookOpen','ic-sm')} onde você encontrou</span>
+        <div class="dosf-cena-en">“${esc(ctx)}”</div>
+        ${ctxPt ? `<div class="dosf-cena-pt">${esc(ctxPt)}</div>` : ''}
+      </div>` : ''}
+      <div class="dosf-sig">${esc(m.meaning_pt)}</div>
+      ${m.definition_pt ? `<div class="dos-sig-def">${esc(m.definition_pt)}</div>` : ''}
+      ${_dosVizinhosHTML(m)}
+      ${_dosOrigemHTML(m)}
+      <div class="dosf-exs">
+        ${(m.examples || []).map((ex, k) => `
+          <div class="dos-ex"><span class="dosf-ex-n">#${k + 1}</span>
+            <div>${buildSrsFrente({ example_en: ex.en || '', word: w.word })}
+            ${ex.pt ? `<span>${escB(ex.pt)}</span>` : ''}</div></div>`).join('')}
+      </div>
+      ${irmaos.length ? `<div class="dos-irmaos">${ic('layers','ic-sm')} ${esc(w.word)} também é: ${
+        irmaos.map(x => esc(x.meaning_pt)).join(' · ')}</div>` : ''}
+    </div>
+    <div class="dosf-rodape">
+      <button class="btn btn-ghost" onclick="dossieFocoAndar(-1)" ${_dosFoco.i === 0 ? 'disabled' : ''}>
+        ${ic('chevronLeft','ic-sm')} <span class="dosf-tecla">←</span></button>
+      ${feito
+        ? `<button class="btn btn-ghost" onclick="dossieFocoDesfazer()">${ic('undo','ic-sm')} não estudei ainda</button>`
+        : `<button class="btn btn-primary" onclick="dossieFocoEstudei()">${ic('check','ic-sm')} Estudei<span class="dosf-longo"> — mandar para a Revisão</span></button>`}
+      <button class="btn btn-ghost" onclick="dossieFocoAndar(1)" ${_dosFoco.i >= _dosFocoLista.length - 1 ? 'disabled' : ''}>
+        <span class="dosf-tecla">→</span> ${ic('chevronRight','ic-sm')}</button>
+    </div>`
+}
+
+// UM listener só, ligado uma vez. Ligar/desligar a cada abertura do foco é
+// como se cria ouvinte órfão — o guarda é o próprio `_dosFoco`.
+if (!window._dosFocoTeclas) {
+  window._dosFocoTeclas = true
+  document.addEventListener('keydown', e => {
+    if (!_dosFoco) return
+    if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return
+    if (e.key === 'Escape') { e.preventDefault(); dossieFocoSair(); return }
+    if (e.key === 'ArrowRight') { e.preventDefault(); dossieFocoAndar(1); return }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); dossieFocoAndar(-1); return }
+    // Enter/espaço = marcar estudado e seguir: a mão fica na mesma tecla do
+    // "próximo" e o fluxo de percorrer o capítulo não se quebra.
+    if (e.code === 'Space' || e.code === 'Enter') {
+      e.preventDefault()
+      const s = _dosFocoLista[_dosFoco.i]
+      // Estado LIVE, pelo mesmo motivo da pintura: o retrato guarda ordem, e
+      // ler `s.feito` daqui mandaria para a revisão um item já mandado.
+      const vivo = s && _dossiePar(s.w.id, s.m.id)
+      if (vivo && sentidoEstado(vivo.m) !== 'revisao') dossieFocoEstudei(); else dossieFocoAndar(1)
+    }
+  })
 }
 
 function renderDossieSection() {

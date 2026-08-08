@@ -803,6 +803,9 @@ function showSection(name) {
 }
 
 function _activateSection(name) {
+  // O modo foco do Estudar é uma tela cheia FORA de `.section` (mora no body).
+  // Trocar de seção sem fechá-lo deixaria a nova tela escondida atrás dele.
+  if (typeof dossieFocoSair === 'function' && document.getElementById('dos-foco')) dossieFocoSair()
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
   document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'))
   const navEl = document.getElementById(`nav-${name}`)

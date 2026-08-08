@@ -279,6 +279,8 @@ async function renderSrsCard() {
       <span class="srb-label">${b.label}</span>
       <span class="srb-interval">${previewInterval(card, b.r)}</span>
     </button>`).join('')
+  // Card novo na tela: qualquer pausa de erro anterior morreu com ele.
+  window._srsErrou = false
 
   el('srs-card-area').innerHTML = `
   <div class="srs-flip-card" id="srs-flip" onclick="flipSrsCard()">
@@ -394,6 +396,17 @@ document.addEventListener('keydown', e => {
   if (!flip) return
   const isFlipped = flip.classList.contains('flipped')
 
+  // PAUSA DO ERRO: a nota já foi dada e a tela está mostrando o material.
+  // Qualquer tecla de avaliação aqui reavaliaria o card seguinte às cegas —
+  // então enquanto a pausa dura, o teclado só sabe seguir.
+  if (window._srsErrou) {
+    if (e.code === 'Space' || e.code === 'Enter' || e.key === 'ArrowRight' ||
+        /^(Digit|Numpad)[1-4]$/.test(e.code)) {
+      e.preventDefault(); srsSeguirAposErro()
+    }
+    return
+  }
+
   // Espaço ou Enter: Revelar ou classificar como Bom (3)
   if (e.code === 'Space' || e.code === 'Enter') {
     e.preventDefault()
@@ -452,6 +465,14 @@ async function renderSrsCardBack() {
   if (backFace) backFace.classList.toggle('has-image', verso.includes('data-has-image'))
 }
 
+// ERROU: O MATERIAL VEM ANTES DO PRÓXIMO CARD.
+// A ordem do Anki é frente → verso → nota, então quando ele aperta "Errei" o
+// verso já passou e o card seguinte entraria na hora — perdendo o único
+// instante em que reler vale alguma coisa.
+// ⚠️ A NOTA É APLICADA NORMALMENTE, na hora: só o AVANÇO fica esperando. Se o
+// agendamento dependesse do "Entendi", fechar o app no meio perderia a
+// avaliação — e perder progresso real por causa de uma tela é o erro que este
+// projeto vem evitando desde o "não estudei ainda".
 function rateSrsCardAndNext(cardId, rating) {
   const card = srsCards.find(c => c.id === cardId)
   if (!card) return
@@ -503,7 +524,59 @@ function rateSrsCardAndNext(cardId, rating) {
   updateSrsSessionCounter()
   _histNavIdx = null
   renderHistoryNav()
+  // Errou: segura o avanço e reabre o verso com o material. Acertou: segue.
+  if (rating === 1) {
+    window._srsErrou = true
+    // Abrir o material estica o verso — no celular (375×812) o "Entendi"
+    // nascia em y=815, ou seja, FORA da tela: a pausa parecia um beco sem
+    // saída. `block:'nearest'` rola o mínimo, então a cena e a definição
+    // continuam à vista logo acima do botão.
+    renderSrsCardBack().then(() => {
+      const b = document.querySelector('.srs-seguir')
+      if (b && b.getBoundingClientRect().bottom > innerHeight) {
+        b.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      }
+    })
+    // Os quatro botões saem de cena: a nota já foi dada, e deixá-los ali
+    // convidaria a avaliar de novo — o segundo clique cairia no card seguinte,
+    // que ele nem viu.
+    const areaNota = el('srs-rating-area'); if (areaNota) areaNota.classList.add('hidden')
+    return
+  }
+  window._srsErrou = false
   renderSrsCard()
+}
+
+// O "Entendi" da pausa do erro — só solta o avanço.
+function srsSeguirAposErro() {
+  window._srsErrou = false
+  renderSrsCard()
+}
+
+// ATALHO REVISAR → ESTUDAR, COM VOLTA.
+// A sessão sobrevive à troca de seção (só `endSrsSession` e `clearAllData`
+// zeram `srsSession`), e trocar de seção não mexe no DOM do card — então
+// voltar devolve exatamente a mesma tela, incluindo a pausa do erro se ela
+// ainda estiver de pé. A pílula flutuante do core é quem oferece a volta.
+function srsAbrirNoEstudar(wordId, meaningId) {
+  const errou = !!window._srsErrou
+  estudoVoltarDefinir({
+    secao: 'revisar',
+    rotulo: 'a revisão',
+    restaurar: () => {
+      // Defensivo: se algo tiver escondido a sessão, ela volta à cena.
+      const s = el('srs-view-session'), d = el('srs-view-dashboard')
+      if (srsSession && s && d) { d.classList.add('hidden'); s.classList.remove('hidden') }
+      window._srsErrou = errou
+    }
+  })
+  showSection('estudar')
+  // A seção é lazy: o módulo pode não existir ainda no clique. O mesmo atraso
+  // curto que `estudoVoltar` usa serve aqui, pelo mesmo motivo.
+  setTimeout(() => {
+    if (typeof dossieAbrirItem === 'function') dossieAbrirItem(wordId, meaningId)
+    else toast('Abra o Estudar e procure o item', 'info')
+  }, 80)
 }
 
 // ================================================================
@@ -571,6 +644,10 @@ function renderHistoryNav() {
 
 async function navigateHistory(dir) {
   if (!srsSession) return
+  // Sair da pausa do erro para olhar o histórico ENCERRA a pausa: a nota já foi
+  // aplicada, e deixar `_srsErrou` ligado pintaria o card antigo com o botão
+  // "Entendi — próximo", que ali não faz sentido nenhum.
+  window._srsErrou = false
   const maxIdx = srsSession.history.length - 1
   if (dir < 0) {
     // Ir para anterior
@@ -709,6 +786,7 @@ function endSrsSession() {
   // log do dia (gravado card a card) — só limpa o backup e sincroniza.
   if (srsSession && srsSession.done) { _clearSessionBackup(); autoSyncAfterChange() }
   srsSession = null
+  window._srsErrou = false   // pausa do erro morre com a sessão
   // Aplica cards que chegaram da nuvem (sync em tempo real) durante a sessão
   if (typeof flushPendingCloudCards === 'function') flushPendingCloudCards()
   el('srs-view-session').classList.add('hidden')
@@ -781,11 +859,61 @@ function buildSrsVerso(card, imgData, imageBelow) {
   const metaChips = buildMetaChips(card)
   if (metaChips) metaRow += metaChips
   if (metaRow) text += `<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:12px">${metaRow}</div>`
-  // 4. Significado + definição
+  // 4. Significado — o que confirma a lembrança. Daqui para baixo é MATERIAL,
+  // e material fica recolhido: verso é hora de RECUPERAR, não de reler. Ler
+  // tudo de novo a cada revisão dá sensação de aprender sem fortalecer nada.
   text += `<div class="srs-back-meaning">${esc(strip(card.meaning_pt))}</div>`
-  if (card.definition_pt) text += `<div class="srs-back-def">${esc(strip(card.definition_pt))}</div>`
-  // 4b. Origem / história da expressão (só quando existe)
-  if (card.origin_pt) text += `<div class="srs-back-origin" style="margin-top:10px;padding:9px 12px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:var(--fs-md);line-height:1.45;color:var(--text2)"><span style="display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--text);font-size:var(--fs-sm);margin-bottom:3px">${ic('sparkles','ic-sm')} Origem</span><div>${esc(strip(card.origin_pt))}</div></div>`
+
+  // O MATERIAL CERTEIRO — abre sozinho quando ele erra (`_srsErrou`), que é o
+  // instante em que reancorar vale ouro. Acertou, some do caminho.
+  // Certeiro é a palavra: aqui entra só o que REANCORA — a cena onde ele
+  // encontrou, a definição, a origem e os vizinhos. Chip, fonte e edição
+  // continuam existindo, mas fora do momento da lembrança.
+  const w = (typeof words !== 'undefined' && Array.isArray(words))
+    ? words.find(x => x.id === card.wordId) : null
+  const sentido = w ? (w.meanings || []).find(m => m && (m.id === card.meaningId)) : null
+  const fraseFonte = (sentido && sentido.context) || (w && w.context) || ''
+  const fraseFontePt = (sentido && sentido.context_pt) || (w && w.context_pt) || ''
+  const sin = (sentido && sentido.synonyms) || []
+  const ant = (sentido && sentido.antonyms) || []
+  let material = ''
+  if (fraseFonte) {
+    const obra = (sentido && sentido.source_title) || (w && w.source_title) || ''
+    const cap = (sentido && sentido.source_context) || (w && w.source_context) || ''
+    material += `<div class="srs-back-cena">
+      <span class="srs-cena-cab">${ic('bookOpen','ic-sm')} onde você encontrou${
+        obra ? ` — ${esc(obra)}${cap ? ', ' + esc(cap) : ''}` : ''}</span>
+      <div class="srs-cena-en">“${escB(fraseFonte)}”</div>
+      ${fraseFontePt ? `<div class="srs-cena-pt">${escB(fraseFontePt)}</div>` : ''}
+    </div>`
+  }
+  if (card.definition_pt) material += `<div class="srs-back-def">${esc(strip(card.definition_pt))}</div>`
+  if (card.origin_pt) material += `<div class="srs-back-origin" style="margin-top:10px;padding:9px 12px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border-left:3px solid rgba(var(--primary-rgb),.5);font-size:var(--fs-md);line-height:1.45;color:var(--text2)"><span style="display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--text);font-size:var(--fs-sm);margin-bottom:3px">${ic('sparkles','ic-sm')} Origem</span><div>${esc(strip(card.origin_pt))}</div></div>`
+  if (sin.length || ant.length) {
+    material += `<div class="srs-back-vizinhos">${
+      sin.length ? `<span>↔ ${sin.slice(0,4).map(esc).join(', ')}</span>` : ''}${
+      ant.length ? `<span class="ant">✕ ${ant.slice(0,3).map(esc).join(', ')}</span>` : ''}</div>`
+  }
+  if (material) {
+    text += `<details class="srs-material${window._srsErrou ? ' erro' : ''}"${window._srsErrou ? ' open' : ''}>
+      <summary>${ic('bookOpen','ic-sm')} ${window._srsErrou ? 'Reveja antes de seguir' : 'Ver o material'}</summary>
+      <div class="srs-material-body">${material}</div>
+    </details>`
+  }
+  // A saída da pausa do erro. Fora dela o botão não existe — o fluxo normal
+  // avança sozinho ao avaliar.
+  // Junto vai o atalho para o Estudar: reler o material curto do verso resolve
+  // o esquecimento raso; quando o item não colou de verdade, o lugar de voltar
+  // a construí-lo é o painel cheio — e a sessão fica esperando, intacta.
+  if (window._srsErrou) {
+    text += `<div class="srs-seguir">
+      <button class="btn btn-primary" onclick="event.stopPropagation();srsSeguirAposErro()">
+        ${ic('arrowRight','ic-sm')} Entendi — próximo</button>
+      ${card.wordId ? `<button class="btn btn-ghost" onclick="event.stopPropagation();srsAbrirNoEstudar('${card.wordId}','${card.meaningId || ''}')"
+        data-tip="Abre o painel completo deste item — a revisão continua de onde parou">
+        ${ic('bookOpen','ic-sm')} Estudar de novo</button>` : ''}
+    </div>`
+  }
   // Footer + configurações (sempre na coluna de texto)
   const SRC = {series:'série', movie:'filme', youtube:'YouTube', kindle:'Kindle', podcast:'podcast', website:'site', manual:'manual'}
   const deckLabel = card.deckId ? getSrsDeckPath(card.deckId) : ''
