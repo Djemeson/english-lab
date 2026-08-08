@@ -6041,6 +6041,29 @@ pré-análise no capítulo** (a glosa que ele mostra é a do contexto antigo). O
 já respondeu, ou já acusou divergência, o botão não aparece — seria pagar por resposta que
 existe.
 
+### COESÃO ENTRE AS TELAS — o "mine" que virou "mina" (2026-08-08)
+
+*"O sentido do contexto aqui é 'explorar', mas quando fui na opção de o que significava
+apareceu 'mina'."* Duas falhas somadas, e a segunda era minha, da rodada anterior:
+
+1. **A checagem podia rodar SEM a frase.** `glossFraseEmVolta(pos)` devolve `''` quando `pos`
+   não veio (o balão também abre por caminhos sem posição), e o `aiChecarAqui` seguia em
+   frente com `Passage: "mine"`. Sem contexto, o modelo responde o sentido mais comum do
+   dicionário — que é literalmente o "dicionário cego ao contexto" que o cabeçalho do
+   `glossario.js` proíbe, e a origem do `barrel`→barril.
+   Agora: queda para o bloco em volta, depois para a frase que o próprio card guardou da
+   captura, e **se ainda assim não houver frase, não pergunta** — diz por quê e não gasta
+   chamada.
+2. **A checagem não sabia o que o app já tinha decidido.** Ela perguntava do zero, ignorando
+   que o item já existia com `context_match` definido. Agora os sentidos do item entram na
+   pergunta (com id) e volta `same_as` — e, quando casa, **quem manda é o texto GRAVADO**, não
+   a redação nova: a IA respondeu "garimpar informações", a tela mostra "explorar, aproveitar".
+   Duas telas do mesmo app não podem dar duas respostas para a mesma coisa.
+   Quando casa, a ação também muda: em vez de "Estudar" (que criaria duplicata), o balão diz
+   *"nada a fazer — já está no seu material"*.
+
+Sentido genuinamente novo (`same_as: null`) segue oferecendo o "Estudar", como antes.
+
 ### O PADRÃO DE SELEÇÃO — a peça que faltava (2026-08-08)
 
 Ele mandou o print de `mine`: **5 significados · 5 selecionados · 15 cards**, num item captado

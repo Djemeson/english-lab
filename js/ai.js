@@ -95,11 +95,21 @@ function lexaFormatar(txt) {
 // citação (`cover for`, nunca `covered for`), pronta para virar item.
 const _checkCache = new Map()
 
-async function aiChecarAqui(alvo, frase, lang) {
+// `jaTem` = os sentidos que o item já tem, com id. Sem isso a checagem ficava
+// FORA da conversa: perguntava do zero e podia responder "mina" para um item
+// cujo sentido do contexto o app já tinha decidido ser "explorar" — duas telas
+// do mesmo app dando respostas diferentes para a mesma palavra.
+async function aiChecarAqui(alvo, frase, lang, jaTem) {
   const termo = String(alvo || '').trim()
   const ctx = String(frase || '').replace(/\s+/g, ' ').trim()
   if (!termo) throw new Error('sem termo')
-  const chave = (lang || 'en') + '|' + termo.toLowerCase() + '|' + ctx.toLowerCase()
+  // SEM A FRASE NÃO HÁ O QUE CHECAR. Responder assim mesmo seria devolver o
+  // sentido mais comum do dicionário — exatamente o "dicionário cego ao
+  // contexto" que este projeto proíbe, e a origem do "barrel"→barril.
+  if (!ctx) throw new Error('não achei a frase em volta — selecione o trecho e use Explicar')
+  const lista = Array.isArray(jaTem) ? jaTem.filter(m => m && m.id && m.meaning_pt) : []
+  const chave = (lang || 'en') + '|' + termo.toLowerCase() + '|' + ctx.toLowerCase() +
+                '|' + lista.map(m => m.id).join(',')
   if (_checkCache.has(chave)) return _checkCache.get(chave)
 
   const L = (typeof getLangDef === 'function') ? getLangDef(lang || 'en') : { nameEn: 'English' }
@@ -118,8 +128,14 @@ Return the unit in CITATION form: bare verb, no inflection ("cover for", never "
 
 STEP 2 — SAY WHAT IT MEANS HERE. The sense IN THIS PASSAGE, in Brazilian Portuguese, max 6 words. Decide WHAT the thing IS in this scene and use the Portuguese word for THAT — "barrel" of a rifle is "cano", never "barril". Never a dictionary list, never two domains hedged together.
 
+${lista.length ? `
+STEP 3 — IS IT ONE THE LEARNER ALREADY HAS? These are the senses already recorded for this item:
+${lista.map(m => `- id "${m.id}": ${m.meaning_pt}${m.definition_pt ? ` (${m.definition_pt})` : ''}`).join('\n')}
+If the sense in THIS passage is one of them, set "same_as" to that id and REUSE ITS WORDING in "gloss" — the learner must not read two different answers for the same sense in two screens of the same app. Only set "same_as": null when the passage really uses a sense that is not in the list.
+Judge by the SENSE, not by the wording.` : ''}
+
 Return ONLY this JSON:
-{"expr":"the study unit in citation form","tipo":"word|phrasal_verb|idiom|collocation","gloss":"o sentido nesta passagem, português do Brasil, máx 6 palavras","nivel":"A1|A2|B1|B2|C1|C2","mesma":true}
+{"expr":"the study unit in citation form","tipo":"word|phrasal_verb|idiom|collocation","gloss":"o sentido nesta passagem, português do Brasil, máx 6 palavras","nivel":"A1|A2|B1|B2|C1|C2","mesma":true,"same_as":null}
 "mesma": true when the unit is just the word itself, false when it is a larger expression.`
 
   const r = await aiJSON([
@@ -128,14 +144,21 @@ Return ONLY this JSON:
   ], { maxTokens: 300 })
 
   const expr = String(r && r.expr || termo).replace(/\s+/g, ' ').trim() || termo
+  // COESÃO: quando a IA diz que é um sentido que ele já tem, quem manda é o
+  // texto GRAVADO, não a redação nova. Duas telas do mesmo app não podem dar
+  // duas respostas para a mesma coisa — foi assim que o Preparar dizia
+  // "explorar" e a checagem respondia "mina".
+  const casou = (r && r.same_as) ? lista.find(m => m.id === r.same_as) : null
   const out = {
     expr,
     tipo: ['word', 'phrasal_verb', 'idiom', 'collocation'].includes(r && r.tipo) ? r.tipo : 'word',
-    gloss: String(r && r.gloss || '').trim(),
+    gloss: casou ? String(casou.meaning_pt).trim() : String(r && r.gloss || '').trim(),
     nivel: String(r && r.nivel || '').trim().toUpperCase(),
     // Não confia no booleano do modelo: compara os textos. Com DeepSeek o JSON
     // vem por texto livre e booleano volta como "true"/"sim"/1 conforme o humor.
-    mesma: expr.toLowerCase() === termo.toLowerCase()
+    mesma: expr.toLowerCase() === termo.toLowerCase(),
+    jaEra: casou ? casou.id : null,
+    def: casou ? String(casou.definition_pt || '').trim() : ''
   }
   if (!out.gloss) throw new Error('resposta sem significado')
   _checkCache.set(chave, out)

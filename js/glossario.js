@@ -510,10 +510,29 @@ function _glossPrender(b) {
   setTimeout(() => { document.addEventListener('mousedown', fora, true); document.addEventListener('keydown', esc, true) }, 0)
 }
 
+// A frase em volta, com queda para o bloco inteiro. `glossFraseEmVolta` devolve
+// '' quando `pos` não veio (o balão também é aberto por caminhos sem posição), e
+// checar SEM frase é perguntar ao dicionário cego — foi assim que "mine" num
+// texto sobre garimpar dados voltou como "mina".
+function _glossFraseParaChecar(pos, achado) {
+  const f = glossFraseEmVolta(pos)
+  if (f && f.split(/\s+/).length > 2) return f
+  const bloco = pos && pos.no && pos.no.parentElement
+    ? String(pos.no.parentElement.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 400)
+    : ''
+  if (bloco && bloco.split(/\s+/).length > 2) return bloco
+  // Último recurso: a frase que o próprio card guardou da captura.
+  return String((achado && achado.contexto) || '').trim()
+}
+
 async function _glossChecar(b, achado, pos, opts) {
   _glossPrender(b)
   const alvo = achado.frase ? achado.casou : (pos ? pos.palavra : achado.termo)
-  const frase = glossFraseEmVolta(pos)
+  const frase = _glossFraseParaChecar(pos, achado)
+  // Os sentidos que o item JÁ tem entram na pergunta. Sem isso a checagem
+  // respondia do zero e podia contradizer o que o app já tinha decidido.
+  const item = achado.id && Array.isArray(words) ? words.find(w => w.id === achado.id) : null
+  const jaTem = item && typeof sentidosDe === 'function' ? sentidosDe(item) : []
   const acoes = b.querySelector('.gloss-acoes')
   const corpo = b.querySelector('.gloss-corpo') || b
   const antes = acoes ? acoes.innerHTML : ''
@@ -521,7 +540,7 @@ async function _glossChecar(b, achado, pos, opts) {
 
   let r = null
   try {
-    r = await aiChecarAqui(alvo, frase, (typeof activeLang === 'function' ? activeLang() : 'en'))
+    r = await aiChecarAqui(alvo, frase, (typeof activeLang === 'function' ? activeLang() : 'en'), jaTem)
   } catch (e) {
     if (acoes) acoes.innerHTML = `<span class="gloss-checando erro">${ic('alert','ic-sm')} ${esc(e.message || 'não deu para checar')}</span>`
     return
@@ -538,9 +557,14 @@ async function _glossChecar(b, achado, pos, opts) {
         rotTipo ? `<span class="gloss-tipo">${esc(rotTipo)}</span>` : ''}${
         r.nivel ? `<span class="gloss-tipo">${esc(r.nivel)}</span>` : ''}</div>
       <div class="gloss-pt">${typeof lexaFormatar === 'function' ? lexaFormatar(r.gloss) : esc(r.gloss)}</div>
+      ${r.jaEra ? `<div class="gloss-rodape">${ic('check','ic-sm')} é o sentido que você já tem deste item</div>` : ''}
     </div>`)
 
-  if (acoes) {
+  if (acoes && r.jaEra) {
+    // Já é um sentido do item: oferecer "estudar" aqui criaria duplicata do que
+    // ele já tem. A informação é a resposta; a ação seria um erro.
+    acoes.innerHTML = `<span class="gloss-checando">${ic('check','ic-sm')} nada a fazer — já está no seu material</span>`
+  } else if (acoes) {
     acoes.innerHTML = `<button class="gloss-btn gloss-estudar destaque" type="button">${
       ic('plus','ic-sm')} Estudar ${r.mesma ? 'este sentido' : esc(r.expr)}</button>`
     acoes.querySelector('.gloss-estudar').onclick = ev => {
