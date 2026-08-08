@@ -5617,7 +5617,11 @@ body.dos-focando{overflow:hidden}
 /* O palco: índice fino à esquerda (só onde sobra largura) + coluna de leitura.
    A rolagem é do CORPO, não da janela — o cabeçalho e o rodapé ficam parados. */
 .dosf-palco{flex:1;display:flex;gap:var(--sp-7);min-height:0;justify-content:center}
-.dosf-corpo{flex:1;overflow-y:auto;max-width:70ch;width:100%;padding:var(--sp-7) var(--sp-2) var(--sp-8)}
+/* Sem recuo no TOPO: ele passou para o cabeçalho. Com o recuo aqui, o
+   cabeçalho pinado parava 20px abaixo da borda e o texto escorria por essa
+   faixa, aparecendo ACIMA dele — medido: "adjetivo atributivo: digest-sized…"
+   visível por cima do próprio item. */
+.dosf-corpo{flex:1;overflow-y:auto;max-width:70ch;width:100%;padding:0 var(--sp-2) var(--sp-8)}
 /* Rolagem suave só para quem não pediu menos movimento. Além da acessibilidade,
    isto evita depender de animação onde ela pode não rodar: com `smooth`, um
    `scrollTop = X` só chega ao destino se houver frames. */
@@ -5638,7 +5642,25 @@ body.dos-focando{overflow:hidden}
 .dosf-indice a.aqui{color:var(--primary);border-left-color:var(--primary);font-weight:600}
 
 /* Cabeçalho do item */
-.dosf-cab{padding-bottom:var(--sp-5);border-bottom:1px solid var(--border)}
+/* O ITEM NUNCA SAI DE VISTA.
+   Rolando, o cabeçalho subia junto e a página virava um monte de seções sem
+   dono — "de formato pequeno, compacto" sem a palavra em cima. Ele fica preso
+   no topo, mas ENCOLHE: em tamanho cheio (título serifado + chips + fonte)
+   comeria uns 110px de uma tela de 900 para sempre. Preso, sobra o essencial —
+   a palavra, a pronúncia e o botão de ouvir — em ~50px.
+   A altura pinada é a régua do `top` dos rótulos das seções, logo abaixo. */
+.dosf-cab{
+  position:sticky;top:0;z-index:2;background:var(--bg);
+  padding-top:var(--sp-7);padding-bottom:var(--sp-5);
+  border-bottom:1px solid var(--border);
+  transition:padding .12s ease;
+}
+.dosf-cab.encolhido{padding-top:var(--sp-3);padding-bottom:var(--sp-3)}
+.dosf-cab.encolhido b{font-size:var(--fs-lg)}
+/* Chips e procedência saem quando pinado: são orientação de entrada, não algo
+   que se consulta a cada rolagem. A palavra e o áudio ficam. */
+.dosf-cab.encolhido .dos-chips,
+.dosf-cab.encolhido .dosf-fonte{display:none}
 .dosf-cab-linha{display:flex;align-items:baseline;gap:var(--sp-3);flex-wrap:wrap}
 .dosf-cab b{font-family:'Newsreader',serif;font-size:var(--fs-2xl);font-weight:600;line-height:1.1}
 .dosf-ipa{color:var(--text3);font-size:var(--fs-md)}
@@ -5685,7 +5707,9 @@ body.dos-focando{overflow:hidden}
     display:grid;grid-template-columns:150px minmax(0,1fr);
     column-gap:var(--sp-8);align-items:start;
   }
-  .dosf-bloco > .dosf-rot{grid-column:1;margin:0;padding-top:2px;position:sticky;top:var(--sp-3)}
+  /* O rótulo prende ABAIXO do cabeçalho pinado, senão desliza por baixo dele
+     e some justamente quando a seção é longa — que é quando ele serve. */
+  .dosf-bloco > .dosf-rot{grid-column:1;margin:0;padding-top:2px;position:sticky;top:60px}
   .dosf-bloco > *:not(.dosf-rot){grid-column:2}
   .dosf-cab{max-width:none}
 }
@@ -5868,7 +5892,14 @@ body.dos-focando #voltar-pill{bottom:auto;top:calc(14px + env(safe-area-inset-to
 @media (max-width:768px){
   #dos-foco{padding:var(--sp-4)}
   .dosf-palco{gap:0}
-  .dosf-corpo{padding:var(--sp-5) 0 var(--sp-7)}
+  /* Mesmo motivo do desktop: o recuo do topo é do cabeçalho pinado, não do
+     corpo — senão o texto escorre por cima dele. */
+  .dosf-corpo{padding:0 0 var(--sp-7)}
+  .dosf-cab{padding-top:var(--sp-5)}
+  /* Pinado no celular, o rótulo do áudio sai e fica só o ícone: com o texto,
+     a linha do título quebrava em duas e o cabeçalho fixo comia 94px de 812. */
+  .dosf-cab.encolhido .dos-audio .btn > span{display:none}
+  .dosf-cab.encolhido .dos-audio .btn{padding:var(--sp-1) var(--sp-3)}
   /* No celular a separação importa MAIS, não menos: sem a coluna do rótulo,
      o espaço e o filete são tudo o que resta para dizer onde uma seção acaba.
      Este override vinha de antes do ritmo novo e desfazia justamente isso. */

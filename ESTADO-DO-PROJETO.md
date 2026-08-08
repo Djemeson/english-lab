@@ -7,7 +7,15 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O RITMO DO PAINEL DE ESTUDO**. *"As informações parecem
+> Última atualização: 2026-08-08 — **O ITEM NUNCA SAI DE VISTA**. O cabeçalho subia com a rolagem
+> e a página virava seções sem dono. Ele passou a ficar **preso no topo, encolhendo** de 115px
+> para 62px — sobram palavra, pronúncia e o botão de ouvir. ⚠️ O recuo do topo teve de sair do
+> corpo e ir para o cabeçalho: com ele no corpo, o texto **escorria por uma faixa de 20px e
+> aparecia ACIMA do item**. E no celular a linha do título quebrava em duas (94px de 812) — os
+> rótulos dos botões de áudio foram para dentro de um `<span>`, ficam só os ícones, e o cabeçalho
+> caiu para **64px**. `sw.js` → `englab-v170`. Ver seção 8.2 ("O item nunca sai de vista").
+>
+> Anterior: 2026-08-08 — **O RITMO DO PAINEL DE ESTUDO**. *"As informações parecem
 > querer viver uma dentro da outra."* Medido antes de mexer: **24px entre as seções contra 8px
 > dentro** — seções de 46px separadas por 24px, ou seja, a distância era menor que a própria
 > seção. O **rótulo ganhou coluna própria** (âncora comum para blocos de formatos diferentes, e
@@ -7211,6 +7219,34 @@ vazia preserva o que existia e devolve `false`; e perda parcial legítima aconte
 nomeando o bloco**.
 
 **Arquivos**: `js/review.js`. `sw.js` → `englab-v169`.
+
+### O ITEM NUNCA SAI DE VISTA (2026-08-08)
+
+*"Quero que ao dar scroll down o 'digest-sized' ainda apareça no topo, pra sempre ter em vista o
+item de estudo."*
+
+O cabeçalho subia junto com a rolagem, e a página virava um monte de seções sem dono — *"de
+formato pequeno, compacto"* sem a palavra em cima. Agora ele fica preso no topo, mas **encolhe**:
+em tamanho cheio (título serifado + chips + procedência) comeria 115px de uma tela de 790 para
+sempre. Pinado, sobra o essencial — palavra, pronúncia e o botão de ouvir — em **62px**.
+
+O interruptor entra no ouvinte de rolagem que já existia (o do marcador do índice): é o MESMO
+evento, e dois ouvintes no mesmo elemento seria pagar duas vezes pela mesma informação.
+
+> ⚠️ **O recuo do topo tinha de mudar de dono.** Com `padding-top` no corpo, o cabeçalho pinado
+> parava 20px abaixo da borda e **o texto escorria por essa faixa, aparecendo ACIMA do item** —
+> medido: *"adjetivo atributivo: digest-sized…"* visível por cima do próprio cabeçalho. O recuo
+> passou para o cabeçalho; a faixa foi a zero.
+
+> ⚠️ **No celular a linha do título quebrava em duas.** "Pronúncia" + "Frase" não cabem em 375px
+> ao lado da palavra, e o cabeçalho fixo ficava com **94px de 812**. Os rótulos dos botões foram
+> para dentro de um `<span>` — some o texto, ficam os ícones, e ouvir continua a um toque. Resultado
+> medido: **64px, 8% da tela, numa linha só**.
+
+O `top` dos rótulos das seções desceu para 60px, senão eles deslizariam por baixo do cabeçalho
+pinado e sumiriam justamente nas seções longas — que é quando servem.
+
+**Arquivos**: `css/styles.css`, `js/dossie.js`. `sw.js` → `englab-v170`.
 
 ### Onde a captura ainda NÃO leva a semente
 

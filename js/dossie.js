@@ -170,13 +170,17 @@ function _dosChips(w, m) {
   return out
 }
 
+// O rótulo vai em `<span>` para poder SUMIR sem levar o botão junto: com o
+// cabeçalho pinado no celular, "Pronúncia" + "Frase" não cabiam na linha do
+// título e a empurravam para uma segunda linha — 94px de cabeçalho fixo numa
+// tela de 812. Só o ícone, os dois botões cabem, e ouvir continua a um toque.
 function _dosAudioHTML(w, m) {
   const frase = (m.examples && m.examples[0] && m.examples[0].en) || ''
   return `<span class="dos-audio">
     <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();playSrsTTS(${escA(JSON.stringify(w.word || ''))})"
-      data-tip="Ouvir a pronúncia">${ic('volume','ic-sm')} Pronúncia</button>
+      data-tip="Ouvir a pronúncia" aria-label="Ouvir a pronúncia">${ic('volume','ic-sm')}<span>Pronúncia</span></button>
     ${frase ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();playSrsTTS(${escA(JSON.stringify(frase.replace(/<[^>]*>/g,'')))})"
-      data-tip="Ouvir a frase inteira">${ic('volume','ic-sm')} Frase</button>` : ''}
+      data-tip="Ouvir a frase inteira" aria-label="Ouvir a frase inteira">${ic('volume','ic-sm')}<span>Frase</span></button>` : ''}
   </span>`
 }
 
@@ -1190,9 +1194,11 @@ function _dosFocoBlocos(w, m, ctx, ctxPt) {
 // retângulos a cada 80ms não custa nada.
 let _dosFocoUltimo = 0
 function _dosFocoObservar(box) {
+  // Só o CORPO é obrigatório: o ouvinte serve duas coisas agora — o marcador
+  // do índice e o encolher do cabeçalho —, e a segunda tem de valer mesmo num
+  // item sem seção nenhuma, que é quando o índice não existe.
   const corpo = box.querySelector('.dosf-corpo')
-  const nav = box.querySelector('.dosf-indice')
-  if (!corpo || !nav || !nav.children.length) return
+  if (!corpo) return
   // O ouvinte morre junto com o nó a cada repintura (o innerHTML troca o
   // corpo inteiro), então não há como sobrar órfão.
   corpo.addEventListener('scroll', () => {
@@ -1206,8 +1212,15 @@ function _dosFocoObservar(box) {
 
 function _dosFocoMarcarAqui(box) {
   const corpo = box.querySelector('.dosf-corpo')
+  if (!corpo) return
+  // O cabeçalho encolhe assim que a rolagem começa. Vai junto com o marcador
+  // do índice porque é o MESMO evento — dois ouvintes de scroll no mesmo
+  // elemento seria pagar duas vezes pela mesma informação.
+  // O limiar é generoso (12px) para não piscar com o tranco do trackpad.
+  const cab = box.querySelector('.dosf-cab')
+  if (cab) cab.classList.toggle('encolhido', corpo.scrollTop > 12)
   const nav = box.querySelector('.dosf-indice')
-  if (!corpo || !nav) return
+  if (!nav) return
   const blocos = [...box.querySelectorAll('.dosf-bloco')]
   if (!blocos.length) return
   // "Onde estou" = o último bloco cujo topo já passou pelo cursor de leitura,
