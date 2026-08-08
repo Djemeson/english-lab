@@ -64,8 +64,35 @@ function _listaCurta(v, teto) {
     .slice(0, teto || 6)
 }
 
+// A FORMA DE CITAÇÃO SÓ ENTRA SE FOR O MESMO ITEM.
+// O texto é capturado como aparece no livro, então chega flexionado e com a
+// maiúscula da frase — "Gals", "fell in love", "ran by". O verbete tem de
+// arquivá-lo como o dicionário arquiva ("gal"), senão o título do estudo
+// mostra a forma da cena e o reencontro de "gal" não acha "Gals".
+//
+// ⚠️ Mas aceitar o que a IA devolver às cegas é trocar a IDENTIDADE do item:
+// `w.word` é a chave de `prepAcharItem`, é o `audioKey` do áudio já gerado e é
+// o texto congelado nos cards. Um "fall in love" → "fall" (encurtar, que é o
+// erro que este projeto já caçou três vezes) partiria a família e deixaria
+// card apontando para outra palavra.
+// A guarda: mesma QUANTIDADE de palavras, e cada palavra ou é igual ou é da
+// mesma família de lema. Ou seja, muda a flexão e a caixa — nunca a extensão.
+function _mesmoItemCanonico(antigo, novo) {
+  const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z' -]/g, ' ').replace(/\s+/g, ' ').trim()
+  const a = norm(antigo).split(' ').filter(Boolean)
+  const b = norm(novo).split(' ').filter(Boolean)
+  if (!a.length || a.length !== b.length) return false
+  const familia = p => (typeof glossLemas === 'function') ? glossLemas(p) : [p]
+  return a.every((p, i) => p === b[i] || familia(p).includes(b[i]) || familia(b[i]).includes(p))
+}
+
 function applyAiResult(w, result) {
-  w.word = result.word || w.word
+  const canon = String(result.word || '').trim()
+  if (canon && canon !== w.word) {
+    if (_mesmoItemCanonico(w.word, canon)) w.word = canon
+    else console.warn(`[ia] forma de citação recusada: "${w.word}" → "${canon}" não é o mesmo item`)
+  }
   // Campos de nível-palavra: preserva o que já existir (não apaga dado curado de uma
   // importação anterior — ex.: doc/leva) — a IA só PREENCHE o que estiver vazio.
   w.type       = w.type       || result.type       || 'word'
@@ -425,6 +452,7 @@ Everything is about THAT sense — never the item's other senses.
 
 Return ONLY this JSON:
 {
+ "citacao": "the item in CITATION FORM — the shape a dictionary files it under, lowercase unless a proper noun ("Gals" → "gal", "fell in love" → "fall in love", "ran by" → "run by"). ⚠️ Only the INFLECTION and the CASE change: keep every word of the unit, never shorten it. Repeat "${alvo}" unchanged when it is already in citation form.",
  "forms": ["inflected forms to recognize, each as \\"form = short PT label\\" (verb: past/participle/3rd person/-ing; noun: plural, especially irregular; adjective: comparative/superlative). Give the citation form first when "${alvo}" is itself inflected. [] for invariable items."],
  "grammar": "the PATTERN this sense takes, PT-BR, one short line — what must come around it (e.g. \\"fall + adjetivo (asleep, silent)\\", \\"give up + verbo em -ing\\", \\"substantivo contável, quase sempre no plural\\"). \\"\\" only if there is genuinely no pattern.",
  "collocations": ["words that habitually travel with THIS sense, 2-4 words each. Fixed or strongly preferred pairings only, never free combinations. []"],
@@ -453,6 +481,15 @@ Return ONLY this JSON:
       return 0
     }
     let n = 0
+    // A forma de citação conserta o TÍTULO do item já gravado — "Gals" vira
+    // "gal". Passa pela mesma guarda da análise: muda flexão e caixa, nunca a
+    // extensão da unidade. Vale nos dois modos, porque um título errado não é
+    // "material faltando", é material errado.
+    const canon = String(r.citacao || '').trim()
+    if (canon && canon !== w.word) {
+      if (_mesmoItemCanonico(w.word, canon)) { w.word = canon; n++ }
+      else console.warn(`[ia] citação recusada: "${w.word}" → "${canon}" não é o mesmo item`)
+    }
     n += põe('forms',        _listaCurta(r.forms, 6))
     n += põe('collocations', _listaCurta(r.collocations, 6))
     n += põe('confusoes',    _listaCurta(r.confusoes, 4))
@@ -472,6 +509,115 @@ Return ONLY this JSON:
     return true
   } catch (e) {
     toast(`Não deu para completar: ${e.message}`, 'error')
+    return false
+  } finally {
+    _emAnalise.delete(marca)
+    if (typeof _dosFocoPintar === 'function') { try { _dosFocoPintar() } catch (e) {} }
+  }
+}
+
+// ================================================================
+// A FAMÍLIA COMPLETA — tudo que existe COM aquele item
+// ================================================================
+// Pedido dele: *"uma seção de tempos verbais, e uma seção com TODOS os phrasal
+// verbs que existem com aquele item, TODOS os idioms, TODOS os collocations e
+// o que mais houver"* — com o envio ao Preparar a UM clique.
+//
+// É diferente de tudo que já existe no item:
+//   `collocations`  — as que acompanham AQUELE SENTIDO, poucas, para produzir.
+//   `sense_audit`   — os outros sentidos da MESMA palavra.
+//   família (aqui)  — as UNIDADES MAIORES que a palavra forma: get → get up,
+//                     get over, get away with… Não são sentidos de "get", são
+//                     itens próprios, e cada um vira um item de estudo à parte.
+//
+// POR QUE É UMA CHAMADA SEPARADA E SOB DEMANDA: para "get" isso é uma lista de
+// dezenas de linhas. Enfiá-la na análise de todo item pagaria caro em cada
+// captura para uma lista que ele talvez nunca abra. Aqui ele pede, paga uma
+// vez, e fica gravado no item.
+//
+// Guardado no ITEM (`w.familia`), não no sentido: a família é da PALAVRA —
+// "get up" existe independentemente de qual sentido de "get" ele encontrou.
+async function expandirFamilia(wordId) {
+  const w = words.find(x => x.id === wordId); if (!w) return false
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error')
+    showSection('configuracoes'); return false
+  }
+  const marca = 'fam|' + wordId
+  if (_emAnalise.has(marca)) { toast('Já estou buscando a família deste item', 'info'); return false }
+  const alvo = (w.word || '').trim()
+  if (!alvo) return false
+  const L = getLangDef(wordLang(w))
+  _emAnalise.add(marca)
+  if (typeof _dosFocoPintar === 'function') { try { _dosFocoPintar() } catch (e) {} }
+  try {
+    const PROMPT = `For the ${L.nameEn} item "${alvo}", list EVERYTHING a learner's dictionary would file under it, for a Brazilian Portuguese-speaking learner.
+
+Return ONLY this JSON:
+{
+ "classe": "the word class of \\"${alvo}\\" in PT-BR: verbo, substantivo, adjetivo, advérbio, preposição… (or \\"\\" if it is already a multi-word expression)",
+ "conjugacao": [
+   {"rotulo": "PT-BR name of the form", "forma": "the form itself", "exemplo": "a SHORT sentence using it, in ${L.nameEn}"}
+ ],
+ "familia": [
+   {"expr": "the full expression, in citation form", "tipo": "phrasal_verb|idiom|collocation|chunk|derivada", "gloss": "what it means, PT-BR, max 6 words", "nivel": "A1|A2|B1|B2|C1|C2"}
+ ]
+}
+
+"conjugacao" — ONLY when "${alvo}" is a VERB; otherwise return []. Give the forms a learner actually has to recognize and produce: infinitivo, presente (3ª pessoa quando muda), passado simples, particípio, gerúndio/-ing. Add the perfect and the continuous ONLY if the verb is irregular or the form is surprising. One SHORT example each. Never a full six-person paradigm for ${L.nameEn} — that is noise.
+
+"familia" — be GENEROUS and be COMPLETE: this is the list he opens to discover what he does not know yet. Include every phrasal verb, idiom, fixed collocation and set expression built on "${alvo}", plus notable DERIVED words (\\"derivada\\": care → careful, careless, caregiver). For a common verb this is normally 15–40 entries; do not stop at five.
+- Every "expr" must genuinely CONTAIN "${alvo}" or a form of it (or be derived from it, for "derivada").
+- Sort by usefulness: what a learner meets most often comes first.
+- "gloss" is what the expression means as a WHOLE, never the sum of the words.
+- Do not repeat the item itself as an entry.
+- Do not invent: if you are not sure the expression is real and current, leave it out.`
+    const r = await aiJSON(PROMPT, { maxTokens: 3000 })
+    if (!r || typeof r !== 'object') throw new Error('resposta vazia')
+    const TIPOS = ['phrasal_verb', 'idiom', 'collocation', 'chunk', 'derivada']
+    const familia = (Array.isArray(r.familia) ? r.familia : [])
+      .map(it => ({
+        expr: String(it && it.expr || '').replace(/\s+/g, ' ').trim(),
+        tipo: TIPOS.includes(it && it.tipo) ? it.tipo : 'collocation',
+        gloss: String(it && it.gloss || '').replace(/\s+/g, ' ').trim(),
+        nivel: String(it && it.nivel || '').trim()
+      }))
+      .filter(it => it.expr && it.expr.length <= 60)
+      // O ITEM NÃO É MEMBRO DA PRÓPRIA FAMÍLIA. Comparar texto com texto não
+      // basta: o modelo devolve a forma que ele viu no livro ("Gals") e o item
+      // já está canônico ("gal") — a linha passava batido, e a lista abria
+      // oferecendo ao aluno o que ele está estudando naquele instante.
+      // A guarda da citação resolve, porque é a mesma pergunta: "é o mesmo
+      // item, só que flexionado?".
+      // ⚠️ MENOS para "derivada": palavra derivada é, POR DEFINIÇÃO, da mesma
+      // família de lema (get → getter), e a guarda a engolia — sumindo com
+      // justamente a categoria que ele pediu. Ali basta não ser a mesma
+      // palavra escrita igual.
+      .filter(it => it.tipo === 'derivada'
+        ? it.expr.toLowerCase() !== alvo.toLowerCase()
+        : !_mesmoItemCanonico(alvo, it.expr))
+      .slice(0, 60)
+    const conjugacao = (Array.isArray(r.conjugacao) ? r.conjugacao : [])
+      .map(it => ({
+        rotulo: String(it && it.rotulo || '').trim(),
+        forma: String(it && it.forma || '').trim(),
+        exemplo: String(it && it.exemplo || '').trim()
+      }))
+      .filter(it => it.forma)
+      .slice(0, 10)
+    w.familia = familia
+    w.conjugacao = conjugacao
+    w.classe = String(r.classe || '').trim()
+    w.familia_at = Date.now()   // carimbo: sem ele, item sem família ofereceria o botão para sempre
+    w.updated_at = new Date().toISOString()
+    saveWords()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+    toast(familia.length
+      ? `${familia.length} expressões encontradas com "${alvo}"`
+      : `Nada a listar além de "${alvo}"`, familia.length ? 'success' : 'info')
+    return true
+  } catch (e) {
+    toast(`Não deu para buscar a família: ${e.message}`, 'error')
     return false
   } finally {
     _emAnalise.delete(marca)
@@ -642,7 +788,7 @@ ${promptTypeRules(wordLang(w))}
 
 Return ONLY this JSON (no markdown, no explanation):
 {
-  "word": "exact word or expression to study",
+  "word": "the item in CITATION FORM — the exact shape a dictionary files it under, lowercase unless it is a proper noun. The text was captured as it appeared in the book, so it usually arrives inflected or capitalized: \"Gals\" → \"gal\", \"fell in love\" → \"fall in love\", \"ran by\" → \"run by\", \"children\" → \"child\", \"was thinking\" → \"think\".\\n⚠️ CANONICALIZING IS NOT SHORTENING: keep every word of the unit. \"fall in love\" stays \"fall in love\", never \"fall\"; \"put up with\" never becomes \"put up\". Only the INFLECTION and the CASE change, never the extension of the unit.",
   "detected_lang": "${L.code}",
   "context_pt": "the CONTEXT SENTENCE translated into natural Brazilian Portuguese — what it SAYS in that scene, never word by word. Empty string if there is no context sentence. This must agree with the meaning marked context_match: if the translation contradicts it, one of the two is wrong.",
   "type": "word|phrasal_verb|idiom|collocation",

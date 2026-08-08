@@ -5720,6 +5720,52 @@ body.dos-focando{overflow:hidden}
 }
 .dosf-correcao .dosf-nota{margin-top:var(--sp-2)}
 
+/* Tempos verbais — tabela, porque a informação É tabular: rótulo, forma,
+   exemplo. Em lista corrida a forma se perde no meio da frase. */
+.dosf-conj{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.dosf-conj tr + tr{border-top:1px solid var(--border)}
+.dosf-conj th,.dosf-conj td{padding:var(--sp-2) var(--sp-3);text-align:left;vertical-align:baseline}
+.dosf-conj th{
+  color:var(--text3);font-size:var(--fs-2xs);font-weight:600;white-space:nowrap;
+  width:1%;padding-left:0;
+}
+.dosf-conj td b{color:var(--text);font-weight:600;white-space:nowrap}
+.dosf-conj td:last-child{color:var(--text2);line-height:1.5;padding-right:0}
+
+/* A família completa — uma lista para percorrer e garimpar, com o envio ao
+   Preparar a UM clique em cada linha. */
+.dosf-fam-grupo + .dosf-fam-grupo{margin-top:var(--sp-6)}
+.dosf-fam-grupo h4{
+  display:flex;align-items:center;gap:var(--sp-2);
+  font-size:var(--fs-2xs);color:var(--text3);text-transform:uppercase;
+  letter-spacing:.08em;font-weight:700;margin-bottom:var(--sp-3);
+}
+.dosf-fam-grupo h4 span{
+  background:var(--surface2);color:var(--text3);border-radius:20px;
+  padding:0 7px;font-size:var(--fs-3xs);letter-spacing:0;
+}
+.dosf-fam-linha{
+  display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
+  padding:var(--sp-2) 0;border-bottom:1px solid var(--border);
+}
+.dosf-fam-linha:last-child{border-bottom:0}
+.dosf-fam-txt{flex:1;min-width:0;display:flex;align-items:baseline;gap:var(--sp-2);flex-wrap:wrap}
+.dosf-fam-txt b{font-size:var(--fs-md);font-weight:600}
+.dosf-fam-txt i{
+  font-style:normal;font-size:var(--fs-3xs);font-weight:700;color:var(--primary);
+  background:rgba(var(--primary-rgb),.14);padding:0 5px;border-radius:var(--radius-xs);
+}
+.dosf-fam-txt span{color:var(--text3);font-size:var(--fs-sm)}
+/* As ações só aparecem no hover no desktop: 40 linhas com dois botões cada
+   viram uma parede de botões. No celular (sem hover) ficam sempre visíveis. */
+.dosf-fam-acoes{display:flex;gap:var(--sp-2);opacity:0;transition:opacity .12s}
+.dosf-fam-linha:hover .dosf-fam-acoes,
+.dosf-fam-linha:focus-within .dosf-fam-acoes{opacity:1}
+.dosf-fam-acoes .btn{padding:2px var(--sp-3);font-size:var(--fs-2xs);min-height:0}
+.dosf-fam-linha.meu{opacity:.5}
+.dosf-fam-selo{display:flex;align-items:center;gap:4px;font-size:var(--fs-2xs);color:var(--success)}
+@media (hover:none){ .dosf-fam-acoes{opacity:1} }
+
 /* Listas dos blocos (irmãos, sentidos que faltam) */
 .dosf-lista{list-style:none;display:flex;flex-direction:column;gap:var(--sp-2)}
 .dosf-lista li{

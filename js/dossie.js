@@ -846,6 +846,131 @@ function _dosCompletarHTML(w, m) {
 }
 
 // ================================================================
+// TEMPOS VERBAIS e A FAMÍLIA COMPLETA
+// ================================================================
+// A conjugação e a família vêm da MESMA chamada (`expandirFamilia`) e moram no
+// ITEM, não no sentido: "get up" existe independentemente de qual sentido de
+// "get" ele encontrou no livro.
+function _dosConjugacaoHTML(w) {
+  const c = w.conjugacao || []
+  if (!c.length) return ''
+  return `<table class="dosf-conj"><tbody>${c.map(f => `
+    <tr>
+      <th>${esc(f.rotulo || '')}</th>
+      <td><b>${esc(f.forma)}</b></td>
+      <td>${f.exemplo ? buildSrsFrente({ example_en: f.exemplo, word: f.forma }) : ''}</td>
+    </tr>`).join('')}</tbody></table>`
+}
+
+const _DOS_FAM_ROTULOS = {
+  phrasal_verb: 'phrasal verbs', idiom: 'idioms', collocation: 'colocações',
+  chunk: 'blocos fixos', derivada: 'palavras derivadas'
+}
+const _DOS_FAM_ORDEM = ['phrasal_verb', 'idiom', 'collocation', 'chunk', 'derivada']
+
+// Cada linha tem PREPARAR a um clique — o pedido literal dele — e EXPLICAR ao
+// lado, que abre o painel da Lexa sem tirar ninguém do estudo. O que ele já
+// tem aparece marcado e não é clicável, pela mesma regra dos chips da frase.
+function _dosFamiliaCompletaHTML(w) {
+  const fam = w.familia || []
+  if (!fam.length) return ''
+  const lang = wordLang(w)
+  const grupos = _DOS_FAM_ORDEM.map(tipo => {
+    const lista = fam.filter(x => x.tipo === tipo)
+    if (!lista.length) return ''
+    return `<div class="dosf-fam-grupo">
+      <h4>${esc(_DOS_FAM_ROTULOS[tipo])} <span>${lista.length}</span></h4>
+      ${lista.map(x => {
+        const meu = typeof prepAcharItem === 'function' && prepAcharItem(x.expr, lang)
+        return `<div class="dosf-fam-linha${meu ? ' meu' : ''}">
+          <div class="dosf-fam-txt"><b>${esc(x.expr)}</b>${x.nivel ? `<i>${esc(x.nivel)}</i>` : ''}
+            ${x.gloss ? `<span>${esc(x.gloss)}</span>` : ''}</div>
+          ${meu ? `<span class="dosf-fam-selo">${ic('check','ic-sm')} já é seu</span>` : `
+            <span class="dosf-fam-acoes">
+              <button class="btn btn-ghost btn-sm" onclick="dossieFamiliaExplicar('${w.id}',${escA(JSON.stringify(x.expr))})"
+                data-tip="A Lexa explica sem tirar você do estudo">${ic('sparkles','ic-sm')} explicar</button>
+              <button class="btn btn-secondary btn-sm" onclick="dossieFamiliaPreparar('${w.id}',${escA(JSON.stringify(x.expr))})"
+                data-tip="Vai direto para a fila do Preparar">${ic('plus','ic-sm')} Preparar</button>
+            </span>`}
+        </div>`
+      }).join('')}
+    </div>`
+  }).filter(Boolean).join('')
+  return grupos
+}
+
+function _dosFamAchar(wordId, expr) {
+  const w = words.find(x => x.id === wordId)
+  const it = w && (w.familia || []).find(x => x.expr === expr)
+  return { w, it }
+}
+
+function dossieFamiliaPreparar(wordId, expr) {
+  const { w, it } = _dosFamAchar(wordId, expr)
+  if (!w || !it || typeof lexaChipParaPreparar !== 'function') return
+  // Reusa a peça dos chips da frase: mesma criação, mesma semente, mesma
+  // proteção contra duplicar. A cena vai a do item — é a passagem onde ele
+  // encontrou a palavra-raiz, que é o contexto que este membro da família tem.
+  lexaChipParaPreparar(
+    { expr: it.expr, gloss: it.gloss, type: it.tipo === 'derivada' ? 'word' : it.tipo },
+    { contexto: w.context || '', lang: wordLang(w),
+      source_type: w.source_type || 'manual', source_title: w.source_title || '',
+      source_context: w.source_context || '' })
+  _dosFocoPintar()
+}
+
+async function dossieFamiliaExplicar(wordId, expr) {
+  const { w, it } = _dosFamAchar(wordId, expr)
+  if (!w || !it || typeof lexaPainelAbrir !== 'function') return
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return
+  }
+  const corpo = lexaPainelAbrir({ titulo: lexaNome(), frase: it.expr,
+    fonte: `da família de "${w.word}"` })
+  const vivo = () => el('lexa-painel-corpo') === corpo
+  corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(lexaNome())} está explicando…`
+  try {
+    const L = getLangDef(wordLang(w))
+    const sistema = lexaExplicar()
+    const pergunta = `O aluno estuda "${w.word}" e está vendo a família de expressões dele.
+Explique a expressão ${L.nameEn} "${it.expr}"${it.gloss ? ` (${it.gloss})` : ''}: o que quer dizer, quando se usa e um exemplo curto.`
+    const resp = await aiTextSeguro([
+      { role: 'system', content: sistema },
+      { role: 'user', content: pergunta }
+    ], { maxTokens: 500 })
+    if (!vivo()) return
+    corpo.innerHTML = lexaFormatar(resp)
+    if (typeof lexaChatMontar === 'function') {
+      lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
+    }
+  } catch (e) {
+    if (vivo()) corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)}</span>`
+  }
+}
+
+// O convite a buscar a família. Some depois de buscada (o carimbo é quem
+// impede o botão de ficar pedindo dinheiro para sempre), e vira "atualizar".
+function _dosFamiliaConviteHTML(w) {
+  if (typeof expandirFamilia !== 'function') return ''
+  const rodando = typeof estaEmAnalise === 'function' && estaEmAnalise('fam|' + w.id)
+  const tem = (w.familia || []).length
+  if (!tem && w.familia_at) return ''   // já buscou e não havia nada
+  return `${tem ? '' : `<p class="dosf-texto">Uma chamada de IA lista <b>tudo que existe com
+      "${esc(w.word)}"</b> — phrasal verbs, idioms, colocações, blocos fixos e palavras derivadas —
+      e cada um fica a um clique do Preparar.</p>`}
+    <button class="btn ${tem ? 'btn-ghost' : 'btn-secondary'} btn-sm" ${rodando ? 'disabled' : ''}
+      onclick="dossieFamiliaBuscar('${w.id}')">${
+      rodando ? '<span class="spinner"></span> procurando…'
+              : ic(tem ? 'refresh' : 'layers','ic-sm') + (tem ? ' Atualizar a lista' : ' Buscar tudo que existe com este item')}</button>`
+}
+
+async function dossieFamiliaBuscar(wordId) {
+  if (typeof expandirFamilia !== 'function') return
+  await expandirFamilia(wordId)
+  _dosFocoPintar()
+}
+
+// ================================================================
 // PRODUZA — o único ato da página que sai DELE
 // ================================================================
 // Tudo acima é consumo: ler, comparar, entender. Aqui ele escreve uma frase
@@ -977,11 +1102,20 @@ function _dosFocoBlocos(w, m, ctx, ctxPt) {
     { id:'forma',   rotulo:'A forma',           icone:'shrink',   html:_dosFormasHTML(m) },
     { id:'padrao',  rotulo:'Como se comporta',  icone:'wrench',   html:_dosPadraoHTML(m) },
     { id:'anda',    rotulo:'Com quem anda',     icone:'zap',      html:_dosColocacoesHTML(m) },
+    // A conjugação fica logo depois da forma e do padrão: é a mesma pergunta
+    // ("que cara isso tem?"), só que estendida no tempo.
+    { id:'tempos',  rotulo:'Tempos verbais',    icone:'clock',    html:_dosConjugacaoHTML(w) },
     { id:'uso',     rotulo:'Em uso',            icone:'message',  html:_dosExemplosHTML(w, m, ctx, ctxPt) },
     { id:'regua',   rotulo:'A régua',           icone:'layers',   html:_dosReguaHTML(m) },
     { id:'cuidado', rotulo:'Cuidado',           icone:'alert',
       html: m.armadilha ? `<p class="dosf-texto dosf-alerta">${esc(m.armadilha)}</p>` : '' },
     { id:'mais',    rotulo:'Também quer dizer', icone:'book',     html:_dosMaisSentidosHTML(w, m) },
+    // A família fica DEPOIS de "também quer dizer" porque é o passo seguinte
+    // da mesma escada: primeiro os outros sentidos da MESMA palavra, depois as
+    // unidades MAIORES que ela forma — que são itens de estudo à parte.
+    { id:'familia', icone:'layers',
+      rotulo: (w.familia || []).length ? `Tudo com "${w.word}"` : 'A família deste item',
+      html: _dosFamiliaCompletaHTML(w) + _dosFamiliaConviteHTML(w) },
     // Aqui o texto vai NU: quem rotula é o cabeçalho da seção. A versão com
     // rótulo próprio (`_dosOrigemHTML`) continua servindo o cartão da lista,
     // que não tem seções.

@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **CURIOSIDADE NÃO É REGISTRO**. A "curiosidade" de *gals* era
+> Última atualização: 2026-08-08 — **A FORMA NEUTRA E A FAMÍLIA COMPLETA**. O item aparecia como
+> "Gals" (a forma do livro): o prompt passou a pedir a **forma de citação**, com a guarda
+> `_mesmoItemCanonico` — muda flexão e caixa, **nunca a extensão** —, porque `w.word` é a chave do
+> reencontro, do áudio e dos cards. Duas seções novas, da MESMA chamada, sob demanda e guardadas
+> no ITEM: **tempos verbais** e **tudo que existe com aquele item** (phrasal verbs, idioms,
+> colocações, blocos fixos e derivadas), com **Preparar a um clique** e explicar ao lado. ⚠️ Dois
+> filtros que o teste corrigiu: o item voltava como membro da própria família, e o conserto disso
+> engoliu as **derivadas** — que são, por definição, da mesma família de lema.
+> `sw.js` → `englab-v164`. Ver seção 8.2 ("A forma neutra e a família completa").
+>
+> Anterior: 2026-08-08 — **CURIOSIDADE NÃO É REGISTRO**. A "curiosidade" de *gals* era
 > uma observação de TOM ("leve, amistoso e um pouco retrô") — ou seja, `registro_uso` disfarçado.
 > O defeito era da especificação: ela dizia *"where it is heard"*, que é justamente o trabalho do
 > vizinho, e "genuinely interesting" não restringe modelo nenhum. Agora **cada campo tem um
@@ -6960,6 +6970,60 @@ Provado com o texto exato do print: a seção **Curiosidade desapareceu** (campo
 conteúdo reapareceu em *Como se comporta*, como registro.
 
 **Arquivos**: `js/review.js`, `js/dossie.js`. `sw.js` → `englab-v163`.
+
+### A FORMA NEUTRA E A FAMÍLIA COMPLETA (2026-08-08)
+
+Print do estudo de **Gals**, e três pedidos: o item devia aparecer na forma neutra; devia haver uma
+seção de **tempos verbais**; e uma seção com **TODOS** os phrasal verbs, idioms e collocations que
+existem com aquele item — *"se eu quiser mandar algum phrasal verb pra Preparar quero que esteja a
+1 clique de distância"*.
+
+#### A forma de citação
+
+O texto é capturado como aparece no livro, então chega flexionado e com a maiúscula da frase. O
+campo `word` do prompt dizia só *"exact word or expression to study"* — a IA devolvia "Gals" de
+volta, e o verbete arquivava a forma da cena. Agora ele pede a **forma de citação**, e a regra que
+já existia para o extrator de documento veio junto: *canonicalizar não é encurtar*.
+
+> ⚠️ **Aceitar o que a IA devolve às cegas é trocar a IDENTIDADE do item.** `w.word` é a chave do
+> `prepAcharItem`, é o `audioKey` do áudio já gerado e é o texto congelado nos cards — um
+> "fall in love" → "fall" partiria a família e deixaria card apontando para outra palavra.
+> `_mesmoItemCanonico` exige **mesma quantidade de palavras** e cada palavra igual ou da mesma
+> família de lema: muda a flexão e a caixa, nunca a extensão. Provado nos seis casos:
+> `Gals→gal` ✓, `fell in love→fall in love` ✓, `ran by→run by` ✓, `fall in love→fall` ✗,
+> `get up→get` ✗, `gal→woman` ✗.
+
+O item já gravado se conserta pelo **Refazer o material**, que agora também devolve a citação —
+provado: `w.word` saiu de "Gals" para "gal".
+
+#### Tempos verbais e a família
+
+As duas vêm da **mesma chamada** (`expandirFamilia`), **sob demanda** e guardadas **no item**, não
+no sentido: "get up" existe independentemente de qual sentido de "get" ele encontrou no livro.
+
+É uma chamada separada porque para "get" a lista é de dezenas de linhas — enfiá-la na análise de
+todo item pagaria caro em cada captura por algo que ele talvez nunca abra.
+
+A família é **diferente de tudo que já existia** no item, e vale registrar para não se
+sobreporem de novo:
+- `collocations` — as que acompanham AQUELE SENTIDO, poucas, para produzir;
+- `sense_audit` — os outros sentidos da MESMA palavra;
+- **família** — as unidades MAIORES que a palavra forma, que são itens de estudo à parte.
+
+Cada linha tem **Preparar a um clique** (o pedido literal) e **explicar** ao lado, que abre o
+painel da Lexa sem tirar ninguém do estudo. O envio reusa `lexaChipParaPreparar` — mesma criação,
+mesma semente, mesma proteção contra duplicar. O que ele já tem aparece marcado e sai de cena.
+Medido: um clique em "get over" → item novo em `pending_ai`, tipo `phrasal_verb`, glosa como
+semente, cena herdada, **zero cards** (parou no Preparar), e a linha vira "já é seu".
+
+> ⚠️ **Dois filtros que o teste corrigiu.** O primeiro: o item voltava como membro da própria
+> família, porque o modelo devolve a forma do livro ("Gals") e o item já está canônico ("gal") —
+> comparação literal não pegava. Passou a usar a mesma guarda da citação. O segundo veio do
+> conserto: a guarda engoliu **"getter"**, e palavra derivada é *por definição* da mesma família
+> de lema — sumia justamente a categoria pedida. Para `derivada` basta não ser a mesma palavra
+> escrita igual.
+
+**Arquivos**: `js/review.js`, `js/dossie.js`, `css/styles.css`. `sw.js` → `englab-v164`.
 
 ### Onde a captura ainda NÃO leva a semente
 
