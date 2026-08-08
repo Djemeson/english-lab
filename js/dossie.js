@@ -629,6 +629,28 @@ function _dosReguaHTML(m) {
   return out
 }
 
+// LEITURA TOLERANTE de campo que virou LISTA.
+// `armadilha` e `curiosidade` nasceram como texto único e viraram lista — uma
+// palavra pode ter duas armadilhas e quatro curiosidades, e guardar em string
+// obrigava a IA a escolher uma e jogar o resto fora. Item já gravado continua
+// com string, e migrar dado só para mudar a forma seria arriscar o acervo por
+// nada: quem lê aceita as duas.
+function _dosLista(v) {
+  if (Array.isArray(v)) return v.map(x => String(x || '').trim()).filter(Boolean)
+  const s = String(v || '').trim()
+  return s ? [s] : []
+}
+function _dosTem(v) { return _dosLista(v).length > 0 }
+
+function _dosNotasHTML(v, classe) {
+  const lista = _dosLista(v)
+  if (!lista.length) return ''
+  // Uma nota só não vira lista: numeração para um item é ruído.
+  if (lista.length === 1) return `<p class="dosf-texto ${classe || ''}">${esc(lista[0])}</p>`
+  return `<ul class="dosf-notas ${classe || ''}">${
+    lista.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`
+}
+
 // A FORMA — a informação que mais falta hoje. O item foi capturado como
 // "Gals" e nada na tela dizia que o dicionário arquiva isso como "gal".
 // Sem isto se aprende uma flexão e não se reconhece a outra.
@@ -822,9 +844,12 @@ async function dossieContarNoLivro(wordId) {
 // (inclusive quando a IA responde que não há nada a acrescentar: o carimbo
 // `material_at` é o que impede o botão de ficar pedindo dinheiro para sempre).
 function _dosCompletarHTML(w, m) {
-  const temAlgo = (m.forms || []).length || (m.collocations || []).length ||
-                  (m.confusoes || []).length || m.grammar || m.armadilha ||
-                  m.curiosidade || m.registro_uso
+  // ⚠️ `[]` É TRUTHY em JS. Com `armadilha` e `curiosidade` virando LISTA, um
+  // `m.armadilha ? …` daria "tem material" para um item cujo campo veio vazio —
+  // e a oferta de completar sumiria de quem mais precisa dela. Tudo passa por
+  // `_dosTem`, que mede array e string pela mesma régua.
+  const temAlgo = ['forms','collocations','confusoes','armadilha','curiosidade']
+                    .some(c => _dosTem(m[c])) || m.grammar || m.registro_uso
   if (typeof completarMaterial !== 'function') return ''
   const rodando = typeof estaEmAnalise === 'function' && estaEmAnalise(w.id + '|' + m.id)
   // JÁ TEM MATERIAL: a oferta deixa de ser "completar" e vira REFAZER.
@@ -1112,8 +1137,9 @@ function _dosFocoBlocos(w, m, ctx, ctxPt) {
     { id:'tempos',  rotulo:'Tempos verbais',    icone:'clock',    html:_dosConjugacaoHTML(w) },
     { id:'uso',     rotulo:'Em uso',            icone:'message',  html:_dosExemplosHTML(w, m, ctx, ctxPt) },
     { id:'regua',   rotulo:'A régua',           icone:'layers',   html:_dosReguaHTML(m) },
-    { id:'cuidado', rotulo:'Cuidado',           icone:'alert',
-      html: m.armadilha ? `<p class="dosf-texto dosf-alerta">${esc(m.armadilha)}</p>` : '' },
+    { id:'cuidado', icone:'alert',
+      rotulo: _dosLista(m.armadilha).length > 1 ? 'Cuidados' : 'Cuidado',
+      html: _dosNotasHTML(m.armadilha, 'dosf-alerta') },
     { id:'mais',    rotulo:'Também quer dizer', icone:'book',     html:_dosMaisSentidosHTML(w, m) },
     // A família fica DEPOIS de "também quer dizer" porque é o passo seguinte
     // da mesma escada: primeiro os outros sentidos da MESMA palavra, depois as
@@ -1128,12 +1154,15 @@ function _dosFocoBlocos(w, m, ctx, ctxPt) {
     // que ela virou. Ao contrário, a nota cultural chega sem chão.
     { id:'origem',  rotulo:'De onde vem',  icone:'sparkles',
       html: m.origin_pt ? `<p class="dosf-texto">${esc(m.origin_pt)}</p>` : '' },
-    { id:'curiosidade', rotulo:'Curiosidade',   icone:'flame',
-      html: m.curiosidade ? `<p class="dosf-texto">${esc(m.curiosidade)}</p>` : '' },
+    // Plural no rotulo quando ha mais de uma: a tela nao pode chamar de
+    // "Curiosidade" uma lista de quatro.
+    { id:'curiosidade', icone:'flame',
+      rotulo: _dosLista(m.curiosidade).length > 1 ? 'Curiosidades' : 'Curiosidade',
+      html: _dosNotasHTML(m.curiosidade) },
     // O rótulo muda com o estado: falta material, ou material que dá para
     // refazer com as regras de hoje.
     { id:'completar', icone:'sparkles', html:_dosCompletarHTML(w, m),
-      rotulo: (m.material_at || (m.forms || []).length || m.grammar || m.curiosidade)
+      rotulo: (m.material_at || (m.forms || []).length || m.grammar || _dosTem(m.curiosidade))
         ? 'O material desta análise' : 'Falta material' },
     // O último bloco antes de produzir: a palavra dentro da SUA história de
     // leitura. Tudo local, nenhuma chamada de IA.

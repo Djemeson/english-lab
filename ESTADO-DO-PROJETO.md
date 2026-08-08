@@ -19,8 +19,11 @@
 > **tetos de quantidade** que eu tinha criado antes: forms/colocações (6), régua (4), conjugação
 > (10), família (60), e os cortes de EXIBIÇÃO de sinônimos e antônimos, que eram os piores (o
 > dado estava gravado e pago, e a tela escondia parte dele em silêncio). O teto que ficou é contra
-> LIXO, não contra quantidade. `sw.js` → `englab-v167`. Ver seção 8.2 ("O ritmo do painel de
-> estudo").
+> LIXO, não contra quantidade. E o último teto era de FORMATO: `curiosidade` e `armadilha` eram
+> texto único, o que obrigava a IA a escolher uma e jogar o resto fora — viraram **listas**, com
+> rótulo no plural quando há várias. ⚠️ `[]` é truthy em JS, e isso teria feito o "Completar
+> material" sumir de quem mais precisa dele. `sw.js` → `englab-v168`. Ver seção 8.2 ("O ritmo do
+> painel de estudo").
 >
 > Anterior: 2026-08-08 — **A FORMA NEUTRA E A FAMÍLIA COMPLETA**. O item aparecia como
 > "Gals" (a forma do livro): o prompt passou a pedir a **forma de citação**, com a guarda
@@ -7142,6 +7145,34 @@ horizontal. E o normalizador continua barrando o que deve: string de 200 caracte
 repetida.
 
 **Arquivos**: `js/review.js`, `js/dossie.js`, `js/study.js`. `sw.js` → `englab-v167`.
+
+#### E o último teto: curiosidade e armadilha viram LISTA
+
+*"A curiosidade agora tá bem legal, mas não precisa ser só uma. Deve trazer tantas quantas
+houverem. Não deve haver limitação."*
+
+Os dois campos eram **texto único**, e isso é um teto disfarçado de formato: obrigava a IA a
+escolher uma curiosidade e jogar as outras fora. Uma palavra rica tem três ou quatro; e
+`armadilha` tinha exatamente a mesma forma e o mesmo problema — um item pode ter mais de um falso
+amigo —, então as duas mudaram juntas. O prompt passou a dizer, com destaque, que **não há teto**,
+e que se para só quando a próxima entrada falharia no teste da troca.
+
+O rótulo acompanha o conteúdo: **"Curiosidade" com uma, "Curiosidades" com várias** (e o mesmo
+para "Cuidado"/"Cuidados"). Uma nota só continua sendo parágrafo — numerar um item é ruído.
+
+> ⚠️ **`[]` é truthy em JavaScript.** Com os campos virando lista, o `m.armadilha ? …` que decidia
+> "este item já tem material" passaria a dizer SIM para um item cujo campo voltou vazio — e a
+> oferta de "Completar material" sumiria justamente de quem mais precisa dela. Tudo passou por
+> `_dosTem`, que mede array e string pela mesma régua.
+
+**Sem migração de dado**: `_dosLista` aceita string e array, então item já gravado continua
+legível. Migrar o acervo só para mudar a forma seria arriscá-lo por nada.
+
+Provado nos quatro casos: várias (3 de 3 e 2 de 2 na tela, com os rótulos no plural), uma só
+(parágrafo, singular), string antiga (aparece igual) e lista vazia (a seção não existe e a oferta
+de completar continua de pé).
+
+**Arquivos**: `js/review.js`, `js/dossie.js`, `css/styles.css`. `sw.js` → `englab-v168`.
 
 ### Onde a captura ainda NÃO leva a semente
 

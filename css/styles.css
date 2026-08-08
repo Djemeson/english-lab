@@ -5746,6 +5746,14 @@ body.dos-focando{overflow:hidden}
   padding:var(--sp-3) var(--sp-4);border-radius:var(--radius-sm);
   background:rgba(231,186,83,.08);border-left:3px solid var(--warning);color:var(--text2);
 }
+/* Notas em lista (curiosidades, armadilhas): sem marcador e separadas por
+   espaço, como os outros blocos — o que agrupa é a seção, não um bolinha. */
+.dosf-notas{list-style:none;display:flex;flex-direction:column;gap:var(--sp-4)}
+.dosf-notas li{font-size:var(--fs-md);line-height:1.6;color:var(--text2)}
+.dosf-notas.dosf-alerta{
+  gap:var(--sp-3);padding:var(--sp-3) var(--sp-4);
+}
+.dosf-notas.dosf-alerta li + li{padding-top:var(--sp-3);border-top:1px solid rgba(231,186,83,.25)}
 
 /* A régua com a diferença escrita */
 .dosf-conf li b{margin-right:4px;color:var(--text)}
