@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O TRABALHO SOBREVIVE AO RECARREGAMENTO**. *"Posso não
+> Última atualização: 2026-08-08 — **O PAINEL DA LEXA**. A explicação com os chips morava num
+> popup de 420px e ficou apertada. Virou **painel próprio, com dois tamanhos** (cheio para
+> concentrar, compacto para ver a página por trás) e o **mesmo DOM nos dois** — alternar é trocar
+> uma classe, então conversa, chips e rolagem sobrevivem. A escolha fica guardada. Vale nas três
+> telas que explicam. ⚠️ Dois defeitos que o painel expôs: o **acerto de cache dava tela pela
+> metade** (guardava só o HTML, sem chips nem conversa — agora guarda o contexto inteiro e a
+> montagem é uma função só) e a **coluna medida em `ch` por filho desalinhava** (cada um usava a
+> própria fonte como régua: 640px × 581px). De graça, caiu a trava do vigia de seleção do leitor.
+> `sw.js` → `englab-v162`. Ver seção 8.2 ("O painel da Lexa").
+>
+> Anterior: 2026-08-08 — **O TRABALHO SOBREVIVE AO RECARREGAMENTO**. *"Posso não
 > finalizar tudo na primeira vez."* As **marcas da triagem** passaram a ser gravadas (chave
 > própria, gravação adiada em 400 ms) — ⚠️ o registro é a verdade INTEIRA e não um complemento ao
 > palpite, senão DESMARCAR não sobreviveria e o app desfaria a decisão dele em silêncio. E a
@@ -6857,6 +6867,47 @@ recarregamento" custam outra.
 > frase a nunca mais ser quebrada. Na memória tudo bem — morre com a sessão.
 
 **Arquivos**: `js/ler.js`, `js/review.js`, `js/ai.js`. `sw.js` → `englab-v161`.
+
+### O PAINEL DA LEXA — a explicação sai do balãozinho (2026-08-08)
+
+*"Essa análise que é feita dos chips é meio apertada do jeito que é hoje. Ao apertar no botão de
+análise com IA deve abrir um painel completo só seu, pra máximo foco e concentração, mas sendo
+possível sair do modo full."*
+
+O popup do leitor é `max-width: min(420px, 92vw)`. Quando ele só carregava "2 a 4 frases", isso
+bastava. Hoje carrega explicação + os chips de **todas** as unidades da frase + a conversa que
+continua dali — e 420px espremem as três.
+
+**Um painel, dois tamanhos, e o MESMO DOM nos dois.** Alternar é trocar uma classe, então nada se
+perde na troca: nem a conversa, nem os chips, nem a rolagem. Remontar em outro hospedeiro é que
+perderia. `cheio` cobre a tela; `compacto` é um cartão centrado com a página visível por trás (no
+celular vira folha de baixo). A escolha fica guardada em `uiPrefs` — quem prefere um dos dois
+prefere sempre. Esc fecha, clique no fundo fecha, clique dentro não.
+
+Vale nas **três** telas que explicam: leitor, vídeo/podcast e Preparar.
+
+**O que caiu junto, de graça:** no leitor, a explicação dependia da seleção continuar de pé, e por
+isso existia uma trava (`aoFoco` → `_lerIgnoraSel`) só para o vigia de seleção não fechar o popup
+enquanto ele digitava na conversa. O painel não depende da seleção — a briga inteira deixou de
+existir.
+
+> ⚠️ **O acerto de cache passou a dar tela pela metade.** `_revExplainCache` guardava só o HTML e
+> a função voltava ali mesmo — o que já deixava chips e conversa de fora, mas passava
+> despercebido num balãozinho. Num painel inteiro seria gritante: reabrir a mesma seleção abriria
+> uma tela sem chips e sem poder perguntar nada. Agora ele guarda
+> `{html, sistema, pergunta, resposta}` e a montagem virou **uma função só**, chamada tanto pelo
+> cache quanto pela IA — duas cópias é como a divergência começou.
+
+> ⚠️ **Coluna de leitura medida em `ch` dentro de cada filho desalinhava a tela.** Cada elemento
+> usava a PRÓPRIA fonte como régua: a frase (maior) dava 640px e o corpo (menor) 581px, e os dois
+> não batiam. Medido no teste, corrigido pondo a medida **uma vez, no contêiner** — agora topo,
+> frase, corpo, chips e conversa começam e terminam no mesmo pixel.
+
+Cada caminho ganhou um guarda `vivo()`: fechar o painel enquanto a IA responde não pode fazer o
+app reabri-lo sozinho.
+
+**Arquivos**: `js/ai.js`, `js/ler.js`, `js/video-study.js`, `js/review.js`, `css/styles.css`.
+`sw.js` → `englab-v162`.
 
 ### Onde a captura ainda NÃO leva a semente
 

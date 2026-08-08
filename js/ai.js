@@ -102,6 +102,92 @@ function lexaChatHTML() {
 }
 
 // ================================================================
+// O PAINEL DA LEXA — a explicação deixa de morar num popup de 420px
+// ================================================================
+// A explicação nasceu como balãozinho ao lado da seleção, e enquanto era só
+// "2 a 4 frases" isso bastava. Não basta mais: hoje ela carrega a explicação,
+// os chips de TODAS as unidades da frase e a conversa que continua dali — e
+// 420px espremem as três. Foi o que ele viu: *"é meio apertado do jeito que é
+// hoje… deve abrir um painel completo só seu, pra máximo foco e concentração"*.
+//
+// UM PAINEL, DOIS TAMANHOS, e o mesmo DOM nos dois: alternar é trocar uma
+// classe, então nada se perde na troca — nem a conversa, nem os chips, nem a
+// rolagem. Remontar em outro hospedeiro é que perderia.
+//   'cheio'    — a tela inteira, para se concentrar
+//   'compacto' — cartão centrado, quando ele quer ver a página por trás
+// A escolha fica guardada: quem prefere um dos dois prefere sempre.
+//
+// Fechar é barato porque o material sobrevive: a quebra da frase está no
+// IndexedDB (ver `quebrarTrecho`), então reabrir não custa chamada nenhuma.
+// É o próprio argumento dele para o painel poder ser fechado sem medo.
+const LEXA_PAINEL_MODOS = ['cheio', 'compacto']
+
+function lexaPainelModoAtual() {
+  const p = (typeof loadUiPrefs === 'function' && loadUiPrefs().lexaPainel) || 'cheio'
+  return LEXA_PAINEL_MODOS.includes(p) ? p : 'cheio'
+}
+
+function lexaPainelAlternar() {
+  const box = document.getElementById('lexa-painel'); if (!box) return
+  const novo = box.classList.contains('cheio') ? 'compacto' : 'cheio'
+  box.className = 'lexa-painel ' + novo
+  const b = box.querySelector('.lexa-painel-modo')
+  if (b) b.innerHTML = (novo === 'cheio' ? ic('shrink','ic-sm') + ' sair da tela cheia'
+                                          : ic('expand','ic-sm') + ' tela cheia')
+  if (typeof saveUiPref === 'function') saveUiPref('lexaPainel', novo)
+}
+
+function lexaPainelFechar() {
+  const box = document.getElementById('lexa-painel')
+  if (box) box.remove()
+  document.body.classList.remove('lexa-painel-aberto')
+}
+
+// Abre (ou reaproveita) o painel e devolve o CORPO, onde quem chamou escreve.
+// `fonte` é a linha de procedência do topo: livro e capítulo, episódio, item.
+function lexaPainelAbrir({ titulo, frase, fonte }) {
+  lexaPainelFechar()
+  const modo = lexaPainelModoAtual()
+  const box = document.createElement('div')
+  box.id = 'lexa-painel'
+  box.className = 'lexa-painel ' + modo
+  box.innerHTML = `
+    <div class="lexa-painel-caixa">
+      <header class="lexa-painel-topo">
+        <div class="lexa-painel-quem">
+          <b>${esc(titulo || lexaNome())}</b>
+          ${fonte ? `<span>${esc(fonte)}</span>` : ''}
+        </div>
+        <button class="btn btn-ghost btn-sm lexa-painel-modo" onclick="lexaPainelAlternar()">${
+          modo === 'cheio' ? ic('shrink','ic-sm') + ' sair da tela cheia'
+                           : ic('expand','ic-sm') + ' tela cheia'}</button>
+        <button class="btn btn-ghost btn-sm" onclick="lexaPainelFechar()">${ic('x','ic-sm')} fechar <span class="lexa-painel-tecla">Esc</span></button>
+      </header>
+      ${frase ? `<div class="lexa-painel-frase">“${escB(frase)}”</div>` : ''}
+      <div class="lexa-painel-corpo" id="lexa-painel-corpo"></div>
+    </div>`
+  // Clique no fundo fecha — mas só no fundo. No modo cheio o fundo é a borda
+  // externa; no compacto é o escurecido em volta do cartão.
+  box.addEventListener('mousedown', e => { if (e.target === box) lexaPainelFechar() })
+  document.body.appendChild(box)
+  document.body.classList.add('lexa-painel-aberto')
+  return box.querySelector('.lexa-painel-corpo')
+}
+
+// UM ouvinte, ligado uma vez. O guarda é a existência do painel.
+if (!window._lexaPainelTeclas) {
+  window._lexaPainelTeclas = true
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return
+    if (!document.getElementById('lexa-painel')) return
+    // Digitando na conversa, Esc fecha o painel do mesmo jeito: é o "me tira
+    // daqui" universal, e o que ele escreveu ali é pergunta de passagem.
+    e.preventDefault()
+    lexaPainelFechar()
+  })
+}
+
+// ================================================================
 // O QUE TEM NESTA FRASE — os chips das unidades
 // ================================================================
 // Pedido do Djemeson, e o motivo dele é o desenho inteiro: *"quando eu não

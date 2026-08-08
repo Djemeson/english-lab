@@ -1172,19 +1172,28 @@ function _lerAoSelecionar() {
   pop.querySelector('[data-p="wiki"]').onclick = () => lerAbrirBusca('wiki')
   pop.querySelector('[data-p="web"]').onclick = () => lerAbrirBusca('web')
   pop.querySelector('[data-p="exp"]').onclick = async () => {
-    const corpo = el('ler-pop-corpo')
     const alvo = _lerPopAlvo, ctx = _lerPopCtx
-    corpo.classList.remove('hidden')
+    // A EXPLICAÇÃO SAI DO BALÃOZINHO. Ela carrega explicação + chips de todas
+    // as unidades da frase + a conversa, e 420px espremem as três. O popup de
+    // seleção fecha: quem manda agora é o painel, que não depende da seleção
+    // continuar de pé — e com isso some também toda a briga do vigia de
+    // seleção com o campo de texto da conversa.
+    _lerFecharPopup()
+    const corpo = lexaPainelAbrir({
+      titulo: lexaNome(),
+      frase: ctx,
+      fonte: [_lerLivro.title, (_lerLivro.chapters[_lerCap] || {}).titulo].filter(Boolean).join(' · ')
+    })
     corpo.innerHTML = `<div class="ler-pop-txt">${esc(lexaNome())} está lendo o trecho…</div>`
+    const vivo = () => el('lexa-painel-corpo') === corpo
 
     // A figura vai em PARALELO com a IA e entra assim que chegar: a Wikipédia
     // responde em ~0,6s e a explicação leva alguns segundos — fazer o texto
     // esperar a foto seria trocar o essencial pelo acessório.
     if (typeof wikiIlustracao === 'function') {
       wikiIlustracao(alvo, (_lerLivro && _lerLivro.lang) || 'en').then(info => {
-        if (!info || alvo !== _lerPopAlvo) return
-        const c = el('ler-pop-corpo')
-        if (c && !c.querySelector('.ll-wiki-fig')) c.insertAdjacentHTML('afterbegin', wikiFiguraHTML(info))
+        if (!info || !vivo()) return
+        if (!corpo.querySelector('.ll-wiki-fig')) corpo.insertAdjacentHTML('afterbegin', wikiFiguraHTML(info))
       }).catch(() => {})
     }
 
@@ -1199,33 +1208,30 @@ function _lerAoSelecionar() {
         { role: 'system', content: sistema },
         { role: 'user', content: pergunta }
       ], { maxTokens: 600 })
-      const corpoAtual = el('ler-pop-corpo')
-      const txtEl = corpoAtual && corpoAtual.querySelector('.ler-pop-txt')
+      // Fechou o painel enquanto a IA respondia: não há mais onde escrever, e
+      // reabrir por conta própria seria o app decidindo por ele.
+      if (!vivo()) return
+      const txtEl = corpo.querySelector('.ler-pop-txt')
       // innerHTML com `lexaFormatar`, não textContent: a resposta vem em
       // markdown e o `textContent` a mostrava crua — `**pals** = "amigos"`,
       // com os asteriscos na cara do aluno.
       if (txtEl) txtEl.innerHTML = t ? lexaFormatar(t) : esc(`${lexaNome()} devolveu uma resposta vazia`)
-      // A conversa continua daqui: a explicação vira a primeira mensagem, então
-      // a pergunta seguinte já sabe o livro, a frase e o termo.
       // Os chips da FRASE (não do que ele selecionou): é a frase inteira que
       // ele não entendeu, e a peça que derrubou a leitura pode ser outra.
-      if (t && corpoAtual && typeof lexaChipsMontar === 'function' && !corpoAtual.querySelector('.lexa-chips-slot')) {
-        lexaChipsMontar(corpoAtual, {
+      if (t && !corpo.querySelector('.lexa-chips-slot') && typeof lexaChipsMontar === 'function') {
+        lexaChipsMontar(corpo, {
           trecho: ctx, contexto: trecho || '', lang: _lerLivro.lang || 'en', fonte: _lerLivro.title,
           origem: { source_type: 'kindle', source_title: _lerLivro.title,
                     source_context: (_lerLivro.chapters[_lerCap] || {}).titulo || '' }
         })
       }
-      if (t && corpoAtual && typeof lexaChatMontar === 'function' && !corpoAtual.querySelector('.lexa-chat')) {
-        lexaChatMontar(corpoAtual, { sistema, primeira: pergunta, resposta: t,
-          // Enquanto o campo tem foco, o vigia de seleção não fecha o popup:
-          // clicar ali desfaz a seleção do texto, e sem isto a conversa sumia
-          // 350ms depois de ele começar a escrever. Reusa a trava que o
-          // duplo-clique já usava.
-          aoFoco: on => { _lerIgnoraSel = on } })
+      // A conversa continua daqui: a explicação vira a primeira mensagem, então
+      // a pergunta seguinte já sabe o livro, a frase e o termo.
+      if (t && !corpo.querySelector('.lexa-chat') && typeof lexaChatMontar === 'function') {
+        lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: t })
       }
     } catch (e) {
-      const txtEl = el('ler-pop-corpo') && el('ler-pop-corpo').querySelector('.ler-pop-txt')
+      const txtEl = vivo() && corpo.querySelector('.ler-pop-txt')
       if (txtEl) txtEl.textContent = 'Não deu: ' + e.message
     }
   }

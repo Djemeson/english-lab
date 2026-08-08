@@ -747,11 +747,40 @@ async function videoOvExplain() {
   const trecho = _vidCues.slice(Math.max(0, i - 2), i + 2)
     .map((c, k) => (Math.max(0, i - 2) + k === i ? '>> ' : '   ') + c.t)
     .join('\n').slice(0, 700)
-  let corpo = pop.querySelector('.sel-pop-exp')
-  if (!corpo) { corpo = document.createElement('div'); corpo.className = 'sel-pop-exp'; pop.appendChild(corpo) }
-  const chave = 'vid|' + contexto + '|' + txt
-  if (typeof _revExplainCache !== 'undefined' && _revExplainCache.has(chave)) { corpo.innerHTML = _revExplainCache.get(chave); return }
   if (!aiChatCfg().key) { toast('Configure uma chave de IA em Configurações', 'warning'); return }
+  // Sai do balãozinho da legenda pelo mesmo motivo do leitor: explicação +
+  // chips de todas as unidades da fala + conversa não cabem num popup.
+  if (pop) pop.classList.add('hidden')
+  const corpo = lexaPainelAbrir({
+    titulo: lexaNome(),
+    frase: contexto,
+    fonte: (_vidCur && _vidCur.title) || ''
+  })
+  const vivo = () => el('lexa-painel-corpo') === corpo
+  const chave = 'vid|' + contexto + '|' + txt
+  // Mesma montagem para o cache e para a IA — ver o comentário do
+  // `_revExplainCache`: com uma cópia só, o acerto de cache não volta a dar
+  // tela pela metade.
+  const montar = c => {
+    if (!vivo()) return
+    corpo.innerHTML = c.html
+    if (typeof lexaChipsMontar === 'function') {
+      // Os chips da FALA inteira, não só do que ele marcou.
+      lexaChipsMontar(corpo, {
+        trecho: contexto, contexto: trecho || '', lang: (_vidCur && _vidCur.lang) || 'en',
+        fonte: (_vidCur && _vidCur.title) || '',
+        origem: { source_type: (_vidCur && _vidCur.source_type) || 'series',
+                  source_title: (_vidCur && _vidCur.title) || '' }
+      })
+    }
+    // A conversa continua sobre a CENA: a caixa já sabe o episódio e a fala.
+    if (typeof lexaChatMontar === 'function') {
+      lexaChatMontar(corpo, { sistema: c.sistema, primeira: c.pergunta, resposta: c.resposta })
+    }
+  }
+  if (typeof _revExplainCache !== 'undefined' && _revExplainCache.has(chave)) {
+    montar(_revExplainCache.get(chave)); return
+  }
   corpo.innerHTML = '<span class="gen-spinner"></span> a IA está explicando...'
   try {
     const sistema = lexaExplicar()
@@ -768,23 +797,12 @@ Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultur
     // resposta vazia (DeepSeek faz isso às vezes) NÃO pode virar cache — senão
     // a seleção fica muda para sempre; trata como erro e oferece re-tentar
     if (!resp || !resp.trim()) throw new Error('a IA devolveu uma resposta vazia')
-    const html = lexaFormatar(resp)
-    if (typeof _revExplainCache !== 'undefined') _revExplainCache.set(chave, html)
-    corpo.innerHTML = html
-    // Os chips da FALA inteira, não só do que ele marcou.
-    if (typeof lexaChipsMontar === 'function') {
-      lexaChipsMontar(corpo, {
-        trecho: contexto, contexto: trecho || '', lang: (_vidCur && _vidCur.lang) || 'en',
-        fonte: (_vidCur && _vidCur.title) || '',
-        origem: { source_type: (_vidCur && _vidCur.source_type) || 'series',
-                  source_title: (_vidCur && _vidCur.title) || '' }
-      })
-    }
-    // A conversa continua sobre a CENA: a caixa já sabe o episódio e a fala.
-    if (typeof lexaChatMontar === 'function') lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
+    const guardado = { html: lexaFormatar(resp), sistema, pergunta, resposta: resp }
+    if (typeof _revExplainCache !== 'undefined') _revExplainCache.set(chave, guardado)
+    montar(guardado)
   } catch (e) {
-    // erro DENTRO do popup (um toast some antes de o aluno entender o que houve)
-    corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)} — clique em Explicar para tentar de novo.</span>`
+    // erro DENTRO do painel (um toast some antes de o aluno entender o que houve)
+    if (vivo()) corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)} — feche e clique em Explicar para tentar de novo.</span>`
   }
 }
 

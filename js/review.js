@@ -2643,7 +2643,13 @@ async function revExprAdotar(wordId, i) {
   toast(`"${w.word}" dispensada`, 'info')
 }
 
-const _revExplainCache = new Map()
+// Guarda o CONTEXTO INTEIRO da explicação, não só o HTML.
+// Com o balãozinho, um acerto de cache pintava o texto e voltava — e isso já
+// deixava chips e conversa de fora. No painel isso ficaria gritante: reabrir
+// a mesma seleção daria uma tela pela metade, sem os chips e sem poder
+// perguntar nada. Guardando {html, sistema, pergunta, resposta}, o acerto de
+// cache monta a tela COMPLETA sem gastar chamada nenhuma.
+const _revExplainCache = new Map()   // chave → { html, sistema, pergunta, resposta }
 
 if (!window._revSelBound) {
   window._revSelBound = true
@@ -2707,14 +2713,40 @@ async function revSelExplain() {
   if (!txt || !pop) return
   const w = (typeof activeWordId !== 'undefined' && activeWordId) ? words.find(x => x.id === activeWordId) : null
   const chave = (w ? w.word : '') + '|' + txt
-  let corpo = pop.querySelector('.sel-pop-exp')
-  if (!corpo) {
-    corpo = document.createElement('div')
-    corpo.className = 'sel-pop-exp'
-    pop.appendChild(corpo)
-  }
-  if (_revExplainCache.has(chave)) { corpo.innerHTML = _revExplainCache.get(chave); return }
   if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
+  // Painel próprio, como no leitor e no vídeo: o balãozinho da seleção não
+  // comporta explicação + chips de todas as unidades + conversa.
+  pop.classList.add('hidden')
+  const fraseDoItem = window._revSelCtx || (w && w.context) || txt
+  const corpo = lexaPainelAbrir({
+    titulo: lexaNome(),
+    frase: fraseDoItem,
+    fonte: [(w && w.word) || '', (w && w.source_title) || ''].filter(Boolean).join(' · ')
+  })
+  const vivo = () => el('lexa-painel-corpo') === corpo
+  // Os chips e a conversa se montam do mesmo jeito, tendo a explicação vindo
+  // do cache ou da IA — por isso a montagem é UMA função, chamada dos dois
+  // caminhos. Duplicá-la aqui é como o acerto de cache passou a dar tela pela
+  // metade em primeiro lugar.
+  const montar = ctx2 => {
+    if (!vivo()) return
+    corpo.innerHTML = ctx2.html
+    if (typeof lexaChipsMontar === 'function') {
+      // Os chips saem da FRASE do item, não do pedaço selecionado: quem não
+      // entendeu a frase precisa ver de que ela é feita.
+      lexaChipsMontar(corpo, {
+        trecho: fraseDoItem, lang: (w && wordLang(w)) || 'en', fonte: (w && w.source_title) || '',
+        origem: { source_type: (w && w.source_type) || 'manual', source_title: (w && w.source_title) || '',
+                  source_context: (w && w.source_context) || '' }
+      })
+    }
+    // A conversa nasce sabendo a explicação, mas NÃO herda a conversa velha:
+    // ela é da sessão, e reabrir tem de trazer a caixa vazia.
+    if (typeof lexaChatMontar === 'function') {
+      lexaChatMontar(corpo, { sistema: ctx2.sistema, primeira: ctx2.pergunta, resposta: ctx2.resposta })
+    }
+  }
+  if (_revExplainCache.has(chave)) { montar(_revExplainCache.get(chave)); return }
   corpo.innerHTML = '<span class="gen-spinner"></span> a Lexa está explicando...'
   // Mesma ilustração do leitor, mesma regra: só entra quando o verbete da
   // Wikipédia é REALMENTE do que foi selecionado (ver wikiIlustracao).
@@ -2732,24 +2764,11 @@ Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultur
       { role: 'user', content: pergunta }
     ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
     await pFig   // a figura já veio (é mais rápida que a IA); só junta
-    const html = figura + lexaFormatar(resp)
-    _revExplainCache.set(chave, html)   // aiTextSeguro nunca devolve vazio: não cacheia silêncio
-    corpo.innerHTML = html
-    // Os chips saem da FRASE do item, não do pedaço selecionado: quem não
-    // entendeu a frase precisa ver de que ela é feita.
-    const fraseDoItem = window._revSelCtx || (w && w.context) || txt
-    if (typeof lexaChipsMontar === 'function') {
-      lexaChipsMontar(corpo, {
-        trecho: fraseDoItem, lang: (w && wordLang(w)) || 'en', fonte: (w && w.source_title) || '',
-        origem: { source_type: (w && w.source_type) || 'manual', source_title: (w && w.source_title) || '',
-                  source_context: (w && w.source_context) || '' }
-      })
-    }
-    // A conversa continua daqui — o chat NÃO entra no cache: ele é da sessão,
-    // e reabrir a explicação tem de trazer a caixa vazia, não a conversa velha.
-    if (typeof lexaChatMontar === 'function') lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
+    const guardado = { html: figura + lexaFormatar(resp), sistema, pergunta, resposta: resp }
+    _revExplainCache.set(chave, guardado)   // aiTextSeguro nunca devolve vazio: não cacheia silêncio
+    montar(guardado)
   } catch (e) {
-    corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)} — clique em Explicar para tentar de novo.</span>`
+    if (vivo()) corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)} — feche e clique em Explicar para tentar de novo.</span>`
   }
 }
 

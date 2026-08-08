@@ -5100,6 +5100,74 @@ body.ler-full .mobile-bottom-nav{display:none}
    CONVERSA COM A LEXA dentro do popup de seleção (leitor, Preparar, vídeo).
    A explicação deixa de ser resposta única e vira o começo de uma linha.
    ================================================================ */
+/* ================================================================
+   O PAINEL DA LEXA — dois tamanhos, o mesmo conteúdo
+   ================================================================
+   'cheio' cobre a tela para se concentrar; 'compacto' é um cartão centrado
+   com a página visível por trás. Trocar é só trocar a classe: o DOM é o
+   mesmo, então a conversa, os chips e a rolagem sobrevivem à troca. */
+.lexa-painel{
+  position:fixed;inset:0;z-index:var(--z-modal);
+  display:flex;align-items:center;justify-content:center;
+  animation:lexaPainelEntra .16s ease-out;
+}
+@keyframes lexaPainelEntra{from{opacity:0}to{opacity:1}}
+.lexa-painel-caixa{
+  display:flex;flex-direction:column;min-height:0;
+  background:var(--surface);border:1px solid var(--border);
+  box-shadow:0 20px 60px -20px rgba(0,0,0,.7);
+}
+.lexa-painel.cheio{background:var(--bg)}
+/* A COLUNA DE LEITURA É MEDIDA UMA VEZ, no contêiner. Medindo em `ch` dentro
+   de cada filho, cada um usava a PRÓPRIA fonte como régua — a frase (maior)
+   dava 640px e o corpo (menor) 581px, e os dois desalinhavam na tela. */
+.lexa-painel.cheio .lexa-painel-caixa{
+  width:100%;max-width:46rem;height:100%;border:0;box-shadow:none;background:transparent;
+  padding:var(--sp-5) var(--sp-6);
+}
+/* No compacto o fundo escurece: é o que diz "isto é uma camada por cima",
+   e é a área que responde ao clique para fechar. */
+.lexa-painel.compacto{background:rgba(0,0,0,.55);padding:var(--sp-5)}
+.lexa-painel.compacto .lexa-painel-caixa{
+  width:min(620px,100%);max-height:min(80vh,760px);border-radius:var(--radius);
+  padding:var(--sp-5);
+}
+
+.lexa-painel-topo{
+  display:flex;align-items:center;gap:var(--sp-3);flex-shrink:0;flex-wrap:wrap;
+  padding-bottom:var(--sp-3);border-bottom:1px solid var(--border);
+}
+.lexa-painel-quem{display:flex;flex-direction:column;margin-right:auto;min-width:0}
+.lexa-painel-quem b{font-size:var(--fs-base)}
+.lexa-painel-quem span{font-size:var(--fs-2xs);color:var(--text3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lexa-painel-tecla{
+  display:inline-block;padding:0 4px;margin-left:3px;border:1px solid var(--border);
+  border-radius:4px;font-size:var(--fs-3xs);color:var(--text3);
+}
+/* A frase é a âncora: fica parada no topo enquanto o resto rola, porque é a
+   ela que tudo abaixo se refere. */
+.lexa-painel-frase{
+  flex-shrink:0;margin-top:var(--sp-4);padding-left:var(--sp-4);
+  border-left:3px solid rgba(var(--primary-rgb),.45);
+  font-size:var(--fs-md);line-height:1.55;font-style:italic;color:var(--text2);
+  max-height:22vh;overflow-y:auto;
+}
+.lexa-painel-corpo{
+  flex:1;overflow-y:auto;min-height:0;padding-top:var(--sp-4);
+  font-size:var(--fs-sm);line-height:1.6;
+}
+.lexa-painel .lexa-chat-msgs{max-height:none}
+@media (max-width:768px){
+  .lexa-painel.compacto{padding:0}
+  .lexa-painel.compacto .lexa-painel-caixa{
+    width:100%;max-height:88vh;margin-top:auto;
+    border-radius:var(--radius) var(--radius) 0 0;
+  }
+  .lexa-painel.compacto{align-items:flex-end}
+  .lexa-painel.cheio .lexa-painel-caixa{padding:var(--sp-4)}
+}
+
 /* ---- O QUE TEM NESTA FRASE: as unidades como chips ----
    Ficam ENTRE a explicação e a caixa de conversa: a explicação resolve a
    frase, os chips dizem de que ela é feita, e a conversa é para o que sobrar.
