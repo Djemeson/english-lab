@@ -394,7 +394,14 @@ Return ONLY this JSON:
 //
 // É por SENTIDO, não por item: cada sentido tem a própria forma, o próprio
 // padrão e as próprias colocações.
-async function completarMaterial(wordId, meaningId) {
+// `refazer` sobrescreve o que já existe, em vez de só preencher o que falta.
+// Existe porque melhorar o PROMPT não melhora o dado JÁ GRAVADO — a lição que
+// este projeto já pagou três vezes. Quando a regra da "curiosidade" foi
+// apertada (ela vinha devolvendo observação de REGISTRO disfarçada de
+// curiosidade), todo item analisado antes ficou com o texto velho, e sem isto
+// a única saída seria a re-análise inteira: mais cara e mexendo no que ele já
+// curou.
+async function completarMaterial(wordId, meaningId, refazer) {
   const w = words.find(x => x.id === wordId); if (!w) return false
   const m = (w.meanings || []).find(x => x && x.id === meaningId); if (!m) return false
   if (!aiChatCfg().key) {
@@ -423,8 +430,8 @@ Return ONLY this JSON:
  "collocations": ["words that habitually travel with THIS sense, 2-4 words each. Fixed or strongly preferred pairings only, never free combinations. []"],
  "confusoes": ["words a learner mixes up with this one, each as \\"word — what makes it DIFFERENT\\", in PT-BR. State the difference, never just name the neighbour. []"],
  "armadilha": "false friend or systematic trap for a BRAZILIAN PORTUGUESE speaker (1-2 sentences, PT-BR). \\"\\" for the vast majority of items.",
- "curiosidade": "one genuinely interesting NON-etymological note in PT-BR (cultural fact, famous use, why it is spelled that way). \\"\\" when there is nothing. Never filler.",
- "registro_uso": "one line in PT-BR: where this sense is used and where it must NOT be. \\"\\" when it is plainly neutral."
+ "curiosidade": "ONE CONCRETE FACT the learner did not know, PT-BR, 1-2 sentences. A fact ABOUT THE WORLD — datable, nameable, checkable — never an impression about how the word feels. GOOD: a real work/brand/person and its date; an event that spread the word; a famous line; a completely different meaning in another field. REJECT (wrong field or nothing): tone, style, register, where it is heard — that is \\"registro_uso\\"; \\"é muito usada\\", \\"aparece em títulos\\", \\"soa informal\\"; restating meaning or etymology. THE TEST: if the same sentence would work for hundreds of other words by swapping the word, it is NOT a curiosity — return \\"\\". Empty is the right answer for most ordinary words.",
+ "registro_uso": "one line in PT-BR on the TONE and the PLACE of this sense: how it soa (leve, afetuoso, datado, técnico…), onde se usa e onde NÃO se usa. THIS is the home of everything about tone and style — never put that in \\"curiosidade\\". \\"\\" when it is plainly neutral."
 }`
     const r = await aiJSON(PROMPT, { maxTokens: 1200 })
     if (!r || typeof r !== 'object') throw new Error('resposta vazia')
@@ -432,7 +439,17 @@ Return ONLY this JSON:
     // nova), esta chamada não pode passar por cima.
     const põe = (campo, valor) => {
       const vazio = Array.isArray(m[campo]) ? !m[campo].length : !String(m[campo] || '').trim()
-      if (vazio && (Array.isArray(valor) ? valor.length : String(valor || '').trim())) { m[campo] = valor; return 1 }
+      const veio = Array.isArray(valor) ? valor.length : String(valor || '').trim()
+      // No refazer, a resposta VAZIA também vale: se a regra nova diz que
+      // aquele campo não tinha o que dizer, o texto ruim tem de sair. Sem
+      // isso, "melhorar" nunca conseguiria apagar uma curiosidade que era
+      // registro disfarçado.
+      if (refazer) {
+        const mudou = JSON.stringify(m[campo] ?? '') !== JSON.stringify(valor ?? '')
+        m[campo] = valor
+        return mudou ? 1 : 0
+      }
+      if (vazio && veio) { m[campo] = valor; return 1 }
       return 0
     }
     let n = 0
@@ -449,8 +466,9 @@ Return ONLY this JSON:
     w.updated_at = new Date().toISOString()
     saveWords()
     if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
-    toast(n ? `Material completado (${n} ${n === 1 ? 'bloco novo' : 'blocos novos'})`
-            : 'A IA não achou o que acrescentar para este sentido', n ? 'success' : 'info')
+    toast(n ? `Material ${refazer ? 'refeito' : 'completado'} (${n} ${n === 1 ? 'bloco' : 'blocos'})`
+            : (refazer ? 'A IA devolveu o mesmo material' : 'A IA não achou o que acrescentar para este sentido'),
+          n ? 'success' : 'info')
     return true
   } catch (e) {
     toast(`Não deu para completar: ${e.message}`, 'error')
@@ -601,7 +619,8 @@ These exist so the learner can PRODUCE the item, not merely recognize it, and th
 - ⚠️ EMPTY IS A VALID AND FREQUENT ANSWER. An invented false friend, a made-up collocation or a "curiosity" that says nothing are worse than leaving the field empty: the learner would memorize something false. If you are not reasonably sure, return "" or [].
 - Expect most ordinary words to have "armadilha": "" and "curiosidade": "". Expect almost every item to have "forms" and "grammar" filled — those two are the ones a learner misses most.
 - "forms" is about SHAPE (inflection), never about meaning. "collocations" is about COMPANY (which words come next), never a definition. "confusoes" is about the BORDER with a neighbour word, and each entry must state the difference, not just name the neighbour.
-- Never repeat the same content in two of these fields, and never repeat in "curiosidade" what "origin_pt" already says.
+- EACH FIELD HAS ONE JOB AND THEY DO NOT OVERLAP. Tone, style and where it is heard → "registro_uso". Where the word came from → "origin_pt". A fact about the world → "curiosidade". Writing a register observation inside "curiosidade" is a WRONG ANSWER, not a partial one — the real case: for "gals" it returned *"em títulos como 'pals 'n' gals' a palavra costuma aparecer em tom leve, amistoso e um pouco retrô"*, which is register wearing a curiosity's clothes.
+- THE SWAP TEST, for "curiosidade" and "armadilha": if the sentence you wrote would still be true after swapping the item for hundreds of other words, it says nothing about THIS item — return "".
 
 Example of CORRECT behavior for "take off" with context "his startup took off overnight":
 sense_audit: [
@@ -651,8 +670,8 @@ Return ONLY this JSON (no markdown, no explanation):
       "collocations": ["the words that habitually travel with this sense — fixed or strongly preferred pairings, in the target language, 2-4 words each (e.g. for \\"rain\\": \\"heavy rain\\", \\"pouring rain\\"). NOT free combinations that merely happen to be possible. Empty array when the item has no notable partners."],
       "confusoes": ["near words a learner mixes up with this one, each as \\"word — what makes it DIFFERENT\\", in Brazilian Portuguese (e.g. \\"girl — neutro, mas infantiliza uma adulta\\", \\"chick — gíria, pode ofender\\"). A synonym list alone never says the difference, and the difference is the whole information. Empty array when nothing is genuinely confusable."],
       "armadilha": "FALSE FRIEND or systematic trap for a BRAZILIAN PORTUGUESE speaker, 1-2 sentences in PT-BR (e.g. \\"pretend\\" não é \\"pretender\\"; \\"actually\\" não é \\"atualmente\\"; \\"push\\" não é \\"puxar\\"). Fill ONLY when a Portuguese speaker really does fall for it. EMPTY STRING for the vast majority of items — a fake trap is worse than none.",
-      "curiosidade": "one genuinely interesting NON-ETYMOLOGICAL note in PT-BR (1-2 sentences): a cultural fact, a famous use, why it is spelled that way, where it is heard. Etymology belongs to \\"origin_pt\\" — do NOT repeat it here. EMPTY STRING when there is nothing genuinely interesting. NEVER filler like \\"é uma palavra muito usada\\".",
-      "registro_uso": "one line in PT-BR saying WHERE this sense is used and where it must NOT be — the practical reading of \\"register\\" (e.g. \\"entre amigos e no sul dos EUA; num e-mail de trabalho soa datado\\"). Empty string when the sense is plainly neutral everywhere.",
+      "curiosidade": "ONE CONCRETE FACT the learner did not know, in PT-BR (1-2 sentences). A fact ABOUT THE WORLD — datable, nameable, checkable — never an impression about how the word feels or where it is used.\\nGOOD: a real work, brand or person the word is tied to, with the date (\\"Archie's Pals 'n' Gals foi uma revista da Archie Comics publicada de 1952 a 1991\\"); a historical event that created or spread it; a famous line or scene; a technical or legal definition that surprises; a COMPLETELY different meaning in another field (\\"gal\\" também é a abreviação de \\"gallon\\"); the story behind a false friend.\\nREJECT — these are not weak answers, they are the WRONG FIELD or nothing at all: anything about tone, style, register or where it is heard (that is \\"registro_uso\\"); \\"é muito usada\\", \\"aparece em títulos\\", \\"soa informal\\", \\"tem um ar retrô\\"; restating the meaning or the etymology in other words (etymology is \\"origin_pt\\").\\nTHE TEST, apply it before returning: could this same sentence be written about HUNDREDS of other words just by swapping the word? Then it is NOT a curiosity — return \\"\\".\\nEMPTY STRING is the right answer for most ordinary words, and returning it is better than inventing.",
+      "registro_uso": "one line in PT-BR on the TONE and the PLACE of this sense: how it soa (leve, afetuoso, datado, técnico, agressivo…), onde se usa e onde NÃO se usa — the practical reading of \\"register\\" (e.g. \\"entre amigos e no sul dos EUA; num e-mail de trabalho soa datado e caricato\\"). THIS is the home of everything about tone and style — never put that in \\"curiosidade\\". Empty string when the sense is plainly neutral everywhere.",
       "examples": [
         {"en": "Sentence with <b>word</b> in present tense.", "pt": "Tradução natural com o <b>equivalente</b> em português."},
         {"en": "Sentence with <b>word</b> in past tense.", "pt": "Tradução natural com o <b>equivalente</b> em português."},

@@ -820,9 +820,23 @@ function _dosCompletarHTML(w, m) {
   const temAlgo = (m.forms || []).length || (m.collocations || []).length ||
                   (m.confusoes || []).length || m.grammar || m.armadilha ||
                   m.curiosidade || m.registro_uso
-  if (temAlgo || m.material_at) return ''
   if (typeof completarMaterial !== 'function') return ''
   const rodando = typeof estaEmAnalise === 'function' && estaEmAnalise(w.id + '|' + m.id)
+  // JÁ TEM MATERIAL: a oferta deixa de ser "completar" e vira REFAZER.
+  // Melhorar o prompt não melhora o dado já gravado — a lição que este projeto
+  // já pagou três vezes. Foi o caso da "curiosidade", que vinha devolvendo
+  // observação de REGISTRO disfarçada ("tom leve, amistoso e um pouco retrô"
+  // para "gals"): a regra apertou, e sem isto todo item antigo ficaria com o
+  // texto velho até uma re-análise inteira — mais cara, e mexendo no que ele
+  // já curou.
+  if (temAlgo || m.material_at) {
+    return `<p class="dosf-texto dosf-nota">Forma, padrão, colocações, régua, cuidado e
+        curiosidade vieram de uma análise anterior. Refazer pede tudo de novo com as regras
+        atuais — significado, definição e exemplos continuam intocados.</p>
+      <button class="btn btn-ghost btn-sm" ${rodando ? 'disabled' : ''}
+        onclick="dossieCompletar('${w.id}','${m.id}',true)">${
+        rodando ? '<span class="spinner"></span> refazendo…' : ic('refresh','ic-sm') + ' Refazer o material'}</button>`
+  }
   return `<p class="dosf-texto">Este sentido foi analisado antes de o app aprender a guardar
       forma, padrão, colocações e régua. Uma chamada de IA busca só o que falta —
       seu significado, definição e exemplos não são tocados.</p>
@@ -928,9 +942,9 @@ Return ONLY this JSON:
   _dosFocoPintar()
 }
 
-async function dossieCompletar(wordId, meaningId) {
+async function dossieCompletar(wordId, meaningId, refazer) {
   if (typeof completarMaterial !== 'function') return
-  await completarMaterial(wordId, meaningId)
+  await completarMaterial(wordId, meaningId, refazer)
   _dosFocoPintar()
 }
 
@@ -977,7 +991,11 @@ function _dosFocoBlocos(w, m, ctx, ctxPt) {
       html: m.origin_pt ? `<p class="dosf-texto">${esc(m.origin_pt)}</p>` : '' },
     { id:'curiosidade', rotulo:'Curiosidade',   icone:'flame',
       html: m.curiosidade ? `<p class="dosf-texto">${esc(m.curiosidade)}</p>` : '' },
-    { id:'completar', rotulo:'Falta material', icone:'sparkles', html:_dosCompletarHTML(w, m) },
+    // O rótulo muda com o estado: falta material, ou material que dá para
+    // refazer com as regras de hoje.
+    { id:'completar', icone:'sparkles', html:_dosCompletarHTML(w, m),
+      rotulo: (m.material_at || (m.forms || []).length || m.grammar || m.curiosidade)
+        ? 'O material desta análise' : 'Falta material' },
     // O último bloco antes de produzir: a palavra dentro da SUA história de
     // leitura. Tudo local, nenhuma chamada de IA.
     { id:'vida',    rotulo:'Na sua vida', icone:'clock',

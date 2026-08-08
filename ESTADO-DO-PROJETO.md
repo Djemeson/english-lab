@@ -7,7 +7,18 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O PAINEL DA LEXA**. A explicação com os chips morava num
+> Última atualização: 2026-08-08 — **CURIOSIDADE NÃO É REGISTRO**. A "curiosidade" de *gals* era
+> uma observação de TOM ("leve, amistoso e um pouco retrô") — ou seja, `registro_uso` disfarçado.
+> O defeito era da especificação: ela dizia *"where it is heard"*, que é justamente o trabalho do
+> vizinho, e "genuinely interesting" não restringe modelo nenhum. Agora **cada campo tem um
+> trabalho e eles não se sobrepõem**, e "interessante" virou testável: um FATO sobre o mundo,
+> datável e verificável, mais o **teste da troca** — se a frase continuaria verdadeira trocando a
+> palavra por centenas de outras, devolva vazio. Como prompt novo não conserta dado gravado
+> (quarta vez), `completarMaterial` ganhou o modo **refazer**, que sobrescreve inclusive com
+> vazio — senão nunca daria para APAGAR a curiosidade ruim. `sw.js` → `englab-v163`.
+> Ver seção 8.2 ("Curiosidade não é registro").
+>
+> Anterior: 2026-08-08 — **O PAINEL DA LEXA**. A explicação com os chips morava num
 > popup de 420px e ficou apertada. Virou **painel próprio, com dois tamanhos** (cheio para
 > concentrar, compacto para ver a página por trás) e o **mesmo DOM nos dois** — alternar é trocar
 > uma classe, então conversa, chips e rolagem sobrevivem. A escolha fica guardada. Vale nas três
@@ -6908,6 +6919,47 @@ app reabri-lo sozinho.
 
 **Arquivos**: `js/ai.js`, `js/ler.js`, `js/video-study.js`, `js/review.js`, `css/styles.css`.
 `sw.js` → `englab-v162`.
+
+### CURIOSIDADE NÃO É REGISTRO (2026-08-08)
+
+Print da "Curiosidade" de **gals**: *"Em títulos e expressões como 'pals 'n' gals', a palavra
+costuma aparecer em tom leve, amistoso e um pouco retrô."* A pergunta dele: *"isso realmente é uma
+curiosidade?"*
+
+Não é — **é registro**, e registro tem campo próprio (`registro_uso`). O defeito era meu, na
+especificação: eu tinha escrito *"a cultural fact, a famous use, why it is spelled that way,
+**where it is heard**"*. Esse "where it is heard" É o trabalho do `registro_uso`, então o campo
+tinha licença para invadir o vizinho. E "genuinely interesting" não restringe modelo nenhum: ele
+satisfaz o adjetivo com uma observação de tom bem escrita.
+
+Duas correções, nos três lugares onde a regra vive (schema da análise, `completarMaterial` e o
+bloco compartilhado):
+
+- **Cada campo tem UM trabalho e eles não se sobrepõem.** Tom, estilo e onde se ouve →
+  `registro_uso` (que passou a dizer explicitamente que é a casa disso). De onde a palavra veio →
+  `origin_pt`. Fato sobre o mundo → `curiosidade`. Escrever registro dentro de curiosidade é
+  **resposta errada, não resposta fraca** — e o caso real ficou nomeado no prompt.
+- **"Interessante" virou testável.** Curiosidade agora é *um fato sobre o mundo — datável,
+  nomeável, verificável*, com exemplos do que serve (obra/marca/pessoa com data, evento que
+  espalhou a palavra, sentido completamente diferente em outra área — "gal" também é a abreviação
+  de "gallon") e do que é rejeição. Mais **o teste da troca**:
+
+> Se a mesma frase continuaria verdadeira trocando o item por centenas de outras palavras, ela não
+> diz nada sobre ESTE item — devolva `""`.
+
+O texto do print falha nesse teste de forma perfeita, e por isso passava.
+
+**E o dado já gravado não se conserta sozinho** (quarta vez que este projeto paga essa lição).
+`completarMaterial` ganhou o modo **refazer**: pede tudo de novo com as regras atuais e
+**sobrescreve**, inclusive com vazio — sem aceitar o vazio, "melhorar" nunca conseguiria APAGAR
+uma curiosidade que era registro disfarçado. A seção do foco troca de cara conforme o estado:
+"Falta material" (completar) ou "O material desta análise" (refazer). Significado, definição e
+exemplos continuam intocados nos dois casos.
+
+Provado com o texto exato do print: a seção **Curiosidade desapareceu** (campo voltou vazio) e o
+conteúdo reapareceu em *Como se comporta*, como registro.
+
+**Arquivos**: `js/review.js`, `js/dossie.js`. `sw.js` → `englab-v163`.
 
 ### Onde a captura ainda NÃO leva a semente
 
