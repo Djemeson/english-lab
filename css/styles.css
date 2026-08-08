@@ -5313,6 +5313,28 @@ body.ler-full .mobile-bottom-nav{display:none}
   background:rgba(var(--primary-rgb),.9);color:#fff;
   border-color:rgba(var(--primary-rgb),.9);
 }
+/* O TERCEIRO ESTADO. Âmbar e não vermelho: "não conheço" não é erro nem
+   perigo — é o que vale estudar, a parte boa da triagem. E precisa ser
+   inconfundível com o azul do "conheço" à distância de uma varredura. */
+.ler-niv-chip.nao{
+  background:rgba(231,186,83,.16);color:var(--warning);
+  border-color:rgba(231,186,83,.55);font-weight:600;
+}
+.ler-niv-chip.nao:hover{border-color:var(--warning);color:var(--warning)}
+
+/* AS DUAS FERRAMENTAS — o pincel na mão fica evidente, senão o clique seguinte
+   é uma aposta. Botão de rádio disfarçado de par de abas. */
+.ler-niv-ferr{display:inline-flex;border:1px solid var(--border);border-radius:20px;overflow:hidden}
+.ler-niv-f{
+  display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+  padding:5px 12px;border:0;background:transparent;color:var(--text3);
+  font:inherit;font-size:var(--fs-2xs);font-weight:600;
+}
+.ler-niv-f:hover{color:var(--text)}
+.ler-niv-f.on{background:rgba(var(--primary-rgb),.9);color:#fff}
+.ler-niv-f.nao.on{background:rgba(231,186,83,.9);color:#1a1408}
+.ler-niv-resumo .nao{color:var(--warning)}
+.ler-niv-cont .nao{color:var(--warning)}
 /* Quantas vezes a palavra volta no capítulo — repetição é o melhor
    argumento para estudá-la, então merece estar no chip. */
 .ler-niv-chip i{
@@ -5326,6 +5348,11 @@ body.ler-full .mobile-bottom-nav{display:none}
   .ler-niv-rolo{max-height:56vh;max-height:56dvh}
   .ler-niv-chip{padding:8px 13px;min-height:38px}
   .ler-niv-acoes .btn{min-height:32px}
+  /* A ferramenta é a primeira decisão da tela: no celular ela ocupa a linha
+     inteira em vez de disputar espaço com o resumo. */
+  .ler-niv-ferr{width:100%}
+  .ler-niv-f{flex:1;justify-content:center;min-height:34px}
+  .ler-niv-barra .btn-primary{margin-left:0;flex:1}
 }
 /* Selo de expressão no chip: distingue "tire of" de "tire" na mesma lista */
 .ler-niv-chip u{

@@ -2254,8 +2254,12 @@ function _lerNivMontar(chave, itens) {
   // conhece vocabulário em blocos perfeitamente alinhados com a escala: quem
   // é B1 sabe "bayonet" se leu sobre guerra. A escala é um palpite útil para
   // poupar cliques, não um teto.
-  const sel = new Set(vivos.filter(it => cefrIdx(it.n) < nivel).map(it => it.w))
-  _lerNiv = { chave, itens: vivos, sel }
+  // O estado é um MAPA de três valores, não mais um Set de marcados: ver o
+  // bloco "AS DUAS FERRAMENTAS". A pré-marcação continua a mesma — tudo
+  // abaixo do nível dele nasce como 'sim'.
+  const marca = new Map()
+  for (const it of vivos) if (cefrIdx(it.n) < nivel) marca.set(it.w, 'sim')
+  _lerNiv = { chave, itens: vivos, marca }
   return vivos.length
 }
 
@@ -2425,31 +2429,83 @@ async function lerClassificar(cap, refazer) {
 }
 
 // ---- A TELA ----------------------------------------------------
-function lerNivToggle(w) {
-  if (!_lerNiv) return
-  _lerNiv.sel.has(w) ? _lerNiv.sel.delete(w) : _lerNiv.sel.add(w)
+// ================================================================
+// AS DUAS FERRAMENTAS — pincel de "conheço" e pincel de "não conheço"
+// ================================================================
+// A tela nasceu binária: marcado = conheço, não marcado = vai estudar. Isso
+// funciona enquanto a proposta da IA está quase certa e ele só desmarca a
+// exceção. Não funciona quando a exceção é a maioria — e foi o que ele
+// descreveu: às vezes é mais rápido marcar SÓ o que não conhece e varrer o
+// resto de uma vez.
+//
+// O que faltava para isso era um TERCEIRO estado. Com dois, "não marcado"
+// significa duas coisas ao mesmo tempo — "ainda não olhei" e "olhei e não
+// sei" — e nenhuma varredura em massa é segura, porque ela atropela as duas.
+//   (vazio)  = ainda não olhei
+//   'sim'    = conheço
+//   'nao'    = não conheço  ← protege da varredura
+//
+// A FERRAMENTA ATIVA decide o que o clique pinta. Ele sugeriu como alternativa
+// um ciclo de três estados no mesmo clique (1 clique = conheço, 2 = não
+// conheço); ficou de fora porque a ferramenta já resolve, e as duas juntas
+// brigariam: com o pincel de "não conheço" na mão, o primeiro clique teria de
+// pintar "conheço" para respeitar o ciclo. Clicar de novo com o MESMO pincel
+// apaga a marca — é o comportamento normal de pincel e não precisa ser
+// aprendido.
+//
+// E é isto que faz o fluxo dele fechar: **"todas as restantes" pinta só o que
+// está SEM MARCA.** Marcar as 8 que não conhece e varrer as outras 300 como
+// conhecidas passa a ser uma varredura só, sem risco de apagar as 8.
+let _lerNivFerr = 'sim'        // pincel ativo: 'sim' (conheço) | 'nao'
+
+function lerNivFerramenta(qual) {
+  _lerNivFerr = (qual === 'nao') ? 'nao' : 'sim'
   _lerNivRepintar()
 }
 
-function lerNivGrupo(nivel, ligar) {
+function _lerNivMarca(w) { return (_lerNiv && _lerNiv.marca.get(w)) || '' }
+
+function lerNivToggle(w, nivel) {
+  if (!_lerNiv) return
+  // Mesmo pincel duas vezes = apaga. Pincel diferente = repinta por cima, sem
+  // precisar limpar antes.
+  if (_lerNiv.marca.get(w) === _lerNivFerr) _lerNiv.marca.delete(w)
+  else _lerNiv.marca.set(w, _lerNivFerr)
+  _lerNivRepintarGrupo(nivel)
+}
+
+// `modo`: 'restantes' pinta só quem está sem marca (o varrer seguro),
+//         'todas' pinta tudo da faixa, 'limpar' devolve a faixa ao zero.
+function lerNivGrupo(nivel, modo) {
   if (!_lerNiv) return
   for (const it of _lerNiv.itens) {
     if (it.n !== nivel) continue
-    if (ligar) _lerNiv.sel.add(it.w); else _lerNiv.sel.delete(it.w)
+    if (modo === 'limpar') { _lerNiv.marca.delete(it.w); continue }
+    if (modo === 'restantes' && _lerNiv.marca.has(it.w)) continue
+    _lerNiv.marca.set(it.w, _lerNivFerr)
   }
-  _lerNivRepintar()
+  _lerNivRepintarGrupo(nivel)
 }
 
-function lerNivConfirmar() {
-  if (!_lerNiv || !_lerNiv.sel.size) return
+// Confirma as CONHECIDAS. Sem `nivel`, vale para a triagem inteira (a barra
+// do topo); com `nivel`, só para aquela faixa — que é o pedido dele: resolver
+// uma faixa, tirá-la da frente, e seguir verificando as outras.
+function lerNivConfirmar(nivel) {
+  if (!_lerNiv) return
+  const alvo = _lerNiv.itens.filter(it =>
+    _lerNiv.marca.get(it.w) === 'sim' && (!nivel || it.n === nivel))
+  if (!alvo.length) return
   // Guarda ANTES de marcar: só o que não era conhecido é que precisa voltar
   // no desfazer, senão reverter apagaria marcação legítima antiga.
-  const marcadas = [..._lerNiv.sel].filter(w => !isKnownWord(w))
+  const marcadas = alvo.map(it => it.w).filter(w => !isKnownWord(w))
   for (const w of marcadas) markKnownWord(w, true)
   _lerNivDesfazer = marcadas
-  _lerNiv.itens = _lerNiv.itens.filter(it => !_lerNiv.sel.has(it.w))
-  _lerNiv.sel = new Set()
-  toast(marcadas.length + ' palavras marcadas como conhecidas', 'success')
+  const fora = new Set(alvo.map(it => it.w))
+  _lerNiv.itens = _lerNiv.itens.filter(it => !fora.has(it.w))
+  for (const w of fora) _lerNiv.marca.delete(w)
+  toast(marcadas.length + (marcadas.length === 1 ? ' palavra marcada' : ' palavras marcadas') +
+    ' como ' + (marcadas.length === 1 ? 'conhecida' : 'conhecidas') +
+    (nivel ? ' em ' + nivel : ''), 'success')
   _lerRenderFerramentas()
 }
 
@@ -2470,8 +2526,11 @@ function lerNivDesfazerMarcacao() {
 // capítulo: card sem contexto é o que produz "barrel = barril".
 async function lerNivEstudarGrupo(nivel) {
   if (!_lerNiv) return
-  const lista = _lerNiv.itens.filter(it => it.n === nivel && !_lerNiv.sel.has(it.w)).map(it => it.w)
-  if (!lista.length) { toast('nenhuma palavra desmarcada em ' + nivel, 'info'); return }
+  // Vai quem NÃO é 'conheço' — o explicitamente "não conheço" e o que ele
+  // ainda não olhou. Continua a mesma semântica de antes; o estado novo só
+  // deixou de esconder um dentro do outro.
+  const lista = _lerNiv.itens.filter(it => it.n === nivel && _lerNiv.marca.get(it.w) !== 'sim').map(it => it.w)
+  if (!lista.length) { toast('nada a estudar em ' + nivel + ' — está tudo marcado como conhecido', 'info'); return }
   const c = CEFR.find(x => x.id === nivel)
   const ok = await confirmModal({
     title: 'Mandar ' + nivel + ' para o Preparar',
@@ -2480,8 +2539,8 @@ async function lerNivEstudarGrupo(nivel) {
     html: '<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.55">' +
       'Vai' + (lista.length > 1 ? 'o <b>' + lista.length + ' palavras</b>' : ' <b>1 palavra</b>') + ' da faixa <b>' + esc(nivel) + '</b>' +
       (c ? ' (' + esc(c.dica) + ')' : '') +
-      (lista.length > 1 ? ' — as que continuam <b>desmarcadas</b>, ou seja, as que você não disse conhecer.<br><br>'
-                        : ' — a que continua <b>desmarcada</b>.<br><br>') +
+      (lista.length > 1 ? ' — as que <b>não</b> estão marcadas como conhecidas.<br><br>'
+                        : ' — a que <b>não</b> está marcada como conhecida.<br><br>') +
       'Cada uma vai com a <b>frase do capítulo</b> em que aparece. ' +
       'A análise com IA continua sendo escolha sua, lá no Preparar.</p>'
   })
@@ -2489,7 +2548,9 @@ async function lerNivEstudarGrupo(nivel) {
   _lerNivProgresso('mandando ' + lista.length + ' palavras de ' + nivel + '…', 0, 0, 0)
   const n = await _lerCapturarSemFrase(lista)
   // Some da triagem: virou item de estudo, não é mais candidata a "conheço".
-  _lerNiv.itens = _lerNiv.itens.filter(it => !(it.n === nivel && !_lerNiv.sel.has(it.w)))
+  const foi = new Set(lista)
+  _lerNiv.itens = _lerNiv.itens.filter(it => !foi.has(it.w))
+  for (const w of foi) _lerNiv.marca.delete(w)
   _lerRenderFerramentas()
   if (n) toast(n + ' palavras de ' + nivel + ' foram para o Preparar', 'success')
 }
@@ -2497,6 +2558,29 @@ async function lerNivEstudarGrupo(nivel) {
 function _lerNivRepintar() {
   const c = el('ler-niv-corpo')
   if (c) c.innerHTML = _lerNivCorpoHTML()
+}
+
+// REPINTURA POR FAIXA, não da tela inteira.
+// Um capítulo traz 400+ chips, e `innerHTML` no corpo todo a cada clique
+// significa reconstruir 400 nós para mudar um. Numa varredura de dezenas de
+// cliques isso é a diferença entre a tela responder e a tela travar. A faixa
+// tem algumas dezenas — e é o único bloco que um clique pode mudar.
+function _lerNivRepintarGrupo(nivel) {
+  // Busca DENTRO do painel, não no documento: `document.querySelector` pega o
+  // primeiro que achar em qualquer lugar da página, e no teste isso já pegou
+  // um nó de outra árvore — a faixa certa ficava sem repintar e a tela mentia
+  // em silêncio. O painel é o escopo natural.
+  const corpo = el('ler-niv-corpo')
+  const sec = corpo && nivel && corpo.querySelector(`.ler-niv-grupo[data-nivel="${nivel}"]`)
+  if (!sec) { _lerNivRepintar(); return }
+  const meu = cefrIdx(cefrNivelAluno())
+  const c = CEFR.find(x => x.id === nivel)
+  const lista = _lerNiv.itens.filter(it => it.n === nivel)
+    .sort((a, b) => (b.freq || 0) - (a.freq || 0) || a.w.localeCompare(b.w))
+  if (!c || !lista.length) { _lerNivRepintar(); return }
+  sec.outerHTML = _lerNivGrupoHTML(c, lista, meu)
+  const barra = corpo.querySelector('.ler-niv-barra')
+  if (barra) barra.outerHTML = _lerNivBarraHTML()
 }
 
 function _lerNivCorpoHTML() {
@@ -2511,50 +2595,79 @@ function _lerNivCorpoHTML() {
   const grupos = CEFR.map(c => {
     const lista = (porNivel.get(c.id) || [])
       .sort((a, b) => (b.freq || 0) - (a.freq || 0) || a.w.localeCompare(b.w))
-    if (!lista.length) return ''
-    const marcados = lista.filter(it => _lerNiv.sel.has(it.w)).length
-    const restam = lista.length - marcados
-    const abaixo = c.i < meu
-    const meuNivel = c.i === meu
-    return `
-      <section class="ler-niv-grupo${abaixo ? ' abaixo' : ''}${meuNivel ? ' meu' : ''}">
-        <header class="ler-niv-cab">
-          <b class="ler-niv-tag">${c.id}</b>
-          <span class="ler-niv-desc">${esc(c.dica)}</span>
-          ${meuNivel ? '<em class="ler-niv-marca">seu nível</em>' : ''}
-          <span class="ler-niv-cont"><b>${marcados}</b>/${lista.length} conheço</span>
-        </header>
-        <div class="ler-niv-acoes">
-          <button class="btn btn-ghost btn-sm" onclick="lerNivGrupo('${c.id}',${marcados < lista.length})">
-            ${marcados < lista.length ? ic('check','ic-sm') + ' conheço todas' : ic('undo','ic-sm') + ' desmarcar todas'}</button>
-          <button class="btn btn-ghost btn-sm${restam ? '' : ' hidden'}" onclick="lerNivEstudarGrupo('${c.id}')">
-            ${ic('plus','ic-sm')} estudar ${restam === 1 ? 'a 1 restante' : 'as ' + restam + ' restantes'}</button>
-        </div>
-        <div class="ler-niv-lista">
-          ${lista.map(it => `
-            <button class="ler-niv-chip${_lerNiv.sel.has(it.w) ? ' on' : ''}"
-              onclick="lerNivToggle(${escA(JSON.stringify(it.w))})"
-              data-tip="${(it.freq || 1) > 1 ? 'aparece ' + it.freq + ' vezes neste capítulo' : 'aparece 1 vez'}">
-              ${_lerNiv.sel.has(it.w) ? ic('check', 'ic-sm') : ''}${esc(it.w)}${
-                it.ex ? '<u>expr</u>' : ''}${
-                (it.freq || 1) > 2 ? `<i>${it.freq}</i>` : ''}</button>`).join('')}
-        </div>
-      </section>`
+    return lista.length ? _lerNivGrupoHTML(c, lista, meu) : ''
   }).join('')
 
-  const n = _lerNiv.sel.size
-  const total = _lerNiv.itens.length
+  return _lerNivBarraHTML() + `<div class="ler-niv-rolo">${grupos}</div>`
+}
+
+function _lerNivGrupoHTML(c, lista, meu) {
+  const sim = lista.filter(it => _lerNivMarca(it.w) === 'sim').length
+  const nao = lista.filter(it => _lerNivMarca(it.w) === 'nao').length
+  const virgens = lista.length - sim - nao
+  const restam = lista.length - sim
+  const abaixo = c.i < meu
+  const meuNivel = c.i === meu
+  const pincel = _lerNivFerr === 'sim' ? 'conheço' : 'não conheço'
+  return `
+    <section class="ler-niv-grupo${abaixo ? ' abaixo' : ''}${meuNivel ? ' meu' : ''}" data-nivel="${c.id}">
+      <header class="ler-niv-cab">
+        <b class="ler-niv-tag">${c.id}</b>
+        <span class="ler-niv-desc">${esc(c.dica)}</span>
+        ${meuNivel ? '<em class="ler-niv-marca">seu nível</em>' : ''}
+        <span class="ler-niv-cont"><b>${sim}</b> conheço${nao ? ` · <b class="nao">${nao}</b> não` : ''}${
+          virgens ? ` · ${virgens} sem olhar` : ''}</span>
+      </header>
+      <div class="ler-niv-acoes">
+        ${virgens ? `<button class="btn btn-ghost btn-sm" onclick="lerNivGrupo('${c.id}','restantes')"
+          data-tip="Pinta só o que ainda está sem marca — o que você já marcou fica como está">
+          ${ic(_lerNivFerr === 'sim' ? 'check' : 'x','ic-sm')} ${virgens} sem olhar: ${pincel}</button>`
+        : `<button class="btn btn-ghost btn-sm" onclick="lerNivGrupo('${c.id}','todas')"
+          data-tip="Repinta a faixa inteira com a ferramenta ativa, inclusive o que já está marcado">
+          ${ic(_lerNivFerr === 'sim' ? 'check' : 'x','ic-sm')} toda a faixa: ${pincel}</button>`}
+        ${(sim || nao) ? `<button class="btn btn-ghost btn-sm" onclick="lerNivGrupo('${c.id}','limpar')"
+          data-tip="Tira todas as marcas desta faixa">${ic('undo','ic-sm')} limpar faixa</button>` : ''}
+        ${sim ? `<button class="btn btn-secondary btn-sm" onclick="lerNivConfirmar('${c.id}')"
+          data-tip="Grava como conhecidas e tira da triagem — o resto da faixa continua aqui">
+          ${ic('checkCircle','ic-sm')} resolver ${sim} conhecida${sim !== 1 ? 's' : ''}</button>` : ''}
+        <button class="btn btn-ghost btn-sm${restam ? '' : ' hidden'}" onclick="lerNivEstudarGrupo('${c.id}')">
+          ${ic('plus','ic-sm')} estudar ${restam === 1 ? 'a 1 restante' : 'as ' + restam + ' restantes'}</button>
+      </div>
+      <div class="ler-niv-lista">
+        ${lista.map(it => {
+          const m = _lerNivMarca(it.w)
+          return `<button class="ler-niv-chip${m === 'sim' ? ' on' : m === 'nao' ? ' nao' : ''}"
+            onclick="lerNivToggle(${escA(JSON.stringify(it.w))},'${c.id}')"
+            data-tip="${(it.freq || 1) > 1 ? 'aparece ' + it.freq + ' vezes neste capítulo' : 'aparece 1 vez'}">
+            ${m === 'sim' ? ic('check','ic-sm') : m === 'nao' ? ic('x','ic-sm') : ''}${esc(it.w)}${
+              it.ex ? '<u>expr</u>' : ''}${
+              (it.freq || 1) > 2 ? `<i>${it.freq}</i>` : ''}</button>`
+        }).join('')}
+      </div>
+    </section>`
+}
+
+function _lerNivBarraHTML() {
+  const itens = (_lerNiv && _lerNiv.itens) || []
+  const sim = itens.filter(it => _lerNivMarca(it.w) === 'sim').length
+  const nao = itens.filter(it => _lerNivMarca(it.w) === 'nao').length
+  const virgens = itens.length - sim - nao
   return `
     <div class="ler-niv-barra">
-      <div class="ler-niv-resumo">
-        <b>${n}</b> ${n === 1 ? 'marcada' : 'marcadas'} como ${n === 1 ? 'conhecida' : 'conhecidas'} · <b>${total - n}</b> para estudar
+      <div class="ler-niv-ferr" role="group" aria-label="Ferramenta de marcação">
+        <button class="ler-niv-f${_lerNivFerr === 'sim' ? ' on' : ''}" onclick="lerNivFerramenta('sim')"
+          data-tip="Com esta na mão, clicar numa palavra diz: eu conheço">${ic('check','ic-sm')} conheço</button>
+        <button class="ler-niv-f nao${_lerNivFerr === 'nao' ? ' on' : ''}" onclick="lerNivFerramenta('nao')"
+          data-tip="Com esta na mão, clicar numa palavra diz: não conheço — e ela fica protegida das varreduras">${ic('x','ic-sm')} não conheço</button>
       </div>
-      ${n ? `<button class="btn btn-primary btn-sm" onclick="lerNivConfirmar()">
-        ${ic('check','ic-sm')} Marcar ${n} como conhecidas</button>` : ''}
+      <div class="ler-niv-resumo">
+        <b>${sim}</b> conheço · <b class="nao">${nao}</b> não · <b>${virgens}</b> sem olhar
+      </div>
+      ${sim ? `<button class="btn btn-primary btn-sm" onclick="lerNivConfirmar()">
+        ${ic('check','ic-sm')} Resolver ${sim} conhecida${sim !== 1 ? 's' : ''}</button>` : ''}
       ${_lerNivDesfazer && _lerNivDesfazer.length
         ? `<button class="btn btn-ghost btn-sm" onclick="lerNivDesfazerMarcacao()">${ic('undo','ic-sm')} Desfazer (${_lerNivDesfazer.length})</button>` : ''}
-    </div>
-    <div class="ler-niv-rolo">${grupos}</div>`
+    </div>`
 }
 
 function _lerNivBlocoHTML() {
@@ -2571,7 +2684,7 @@ function _lerNivBlocoHTML() {
   return '<div class="ler-pre ler-niv" id="ler-niv-area">' +
     '<div class="ler-niv-topo">' +
       '<b>Triagem por nível</b>' +
-      '<span class="ler-niv-sub">clique em qualquer palavra, de qualquer faixa, para marcar ou desmarcar</span>' +
+      '<span class="ler-niv-sub">escolha a ferramenta e clique nas palavras — clicar de novo com a mesma apaga a marca</span>' +
       '<button class="btn btn-ghost btn-sm" onclick="lerClassificar(undefined,true)">' + ic('refresh','ic-sm') + ' Refazer</button>' +
     '</div>' +
     '<div id="ler-niv-corpo">' + _lerNivCorpoHTML() + '</div></div>'

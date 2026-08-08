@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O QUE TEM NESTA FRASE**. *"Quando eu não entendo uma frase,
+> Última atualização: 2026-08-08 — **OS DOIS PINCÉIS DA TRIAGEM**. A triagem por nível do leitor
+> era binária (marcado = conheço), e com dois estados *"não marcado"* quer dizer **duas coisas ao
+> mesmo tempo** — "ainda não olhei" e "olhei e não sei" —, o que torna toda varredura em massa
+> insegura. Entrou o **terceiro estado** e **dois pincéis**: a ferramenta ativa decide o que o
+> clique pinta, e **"sem olhar: conheço" pinta só o que está sem marca** — é essa regra que faz o
+> fluxo dele fechar (marcar as 8 que não conhece e varrer as outras 300 de uma vez). Cada faixa
+> ganhou **"resolver N conhecidas"**, que grava e tira só aquelas da triagem. ⚠️ A repintura
+> passou a ser **por faixa**: 400+ chips reconstruídos a cada clique era a diferença entre a tela
+> responder e travar. `sw.js` → `englab-v160`. Ver seção 8.2 ("Os dois pincéis da triagem").
+>
+> Anterior: 2026-08-08 — **O QUE TEM NESTA FRASE**. *"Quando eu não entendo uma frase,
 > pode se dar por ter elementos que não entendo ou que tenham significado diferente do que sei."*
 > Toda explicação da Lexa passa a listar as **unidades da frase** — palavra, phrasal verb, idiom,
 > colocação, bloco fixo — com a categoria à vista e o sentido ALI; clicar manda para o Preparar
@@ -6740,6 +6750,65 @@ Duas coisas que o caminho longo exigiu:
 De brinde, a passagem no modo foco ganhou **"Ouvir"** e, quando há cena de vídeo, **"Rever a
 cena"**: a gravação real existia e não havia como tocá-la fora do card. E o selo deixou de dizer
 "do seu livro" para tudo — série, podcast e YouTube têm cena, não página.
+
+### OS DOIS PINCÉIS DA TRIAGEM (2026-08-08)
+
+Pedido dele sobre a triagem por nível do leitor: uma opção **dentro de cada faixa** para resolver
+as já marcadas como conhecidas (elas saem da verificação, o resto continua), e — a ideia boa —
+uma **seleção de ferramentas**: *"se eu marcar somente as que desconheço, posso apertar o botão
+de selecionar todos, que agora marcaria com outra cor que não como conhecido"*.
+
+#### O que faltava era o TERCEIRO estado
+
+A tela nasceu binária: marcado = conheço, não marcado = vai estudar. Funciona enquanto a proposta
+da IA está quase certa e ele só desmarca a exceção; **não funciona quando a exceção é a maioria**.
+E com dois estados, "não marcado" significa duas coisas ao mesmo tempo — *"ainda não olhei"* e
+*"olhei e não sei"* —, então **nenhuma varredura em massa é segura**: ela atropela as duas.
+
+```
+(vazio) = ainda não olhei
+'sim'   = conheço
+'nao'   = não conheço   ← é isto que sobrevive à varredura
+```
+
+`_lerNiv.sel` (Set) virou `_lerNiv.marca` (Map de três valores).
+
+#### As ferramentas, e a regra que faz o fluxo dele fechar
+
+Dois pincéis no topo, um ativo por vez. **A ferramenta ativa decide o que o clique pinta**;
+clicar de novo com o MESMO pincel apaga a marca (comportamento de pincel, não precisa ser
+aprendido); com o pincel diferente, repinta por cima sem limpar antes.
+
+> **"Sem olhar: conheço" pinta SÓ o que está sem marca.** É esta regra, e só ela, que faz o fluxo
+> dele funcionar: marcar as 8 que não conhece e varrer as outras 300 como conhecidas vira uma
+> varredura só, sem risco de apagar as 8. Quando a faixa não tem mais nada sem marca, o botão
+> troca para **"toda a faixa"**, que repinta tudo — em vez de virar um botão que não faz nada.
+
+Ele sugeriu como alternativa um ciclo de três estados no mesmo clique (1 clique = conheço, 2 =
+não conheço). Ficou de fora porque as duas coisas brigam: com o pincel de "não conheço" na mão, o
+primeiro clique teria de pintar "conheço" para respeitar o ciclo.
+
+#### Resolver por faixa
+
+`lerNivConfirmar(nivel)` — sem argumento vale para a triagem inteira (a barra do topo), com
+argumento resolve só aquela faixa: grava as conhecidas, **tira-as da triagem** e deixa o resto da
+faixa no lugar. O desfazer continua valendo.
+
+**Âmbar, não vermelho**, para o "não conheço": não é erro nem perigo — é o que vale estudar, a
+parte boa da triagem. E precisa ser inconfundível com o azul do "conheço" à distância de uma
+varredura.
+
+> ⚠️ **A repintura passou a ser POR FAIXA.** Um capítulo traz 400+ chips, e a tela refazia o
+> `innerHTML` do corpo inteiro a cada clique — 400 nós reconstruídos para mudar um. Numa varredura
+> de dezenas de cliques é a diferença entre responder e travar. Provado: clicar num chip de C1
+> deixa A1 e B2 **como o mesmo nó** e refaz só C1 e a barra. (Trocar de ferramenta ainda repinta
+> tudo, e deve mesmo: ela muda o rótulo de ação de todas as faixas.)
+>
+> O teste também pegou uma fragilidade de escopo: a busca da faixa era `document.querySelector`,
+> que pega o primeiro nó da página inteira — com dois painéis na árvore, a faixa certa ficava sem
+> repintar **em silêncio**. Agora a busca é dentro de `#ler-niv-corpo`.
+
+**Arquivos**: `js/ler.js`, `css/styles.css`. `sw.js` → `englab-v160`.
 
 ### Onde a captura ainda NÃO leva a semente
 
