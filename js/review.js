@@ -2267,9 +2267,41 @@ async function _revBreakFetch(w) {
 // que divergem na primeira correção. Ele carrega dez armadilhas já pagas (o
 // "the mud" que virava colocação, a tradução literal, o objeto inteiro voltando
 // como unidade) e nenhuma delas precisa ser reaprendida.
+// O CACHE MORA AQUI, em quem PRODUZ o caro — não em cada tela que consome.
+// Ele nasceu dentro dos chips da explicação, e nascer ali deixava o raio-X do
+// Preparar de fora: a mesma quebra, a mesma chamada paga, e a cada
+// recarregamento tudo de novo. Guardado neste ponto, quem chamar ganha junto.
+// A chave é trecho + idioma, e isso basta porque o `contexto` acompanha o
+// trecho na prática (a mesma frase vem sempre da mesma passagem).
+// ⚠️ SUBA a versão quando o prompt mudar o QUE ele devolve — senão resposta
+// velha ressuscita como nova. Foi a armadilha que já pegou LER_PRE_VER e
+// LER_NIV_VER, duas vezes.
+const QUEBRA_VER = 1
+const _quebraMem = new Map()   // dentro da sessão, sem tocar o disco
+
+function _quebraChave(trecho, lang) {
+  return 'quebra:' + (lang || 'en') + ':' +
+    (typeof audioKey === 'function' ? audioKey(String(trecho)) : String(trecho).slice(0, 60))
+}
+
+async function _quebraDoDisco(trecho, lang) {
+  if (typeof BookDB === 'undefined') return null
+  try {
+    const b = await BookDB.get(_quebraChave(trecho, lang))
+    if (!b) return null
+    const d = JSON.parse(typeof b.text === 'function' ? await b.text() : String(b))
+    if (!d || !Array.isArray(d.items) || Number(d.v || 0) < QUEBRA_VER) return null
+    return { items: d.items, trad: String(d.trad || '') }
+  } catch (e) { return null }
+}
+
 async function quebrarTrecho({ trecho, contexto = '', lang = 'en', fonte = '' }) {
   const alvo = String(trecho || '').trim()
   if (!alvo) return { items: [], trad: '' }
+  const memo = _quebraMem.get(_quebraChave(alvo, lang))
+  if (memo) return memo
+  const doDisco = await _quebraDoDisco(alvo, lang)
+  if (doDisco) { _quebraMem.set(_quebraChave(alvo, lang), doDisco); return doDisco }
   const ctx = String(contexto || '').trim()
   const L = getLangDef(lang)
   const r = await aiJSON(`Break down this ${L.nameEn} snippet for a Brazilian learner who is deciding WHAT to study in it. This is a quick TRIAGE, not a deep analysis. Return ONLY JSON.
@@ -2363,7 +2395,17 @@ ${promptRegrasLexicais(lang, 'glosa')}
   // legítima — frase simples não tem unidade a destacar, e um erro ali viraria
   // uma faixa vermelha em cima de uma explicação que deu certo. Quem precisa
   // do erro o levanta (ver `_revBreakFetch`).
-  return { items, trad: String(r.trad || '').trim() }
+  const saida = { items, trad: String(r.trad || '').trim() }
+  _quebraMem.set(_quebraChave(alvo, lang), saida)
+  // Resposta VAZIA não vai para o disco: pode ser tropeço do modelo, e gravada
+  // condenaria a frase a nunca mais ser quebrada. Na memória tudo bem — morre
+  // com a sessão.
+  if (items.length && typeof BookDB !== 'undefined') {
+    BookDB.set(_quebraChave(alvo, lang),
+      new Blob([JSON.stringify({ v: QUEBRA_VER, items, trad: saida.trad, at: Date.now() })]))
+      .catch(e => console.warn('[quebra] não gravei:', e && e.message))
+  }
+  return saida
 }
 // Determinantes que nunca formam unidade de estudo com o substantivo seguinte.
 const _RVB_DET_LISTA = 'the|a|an|this|that|these|those|my|your|his|her|its|our|their|some|any|no'

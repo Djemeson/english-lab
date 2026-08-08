@@ -123,7 +123,11 @@ const _LEXA_CHIP_CATS = {
   phrasal_verb: 'phrasal verb', idiom: 'idiom', collocation: 'colocação',
   chunk: 'bloco fixo', word: ''
 }
-const _lexaChipsCache = new Map()   // trecho|lang → items
+// Sem cache PRÓPRIO aqui: quem guarda a quebra é `quebrarTrecho`, que é quem
+// paga por ela. Cache em quem consome deixaria o raio-X do Preparar de fora e
+// seriam duas cópias da mesma coisa — a receita conhecida de divergir.
+// Chamar de novo a mesma frase, mesmo depois de recarregar a página, custa
+// zero: `quebrarTrecho` responde da memória ou do IndexedDB.
 
 function lexaChipsHTML(items, jaTenho) {
   if (!items || !items.length) return ''
@@ -149,23 +153,19 @@ function lexaChipsHTML(items, jaTenho) {
 // cena e sem dossiê — o mesmo furo do Assistente antes de ter origem.
 async function lexaChipsMontar(caixa, { trecho, contexto, lang, fonte, origem }) {
   if (!caixa || !trecho) return
-  const chave = trecho + '|' + (lang || 'en')
-  let items = _lexaChipsCache.get(chave)
   const slot = document.createElement('div')
   slot.className = 'lexa-chips-slot'
   caixa.appendChild(slot)
-  if (!items) {
-    slot.innerHTML = `<div class="lexa-chips-carregando"><span class="spinner"></span> vendo o que tem na frase…</div>`
-    try {
-      const r = await quebrarTrecho({ trecho, contexto: contexto || '', lang: lang || 'en', fonte: fonte || '' })
-      items = r.items || []
-      _lexaChipsCache.set(chave, items)
-    } catch (e) {
-      // Falhar aqui NÃO pode estragar a explicação, que é o que ele pediu e já
-      // está na tela. Some em silêncio — o console guarda o motivo.
-      console.warn('[lexa] quebra da frase falhou:', e.message)
-      slot.remove(); return
-    }
+  slot.innerHTML = `<div class="lexa-chips-carregando"><span class="spinner"></span> vendo o que tem na frase…</div>`
+  let items
+  try {
+    const r = await quebrarTrecho({ trecho, contexto: contexto || '', lang: lang || 'en', fonte: fonte || '' })
+    items = r.items || []
+  } catch (e) {
+    // Falhar aqui NÃO pode estragar a explicação, que é o que ele pediu e já
+    // está na tela. Some em silêncio — o console guarda o motivo.
+    console.warn('[lexa] quebra da frase falhou:', e.message)
+    slot.remove(); return
   }
   if (!items.length) { slot.remove(); return }
   const jaTenho = new Set()

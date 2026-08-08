@@ -217,13 +217,16 @@ async function lerExcluir(id) {
            Os <b>cards que você já criou continuam</b> — eles vivem em Estudar/Revisar, não aqui.</p>`
   }))) return
   await BookDB.del(id)
-  // As leituras de capítulo (`pre:<id>:<n>`) morrem com o livro. Sem isto elas
-  // ficariam órfãs no IndexedDB para sempre — ninguém mais teria como
-  // alcançá-las para apagar, porque a chave depende de um livro que não existe.
+  // Tudo que é derivado do livro morre com ele: as leituras de capítulo
+  // (`pre:`), a classificação por nível (`niv:`) e as marcas da triagem
+  // (`nivmarca:`). Sem isto ficariam órfãs no IndexedDB para sempre — ninguém
+  // mais teria como alcançá-las, porque a chave depende de um livro que já não
+  // existe.
   try {
     const chaves = await BookDB.keys()
+    const meus = ['pre:', 'niv:', 'nivmarca:'].map(p => p + id + ':')
     for (const k of chaves) {
-      if (typeof k === 'string' && k.startsWith('pre:' + id + ':')) await BookDB.del(k)
+      if (typeof k === 'string' && meus.some(p => k.startsWith(p))) await BookDB.del(k)
     }
   } catch (e) {}
   livros = livros.filter(x => x.id !== id)
@@ -2223,6 +2226,53 @@ let _lerNivDesfazer = null     // últimas marcadas, para reverter em um clique
 
 function _lerChaveNiv(cap) { return 'niv:' + (_lerLivro ? _lerLivro.id : '?') + ':' + cap }
 
+// ================================================================
+// AS MARCAS SOBREVIVEM AO RECARREGAMENTO
+// ================================================================
+// A CLASSIFICAÇÃO já era gravada (é cara, uma chamada de IA por capítulo);
+// as MARCAS dele, não. Um capítulo de 400 palavras não se resolve numa
+// sentada — e recarregar a página jogava fora o trabalho de triagem inteiro,
+// devolvendo a tela ao palpite inicial. Ele descreveu exatamente isso: "posso
+// não finalizar tudo na primeira vez".
+//
+// Ficam em chave PRÓPRIA, ao lado da classificação. Junto seria reescrever o
+// blob dos 400 itens a cada clique; separada, o que se grava é só o mapa.
+// E a gravação é ADIADA: numa varredura são dezenas de cliques por segundo, e
+// gravar em cada um faria a tela esperar o disco.
+function _lerChaveNivMarca(chave) { return String(chave).replace(/^niv:/, 'nivmarca:') }
+
+let _lerNivGravando = null
+function _lerNivSalvarMarcas() {
+  if (!_lerNiv) return
+  clearTimeout(_lerNivGravando)
+  const chave = _lerChaveNivMarca(_lerNiv.chave)
+  const marca = [..._lerNiv.marca]
+  _lerNivGravando = setTimeout(() => {
+    BookDB.set(chave, new Blob([JSON.stringify({ v: LER_NIV_VER, marca, at: Date.now() })]))
+      .catch(e => console.warn('[niv] não gravei as marcas:', e && e.message))
+  }, 400)
+}
+
+// ⚠️ O REGISTRO GRAVADO É A VERDADE INTEIRA, não um complemento ao palpite.
+// Se fosse complemento, DESMARCAR não sobreviveria: tirar "house" (A1, que
+// nasce pré-marcada) some do mapa, e no recarregamento a pré-marcação a
+// devolveria como conhecida — o app desfazendo a decisão dele em silêncio.
+// Existindo registro, ele substitui o mapa; o que não estiver nele é "sem
+// olhar", que é justamente o que desmarcar quer dizer.
+async function _lerNivCarregarMarcas() {
+  if (!_lerNiv) return
+  try {
+    const b = await BookDB.get(_lerChaveNivMarca(_lerNiv.chave))
+    if (!b) return
+    const d = JSON.parse(typeof b.text === 'function' ? await b.text() : String(b))
+    if (!d || !Array.isArray(d.marca) || Number(d.v || 0) < LER_NIV_VER) return
+    const vivas = new Set(_lerNiv.itens.map(it => it.w))
+    const novo = new Map()
+    for (const [w, v] of d.marca) if (vivas.has(w) && (v === 'sim' || v === 'nao')) novo.set(w, v)
+    _lerNiv.marca = novo
+  } catch (e) { console.warn('[niv] marcas gravadas ilegíveis:', e && e.message) }
+}
+
 async function _lerNivDoCache(cap) {
   try {
     const b = await BookDB.get(_lerChaveNiv(cap))
@@ -2267,7 +2317,11 @@ async function lerNivAplicar(cap) {
   const d = await _lerNivDoCache(cap)
   if (_lerCap !== cap) return 0
   if (!d) { _lerNiv = null; return 0 }
-  return _lerNivMontar(_lerChaveNiv(cap), d.itens)
+  const n = _lerNivMontar(_lerChaveNiv(cap), d.itens)
+  // Depois de montar: o palpite inicial entra primeiro e as marcas gravadas
+  // passam por cima. Quem chama já é assíncrono e repinta ao terminar.
+  await _lerNivCarregarMarcas()
+  return n
 }
 
 async function lerClassificar(cap, refazer) {
@@ -2408,6 +2462,11 @@ async function lerClassificar(cap, refazer) {
     if (!saida.length) throw new Error('a IA não devolveu nenhuma classificação reconhecível')
 
     await BookDB.set(_lerChaveNiv(cap), new Blob([JSON.stringify({ v: LER_NIV_VER, itens: saida, at: Date.now() })]))
+    // Classificação nova = triagem nova. Marcas de uma classificação anterior
+    // apontam para uma lista que não existe mais, e ressuscitá-las daria a
+    // pior impressão possível: palavra marcada como conhecida sem ele ter
+    // olhado. "Refazer" recomeça do palpite.
+    await BookDB.del(_lerChaveNivMarca(_lerChaveNiv(cap)))
     if (_lerCap === cap) _lerNivMontar(_lerChaveNiv(cap), saida)
 
     let extra = ''
@@ -2471,6 +2530,7 @@ function lerNivToggle(w, nivel) {
   // precisar limpar antes.
   if (_lerNiv.marca.get(w) === _lerNivFerr) _lerNiv.marca.delete(w)
   else _lerNiv.marca.set(w, _lerNivFerr)
+  _lerNivSalvarMarcas()
   _lerNivRepintarGrupo(nivel)
 }
 
@@ -2484,6 +2544,7 @@ function lerNivGrupo(nivel, modo) {
     if (modo === 'restantes' && _lerNiv.marca.has(it.w)) continue
     _lerNiv.marca.set(it.w, _lerNivFerr)
   }
+  _lerNivSalvarMarcas()
   _lerNivRepintarGrupo(nivel)
 }
 
@@ -2503,6 +2564,7 @@ function lerNivConfirmar(nivel) {
   const fora = new Set(alvo.map(it => it.w))
   _lerNiv.itens = _lerNiv.itens.filter(it => !fora.has(it.w))
   for (const w of fora) _lerNiv.marca.delete(w)
+  _lerNivSalvarMarcas()
   toast(marcadas.length + (marcadas.length === 1 ? ' palavra marcada' : ' palavras marcadas') +
     ' como ' + (marcadas.length === 1 ? 'conhecida' : 'conhecidas') +
     (nivel ? ' em ' + nivel : ''), 'success')
@@ -2512,10 +2574,21 @@ function lerNivConfirmar(nivel) {
 function lerNivDesfazerMarcacao() {
   if (!_lerNivDesfazer || !_lerNivDesfazer.length) return
   for (const w of _lerNivDesfazer) markKnownWord(w, false)
-  const n = _lerNivDesfazer.length
+  const voltando = _lerNivDesfazer
+  const n = voltando.length
   _lerNivDesfazer = null
   toast(n + ' marcações desfeitas', 'info')
-  lerNivAplicar(_lerCap).then(() => _lerRenderFerramentas())
+  lerNivAplicar(_lerCap).then(() => {
+    // Voltam MARCADAS como conhecidas, que é o estado em que estavam um
+    // instante antes de ele confirmar. Voltar como "sem olhar" faria o
+    // desfazer apagar duas decisões em vez de uma — a de gravar e a de marcar.
+    if (_lerNiv) {
+      const vivas = new Set(_lerNiv.itens.map(it => it.w))
+      for (const w of voltando) if (vivas.has(w)) _lerNiv.marca.set(w, 'sim')
+      _lerNivSalvarMarcas()
+    }
+    _lerRenderFerramentas()
+  })
 }
 
 // Manda para o Preparar SÓ as palavras NÃO MARCADAS de uma faixa. A semântica
@@ -2551,6 +2624,7 @@ async function lerNivEstudarGrupo(nivel) {
   const foi = new Set(lista)
   _lerNiv.itens = _lerNiv.itens.filter(it => !foi.has(it.w))
   for (const w of foi) _lerNiv.marca.delete(w)
+  _lerNivSalvarMarcas()
   _lerRenderFerramentas()
   if (n) toast(n + ' palavras de ' + nivel + ' foram para o Preparar', 'success')
 }

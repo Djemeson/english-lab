@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **OS DOIS PINCÉIS DA TRIAGEM**. A triagem por nível do leitor
+> Última atualização: 2026-08-08 — **O TRABALHO SOBREVIVE AO RECARREGAMENTO**. *"Posso não
+> finalizar tudo na primeira vez."* As **marcas da triagem** passaram a ser gravadas (chave
+> própria, gravação adiada em 400 ms) — ⚠️ o registro é a verdade INTEIRA e não um complemento ao
+> palpite, senão DESMARCAR não sobreviveria e o app desfaria a decisão dele em silêncio. E a
+> **quebra da frase** (os chips) foi para o IndexedDB — mudando de lugar no caminho: saiu de dentro
+> dos chips e foi para `quebrarTrecho`, **em quem produz o caro**, e com isso o raio-X do Preparar
+> ganhou junto. Resposta vazia não vai para o disco. "Refazer" apaga as marcas, o desfazer devolve
+> as palavras marcadas, e apagar um livro leva junto `pre:`, `niv:` e `nivmarca:`.
+> `sw.js` → `englab-v161`. Ver seção 8.2 ("O trabalho sobrevive ao recarregamento").
+>
+> Anterior: 2026-08-08 — **OS DOIS PINCÉIS DA TRIAGEM**. A triagem por nível do leitor
 > era binária (marcado = conheço), e com dois estados *"não marcado"* quer dizer **duas coisas ao
 > mesmo tempo** — "ainda não olhei" e "olhei e não sei" —, o que torna toda varredura em massa
 > insegura. Entrou o **terceiro estado** e **dois pincéis**: a ferramenta ativa decide o que o
@@ -6809,6 +6819,44 @@ varredura.
 > repintar **em silêncio**. Agora a busca é dentro de `#ler-niv-corpo`.
 
 **Arquivos**: `js/ler.js`, `css/styles.css`. `sw.js` → `englab-v160`.
+
+### O TRABALHO SOBREVIVE AO RECARREGAMENTO (2026-08-08)
+
+*"Quero que essa análise e os chips que a IA traz permaneçam mesmo quando a página recarregar,
+pois posso não finalizar tudo na primeira vez."*
+
+Duas coisas se perdiam, e as duas por motivos diferentes.
+
+**As marcas da triagem.** A CLASSIFICAÇÃO já era gravada (é cara — uma chamada de IA por
+capítulo); as marcas dele, não. Um capítulo de 400 palavras não se resolve numa sentada, e
+recarregar devolvia a tela ao palpite inicial, jogando fora a triagem inteira. Agora vão para
+`nivmarca:<livro>:<cap>`, em chave **própria** (junto seria reescrever o blob dos 400 itens a cada
+clique) e com gravação **adiada** em 400 ms (numa varredura são dezenas de cliques por segundo, e
+gravar em cada um faria a tela esperar o disco).
+
+> ⚠️ **O registro gravado é a verdade INTEIRA, não um complemento ao palpite.** Se fosse
+> complemento, DESMARCAR não sobreviveria: tirar "house" (A1, que nasce pré-marcada) some do mapa,
+> e no recarregamento a pré-marcação a devolveria como conhecida — o app desfazendo a decisão dele
+> em silêncio. Existindo registro, ele substitui o mapa. Provado com recarregamento real: as duas
+> marcas 'nao', as seis 'sim' e **a desmarcação de "house"** voltaram idênticas.
+
+Detalhes que o caminho exigiu: **"Refazer" apaga as marcas** (classificação nova = lista nova, e
+marca velha apontando para ela daria a pior impressão possível — palavra marcada como conhecida
+sem ele ter olhado); **o desfazer devolve as palavras MARCADAS**, que é o estado em que estavam um
+instante antes de confirmar; e **apagar um livro leva junto** `pre:`, `niv:` e `nivmarca:` — antes
+só `pre:` era limpo, e o resto ficava órfão no IndexedDB para sempre.
+
+**A quebra da frase.** O cache dos chips vivia só em memória: a mesma frase custava de novo a cada
+recarregamento. Ele foi para o IndexedDB — **e mudou de lugar no caminho**. Nasceu dentro dos
+chips, mas cache em quem CONSOME deixava o raio-X do Preparar de fora, e seriam duas cópias da
+mesma coisa. Foi para dentro de `quebrarTrecho`, **em quem produz o caro**: agora os chips e o
+raio-X ganham juntos. Medido: 1 chamada, e nem a segunda montagem nem a "de depois do
+recarregamento" custam outra.
+
+> **Resposta vazia não vai para o disco.** Pode ser tropeço do modelo, e gravada condenaria a
+> frase a nunca mais ser quebrada. Na memória tudo bem — morre com a sessão.
+
+**Arquivos**: `js/ler.js`, `js/review.js`, `js/ai.js`. `sw.js` → `englab-v161`.
 
 ### Onde a captura ainda NÃO leva a semente
 
