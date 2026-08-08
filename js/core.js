@@ -309,6 +309,18 @@ let activeConversaId = null
 function loadConversas() { try { conversas = JSON.parse(localStorage.getItem(SK.conversas) || '[]') } catch { conversas = [] } }
 function saveConversas() { try { localStorage.setItem(SK.conversas, JSON.stringify(conversas)) } catch(e) { console.warn('[conversas] save falhou:', e.message) } }
 
+// ── O NOME DA LEXA, alcançável de QUALQUER arquivo ─────────────────
+// Nasceu como `const lexaNome` dentro de `ler.js`, que é LAZY — e isso ficou
+// bem enquanto só o leitor a usava. Quando o painel, o menu de seleção e o
+// Preparar passaram a chamá-la, virou a armadilha nº 1 do projeto: arquivo do
+// SHELL falando com símbolo de arquivo lazy. O sintoma foi mudo — clicar em
+// "Explicar" fechava o balão e não acontecia nada, porque `lexaNome is not
+// defined` derrubava a função antes de o painel abrir e o erro morria no
+// console.
+// Mora aqui, que é o PRIMEIRO arquivo a carregar, e é tolerante: `LEXA_NOME`
+// vem de `ai.js`, que carrega depois — o corpo só roda quando alguém chama.
+function lexaNome() { return (typeof LEXA_NOME === 'string' ? LEXA_NOME : 'Lexa') }
+
 // ── NOME DA OBRA: o que o autor chamou, não o que veio no arquivo ──
 // O `source_title` é o que a fonte deu — e a fonte traz lixo: o EPUB devolve
 // "Billy Summers (US Edition)", o vídeo devolve o nome do arquivo, o podcast

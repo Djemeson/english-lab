@@ -12,6 +12,11 @@
 // barato, se você disser só "paraense e bem-humorada", devolve "égua,
 // maninho!" em toda resposta. O sotaque dela é temperamento, não fantasia.
 const LEXA_NOME = 'Lexa'
+// `lexaNome()` — o acessor tolerante — mora em `core.js`, o primeiro arquivo a
+// carregar. Ele nasceu em `ler.js` (LAZY), e quando o painel e o menu de
+// seleção daqui passaram a chamá-lo virou a armadilha nº 1: shell falando com
+// símbolo de arquivo lazy. Dentro DESTE arquivo dá para usar `LEXA_NOME`
+// direto, que é daqui mesmo.
 
 function lexaSistema(extra) {
   const nome = (typeof getLangDef === 'function' && typeof activeLang === 'function')
@@ -155,7 +160,7 @@ function lexaPainelAbrir({ titulo, frase, fonte, lang }) {
     <div class="lexa-painel-caixa">
       <header class="lexa-painel-topo">
         <div class="lexa-painel-quem">
-          <b>${esc(titulo || lexaNome())}</b>
+          <b>${esc(titulo || LEXA_NOME)}</b>
           ${fonte ? `<span>${esc(fonte)}</span>` : ''}
         </div>
         <button class="btn btn-ghost btn-sm lexa-painel-modo" onclick="lexaPainelAlternar()">${
@@ -269,9 +274,9 @@ async function selMenuExplicar() {
     toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return
   }
   const L = getLangDef(c.lang || 'en')
-  const corpo = lexaPainelAbrir({ titulo: lexaNome(), frase: c.frase || c.txt, fonte: c.fonte || '' })
+  const corpo = lexaPainelAbrir({ titulo: LEXA_NOME, frase: c.frase || c.txt, fonte: c.fonte || '' })
   const vivo = () => el('lexa-painel-corpo') === corpo
-  corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(lexaNome())} está explicando…`
+  corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(LEXA_NOME)} está explicando…`
   try {
     const sistema = lexaExplicar()
     const pergunta = `${c.frase ? `A frase é: "${c.frase}".\n` : ''}O aluno selecionou: "${c.txt}".

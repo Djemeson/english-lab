@@ -23,10 +23,11 @@ let _lerSalvarTimer = null
 let _lerIgnoraSel = false // suprime o popup logo após um duplo-clique
 let _lerInicioLeitura = 0
 
-// A Lexa mora em js/ai.js, que é do SHELL (cache-first). Este arquivo é lazy
-// (network-first) e pode chegar ANTES dele numa visita logo após o deploy —
-// por isso nunca falamos direto com o símbolo de lá.
-const lexaNome = () => (typeof LEXA_NOME === 'string' ? LEXA_NOME : 'Lexa')
+// `lexaNome()` MUDOU DE CASA: vive em `core.js`, o primeiro arquivo a carregar,
+// porque telas do shell (o painel da Lexa, o menu de seleção, o Preparar)
+// passaram a chamá-la e daqui elas não a alcançavam. Redeclarar aqui seria
+// pior que inútil: um `const` sobre a função global do core estoura com
+// "already been declared" e derruba o leitor inteiro.
 const lexaPrompt = () => (typeof lexaExplicar === 'function' ? lexaExplicar()
   : 'Você é a Lexa, tutora de inglês do Language Lab. Responda em PT-BR, 2 a 4 frases, sem introduções, traduzindo o SENTIDO e nunca palavra por palavra.')
 

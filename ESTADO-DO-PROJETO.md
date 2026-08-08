@@ -20,8 +20,11 @@
 > e a resolução acontece **na entrada** do livro, vídeo ou episódio, uma chamada por obra. **E a
 > obra virou PASTA**: nasce fechada e diz quantos capítulos tem — escancarar 12 linhas por livro
 > era a parede que a hierarquia veio desfazer. Buscando, tudo abre; voltando de um capítulo, a
-> pasta continua como ele deixou.
-> `sw.js` → `englab-v173`. Ver seção 8.2 ("Obra → capítulo → itens").
+> pasta continua como ele deixou. **E o "Explicar" do menu de seleção não fazia nada**:
+> `lexaNome is not defined` — a armadilha nº 1 (shell chamando símbolo de arquivo LAZY), silenciosa
+> porque o balão fechava antes do erro. A definição foi para `core.js`; ⚠️ a correção óbvia
+> (declarar a função em `ai.js`) teria quebrado o LEITOR inteiro com "already been declared".
+> `sw.js` → `englab-v174`. Ver seção 8.2 ("Obra → capítulo → itens").
 >
 > Anterior: 2026-08-08 — **O ITEM NUNCA SAI DE VISTA**. O cabeçalho subia com a rolagem
 > e a página virava seções sem dono. Ele passou a ficar **preso no topo, encolhendo** de 115px
@@ -7363,6 +7366,35 @@ O cabeçalho virou `<button>` com `aria-expanded`, e a seta gira. No celular, 12
 estoura.
 
 **Arquivos**: `js/dossie.js`, `css/styles.css`. `sw.js` → `englab-v173`.
+
+#### O "Explicar" que não fazia nada — armadilha nº 1 de novo
+
+*"Ao clicar em explicar o balão some e não acontece nada."*
+
+Reproduzido com o console aberto: **`ReferenceError: lexaNome is not defined`**. É a armadilha nº 1
+do projeto, na forma mais silenciosa possível — `_selMenuFechar()` roda ANTES de abrir o painel,
+então o balão sumia; o erro derrubava a função na linha seguinte e morria no console. Nenhum aviso,
+nenhum toast: só "não acontece nada".
+
+`lexaNome()` nasceu como `const` dentro de **`ler.js`, que é LAZY**. Enquanto só o leitor a usava,
+tudo bem. Quando o painel da Lexa, o menu de seleção (`ai.js`, SHELL) e o Preparar (`review.js`,
+SHELL) passaram a chamá-la, ela deixou de existir em qualquer sessão onde o leitor nunca tivesse
+sido aberto — que é o caso normal de quem entra direto no Estudar.
+
+> ⚠️ **A correção óbvia estava errada e teria sido pior.** Declarar `function lexaNome()` em
+> `ai.js` faria o `const lexaNome` de `ler.js` estourar com *"Identifier has already been
+> declared"* ao carregar o leitor — trocando um botão quebrado pelo **leitor inteiro** quebrado.
+> Um `const` de script não convive com propriedade global não configurável de mesmo nome.
+
+A definição foi para **`core.js`**, o primeiro arquivo a carregar, e é tolerante (`LEXA_NOME` vem
+de `ai.js`, que carrega depois — o corpo só roda quando alguém chama). `ler.js` deixou de
+redeclarar. **Uma definição, alcançável de todo lugar.**
+
+Provado nos dois lados: numa sessão **sem o leitor carregado**, selecionar e clicar em Explicar
+abre o painel com título, frase, resposta e conversa; e carregar o leitor depois disso **não gera
+erro nenhum** — que é onde o "already been declared" apareceria.
+
+**Arquivos**: `js/core.js`, `js/ai.js`, `js/ler.js`. `sw.js` → `englab-v174`.
 
 ### Onde a captura ainda NÃO leva a semente
 
