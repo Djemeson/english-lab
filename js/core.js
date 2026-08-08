@@ -548,33 +548,152 @@ function loadWords() {
 // Agrupar é da VISTA; aninhar no dado seria refazer o erro que o `moved_to`
 // desfez (o sentido "apaixonar-se" que teve de sair de `fall`).
 //
-// A cabeça de uma expressão é a primeira palavra de conteúdo: o verbo do
-// phrasal, o substantivo do idiom. Artigo e preposição na frente não mandam —
-// senão "a piece of cake" viraria família de "a".
-const _LEMA_VAZIAS = new Set(['a','an','the','to','in','on','at','of','for','be','get'])
+// ONDE FICA A CABEÇA — a regra que decide tudo:
+//
+//   Expressão que começa com VERBO é de cabeça INICIAL.
+//     "fall by the wayside", "kick the bucket", "give up", "take it easy"  → o verbo
+//   Qualquer outra é de cabeça FINAL (é assim que o inglês monta sintagma nominal).
+//     "under the weather" → weather · "the last straw" → straw
+//     "cold feet" → foot   · "crocodile tears" → tear
+//
+// A primeira versão só pegava "a primeira palavra de conteúdo", e por isso
+// mandava "under the weather" para a família de `under` — juntando idioms que
+// não têm nada a ver só porque começam com a mesma preposição.
+
+// Palavras que nunca são cabeça de nada.
+const _LEMA_FUNCIONAIS = new Set([
+  'a','an','the','this','that','these','those','some','any','no','every','each',
+  'of','in','on','at','to','for','with','by','from','into','onto','over','under',
+  'out','up','down','off','about','around','through','across','after','before',
+  'behind','between','against','without','within','upon','than','then','so','as',
+  'and','or','but','nor','if','when','while','not',"n't",
+  'it','its','one','ones',"one's",'someone',"someone's",'something','somebody',
+  'oneself','myself','yourself','himself','herself','itself','ourselves',
+  'themselves','my','your','his','her','their','our','you','he','she','they','we','i',
+  'very','too','just','only','own','more','most','less','least'
+])
+
+// Verbos que começam expressão. Lista fechada e curta de propósito: são os que
+// de fato encabeçam phrasal verbs e idioms em inglês. Auxiliares entram porque
+// AQUI eles são o núcleo ("get by", "be into", "do over", "have it out") — o
+// contrário do que valeria numa frase.
+const _LEMA_VERBOS = new Set([
+  'be','have','do','get','go','come','take','make','give','put','keep','let','run',
+  'hit','break','cut','hold','throw','turn','bring','call','fall','pull','push',
+  'draw','drive','ride','catch','kick','spill','bite','beat','blow','burn','buy',
+  'carry','clear','cost','count','cross','drop','eat','face','feel','fight','find',
+  'fly','follow','hang','hear','jump','know','lay','lead','leave','lie','look',
+  'lose','love','meet','miss','move','pass','pay','pick','play','ring','rise',
+  'roll','save','say','see','sell','send','set','shake','shoot','show','sing',
+  'sit','sleep','speak','stand','start','stay','step','stick','stop','strike',
+  'swear','talk','teach','tell','think','touch','walk','watch','wear','win',
+  'work','wrap','write','bear','bend','bury','change','chew','choose','close',
+  'cook','cry','dig','draw','dress','drink','fill','fit','fix','hide','hurt',
+  'kill','knock','land','laugh','learn','live','mind','open','order','own',
+  'paint','plan','point','pour','pray','press','print','raise','reach','read',
+  'ride','rub','rush','seek','settle','shut','sink','slip','smell','sort','spend',
+  'spread','stir','swim','switch','take','tear','throw','tie','try','use','wait',
+  'wake','wash','wave','weigh','wind','wipe','wish'
+])
+
+// Uma forma flexionada ainda é verbo: "fell/kicked/spilling/takes".
+function _lemaEhVerbo(tok) {
+  const t = String(tok || '').toLowerCase()
+  if (!t) return false
+  if (_LEMA_VERBOS.has(t)) return true
+  const base = (typeof GLOSS_IRREG === 'object' && GLOSS_IRREG) ? GLOSS_IRREG[t] : null
+  if (base && _LEMA_VERBOS.has(base)) return true
+  if (typeof glossLemas === 'function') {
+    for (const c of glossLemas(t, { estrito: true })) if (_LEMA_VERBOS.has(c)) return true
+  }
+  return false
+}
+
+// Reduz a forma à base pela mesma escada do glossário: tabela de irregulares
+// primeiro (medida e específica), regras de sufixo depois.
+function _lemaBase(tok) {
+  const t = String(tok || '').toLowerCase()
+  if (!t) return ''
+  const irr = (typeof GLOSS_IRREG === 'object' && GLOSS_IRREG) ? GLOSS_IRREG[t] : null
+  if (irr) return irr
+  if (typeof glossLemas === 'function') {
+    const cands = glossLemas(t, { estrito: true })
+    // O primeiro candidato é a própria palavra; o segundo, quando existe, é a
+    // redução mais provável ("running"→"run", "leaves"→"leave").
+    if (cands.length > 1) return cands[1]
+  }
+  return t
+}
+
+// A cabeça da expressão, já reduzida à base.
+function lemaCabeca(expr, tipo) {
+  const bruto = String(expr || '').toLowerCase().replace(/[^\p{L}\p{N}'\s-]/gu, ' ').trim()
+  if (!bruto) return ''
+  const toks = bruto.split(/\s+/).filter(Boolean)
+  if (toks.length === 1) return _lemaBase(toks[0])
+
+  // Phrasal verb é head-initial POR DEFINIÇÃO — o verbo vem primeiro e a
+  // partícula é o que muda o sentido. Nem precisa adivinhar.
+  if (tipo === 'phrasal_verb') return _lemaBase(toks[0])
+
+  // "to be honest": o marcador de infinitivo não conta, mas o verbo depois dele sim.
+  const inicio = toks[0] === 'to' && toks.length > 1 ? 1 : 0
+
+  // Começa com verbo? Cabeça inicial.
+  if (_lemaEhVerbo(toks[inicio])) return _lemaBase(toks[inicio])
+
+  // Senão, cabeça final: o último token de conteúdo.
+  for (let i = toks.length - 1; i >= 0; i--) {
+    if (!_LEMA_FUNCIONAIS.has(toks[i])) return _lemaBase(toks[i])
+  }
+  // Só palavras funcionais ("by and large" cai aqui se 'large' entrasse na
+  // lista): devolve a última mesmo, para a chave ser estável.
+  return _lemaBase(toks[toks.length - 1])
+}
 
 function lemaDoItem(w) {
   if (!w) return ''
-  if (w.lemma) return w.lemma
   const bruto = String(w.word || '').trim().toLowerCase()
   if (!bruto) return ''
-  const toks = bruto.split(/\s+/).filter(Boolean)
-  const cabeca = toks.find(t => !_LEMA_VAZIAS.has(t)) || toks[0] || ''
-  // Flexão vira base: quem leu "fell" e quem leu "fall" está na mesma família.
-  // A tabela de irregulares do glossário já foi medida e cobre o que regra de
-  // sufixo não alcança.
-  let lema = (typeof GLOSS_IRREG === 'object' && GLOSS_IRREG && GLOSS_IRREG[cabeca]) || cabeca
+  // O cache é invalidado quando a PALAVRA muda: editar "fell" para "fall in
+  // love" tem de mudar a família, e um lema velho grudado no item faria a
+  // entrada aparecer para sempre debaixo do teto errado.
+  if (w.lemma && w.lemma_de === bruto) return w.lemma
+
+  let lema = lemaCabeca(bruto, w.type)
+
   // Se algum item que já existe casa com um candidato de lema, é ELE que manda:
   // a família se mantém junta conforme cresce, em vez de rachar por grafia.
   if (typeof glossLemas === 'function' && Array.isArray(words)) {
-    const cands = [lema, ...glossLemas(cabeca, { estrito: true })]
+    const cands = [lema, ...glossLemas(lema, { estrito: true })]
     for (const c of cands) {
       const dono = words.find(x => x !== w && String(x.word || '').trim().toLowerCase() === c)
-      if (dono) { lema = String(dono.lemma || dono.word || c).toLowerCase(); break }
+      if (dono) { lema = c; break }
     }
   }
   w.lemma = lema
+  w.lemma_de = bruto
   return lema
+}
+
+// O LEMA QUE A IA DEVOLVE tem prioridade sobre a regra — ela sabe de morfologia
+// e de núcleo de expressão o que nenhuma lista fechada aqui vai saber. Mas é
+// VALIDADO antes de entrar: lema alucinado espalharia famílias inteiras pelo
+// verbete, e o estrago seria silencioso. Só passa palavra única que tenha
+// relação real com a expressão.
+function aplicarLemaDaIA(w, bruto) {
+  const cand = String(bruto || '').toLowerCase().trim()
+  if (!w || !cand || /\s/.test(cand) || !/^[\p{L}'-]+$/u.test(cand)) return false
+  const toks = String(w.word || '').toLowerCase().split(/\s+/).filter(Boolean)
+  const parente = toks.some(t => {
+    if (t === cand || _lemaBase(t) === cand) return true
+    if (typeof glossLemas === 'function') return glossLemas(t, { estrito: true }).includes(cand)
+    return false
+  })
+  if (!parente) return false
+  w.lemma = cand
+  w.lemma_de = String(w.word || '').trim().toLowerCase()
+  return true
 }
 
 // ---- Badge da seção ESTUDAR (os dossiês) -----------------------------

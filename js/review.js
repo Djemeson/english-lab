@@ -58,6 +58,14 @@ function applyAiResult(w, result) {
   w.type       = w.type       || result.type       || 'word'
   w.type_label = w.type_label || result.type_label  || ''
   w.ipa        = w.ipa        || result.ipa         || ''
+  // LEMA DA IA — prioridade sobre a regra, porque ela sabe de núcleo de
+  // expressão o que nenhuma lista fechada aqui vai saber ("under the weather"
+  // → weather). Passa por validação em `aplicarLemaDaIA`: lema alucinado
+  // espalharia famílias inteiras pelo verbete, e em silêncio.
+  if (typeof aplicarLemaDaIA === 'function' && result.lemma) aplicarLemaDaIA(w, result.lemma)
+  // Sem lema da IA (ou recusado), a regra decide — e agora com o `type` já
+  // preenchido acima, que é o que distingue cabeça inicial de final.
+  if (!w.lemma && typeof lemaDoItem === 'function') { w.lemma = ''; lemaDoItem(w) }
   // Auto-detecção de idioma: se a IA detectou outro idioma, adota (seletor manda, detecção corrige)
   const det = (result.detected_lang || '').toLowerCase().slice(0, 5)
   if (det && det !== wordLang(w)) {
@@ -369,6 +377,7 @@ Return ONLY this JSON (no markdown, no explanation):
   "context_pt": "the CONTEXT SENTENCE translated into natural Brazilian Portuguese — what it SAYS in that scene, never word by word. Empty string if there is no context sentence. This must agree with the meaning marked context_match: if the translation contradicts it, one of the two is wrong.",
   "type": "word|phrasal_verb|idiom|collocation",
   "type_label": "precise local category in Brazilian Portuguese, or empty string",
+  "lemma": "the HEAD WORD of this item, in dictionary base form, lowercase, ONE word — the word a dictionary would file this expression under. For a single word, its own base form ('fell' → 'fall', 'children' → 'child'). For a verb-headed expression, the verb ('fall by the wayside' → 'fall', 'gets up his quills' → 'get'). For a noun phrase, the head NOUN, which in English comes LAST ('under the weather' → 'weather', 'the last straw' → 'straw', 'cold feet' → 'foot'). It MUST be a word that appears in the item (or its base form) — never a synonym, never a translation.",
   "ipa": ${promptIpaRule(wordLang(w))},
   "level": "A2|B1|B2|C1|C2",
   "sense_audit": ["FILL THIS FIRST, before writing meanings. One short line per candidate sense you considered, each ending with SPLIT or MERGED and the test that decided it. Max 12 words per line. Example for 'emasculating': ['pessoa: desvirilizador/castrador — MERGED, test 1 ok', 'lei/regra: esvazia, enfraquece — SPLIT, test 2', 'veterinária: castrar literal — SPLIT, domain']"],

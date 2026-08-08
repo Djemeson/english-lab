@@ -5929,11 +5929,44 @@ tem card ⇒ `revisao`; item `in_study` ⇒ `estudo`; item já no SRS com sentid
 
 ### FASE 3 — o verbete e as saídas (FEITA em 2026-08-08)
 
-**5. Lema e verbete por família.** `lemaDoItem()` (core.js) deriva a chave do verbete: pega a
-**cabeça** da expressão (a primeira palavra de conteúdo — artigo e preposição na frente não
-mandam, senão "a piece of cake" viraria família de "a"), passa pela tabela de irregulares do
-glossário (`fell` → `fall`) e, se algum item existente casar com um candidato, **é ele que
-manda** — a família se mantém junta conforme cresce. Fica em cache no `w.lemma`.
+**5. Lema e verbete por família.** A chave do verbete é a **cabeça** da expressão, e a regra
+que decide onde ela fica é uma só:
+
+> **Expressão que começa com VERBO é de cabeça INICIAL; qualquer outra é de cabeça FINAL** —
+> que é como o inglês monta sintagma nominal.
+
+| tipo | exemplo | lema |
+|---|---|---|
+| palavra | `fell`, `children` | `fall`, `child` |
+| phrasal verb (cabeça inicial por definição) | `get by`, `look forward to` | `get`, `look` |
+| idiom com verbo | `fall by the wayside`, `gets up his quills` | `fall`, `get` |
+| idiom sem verbo | `under the weather`, `the last straw` | `weather`, `straw` |
+| composto nominal | `cold feet`, `crocodile tears` | `foot`, `tear` |
+
+Peças (todas em `core.js`): `_LEMA_FUNCIONAIS` (o que nunca é cabeça), `_LEMA_VERBOS` (~150
+verbos que encabeçam expressão — auxiliares incluídos, porque aqui `get`/`be`/`do` **são** o
+núcleo), `_lemaEhVerbo()` (reconhece a forma flexionada), `_lemaBase()` (tabela de irregulares
+antes das regras de sufixo) e `lemaCabeca(expr, tipo)`.
+**Medido**: 30 de 31 casos difíceis. O único fora é `leaves` → `leaf` em vez de `leave` — e
+não é bug, é ambiguidade real (plural de *leaf* e 3ª pessoa de *leave*); é exatamente onde a
+IA decide.
+
+**O LEMA DA IA TEM PRIORIDADE.** A análise que já roda passou a devolver `"lemma"`, com a
+regra de cabeça escrita no prompt — ela sabe de núcleo de expressão o que lista fechada nenhuma
+vai saber. Mas passa por `aplicarLemaDaIA()`, que **valida**: uma palavra só, alfabética, e que
+tenha parentesco real com a expressão. Lema alucinado espalharia famílias inteiras pelo
+verbete, e em silêncio — testado que ele recusa tradução ("doente"), sinônimo ("sick"), duas
+palavras e lixo, e aceita flexão (`fell`→`fall`) e plural irregular (`feet`→`foot`).
+
+O cache (`w.lemma`) é invalidado quando a PALAVRA muda (`w.lemma_de`): editar o item tem de
+mudar a família, e lema velho grudado deixaria a entrada para sempre no teto errado.
+Se algum item existente casar com um candidato, **é ele que manda** — a família se mantém
+junta conforme cresce, em vez de rachar por grafia.
+
+⚠️ **A trava do vazio da Biblioteca também teve de mudar** (achado no teste): ela olhava só
+`srsCards.length`, então quem já preparou material e ainda não estudou nada tinha verbete cheio
+e via **"Biblioteca vazia"**. Agora o vazio depende do MODO — cards conta cards, Palavras conta
+sentidos.
 
 A Biblioteca → Palavras passou a montar o verbete **a partir de `words[]`, não dos cards**.
 Antes ela só enxergava o que virou card, e por isso todo sentido guardado como `saber` ficava
@@ -5988,11 +6021,13 @@ lugar só.
       conferir (a) que a IA devolve `same_as: null` para o novo e o id certo para o antigo, e
       (b) que o sentido velho **não é duplicado**. ⚠️ Com DeepSeek o `aiJSON` cai para texto
       livre — vale medir se o campo sobrevive; se não, a rede do casamento por texto assume.
-- [ ] **O LEMA NÃO COBRE TUDO, e isso é esperado.** A cabeça é a primeira palavra de conteúdo,
-      o que acerta phrasal e idiom verbal ("fall by the wayside" → `fall`) e erra quando o
-      núcleo é outro ("piece of cake" cai em `piece`, que é razoável; "under the weather" cai
-      em `under`, que não é). Só vale mexer se incomodar de verdade — e aí o caminho é a IA
-      devolver o lema na análise que já acontece, não uma tabela nova.
+- [x] ~~O lema não cobre tudo~~ — **estendido ao máximo em 2026-08-08** (ver 8.2, item 5):
+      regra de cabeça inicial/final por tipo + IA devolvendo `lemma` validado. Medido em 30/31
+      casos difíceis. O que **sobra** e é limite conhecido, não pendência:
+      **(a)** ambiguidade real de forma (`leaves` = *leaf* ou *leave*) — só o contexto resolve,
+      e é a IA quem resolve; **(b)** derivação continua **fora de propósito** — `glossLemas`
+      exclui `-er`/`-est`/`-ly` porque "teacher" não é "teach" e "hardly" não é "hard"; juntar
+      essas famílias reintroduziria a classe de erro das rodadas 163-167.
 - [ ] **ZONA DE PERIGO — conferir num aparelho com dado real.** O "apagar tudo" ganhou o que
       faltava (bases `english-lab-books` e `el-video-db` inteiras, as chaves soltas do
       localStorage e recarregamento no fim). Foi exercitado com dado sintético; num aparelho

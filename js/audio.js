@@ -721,10 +721,18 @@ function setLibLang(code) {
 function openBiblioteca() {
   const emptyEl = el('biblioteca-empty')
   const area = el('srs-all-cards-area')
-  if (!srsCards.length) {
+  // O VAZIO DEPENDE DO MODO. Desde a Fase 3 o verbete é montado a partir de
+  // `words[]`, não dos cards: quem já preparou material mas ainda não estudou
+  // nada tem verbete cheio e ZERO cards. Enquanto esta trava olhava só o
+  // `srsCards`, a Biblioteca respondia "vazia" com o conteúdo pronto do lado.
+  const temVerbete = Array.isArray(words) && words.some(w =>
+    (w.meanings || []).some(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em))
+  const vazio = _libMode === 'words' ? !temVerbete : !srsCards.length
+  if (vazio) {
     if (area) area.innerHTML = ''
     if (emptyEl) emptyEl.style.display = ''
     clearLibraryFilterUI()
+    _applyLibModeUI()
     return
   }
   if (emptyEl) emptyEl.style.display = 'none'
