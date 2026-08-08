@@ -6041,6 +6041,54 @@ pré-análise no capítulo** (a glosa que ele mostra é a do contexto antigo). O
 já respondeu, ou já acusou divergência, o botão não aparece — seria pagar por resposta que
 existe.
 
+### UM SENTIDO POR ENCONTRO — a análise para de despejar o verbete (2026-08-08)
+
+A pergunta dele fechou a incoerência que sobrava: *"mandar até mesmo os sentidos que eu não vou
+estudar não vai contra a minha ideia de ir construindo aos poucos o vocabulário de diferentes
+significados pra um mesmo item?"* **Vai**, por três motivos:
+
+1. **O verbete deixa de ser o histórico dele.** O "meu, minha" do `mine` não veio de cena
+   nenhuma — não tem frase, obra nem capítulo. Guardá-lo transforma o dicionário pessoal
+   naquilo que ele recusou no papo do Oxford: uma entrada genérica com um sentido real e o
+   resto de enfeite.
+2. **Mata o reencontro** — medido: sentido guardado como `saber` **cala o alerta** de "sentido
+   novo". O segundo encontro, que ele chamou de o mais valioso, não produzia nada.
+3. **Não sobra progressão.** Item que nasce completo não cresce.
+
+E o argumento que parecia sustentar o despejo — *"o custo já foi pago"* — **é falso**: no
+prompt, o grosso da resposta é POR SENTIDO (definição, origem, sinônimos, antônimos e 3
+exemplos com tradução). Pedir só o do contexto é a opção **mais barata**, não a mais cara.
+
+**A política nova**: a IA **delibera sobre todos os sentidos e devolve UM** — o do contexto.
+- O `sense_audit` (que já existia) virou a peça central: é lá que ficam os sentidos
+  considerados e descartados, e é essa deliberação que faz `barrel` sair "cano". **Pensa em
+  cinco, escreve um.**
+- Invertidas todas as regras que exigiam o contrário: o bloco de fonte, o exemplo do
+  `take off` (agora mostra o `sense_audit` com dois descartados e UM objeto), o caso
+  `emasculating` (a divisão continua valendo para não mentir dentro de um objeto — deixou de
+  ser licença para devolver vários) e a checagem de coerência (exemplo que não cabe no sentido
+  se **reescreve**, não vira sentido novo).
+- Item **sem frase de contexto** devolve o sentido mais comum, ainda com `context_match: true`.
+
+⚠️ **A MUDANÇA CRÍTICA, e quase invisível**: `w.meanings = freshMeanings.map(...)` fazia a lista
+nova SUBSTITUIR a antiga. Isso era inofensivo enquanto a IA devolvia tudo (a lista nova era um
+superconjunto); com um sentido de volta, **a primeira re-análise apagaria todo o vocabulário
+acumulado do item** e deixaria os cards órfãos. Agora o que a IA não devolveu é preservado
+(`sobraram`), e as lápides `moved_to`/`fundido_em` sobrevivem até ao "Refazer do zero", porque
+elas seguram a posição no array para os cards antigos não apontarem para o sentido errado.
+**Medido**: re-análise devolvendo 1 sentido manteve os 3 (um `saber` e um `revisao` intactos).
+
+**A válvula**: `completarVerbete()` — botão *"Completar verbete"* no card do Preparar. Traz os
+OUTROS sentidos numa chamada própria, com **um exemplo cada** (são para consultar, não para
+drilar), já listando o que ele tem para não repetir, com rede no código contra a repetição que
+o modelo faz mesmo assim. Nascem `saber` **e já enviados** — ele pediu para ver, então aparecem
+no verbete e no glossário na hora; fazê-lo "enviar" um sentido que nunca vai estudar seria
+burocracia. O panorama do Oxford não se perdeu: deixou de ser padrão e virou escolha.
+
+**Medido de ponta a ponta**: `mine` analisado devolve 1 sentido → 1 selecionado → **3 cards**
+(era 15). "Completar verbete" acrescentou 2 sentidos como consulta, sem duplicar o repetido, e
+os três selos aparecem no verbete (*na revisão* / *só consulta*).
+
 ### "EM ANÁLISE" SOBREVIVE À NAVEGAÇÃO (2026-08-08)
 
 *"Essa frase está sendo analisada com IA, mas eu cliquei em outro item e quando voltei aqui

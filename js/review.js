@@ -166,7 +166,7 @@ function applyAiResult(w, result) {
   const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
   const curated = w._refazer ? [] : oldMeanings.filter(om => Array.isArray(om.examples) && om.examples.length > 0)
   const usedOld = new Set()
-  w.meanings = freshMeanings.map(nm => {
+  const mapeados = freshMeanings.map(nm => {
     // FASE 3 — `same_as` primeiro: é a IA dizendo "este é aquele sentido que
     // ele já tem", olhando o SENTIDO e não a grafia. O casamento por texto
     // normalizado continua logo abaixo, como rede: modelo que ignora o campo
@@ -238,11 +238,111 @@ function applyAiResult(w, result) {
       source_context: match.source_context
     }
   })
+
+  // O QUE A IA NÃO DEVOLVEU **NÃO SE PERDE**. Isto passou a ser vital quando a
+  // análise virou "um sentido por vez": antes a lista nova era um superconjunto
+  // da antiga, e `w.meanings = novos` era inofensivo; com UM sentido de volta,
+  // a mesma linha apagaria todo o vocabulário acumulado do item — e deixaria os
+  // cards dos sentidos apagados órfãos.
+  // Ordem: o do contexto primeiro (é o que ele acabou de encontrar), depois os
+  // que já estavam ali.
+  // "Refazer do zero" continua jogando fora os sentidos — é para isso que ele
+  // existe. Mas as LÁPIDES sobrevivem sempre: `moved_to` e `fundido_em` não são
+  // sentidos, são marcas que seguram a posição no array para os cards antigos
+  // não passarem a apontar para o sentido errado.
+  const sobraram = oldMeanings.filter(om =>
+    om && !usedOld.has(om.id) && (om.moved_to || om.fundido_em || !w._refazer))
+  w.meanings = [...mapeados, ...sobraram]
   w.ai_processed = true
   w.updated_at = new Date().toISOString()
   // Sentido novo nasce sem `estado` (= 'pronto'), então o item cai sozinho em
   // `pending_review`; os já estudados mantêm o deles.
   sincronizarStatusItem(w)
+}
+
+// ================================================================
+// COMPLETAR O VERBETE — o panorama, quando VOCÊ pedir
+// ================================================================
+// A análise passou a devolver só o sentido do contexto, porque o item cresce
+// por encontro. Mas "quero ver tudo que esta palavra significa" continua sendo
+// uma pergunta legítima — era o que ele tinha no Oxford. Ela só deixou de ser
+// PADRÃO e virou escolha, com uma chamada própria.
+//
+// O que chega por aqui nasce `saber`: é consulta, não fila. Não tem frase nem
+// fonte de propósito — esses sentidos não vieram de cena nenhuma, e inventar
+// uma origem para eles seria falsificar o histórico de leitura que o verbete
+// existe para contar.
+async function completarVerbete(wordId) {
+  const w = words.find(x => x.id === wordId)
+  if (!w) return
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error')
+    showSection('configuracoes'); return
+  }
+  if (_emAnalise.has(wordId)) { toast('Este item já está sendo analisado', 'info'); return }
+  const alvo = w.word || ''
+  if (!alvo) { toast('Item sem palavra — não dá para completar o verbete', 'warning'); return }
+
+  const jaTem = sentidosDe(w)
+  const L = getLangDef(wordLang(w))
+  _emAnalise.add(wordId)
+  if (activeWordId === wordId) renderWordCard(wordId)
+  renderSidebar()
+  try {
+    const PROMPT = `List the OTHER common senses of the ${L.nameEn} item "${alvo}" for a Brazilian Portuguese-speaking learner.
+
+The learner ALREADY has these senses — do NOT repeat them, in any wording:
+${jaTem.map(m => `- ${m.meaning_pt}`).join('\n') || '- (none)'}
+
+Return every OTHER sense that a good learner's dictionary would list. If there are none left, return an empty array.
+Same splitting discipline as always: one object per SENSE, never two ideas merged with commas or semicolons.
+Each sense gets ONE example only — these are for consulting, not for drilling.
+
+Return ONLY this JSON:
+{"meanings":[{"meaning_pt":"tradução em forma de citação, máx 8 palavras, UM sentido","definition_pt":"definição em português, 1-2 frases","type_label":"categoria local em português, ou vazio","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","level":"A2|B1|B2|C1|C2","examples":[{"en":"Sentence with <b>${alvo}</b>.","pt":"Tradução natural com o <b>equivalente</b>."}]}]}`
+
+    const r = await aiJSON(PROMPT, { maxTokens: 2500 })
+    const brutos = Array.isArray(r && r.meanings) ? r.meanings : []
+    const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+    const tinha = new Set(jaTem.map(m => norm(m.meaning_pt)))
+    const novos = []
+    for (const m of brutos) {
+      const pt = String(m && m.meaning_pt || '').trim()
+      if (!pt || tinha.has(norm(pt))) continue   // rede: o modelo repete às vezes
+      tinha.add(norm(pt))
+      novos.push({
+        id: uid(),
+        meaning_pt: pt,
+        definition_pt: String(m.definition_pt || '').trim(),
+        type_label: String(m.type_label || '').trim(),
+        register: m.register || 'neutral',
+        variety: 'general',
+        level: String(m.level || '').trim(),
+        examples: Array.isArray(m.examples) ? m.examples.filter(e => e && e.en).slice(0, 1) : [],
+        context_match: false,
+        selected: false,
+        // Nasce como consulta e JÁ ENVIADO: ele pediu para ver, então tem de
+        // aparecer no verbete e no glossário na hora. Passar pelo Preparar
+        // seria pedir que ele "enviasse" um sentido que nunca vai estudar.
+        estado: 'saber'
+      })
+    }
+    if (!novos.length) { toast('Nada a acrescentar — o verbete já está completo', 'info'); return }
+    w.meanings = [...(w.meanings || []), ...novos]
+    w.updated_at = new Date().toISOString()
+    sincronizarStatusItem(w)
+    saveWords()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+    if (typeof glossInvalidar === 'function') glossInvalidar()
+    toast(`${novos.length} sentido${novos.length !== 1 ? 's' : ''} ${novos.length !== 1 ? 'acrescentados' : 'acrescentado'} ao verbete, como consulta`, 'success')
+  } catch (e) {
+    toast(`Não deu para completar: ${e.message}`, 'error')
+  } finally {
+    _emAnalise.delete(wordId)
+    renderSidebar()
+    if (activeWordId === wordId) renderWordCard(wordId)
+    renderDashboard()
+  }
 }
 
 // ================================================================
@@ -288,7 +388,7 @@ SOURCE-AWARE DISAMBIGUATION — CRITICAL:
 - Inside a specific genre, a common word frequently carries a special domain-specific meaning. You MUST treat the sense as it is actually used IN THIS SOURCE'S CONTEXT as the PRIMARY meaning: set its "context_match": true and place it FIRST in the array.
 - Canonical example: "snuff" captured from *Survivor* means "apagar (a tocha)" — the host snuffs the eliminated player's torch — NOT "rapé" (powdered tobacco). The reality-show sense wins because of the source.
 - If a context sentence is present, combine it WITH the inferred genre to choose the right primary sense.
-- You MUST still ALSO return the other common general senses with "context_match": false, exactly as usual — never drop them.`
+- Return ONLY that source-aware sense. The general senses are not wrong — they just are not what this source taught, and they arrive when he meets them.`
   }
 
   // A SEMENTE VIVE FORA DO BLOCO DE FONTE, de propósito. Enquanto morava lá
@@ -364,30 +464,32 @@ WORKED EXAMPLE — "emasculating":
 - "desvirilizador" and "castrador" survive Test 1 (interchangeable when talking about a man's pride) → SAME object.
 - "que esvazia / enfraquece" (an emasculated bill, emasculating the regulations) fails Test 2 — it applies to laws and rules, not to a man's masculinity → SEPARATE object.
 - the literal veterinary sense "castrar (remover os testículos)" is another domain → SEPARATE object.
-So "emasculating" must return 2–3 meaning objects. Returning ONE object whose meaning_pt reads "desvirilizador, castrador, debilitante" is WRONG: "debilitante" is a different sense smuggled in as if it were a synonym.
+So "emasculating" has 2–3 DISTINCT senses — list all of them in "sense_audit" and then return the ONE the context sentence uses. Writing a single object whose meaning_pt reads "desvirilizador, castrador, debilitante" is WRONG either way: "debilitante" is a different sense smuggled in as if it were a synonym. Splitting is about not lying inside one object; it is not permission to return several.
 
 ${promptUnidadeDoSentido(target, 'analise')}
 
 Rules for meanings — CRITICAL:
-- The context sentence is ONLY used to identify the word correctly and to mark which sense appeared there. It does NOT limit which meanings you return.
-- ALWAYS return ALL distinct senses the word has in common ${L.nameEn} usage — not just the one from the context.
-- Think of yourself as a dictionary: if the word has 3 senses, return 3 meaning objects. If it has 2, return 2. Never collapse them into one.
-- NEVER merge two different senses into one meaning — not with semicolons ("decolar; ter sucesso" is WRONG) and not with commas pretending they are synonyms.
-- NEVER omit a common sense just because it doesn't appear in the context sentence
-- Each meaning MUST have its own 3 examples that illustrate that specific sense
-- CRITICAL: every example placed under a meaning MUST unambiguously illustrate THAT meaning's sense — never another sense of the word. If "${target}" has multiple senses, an example for sense A must NOT make sense if read with sense B. Double-check each example matches its meaning before returning.
-- COHERENCE CHECK (do this for every meaning before returning): the bolded Portuguese in each of its 3 examples must be interchangeable with the translations listed in that meaning's "meaning_pt". If one example needed a Portuguese word that is NOT interchangeable with them, that is proof a sense is missing — create the extra meaning object for it.
-- BEFORE RETURNING A SINGLE MEANING: run tests 1–3 once more. One sense is a legitimate answer for concrete words ("spoon"), but most C1/C2 adjectives, phrasal verbs and idioms carry 2 or more.
-- Set "context_match": true ONLY for the meaning that matches the context sentence; all others get false
-- The context_match meaning must reflect how the expression is USED in that scene — its function there — never its most literal dictionary reading (cheap-model trap: for "get you in" at a hotel desk, the context sense is "encaixar (na agenda)", not "colocar dentro")
-- Put the context-matching meaning FIRST in the array (so the learner sees their original context first)
+- THINK ABOUT EVERY SENSE, RETURN ONLY ONE. List every candidate sense in "sense_audit" — that deliberation is what makes you pick correctly, and it is where "barrel" stops being "barril". Then write full material for THE SENSE USED IN THE CONTEXT SENTENCE, and for that one alone.
+- "meanings" must contain EXACTLY ONE object, with "context_match": true.
+- Do NOT return the other senses. The learner is building this item one encounter at a time: the senses he has not met yet arrive later, each with the scene that taught it. Returning the whole dictionary entry now would fill his notebook with senses no book ever showed him.
+${ctx ? '' : `- THERE IS NO CONTEXT SENTENCE for this item, so there is no sense to match: return the single MOST COMMON sense of "${target}" and still set "context_match": true.`}
+- NEVER merge two different senses into one meaning — not with semicolons ("decolar; ter sucesso" is WRONG) and not with commas pretending they are synonyms. If the context sense passes the splitting tests as TWO senses, the context one is the narrower one that actually fits the sentence — return that one.
+- The meaning you return MUST have its own 3 examples, and all three must illustrate THAT sense. If one of them only works under a different sense of "${target}", it is the wrong example — replace it, do not add another meaning object.
+- "sense_audit" is REQUIRED and is not decoration: it must list the senses you considered and end with which one the context selected and why.
+- COHERENCE CHECK (before returning): the bolded Portuguese in each of the 3 examples must be interchangeable with the translations listed in "meaning_pt". If one example needed a Portuguese word that is NOT interchangeable with them, that example belongs to ANOTHER sense — rewrite the example so it illustrates the context sense. Never widen "meaning_pt" to cover it.
+- The meaning you return MUST reflect how the expression is USED in that scene — its function there — never its most literal dictionary reading (cheap-model trap: for "get you in" at a hotel desk, the context sense is "encaixar (na agenda)", not "colocar dentro")
+- "context_match": true on the single object you return.
 
 Example of CORRECT behavior for "take off" with context "his startup took off overnight":
-meanings: [
-  { meaning_pt: "ter sucesso repentino", ..., context_match: true,  examples: [...] },  ← matches context, comes first
-  { meaning_pt: "decolar",              ..., context_match: false, examples: [...] },  ← different sense, still included
-  { meaning_pt: "tirar, remover",       ..., context_match: false, examples: [...] }   ← different sense, still included
+sense_audit: [
+  "decolar (avião) — considered, not the context",
+  "tirar, remover (roupa) — considered, not the context",
+  "ter sucesso repentino — SELECTED: 'startup ... overnight' is the scene"
 ]
+meanings: [
+  { meaning_pt: "ter sucesso repentino", ..., context_match: true, examples: [3 examples of THIS sense] }
+]
+← exactly one object. "decolar" and "tirar" were weighed and left out on purpose: they arrive when he meets them.
 
 Rules for "variety" and "register" — ALWAYS fill BOTH for every meaning, never leave blank:
 ${promptVarietyRules(wordLang(w))}
@@ -406,7 +508,7 @@ Return ONLY this JSON (no markdown, no explanation):
   "lemma": "the HEAD WORD of this item, in dictionary base form, lowercase, ONE word — the word a dictionary would file this expression under. For a single word, its own base form ('fell' → 'fall', 'children' → 'child'). For a verb-headed expression, the verb ('fall by the wayside' → 'fall', 'gets up his quills' → 'get'). For a noun phrase, the head NOUN, which in English comes LAST ('under the weather' → 'weather', 'the last straw' → 'straw', 'cold feet' → 'foot'). It MUST be a word that appears in the item (or its base form) — never a synonym, never a translation.",
   "ipa": ${promptIpaRule(wordLang(w))},
   "level": "A2|B1|B2|C1|C2",
-  "sense_audit": ["FILL THIS FIRST, before writing meanings. One short line per candidate sense you considered, each ending with SPLIT or MERGED and the test that decided it. Max 12 words per line. Example for 'emasculating': ['pessoa: desvirilizador/castrador — MERGED, test 1 ok', 'lei/regra: esvazia, enfraquece — SPLIT, test 2', 'veterinária: castrar literal — SPLIT, domain']"],
+  "sense_audit": ["FILL THIS FIRST, before writing the meaning. One short line per candidate sense you considered — INCLUDING the ones you will not return — each ending with SPLIT or MERGED and the test that decided it, and the last line naming the one the CONTEXT selected. Max 12 words per line. Example for 'emasculating': ['pessoa: desvirilizador/castrador — MERGED, test 1 ok', 'lei/regra: esvazia, enfraquece — SPLIT, test 2', 'veterinária: castrar literal — SPLIT, domain', 'SELECIONADO: lei/regra — a frase fala de uma emenda']"],
   "meanings": [
     {
       "meaning_pt": "Portuguese translation in NEUTRAL CITATION FORM (lemma), preserving word class: verbs in the INFINITIVE ('esvaziar', never 'esvazia'), adjectives in the MASCULINE SINGULAR ('castrador', never 'castradora'), nouns in the singular. NEVER a conjugated or inflected form here. Use only Portuguese words that actually exist and sound natural — if the derived adjective would sound invented (e.g. 'esvaziador'), use a natural periphrase with the same class function: 'que esvazia, que enfraquece'. List 2–3 variants separated by commas ONLY when they pass the SUBSTITUTION test with each other (e.g. 'séquito, comitiva, cortejo' for 'retinue'). If a candidate word does not survive that test, it belongs to another meaning object — do not list it here. Max 8 words total. ONE sense only — no semicolons.",
@@ -428,7 +530,8 @@ Return ONLY this JSON (no markdown, no explanation):
       ]
     }
   ]
-}`
+}
+"meanings" has EXACTLY ONE object — the sense used in the context sentence. The senses you left out belong in "sense_audit", not here.`
 
   try {
     // Teto maior: com 2–3 sentidos × 3 exemplos, 2800 truncava a resposta
@@ -1075,10 +1178,13 @@ function renderWordCard(wordId) {
           <span>${selCount} selecionado${selCount !== 1 ? 's' : ''} · ${totalCards} card${totalCards !== 1 ? 's' : ''}</span>
         </div>
         <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="completarVerbete('${w.id}')"
+            data-tip="Quer o panorama? Traz os OUTROS sentidos que este item tem no dicionário e guarda como consulta — eles não entram na fila de estudo.">${ic('bookOpen','ic-sm')}Completar verbete</button>
+          ${(typeof sentidosDe === 'function' && sentidosDe(w).length > 1) ? `
           <button class="btn btn-ghost btn-sm" onclick="selectContextMeaning('${w.id}')"
             data-tip="Deixa marcado só o sentido da frase de onde este item saiu — os outros viram consulta ao enviar">${ic('check','ic-sm')}Só o do contexto</button>
           <button class="btn btn-ghost btn-sm" onclick="selectAllMeanings('${w.id}',true)">Todos</button>
-          <button class="btn btn-ghost btn-sm" onclick="selectAllMeanings('${w.id}',false)">Nenhum</button>
+          <button class="btn btn-ghost btn-sm" onclick="selectAllMeanings('${w.id}',false)">Nenhum</button>` : ''}
         </div>
       </div>
       ${w.meanings.map((m, mi) => m.moved_to ? '' : renderMeaningItem(w.id, m, mi)).join('')}
