@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A FORMA NEUTRA E A FAMÍLIA COMPLETA**. O item aparecia como
+> Última atualização: 2026-08-08 — **O RITMO DO PAINEL DE ESTUDO**. *"As informações parecem
+> querer viver uma dentro da outra."* Medido antes de mexer: **24px entre as seções contra 8px
+> dentro** — seções de 46px separadas por 24px, ou seja, a distância era menor que a própria
+> seção. O **rótulo ganhou coluna própria** (âncora comum para blocos de formatos diferentes, e
+> gruda no topo enquanto a seção rola), o **espaço entre passou a dominar o de dentro** (64px
+> contra 10px) e a **decoração interna diminuiu** — com separação de verdade, borda dentro de
+> seção é terceiro nível de moldura, e redundância lê como aperto. ⚠️ A coluna do rótulo não pode
+> somar-se à largura de leitura: a 56rem o texto ficou com 78 caracteres por linha; a 48rem voltou
+> a 64. `sw.js` → `englab-v166`. Ver seção 8.2 ("O ritmo do painel de estudo").
+>
+> Anterior: 2026-08-08 — **A FORMA NEUTRA E A FAMÍLIA COMPLETA**. O item aparecia como
 > "Gals" (a forma do livro): o prompt passou a pedir a **forma de citação**, com a guarda
 > `_mesmoItemCanonico` — muda flexão e caixa, **nunca a extensão** —, porque `w.word` é a chave do
 > reencontro, do áudio e dos cards. Duas seções novas, da MESMA chamada, sob demanda e guardadas
@@ -7050,6 +7060,47 @@ borbulha para o fundo dos painéis (que fecham ao clique de fora), e o menu vive
 
 **Arquivos**: `js/review.js`, `js/dossie.js`, `js/ai.js`, `js/ler.js`, `js/video-study.js`,
 `css/styles.css`. `sw.js` → `englab-v165`.
+
+### O RITMO DO PAINEL DE ESTUDO (2026-08-08)
+
+*"O painel de estudo tem bastante informação valiosa, mas as informações parecem querer viver uma
+dentro da outra. Falta conforto visual, separação mais coerente entre as seções."*
+
+**Medido antes de mexer**, e o número explica tudo:
+
+```
+24px ENTRE as seções   ×   8px DENTRO delas
+```
+
+Seções de 46px ("De onde vem", "Curiosidade") separadas por 24px — **a distância era menor que a
+própria seção**. E cada bloco tinha um tratamento próprio (caixa de código, tabela, cápsulas,
+chips, texto nu, lista com risco à esquerda), então blocos vizinhos não compartilhavam âncora
+nenhuma. Era literalmente isso o "querer viver uma dentro da outra".
+
+Três decisões, em ordem de impacto:
+
+1. **O rótulo ganhou coluna própria.** Todas as seções passam a começar no mesmo x e o rótulo
+   nunca disputa a linha com o conteúdo — é o que dicionário e obra de referência fazem, e é o que
+   dá âncora comum a blocos de formatos diferentes. Ele **gruda no topo** enquanto a seção rola:
+   numa lista de 40 expressões, saber em que seção se está deixa de depender da memória.
+2. **O espaço entre passou a dominar o espaço dentro**: 32px de margem + filete + 32px de recuo
+   (64px de conteúdo a conteúdo) contra 10px do rótulo ao texto. É a única regra que faz
+   agrupamento visual funcionar.
+3. **A decoração interna diminuiu.** Com separação de verdade entre seções, borda e fundo dentro
+   de cada uma viram terceiro nível de moldura — e redundância lê como aperto. O risco à esquerda
+   das listas saiu; o que separa os itens agora é espaço.
+
+> ⚠️ **A coluna do rótulo não pode sair da largura de leitura.** Primeira tentativa (56rem) deixou
+> o texto com **78 caracteres por linha**, acima do confortável, porque a coluna do rótulo somou-se
+> à coluna de texto em vez de sair dela. Com 48rem a leitura voltou a **64 caracteres**, meio da
+> faixa boa (55–75).
+
+A coluna só existe onde há largura para ela (≥1000px); abaixo disso o rótulo volta a ficar acima do
+conteúdo. **E o celular tinha um override antigo** que deixava a margem em 20px — justo onde a
+separação importa MAIS, porque sem a coluna do rótulo o espaço e o filete são tudo o que resta.
+Corrigido para 44px de conteúdo a conteúdo.
+
+**Arquivos**: `css/styles.css`. `sw.js` → `englab-v166`.
 
 ### Onde a captura ainda NÃO leva a semente
 

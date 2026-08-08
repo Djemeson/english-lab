@@ -5647,13 +5647,48 @@ body.dos-focando{overflow:hidden}
 .dosf-fonte a{color:var(--text3);text-decoration:none;border-bottom:1px dotted var(--border-strong)}
 .dosf-fonte a:hover{color:var(--primary);border-bottom-color:var(--primary)}
 
-/* Seções — o arco. Rótulo pequeno em caixa alta; o conteúdo é que fala. */
-.dosf-bloco{margin-top:var(--sp-8)}
+/* ---- O RITMO DAS SEÇÕES ----
+   Medido antes de mexer: 24px ENTRE as seções contra 8px DENTRO delas. Seções
+   de 46px separadas por 24px — a distância era menor que a própria seção, e o
+   olho não tinha como saber onde uma acabava. Somado a isso, cada bloco tinha
+   um tratamento próprio (caixa, tabela, texto nu), então nada compartilhava
+   âncora nenhuma. Era isso o "querer viver uma dentro da outra".
+
+   Três decisões, nesta ordem de importância:
+   1. O RÓTULO GANHA COLUNA PRÓPRIA. Todas as seções passam a começar no mesmo
+      lugar e o rótulo nunca disputa a linha com o conteúdo — é o que dicionário
+      e obra de referência fazem, e é o que dá âncora comum a blocos de formatos
+      diferentes. Ele gruda no topo enquanto a seção rola: numa lista de 40
+      expressões, saber em que seção se está deixa de depender da memória.
+   2. O ESPAÇO ENTRE PASSA A DOMINAR o espaço dentro (32px + filete contra
+      8px), que é a única regra que faz agrupamento visual funcionar.
+   3. A DECORAÇÃO INTERNA DIMINUI. Com separação de verdade entre seções, borda
+      e fundo dentro de cada uma viram redundância — e redundância lida como
+      aperto. */
+.dosf-bloco{margin-top:var(--sp-9);padding-top:var(--sp-9);border-top:1px solid var(--border)}
+.dosf-bloco:first-of-type{margin-top:var(--sp-6);padding-top:0;border-top:0}
 .dosf-rot{
   display:flex;align-items:center;gap:5px;font-size:var(--fs-3xs);color:var(--text3);
-  text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:var(--sp-3);
+  text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:var(--sp-4);
 }
 .dosf-texto{font-size:var(--fs-md);line-height:1.6;color:var(--text2)}
+
+/* A coluna do rótulo só existe quando há largura para ela sem espremer a
+   leitura; abaixo disso o rótulo volta a ficar acima do conteúdo. */
+@media (min-width:1000px){
+  /* Medido: a 56rem a coluna de texto dava 78 caracteres por linha, acima do
+     confortável. 48rem menos a coluna do rótulo devolve ~66, que é o meio da
+     faixa boa (55–75) — a coluna do rótulo tem de sair da largura de leitura,
+     não somar-se a ela. */
+  .dosf-corpo{max-width:48rem}
+  .dosf-bloco{
+    display:grid;grid-template-columns:150px minmax(0,1fr);
+    column-gap:var(--sp-8);align-items:start;
+  }
+  .dosf-bloco > .dosf-rot{grid-column:1;margin:0;padding-top:2px;position:sticky;top:var(--sp-3)}
+  .dosf-bloco > *:not(.dosf-rot){grid-column:2}
+  .dosf-cab{max-width:none}
+}
 
 /* O CENTRO da página */
 .dosf-sig{font-size:var(--fs-xl);font-weight:700;color:rgba(var(--primary-rgb),1);line-height:1.25}
@@ -5713,9 +5748,8 @@ body.dos-focando{overflow:hidden}
 }
 
 /* A régua com a diferença escrita */
-.dosf-conf li{border-left-color:rgba(var(--primary-rgb),.4)}
-.dosf-conf li b{margin-right:4px}
-.dosf-conf li span{color:var(--text2)}
+.dosf-conf li b{margin-right:4px;color:var(--text)}
+.dosf-conf li span{color:var(--text3)}
 
 /* Produza — o único bloco onde ele escreve */
 .dosf-escrita{
@@ -5788,11 +5822,11 @@ body.dos-focando{overflow:hidden}
 @media (hover:none){ .dosf-fam-acoes{opacity:1} }
 
 /* Listas dos blocos (irmãos, sentidos que faltam) */
-.dosf-lista{list-style:none;display:flex;flex-direction:column;gap:var(--sp-2)}
-.dosf-lista li{
-  font-size:var(--fs-md);color:var(--text2);line-height:1.5;
-  padding-left:var(--sp-4);border-left:2px solid var(--border);
-}
+/* Sem borda à esquerda: com a seção já delimitada por filete e coluna própria,
+   um risco por item era o terceiro nível de moldura na mesma tela. O que
+   separa os itens agora é espaço. */
+.dosf-lista{list-style:none;display:flex;flex-direction:column;gap:var(--sp-4)}
+.dosf-lista li{font-size:var(--fs-md);color:var(--text2);line-height:1.5}
 .dosf-lista li b{color:var(--text);font-weight:600}
 .dosf-nota{font-size:var(--fs-xs);color:var(--text3)}
 .dosf-lista .dosf-nota{margin-left:var(--sp-2)}
@@ -5827,7 +5861,10 @@ body.dos-focando #voltar-pill{bottom:auto;top:calc(14px + env(safe-area-inset-to
   #dos-foco{padding:var(--sp-4)}
   .dosf-palco{gap:0}
   .dosf-corpo{padding:var(--sp-5) 0 var(--sp-7)}
-  .dosf-bloco{margin-top:var(--sp-7)}
+  /* No celular a separação importa MAIS, não menos: sem a coluna do rótulo,
+     o espaço e o filete são tudo o que resta para dizer onde uma seção acaba.
+     Este override vinha de antes do ritmo novo e desfazia justamente isso. */
+  .dosf-bloco{margin-top:var(--sp-8);padding-top:var(--sp-7)}
   .dosf-cab b{font-size:var(--fs-xl)}
   .dosf-viz{flex-direction:column;gap:2px}
   .dosf-viz-cab{min-width:0}
