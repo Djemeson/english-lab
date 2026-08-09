@@ -333,8 +333,8 @@ Explique o que "${c.txt}" significa AQUI, em ${L.nameEn}. Se for gíria, marca, 
     if (!lexaBalaoVivo(corpo)) return
     corpo.innerHTML = lexaFormatar(resp)
     if (typeof lexaChipsMontar === 'function' && c.frase) {
-      lexaChipsMontar(corpo, { trecho: c.frase, lang: c.lang || 'en', fonte: c.fonte || '',
-        origem: c.origem || {} })
+      lexaChipsMontar(corpo, { trecho: c.txt, contexto: c.frase, lang: c.lang || 'en',
+        fonte: c.fonte || '', origem: c.origem || {} })
     }
     if (typeof lexaChatMontar === 'function') {
       lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
@@ -394,7 +394,7 @@ function lexaChipsHTML(items, jaTenho) {
   if (!items || !items.length) return ''
   return `
     <div class="lexa-chips">
-      <div class="lexa-chips-cab">${ic('layers','ic-sm')} o que tem nesta frase
+      <div class="lexa-chips-cab">${ic('layers','ic-sm')} o que tem no que você marcou
         <span>clique para mandar ao Preparar</span></div>
       <div class="lexa-chips-lista">${items.map((it, i) => {
         const cat = _LEXA_CHIP_CATS[it.type] || ''
@@ -412,12 +412,24 @@ function lexaChipsHTML(items, jaTenho) {
 // `origem` leva o que o item precisa para nascer inteiro no Preparar: a frase
 // de onde veio, a obra e o idioma. Sem isso o chip viraria item órfão, sem
 // cena e sem dossiê — o mesmo furo do Assistente antes de ter origem.
+// ⚠️ `trecho` É O QUE ELE MARCOU. `contexto` é a frase em volta, e serve só
+// para a IA desambiguar — nunca para virar chip.
+// Isto já foi ao contrário, e ele pegou: marcou *"looks lower middle-class to
+// Billy"* e os chips vieram com "two miles", "downtown", "enter",
+// "neighborhood" — palavras da frase que ele NÃO marcou. *"Olha o que eu
+// selecionei e olha o que aparece de chips."* A quebra tem de respeitar a
+// fronteira da seleção: o que ele marcou é o pedido dele, e o resto da frase é
+// cenário.
 async function lexaChipsMontar(caixa, { trecho, contexto, lang, fonte, origem }) {
   if (!caixa || !trecho) return
+  // UM PEDAÇO SÓ NÃO SE QUEBRA. Marcando uma palavra, o único chip possível é
+  // ela mesma — e a explicação inteira já é sobre ela. Sair aqui poupa uma
+  // chamada de IA e uma lista com um item redundante.
+  if (!/\s/.test(String(trecho).trim())) return
   const slot = document.createElement('div')
   slot.className = 'lexa-chips-slot'
   caixa.appendChild(slot)
-  slot.innerHTML = `<div class="lexa-chips-carregando"><span class="spinner"></span> vendo o que tem na frase…</div>`
+  slot.innerHTML = `<div class="lexa-chips-carregando"><span class="spinner"></span> vendo o que tem aqui dentro…</div>`
   let items
   try {
     const r = await quebrarTrecho({ trecho, contexto: contexto || '', lang: lang || 'en', fonte: fonte || '' })

@@ -3088,10 +3088,12 @@ async function revSelExplain() {
     if (!vivo()) return
     corpo.innerHTML = ctx2.html
     if (typeof lexaChipsMontar === 'function') {
-      // Os chips saem da FRASE do item, não do pedaço selecionado: quem não
-      // entendeu a frase precisa ver de que ela é feita.
+      // Os chips saem DO QUE ELE MARCOU; a frase entra só como contexto para a
+      // IA desambiguar. Saindo da frase inteira, vinham chips de palavras que
+      // ele não tinha marcado — foi o que ele pegou no leitor.
       lexaChipsMontar(corpo, {
-        trecho: fraseDoItem, lang: (w && wordLang(w)) || 'en', fonte: (w && w.source_title) || '',
+        trecho: txt, contexto: fraseDoItem,
+        lang: (w && wordLang(w)) || 'en', fonte: (w && w.source_title) || '',
         origem: _revOrigemDaFrase(w, fraseDoItem)
       })
     }

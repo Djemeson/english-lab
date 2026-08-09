@@ -7,7 +7,18 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A ABERTURA DO CAPÍTULO FAZIA AS VEZES DE TODA FRASE**. Ele
+> Última atualização: 2026-08-08 — **OS CHIPS SÃO DO QUE ELE MARCOU**. Ele marcou *"looks lower
+> middle-class to Billy"* e vieram chips de "two miles", "downtown", "enter", "neighborhood" —
+> palavras da frase que ele NÃO marcou. *"Olha o que eu selecionei e olha o que aparece de chips."*
+> A máquina já estava certa: `quebrarTrecho` sempre teve `trecho` (o que quebrar) e `contexto` (só
+> para desambiguar, com a regra *"NEVER take units from it"* no prompt). Os **quatro** chamadores é
+> que mandavam a FRASE como `trecho`. Agora mandam a marcação, e a frase vai como contexto.
+> **Marcação de uma palavra só não gera chips** — não há o que quebrar, a explicação já é sobre ela,
+> e some uma chamada de IA. O rótulo virou "o que tem no que você marcou". ⚠️ Isto **reverte de
+> propósito** a decisão da 96ª rodada ("os chips saem da FRASE, não do pedaço selecionado"): ele
+> viu na prática e não é o que quer. `sw.js` → `englab-v178`.
+>
+> Anterior: 2026-08-08 — **A ABERTURA DO CAPÍTULO FAZIA AS VEZES DE TODA FRASE**. Ele
 > selecionou **"fancy"** no leitor e a Lexa respondeu *"fancy não aparece no trecho enviado"*;
 > selecionou **"drive"** e ela negou que fosse "dirigir"; e os chips vinham do capítulo inteiro.
 > A raiz é antiga e não tem nada a ver com o balão: **`_lerBlocoEmVolta` subia seis níveis e ficava
@@ -7601,6 +7612,37 @@ modo suspenso levada até o fim — a frase está logo ali atrás, na página; r
 resposta para baixo.
 
 **Arquivos**: `js/ler.js`, `js/review.js`, `js/ai.js`, `css/styles.css`. `sw.js` → `englab-v177`.
+
+### Os chips são do que ele marcou (2026-08-08)
+
+Corrigida a frase, sobrou o vazamento: ele marcou **"looks lower middle-class to Billy"** e os
+chips trouxeram *two miles*, *downtown*, *enter*, *neighborhood* — palavras da frase que ele **não**
+marcou. *"Olha o que eu selecionei e olha o que aparece de chips."*
+
+**A máquina já estava certa.** `quebrarTrecho({ trecho, contexto })` sempre distinguiu os dois, e o
+prompt já dizia *"Snippet to break down (ONLY this)"* e *"Surrounding sentence (context to
+understand the MEANING only — NEVER take units from it)"*. Havia até o cinto de segurança `dentro()`
+para o modelo barato que ignora a regra. **Os quatro chamadores** é que mandavam a FRASE como
+`trecho` — e aí não havia o que filtrar: as unidades da frase estavam, por definição, dentro do
+"trecho".
+
+Agora os quatro mandam a MARCAÇÃO como `trecho`, e a frase (mais o parágrafo/as falas em volta, no
+leitor e no vídeo) como `contexto`.
+
+**Marcação de uma palavra só não gera chips.** Não há o que quebrar: o único chip possível seria a
+própria palavra, e a explicação inteira já é sobre ela. Sair antes poupa uma chamada de IA. Quem
+quer mandá-la ao Preparar tem o botão no cabeçalho do balão.
+
+⚠️ Isto **reverte de propósito** a decisão registrada na 96ª rodada — *"os chips saem da FRASE do
+item, não do pedaço selecionado: quem não entendeu a frase precisa ver de que ela é feita"*. O
+argumento era bom no papel; no uso, o que ele quer ver é o que ele apontou. Se um dia fizer falta
+ver as unidades da frase inteira, o caminho é marcar a frase inteira.
+
+Provado com `aiJSON` dublado devolvendo as cinco unidades do caso real: as três de fora da marcação
+foram descartadas pelo `dentro()`, sobraram *lower middle-class* e *looks*; e "fancy" sozinho não
+chegou nem a chamar a IA.
+
+**Arquivos**: `js/ai.js`, `js/ler.js`, `js/review.js`, `js/video-study.js`. `sw.js` → `englab-v178`.
 
 ### Onde a captura ainda NÃO leva a semente
 

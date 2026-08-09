@@ -769,9 +769,12 @@ async function videoOvExplain() {
     if (!vivo()) return
     corpo.innerHTML = c.html
     if (typeof lexaChipsMontar === 'function') {
-      // Os chips da FALA inteira, não só do que ele marcou.
+      // Os chips DO QUE ELE MARCOU. A fala e as falas em volta entram como
+      // contexto, para a IA desambiguar — não como fonte de chip. Saindo da
+      // fala inteira, vinham unidades que ele não tinha marcado.
       lexaChipsMontar(corpo, {
-        trecho: contexto, contexto: trecho || '', lang: (_vidCur && _vidCur.lang) || 'en',
+        trecho: txt, contexto: [contexto, trecho].filter(Boolean).join('\n').slice(0, 700),
+        lang: (_vidCur && _vidCur.lang) || 'en',
         fonte: (_vidCur && _vidCur.title) || '',
         origem: { source_type: (_vidCur && _vidCur.source_type) || 'series',
                   source_title: (_vidCur && _vidCur.title) || '' }

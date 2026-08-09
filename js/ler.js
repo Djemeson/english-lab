@@ -1259,11 +1259,15 @@ function _lerAoSelecionar() {
       // markdown e o `textContent` a mostrava crua — `**pals** = "amigos"`,
       // com os asteriscos na cara do aluno.
       if (txtEl) txtEl.innerHTML = t ? lexaFormatar(t) : esc(`${lexaNome()} devolveu uma resposta vazia`)
-      // Os chips da FRASE (não do que ele selecionou): é a frase inteira que
-      // ele não entendeu, e a peça que derrubou a leitura pode ser outra.
+      // OS CHIPS SÃO DO QUE ELE MARCOU. Já foram da frase inteira, e ele pegou:
+      // marcou "looks lower middle-class to Billy" e vieram "two miles",
+      // "downtown", "enter" — palavras da frase que ele não tinha marcado. A
+      // frase entra como CONTEXTO, para a IA desambiguar, e não como fonte de
+      // chip.
       if (t && !corpo.querySelector('.lexa-chips-slot') && typeof lexaChipsMontar === 'function') {
         lexaChipsMontar(corpo, {
-          trecho: ctx, contexto: trecho || '', lang: _lerLivro.lang || 'en', fonte: _lerLivro.title,
+          trecho: alvo, contexto: [ctx, trecho].filter(Boolean).join(' ').slice(0, 700),
+          lang: _lerLivro.lang || 'en', fonte: _lerLivro.title,
           origem: { source_type: 'kindle', source_title: _lerLivro.title,
                     source_context: (_lerLivro.chapters[_lerCap] || {}).titulo || '' }
         })
