@@ -7,7 +7,18 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A FONTE ANCESTRAL, E O BALÃO QUE VOLTOU**. Três defeitos
+> Última atualização: 2026-08-08 — **O BALÃO É A ÚNICA CASA DA LEXA**. Regra dele, para o projeto
+> inteiro: *"o painel completo só deveria ser aberto quando a IA analisa o capítulo do livro, onde
+> tem que selecionar dezenas de chips. Todo o resto onde a Lexa explica deve ser no menu suspenso
+> mesmo."* O painel de tela cheia **foi removido** — função, CSS, preferência e atalho. Entrou
+> `lexaBalaoAbrir({titulo, frase, fonte, alvo})`, que devolve o corpo igual ao painel devolvia, e
+> os **cinco** chamadores mudaram de casa: seleção no Estudar, família do Estudar, leitor, Preparar
+> e vídeo. O balão leva tudo o que o painel levava — explicação, chips das unidades e a conversa —
+> e ancora onde a mão dele estava (o popup que o chamou, o botão que ele clicou). A triagem do
+> capítulo, a tal exceção, **nunca usou o painel**: ela tem superfície própria (`#ler-niv-area`) e
+> ficou como estava. `sw.js` → `englab-v176`. Ver 8.2 ("O balão é a única casa da Lexa").
+>
+> Anterior: 2026-08-08 — **A FONTE ANCESTRAL, E O BALÃO QUE VOLTOU**. Três defeitos
 > num PDF dele, dois com a mesma raiz. Selecionando **"cramped"** dentro do exemplo #2 do item
 > *digest-sized*, a Lexa abria falando da passagem de **Billy Summers** e respondia *"cramped não
 > aparece nessa frase"*; mandada ao Preparar, a palavra nascia como item **do livro**, com a
@@ -7480,6 +7491,57 @@ foco sobrevivendo ao Esc do balão.
 **Arquivos**: `js/ai.js`, `js/dossie.js`, `js/review.js`, `js/core.js`, `css/styles.css`.
 `sw.js` → `englab-v175`.
 
+### O balão é a única casa da Lexa (2026-08-08)
+
+Regra dele, dita para o projeto inteiro:
+
+> *"O painel completo só deveria ser aberto quando a IA analisa o capítulo do livro, onde tem que
+> selecionar dezenas de chips e dizer se conheço ou não. Todo o resto onde a Lexa explica deve ser
+> no menu suspenso mesmo. **Em todo o projeto deve ser assim.**"*
+
+**A razão é o gesto.** Perguntar durante a leitura é coisa de passagem: você tropeça numa palavra,
+quer saber e voltar para onde estava. O painel de tela cheia cobria a página e tirava de vista
+**justamente a frase que gerou a pergunta** — sumia o motivo junto com a dúvida. O balão fica por
+cima, e o texto continua ali atrás.
+
+O painel foi **removido inteiro**: `lexaPainelAbrir/Fechar/Alternar/ModoAtual`, o ouvinte de Esc, a
+preferência `uiPrefs.lexaPainel` e ~60 linhas de CSS. Ficou um objeto flutuante só no app, com um
+jeito só de fechar — antes, abrir a explicação podia deixar um menu de seleção órfão atrás dela.
+
+Entrou **`lexaBalaoAbrir({ titulo, frase, fonte, alvo, acoes })`**, com a mesma assinatura de
+antes (devolve o CORPO), então os cinco chamadores mudaram só de casa:
+
+| Onde | Ancora em |
+|---|---|
+| seleção em qualquer texto (`selMenuExplicar`) | o retângulo da seleção |
+| família do Estudar (`dossieFamiliaExplicar`) | o botão clicado (por isso ganhou `event`) |
+| leitor (`#ler-pop` → Explicar) | o popup de seleção, antes de fechar |
+| Preparar (`revSelExplain`) | idem |
+| vídeo (`vidExplicar`) | idem — aqui cobrir a tela seria cobrir a **cena** |
+
+**A exceção que ele citou nunca passou por aqui**: a triagem por nível do capítulo é
+`#ler-niv-area`, superfície própria dentro do leitor, com as centenas de chips de "conheço / não
+conheço". Ficou como estava.
+
+Três detalhes que só aparecem montando:
+
+- **O balão prefere ficar ABAIXO da âncora**; o menu de dois botões prefere acima. O menu não pode
+  tapar o que você selecionou; o balão **nasce vazio e cresce** conforme a resposta chega, e
+  crescer para baixo a partir de um topo fixo é o único jeito de o texto não escorregar debaixo dos
+  olhos enquanto está sendo lido.
+- **O reposicionamento é por exceção, não por mudança.** Um `MutationObserver` vigia o balão, mas
+  só o recoloca quando ele **sairia da tela** — recolocar a cada mensagem faria o balão pular
+  justamente enquanto ele lê ou digita na conversa.
+- **A altura é flex, não conta fixa.** A frase é opcional; qualquer `max-height` calculado erraria
+  num dos dois casos — espaço branco sem ela, rodapé da conversa cortado com ela.
+
+⚠️ **Selecionar DENTRO da explicação deixou de abrir uma segunda pergunta.** O painel permitia
+(era outro elemento); o balão é o próprio `#sel-menu`, e uma seleção nova o substituiria — a
+resposta que ele está lendo sumiria no meio da leitura. Os chips das unidades cobrem o caso comum.
+
+**Arquivos**: `js/ai.js`, `js/dossie.js`, `js/ler.js`, `js/review.js`, `js/video-study.js`,
+`css/styles.css`. `sw.js` → `englab-v176`.
+
 ### Onde a captura ainda NÃO leva a semente
 
 Só o leitor foi ligado. Faltam **vídeo/legenda** e **a extensão (Netflix/Kindle)** — e o
@@ -7497,13 +7559,14 @@ lugar só.
       `dossieFamiliaPreparar` e `revSelExplain`. Ver o topo deste arquivo.
 - [x] ~~"Explicar" abria painel em vez do modo suspenso~~ — **corrigido em 2026-08-08**: a resposta
       nasce no próprio balão (`#sel-menu.sel-exp`), com botões de Preparar, expandir e fechar.
-- [ ] **O LEITOR AINDA ABRE O PAINEL no "Explicar"** (2026-08-08). Ele descreveu o modo suspenso
-      como *"igual acontece quando marco uma palavra no livro"* — mas o `#ler-pop` foi migrado para
-      `lexaPainelAbrir` numa rodada anterior, e ele mesmo disse *"não sei se tu mudou, eu não testei
-      depois das mudanças gerais"*. **Ficou de fora de propósito**: o popup do leitor tem máquina
-      própria (ilustração da Wikipédia, chips, conversa) e trazê-lo para o balão é cirurgia, não
-      ganho de graça. Mesma pergunta vale para `video-study.js`. **Decidir com ele** se os dois
-      seguem o Estudar.
+- [x] ~~O leitor ainda abre o painel no "Explicar"~~ — **resolvido em 2026-08-08**, e ele fechou a
+      questão para o projeto inteiro: o painel foi REMOVIDO e o balão virou a única casa da Lexa
+      nas cinco telas. Ver 8.2 ("O balão é a única casa da Lexa").
+- [ ] **USAR O BALÃO NO LEITOR E NO VÍDEO COM CONTEÚDO DE VERDADE** (2026-08-08). O balão foi
+      provado no navegador por dois caminhos (seleção e família), e os cinco chamadores carregam
+      sem erro — mas leitor e vídeo pedem livro aberto e episódio tocando, que o ambiente de teste
+      não tem. Falta ver: se a ilustração da Wikipédia cabe bem lá dentro, se a conversa tem
+      espaço confortável no celular, e se o balão ancorado no popup do vídeo atrapalha a legenda.
 - [ ] **`OBRA_ESTUDO` cria um grupo novo no Estudar** (2026-08-08). Itens pescados de exemplos e da
       família passam a se juntar sob a pasta *"Do seu estudo"*, com o item de origem por capítulo.
       É o desenho pretendido (procedência honesta), mas só o uso dirá se essa pasta vira um

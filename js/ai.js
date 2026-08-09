@@ -109,90 +109,88 @@ function lexaChatHTML() {
 // ================================================================
 // O PAINEL DA LEXA — a explicação deixa de morar num popup de 420px
 // ================================================================
-// A explicação nasceu como balãozinho ao lado da seleção, e enquanto era só
-// "2 a 4 frases" isso bastava. Não basta mais: hoje ela carrega a explicação,
-// os chips de TODAS as unidades da frase e a conversa que continua dali — e
-// 420px espremem as três. Foi o que ele viu: *"é meio apertado do jeito que é
-// hoje… deve abrir um painel completo só seu, pra máximo foco e concentração"*.
+// O BALÃO SUSPENSO — a ÚNICA casa das explicações da Lexa, no projeto inteiro.
 //
-// UM PAINEL, DOIS TAMANHOS, e o mesmo DOM nos dois: alternar é trocar uma
-// classe, então nada se perde na troca — nem a conversa, nem os chips, nem a
-// rolagem. Remontar em outro hospedeiro é que perderia.
-//   'cheio'    — a tela inteira, para se concentrar
-//   'compacto' — cartão centrado, quando ele quer ver a página por trás
-// A escolha fica guardada: quem prefere um dos dois prefere sempre.
+// Houve uma fase de painel de tela cheia, e ela morreu no uso: *"o painel
+// completo só deveria ser aberto quando a IA analisa o capítulo do livro, onde
+// tem que selecionar dezenas de chips e dizer se conheço ou não. Todo o resto
+// onde a Lexa explica deve ser no menu suspenso mesmo. Em todo o projeto deve
+// ser assim."*
+//
+// A razão é o GESTO. Perguntar durante a leitura é coisa de passagem: você
+// tropeça numa palavra, quer saber e voltar para onde estava. O painel cobre a
+// página e tira de vista justamente a frase que gerou a pergunta — some o
+// motivo junto com a dúvida. O balão fica POR CIMA do texto, e o texto continua
+// ali atrás. A única tela que merece a superfície inteira é a triagem do
+// capítulo, que tem centenas de chips para marcar — e essa já tem a dela
+// (`#ler-niv-area`), sem passar por aqui.
 //
 // Fechar é barato porque o material sobrevive: a quebra da frase está no
 // IndexedDB (ver `quebrarTrecho`), então reabrir não custa chamada nenhuma.
-// É o próprio argumento dele para o painel poder ser fechado sem medo.
-const LEXA_PAINEL_MODOS = ['cheio', 'compacto']
+//
+// O balão é o MESMO elemento do menu de seleção (`#sel-menu`, com a classe
+// `sel-exp`) — de propósito: assim só existe um objeto flutuante de cada vez,
+// com um jeito só de fechar, e abrir a explicação nunca deixa um menu órfão
+// pendurado atrás dela.
 
-function lexaPainelModoAtual() {
-  const p = (typeof loadUiPrefs === 'function' && loadUiPrefs().lexaPainel) || 'cheio'
-  return LEXA_PAINEL_MODOS.includes(p) ? p : 'cheio'
+// Onde ancorar: aceita elemento, evento, DOMRect — ou nada, e aí ele nasce no
+// alto e ao centro. Quem chama a partir de um popup passa o popup: o balão
+// aparece onde a mão dele já estava.
+function _lexaRetangulo(alvo) {
+  if (!alvo) return { top: Math.round(innerHeight * 0.28), bottom: Math.round(innerHeight * 0.28),
+                      left: innerWidth / 2, width: 0 }
+  if (alvo.top !== undefined && alvo.width !== undefined) return alvo
+  const e = alvo.currentTarget || alvo.target || alvo
+  const r = (e && e.getBoundingClientRect) ? e.getBoundingClientRect() : null
+  return r || _lexaRetangulo(null)
 }
 
-function lexaPainelAlternar() {
-  const box = document.getElementById('lexa-painel'); if (!box) return
-  const novo = box.classList.contains('cheio') ? 'compacto' : 'cheio'
-  box.className = 'lexa-painel ' + novo
-  const b = box.querySelector('.lexa-painel-modo')
-  if (b) b.innerHTML = (novo === 'cheio' ? ic('shrink','ic-sm') + ' sair da tela cheia'
-                                          : ic('expand','ic-sm') + ' tela cheia')
-  if (typeof saveUiPref === 'function') saveUiPref('lexaPainel', novo)
+// Abre o balão e devolve o CORPO, onde quem chamou escreve. Mesma assinatura de
+// antes (`titulo, frase, fonte`), então os cinco chamadores mudaram só de casa.
+function lexaBalaoAbrir({ titulo, frase, fonte, alvo, acoes }) {
+  _selMenuFechar()
+  const r = _lexaRetangulo(alvo)
+  const p = document.createElement('div')
+  p.id = 'sel-menu'
+  p.className = 'sel-exp'
+  p.innerHTML = `
+    <header class="sel-exp-cab">
+      <b>${esc(titulo || LEXA_NOME)}</b>
+      ${fonte ? `<span class="sel-exp-fonte">${esc(fonte)}</span>` : ''}
+      ${acoes || ''}
+      <button class="sel-exp-btn" onclick="_selMenuFechar()" data-tip="Fechar">${ic('x','ic-sm')}</button>
+    </header>
+    ${frase ? `<div class="sel-exp-frase">“${escB(frase)}”</div>` : ''}
+    <div class="sel-exp-corpo" id="lexa-balao-corpo"></div>`
+  p.addEventListener('mousedown', e => e.stopPropagation())
+  document.body.appendChild(p)
+  // A RESPOSTA CHEGA EM PARTES — spinner, figura, texto, chips, conversa — e a
+  // cada parte o balão muda de tamanho. Sem reposicionar, ele cresceria para
+  // fora da tela ou taparia a frase. O observador faz isso sozinho, em vez de
+  // exigir uma chamada de ajuste em cada um dos cinco chamadores (e de cada
+  // ponto de pintura dentro deles — foi assim que a explicação já saiu pela
+  // metade uma vez).
+  // ⚠️ Só recoloca quando ele SAIRIA da tela. Recolocar a cada mudança faria o
+  // balão pular a cada mensagem da conversa, justamente enquanto ele lê ou
+  // digita — e o texto escorregando debaixo dos olhos é pior do que a
+  // imperfeição de posição que isso corrige.
+  const corpo = p.querySelector('.sel-exp-corpo')
+  try {
+    const mo = new MutationObserver(() => {
+      const b = p.getBoundingClientRect()
+      if (b.bottom > innerHeight - 4 || b.top < 4 || b.right > innerWidth - 4) _selMenuPor(p, r)
+    })
+    mo.observe(p, { childList: true, subtree: true, characterData: true })
+    p._mo = mo
+  } catch (e) {}
+  _selMenuPor(p, r)
+  return corpo
 }
 
-function lexaPainelFechar() {
-  const box = document.getElementById('lexa-painel')
-  if (box) box.remove()
-  document.body.classList.remove('lexa-painel-aberto')
-}
-
-// Abre (ou reaproveita) o painel e devolve o CORPO, onde quem chamou escreve.
-// `fonte` é a linha de procedência do topo: livro e capítulo, episódio, item.
-function lexaPainelAbrir({ titulo, frase, fonte, lang }) {
-  lexaPainelFechar()
-  const modo = lexaPainelModoAtual()
-  const box = document.createElement('div')
-  box.id = 'lexa-painel'
-  box.className = 'lexa-painel ' + modo
-  box.innerHTML = `
-    <div class="lexa-painel-caixa">
-      <header class="lexa-painel-topo">
-        <div class="lexa-painel-quem">
-          <b>${esc(titulo || LEXA_NOME)}</b>
-          ${fonte ? `<span>${esc(fonte)}</span>` : ''}
-        </div>
-        <button class="btn btn-ghost btn-sm lexa-painel-modo" onclick="lexaPainelAlternar()">${
-          modo === 'cheio' ? ic('shrink','ic-sm') + ' sair da tela cheia'
-                           : ic('expand','ic-sm') + ' tela cheia'}</button>
-        <button class="btn btn-ghost btn-sm" onclick="lexaPainelFechar()">${ic('x','ic-sm')} fechar <span class="lexa-painel-tecla">Esc</span></button>
-      </header>
-      ${frase ? `<div class="lexa-painel-frase">“${escB(frase)}”</div>` : ''}
-      <div class="lexa-painel-corpo" id="lexa-painel-corpo"></div>
-    </div>`
-  // Clique no fundo fecha — mas só no fundo. No modo cheio o fundo é a borda
-  // externa; no compacto é o escurecido em volta do cartão.
-  box.addEventListener('mousedown', e => { if (e.target === box) lexaPainelFechar() })
-  document.body.appendChild(box)
-  document.body.classList.add('lexa-painel-aberto')
-  // Selecionar vale aqui também: a explicação costuma trazer uma palavra que
-  // ele também não conhece, e parar ali para perguntar é o uso natural.
-  selMenuAtivar(box, () => ({ frase, fonte, lang: lang || (typeof activeLang === 'function' ? activeLang() : 'en') }))
-  return box.querySelector('.lexa-painel-corpo')
-}
-
-// UM ouvinte, ligado uma vez. O guarda é a existência do painel.
-if (!window._lexaPainelTeclas) {
-  window._lexaPainelTeclas = true
-  document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape') return
-    if (!document.getElementById('lexa-painel')) return
-    // Digitando na conversa, Esc fecha o painel do mesmo jeito: é o "me tira
-    // daqui" universal, e o que ele escreveu ali é pergunta de passagem.
-    e.preventDefault()
-    lexaPainelFechar()
-  })
+// "Ainda é este balão?" — o guarda de sempre contra a resposta lenta pintando
+// por cima de uma pergunta nova (ou de um balão já fechado).
+function lexaBalaoVivo(corpo) {
+  return !!corpo && document.getElementById('lexa-balao-corpo') === corpo
 }
 
 // ================================================================
@@ -211,7 +209,10 @@ if (!window._lexaPainelTeclas) {
 let _selMenuCtx = null
 
 function _selMenuFechar() {
-  const p = document.getElementById('sel-menu'); if (p) p.remove()
+  const p = document.getElementById('sel-menu')
+  // O observador de tamanho morre junto: deixá-lo vivo é criar vigia órfão a
+  // cada explicação fechada.
+  if (p) { if (p._mo) { try { p._mo.disconnect() } catch (e) {} } p.remove() }
   _selMenuCtx = null
 }
 
@@ -222,8 +223,16 @@ function _selMenuPor(p, r) {
   if (!p || !r) return
   const larg = p.offsetWidth, alt = p.offsetHeight
   p.style.left = Math.round(Math.max(8, Math.min(r.left + r.width / 2 - larg / 2, innerWidth - larg - 8))) + 'px'
-  const acima = r.top - alt - 8
-  p.style.top = Math.round(acima > 8 ? acima : Math.min(r.bottom + 8, innerHeight - alt - 8)) + 'px'
+  // O MENU prefere ficar ACIMA, para não tapar o que ele acabou de selecionar.
+  // O BALÃO prefere ABAIXO: ele nasce vazio e CRESCE conforme a resposta chega,
+  // e crescer para baixo a partir de um topo fixo é o único jeito de o texto
+  // não escorregar debaixo dos olhos enquanto está sendo lido.
+  const balao = p.classList.contains('sel-exp')
+  const abaixo = r.bottom + 8, acima = r.top - alt - 8
+  let topo
+  if (balao) topo = (abaixo + alt <= innerHeight - 8) ? abaixo : (acima > 8 ? acima : innerHeight - alt - 8)
+  else       topo = acima > 8 ? acima : Math.min(abaixo, innerHeight - alt - 8)
+  p.style.top = Math.round(Math.max(8, topo)) + 'px'
 }
 
 // `obterContexto(no)` devolve { frase, lang, origem } — e recebe o NÓ onde a
@@ -292,32 +301,24 @@ function selMenuPreparar() {
 // página e tira da vista exatamente a frase que motivou a pergunta — "não ficou
 // no modo suspenso, que é o que eu queria nesse caso, igual acontece quando
 // marco uma palavra no livro".
-// Então a resposta nasce no balão, em cima do texto, com a frase à vista. O
-// painel continua existindo para quem quiser mais espaço, a um clique — e sem
-// gastar uma segunda chamada, porque a resposta viaja junto.
+// Então a resposta nasce no balão, em cima do texto, com a frase à vista — e
+// leva junto tudo o que o painel levava: os chips das unidades e a conversa.
 async function selMenuExplicar() {
   const c = _selMenuCtx; if (!c) return
-  const p = document.getElementById('sel-menu'); if (!p) return
   try { window.getSelection().removeAllRanges() } catch (e) {}
   if (!aiChatCfg().key) {
     _selMenuFechar()
     toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return
   }
   const L = getLangDef(c.lang || 'en')
-  // Vivo = este balão ainda é o balão, e ainda é desta seleção. Uma seleção nova
-  // troca os dois, e a resposta velha não pode aterrissar por cima da nova.
-  const vivo = () => document.getElementById('sel-menu') === p && _selMenuCtx === c
-  p.classList.add('sel-exp')
-  p.innerHTML = `
-    <header class="sel-exp-cab">
-      <b>"${esc(c.txt)}"</b>
-      <button class="sel-exp-btn" onclick="selMenuPreparar()" data-tip="Mandar para o Preparar">${ic('plus','ic-sm')}</button>
-      <button class="sel-exp-btn" onclick="selMenuExpandir()" data-tip="Abrir no painel, com espaço para conversar">${ic('expand','ic-sm')}</button>
-      <button class="sel-exp-btn" onclick="_selMenuFechar()" data-tip="Fechar">${ic('x','ic-sm')}</button>
-    </header>
-    <div class="sel-exp-corpo"><span class="gen-spinner"></span> ${esc(lexaNome())} está explicando…</div>`
-  _selMenuPor(p, c.rect)
-  const corpo = p.querySelector('.sel-exp-corpo')
+  const corpo = lexaBalaoAbrir({
+    titulo: `"${c.txt}"`, fonte: c.fonte || '', alvo: c.rect,
+    acoes: `<button class="sel-exp-btn" onclick="selMenuPreparar()" data-tip="Mandar para o Preparar">${ic('plus','ic-sm')}</button>`
+  })
+  // `lexaBalaoAbrir` zera o contexto (fecha o menu antes de abrir o balão), e o
+  // botão "Preparar" do cabeçalho precisa dele de volta.
+  _selMenuCtx = c
+  corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(lexaNome())} está explicando…`
   try {
     const sistema = lexaExplicar()
     const pergunta = `${c.frase ? `A frase é: "${c.frase}".\n` : ''}O aluno selecionou: "${c.txt}".
@@ -326,33 +327,17 @@ Explique o que "${c.txt}" significa AQUI, em ${L.nameEn}. Se for gíria, marca, 
       { role: 'system', content: sistema },
       { role: 'user', content: pergunta }
     ], { maxTokens: 600 })
-    if (!vivo()) return
-    // Guardado no contexto: é o que deixa "abrir no painel" ser instantâneo.
-    c.sistema = sistema; c.pergunta = pergunta; c.resposta = resp
+    if (!lexaBalaoVivo(corpo)) return
     corpo.innerHTML = lexaFormatar(resp)
     if (typeof lexaChipsMontar === 'function' && c.frase) {
       lexaChipsMontar(corpo, { trecho: c.frase, lang: c.lang || 'en', fonte: c.fonte || '',
         origem: c.origem || {} })
     }
-    _selMenuPor(p, c.rect)
+    if (typeof lexaChatMontar === 'function') {
+      lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
+    }
   } catch (e) {
-    if (vivo()) { corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)}</span>`; _selMenuPor(p, c.rect) }
-  }
-}
-
-// O balão apertou? O painel recebe a MESMA resposta — mais espaço, mais os
-// chips e a conversa, que no balão não caberiam.
-function selMenuExpandir() {
-  const c = _selMenuCtx; if (!c || !c.resposta) return
-  _selMenuFechar()
-  const corpo = lexaPainelAbrir({ titulo: LEXA_NOME, frase: c.frase || c.txt, fonte: c.fonte || '', lang: c.lang })
-  corpo.innerHTML = lexaFormatar(c.resposta)
-  if (typeof lexaChipsMontar === 'function' && c.frase) {
-    lexaChipsMontar(corpo, { trecho: c.frase, lang: c.lang || 'en', fonte: c.fonte || '',
-      origem: c.origem || {} })
-  }
-  if (typeof lexaChatMontar === 'function') {
-    lexaChatMontar(corpo, { sistema: c.sistema, primeira: c.pergunta, resposta: c.resposta })
+    if (lexaBalaoVivo(corpo)) corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)}</span>`
   }
 }
 

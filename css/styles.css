@@ -5126,11 +5126,17 @@ body.ler-full .mobile-bottom-nav{display:none}
    do texto, com a frase ainda à vista, e some quando ele volta a ler. Por isso
    ele CRESCE no lugar em vez de virar painel: é o mesmo objeto, só que agora
    com conteúdo. O painel continua a um clique, no botão de expandir. */
+/* Largura de leitura, não de menu: aqui cabem a explicação, os chips de todas
+   as unidades da frase e a conversa — o que antes era motivo para abrir painel.
+   O teto de altura é o que o mantém "suspenso": passando disso, quem rola é o
+   corpo, e a página continua visível em volta. */
 #sel-menu.sel-exp{
-  display:block;padding:0;width:min(30rem,calc(100vw - 16px));
-  max-height:min(26rem,60vh);overflow:hidden;
+  display:flex;flex-direction:column;align-items:stretch;gap:0;padding:0;
+  width:min(34rem,calc(100vw - 16px));
+  max-height:min(34rem,72vh);overflow:hidden;
   border-radius:var(--radius);border-color:var(--border);
 }
+#sel-menu.sel-exp .sel-exp-cab,#sel-menu.sel-exp .sel-exp-frase{flex:none}
 .sel-exp-cab{
   display:flex;align-items:center;gap:6px;padding:8px 8px 8px 12px;
   border-bottom:1px solid var(--border);background:var(--surface2);
@@ -5144,8 +5150,12 @@ body.ler-full .mobile-bottom-nav{display:none}
   flex:none;padding:5px;background:transparent;border:1px solid transparent;color:var(--text3);
 }
 #sel-menu.sel-exp .sel-exp-btn:hover{background:var(--surface);border-color:var(--border);color:var(--text)}
+/* `flex:1` com `min-height:0`, e NÃO um `max-height` calculado: a frase é
+   opcional, então qualquer conta fixa erraria num dos dois casos — sobrando
+   espaço branco sem ela, ou cortando o rodapé da conversa com ela. */
 .sel-exp-corpo{
-  padding:12px 14px 14px;overflow-y:auto;max-height:calc(min(26rem,60vh) - 42px);
+  flex:1 1 auto;min-height:0;
+  padding:12px 14px 14px;overflow-y:auto;
   font-size:var(--fs-sm);line-height:1.6;color:var(--text);
   /* O texto aqui é para ser lido e, às vezes, copiado — ao contrário do menu
      de dois botões, onde selecionar não faria sentido nenhum. */
@@ -5154,72 +5164,29 @@ body.ler-full .mobile-bottom-nav{display:none}
 .sel-exp-corpo>*:first-child{margin-top:0}
 .sel-exp-corpo>*:last-child{margin-bottom:0}
 
-/* ================================================================
-   O PAINEL DA LEXA — dois tamanhos, o mesmo conteúdo
-   ================================================================
-   'cheio' cobre a tela para se concentrar; 'compacto' é um cartão centrado
-   com a página visível por trás. Trocar é só trocar a classe: o DOM é o
-   mesmo, então a conversa, os chips e a rolagem sobrevivem à troca. */
-.lexa-painel{
-  position:fixed;inset:0;z-index:var(--z-modal);
-  display:flex;align-items:center;justify-content:center;
-  animation:lexaPainelEntra .16s ease-out;
-}
-@keyframes lexaPainelEntra{from{opacity:0}to{opacity:1}}
-.lexa-painel-caixa{
-  display:flex;flex-direction:column;min-height:0;
-  background:var(--surface);border:1px solid var(--border);
-  box-shadow:0 20px 60px -20px rgba(0,0,0,.7);
-}
-.lexa-painel.cheio{background:var(--bg)}
-/* A COLUNA DE LEITURA É MEDIDA UMA VEZ, no contêiner. Medindo em `ch` dentro
-   de cada filho, cada um usava a PRÓPRIA fonte como régua — a frase (maior)
-   dava 640px e o corpo (menor) 581px, e os dois desalinhavam na tela. */
-.lexa-painel.cheio .lexa-painel-caixa{
-  width:100%;max-width:46rem;height:100%;border:0;box-shadow:none;background:transparent;
-  padding:var(--sp-5) var(--sp-6);
-}
-/* No compacto o fundo escurece: é o que diz "isto é uma camada por cima",
-   e é a área que responde ao clique para fechar. */
-.lexa-painel.compacto{background:rgba(0,0,0,.55);padding:var(--sp-5)}
-.lexa-painel.compacto .lexa-painel-caixa{
-  width:min(620px,100%);max-height:min(80vh,760px);border-radius:var(--radius);
-  padding:var(--sp-5);
-}
-
-.lexa-painel-topo{
-  display:flex;align-items:center;gap:var(--sp-3);flex-shrink:0;flex-wrap:wrap;
-  padding-bottom:var(--sp-3);border-bottom:1px solid var(--border);
-}
-.lexa-painel-quem{display:flex;flex-direction:column;margin-right:auto;min-width:0}
-.lexa-painel-quem b{font-size:var(--fs-base)}
-.lexa-painel-quem span{font-size:var(--fs-2xs);color:var(--text3);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lexa-painel-tecla{
-  display:inline-block;padding:0 4px;margin-left:3px;border:1px solid var(--border);
-  border-radius:4px;font-size:var(--fs-3xs);color:var(--text3);
-}
-/* A frase é a âncora: fica parada no topo enquanto o resto rola, porque é a
-   ela que tudo abaixo se refere. */
-.lexa-painel-frase{
-  flex-shrink:0;margin-top:var(--sp-4);padding-left:var(--sp-4);
+/* A frase que gerou a pergunta fica PARADA entre o cabeçalho e o corpo: é a
+   ela que tudo abaixo se refere, e vê-la enquanto lê a resposta é metade do
+   trabalho. Duas linhas bastam — ela está logo ali atrás, na página. */
+.sel-exp-frase{
+  flex-shrink:0;margin:10px 14px 0;padding-left:10px;
   border-left:3px solid rgba(var(--primary-rgb),.45);
-  font-size:var(--fs-md);line-height:1.55;font-style:italic;color:var(--text2);
-  max-height:22vh;overflow-y:auto;
+  font-size:var(--fs-xs);line-height:1.5;font-style:italic;color:var(--text2);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
-.lexa-painel-corpo{
-  flex:1;overflow-y:auto;min-height:0;padding-top:var(--sp-4);
-  font-size:var(--fs-sm);line-height:1.6;
+.sel-exp-fonte{
+  flex:none;max-width:11rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:var(--fs-3xs);color:var(--text3);
 }
-.lexa-painel .lexa-chat-msgs{max-height:none}
+/* A conversa vive dentro do balão: sem teto próprio, quem rola é o corpo. */
+#sel-menu.sel-exp .lexa-chat-msgs{max-height:none}
+#sel-menu.sel-exp .lexa-chat textarea{min-height:2.4rem}
+/* No celular o balão encosta nas bordas e sobe do rodapé: perseguir o
+   retângulo da seleção numa tela de 375px joga o balão para fora. */
 @media (max-width:768px){
-  .lexa-painel.compacto{padding:0}
-  .lexa-painel.compacto .lexa-painel-caixa{
-    width:100%;max-height:88vh;margin-top:auto;
-    border-radius:var(--radius) var(--radius) 0 0;
+  #sel-menu.sel-exp{
+    left:8px!important;right:8px;width:auto;
+    max-height:70vh;
   }
-  .lexa-painel.compacto{align-items:flex-end}
-  .lexa-painel.cheio .lexa-painel-caixa{padding:var(--sp-4)}
 }
 
 /* ---- O QUE TEM NESTA FRASE: as unidades como chips ----

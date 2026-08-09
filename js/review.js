@@ -3047,17 +3047,20 @@ async function revSelExplain() {
   const w = (typeof activeWordId !== 'undefined' && activeWordId) ? words.find(x => x.id === activeWordId) : null
   const chave = (w ? w.word : '') + '|' + txt
   if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
-  // Painel próprio, como no leitor e no vídeo: o balãozinho da seleção não
-  // comporta explicação + chips de todas as unidades + conversa.
+  // Balão suspenso, como no leitor, no vídeo e no Estudar — é o mesmo em todo o
+  // projeto. O balãozinho da seleção não comporta explicação + chips de todas
+  // as unidades + conversa, mas o painel de tela cheia cobria justamente o
+  // cartão que gerou a dúvida. O balão fica por cima, ancorado onde ele clicou.
+  const onde = pop.getBoundingClientRect()
   pop.classList.add('hidden')
   const fraseDoItem = window._revSelCtx || (w && w.context) || txt
-  const corpo = lexaPainelAbrir({
-    titulo: lexaNome(),
+  const corpo = lexaBalaoAbrir({
+    titulo: `"${txt}"`,
     frase: fraseDoItem,
-    fonte: [(w && w.word) || '', (w && w.source_title) || ''].filter(Boolean).join(' · '),
-    lang: (w && wordLang(w)) || 'en'
+    fonte: [(w && w.word) || '', obraNome((w && w.source_title) || '')].filter(Boolean).join(' · '),
+    alvo: onde
   })
-  const vivo = () => el('lexa-painel-corpo') === corpo
+  const vivo = () => lexaBalaoVivo(corpo)
   // Os chips e a conversa se montam do mesmo jeito, tendo a explicação vindo
   // do cache ou da IA — por isso a montagem é UMA função, chamada dos dois
   // caminhos. Duplicá-la aqui é como o acerto de cache passou a dar tela pela

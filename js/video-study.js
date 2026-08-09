@@ -749,15 +749,18 @@ async function videoOvExplain() {
     .join('\n').slice(0, 700)
   if (!aiChatCfg().key) { toast('Configure uma chave de IA em Configurações', 'warning'); return }
   // Sai do balãozinho da legenda pelo mesmo motivo do leitor: explicação +
-  // chips de todas as unidades da fala + conversa não cabem num popup.
+  // chips de todas as unidades da fala + conversa não cabem num popup. Vai para
+  // o BALÃO SUSPENSO da Lexa, o mesmo de todo o projeto — e aqui a razão de não
+  // ser painel é ainda mais visível: cobrir a tela seria cobrir a CENA.
+  const onde = pop ? pop.getBoundingClientRect() : null
   if (pop) pop.classList.add('hidden')
-  const corpo = lexaPainelAbrir({
-    titulo: lexaNome(),
+  const corpo = lexaBalaoAbrir({
+    titulo: `"${txt}"`,
     frase: contexto,
     fonte: (_vidCur && _vidCur.title) || '',
-    lang: (_vidCur && _vidCur.lang) || 'en'
+    alvo: onde
   })
-  const vivo = () => el('lexa-painel-corpo') === corpo
+  const vivo = () => lexaBalaoVivo(corpo)
   const chave = 'vid|' + contexto + '|' + txt
   // Mesma montagem para o cache e para a IA — ver o comentário do
   // `_revExplainCache`: com uma cópia só, o acerto de cache não volta a dar

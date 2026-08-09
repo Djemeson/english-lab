@@ -1022,7 +1022,7 @@ function _dosFamiliaCompletaHTML(w) {
             ${x.gloss ? `<span>${esc(x.gloss)}</span>` : ''}</div>
           ${meu ? `<span class="dosf-fam-selo">${ic('check','ic-sm')} já é seu</span>` : `
             <span class="dosf-fam-acoes">
-              <button class="btn btn-ghost btn-sm" onclick="dossieFamiliaExplicar('${w.id}',${escA(JSON.stringify(x.expr))})"
+              <button class="btn btn-ghost btn-sm" onclick="dossieFamiliaExplicar(event,'${w.id}',${escA(JSON.stringify(x.expr))})"
                 data-tip="A Lexa explica sem tirar você do estudo">${ic('sparkles','ic-sm')} explicar</button>
               <button class="btn btn-secondary btn-sm" onclick="dossieFamiliaPreparar('${w.id}',${escA(JSON.stringify(x.expr))})"
                 data-tip="Vai direto para a fila do Preparar">${ic('plus','ic-sm')} Preparar</button>
@@ -1056,15 +1056,17 @@ function dossieFamiliaPreparar(wordId, expr) {
   _dosFocoPintar()
 }
 
-async function dossieFamiliaExplicar(wordId, expr) {
+// O `ev` só serve para ANCORAR o balão no botão que ele clicou — a explicação
+// aparece onde a mão dele já estava, e não no meio da tela.
+async function dossieFamiliaExplicar(ev, wordId, expr) {
   const { w, it } = _dosFamAchar(wordId, expr)
-  if (!w || !it || typeof lexaPainelAbrir !== 'function') return
+  if (!w || !it || typeof lexaBalaoAbrir !== 'function') return
   if (!aiChatCfg().key) {
     toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return
   }
-  const corpo = lexaPainelAbrir({ titulo: lexaNome(), frase: it.expr,
-    fonte: `da família de "${w.word}"`, lang: wordLang(w) })
-  const vivo = () => el('lexa-painel-corpo') === corpo
+  const corpo = lexaBalaoAbrir({ titulo: it.expr, fonte: `da família de "${w.word}"`,
+    alvo: (ev && ev.currentTarget) || ev })
+  const vivo = () => lexaBalaoVivo(corpo)
   corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(lexaNome())} está explicando…`
   try {
     const L = getLangDef(wordLang(w))

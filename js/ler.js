@@ -1185,20 +1185,23 @@ function _lerAoSelecionar() {
   pop.querySelector('[data-p="web"]').onclick = () => lerAbrirBusca('web')
   pop.querySelector('[data-p="exp"]').onclick = async () => {
     const alvo = _lerPopAlvo, ctx = _lerPopCtx
-    // A EXPLICAÇÃO SAI DO BALÃOZINHO. Ela carrega explicação + chips de todas
-    // as unidades da frase + a conversa, e 420px espremem as três. O popup de
-    // seleção fecha: quem manda agora é o painel, que não depende da seleção
-    // continuar de pé — e com isso some também toda a briga do vigia de
-    // seleção com o campo de texto da conversa.
+    // A EXPLICAÇÃO SAI DO BALÃOZINHO DE SELEÇÃO e vai para o BALÃO SUSPENSO da
+    // Lexa (`lexaBalaoAbrir`), que é o mesmo em todo o projeto. Ele cabe o que
+    // o popup não cabia — explicação + chips de todas as unidades + a conversa
+    // — sem cobrir a página, que é o ponto: a frase que gerou a dúvida continua
+    // ali atrás. O popup de seleção fecha, e com ele some toda a briga do vigia
+    // de seleção com o campo de texto da conversa.
+    // O balão nasce ANCORADO no popup: aparece onde a mão dele já estava.
+    const onde = pop.getBoundingClientRect()
     _lerFecharPopup()
-    const corpo = lexaPainelAbrir({
-      titulo: lexaNome(),
+    const corpo = lexaBalaoAbrir({
+      titulo: alvo,
       frase: ctx,
       fonte: [_lerLivro.title, (_lerLivro.chapters[_lerCap] || {}).titulo].filter(Boolean).join(' · '),
-      lang: _lerLivro.lang || 'en'
+      alvo: onde
     })
     corpo.innerHTML = `<div class="ler-pop-txt">${esc(lexaNome())} está lendo o trecho…</div>`
-    const vivo = () => el('lexa-painel-corpo') === corpo
+    const vivo = () => lexaBalaoVivo(corpo)
 
     // A figura vai em PARALELO com a IA e entra assim que chegar: a Wikipédia
     // responde em ~0,6s e a explicação leva alguns segundos — fazer o texto
