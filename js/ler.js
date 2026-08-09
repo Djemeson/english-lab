@@ -989,23 +989,50 @@ function _lerDuploClique(ev) {
 // referente e a explicação virou "começa a dançar".
 // A FRASE continua sendo o que vai para o card (contexto enxuto, do tamanho
 // certo para virar exemplo); o parágrafo é só para a IA entender.
+// ⚠️ ELE SOBE ATRÁS DO PARÁGRAFO, NÃO DO MAIOR TEXTO.
+// A primeira versão subia seis níveis e ficava com o texto MAIS LONGO que
+// achasse — e num EPUB o pai do parágrafo costuma ser o `<div>` do capítulo
+// inteiro. Resultado: qualquer palavra do meio do capítulo vinha com "CHAPTER
+// 11 Billy Summers sits in the hotel lobby…" por contexto. Aí o `indexOf` da
+// palavra falhava dentro desses 700 caracteres, e a frase virava a ABERTURA DO
+// CAPÍTULO — sempre a mesma, para toda palavra. Foi o que ele viu: selecionou
+// "fancy" e a Lexa respondeu *"fancy não aparece no trecho enviado"*;
+// selecionou "drive" e ela negou que fosse "dirigir".
+// ⚠️ O estrago não era só da explicação: `_lerDuploClique` usa a MESMA peça, e
+// então TODA palavra capturada no leitor guardava a abertura do capítulo como
+// contexto — e ia assim para o card, para os exemplos e para a análise.
+const LER_BLOCOS = 'p, li, blockquote, h1, h2, h3, h4, h5, h6, td, dd, figcaption, pre'
+
 function _lerBlocoEmVolta(sel) {
   let no = sel && sel.anchorNode
   if (no && no.nodeType === 3) no = no.parentElement
-  let bloco = ''
+  if (!no) return ''
+  const limpo = e => ((e && e.textContent) || '').replace(/\s+/g, ' ').trim()
+  // O parágrafo de verdade, quando o EPUB o marca — que é o caso normal.
+  const p = no.closest ? no.closest(LER_BLOCOS) : null
+  if (p) return limpo(p).slice(0, 700)
+  // Sem marcação de parágrafo (EPUB que quebra tudo em `<div>`): sobe UM DE
+  // CADA VEZ e para no PRIMEIRO que já tem texto de parágrafo. Nunca aceita um
+  // ancestral gigante: isso é capítulo, não contexto.
+  let melhor = ''
   for (let i = 0; i < 6 && no && no.id !== 'ler-conteudo'; i++) {
-    const t = (no.textContent || '').replace(/\s+/g, ' ').trim()
-    if (t.length > bloco.length) bloco = t
-    if (bloco.length > 700) break
+    const t = limpo(no)
+    if (t.length > 1200) break
+    if (t.length >= 40) return t.slice(0, 700)
+    if (t.length > melhor.length) melhor = t
     no = no.parentElement
   }
-  return bloco.slice(0, 700)
+  return melhor.slice(0, 700)
 }
 
 function _lerFraseEmVolta(sel, alvo) {
   const bloco = _lerBlocoEmVolta(sel)
   if (!bloco) return ''
-  const i = bloco.toLowerCase().indexOf(String(alvo).toLowerCase())
+  // O alvo é normalizado como o bloco: uma seleção que atravessa quebra de
+  // linha traz "\n" no meio e o `indexOf` falhava por causa disso — o mesmo
+  // desfecho do bug do capítulo, só que sem parecer bug.
+  alvo = String(alvo || '').replace(/\s+/g, ' ').trim()
+  const i = bloco.toLowerCase().indexOf(alvo.toLowerCase())
   if (i < 0) return bloco.slice(0, 400)
   let ini = 0
   for (let p = i; p > 0; p--) {

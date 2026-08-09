@@ -7,7 +7,22 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O BALÃO É A ÚNICA CASA DA LEXA**. Regra dele, para o projeto
+> Última atualização: 2026-08-08 — **A ABERTURA DO CAPÍTULO FAZIA AS VEZES DE TODA FRASE**. Ele
+> selecionou **"fancy"** no leitor e a Lexa respondeu *"fancy não aparece no trecho enviado"*;
+> selecionou **"drive"** e ela negou que fosse "dirigir"; e os chips vinham do capítulo inteiro.
+> A raiz é antiga e não tem nada a ver com o balão: **`_lerBlocoEmVolta` subia seis níveis e ficava
+> com o texto MAIS LONGO** que achasse — e num EPUB o pai do parágrafo é o `<div>` do capítulo.
+> Aí o `indexOf` da palavra falhava dentro dos 700 caracteres e a "frase" virava a ABERTURA DO
+> CAPÍTULO, a mesma para toda palavra. Agora ele sobe até o PARÁGRAFO (`closest('p, li, …')`).
+> ⚠️ **O estrago não era só da explicação**: `_lerDuploClique` usa a mesma peça, então **toda
+> palavra capturada no leitor guardou a abertura do capítulo como contexto** — ver pendência sobre
+> o acervo já capturado. Mesmo defeito, versão leve, corrigido no Preparar (`_revFraseEmVolta`).
+> **E o balão voltou ao tamanho de antes** (432px, sem o bloco da frase): *"ficou imenso, não está
+> como era antes, eu adorava como era antes"* — e o texto que a IA está lendo *"é irrelevante, pode
+> ficar oculto"*, porque num balão suspenso a frase está logo ali atrás, na página.
+> `sw.js` → `englab-v177`. Ver 8.2 ("A abertura do capítulo").
+>
+> Anterior: 2026-08-08 — **O BALÃO É A ÚNICA CASA DA LEXA**. Regra dele, para o projeto
 > inteiro: *"o painel completo só deveria ser aberto quando a IA analisa o capítulo do livro, onde
 > tem que selecionar dezenas de chips. Todo o resto onde a Lexa explica deve ser no menu suspenso
 > mesmo."* O painel de tela cheia **foi removido** — função, CSS, preferência e atalho. Entrou
@@ -7542,6 +7557,51 @@ resposta que ele está lendo sumiria no meio da leitura. Os chips das unidades c
 **Arquivos**: `js/ai.js`, `js/dossie.js`, `js/ler.js`, `js/review.js`, `js/video-study.js`,
 `css/styles.css`. `sw.js` → `englab-v176`.
 
+### A abertura do capítulo fazia as vezes de toda frase (2026-08-08)
+
+O balão suspenso, ao mostrar a frase que ia para a IA, **denunciou um bug antigo** que estava
+escondido havia rodadas.
+
+**O que ele viu.** Selecionou **"fancy"** no meio do capítulo e a Lexa respondeu *"fancy não
+aparece no trecho enviado"*. Selecionou **"drive"**, que ali era claramente *dirigir*, e ela negou.
+E os chips — que deviam ser da frase — listaram *comic book, very much, turn out to be, lobby,
+ride, noon, digest-sized, Although*: as unidades da **abertura do capítulo**, não da frase dele.
+
+**A raiz.** `_lerBlocoEmVolta` subia até seis níveis de DOM e ficava com o texto **mais longo** que
+encontrasse, cortado em 700 caracteres. Num EPUB o pai do parágrafo é o `<div>` do capítulo — então
+o "bloco" virava o capítulo. Daí:
+
+1. `_lerFraseEmVolta` procurava a palavra nesses 700 caracteres;
+2. qualquer palavra depois do primeiro parágrafo **não estava ali**;
+3. o `if (i < 0)` devolvia `bloco.slice(0, 400)` — **a abertura do capítulo**, sempre a mesma.
+
+Um `if` de fallback silencioso transformando "não achei" em "toma esta outra frase". Reproduzido no
+navegador com a estrutura real (`#ler-conteudo > div.capitulo > p`): o código antigo devolveu
+`"CHAPTER 11 Billy Summers sits in the hotel lobby, waiting for his ride. It's Friday noon. Filler
+paragraph num…"` — sem a palavra dentro. O novo devolve a frase certa.
+
+**A correção.** Subir até o **parágrafo**, não até o maior texto: `closest('p, li, blockquote, h1…,
+td, dd, figcaption, pre')`. Sem marcação de parágrafo (EPUB que quebra tudo em `<div>`), sobe um de
+cada vez e para no **primeiro** com texto de parágrafo, recusando qualquer ancestral acima de 1200
+caracteres — isso é capítulo, não contexto. O alvo também passou a ser normalizado antes do
+`indexOf`: uma seleção que atravessa quebra de linha trazia `\n` e falhava pelo mesmo caminho.
+
+**⚠️ O estrago era maior que a explicação.** `_lerDuploClique` chama a MESMA peça — então **toda
+palavra capturada no leitor** guardou a abertura do capítulo como `context`, e foi assim para o
+card, para os exemplos e para a análise da IA. Ver a pendência sobre o acervo já capturado.
+
+Mesmo defeito, versão leve, corrigido junto no Preparar: `_revSelCtx` pegava o bloco do
+`closest(… 'div' …)` e o cortava em 220 caracteres. Agora passa por `_revFraseEmVolta`, que extrai
+a frase em volta do termo.
+
+**E o balão encolheu.** *"Ficou imenso, não está como era antes, eu adorava como era antes."* Voltou
+a 432px (o antigo `#ler-pop` tinha 420) com teto de 58vh, e o bloco que repetia a frase **saiu**:
+*"aparece o texto todo que a IA tá lendo e isso é irrelevante, pode ficar oculto"*. É a lógica do
+modo suspenso levada até o fim — a frase está logo ali atrás, na página; repeti-la só empurrava a
+resposta para baixo.
+
+**Arquivos**: `js/ler.js`, `js/review.js`, `js/ai.js`, `css/styles.css`. `sw.js` → `englab-v177`.
+
 ### Onde a captura ainda NÃO leva a semente
 
 Só o leitor foi ligado. Faltam **vídeo/legenda** e **a extensão (Netflix/Kindle)** — e o
@@ -7562,6 +7622,15 @@ lugar só.
 - [x] ~~O leitor ainda abre o painel no "Explicar"~~ — **resolvido em 2026-08-08**, e ele fechou a
       questão para o projeto inteiro: o painel foi REMOVIDO e o balão virou a única casa da Lexa
       nas cinco telas. Ver 8.2 ("O balão é a única casa da Lexa").
+- [ ] **O ACERVO JÁ CAPTURADO NO LEITOR ESTÁ COM O CONTEXTO ERRADO** (2026-08-08). Enquanto
+      `_lerBlocoEmVolta` subia atrás do maior texto, **toda palavra pescada no leitor** guardou a
+      abertura do capítulo como `context` — e esse contexto virou o exemplo do card e a base da
+      análise da IA. A correção vale só dali para a frente; o que já está salvo continua errado.
+      **Como consertar**: os capítulos estão no `BookDB`, então dá para varrer os itens de
+      `source_type === 'kindle'`, procurar a palavra no capítulo gravado e reescrever `context` com
+      a frase de verdade — item por item, sem IA. Vale um botão em Configurações, perto do
+      "devolver tudo para o Preparar". **Sintoma para reconhecer**: vários itens de livros
+      diferentes com a MESMA frase de contexto, sempre a primeira do capítulo.
 - [ ] **USAR O BALÃO NO LEITOR E NO VÍDEO COM CONTEÚDO DE VERDADE** (2026-08-08). O balão foi
       provado no navegador por dois caminhos (seleção e família), e os cinco chamadores carregam
       sem erro — mas leitor e vídeo pedem livro aberto e episódio tocando, que o ambiente de teste

@@ -5126,17 +5126,18 @@ body.ler-full .mobile-bottom-nav{display:none}
    do texto, com a frase ainda à vista, e some quando ele volta a ler. Por isso
    ele CRESCE no lugar em vez de virar painel: é o mesmo objeto, só que agora
    com conteúdo. O painel continua a um clique, no botão de expandir. */
-/* Largura de leitura, não de menu: aqui cabem a explicação, os chips de todas
-   as unidades da frase e a conversa — o que antes era motivo para abrir painel.
-   O teto de altura é o que o mantém "suspenso": passando disso, quem rola é o
-   corpo, e a página continua visível em volta. */
+/* PEQUENO DE PROPÓSITO — *"o painel ficou imenso, não está como era antes, eu
+   adorava como era antes"*. O antigo balãozinho do leitor tinha 420px, e é
+   nessa medida que ele funciona: um post-it por cima da página, não uma segunda
+   página. O que cresceu não foi a necessidade, foi a minha mão — os chips e a
+   conversa cabem aqui rolando, que é justamente o que um balão deve fazer. */
 #sel-menu.sel-exp{
   display:flex;flex-direction:column;align-items:stretch;gap:0;padding:0;
-  width:min(34rem,calc(100vw - 16px));
-  max-height:min(34rem,72vh);overflow:hidden;
+  width:min(27rem,calc(100vw - 16px));
+  max-height:min(26rem,58vh);overflow:hidden;
   border-radius:var(--radius);border-color:var(--border);
 }
-#sel-menu.sel-exp .sel-exp-cab,#sel-menu.sel-exp .sel-exp-frase{flex:none}
+#sel-menu.sel-exp .sel-exp-cab{flex:none}
 .sel-exp-cab{
   display:flex;align-items:center;gap:6px;padding:8px 8px 8px 12px;
   border-bottom:1px solid var(--border);background:var(--surface2);
@@ -5164,15 +5165,6 @@ body.ler-full .mobile-bottom-nav{display:none}
 .sel-exp-corpo>*:first-child{margin-top:0}
 .sel-exp-corpo>*:last-child{margin-bottom:0}
 
-/* A frase que gerou a pergunta fica PARADA entre o cabeçalho e o corpo: é a
-   ela que tudo abaixo se refere, e vê-la enquanto lê a resposta é metade do
-   trabalho. Duas linhas bastam — ela está logo ali atrás, na página. */
-.sel-exp-frase{
-  flex-shrink:0;margin:10px 14px 0;padding-left:10px;
-  border-left:3px solid rgba(var(--primary-rgb),.45);
-  font-size:var(--fs-xs);line-height:1.5;font-style:italic;color:var(--text2);
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
-}
 .sel-exp-fonte{
   flex:none;max-width:11rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   font-size:var(--fs-3xs);color:var(--text3);
@@ -5185,7 +5177,7 @@ body.ler-full .mobile-bottom-nav{display:none}
 @media (max-width:768px){
   #sel-menu.sel-exp{
     left:8px!important;right:8px;width:auto;
-    max-height:70vh;
+    max-height:62vh;
   }
 }
 

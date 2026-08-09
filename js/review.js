@@ -3013,7 +3013,7 @@ function _revShowSelPop(txt, sel) {
   window._revSelText = txt
   // frase-contexto: o bloco de texto mais próximo de onde a seleção começou
   const blocoEl = sel.anchorNode.parentElement && sel.anchorNode.parentElement.closest('div, p, blockquote, li, h1, h2, h3, span')
-  window._revSelCtx = (blocoEl ? blocoEl.textContent : '').replace(/\s+/g, ' ').trim().slice(0, 220)
+  window._revSelCtx = _revFraseEmVolta(blocoEl ? blocoEl.textContent : '', txt)
   pop.innerHTML = `
     <b>"${esc(txt)}"</b>
     <button class="btn btn-secondary btn-sm" onclick="revSelExplain()" data-tip="Mini-explicação da IA aqui mesmo — sentido, e o que é se for marca/gíria/referência">${ic('sparkles','ic-sm')}Explicar</button>
@@ -3023,6 +3023,25 @@ function _revShowSelPop(txt, sel) {
   const acima = r.top > 64
   pop.style.left = Math.max(8, Math.min(window.innerWidth - 360, r.left + r.width / 2 - 170)) + 'px'
   pop.style.top = (acima ? r.top - 52 : r.bottom + 10) + 'px'
+}
+
+// A FRASE em volta do que ele marcou, não o bloco inteiro.
+// `closest(… 'div' …)` pode devolver o cartão todo, e cortar esse blob em 220
+// caracteres manda a IA procurar o termo num texto onde ele talvez nem esteja —
+// a mesma raiz do bug do capítulo no leitor, onde a Lexa respondia *"fancy não
+// aparece no trecho enviado"*.
+function _revFraseEmVolta(bloco, alvo) {
+  const b = String(bloco || '').replace(/\s+/g, ' ').trim()
+  const a = String(alvo || '').replace(/\s+/g, ' ').trim()
+  if (!b || !a) return b.slice(0, 300)
+  const i = b.toLowerCase().indexOf(a.toLowerCase())
+  if (i < 0) return b.slice(0, 300)
+  let ini = 0
+  for (let p = i; p > 0; p--) if (/[.!?…]/.test(b[p - 1]) && /\s/.test(b[p] || ' ')) { ini = p; break }
+  let fim = b.length
+  for (let p = i + a.length; p < b.length; p++) if (/[.!?…]/.test(b[p])) { fim = p + 1; break }
+  const f = b.slice(ini, fim).trim()
+  return (f.length < 8 ? b : f).slice(0, 300)
 }
 
 // A MESMA REGRA DO ESTUDAR, aqui no Preparar: só a passagem de verdade carrega

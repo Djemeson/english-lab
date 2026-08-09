@@ -145,8 +145,12 @@ function _lexaRetangulo(alvo) {
   return r || _lexaRetangulo(null)
 }
 
-// Abre o balão e devolve o CORPO, onde quem chamou escreve. Mesma assinatura de
-// antes (`titulo, frase, fonte`), então os cinco chamadores mudaram só de casa.
+// Abre o balão e devolve o CORPO, onde quem chamou escreve.
+// ⚠️ `frase` é ACEITO E NÃO MOSTRADO, de propósito: *"aparece o texto todo que
+// a IA tá lendo e isso é irrelevante, pode ficar oculto"*. E é mesmo — num
+// balão suspenso a frase está logo ali atrás, na página; repeti-la só empurrava
+// a resposta para baixo. Os chamadores continuam passando porque é o mesmo
+// texto que vira `trecho` dos chips.
 function lexaBalaoAbrir({ titulo, frase, fonte, alvo, acoes }) {
   _selMenuFechar()
   const r = _lexaRetangulo(alvo)
@@ -160,7 +164,6 @@ function lexaBalaoAbrir({ titulo, frase, fonte, alvo, acoes }) {
       ${acoes || ''}
       <button class="sel-exp-btn" onclick="_selMenuFechar()" data-tip="Fechar">${ic('x','ic-sm')}</button>
     </header>
-    ${frase ? `<div class="sel-exp-frase">“${escB(frase)}”</div>` : ''}
     <div class="sel-exp-corpo" id="lexa-balao-corpo"></div>`
   p.addEventListener('mousedown', e => e.stopPropagation())
   document.body.appendChild(p)
