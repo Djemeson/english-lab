@@ -97,7 +97,7 @@ function markDeleted(id) { const ids = loadDeletedIds(); ids.add(id); saveDelete
 
 const DEF_CFG = {
   aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
-  openaiKey: '', geminiKey: '', deepseekKey: '', groqKey: '',
+  openaiKey: '', geminiKey: '', groqKey: '',
   aiModelProv: {},
   vidPT: '',        // modo de tradução no vídeo, lembrado entre sessões
   sttProvider: 'auto',  // quem transcreve: auto (Groq se houver chave) | groq | openai
@@ -422,7 +422,7 @@ async function backupCfgToIDB() {
     const prev = (await SettingsDB.get('cfg')) || {}
     const merged = { ...cfg }
     // Protege os campos sensíveis: não apaga um valor já salvo com string vazia
-    for (const k of ['openaiKey', 'geminiKey', 'deepseekKey', 'groqKey']) {
+    for (const k of ['openaiKey', 'geminiKey', 'groqKey']) {
       if (!merged[k] && prev[k]) merged[k] = prev[k]
     }
     await SettingsDB.set('cfg', merged)
@@ -436,7 +436,7 @@ async function restoreCfgFromBackup() {
   try { backup = await SettingsDB.get('cfg') } catch {}
   if (!backup || typeof backup !== 'object') return false
   let restored = false
-  const keys = ['openaiKey', 'geminiKey', 'deepseekKey', 'groqKey', 'theme', 'accent', 'aiProvider', 'aiModel', 'ttsProvider']
+  const keys = ['openaiKey', 'geminiKey', 'groqKey', 'theme', 'accent', 'aiProvider', 'aiModel', 'ttsProvider']
   for (const k of keys) {
     const cur = cfg[k]
     const curEmptyOrDefault = (cur === undefined || cur === '' || cur === DEF_CFG[k])

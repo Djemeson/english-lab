@@ -214,9 +214,11 @@ function applyAiResult(w, result) {
     // Marca o significado que descreve uma FUNÇÃO gramatical (auxiliar
     // enfático, marcador de infinitivo…) em vez de um sentido lexical. É o que
     // impede o merge de preservação de trocar um pelo outro.
-    // Leitura TOLERANTE de propósito: com DeepSeek o JSON vem por texto livre
-    // (o `response_format` não é usado — ver ai.js), então booleano volta como
-    // `true`, `"true"`, `"sim"` ou `1` conforme o humor do modelo.
+    // Leitura TOLERANTE, e ela CONTINUA valendo mesmo com o esquema estrito:
+    // `ESQ.analise` só vale quando o fornecedor sustenta `json_schema`. Caindo
+    // para a camada de texto livre (Gemini, Groq, ou a API recusando o
+    // esquema), booleano volta como `true`, `"true"`, `"sim"` ou `1` conforme
+    // o humor do modelo.
     gramatical:    _ehSim(m.gramatical),
     // Declaração da própria IA de que este sentido só existe com material fixo
     // ("in love"). É a fonte primária; o detector do código (unidadeFixaDoSentido)
@@ -240,8 +242,10 @@ function applyAiResult(w, result) {
     // Estudar**. Nada daqui vai para o SRS — são coisas que só fazem
     // diferença no primeiro contato com o item.
     //
-    // Todos OPCIONais e tolerantes: com DeepSeek o `aiJSON` cai para texto
-    // livre, e campo novo é superfície nova para quebrar. Campo ausente vira
+    // Todos tolerantes a campo ausente — e isso não virou letra morta com o
+    // esquema estrito: sob `json_schema` o campo vem SEMPRE (vazio quando não
+    // há o que dizer), mas as camadas de baixo continuam existindo para os
+    // fornecedores que não sustentam contrato de forma. Campo ausente vira
     // vazio, e vazio simplesmente não aparece na tela.
     //
     // ⚠️ NENHUM deles pode entrar na lista de preservados do merge (mais
@@ -411,7 +415,7 @@ Each sense gets ONE example only — these are for consulting, not for drilling.
 Return ONLY this JSON:
 {"meanings":[{"meaning_pt":"tradução em forma de citação, máx 8 palavras, UM sentido","definition_pt":"definição em português, 1-2 frases","type_label":"categoria local em português, ou vazio","register":"neutral|formal|informal|colloquial|slang|technical|literary|archaic|vulgar","level":"A2|B1|B2|C1|C2","examples":[{"en":"Sentence with <b>${alvo}</b>.","pt":"Tradução natural com o <b>equivalente</b>."}]}]}`
 
-    const r = await aiJSON(PROMPT, { maxTokens: 2500 })
+    const r = await aiJSON(PROMPT, { maxTokens: 2500, schema: ESQ.sentidos, schemaNome: 'sentidos' })
     const brutos = Array.isArray(r && r.meanings) ? r.meanings : []
     const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
     const tinha = new Set(jaTem.map(m => norm(m.meaning_pt)))
@@ -511,7 +515,7 @@ Return ONLY this JSON:
  "curiosidade": ["CONCRETE FACTS the learner did not know, ONE PER ENTRY, 1-2 sentences each in PT-BR. List AS MANY as genuinely exist — there is no ceiling, and a rich word easily has three or four. Each must be a fact ABOUT THE WORLD (datable, nameable, checkable), never an impression about how the word feels. GOOD: a real work/brand/person and its date; an event that created or spread it; a famous line; a completely different meaning in another field. REJECT (wrong field, or nothing at all): tone, style, register, where it is heard — that is \\"registro_uso\\"; \\"é muito usada\\", \\"aparece em títulos\\", \\"soa informal\\"; restating the meaning or the etymology. THE TEST, per entry: if that same sentence would work for hundreds of other words by swapping the word, it is not a curiosity — leave it out. [] is the right answer for ordinary words with no story."],
  "registro_uso": "one line in PT-BR on the TONE and the PLACE of this sense: how it soa (leve, afetuoso, datado, técnico…), onde se usa e onde NÃO se usa. THIS is the home of everything about tone and style — never put that in \\"curiosidade\\". \\"\\" when it is plainly neutral."
 }`
-    const r = await aiJSON(PROMPT, { maxTokens: 1200 })
+    const r = await aiJSON(PROMPT, { maxTokens: 1200, schema: ESQ.completar, schemaNome: 'completar' })
     if (!r || typeof r !== 'object') throw new Error('resposta vazia')
     // Só PREENCHE o que está faltando: se ele já tem material (de uma análise
     // nova), esta chamada não pode passar por cima.
@@ -643,7 +647,7 @@ Rules:
 - If you RECOGNIZE the work, use the canonical title even when the input is mangled or abbreviated.
 - If you DO NOT recognize it, just clean the noise off the string you were given. NEVER invent a different work.
 - "autor" only when you are sure. A wrong author is worse than none.
-- Titles stay in their ORIGINAL language — do not translate.`, { maxTokens: 1200 })
+- Titles stay in their ORIGINAL language — do not translate.`, { maxTokens: 1200, schema: ESQ.obras, schemaNome: 'obras' })
 
     const arr = Array.isArray(r && r.obras) ? r.obras : []
     let n = 0
@@ -722,7 +726,7 @@ Return ONLY this JSON:
 - "gloss" is what the expression means as a WHOLE, never the sum of the words.
 - Do not repeat the item itself as an entry.
 - Do not invent: if you are not sure the expression is real and current, leave it out.`
-    const r = await aiJSON(PROMPT, { maxTokens: 3000 })
+    const r = await aiJSON(PROMPT, { maxTokens: 3000, schema: ESQ.familia, schemaNome: 'familia' })
     if (!r || typeof r !== 'object') throw new Error('resposta vazia')
     const TIPOS = ['phrasal_verb', 'idiom', 'collocation', 'chunk', 'derivada']
     const familia = (Array.isArray(r.familia) ? r.familia : [])
@@ -984,7 +988,7 @@ Return ONLY this JSON (no markdown, no explanation):
   try {
     // Teto maior: com 2–3 sentidos × 3 exemplos, 2800 truncava a resposta
     // (e resposta truncada volta como 1 sentido só — o bug que o Djemeson viu)
-    let result = await aiJSON(PROMPT, { maxTokens: 5000 })
+    let result = await aiJSON(PROMPT, { maxTokens: 5000, schema: ESQ.analise, schemaNome: 'analise' })
     // Rede de segurança: prompt não é garantia com modelo barato — o código
     // confere a classe de erro conhecida e repete UMA vez quando a resposta
     // vem errada (padrão da 49ª rodada).
@@ -2644,7 +2648,7 @@ ${promptRegrasLexicais(lang, 'glosa')}
 - LITERAL-TRANSLATION TRAP — avoid it explicitly: FIRST work out what the unit DOES in this scene, THEN write the gloss for that function. "We'll get you in for that" said at a hotel desk → gloss "a gente te encaixa (na agenda)", NEVER "colocar você dentro". If a gloss reads like word-by-word substitution, redo it before returning.
 - "nivel" is the CEFR difficulty of that unit for a learner.
 - "trad" must AGREE with the glosses: it is the same reading of the same sentence. If your translation of the whole snippet contradicts a gloss, one of them is wrong — fix it before returning.
-- Typically 1–8 items. Cover everything a learner might not know.`, { maxTokens: 800 })
+- Typically 1–8 items. Cover everything a learner might not know.`, { maxTokens: 800, schema: ESQ.quebra, schemaNome: 'quebra' })
   // Cinto e suspensório: modelo barato ignora a regra e devolve pedaços da
   // frase de CONTEXTO ("Okay.", "Great.") — só passa o que está literalmente
   // dentro do objeto de estudo (comparação sem caixa/pontuação).

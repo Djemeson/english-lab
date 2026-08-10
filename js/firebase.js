@@ -213,7 +213,6 @@ async function fbPushData() {
     }
     if (cfg.openaiKey)   cfgPayload.openaiKey   = cfg.openaiKey
     if (cfg.geminiKey)   cfgPayload.geminiKey   = cfg.geminiKey
-    if (cfg.deepseekKey) cfgPayload.deepseekKey = cfg.deepseekKey
     if (cfg.groqKey)     cfgPayload.groqKey     = cfg.groqKey
     cfgPayload.aiModelProv = cfg.aiModelProv || {}
     cfgPayload.vidPT = cfg.vidPT || ''
@@ -371,7 +370,6 @@ async function fbPull() {
       const c = cfgDoc2.data() || {}
       if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
     if (c.geminiKey)   cfg.geminiKey   = c.geminiKey
-    if (c.deepseekKey) cfg.deepseekKey = c.deepseekKey
     if (c.groqKey)     cfg.groqKey     = c.groqKey
     if (c.aiModelProv) cfg.aiModelProv = c.aiModelProv
     if (c.vidPT !== undefined) cfg.vidPT = c.vidPT
@@ -560,7 +558,6 @@ function applyCloudDocs(docs) {
     const c = docs.cfg
     if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
     if (c.geminiKey)   cfg.geminiKey   = c.geminiKey
-    if (c.deepseekKey) cfg.deepseekKey = c.deepseekKey
     if (c.groqKey)     cfg.groqKey     = c.groqKey
     if (c.aiModelProv) cfg.aiModelProv = c.aiModelProv
     if (c.vidPT !== undefined) cfg.vidPT = c.vidPT

@@ -49,7 +49,7 @@ function _vidSyncRender(msg) {
       <div class="vid-sync-row">
         <span class="vid-sync-hint">Tradução:</span>
         <button class="btn btn-secondary btn-sm" ${_vidPTfullRodando ? 'disabled' : ''} onclick="videoTranslateFull()"
-          data-tip="A IA traduz a legenda INTEIRA para PT-BR de uma vez (centavos no DeepSeek/Gemini). Depois disso a tradução aparece na hora, sem esperar o tempo real">
+          data-tip="A IA traduz a legenda INTEIRA para PT-BR de uma vez (centavos). Depois disso a tradução aparece na hora, sem esperar o tempo real">
           ${ic('sparkles','ic-sm')}Traduzir legenda inteira</button>
       </div>
       <div class="vid-sync-row">

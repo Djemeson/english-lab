@@ -801,7 +801,7 @@ Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultur
       { role: 'system', content: sistema },
       { role: 'user', content: pergunta }
     ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
-    // resposta vazia (DeepSeek faz isso às vezes) NÃO pode virar cache — senão
+    // resposta vazia (qualquer modelo faz isso) NÃO pode virar cache — senão
     // a seleção fica muda para sempre; trata como erro e oferece re-tentar
     if (!resp || !resp.trim()) throw new Error('a IA devolveu uma resposta vazia')
     const guardado = { html: lexaFormatar(resp), sistema, pergunta, resposta: resp }

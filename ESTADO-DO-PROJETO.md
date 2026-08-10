@@ -7,7 +7,22 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **OS CHIPS SÃO DO QUE ELE MARCOU**. Ele marcou *"looks lower
+> Última atualização: 2026-08-08 — **A FORMA VIROU CONTRATO (structured outputs), O DEEPSEEK SAIU
+> E A LUNA VIROU PADRÃO**. Decisão dele: *"não vamos mais usar o DeepSeek, ele não trouxe
+> resultados tão efetivos assim. O modelo padrão será o Luna."* O fornecedor saiu inteiro (tabela,
+> chave, sincronização e os comentários que se justificavam por ele); quem tinha `deepseek` salvo
+> cai sozinho na OpenAI. `gpt-5.6-luna` virou `AI_DEFAULT_MODEL` **e** o primeiro da lista — com
+> `migrarModeloPadrao()`, porque trocar um default não move ninguém que já tem escolha salva.
+> **E `aiJSON` ganhou `json_schema` com `strict: true`**: sete esquemas (`ESQ.*` em `ai.js`) cobrem
+> a análise, o completar, os sentidos, a família, a quebra dos chips, os títulos de obra e a
+> correção do "Produza". Escada de três degraus — schema → json_object → texto — mais a repescagem
+> na OpenAI. ⚠️ A armadilha do modo estrito é `additionalProperties: false`: campo esquecido no
+> esquema vira campo PROIBIDO, e o app perderia o dado em silêncio. Por isso existe `_esqConfere()`,
+> que compara cada esquema com o molde JSON do próprio prompt — os sete passaram com zero faltando
+> e zero sobrando. `sw.js` → `englab-v179`. Ver 8.2 ("A forma virou contrato") e a **especificação
+> da Lexa que leu o livro e vê a web**, na mesma seção.
+>
+> Anterior: 2026-08-08 — **OS CHIPS SÃO DO QUE ELE MARCOU**. Ele marcou *"looks lower
 > middle-class to Billy"* e vieram chips de "two miles", "downtown", "enter", "neighborhood" —
 > palavras da frase que ele NÃO marcou. *"Olha o que eu selecionei e olha o que aparece de chips."*
 > A máquina já estava certa: `quebrarTrecho` sempre teve `trecho` (o que quebrar) e `contexto` (só
@@ -7644,6 +7659,141 @@ chegou nem a chamar a IA.
 
 **Arquivos**: `js/ai.js`, `js/ler.js`, `js/review.js`, `js/video-study.js`. `sw.js` → `englab-v178`.
 
+### A forma virou contrato — structured outputs (2026-08-08)
+
+**O DeepSeek saiu.** Decisão dele: *"não trouxe resultados tão efetivos assim"*. Saiu a entrada da
+tabela, a chave do `DEF_CFG`, a sincronização no `firebase.js` e — o que mais importa — os
+**comentários que se justificavam por ele**, espalhados por `review.js`, `ai.js`, `video-subs.js` e
+`video-study.js`. Quem tem `cfg.aiProvider = 'deepseek'` salvo cai sozinho na OpenAI:
+`aiProviderAtual()` valida contra a tabela. A chave guardada não é apagada de propósito.
+
+**A Luna virou o padrão.** `AI_DEFAULT_MODEL = 'gpt-5.6-luna'`, e ela subiu para o topo de
+`modelos[]` (que é o default de quem nunca escolheu). ⚠️ **Trocar um default não move ninguém** —
+`aiModel()` respeita o que está salvo, e `gpt-4o-mini` está salvo em todo aparelho que já abriu
+Configurações → IA. Por isso `migrarModeloPadrao()`, que só move quem tem o **padrão antigo**
+salvo (isto é, quem nunca escolheu de verdade) e roda **uma vez** — com carimbo, para que voltar
+ao gpt-4o-mini de propósito não seja desfeito no boot seguinte.
+
+A ressalva do MRCR (Luna 41,3% de recall em contexto longo) continua registrada no código, mas a
+decisão ficou menos arriscada do que era: **com contrato de forma, a parte da regra que mais doía
+saiu do prompt**. O que se perde soltando regra agora é julgamento, não estrutura.
+
+#### O contrato
+
+Até aqui a forma da resposta era **pedida em prosa**: cada prompt carrega um molde de JSON, e o
+código põe uma rede embaixo — leitores tolerantes, campos opcionais, extração de JSON do meio do
+texto. Caro em três moedas: tokens de prompt, leitura defensiva espalhada por seis arquivos, e bug
+silencioso quando o campo vem com outro nome (o `curiosidade` que sumiu no "refazer" foi disso).
+
+`json_schema` com `strict: true` inverte: **a API recusa devolver fora do formato.**
+
+`aiJSON(msgs, { schema, schemaNome })`, com escada de três degraus e a repescagem no fim:
+
+| degrau | o que garante | quando |
+|---|---|---|
+| `schema` | forma exata | há esquema **e** o fornecedor sustenta (`P.json === 'schema'`) |
+| `objeto` | JSON válido | sempre disponível |
+| `texto` | nada — extrai o JSON de dentro da resposta | último recurso |
+| OpenAI | repescagem | fornecedor ativo é outro e há chave |
+
+Os fornecedores ganharam `json:` — `'schema'` na OpenAI, `'objeto'` no Gemini e no Groq (a camada
+de compatibilidade do Google aceita `json_schema` de forma irregular conforme o modelo; ficar no
+que se sabe garantido é mais barato que descobrir na fatura).
+
+#### As três regras do modo estrito, e o que elas mudaram aqui
+
+1. todo objeto precisa de `additionalProperties: false`;
+2. **toda** propriedade precisa estar em `required` — não existe campo opcional. Ausência vira
+   presença vazia (`""` ou `[]`). **E isso é bom aqui**: "campo ausente" e "campo vazio" eram dois
+   estados com o mesmo significado, e cada leitor tratava de um jeito;
+3. validação fina (minLength, format, pattern) não entra — por isso o helper `S` só emite o que o
+   modo estrito aceita.
+
+O ganho mais direto é o **enum**: hoje o código recebe `type: "colocação"` em vez de `collocation`
+e cai num default mudo (`_RVB_CATS.some(...)`). Sob contrato, a API não deixa.
+
+#### ⚠️ A armadilha, e a rede contra ela
+
+Com `additionalProperties: false`, **um campo que eu esquecer no esquema o modelo fica proibido de
+devolver** — e o app perde o dado em silêncio, que é pior do que o problema que fui resolver. Por
+isso `_esqConfere(prompt, esquema)`: extrai as chaves do molde JSON que está dentro do próprio
+prompt e compara com as do esquema, nos dois sentidos.
+
+Rodado sobre os sete, fatiando o texto real dos prompts: **zero faltando, zero sobrando** —
+inclusive na análise, que tem 30 campos em dois níveis.
+
+**Os esquemas descrevem a FORMA, não o conteúdo**, e isso é decisão: os prompts daqui foram
+afinados ao longo de dezenas de rodadas, cada campo com instrução, exemplo e contra-exemplo. Mover
+esse texto para dentro do esquema seria reescrever o coração do app numa rodada de infraestrutura.
+O prompt continua ensinando O QUE escrever; o esquema garante ONDE.
+
+**A rede antiga continua de pé, e não é herança morta.** Os leitores tolerantes de `review.js` valem
+para os degraus de baixo — Gemini, Groq, ou a API recusando o esquema. Os comentários foram
+reescritos para dizer isso, em vez de citarem um fornecedor que não existe mais.
+
+**Provado no navegador**: corpo da requisição com `json_schema`/`strict:true`/raiz fechada e o enum
+do `type` na OpenAI; `json_object` sem esquema; `json_object` no Gemini mesmo passando esquema;
+`deepseek` salvo caindo em `openai`; a migração movendo `gpt-4o-mini` → Luna uma vez e não
+desfazendo a escolha deliberada; Configurações listando três fornecedores, sem citar DeepSeek.
+
+**Arquivos**: `js/ai.js`, `js/core.js`, `js/firebase.js`, `js/init.js`, `js/review.js`,
+`js/dossie.js`, `js/video-study.js`, `js/video-subs.js`, `js/video-sync.js`. `sw.js` → `englab-v179`.
+
+### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
+
+Pedido dele, ainda **não implementado**. Duas capacidades diferentes, que só parecem uma.
+
+**O que falta hoje:** a Lexa vê **um parágrafo** (`_lerBlocoEmVolta`) ou as falas vizinhas
+(`video-study.js`). Ela não sabe quem é um personagem, não sabe se a palavra já apareceu antes, e
+não sabe o que uma marca é no mundo real.
+
+#### A — Memória da obra (busca local, zero API nova)
+
+O material já é nosso: o `BookDB` tem os capítulos do EPUB, e `_vidCues` tem a trilha inteira do
+episódio. Recuperação **sem embeddings** — embedding exigiria uma chamada por trecho e um índice
+para guardar; três sinais locais somados resolvem o caso de uso:
+
+1. **Busca por lema** — reusar `glossLemas`, que já resolve flexão ("fell" acha "fall"). É o que faz
+   *"já apareceu antes?"* funcionar de verdade, e não só busca literal.
+2. **Nomes próprios** — capitalizados fora do começo da frase, indexados por capítulo. Resolve
+   *"quem é Nick Majarian?"*.
+3. **Proximidade** — o capítulo atual e os anteriores pesam mais.
+
+⚠️ **A regra que só aparece pensando: SPOILER.** A busca **não pode** trazer trecho de capítulo que
+ele ainda não leu. Corte duro em `_lerCap` — e isso vale também para a contagem ("aparece 7 vezes"
+já entrega que o livro continua). É a diferença entre uma ferramenta de estudo e um estrago.
+
+O índice mora no `BookDB` sob `idxlivro:<id>`, ao lado de `quebra:` e `nivmarca:`, construído na
+abertura do livro. Custo de recuperação: **zero**. A chamada de explicação cresce em tokens de
+entrada — 2.000 tokens extras na Luna dão ~US$ 0,0004. Desprezível.
+
+- **Fase 1 (barata, alto valor):** bloco *"já apareceu antes"* no balão — contagem nos capítulos
+  já lidos e 2-3 trechos. Nenhuma chamada de IA, reusa `glossLemas` + `BookDB`.
+- **Fase 2:** índice de entidades, e a conversa passando a receber os trechos recuperados.
+
+#### B — Olhos na web
+
+Duas rotas, e a escolha mudou de peso hoje:
+
+1. **Responses API + `web_search`** (a do print). A IA decide quando buscar. **Custo
+   arquitetural:** sai do dialeto `chat/completions`, então vale **só na OpenAI** — o app deixaria
+   de trocar de fornecedor nessa função. ⚠️ Esse custo caiu bastante nesta rodada: com o DeepSeek
+   fora e a OpenAI de padrão, "trocar de fornecedor" já não é o que era.
+2. **Buscar por fora e injetar** — é o que `wikiIlustracao` já faz, de graça.
+
+**Recomendação:** rota 1 no "Explicar", com degradação (fornecedor não-OpenAI cai no caminho atual)
+e **interruptor em Configurações**. O gatilho é `tool_choice: 'auto'` — deixar a IA decidir é
+literalmente o que a ferramenta faz, e o prompt do `lexaExplicar` já tem o instinto
+(*"se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real"*).
+⚠️ `web_search` é cobrada por chamada: precisa entrar no `_aiGuardarUso` e na estimativa em reais,
+senão vira custo invisível — o mesmo erro que o aviso de fallback existe para evitar.
+
+#### Ordem sugerida
+
+1. **Fase 1 da obra** — zero IA, zero risco, prova o valor.
+2. **Web search no Explicar** — atrás de interruptor, com o custo à vista.
+3. **Fase 2 da obra** — se a 1 provar.
+
 ### Onde a captura ainda NÃO leva a semente
 
 Só o leitor foi ligado. Faltam **vídeo/legenda** e **a extensão (Netflix/Kindle)** — e o
@@ -7664,6 +7814,19 @@ lugar só.
 - [x] ~~O leitor ainda abre o painel no "Explicar"~~ — **resolvido em 2026-08-08**, e ele fechou a
       questão para o projeto inteiro: o painel foi REMOVIDO e o balão virou a única casa da Lexa
       nas cinco telas. Ver 8.2 ("O balão é a única casa da Lexa").
+- [ ] **OS OUTROS 20 `aiJSON` AINDA NÃO TÊM ESQUEMA** (2026-08-08). Sete dos 27 ganharam contrato de
+      forma — os de maior valor e forma estável. Faltam os de `add.js` (6), `audio.js` (5),
+      `consulta.js`, `ler.js` (2), `study.js`, `video-study.js` e dois de `review.js`. Não é
+      urgente: sem esquema o comportamento é exatamente o de antes. **O caminho é conhecido**:
+      escrever o `ESQ.*`, passar `{ schema, schemaNome }` e rodar `_esqConfere` contra o trecho do
+      prompt — ⚠️ **nunca passar esquema sem conferir**, porque campo esquecido vira campo proibido.
+- [ ] **A LEXA QUE LEU O LIVRO E VÊ A WEB** (2026-08-08) — especificação escrita na seção 8.2,
+      nada implementado. Ordem sugerida: fase 1 da obra (zero IA), depois web search atrás de
+      interruptor, depois fase 2. ⚠️ A regra do **spoiler** é a que não pode ser esquecida.
+- [ ] **PROVAR O CONTRATO COM CHAVE DE VERDADE** (2026-08-08). O corpo da requisição foi conferido
+      com `_aiFetch` dublado; falta a resposta real da API sob `strict: true` — em especial se a
+      Luna sustenta a análise de 30 campos sem estourar o teto de 5000 tokens, já que agora ela é
+      obrigada a devolver TODOS os campos (vazios inclusive) em vez de omitir os que não tem.
 - [ ] **O ACERVO JÁ CAPTURADO NO LEITOR ESTÁ COM O CONTEXTO ERRADO** (2026-08-08). Enquanto
       `_lerBlocoEmVolta` subia atrás do maior texto, **toda palavra pescada no leitor** guardou a
       abertura do capítulo como `context` — e esse contexto virou o exemplo do card e a base da

@@ -1185,7 +1185,7 @@ Return ONLY this JSON:
  "comentario": "1-3 sentences in PT-BR. Say what he got right FIRST — always find something. Then, only if there is a real problem, name it plainly (wrong sense, wrong pattern, unnatural word order, wrong register). Never invent an error just to have something to say.",
  "registro": "one short line in PT-BR on whether the register fits where he would use this sentence, or \\"\\" if it is fine and unremarkable."
 }`
-    const r = await aiJSON(PROMPT, { maxTokens: 700 })
+    const r = await aiJSON(PROMPT, { maxTokens: 700, schema: ESQ.produzir, schemaNome: 'produzir' })
     if (!r || typeof r !== 'object') throw new Error('resposta vazia')
     const fmt = t => (typeof lexaInline === 'function') ? lexaInline(String(t || '')) : esc(String(t || ''))
     const ok = (r.ok === true || /^(true|sim|yes|1)$/i.test(String(r.ok || '')))

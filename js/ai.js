@@ -641,8 +641,9 @@ Return ONLY this JSON:
     tipo: ['word', 'phrasal_verb', 'idiom', 'collocation'].includes(r && r.tipo) ? r.tipo : 'word',
     gloss: casou ? String(casou.meaning_pt).trim() : String(r && r.gloss || '').trim(),
     nivel: String(r && r.nivel || '').trim().toUpperCase(),
-    // Não confia no booleano do modelo: compara os textos. Com DeepSeek o JSON
-    // vem por texto livre e booleano volta como "true"/"sim"/1 conforme o humor.
+    // Não confia no booleano do modelo: compara os textos. Sem contrato de
+    // forma (fornecedor sem `json_schema`), booleano volta como "true"/"sim"/1
+    // conforme o humor do modelo.
     mesma: expr.toLowerCase() === termo.toLowerCase(),
     jaEra: casou ? casou.id : null,
     def: casou ? String(casou.definition_pt || '').trim() : ''
@@ -808,7 +809,13 @@ document.addEventListener('keydown', e => {
 // ciclo de vida próprio e retry automático duplicaria respostas.
 // ================================================================
 
-const AI_DEFAULT_MODEL = 'gpt-4o-mini'
+// O modelo do app quando ninguém escolheu — e o da REDE DE SEGURANÇA (a
+// repescagem na OpenAI quando o fornecedor ativo falha). Luna desde 2026-08-08.
+const AI_DEFAULT_MODEL = 'gpt-5.6-luna'
+// O padrão ANTIGO. Serve a uma coisa só: reconhecer quem nunca escolheu
+// modelo de verdade (tinha o default salvo) para migrá-lo junto. Sem isto,
+// trocar o padrão não moveria ninguém — `aiModel()` respeita o que está salvo.
+const AI_MODELO_ANTIGO = 'gpt-4o-mini'
 
 // ================================================================
 // FORNECEDORES DE IA (análise, traduções e chat).
@@ -834,19 +841,25 @@ const AI_PROVIDERS = {
     // topo e o gpt-5-nano vem depois: nano é o mais barato de todos, mas
     // modelo pequeno é justamente o que solta regra em prompt longo — e o
     // prompt de análise deste app tem centenas de linhas.
+    // JSON: 'schema' = aceita `response_format: json_schema` com `strict`, que é
+    // o contrato de verdade (a API recusa devolver fora do formato). Ver `aiJSON`.
+    json: 'schema',
     // GPT-5.6 (lançada 2026-07-09) é uma família de TRÊS níveis com nome
     // próprio: Sol (topo), Terra (equilibrado) e Luna (rápido/barato).
-    // ⚠️ A ressalva que importa para este app está no MRCR (recall em contexto
-    // longo): Sol 91,5% · Terra 89,6% · **Luna 41,3%**. O prompt de análise
-    // daqui tem ~3.000 tokens — não é "contexto longo" no sentido do teste —,
-    // mas é longo em REGRAS, e é justamente soltar regra que dói. Por isso a
-    // Luna entra como candidata a testar, não como padrão.
+    // ⚠️ A ressalva do MRCR (recall em contexto longo) continua registrada:
+    // Sol 91,5% · Terra 89,6% · **Luna 41,3%**. O prompt de análise daqui tem
+    // ~3.000 tokens — não é "contexto longo" no sentido do teste —, mas é longo
+    // em REGRAS, e soltar regra é o que dói.
+    // ⚠️ LUNA VIROU O PADRÃO em 2026-08-08, por decisão dele — e a decisão ficou
+    // menos arriscada do que era: com STRUCTURED OUTPUTS a parte da regra que
+    // mais doía (o formato do JSON) saiu do prompt e virou contrato da API. O
+    // que se perde soltando regra agora é julgamento, não estrutura.
     // Sol ficou de fora: R$ 0,32 por card analisado é desproporcional para
     // glosa de vocabulário.
     modelos: [
-      { id: 'gpt-4o-mini',   tier: 'baixo', nota: 'rápido e barato (padrão do app)',          preco: { in: 0.15, out: 0.60 } },
+      { id: 'gpt-5.6-luna',  tier: 'baixo', nota: 'GPT-5.6 Luna — geração atual pelo preço de um mini (padrão do app)', preco: { in: 0.20, out: 1.20 } },
+      { id: 'gpt-4o-mini',   tier: 'baixo', nota: 'rápido e barato',                          preco: { in: 0.15, out: 0.60 } },
       { id: 'gpt-5-nano',    tier: 'baixo', nota: 'o mais barato daqui — lote sim, análise não', preco: { in: 0.05, out: 0.40 } },
-      { id: 'gpt-5.6-luna',  tier: 'baixo', nota: 'GPT-5.6 Luna — geração atual pelo preço de um mini', preco: { in: 0.20, out: 1.20 } },
       { id: 'gpt-4.1-mini',  tier: 'baixo', nota: 'melhor texto, preço próximo',              preco: { in: 0.40, out: 1.60 } },
       { id: 'gpt-4o',        tier: 'médio', nota: 'equilibrado (geração 2024)',               preco: { in: 2.50, out: 10.00 } },
       { id: 'gpt-5-mini',    tier: 'médio', nota: 'nova geração',                             preco: { in: 0.25, out: 2.00 } },
@@ -860,39 +873,56 @@ const AI_PROVIDERS = {
     modelsUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/models',
     keyCfg: 'geminiKey',
     placeholder: 'AIza...',
+    // 'objeto' = só `json_object` (JSON válido, sem contrato de forma). A
+    // camada de compatibilidade OpenAI do Google aceita `json_schema` de forma
+    // irregular conforme o modelo; ficar no que se sabe garantido é mais
+    // barato que descobrir na fatura.
+    json: 'objeto',
     modelos: [
       { id: 'gemini-2.5-flash-lite', tier: 'baixo', nota: 'o mais barato da casa',  preco: { in: 0.10, out: 0.40 } },
       { id: 'gemini-2.5-flash',      tier: 'baixo', nota: 'ótimo custo-benefício',  preco: { in: 0.30, out: 2.50 } },
       { id: 'gemini-2.5-pro',        tier: 'alto',  nota: 'mais capaz',             preco: { in: 1.25, out: 10.00 } },
     ]
   },
-  deepseek: {
-    nome: 'DeepSeek',
-    url: 'https://api.deepseek.com/chat/completions',
-    modelsUrl: 'https://api.deepseek.com/models',
-    keyCfg: 'deepseekKey',
-    placeholder: 'sk-...',
-    // IDs V4 confirmados na doc oficial (2026-08): os aliases antigos
-    // deepseek-chat/reasoner foram DESCONTINUADOS em 2026-07-24 — quem os
-    // tinha salvo cai no primeiro da lista via validação do aiModel().
-    // Atenção ao preço dinâmico: 2× no horário de pico da China.
-    modelos: [
-      { id: 'deepseek-v4-flash', tier: 'baixo', nota: 'V4 — muito barato, cache quase grátis', preco: { in: 0.14,  out: 0.28 } },
-      { id: 'deepseek-v4-pro',   tier: 'médio', nota: 'V4 — mais capaz',                       preco: { in: 0.435, out: 0.87 } },
-    ]
-  },
+  // ⚠️ O DEEPSEEK SAIU em 2026-08-08, por decisão dele: *"não vamos mais usar o
+  // DeepSeek, ele não trouxe resultados tão efetivos assim"*. Quem tiver
+  // `cfg.aiProvider = 'deepseek'` salvo cai sozinho na OpenAI — `aiProviderAtual`
+  // valida contra esta tabela. A chave guardada não é apagada de propósito: se
+  // um dia voltar, ela ainda está lá; ela só deixou de ser sincronizada.
   groq: {
     nome: 'Groq',
     url: 'https://api.groq.com/openai/v1/chat/completions',
     modelsUrl: 'https://api.groq.com/openai/v1/models',
     keyCfg: 'groqKey',
     placeholder: 'gsk_...',
+    json: 'objeto',
     modelos: [
       { id: 'llama-3.1-8b-instant',    tier: 'baixo', nota: 'muito rápido, quase grátis',    preco: { in: 0.05, out: 0.08 } },
       { id: 'llama-3.3-70b-versatile', tier: 'baixo', nota: 'mais qualidade, ainda barato',  preco: { in: 0.59, out: 0.79 } },
       { id: 'openai/gpt-oss-120b',     tier: 'médio', nota: 'modelo aberto grande',          preco: { in: 0.15, out: 0.60 } },
     ]
   }
+}
+
+// TROCAR O PADRÃO NÃO MOVE NINGUÉM — este é o problema silencioso de mudar um
+// default. `aiModel()` respeita o que está salvo, e `gpt-4o-mini` está salvo em
+// todo aparelho que já abriu Configurações → IA. Sem esta migração, "o padrão
+// agora é a Luna" seria verdade só para uma instalação nova.
+// ⚠️ Só move quem tem o PADRÃO ANTIGO salvo — isto é, quem nunca escolheu de
+// verdade. Quem escolheu gpt-5, Gemini ou Groq continua onde pôs. E roda uma
+// vez: com o carimbo, voltar para o gpt-4o-mini de propósito não é desfeito no
+// boot seguinte.
+function migrarModeloPadrao() {
+  if (cfg.migModeloLuna) return
+  const antigo = m => m === AI_MODELO_ANTIGO
+  let mexeu = false
+  if (antigo((cfg.aiModel || '').trim())) { cfg.aiModel = AI_DEFAULT_MODEL; mexeu = true }
+  if (cfg.aiModelProv && antigo((cfg.aiModelProv.openai || '').trim())) {
+    cfg.aiModelProv.openai = AI_DEFAULT_MODEL; mexeu = true
+  }
+  cfg.migModeloLuna = 1
+  saveCfg()
+  if (mexeu) console.info('[ai] modelo padrão migrado para', AI_DEFAULT_MODEL)
 }
 
 function aiProviderAtual() {
@@ -1055,14 +1085,158 @@ function _aiParseJSON(data) {
   return null
 }
 
+// ================================================================
+// STRUCTURED OUTPUTS — a forma da resposta vira contrato, não pedido
+// ================================================================
+// O app inteiro se apoia em `aiJSON`, e até aqui a forma da resposta era
+// PEDIDA em prosa: cada prompt carrega um molde de JSON e uma lista de regras,
+// e o código põe uma rede embaixo para o caso de o modelo não obedecer —
+// leitores tolerantes, campos opcionais, extração de JSON do meio do texto.
+// Isso é caro em três moedas: tokens de prompt, código de leitura defensiva
+// espalhado por seis arquivos, e bug silencioso quando o campo vem com outro
+// nome (o `curiosidade` que sumiu no "refazer" foi disso).
+//
+// `json_schema` com `strict: true` inverte o jogo: a API RECUSA devolver fora
+// do formato. O que era esperança vira garantia.
+//
+// ⚠️ AS TRÊS REGRAS DO MODO ESTRITO, que moldam o helper abaixo:
+//   1. todo objeto precisa de `additionalProperties: false`;
+//   2. TODA propriedade precisa estar em `required` — não existe campo
+//      opcional. Ausência vira presença vazia: `""` ou `[]`. E isto é bom
+//      aqui: "campo ausente" e "campo vazio" eram dois estados com o mesmo
+//      significado, e cada leitor tratava de um jeito;
+//   3. palavras-chave de validação fina (minLength, format, pattern) não
+//      entram. Por isso o helper só emite o que o modo estrito aceita.
+const S = {
+  txt:   d => ({ type: 'string', description: d || undefined }),
+  num:   d => ({ type: 'number', description: d || undefined }),
+  bool:  d => ({ type: 'boolean', description: d || undefined }),
+  // O enum é o ganho mais direto: hoje o código recebe `type: "colocação"` em
+  // vez de `collocation` e cai num default silencioso. Aqui a API não deixa.
+  ou:  (vals, d) => ({ type: 'string', enum: vals, description: d || undefined }),
+  lista: (itens, d) => ({ type: 'array', items: itens, description: d || undefined }),
+  obj: (props, d) => ({
+    type: 'object', properties: props,
+    required: Object.keys(props),     // regra 2: todas, sempre
+    additionalProperties: false,
+    description: d || undefined
+  })
+}
+
+// ---- OS ESQUEMAS DO APP ----------------------------------------
+// ⚠️ ELES DESCREVEM A FORMA, NÃO O CONTEÚDO — e isso é decisão, não preguiça.
+// Os prompts daqui foram afinados ao longo de dezenas de rodadas: cada campo
+// carrega instrução, exemplo e contra-exemplo, e mover esse texto para dentro
+// do esquema seria reescrever o coração do app numa rodada de infraestrutura.
+// O prompt continua ensinando O QUE escrever; o esquema garante ONDE.
+//
+// ⚠️ ARMADILHA DO MODO ESTRITO: com `additionalProperties: false`, um campo que
+// eu esquecer aqui o modelo fica PROIBIDO de devolver — e o app perde o dado
+// em silêncio, que é pior do que o problema que vim resolver. Por isso existe
+// `_esqConfere()`, que compara cada esquema com o molde JSON do próprio prompt.
+const ESQ = {}
+
+// A ANÁLISE — o centro do app. Um sentido por encontro, com o audit dos que
+// ficaram de fora.
+ESQ.analise = S.obj({
+  word: S.txt(), detected_lang: S.txt(), context_pt: S.txt(),
+  type: S.ou(['word', 'phrasal_verb', 'idiom', 'collocation']),
+  type_label: S.txt(), lemma: S.txt(), ipa: S.txt(),
+  level: S.ou(['A2', 'B1', 'B2', 'C1', 'C2']),
+  sense_audit: S.lista(S.txt()),
+  meanings: S.lista(S.obj({
+    meaning_pt: S.txt(), definition_pt: S.txt(), origin_pt: S.txt(),
+    // `variety` muda com o idioma (promptVarietyEnum) — texto livre de propósito.
+    variety: S.txt(),
+    register: S.ou(['neutral','formal','informal','colloquial','slang','technical','literary','archaic','vulgar']),
+    level: S.ou(['A2', 'B1', 'B2', 'C1', 'C2']),
+    gramatical: S.bool(), requires: S.txt(), unit: S.txt(), context_match: S.bool(),
+    synonyms: S.lista(S.txt()), antonyms: S.lista(S.txt()), forms: S.lista(S.txt()),
+    grammar: S.txt(), collocations: S.lista(S.txt()), confusoes: S.lista(S.txt()),
+    armadilha: S.lista(S.txt()), curiosidade: S.lista(S.txt()), registro_uso: S.txt(),
+    examples: S.lista(S.obj({ en: S.txt(), pt: S.txt() }))
+  }))
+})
+
+// COMPLETAR MATERIAL — os campos que faltavam num sentido já existente.
+ESQ.completar = S.obj({
+  citacao: S.txt(), forms: S.lista(S.txt()), grammar: S.txt(),
+  collocations: S.lista(S.txt()), confusoes: S.lista(S.txt()),
+  armadilha: S.lista(S.txt()), curiosidade: S.lista(S.txt()), registro_uso: S.txt()
+})
+
+// OS OUTROS SENTIDOS do mesmo item (o "mais sentidos" do Estudar).
+ESQ.sentidos = S.obj({
+  meanings: S.lista(S.obj({
+    meaning_pt: S.txt(), definition_pt: S.txt(), type_label: S.txt(),
+    register: S.ou(['neutral','formal','informal','colloquial','slang','technical','literary','archaic','vulgar']),
+    level: S.ou(['A2', 'B1', 'B2', 'C1', 'C2']),
+    examples: S.lista(S.obj({ en: S.txt(), pt: S.txt() }))
+  }))
+})
+
+// A FAMÍLIA do item: classe, conjugação e tudo que orbita em volta.
+ESQ.familia = S.obj({
+  classe: S.txt(),
+  conjugacao: S.lista(S.obj({ rotulo: S.txt(), forma: S.txt(), exemplo: S.txt() })),
+  familia: S.lista(S.obj({
+    expr: S.txt(),
+    tipo: S.ou(['phrasal_verb', 'idiom', 'collocation', 'chunk', 'derivada']),
+    gloss: S.txt(), nivel: S.ou(['A1', 'A2', 'B1', 'B2', 'C1', 'C2'])
+  }))
+})
+
+// A QUEBRA DO TRECHO — os chips. O `type` aqui era o caso mais gritante: o
+// código recebia "colocação" em vez de "collocation" e caía num default mudo.
+ESQ.quebra = S.obj({
+  trad: S.txt(),
+  items: S.lista(S.obj({
+    expr: S.txt(),
+    type: S.ou(['word', 'phrasal_verb', 'idiom', 'collocation', 'chunk']),
+    gloss: S.txt(), nivel: S.ou(['A1', 'A2', 'B1', 'B2', 'C1', 'C2'])
+  }))
+})
+
+// O TÍTULO LIMPO DA OBRA.
+ESQ.obras = S.obj({
+  obras: S.lista(S.obj({ bruto: S.txt(), titulo: S.txt(), autor: S.txt() }))
+})
+
+// A CORREÇÃO DA FRASE QUE ELE ESCREVEU (bloco "Produza", no Estudar).
+ESQ.produzir = S.obj({
+  ok: S.bool(), corrigida: S.txt(), comentario: S.txt(), registro: S.txt()
+})
+
+// ⚠️ A REDE CONTRA O ESQUECIMENTO. Compara as chaves do molde JSON que está
+// DENTRO do prompt com as chaves do esquema. Se eu acrescentar um campo ao
+// prompt e esquecer aqui, o modo estrito o proibiria em silêncio — e o app
+// perderia o dado sem nenhum erro. Só roda quando pedido (testes/console).
+function _esqConfere(prompt, esquema) {
+  const doPrompt = new Set((String(prompt).match(/"([a-z_]+)"\s*:/g) || [])
+    .map(x => x.replace(/"|:|\s/g, '')))
+  const doEsquema = new Set()
+  const anda = e => {
+    if (!e || typeof e !== 'object') return
+    if (e.properties) { Object.keys(e.properties).forEach(k => { doEsquema.add(k); anda(e.properties[k]) }) }
+    if (e.items) anda(e.items)
+  }
+  anda(esquema)
+  return { faltando: [...doPrompt].filter(k => !doEsquema.has(k)), sobrando: [...doEsquema].filter(k => !doPrompt.has(k)) }
+}
+
 // Chat que retorna JSON. Aceita string única ou array de mensagens.
-// Três camadas, porque o DeepSeek com `response_format: json_object`
-// costuma devolver vazio/truncado (era o "Analisar com IA não faz nada"):
-//   1) fornecedor ativo COM json_object (quando ele se dá bem com isso)
-//   2) mesmo fornecedor SEM json_object, extraindo o JSON do texto
-//   3) OpenAI, se houver chave — nunca deixa a análise no vácuo
+// Passe `schema` (use o helper `S`) para exigir a forma; sem ele, o
+// comportamento é o de antes.
+// Três camadas, em ordem de garantia:
+//   1) 'schema'  — `json_schema` estrito. Só onde o fornecedor sustenta.
+//   2) 'objeto'  — `json_object`: JSON válido, forma por conta do prompt.
+//   3) 'texto'   — sem `response_format`, extraindo o JSON de dentro do texto.
+// E, por fim, a repescagem na OpenAI se o fornecedor ativo for outro.
+// ⚠️ A camada 3 não é herança morta do DeepSeek: qualquer modelo pode
+// devolver o JSON embrulhado em ```json quando o formato é recusado, e é ela
+// que evita perder uma chamada já paga.
 // O fallback é SILENCIOSO por natureza — e silêncio aqui engana a conta: você
-// escolhe o DeepSeek, ele falha em toda chamada, e o app cobra OpenAI sem
+// escolhe o Gemini, ele falha em toda chamada, e o app cobra OpenAI sem
 // você saber. Um aviso por sessão (não por chamada, senão vira spam).
 let _aiFallbackAvisado = false
 function _aiAvisarFallback(nome, modelo, motivo) {
@@ -1093,34 +1267,51 @@ function _aiPorQueVazio(dados) {
   return 'a IA devolveu uma resposta vazia ou fora do formato'
 }
 
-async function aiJSON(messages, { maxTokens, model, timeoutMs, retries } = {}) {
+function _aiFormato(modo, schema, nome) {
+  if (modo === 'schema') {
+    return { response_format: { type: 'json_schema',
+      json_schema: { name: nome || 'resposta', strict: true, schema } } }
+  }
+  if (modo === 'objeto') return { response_format: { type: 'json_object' } }
+  return {}
+}
+
+async function aiJSON(messages, { maxTokens, model, timeoutMs, retries, schema, schemaNome } = {}) {
   const chat = aiChatCfg()
   if (!chat.key) throw new Error('Chave da ' + chat.P.nome + ' não configurada (Configurações → IA)')
   const m = model || chat.model
   const msgs = typeof messages === 'string' ? [{ role: 'user', content: messages }] : messages
-  const corpo = (mod, comFormato) => ({
+  const corpo = (mod, modo) => ({
     model: mod,
-    ...(comFormato ? { response_format: { type: 'json_object' } } : {}),
+    ..._aiFormato(modo, schema, schemaNome),
     messages: msgs,
     ..._aiTokenParam(mod, maxTokens)
   })
-  // O DeepSeek já começa sem json_object: com ele, falha na maioria das vezes.
-  const tentativas = chat.prov === 'deepseek' ? [false] : [true, false]
+  // O modo estrito só entra quando HÁ esquema e o fornecedor o sustenta.
+  const modos = (schema && chat.P.json === 'schema') ? ['schema', 'objeto', 'texto'] : ['objeto', 'texto']
   let erro = null
-  for (const comFormato of tentativas) {
+  for (const modo of modos) {
     try {
-      const res = await _aiFetch(chat.P.url, corpo(m, comFormato), { timeoutMs, retries, key: chat.key })
+      const res = await _aiFetch(chat.P.url, corpo(m, modo), { timeoutMs, retries, key: chat.key })
       const dados = await res.json()
       _aiGuardarUso(dados, m)
       const j = _aiParseJSON(dados)
       if (j) return j
       erro = new Error(_aiPorQueVazio(dados))
-    } catch (e) { erro = e }
+    } catch (e) {
+      erro = e
+      // ⚠️ ESQUEMA RECUSADO É ERRO MEU, NÃO DO MODELO — e cair calado para o
+      // modo frouxo esconderia justamente a garantia que fui buscar. O aviso
+      // deixa isso visível no console em vez de virar "às vezes vem torto".
+      if (modo === 'schema') {
+        console.warn(`[ai] esquema "${schemaNome || 'resposta'}" recusado, seguindo sem contrato de forma:`, e.message)
+      }
+    }
   }
   if (chat.prov !== 'openai' && cfg.openaiKey) {
     try {
       const res = await _aiFetch('https://api.openai.com/v1/chat/completions',
-        corpo(AI_DEFAULT_MODEL, true), { timeoutMs, retries: 1, key: cfg.openaiKey })
+        corpo(AI_DEFAULT_MODEL, schema ? 'schema' : 'objeto'), { timeoutMs, retries: 1, key: cfg.openaiKey })
       const j = _aiParseJSON(await res.json())
       if (j) {
         // O MOTIVO junto: sem ele, "não respondeu" some no console e não dá
@@ -1153,9 +1344,11 @@ async function aiText(messages, { maxTokens, model, timeoutMs, retries } = {}) {
   return String(msg.content || msg.reasoning_content || '').trim()
 }
 
-// Texto com REDE DE SEGURANÇA: se o fornecedor ativo devolver vazio (o
-// DeepSeek faz isso em certas frases) ou falhar, repete na OpenAI quando há
-// chave. É o que garante que "Explicar" nunca fique mudo.
+// Texto com REDE DE SEGURANÇA: se o fornecedor ativo devolver vazio ou falhar,
+// repete na OpenAI quando há chave. É o que garante que "Explicar" nunca fique
+// mudo. Continua valendo com a OpenAI de padrão — a rede é para quem escolheu
+// Gemini ou Groq, e resposta vazia não é privilégio de fornecedor nenhum
+// (teto de tokens estourado no raciocínio devolve vazio em qualquer um).
 async function aiTextSeguro(messages, opts = {}) {
   let erro = null
   try {

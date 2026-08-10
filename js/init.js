@@ -6,6 +6,8 @@ async function initApp() {
   loadCfg()
   await restoreCfgFromBackup()  // repõe chave OpenAI / tema se o localStorage foi limpo
   applyTheme(cfg.theme)   // aplica o tema (já restaurado, se preciso)
+  migrarModeloPadrao()    // trocar o padrão do app não move quem tem escolha salva
+
   loadWords()
   loadConversas()    // conversas do Assistente
   loadVideos()       // metadados de vídeo (seção Vídeo — o módulo é lazy, o estado não)

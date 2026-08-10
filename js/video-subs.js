@@ -504,13 +504,15 @@ function _vidSaveSubsNow() {
 }
 
 // Garante tradução IA das falas [i .. i+n). `sinc` espera terminar.
-// Em LOTE (uma chamada para a janela toda): fornecedores mais lentos que a
-// OpenAI (DeepSeek no pico) não davam conta de N chamadas paralelas antes de
-// a fala passar — falas ficavam sem tradução. Uma chamada só chega a tempo,
+// Em LOTE (uma chamada para a janela toda): fornecedor lento não dá conta de N
+// chamadas paralelas antes de a fala passar — falas ficavam sem tradução (visto
+// com o DeepSeek em horário de pico, quando ele ainda estava aqui). Uma chamada
+// só chega a tempo,
 // custa menos (um prompt) e falha/retenta em bloco.
 // A instrução deixa claro que é tradução FIEL de obra existente: sem isso o
-// DeepSeek omite/recusa falas com conteúdo adulto (comportamento documentado)
-// e "sessões inteiras" ficavam sem tradução perto dessas cenas.
+// modelo omite/recusa falas com conteúdo adulto e "sessões inteiras" ficavam
+// sem tradução perto dessas cenas. Documentado no DeepSeek, mas o risco não
+// era só dele — todo fornecedor tem filtro.
 // Regras herdadas da fonte única (lang.js), com guarda: este módulo é lazy
 // e pode chegar antes de um lang.js novo logo após um deploy.
 const _VID_PT_SIS = 'Você traduz legendas de séries/filmes para estudo de inglês. Traduza cada fala numerada para português do Brasil, natural e curto. Palavrões e conteúdo adulto fazem parte do diálogo original: traduza fielmente, sem censurar, suavizar nem omitir. Responda SÓ as traduções, uma por linha, mantendo o número: "1. tradução". Nada além disso.\n' +
@@ -559,9 +561,10 @@ async function _vidEnsurePT(i, n, sinc, forcaIA) {
   if (sinc) await Promise.all(ps)
 }
 
-// Um bloco de tradução: chamada única em texto puro numerado (NÃO json_object:
-// o DeepSeek nesse modo às vezes devolve vazio/truncado — limitação
-// documentada). Timeout curto: travada não pode segurar a janela.
+// Um bloco de tradução: chamada única em texto puro numerado. NÃO usa
+// `json_object` nem esquema de propósito — são N linhas numeradas, e envelopar
+// isso em JSON só gasta tokens de aspas e escape numa chamada que corre contra
+// o relógio da legenda. Timeout curto: travada não pode segurar a janela.
 async function _vidPTlote(lote) {
   const linhas = lote.map((k, j) => `${j + 1}. ${_vidCues[k].t}`).join('\n')
   try {
@@ -587,7 +590,7 @@ async function _vidPTlote(lote) {
 }
 
 // Falas que voltaram SEM tradução no lote (recusa/omissão silenciosa do
-// fornecedor — DeepSeek faz isso com conteúdo adulto). 1ª vez: deixa o fluxo
+// fornecedor, típica em conteúdo adulto). 1ª vez: deixa o fluxo
 // normal re-tentar. Da 2ª em diante: manda SÓ essas falas para a OpenAI
 // (fallback), que traduz legendas fielmente; sem chave OpenAI (ou se ela
 // também não der), marca a fala como desistida para não virar loop.
