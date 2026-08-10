@@ -5131,6 +5131,55 @@ body.ler-full .mobile-bottom-nav{display:none}
    nessa medida que ele funciona: um post-it por cima da página, não uma segunda
    página. O que cresceu não foi a necessidade, foi a minha mão — os chips e a
    conversa cabem aqui rolando, que é justamente o que um balão deve fazer. */
+/* AS FONTES DA WEB — discretas, mas clicáveis.
+   Ficam logo abaixo da resposta e mostram só o domínio: o que importa é
+   RECONHECER a procedência de relance (comics.org, britannica.com), não ler a
+   URL inteira. O título completo vai no tooltip. */
+.lexa-fontes{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+  margin-top:var(--sp-3);padding-top:var(--sp-2);border-top:1px dashed var(--border);
+  font-size:var(--fs-3xs);color:var(--text3);
+}
+.lexa-fontes a{
+  color:var(--text2);text-decoration:none;
+  padding:2px 7px;border:1px solid var(--border);border-radius:20px;
+}
+.lexa-fontes a:hover{color:var(--text);border-color:var(--primary);background:rgba(var(--primary-rgb),.08)}
+/* O convite para buscar: presente sem se impor — ele custa dinheiro, então não
+   deve parecer o caminho normal. */
+.lexa-web-btn{
+  display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+  margin-top:var(--sp-3);padding:4px 10px;border-radius:20px;
+  font:inherit;font-size:var(--fs-3xs);
+  background:transparent;border:1px dashed var(--border-strong);color:var(--text3);
+}
+.lexa-web-btn:hover{color:var(--text);border-style:solid;border-color:var(--primary)}
+
+/* A ESCOLHA DENTRO DO BALÃO — recolhida, porque quem só quer a resposta não
+   deve tropeçar num painel de ajustes. Aberta, as três posições com o preço de
+   cada uma: é o preço que torna a decisão possível. */
+.lexa-web-modo{margin-top:var(--sp-2)}
+.lexa-web-modo>summary{
+  display:inline-flex;align-items:center;gap:5px;cursor:pointer;list-style:none;
+  font-size:var(--fs-3xs);color:var(--text3);padding:2px 0;
+}
+.lexa-web-modo>summary::-webkit-details-marker{display:none}
+.lexa-web-modo>summary:hover{color:var(--text2)}
+.lexa-web-ops{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.lexa-web-op{
+  display:flex;align-items:baseline;gap:6px;cursor:pointer;text-align:left;
+  padding:5px 9px;border-radius:6px;font:inherit;font-size:var(--fs-3xs);
+  background:var(--surface2);border:1px solid var(--border);color:var(--text2);
+}
+.lexa-web-op i{margin-left:auto;color:var(--text3);font-style:normal;white-space:nowrap}
+.lexa-web-op:hover{border-color:var(--border-strong);color:var(--text)}
+/* A posição marcada usa o acento do tema — nunca cor fixa. */
+.lexa-web-op.on{
+  border-color:rgba(var(--primary-rgb),.65);
+  background:rgba(var(--primary-rgb),.10);color:var(--text);
+}
+.lexa-web-nota{margin:6px 0 0;font-size:var(--fs-3xs);color:var(--text3);line-height:1.45}
+
 /* AMOSTRA DO REPARO — antes e depois, um sobre o outro.
    A frase velha fica riscada e apagada; a nova, viva. É o que deixa ele
    conferir o acerto sem precisar abrir o livro. */

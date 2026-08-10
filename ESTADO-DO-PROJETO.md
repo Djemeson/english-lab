@@ -7,7 +7,20 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O CONTEXTO VOLTOU PARA O LUGAR**. Enquanto o defeito do
+> Última atualização: 2026-08-08 — **A LEXA VÊ A WEB, E A DECISÃO É DELE, NO BALÃO**. A busca só
+> existe na Responses API. Sondada com chave real, e o achado que decidiu o desenho não foi se
+> funciona — foi o preço: **só OFERECER a ferramenta custa 4.436 tokens de entrada, 5,3× o custo da
+> explicação, mesmo quando o modelo decide não buscar** (o manual da ferramenta entra no contexto
+> toda vez). Deixá-la ligada sempre multiplicaria por cinco a conta de TODAS para ganhar em uma a
+> cada vinte. Então: um **filtro local e grátis** (nome próprio, marca, título — 9/9 no banco de
+> prova, incluindo maiúscula que só abre frase) decide quando vale, e um **botão no balão** força
+> quando a resposta vier vaga. As **fontes aparecem** com o domínio clicável — o ganho da web não é
+> saber mais, é poder conferir. ⚠️ **A escolha de rodar sozinha é DELE e mora no balão**, não em
+> Configurações: três posições com **o custo de cada uma em R$/mês calculado sobre o uso dele**
+> (cotação viva), e o app **observa e propõe** quando o comportamento discorda do que está marcado —
+> sem nunca mudar por conta própria. `sw.js` → `englab-v186`.
+>
+> Anterior: 2026-08-08 — **O CONTEXTO VOLTOU PARA O LUGAR**. Enquanto o defeito do
 > `_lerBlocoEmVolta` durou, toda palavra pescada num livro guardou a ABERTURA DO CAPÍTULO como
 > contexto — e ela virou o exemplo do card e a base da análise. Entrou o reparo em Configurações:
 > **sem IA e sem custo**, ele abre o livro do `BookDB`, procura a palavra no capítulo e devolve a
@@ -7968,6 +7981,51 @@ uma cena real do livro. O detector foi afrouxado de propósito.
 ordem invertida, as palavras espalhadas e a folga estourada. E o caso dele deixou de ser acusado.
 
 **Arquivos**: `js/ler.js`, `js/settings.js`, `index.html`, `css/styles.css`. `sw.js` → `englab-v185`.
+
+### A Lexa na web — entregue em 2026-08-08 (a parte B da especificação)
+
+**Medir antes de desenhar.** A Responses API é território novo aqui, então a sondagem veio primeiro
+(`tools/teste-ia.mjs web` e `webcusto`). Três achados:
+
+1. **Funciona**, e o `tool_choice: 'auto'` julga bem: buscou para a referência cultural, **não**
+   buscou para "fancy". Duas buscas encadeadas na primeira, com fontes.
+2. **As fontes voltam** nas anotações, com URL. Mostrá-las é metade do ganho: o modelo já sabia
+   sobre a revista do Archie mesmo sem web — o que a web acrescenta é **poder conferir**.
+3. ⚠️ **O preço de ter a ferramenta à mão.** Mesma pergunta, mesmo modelo:
+   sem a ferramenta **37** tokens de entrada (R$ 0,0010); com ela, **sem buscar**, **4.473**
+   (R$ 0,0055). Os 4.436 de diferença são o manual da ferramenta, que a API põe no contexto a cada
+   chamada. **5,3× o custo, use ou não.**
+
+Daí o desenho: `lexaCheiraMundoReal(termo, frase)` — filtro local, grátis, que usa o sinal que o
+prompt da Lexa já nomeia (*"gíria, marca, referência cultural ou nome próprio"*) e a marca
+tipográfica do nome próprio: maiúscula onde a gramática não pediria. 9/9 no banco de prova,
+incluindo as pegadinhas em que a maiúscula só existe por abrir a frase ("Two miles", "Although").
+
+#### A escolha é dele, e mora no balão
+
+Pedido dele, e ele tem razão: *"essa escolha tem que ser feita no balão"*. A decisão "vale a pena
+buscar sozinha?" só faz sentido no instante em que ele acabou de ler uma resposta e sentir se ela
+bastou — enterrada em Configurações, seria tomada no vazio. Depois de uma busca é a hora ainda
+melhor: ele viu o resultado **e** o preço. **Não há controle disto em Configurações, de propósito.**
+
+Três posições, não duas — a pergunta não é "ligado ou desligado", é *quanto de automático eu quero
+pagar*: `pedido` · `auto` (padrão) · `sempre`. O botão manual existe nos três.
+
+⚠️ **E a escolha não se faz no escuro.** "5,3×" é um número meu, de um teste meu — não diz nada
+sobre a conta dele. O app conta o que acontece (explicações, automáticas, pedidas à mão, e quantas
+viraram busca de fato) e mostra, ao lado de cada posição, **o custo em R$/mês no ritmo dele**, com
+a cotação viva que o resto da tela já usa. Projeta o **pedágio**, que é certo, e soma a busca pela
+taxa observada; o que não sabe, diz por escrito em vez de inventar.
+
+E **observa e propõe, sem nunca mudar sozinho**: se ele pede a busca à mão em mais de 30% das
+vezes, sugere `sempre`; se está em `sempre` mas a web é usada em menos de 15%, sugere `auto`.
+Trocar o modo em silêncio seria tirar de volta a decisão que ele acabou de tomar.
+
+**Só na OpenAI** (Gemini e Groq não têm a Responses API) — fora dela, o caminho de sempre, sem
+botão. Contabilidade: `_aiGuardarUso` já entendia `input_tokens`/`output_tokens`, então a busca
+entra na conta do app sem remendo.
+
+**Arquivos**: `js/ai.js`, `js/core.js`, `css/styles.css`, `tools/teste-ia.mjs`. `sw.js` → `englab-v186`.
 
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 

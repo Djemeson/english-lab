@@ -321,27 +321,128 @@ async function selMenuExplicar() {
   // `lexaBalaoAbrir` zera o contexto (fecha o menu antes de abrir o balão), e o
   // botão "Preparar" do cabeçalho precisa dele de volta.
   _selMenuCtx = c
-  corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(lexaNome())} está explicando…`
-  try {
-    const sistema = lexaExplicar()
-    const pergunta = `${c.frase ? `A frase é: "${c.frase}".\n` : ''}O aluno selecionou: "${c.txt}".
+  // A web entra sozinha quando o termo cheira a mundo real; fora disso, fica a
+  // um botão de distância. Ver `AI_WEB_PEDAGIO`: o custo de tê-la à mão é fixo
+  // e alto, então quem decide primeiro é o filtro de graça.
+  await _selExplicarPintar(corpo, c, aiWebLigada() && lexaCheiraMundoReal(c.txt, c.frase))
+}
+
+// As FONTES são metade do ganho da web: o que ela traz de novo não é saber
+// mais — o modelo já sabia sobre a revista do Archie —, é poder CONFERIR.
+function lexaFontesHTML(fontes) {
+  if (!fontes || !fontes.length) return ''
+  const dominio = u => { try { return new URL(u).hostname.replace(/^www\./, '') } catch { return u } }
+  return `<div class="lexa-fontes">${ic('globe','ic-sm')} ${fontes.slice(0, 5).map(f =>
+    `<a href="${escA(f.url)}" target="_blank" rel="noopener noreferrer" data-tip="${escA(f.titulo || f.url)}">${esc(dominio(f.url))}</a>`
+  ).join('')}</div>`
+}
+
+async function _selExplicarPintar(corpo, c, comWeb) {
+  if (!lexaBalaoVivo(corpo)) return
+  corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(lexaNome())} está ${comWeb ? 'procurando na internet' : 'explicando'}…`
+  const L = getLangDef(c.lang || 'en')
+  const sistema = lexaExplicar()
+  const pergunta = `${c.frase ? `A frase é: "${c.frase}".\n` : ''}O aluno selecionou: "${c.txt}".
 Explique o que "${c.txt}" significa AQUI, em ${L.nameEn}. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real.`
-    const resp = await aiTextSeguro([
-      { role: 'system', content: sistema },
-      { role: 'user', content: pergunta }
-    ], { maxTokens: 600 })
-    if (!lexaBalaoVivo(corpo)) return
-    corpo.innerHTML = lexaFormatar(resp)
-    if (typeof lexaChipsMontar === 'function' && c.frase) {
-      lexaChipsMontar(corpo, { trecho: c.txt, contexto: c.frase, lang: c.lang || 'en',
-        fonte: c.fonte || '', origem: c.origem || {} })
-    }
-    if (typeof lexaChatMontar === 'function') {
-      lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
+  let resp = '', fontes = []
+  try {
+    if (comWeb) {
+      const r = await aiTextWeb({ sistema, pergunta, maxTokens: 600 })
+      resp = r.texto; fontes = r.fontes
+      // Ofereceu e ele não usou? Acontece, e é o certo — mas então a resposta
+      // saiu do que o modelo já sabia, e dizer o contrário seria mentir.
+      if (!r.buscou) fontes = []
+    } else {
+      resp = await aiTextSeguro([
+        { role: 'system', content: sistema },
+        { role: 'user', content: pergunta }
+      ], { maxTokens: 600 })
     }
   } catch (e) {
     if (lexaBalaoVivo(corpo)) corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)}</span>`
+    return
   }
+  if (!lexaBalaoVivo(corpo)) return
+  lexaWebRegistrar({ automatica: comWeb && !c._webManual, manual: !!c._webManual, buscou: !!fontes.length })
+  c._webManual = false
+  corpo.innerHTML = lexaFormatar(resp) + lexaFontesHTML(fontes)
+  // ⚠️ A ESCOLHA MORA AQUI, no balão, e não em Configurações — pedido dele, e
+  // ele tem razão: a decisão "vale a pena buscar sozinha?" só faz sentido no
+  // instante em que ele acabou de ver uma resposta e sentir se ela bastou.
+  // Enterrada num painel de ajustes, ela seria tomada no vazio, longe do caso.
+  // Depois de uma busca é a hora ainda melhor: ele viu o resultado E o preço.
+  if (aiWebPodeUsar()) {
+    corpo.insertAdjacentHTML('beforeend',
+      (comWeb ? '' : `<button class="lexa-web-btn" onclick="selMenuExplicarWeb()">${ic('globe','ic-sm')} procurar na internet</button>`)
+      + lexaWebEscolhaHTML())
+    lexaWebPintarCustos(corpo)
+  }
+  if (typeof lexaChipsMontar === 'function' && c.frase) {
+    lexaChipsMontar(corpo, { trecho: c.txt, contexto: c.frase, lang: c.lang || 'en',
+      fonte: c.fonte || '', origem: c.origem || {} })
+  }
+  if (typeof lexaChatMontar === 'function') {
+    lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
+  }
+}
+
+// O botão: quando a resposta veio vaga, ele força a busca. É a válvula que
+// deixa o filtro automático poder ser conservador sem custar informação.
+function selMenuExplicarWeb() {
+  const c = _selMenuCtx
+  const corpo = document.getElementById('lexa-balao-corpo')
+  if (!c || !corpo) return
+  c._webManual = true
+  _selExplicarPintar(corpo, c, true)
+}
+
+// ---- A escolha, dentro do balão --------------------------------
+// Recolhida: quem não quer decidir nada continua lendo a resposta. Aberta,
+// mostra as três posições COM O PREÇO DE CADA UMA no ritmo dele — e, quando o
+// comportamento observado discorda do que está marcado, diz isso em uma linha.
+function lexaWebEscolhaHTML() {
+  const m = lexaWebModo()
+  const op = (v, rot) => `<button class="lexa-web-op${m === v ? ' on' : ''}" data-web-op="${v}"
+    onclick="lexaWebEscolher('${v}')">${rot}<i data-web-custo="${v}"></i></button>`
+  return `<details class="lexa-web-modo">
+    <summary>${ic('settings','ic-sm')} quando buscar sozinha</summary>
+    <div class="lexa-web-ops">
+      ${op('pedido', 'só quando eu pedir')}
+      ${op('auto', 'quando parecer coisa do mundo real')}
+      ${op('sempre', 'em toda explicação')}
+    </div>
+    <p class="lexa-web-nota" data-web-nota></p>
+  </details>`
+}
+
+// O custo chega DEPOIS: a cotação é assíncrona (e pode vir da rede). A escolha
+// não espera por ela — os rótulos já estão na tela e o preço entra quando
+// chega, em vez de segurar a interface por uma vírgula.
+async function lexaWebPintarCustos(raiz) {
+  if (!raiz) return
+  let p = null
+  try { p = await lexaWebProjecao() } catch (e) { return }
+  if (!raiz.isConnected) return
+  raiz.querySelectorAll('[data-web-custo]').forEach(e => {
+    const v = e.getAttribute('data-web-custo')
+    e.textContent = p.magra ? '' : ` · ~R$ ${p.custo[v].toFixed(2)}/mês`
+  })
+  const nota = raiz.querySelector('[data-web-nota]')
+  if (nota) {
+    nota.textContent = p.magra
+      ? `ainda são ${p.exp} explicações — pouco para estimar o custo com honestidade`
+      : (lexaWebSugestao(p) || `no seu ritmo: ${p.exp} explicações em ${p.dias} ${p.dias === 1 ? 'dia' : 'dias'}`)
+  }
+}
+
+function lexaWebEscolher(v) {
+  cfg.lexaWeb = LEXA_WEB_MODOS.includes(v) ? v : 'auto'
+  if (typeof saveCfg === 'function') saveCfg()
+  const det = document.querySelector('.lexa-web-modo')
+  if (det) det.querySelectorAll('[data-web-op]').forEach(b =>
+    b.classList.toggle('on', b.getAttribute('data-web-op') === cfg.lexaWeb))
+  const rot = { pedido: 'só quando você pedir', auto: 'quando parecer coisa do mundo real', sempre: 'em toda explicação' }
+  toast(`A Lexa vai buscar na internet ${rot[cfg.lexaWeb]}`, 'success')
 }
 
 // Aberto, o balão passa a ser conteúdo — e conteúdo precisa das duas saídas de
@@ -1088,6 +1189,170 @@ function _aiParseJSON(data) {
   const i = raw.indexOf('{'), f = raw.lastIndexOf('}')
   if (i >= 0 && f > i) { try { return JSON.parse(raw.slice(i, f + 1)) } catch {} }
   return null
+}
+
+// ================================================================
+// A LEXA NA WEB — e por que ela NÃO fica ligada o tempo todo
+// ================================================================
+// A busca na web só existe na Responses API (`/v1/responses`), fora do dialeto
+// `chat/completions` que o resto do app fala. Sondado com chave real em
+// 2026-08-08, e o resultado que decidiu o desenho não foi se funciona — foi o
+// preço:
+//
+//   mesma pergunta ("o que significa 'fancy' aqui?"), mesmo modelo:
+//     sem a ferramenta ................  37 tokens de entrada · R$ 0,0010
+//     com a ferramenta, SEM buscar .... 4.473 tokens de entrada · R$ 0,0055
+//
+// ⚠️ Os 4.436 tokens de diferença são o MANUAL DA FERRAMENTA, que a API põe no
+// contexto a cada chamada. Paga-se por ele estar à mão, o modelo usando ou não.
+// Deixar a web ligada em toda explicação seria multiplicar por 5 o custo de
+// TODAS para ganhar em uma a cada vinte.
+//
+// Então: um filtro LOCAL e grátis decide quando vale, e um botão no balão
+// deixa ele forçar quando a resposta vier vaga. O `tool_choice: 'auto'` ainda
+// decide a última palavra — na sondagem ele buscou para a referência cultural
+// e NÃO buscou para "fancy", que é exatamente o julgamento certo.
+const AI_WEB_PEDAGIO = 4436   // medido; entra na estimativa de custo
+
+function aiWebPodeUsar() {
+  return aiProviderAtual() === 'openai' && !!(cfg.openaiKey || '').trim()
+}
+
+// ⚠️ QUANDO RODAR SOZINHA É DECISÃO DELE, e por isso são TRÊS posições — a
+// pergunta não é "ligado ou desligado", é "quanto de automático eu quero
+// pagar". Cada opção tem um preço que só a medição revela, e ele escolhe com
+// esse preço à vista, não com a minha preferência embutida:
+//   'pedido' — nunca sozinha. O botão no balão continua lá. Custo extra: zero.
+//   'auto'   — quando o termo cheira a mundo real (o padrão que eu defendo).
+//   'sempre' — em toda explicação. 5,3× o custo de todas, medido.
+// O botão manual existe nos três modos: é ele que deixa o filtro poder ser
+// conservador sem custar informação.
+const LEXA_WEB_MODOS = ['pedido', 'auto', 'sempre']
+function lexaWebModo() {
+  return LEXA_WEB_MODOS.includes(cfg.lexaWeb) ? cfg.lexaWeb : 'auto'
+}
+
+// ⚠️ E A ESCOLHA NÃO SE FAZ NO ESCURO.
+// "5,3× o custo" é um número meu, de um teste meu, sobre uma pergunta minha —
+// não diz nada sobre a conta DELE. Um app que cobra do bolso do usuário e
+// oferece três posições sem dizer o preço de cada uma está passando a decisão
+// junto com a cegueira.
+// Então o app CONTA o que acontece — quantas explicações, quantas vezes a web
+// entrou sozinha, quantas ele pediu no botão, quantas de fato viraram busca —
+// e devolve a projeção em reais por mês, com a cotação viva que ele já usa no
+// resto da tela. A conta é dele, feita com os números dele.
+const AI_WEB_BUSCA = 10700   // tokens que os RESULTADOS somam quando ela busca
+
+function lexaWebRegistrar({ automatica, manual, buscou }) {
+  const u = cfg.lexaWebUso || (cfg.lexaWebUso = { exp: 0, autos: 0, manuais: 0, buscas: 0, desde: Date.now() })
+  // Pedido manual não é explicação nova: é a MESMA, refeita. Contar como nova
+  // inflaria o denominador e faria a taxa de "eu precisei pedir" mentir para
+  // baixo — justo o sinal que decide se o modo dele está calibrado.
+  if (manual) u.manuais++
+  else { u.exp++; if (automatica) u.autos++ }
+  if (buscou) u.buscas++
+  if (typeof saveCfg === 'function') saveCfg()
+}
+
+// Quanto CADA posição custaria a mais por mês, no ritmo dele.
+async function lexaWebProjecao() {
+  const u = cfg.lexaWebUso || { exp: 0, autos: 0, manuais: 0, buscas: 0, desde: Date.now() }
+  const dias = Math.max(1, (Date.now() - (u.desde || Date.now())) / 864e5)
+  const mes = n => (n / dias) * 30
+  const brl = await aiUsdBrl()
+  const preco = aiPrecoModelo().in
+  // O PEDÁGIO é certo (entra sempre que a ferramenta é oferecida); os
+  // RESULTADOS só entram quando ela de fato busca. Projeta-se o que se sabe, e
+  // o resto vira ressalva escrita — não conta inventada.
+  const pedagio = AI_WEB_PEDAGIO / 1e6 * preco * brl
+  const busca = AI_WEB_BUSCA / 1e6 * preco * brl
+  const taxaBusca = u.exp ? Math.min(1, u.buscas / Math.max(1, u.autos + u.manuais)) : 0.35
+  const conta = n => mes(n) * (pedagio + busca * taxaBusca)
+  return {
+    dias: Math.round(dias), ...u, brl,
+    custo: { pedido: conta(u.manuais), auto: conta(u.autos + u.manuais), sempre: conta(u.exp) },
+    magra: u.exp < 10        // amostra pequena demais para projetar com cara séria
+  }
+}
+
+// O app observa e PROPÕE — não muda nada por conta própria. Trocar o modo dele
+// em silêncio seria tirar de volta a decisão que ele acabou de tomar.
+function lexaWebSugestao(p) {
+  if (!p || p.magra) return ''
+  const modo = lexaWebModo()
+  const pediu = p.manuais / Math.max(1, p.exp)
+  if (modo !== 'sempre' && pediu > 0.3) {
+    return `Você pediu a busca à mão em ${Math.round(pediu * 100)}% das explicações — no seu caso "sempre" talvez pague a pena.`
+  }
+  if (modo === 'sempre' && p.buscas / Math.max(1, p.exp) < 0.15) {
+    return `A web ficou à mão em todas, mas só foi usada em ${Math.round(p.buscas / Math.max(1, p.exp) * 100)}% — "quando parecer coisa do mundo real" daria quase o mesmo por menos.`
+  }
+  if (modo === 'pedido' && p.manuais === 0 && p.exp >= 20) {
+    return `Você nunca precisou da busca em ${p.exp} explicações — deixar em "só quando eu pedir" está saindo de graça.`
+  }
+  return ''
+}
+function lexaWebAutomatica(termo, frase) {
+  if (!aiWebPodeUsar()) return false
+  const m = lexaWebModo()
+  if (m === 'sempre') return true
+  if (m === 'pedido') return false
+  return lexaCheiraMundoReal(termo, frase)
+}
+
+// QUANDO O TERMO CHEIRA A MUNDO REAL.
+// O sinal é o mesmo que o prompt da Lexa já nomeia — *"gíria, marca, referência
+// cultural ou nome próprio"* — e nome próprio tem uma marca tipográfica óbvia:
+// maiúscula onde a gramática não pediria. É de graça, roda antes de qualquer
+// chamada, e erra para o lado barato: o que ele não pegar, o botão pega.
+function lexaCheiraMundoReal(termo, frase) {
+  const t = String(termo || '').trim()
+  if (!t || t.length < 2) return false
+  const f = String(frase || '')
+  const pos = f.indexOf(t)
+  // Maiúscula na PRIMEIRA palavra só conta se ela não estiver abrindo a frase.
+  const abreFrase = pos <= 0 || /[.!?…]["'”’)\s]*$/.test(f.slice(0, pos).trim() + ' ')
+  const toks = t.split(/\s+/).filter(Boolean)
+  if (toks.some((p, i) => /^["'“‘(]?[A-ZÀ-Þ]/.test(p) && !(i === 0 && abreFrase))) return true
+  // O autor marcou com aspas: título, apelido, citação — coisa do mundo, não
+  // vocabulário. (Aspas de fala não pegam: ali dentro há uma frase, não um termo.)
+  if (pos > 0 && /["“'‘]\s*$/.test(f.slice(0, pos))) return true
+  return false
+}
+
+// Texto com busca na web. Devolve `{ texto, fontes, buscou }` — as fontes vêm
+// nas anotações da resposta, e mostrá-las é metade do ganho: o que a web traz
+// de novo não é saber mais, é poder CONFERIR.
+async function aiTextWeb({ sistema, pergunta, maxTokens = 700, timeoutMs }) {
+  const chat = aiChatCfg()
+  if (chat.prov !== 'openai' || !chat.key) throw new Error('a busca na web só existe na OpenAI')
+  const res = await _aiFetch('https://api.openai.com/v1/responses', {
+    model: chat.model,
+    ...(sistema ? { instructions: sistema } : {}),
+    input: pergunta,
+    // A folga de raciocínio vale aqui igual: `max_output_tokens` é LIMITE, não
+    // reserva — só se paga o que for gerado.
+    max_output_tokens: maxTokens + AI_FOLGA_RACIOCINIO,
+    tools: [{ type: 'web_search' }],
+    tool_choice: 'auto'
+  }, { timeoutMs, retries: 0, key: chat.key })
+  const d = await res.json()
+  _aiGuardarUso(d, chat.model)          // já entende input_tokens/output_tokens
+  const saida = Array.isArray(d.output) ? d.output : []
+  const blocos = saida.filter(o => o.type === 'message')
+    .flatMap(o => (o.content || []).filter(c => c.type === 'output_text'))
+  const fontes = []
+  for (const b of blocos) {
+    for (const a of (b.annotations || [])) {
+      const url = a.url || ''
+      if (url && !fontes.some(f => f.url === url)) fontes.push({ url, titulo: a.title || '' })
+    }
+  }
+  return {
+    texto: blocos.map(b => b.text).join('\n').trim(),
+    fontes,
+    buscou: saida.some(o => String(o.type || '').includes('web_search'))
+  }
 }
 
 // ================================================================

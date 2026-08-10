@@ -321,6 +321,91 @@ async function testeChips() {
   }
 }
 
+// ---------------------------------------------------------------
+// A WEB — sondagem da Responses API
+// ---------------------------------------------------------------
+// Território novo: o app inteiro fala `chat/completions`, e a busca na web só
+// existe na `responses`. Antes de desenhar qualquer coisa, MEDIR — o formato
+// da resposta, se o `auto` de fato decide sozinho quando buscar, se vêm as
+// fontes, quanto custa e quanto demora. Nada disto se adivinha.
+async function chamarResponses({ modelo, entrada, comWeb, maxTokens = 900 }) {
+  const corpo = {
+    model: modelo,
+    input: entrada,
+    max_output_tokens: maxTokens + 25000,   // mesma folga de raciocínio do app
+    ...(comWeb ? { tools: [{ type: 'web_search' }], tool_choice: 'auto' } : {})
+  }
+  const t0 = Date.now()
+  const res = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${CHAVE}` },
+    body: JSON.stringify(corpo)
+  })
+  const d = await res.json()
+  const ms = Date.now() - t0
+  if (!res.ok) return { erro: (d.error && d.error.message) || `HTTP ${res.status}`, ms, cru: d }
+  // O formato é aprendido AQUI, da resposta real — não de memória.
+  const saida = Array.isArray(d.output) ? d.output : []
+  const tipos = saida.map(o => o.type)
+  const texto = saida.filter(o => o.type === 'message')
+    .flatMap(o => (o.content || []).filter(c => c.type === 'output_text'))
+  const uso = d.usage || {}
+  const preco = PRECOS[modelo] || { in: 0, out: 0 }
+  const usd = (uso.input_tokens || 0) / 1e6 * preco.in + (uso.output_tokens || 0) / 1e6 * preco.out
+  return {
+    ms, status: d.status, tipos,
+    buscou: tipos.some(t => String(t).includes('web_search')),
+    texto: texto.map(c => c.text).join('\n').trim(),
+    citacoes: texto.flatMap(c => (c.annotations || []).map(a => a.url || a.title || a.type)),
+    entrada: uso.input_tokens || 0, saida: uso.output_tokens || 0,
+    raciocinio: (uso.output_tokens_details || {}).reasoning_tokens || 0,
+    usd, brl: usd * COTACAO, chaves: Object.keys(d)
+  }
+}
+
+async function testeWeb() {
+  console.log('\n=== A LEXA NA WEB — sondagem da Responses API ===')
+  const M = 'gpt-5.6-luna'
+  // Três perguntas, escolhidas pelo que o app REALMENTE faz:
+  //  A) referência cultural concreta — é o caso que hoje sai da memória do
+  //     modelo e pode virar invenção;
+  //  B) palavra comum — não deve valer uma busca;
+  //  C) a mesma A sem a ferramenta, para comparar a resposta lado a lado.
+  const casos = [
+    ['referência cultural (com web)', true,  `O aluno está lendo "Billy Summers", de Stephen King, e encontrou: "Archie's Pals 'n' Gals". Explique em português do Brasil o que é isso no mundo real: que publicação é, de quem, de que época.`],
+    ['referência cultural (sem web)', false, `O aluno está lendo "Billy Summers", de Stephen King, e encontrou: "Archie's Pals 'n' Gals". Explique em português do Brasil o que é isso no mundo real: que publicação é, de quem, de que época.`],
+    ['palavra comum (com web)',       true,  `A frase é: "The houses are nothing fancy." O aluno selecionou "fancy". Explique em português do Brasil o que significa AQUI.`]
+  ]
+  for (const [nome, comWeb, entrada] of casos) {
+    const r = await chamarResponses({ modelo: M, entrada, comWeb })
+    if (r.erro) { console.log(`  ✗ ${nome}: ${r.erro}`); if (r.cru) console.log('    ', JSON.stringify(r.cru).slice(0, 300)); continue }
+    console.log(`  ✓ ${nome}`)
+    console.log(`      buscou na web: ${r.buscou ? 'SIM' : 'não'} · blocos: ${r.tipos.join(', ')}`)
+    console.log(`      ${r.entrada}→${r.saida} tokens${r.raciocinio ? ` (${r.raciocinio} pensando)` : ''} · ${(r.ms/1000).toFixed(1)}s · ${money(r)}`)
+    if (r.citacoes.length) console.log(`      fontes: ${[...new Set(r.citacoes)].slice(0,4).join(' · ')}`)
+    console.log(`      resposta: ${r.texto.replace(/\s+/g,' ').slice(0, 260)}…`)
+  }
+}
+
+// O PREÇO DE APENAS OFERECER A FERRAMENTA.
+// A primeira sondagem deixou uma suspeita grande: a pergunta sobre "fancy" NÃO
+// buscou nada e mesmo assim contou 4.473 tokens de entrada, para um prompt de
+// umas 40 palavras. Se a definição da ferramenta entra no contexto toda vez,
+// ligar a web encarece TODA explicação — inclusive as que nunca vão usá-la.
+// Isso decide o desenho inteiro, então merece medição isolada: mesma pergunta,
+// mesmo modelo, só muda oferecer ou não.
+async function testeWebCusto() {
+  console.log('\n=== QUANTO CUSTA SÓ TER A FERRAMENTA À MÃO ===')
+  const M = 'gpt-5.6-luna'
+  const p = 'A frase é: "The houses are nothing fancy." O aluno selecionou "fancy". Explique em português do Brasil o que significa AQUI.'
+  const a = await chamarResponses({ modelo: M, entrada: p, comWeb: false })
+  const b = await chamarResponses({ modelo: M, entrada: p, comWeb: true })
+  if (a.erro || b.erro) { console.log('  ✗', a.erro || b.erro); return }
+  console.log(`  sem a ferramenta: ${a.entrada} tokens de entrada · ${money(a)} · ${(a.ms/1000).toFixed(1)}s`)
+  console.log(`  com a ferramenta: ${b.entrada} tokens de entrada · ${money(b)} · ${(b.ms/1000).toFixed(1)}s · buscou: ${b.buscou ? 'sim' : 'não'}`)
+  console.log(`  → o pedágio de ter a ferramenta à mão: ${b.entrada - a.entrada} tokens, ${(b.brl / (a.brl || 1e-9)).toFixed(1)}× o custo`)
+}
+
 // SECO — monta tudo e não chama ninguém. É o teste do TESTE: prova que a
 // leitura do código-fonte ainda funciona depois de mexer nos prompts, sem
 // gastar um centavo. Rode este primeiro sempre que o app mudar.
@@ -366,6 +451,8 @@ try {
   if (tudo || qual === 'esquemas') await testeEsquemas()
   if (tudo || qual === 'analise')  await testeAnalise()
   if (tudo || qual === 'chips')    await testeChips()
+  if (tudo || qual === 'web')      await testeWeb()
+  if (tudo || qual === 'webcusto') await testeWebCusto()
 } catch (e) {
   console.error('\nfalhou:', e.message)
   process.exit(1)
