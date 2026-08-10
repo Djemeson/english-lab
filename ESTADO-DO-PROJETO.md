@@ -7739,6 +7739,37 @@ desfazendo a escolha deliberada; Configurações listando três fornecedores, se
 **Arquivos**: `js/ai.js`, `js/core.js`, `js/firebase.js`, `js/init.js`, `js/review.js`,
 `js/dossie.js`, `js/video-study.js`, `js/video-subs.js`, `js/video-sync.js`. `sw.js` → `englab-v179`.
 
+### A bateria contra a API de verdade — `tools/teste-ia.mjs` (2026-08-08)
+
+Ele pediu que eu conseguisse fazer análise completa com as chaves. **A chave nunca passa por mim**:
+vem de `.env` (já no `.gitignore`) por variável de ambiente, e o script não a imprime — só os 4
+últimos caracteres, para depurar autenticação.
+
+**Os prompts e os esquemas são LIDOS DO CÓDIGO-FONTE, não copiados.** Cópia envelhece em silêncio:
+no dia em que o prompt mudasse, o teste passaria a aprovar algo que o app não usa mais. Para isso o
+script tem um scanner de template literal que anda caractere a caractere distinguindo TEXTO de
+`${expressão}` — regex não serve, porque há crases e chaves dentro das interpolações. Ele carrega
+também o `lang.js` de verdade (com dois calços de DOM), a tabela de preços e o `_aiTokenParam` do
+próprio app, para que a conta do teste e a conta da tela nunca divirjam.
+
+Modos: `seco` (monta tudo, **zero chamada, zero custo** — é o teste do teste), `esquemas` (valida os
+7 contratos, barato: a API recusa esquema malformado antes de gerar), `analise` (Luna × gpt-4o-mini,
+com e sem esquema, com e sem reencontro) e `chips` (o caso real do vazamento).
+
+#### ⚠️ O modo seco já pagou o próprio custo, duas vezes
+
+**1. `same_as` estava faltando no esquema — e teria quebrado o reencontro em silêncio.** Ele não
+mora no molde JSON principal: vive no `reencontroBlock`, montado antes e só quando o item já tem
+sentidos. A primeira conferência fatiou só o molde e não o viu. Sob `strict`, o modelo ficaria
+**proibido** de devolvê-lo, e `nm.same_as` (review.js) nunca casaria — a Fase 3 degradaria sem
+nenhum erro. Corrigido com `S.txtOuNulo()`, e a lição está escrita no `_esqConfere`:
+**conferir a função inteira, nunca só o molde**.
+
+**2. O prompt de análise é o DOBRO do que o código dizia.** O comentário da Luna dizia "~3.000
+tokens" desde que ela entrou na lista. Medido: **25.238 caracteres, ~6.300 tokens** (~6.400 com
+reencontro). Não é "contexto longo" no sentido do MRCR, mas é o dobro do que eu supunha ao aceitar
+a troca de modelo — o comentário foi corrigido.
+
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 
 Pedido dele, ainda **não implementado**. Duas capacidades diferentes, que só parecem uma.
@@ -7823,10 +7854,13 @@ lugar só.
 - [ ] **A LEXA QUE LEU O LIVRO E VÊ A WEB** (2026-08-08) — especificação escrita na seção 8.2,
       nada implementado. Ordem sugerida: fase 1 da obra (zero IA), depois web search atrás de
       interruptor, depois fase 2. ⚠️ A regra do **spoiler** é a que não pode ser esquecida.
-- [ ] **PROVAR O CONTRATO COM CHAVE DE VERDADE** (2026-08-08). O corpo da requisição foi conferido
-      com `_aiFetch` dublado; falta a resposta real da API sob `strict: true` — em especial se a
-      Luna sustenta a análise de 30 campos sem estourar o teto de 5000 tokens, já que agora ela é
-      obrigada a devolver TODOS os campos (vazios inclusive) em vez de omitir os que não tem.
+- [ ] **RODAR `tools/teste-ia.mjs` COM CHAVE DE VERDADE** (2026-08-08). A bateria está pronta e o
+      modo `seco` (sem chave, sem custo) já passa. Falta o que só a API responde: se ela aceita os
+      7 esquemas sob `strict: true`, se a Luna preenche os 21 campos do sentido sem truncar, o
+      custo real por análise, e o comparativo Luna × gpt-4o-mini nos MESMOS prompts.
+      **Como**: `.env` na raiz (já ignorado pelo git) com `OPENAI_API_KEY=`, e
+      `set -a; . ./.env; set +a; node tools/teste-ia.mjs tudo`.
+      ⚠️ Vale uma chave separada com teto de gasto — descartável ao fim do teste.
 - [ ] **O ACERVO JÁ CAPTURADO NO LEITOR ESTÁ COM O CONTEXTO ERRADO** (2026-08-08). Enquanto
       `_lerBlocoEmVolta` subia atrás do maior texto, **toda palavra pescada no leitor** guardou a
       abertura do capítulo como `context` — e esse contexto virou o exemplo do card e a base da

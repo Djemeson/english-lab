@@ -9,7 +9,7 @@
 // novos na hora; o shell é cache-first. Sem o bump, um deploy pode juntar
 // ler.js NOVO com ai.js VELHO — e "LEXA_NOME is not defined" na primeira
 // visita. O `activate` apaga os caches antigos, então o bump resolve.
-const CACHE = 'englab-v179'
+const CACHE = 'englab-v180'
 // Cache separado e PERMANENTE para o ffmpeg.wasm (31 MB): não pode ser
 // apagado a cada versão do shell, senão cada deploy custaria 31 MB de novo.
 const CACHE_FFMPEG = 'englab-ffmpeg-v1'
@@ -43,7 +43,6 @@ const NETWORK_ONLY = [
   'securetoken.googleapis.com',
   'api.openai.com',
   'generativelanguage.googleapis.com',   // Gemini
-  'api.deepseek.com',                    // DeepSeek
   'api.groq.com',                        // Groq
   'gistusercontent.com',
   'api.github.com',

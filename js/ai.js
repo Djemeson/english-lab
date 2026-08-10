@@ -847,9 +847,14 @@ const AI_PROVIDERS = {
     // GPT-5.6 (lançada 2026-07-09) é uma família de TRÊS níveis com nome
     // próprio: Sol (topo), Terra (equilibrado) e Luna (rápido/barato).
     // ⚠️ A ressalva do MRCR (recall em contexto longo) continua registrada:
-    // Sol 91,5% · Terra 89,6% · **Luna 41,3%**. O prompt de análise daqui tem
-    // ~3.000 tokens — não é "contexto longo" no sentido do teste —, mas é longo
-    // em REGRAS, e soltar regra é o que dói.
+    // Sol 91,5% · Terra 89,6% · **Luna 41,3%**.
+    // ⚠️ E o tamanho do prompt estava SUBESTIMADO AQUI: este comentário dizia
+    // "~3.000 tokens" desde que a Luna entrou na lista. Medido em 2026-08-08
+    // por `tools/teste-ia.mjs` (que monta o prompt de verdade a partir do
+    // código): **25.238 caracteres, ~6.300 tokens** — mais do que o dobro, e
+    // ~6.400 quando o bloco de reencontro entra. Não é "contexto longo" no
+    // sentido do MRCR, mas é o dobro do que eu supunha ao aceitar a troca.
+    // Por isso a medição com chave real virou pendência de primeira ordem.
     // ⚠️ LUNA VIROU O PADRÃO em 2026-08-08, por decisão dele — e a decisão ficou
     // menos arriscada do que era: com STRUCTURED OUTPUTS a parte da regra que
     // mais doía (o formato do JSON) saiu do prompt e virou contrato da API. O
@@ -1114,6 +1119,8 @@ const S = {
   // O enum é o ganho mais direto: hoje o código recebe `type: "colocação"` em
   // vez de `collocation` e cai num default silencioso. Aqui a API não deixa.
   ou:  (vals, d) => ({ type: 'string', enum: vals, description: d || undefined }),
+  // No modo estrito não existe campo opcional — "pode vir nulo" se diz assim.
+  txtOuNulo: d => ({ type: ['string', 'null'], description: d || undefined }),
   lista: (itens, d) => ({ type: 'array', items: itens, description: d || undefined }),
   obj: (props, d) => ({
     type: 'object', properties: props,
@@ -1151,6 +1158,13 @@ ESQ.analise = S.obj({
     register: S.ou(['neutral','formal','informal','colloquial','slang','technical','literary','archaic','vulgar']),
     level: S.ou(['A2', 'B1', 'B2', 'C1', 'C2']),
     gramatical: S.bool(), requires: S.txt(), unit: S.txt(), context_match: S.bool(),
+    // ⚠️ `same_as` QUASE FICOU DE FORA, e teria quebrado o reencontro (Fase 3)
+    // em silêncio: é por ele que a IA diz "este sentido é aquele que ele já
+    // tem" (review.js, `nm.same_as`). Ele não está no molde JSON principal —
+    // vive no `reencontroBlock`, que só aparece quando o item já tem sentidos.
+    // Foi assim que passou pela primeira conferência: eu fatiei só o molde.
+    // A lição está no `_esqConfere`: conferir a FUNÇÃO INTEIRA, não o molde.
+    same_as: S.txtOuNulo(),
     synonyms: S.lista(S.txt()), antonyms: S.lista(S.txt()), forms: S.lista(S.txt()),
     grammar: S.txt(), collocations: S.lista(S.txt()), confusoes: S.lista(S.txt()),
     armadilha: S.lista(S.txt()), curiosidade: S.lista(S.txt()), registro_uso: S.txt(),
@@ -1207,10 +1221,18 @@ ESQ.produzir = S.obj({
   ok: S.bool(), corrigida: S.txt(), comentario: S.txt(), registro: S.txt()
 })
 
-// ⚠️ A REDE CONTRA O ESQUECIMENTO. Compara as chaves do molde JSON que está
-// DENTRO do prompt com as chaves do esquema. Se eu acrescentar um campo ao
-// prompt e esquecer aqui, o modo estrito o proibiria em silêncio — e o app
-// perderia o dado sem nenhum erro. Só roda quando pedido (testes/console).
+// ⚠️ A REDE CONTRA O ESQUECIMENTO. Compara as chaves citadas no prompt com as
+// chaves do esquema. Se eu acrescentar um campo ao prompt e esquecer aqui, o
+// modo estrito o proibiria em silêncio — e o app perderia o dado sem nenhum
+// erro. Só roda quando pedido (testes/console).
+//
+// ⚠️⚠️ PASSE A FUNÇÃO INTEIRA, NUNCA SÓ O MOLDE JSON. Esta rede já falhou uma
+// vez por isso: o `same_as` da análise não mora no molde, mora num bloco
+// condicional (`reencontroBlock`) montado antes dele. Fatiando só o molde, ele
+// não aparecia — e o esquema o teria banido calado.
+// A varredura é grosseira de propósito (qualquer `"chave":` no texto), então
+// ela também acusa exemplos dentro das instruções. Falso positivo aqui custa
+// dez segundos de leitura; falso negativo custa um campo perdido em produção.
 function _esqConfere(prompt, esquema) {
   const doPrompt = new Set((String(prompt).match(/"([a-z_]+)"\s*:/g) || [])
     .map(x => x.replace(/"|:|\s/g, '')))
