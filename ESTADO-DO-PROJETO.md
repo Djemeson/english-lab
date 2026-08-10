@@ -8074,6 +8074,31 @@ acerto de cache não pode perder a procedência.
 **Arquivos**: `js/ai.js`, `js/core.js`, `js/ler.js`, `js/review.js`, `js/video-study.js`,
 `css/styles.css`, `tools/teste-ia.mjs`. `sw.js` → `englab-v188`.
 
+#### O gasto à toa do automático, contado e dito
+
+Pergunta dele, e ela é a mais afiada da rodada: *"o fato de ele existir ou de a Lexa fazer a
+verificação faz aquele uso a mais? O fato de eu decidir apertar o botão é pra evitar isso."*
+
+**O botão não custa nada** (é HTML) e **o filtro também não** (`lexaCheiraMundoReal` é JavaScript
+local). O pedágio só é pago quando a ferramenta é ENVIADA. Mas ele estava olhando uma tela em que
+ela FOI enviada: o rótulo *"a Lexa achou que não precisava"* quer dizer que o automático disparou,
+a ferramenta viajou junto, e o modelo decidiu não usá-la. **Pedágio pago à toa.** A intuição dele
+estava certa, e o desperdício era invisível.
+
+Agora ele é contado (`autosSemBusca`) e dito, com o valor: *"o automático levou a ferramenta 7× e o
+modelo não usou nenhuma — ~R$ 0,03 de pedágio à toa. 'Só quando eu pedir' zera isso, e o botão
+continua aqui."* Um app que cobra do bolso dele não pode esconder o que gastou por nada.
+
+#### E "já é seu" passou a olhar os cards
+
+O `pals` continuava sem o tique. A marcação saía só de `prepAcharItem`, que olha `words` — e ele
+disse *"os chips pal e gal já existem nos CARDS"*. O card sobrevive ao item apagado: a palavra sai
+de `words`, o card fica na revisão, e o chip volta a se oferecer como novidade. Do ponto de vista
+dele, ter o card É ter a palavra — e é o ponto de vista dele que manda. `lexaJaEhSeu` agora olha os
+dois, com os mesmos lemas nos dois lados (o card guarda a forma capturada, "Pals").
+
+`sw.js` → `englab-v189`.
+
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 
 Pedido dele, ainda **não implementado**. Duas capacidades diferentes, que só parecem uma.

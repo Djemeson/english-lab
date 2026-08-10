@@ -514,6 +514,34 @@ const _LEXA_CHIP_CATS = {
 // Chamar de novo a mesma frase, mesmo depois de recarregar a página, custa
 // zero: `quebrarTrecho` responde da memória ou do IndexedDB.
 
+// "JÁ É SEU" — e o acervo dele é maior que a lista de itens.
+// A marcação saía só de `prepAcharItem`, que olha `words`. Só que ele disse
+// *"os chips pal e gal já existem nos CARDS"* — e o card é o que sobrevive a
+// um item apagado: a palavra sai de `words`, o card continua na revisão, e o
+// chip volta a se oferecer como novidade. Do ponto de vista dele, ter o card
+// É ter a palavra — e é o ponto de vista dele que manda aqui.
+// A comparação passa pelos mesmos lemas do achador de itens, nos dois lados,
+// porque o card guarda a forma como a palavra foi capturada ("Pals").
+function lexaJaEhSeu(expr, lang) {
+  const termo = String(expr || '').trim()
+  if (!termo) return false
+  if (typeof prepAcharItem === 'function' && prepAcharItem(termo, lang)) return true
+  if (typeof srsCards === 'undefined' || !Array.isArray(srsCards)) return false
+  const norm = s => (typeof knownNorm === 'function' ? knownNorm(s) : String(s || '').toLowerCase().trim())
+  const formas = new Set([norm(termo)])
+  if (typeof glossLemas === 'function') {
+    for (const l of glossLemas(termo, { estrito: true })) formas.add(norm(l))
+  }
+  return srsCards.some(c => {
+    if (!c || (lang && c.lang && c.lang !== lang)) return false
+    const p = norm(c.word || '')
+    if (!p) return false
+    if (formas.has(p)) return true
+    if (typeof glossLemas !== 'function') return false
+    return glossLemas(c.word, { estrito: true }).some(x => formas.has(norm(x)))
+  })
+}
+
 function lexaChipsHTML(items, jaTenho) {
   if (!items || !items.length) return ''
   return `
@@ -566,9 +594,7 @@ async function lexaChipsMontar(caixa, { trecho, contexto, lang, fonte, origem })
   }
   if (!items.length) { slot.remove(); return }
   const jaTenho = new Set()
-  items.forEach((it, i) => {
-    if (typeof prepAcharItem === 'function' && prepAcharItem(it.expr, lang || 'en')) jaTenho.add(i)
-  })
+  items.forEach((it, i) => { if (lexaJaEhSeu(it.expr, lang || 'en')) jaTenho.add(i) })
   slot.innerHTML = lexaChipsHTML(items, jaTenho)
   // Delegação num pai só: os chips são repintados a cada clique, e um ouvinte
   // por botão viraria ouvinte órfão a cada repintura.
@@ -1274,6 +1300,12 @@ function lexaWebRegistrar({ automatica, manual, buscou }) {
   if (manual) u.manuais++
   else { u.exp++; if (automatica) u.autos++ }
   if (buscou) u.buscas++
+  // ⚠️ O DESPERDÍCIO TEM DE SER CONTADO, e foi ele quem apontou: *"o fato de eu
+  // decidir apertar o botão é pra evitar isso"*. Está certo — e o modo `auto`
+  // paga o pedágio toda vez que o filtro dispara, inclusive quando o modelo
+  // olha e decide que não precisava buscar. Esse é o gasto invisível do
+  // automático, e um app que cobra do bolso dele não pode deixá-lo invisível.
+  if (automatica && !buscou) u.autosSemBusca = (u.autosSemBusca || 0) + 1
   if (typeof saveCfg === 'function') saveCfg()
 }
 
@@ -1304,6 +1336,14 @@ function lexaWebSugestao(p) {
   if (!p || p.magra) return ''
   const modo = lexaWebModo()
   const pediu = p.manuais / Math.max(1, p.exp)
+  // O gasto à toa vem PRIMEIRO: é o que ele já desconfiava e o único que ele
+  // não tem como enxergar sozinho. Uma oferta que não vira busca é pedágio
+  // pago por nada — e o modo "só quando eu pedir" zera exatamente isso.
+  const aTOA = (p.autosSemBusca || 0)
+  if (modo === 'auto' && aTOA >= 3 && aTOA / Math.max(1, p.autos) > 0.5) {
+    const brl = (AI_WEB_PEDAGIO / 1e6 * aiPrecoModelo().in * (p.brl || 5.4) * aTOA)
+    return `O automático levou a ferramenta ${aTOA}× e o modelo não usou nenhuma — ~R$ ${brl.toFixed(2)} de pedágio à toa. "Só quando eu pedir" zera isso, e o botão continua aqui.`
+  }
   if (modo !== 'sempre' && pediu > 0.3) {
     return `Você pediu a busca à mão em ${Math.round(pediu * 100)}% das explicações — no seu caso "sempre" talvez pague a pena.`
   }
