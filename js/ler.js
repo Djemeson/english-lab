@@ -1169,13 +1169,22 @@ async function lerExplicarSelecao(pop, de) {
     }).catch(() => {})
   }
 
+  // ⚠️ A BUSCA NA OBRA ACONTECE ANTES DA IA, e é por isso que ela vale a pena:
+  // não é um bloco decorativo embaixo da resposta, é INFORMAÇÃO QUE ENTRA na
+  // pergunta. Assim a Lexa pode dizer "aqui é o mesmo sentido do capítulo 4" —
+  // coisa que só quem leu o livro inteiro consegue responder, e agora o app
+  // leu. Custa zero de IA: o livro já está no aparelho.
+  let eco = null
+  try { eco = await obraMontarEco(null, { livro: _lerLivro, termo: alvo, atual: ctx }) } catch (e) {}
+
   try {
     const sistema = lexaPrompt()
     // O TRECHO INTEIRO vai primeiro, e a frase depois. Sem o parágrafo, um
     // pronome no começo da seleção fica órfão e a IA inventa o referente.
     const trecho = (emVolta && emVolta.length > ctx.length) ? emVolta : ''
     const pergunta = `O aluno está lendo "${_lerLivro.title}"${_lerLivro.author ? ', de ' + _lerLivro.author : ''}.${
-    trecho ? `\nTrecho em volta (use para resolver pronomes e referências): "${trecho}"` : ''}\nA frase é: "${ctx}". Ele selecionou: "${alvo}".\nExplique o que "${alvo}" significa AQUI, nesta passagem.`
+    trecho ? `\nTrecho em volta (use para resolver pronomes e referências): "${trecho}"` : ''}\nA frase é: "${ctx}". Ele selecionou: "${alvo}".\nExplique o que "${alvo}" significa AQUI, nesta passagem.${
+    (typeof obraContextoParaIA === 'function' ? obraContextoParaIA(eco) : '')}`
     // A WEB VALE AQUI TAMBÉM. O leitor é onde nome próprio e referência
     // cultural mais aparecem — "Archie's Pals 'n' Gals" saiu daqui —, e a
     // primeira versão da busca só valia no menu de seleção. Uma peça só
@@ -1192,6 +1201,11 @@ async function lerExplicarSelecao(pop, de) {
     // markdown e o `textContent` a mostrava crua — `**pals** = "amigos"`,
     // com os asteriscos na cara do aluno.
     if (txtEl) txtEl.innerHTML = t ? lexaFormatar(t) : esc(`${lexaNome()} devolveu uma resposta vazia`)
+    // O ECO na tela, logo abaixo da explicação: os trechos com o capítulo, e um
+    // clique que leva até lá.
+    if (txtEl && eco && eco.trechos && eco.trechos.length) {
+      txtEl.insertAdjacentHTML('beforeend', obraBlocoHTML(eco, { noLeitor: true }))
+    }
     if (typeof lexaWebRodape === 'function' && txtEl) {
       lexaWebRodape(txtEl, { ...r,
         refazer: () => lerExplicarSelecao(null, { alvo, ctx, trecho: emVolta, web: true }) })
@@ -3183,4 +3197,151 @@ async function reparoExecutar({ simular = true, aoAndar = null } = {}) {
     if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   }
   return rel
+}
+
+// ================================================================
+// A OBRA COMO MEMÓRIA — a Lexa que leu o livro
+// ================================================================
+// Até aqui a Lexa via UM parágrafo. Ela não sabia quem é um personagem, nem se
+// a palavra já tinha aparecido antes, nem que aquele nome volta no capítulo
+// seguinte. E o material para saber já é nosso: o EPUB inteiro está no
+// `BookDB`, e o app não precisa pedir nada a ninguém para procurar dentro dele.
+//
+// Sem embeddings de propósito: eles custariam uma chamada por trecho e um
+// índice para guardar. A busca por LEMA que o reparo já usa (`_repCasa`)
+// resolve o caso de uso — ela acha "fell" procurando "fall" e aguenta o
+// phrasal partido pelo objeto.
+//
+// ⚠️⚠️ A REGRA QUE MANDA AQUI É O SPOILER.
+// Trazer um trecho do capítulo 30 para quem está no 11 estraga o livro — e
+// estragar o livro de alguém é pior do que não ajudar. O teto não é o capítulo
+// ABERTO, é o mais longe que ele já leu (`livro.pos.cap`), que fica gravado por
+// livro: assim o Estudar, que não tem "capítulo atual", respeita a mesma
+// fronteira. Nenhuma função daqui aceita ser chamada sem esse teto.
+
+const _obrTexto = new Map()          // livroId|capIdx → texto limpo do capítulo
+const _obrLivro = new Map()          // livroId → { ep, txtCaps, nCaps }
+
+function obraAteOndeLeu(livro) {
+  if (!livro) return -1
+  const n = (livro.chapters || []).length
+  const p = (livro.pos && Number(livro.pos.cap)) || 0
+  return Math.max(0, Math.min(p, n - 1))
+}
+
+async function _obrAbrir(livro) {
+  if (_obrLivro.has(livro.id)) return _obrLivro.get(livro.id)
+  const blob = await BookDB.get(livro.id)
+  if (!blob) throw new Error('o arquivo do livro não está neste aparelho')
+  const buf = await blob.arrayBuffer()
+  let dados
+  if (livro.format === 'epub') {
+    const ep = await epubAbrir(buf)
+    dados = { ep, nCaps: (livro.chapters || []).length }
+  } else {
+    const txt = new TextDecoder('utf-8').decode(buf)
+    const ehHtml = /^\s*(<!doctype html|<html)/i.test(txt)
+    const caps = textoParaCapitulos(ehHtml ? epubTextoLimpo(txt) : txt)
+    dados = { txtCaps: caps, nCaps: caps.length }
+  }
+  _obrLivro.set(livro.id, dados)
+  return dados
+}
+
+async function obraTextoCap(livro, i) {
+  const k = livro.id + '|' + i
+  if (_obrTexto.has(k)) return _obrTexto.get(k)
+  let t = ''
+  try {
+    const d = await _obrAbrir(livro)
+    if (d.txtCaps) t = _repEspacos(epubTextoLimpo((d.txtCaps[i] || {}).html || ''))
+    else {
+      const c = (livro.chapters || [])[i]
+      const html = c && c.href ? await d.ep.zip.texto(c.href) : ''
+      t = html ? _repEspacos(epubTextoLimpo(html)) : ''
+    }
+  } catch (e) { throw e }
+  _obrTexto.set(k, t)
+  return t
+}
+
+// A BUSCA. Devolve as frases onde o termo aparece, do capítulo mais recente
+// para o mais antigo — o que ele leu ontem lembra mais que o do mês passado.
+async function obraBuscar(livro, termo, { ateCap, maxTrechos = 3 } = {}) {
+  const vazio = { total: 0, caps: 0, trechos: [], limite: ateCap }
+  if (!livro || !String(termo || '').trim()) return vazio
+  const teto = Number.isInteger(ateCap) ? ateCap : obraAteOndeLeu(livro)
+  if (teto < 0) return vazio
+  let total = 0, caps = 0
+  const trechos = []
+  for (let i = teto; i >= 0; i--) {          // do mais recente para trás
+    let txt = ''
+    try { txt = await obraTextoCap(livro, i) } catch (e) { break }
+    if (!txt) continue
+    const achadas = _repFrases(txt).filter(f => _repCasa(termo, f))
+    if (!achadas.length) continue
+    caps++; total += achadas.length
+    for (const f of achadas) {
+      if (trechos.length >= maxTrechos) break
+      trechos.push({ cap: i, titulo: (((livro.chapters || [])[i]) || {}).titulo || `Parte ${i + 1}`,
+                     frase: f.slice(0, 300) })
+    }
+  }
+  return { total, caps, trechos, limite: teto }
+}
+
+// ---- O que aparece na tela --------------------------------------
+// Um bloco discreto, embaixo da explicação: quantas vezes já apareceu no que
+// ele JÁ LEU, e os trechos. No leitor, clicar leva ao capítulo.
+function obraBlocoHTML(r, { noLeitor } = {}) {
+  if (!r || !r.total) return ''
+  const nCap = r.caps === 1 ? 'num capítulo' : `em ${r.caps} capítulos`
+  return `<div class="obra-eco">
+    <div class="obra-eco-cab">${ic('bookOpen','ic-sm')} já apareceu no que você leu
+      <span>${r.total}× ${nCap}</span></div>
+    ${r.trechos.map(t => `<div class="obra-eco-tr">
+      ${noLeitor
+        ? `<button class="obra-eco-ir" onclick="obraIrAoCapitulo(${t.cap})" data-tip="Abrir este capítulo">${esc(t.titulo)}</button>`
+        : `<i>${esc(t.titulo)}</i>`}
+      <p>${escB(t.frase)}</p>
+    </div>`).join('')}
+  </div>`
+}
+
+function obraIrAoCapitulo(i) {
+  if (typeof lerIrParaCapitulo !== 'function' || !_lerLivro) return
+  if (typeof _selMenuFechar === 'function') _selMenuFechar()
+  lerIrParaCapitulo(i, 0)
+}
+
+// Busca e pinta, sem segurar a explicação: o eco entra quando chegar.
+// ⚠️ A frase ATUAL não conta como "já apareceu": ela é onde ele está agora, e
+// listá-la faria o bloco dizer que a palavra tem eco quando ela é estreia.
+async function obraMontarEco(corpo, { livro, termo, atual, noLeitor }) {
+  if (!corpo || !livro || !termo) return null
+  let r = null
+  try { r = await obraBuscar(livro, termo, { maxTrechos: 4 }) } catch (e) { return null }
+  const agora = _repNorm(atual || '')
+  r.trechos = r.trechos.filter(t => _repNorm(t.frase) !== agora)
+  if (agora && r.total > 0) r.total = Math.max(0, r.total - 1)   // a atual sai da conta
+  if (!r.total || !r.trechos.length) return r
+  if (corpo.isConnected) corpo.insertAdjacentHTML('beforeend', obraBlocoHTML(r, { noLeitor }))
+  return r
+}
+
+// O que vai para a IA: os trechos anteriores, para a explicação poder dizer se
+// o sentido de agora é o MESMO de antes ou outro. É a pergunta que só quem leu
+// o livro inteiro consegue responder — e agora o app leu.
+function obraContextoParaIA(r) {
+  if (!r || !r.trechos || !r.trechos.length) return ''
+  return `\nESTA EXPRESSÃO JÁ APARECEU no que ele leu deste livro:\n${
+    r.trechos.map(t => `- (${t.titulo}) "${t.frase}"`).join('\n')}\nSe o sentido AQUI for o mesmo de antes, diga isso em meia frase. Se for OUTRO, avise — é a armadilha que faz o aluno ler a página errada.`
+}
+
+// O livro de um item, pelo título bruto que ele guardou.
+function obraDoItem(w, m) {
+  if (typeof livros === 'undefined' || !Array.isArray(livros)) return null
+  const t = _repNorm(obraNome((m && m.source_title) || (w && w.source_title) || ''))
+  if (!t) return null
+  return livros.find(l => _repNorm(obraNome(l.title)) === t || _repNorm(l.title) === t) || null
 }

@@ -884,33 +884,49 @@ function _dosIrParaItem(ev, wordId) {
   return false
 }
 
-// QUANTAS VEZES APARECE NO SEU LIVRO. Isto ninguém tem, e é de graça: o EPUB
-// inteiro está guardado (`BookDB.set(id, blob)` em ler.js), então dá para
-// contar as ocorrências do item no livro todo e dizer se vale a pena decorar.
-// Sob demanda e com cache: abrir e descomprimir um livro custa alguns décimos
-// de segundo, e ninguém deve pagar isso ao simplesmente abrir um item.
-const _dosFreqCache = new Map()     // livroId|termo → { n, caps }
+// QUANTAS VEZES APARECE NO SEU LIVRO — e ONDE.
+// ⚠️ ESTA PEÇA FOI REFEITA. A primeira versão contava o livro INTEIRO com um
+// regex, e tinha dois defeitos: dava só um número (sem os trechos, que é onde
+// está o aprendizado) e, pior, contava capítulos que ele AINDA NÃO LEU —
+// spoiler embutido numa tela de estudo. Agora usa o motor da obra
+// (`obraBuscar`, em ler.js), que respeita a fronteira do que ele já leu e
+// devolve as frases.
+// O motor é LAZY: o Estudar carrega o pacote do leitor sob demanda, do mesmo
+// jeito que o reparo faz em Configurações (armadilha nº 1).
+const _dosFreqCache = new Map()     // livroId|termo → resultado da busca
+
+async function _dosCarregarObra() {
+  if (typeof obraBuscar === 'function') return true
+  for (const f of ['js/epub.js', 'js/ler.js']) {
+    try { await _loadScript(f) } catch (e) { console.error(e); return false }
+  }
+  return typeof obraBuscar === 'function'
+}
 
 function _dosFreqHTML(w) {
   const livro = _dosLivroDoItem(w)
   if (!livro) return ''
   const chave = livro.id + '|' + String(w.word || '').toLowerCase()
-  const pronto = _dosFreqCache.get(chave)
-  if (pronto) {
-    if (!pronto.n) return ''
+  const r = _dosFreqCache.get(chave)
+  if (r) {
+    if (!r.total) return `<p class="dosf-nota">${ic('search','ic-sm')} não achei
+      <b>${esc(w.word)}</b> no que você já leu de <i>${esc(obraNome(livro.title))}</i>.</p>`
     return `<p class="dosf-texto">${ic('search','ic-sm')} <b>${esc(w.word)}</b> aparece
-      <b>${pronto.n}×</b> em <i>${esc(livro.title)}</i>${
-      pronto.caps ? ` — em ${pronto.caps} ${pronto.caps === 1 ? 'trecho' : 'trechos'} do livro` : ''}.</p>`
+        <b>${r.total}×</b> no que você já leu de <i>${esc(obraNome(livro.title))}</i>${
+        r.caps > 1 ? `, em ${r.caps} capítulos` : ''}.</p>
+      ${typeof obraBlocoHTML === 'function' ? obraBlocoHTML(r, { noLeitor: false }) : ''}`
   }
   return `<p class="dosf-texto" id="dosf-freq"><button class="btn btn-ghost btn-sm"
-    onclick="dossieContarNoLivro('${w.id}')">${ic('search','ic-sm')} Contar quantas vezes aparece em "${escA(livro.title)}"</button></p>`
+    onclick="dossieContarNoLivro('${w.id}')">${ic('search','ic-sm')} Procurar em "${escA(obraNome(livro.title))}"</button>
+    <span class="dosf-nota"> — só no que você já leu, sem estragar o que vem.</span></p>`
 }
 
 function _dosLivroDoItem(w) {
   if (!Array.isArray(livros) || !livros.length) return null
-  const t = String(w.source_title || '').trim().toLowerCase()
+  const t = String(obraNome(w.source_title || '')).trim().toLowerCase()
   if (!t) return null
-  return livros.find(l => String(l.title || '').trim().toLowerCase() === t) || null
+  return livros.find(l => String(obraNome(l.title) || '').trim().toLowerCase() === t
+                       || String(l.title || '').trim().toLowerCase() === t) || null
 }
 
 async function dossieContarNoLivro(wordId) {
@@ -918,26 +934,14 @@ async function dossieContarNoLivro(wordId) {
   const livro = _dosLivroDoItem(w); if (!livro) return
   const alvo = el('dosf-freq')
   if (alvo) alvo.innerHTML = `<span class="dosf-nota"><span class="spinner"></span> lendo o livro…</span>`
+  if (!(await _dosCarregarObra())) {
+    if (alvo) alvo.innerHTML = `<span class="dosf-nota">não consegui carregar o leitor</span>`
+    return
+  }
   try {
-    const blob = await BookDB.get(livro.id)
-    if (!blob) throw new Error('o arquivo do livro não está mais neste aparelho')
-    const ep = await epubAbrir(await blob.arrayBuffer())
-    // As flexões vêm do MESMO gerador do glossário — senão "gals" não acharia
-    // "gal" e a conta sairia menor do que a verdade.
-    const termos = (typeof glossLemas === 'function')
-      ? [...new Set([String(w.word).toLowerCase(), ...glossLemas(String(w.word).toLowerCase())])]
-      : [String(w.word).toLowerCase()]
-    const rx = new RegExp('\\b(' + termos.map(escR).join('|') + ')\\b', 'gi')
-    let n = 0, caps = 0
-    for (const c of ep.capitulos) {
-      const html = await ep.zip.texto(c.href)
-      const txt = html ? epubTextoLimpo(html) : ''
-      const achou = txt ? (txt.match(rx) || []).length : 0
-      if (achou) { n += achou; caps++ }
-    }
-    _dosFreqCache.set(livro.id + '|' + String(w.word || '').toLowerCase(), { n, caps })
+    const r = await obraBuscar(livro, String(w.word || ''), { maxTrechos: 4 })
+    _dosFreqCache.set(livro.id + '|' + String(w.word || '').toLowerCase(), r)
     _dosFocoPintar()
-    if (!n) toast(`"${w.word}" não foi encontrada no texto do livro`, 'info')
   } catch (e) {
     console.error(e)
     if (alvo) alvo.innerHTML = `<span class="dosf-nota">não deu para ler o livro: ${esc(e.message || 'erro')}</span>`

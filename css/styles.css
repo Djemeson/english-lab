@@ -5166,6 +5166,35 @@ body.ler-full .mobile-bottom-nav{display:none}
 .lexa-web-btn:hover{color:var(--text);border-style:solid;border-color:var(--primary)}
 .lexa-web-btn i{font-style:normal;opacity:.75;font-variant-numeric:tabular-nums}
 
+/* O ECO DA OBRA — "já apareceu no que você leu".
+   Fica embaixo da explicação, discreto: é memória, não manchete. O trecho vem
+   em itálico com a barra do acento, como toda citação do app, e o capítulo é
+   clicável no leitor (fora dele, vira só rótulo — não há para onde ir). */
+.obra-eco{
+  margin-top:var(--sp-3);padding-top:var(--sp-2);
+  border-top:1px dashed var(--border);
+}
+.obra-eco-cab{
+  display:flex;align-items:center;gap:5px;flex-wrap:wrap;
+  font-size:var(--fs-3xs);text-transform:uppercase;letter-spacing:.04em;
+  color:var(--text3);font-weight:600;
+}
+.obra-eco-cab span{text-transform:none;letter-spacing:0;font-weight:400;color:var(--text2)}
+.obra-eco-tr{margin-top:var(--sp-2)}
+.obra-eco-tr i,.obra-eco-ir{
+  font-style:normal;font-size:var(--fs-3xs);color:var(--text3);
+}
+.obra-eco-ir{
+  cursor:pointer;background:none;border:0;padding:0;font:inherit;
+  font-size:var(--fs-3xs);color:var(--text3);text-decoration:underline dotted;
+}
+.obra-eco-ir:hover{color:var(--primary)}
+.obra-eco-tr p{
+  margin:2px 0 0;padding-left:8px;
+  border-left:2px solid rgba(var(--primary-rgb),.35);
+  font-size:var(--fs-xs);line-height:1.5;font-style:italic;color:var(--text2);
+}
+
 /* AMOSTRA DO REPARO — antes e depois, um sobre o outro.
    A frase velha fica riscada e apagada; a nova, viva. É o que deixa ele
    conferir o acerto sem precisar abrir o livro. */

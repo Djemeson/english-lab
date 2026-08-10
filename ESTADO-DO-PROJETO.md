@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A WEB SÓ ACONTECE QUANDO ELE CLICA**. Decisão dele, e ela
+> Última atualização: 2026-08-08 — **A LEXA LEU O LIVRO**. Até aqui ela via UM parágrafo: não sabia
+> quem é um personagem, nem se a palavra já tinha aparecido antes. O material sempre foi nosso — o
+> EPUB inteiro está no `BookDB` —, e agora o app procura dentro dele. **Zero IA e zero API nova**:
+> a busca por lema que o reparo já usava (`_repCasa`, que acha "fell" procurando "fall" e aguenta o
+> phrasal partido pelo objeto) resolve o caso de uso sem embeddings. ⚠️ **A regra que manda é o
+> SPOILER**: o teto não é o capítulo aberto, é o mais longe que ele já leu (`livro.pos.cap`), que
+> fica gravado por livro — assim o Estudar, que não tem "capítulo atual", respeita a mesma
+> fronteira. **E o eco entra ANTES da IA**, não como bloco decorativo embaixo: os trechos anteriores
+> vão na pergunta, então a Lexa pode dizer *"aqui é o mesmo sentido do capítulo 4"* — coisa que só
+> quem leu o livro responde. O "contar no livro" do Estudar foi refeito em cima do mesmo motor:
+> contava o livro INTEIRO (spoiler embutido) e dava só um número. `sw.js` → `englab-v195`.
+>
+> Anterior: 2026-08-08 — **A WEB SÓ ACONTECE QUANDO ELE CLICA**. Decisão dele, e ela
 > apagou o que eu tinha construído nas rodadas anteriores: *"sobre a pesquisa web, ele nunca deve
 > ser automático. Só acontece quando eu clico."* Saíram o filtro de nome próprio, as três posições
 > de escolha, a projeção de custo por modo, os contadores e a memória do "não adiantou" — **tudo
@@ -8226,6 +8238,53 @@ sem resultado no caso mais comum — nome próprio famoso, que o modelo já conh
 
 `sw.js` → `englab-v191`.
 
+### A LEXA LEU O LIVRO — entregue em 2026-08-08 (a parte A da especificação)
+
+**O motor** (`js/ler.js`): `obraBuscar(livro, termo, { ateCap, maxTrechos })` devolve
+`{ total, caps, trechos }`, do capítulo mais recente para o mais antigo — o que ele leu ontem
+lembra mais que o do mês passado. Reusa `_repCasa` e `_repFrases`, escritos para o reparo do
+contexto: já sabem flexão e phrasal separado pelo objeto. Texto de capítulo em cache de sessão
+(`_obrTexto`), livro aberto uma vez só (`_obrLivro`), e o ramo `.txt`/`.html` junto, porque nem
+todo livro é EPUB.
+
+**Sem embeddings, de propósito.** Custariam uma chamada de IA por trecho e um índice para guardar.
+A busca por lema entrega o caso de uso; e um índice de entidades separado também não foi preciso —
+procurar o NOME já devolve as passagens onde ele aparece, que é exatamente o que a IA precisa para
+responder "quem é Nick Majarian?".
+
+#### ⚠️ A regra do spoiler é a espinha, não um detalhe
+
+Trazer um trecho do capítulo 30 para quem está no 11 estraga o livro — e estragar o livro de alguém
+é pior do que não ajudar. O teto **não é o capítulo aberto**: é `livro.pos.cap`, o mais longe que
+ele já leu, gravado por livro. Isso resolve dois casos de uma vez: no leitor a fronteira acompanha
+a leitura, e no **Estudar** — que não tem "capítulo atual" — ela existe do mesmo jeito. Nenhuma
+função do motor aceita rodar sem esse teto.
+
+#### O eco entra ANTES da IA
+
+É o que separa isto de um bloco decorativo. `obraContextoParaIA(eco)` põe os trechos anteriores
+**dentro da pergunta**, com uma instrução: *se o sentido aqui for o mesmo de antes, diga em meia
+frase; se for outro, avise*. Palavra que muda de sentido entre capítulos é a armadilha que faz o
+aluno ler a página errada — e só quem leu o livro inteiro percebe. Agora o app leu.
+
+Na tela, o bloco "já apareceu no que você leu" traz a contagem e até quatro trechos, com o capítulo
+clicável (no leitor, leva até lá). ⚠️ A frase ATUAL é descontada da conta e removida dos trechos:
+ela é onde ele está agora, e listá-la faria a estreia de uma palavra parecer reencontro.
+
+#### O "contar no livro" do Estudar foi refeito
+
+A peça antiga tinha dois defeitos: contava com regex o livro **INTEIRO** — spoiler embutido numa
+tela de estudo — e devolvia só um número, sem os trechos, que é onde está o aprendizado. Agora usa
+o mesmo motor. ⚠️ Ele é LAZY: o Estudar carrega o pacote do leitor sob demanda, com guarda por
+`typeof`, do mesmo jeito que o reparo faz em Configurações (armadilha nº 1).
+
+**Provado no navegador** com um livro de quatro capítulos e a leitura parada no segundo: achou as
+duas ocorrências dos capítulos lidos, **não trouxe a do capítulo 4** (que entregava o assassino),
+passou a trazê-la quando a leitura avançou, encontrou o phrasal partido e ordenou do mais recente
+para o mais antigo.
+
+**Arquivos**: `js/ler.js`, `js/dossie.js`, `css/styles.css`. `sw.js` → `englab-v195`.
+
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 
 Pedido dele, ainda **não implementado**. Duas capacidades diferentes, que só parecem uma.
@@ -8307,12 +8366,11 @@ lugar só.
       urgente: sem esquema o comportamento é exatamente o de antes. **O caminho é conhecido**:
       escrever o `ESQ.*`, passar `{ schema, schemaNome }` e rodar `_esqConfere` contra o trecho do
       prompt — ⚠️ **nunca passar esquema sem conferir**, porque campo esquecido vira campo proibido.
-- [ ] **A LEXA QUE LEU O LIVRO E VÊ A WEB** (2026-08-08) — especificação escrita na seção 8.2,
-      nada implementado. Ordem sugerida: fase 1 da obra (zero IA), depois web search atrás de
-      interruptor, depois fase 2. ⚠️ A regra do **spoiler** é a que não pode ser esquecida.
-- [x] ~~Rodar `tools/teste-ia.mjs` com chave de verdade~~ — **feito em 2026-08-08**. 7/7 contratos
-      aceitos, nada truncado, e dois bugs encontrados. Resultados na seção 8.2 ("O que a API
-      respondeu"). Para repetir: `node tools/teste-ia.mjs tudo` (o script lê o `.env` sozinho).
+- [x] ~~A Lexa que leu o livro e vê a web~~ — **as duas entregues em 2026-08-08**. A web só no
+      clique; a obra com a regra do spoiler e o eco entrando antes da IA. Ver 8.2.
+      ⚠️ **Falta usar com um livro de verdade**: o comportamento foi provado com um EPUB de
+      mentira de quatro capítulos. Com *Billy Summers* aberto, conferir se a busca em um livro
+      grande responde rápido o bastante para não atrasar a explicação.
 - [ ] **O REDUTOR DE LEMA COROA NÃO-PALAVRAS** (2026-08-08) — achado pela bateria, **anterior a
       esta rodada** e maior que ela. `_lemaBase` pega cegamente `glossLemas(...)[1]`, e para
       consoante dobrada ou 'e' mudo isso é a resposta errada:
