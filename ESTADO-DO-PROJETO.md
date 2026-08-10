@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A FORMA VIROU CONTRATO (structured outputs), O DEEPSEEK SAIU
+> Última atualização: 2026-08-08 — **A BATERIA RODOU COM CHAVE DE VERDADE**. 19 chamadas, R$ 0,13.
+> **7/7 contratos aceitos** sob `strict: true`, **nada truncou** (a Luna gasta 1.583–2.486 tokens de
+> saída contra teto de 5.000), e o contrato saiu **mais barato**: com esquema ela gastou 36% menos
+> no caso com reencontro, porque sobra menos coisa para decidir sozinha. A troca de modelo se
+> justificou: Luna preenche 17–18 dos 21 campos do sentido contra 9–12 do gpt-4o-mini, que deixa
+> vazio justamente o que as últimas rodadas acrescentaram. ⚠️ **E o `same_as` provou o ponto
+> sozinho**: sem esquema o gpt-4o-mini OMITIU o campo e o reencontro falharia calado; com esquema
+> voltou certo. **Dois bugs de brinde**: o lema de composto com hífen virava não-palavra
+> (`digest-sized` → `digest-siz`) — **corrigido**; e o mesmo defeito em palavra simples
+> (`running` → `runn`) ficou como pendência, porque exige migração do acervo.
+> Ver 8.2 ("O que a API respondeu").
+>
+> Anterior: 2026-08-08 — **A FORMA VIROU CONTRATO (structured outputs), O DEEPSEEK SAIU
 > E A LUNA VIROU PADRÃO**. Decisão dele: *"não vamos mais usar o DeepSeek, ele não trouxe
 > resultados tão efetivos assim. O modelo padrão será o Luna."* O fornecedor saiu inteiro (tabela,
 > chave, sincronização e os comentários que se justificavam por ele); quem tinha `deepseek` salvo
@@ -7770,6 +7782,61 @@ tokens" desde que ela entrou na lista. Medido: **25.238 caracteres, ~6.300 token
 reencontro). Não é "contexto longo" no sentido do MRCR, mas é o dobro do que eu supunha ao aceitar
 a troca de modelo — o comentário foi corrigido.
 
+### O que a API respondeu — a bateria rodada de verdade (2026-08-08)
+
+Chave real, 19 chamadas, **R$ 0,13 no total**.
+
+**Os 7 contratos: aceitos.** `strict: true` passou em todos — a API valida o esquema antes de
+gerar, então esquema torto voltaria 400 na hora.
+
+**Nada truncou.** A preocupação de que o modo estrito estouraria o teto (o modelo é obrigado a
+devolver todos os campos, vazios inclusive) **não se confirmou**: a Luna gasta 1.583–2.486 tokens de
+saída contra um teto de 5.000. E os tokens de raciocínio aparecem na conta — 960 a 1.640 por
+chamada —, o que confirma que o `AI_FOLGA_RACIOCINIO` de 25.000 não era exagero.
+
+| | campos preenchidos (de 21) | saída | tempo | custo |
+|---|---|---|---|---|
+| **Luna + esquema** | **17–18** | 1.583–2.151 | 17–23s | R$ 0,018–0,021 |
+| Luna cru | 17–18 | 2.398–2.486 | 24–26s | R$ 0,022–0,023 |
+| gpt-4o-mini + esquema | 12 | ~543 | 7–8s | R$ 0,007 |
+| gpt-4o-mini cru | 9–11 | ~520 | 7s | R$ 0,007 |
+
+**A troca de modelo se justificou.** O gpt-4o-mini deixa vazios justamente os campos que as últimas
+rodadas acrescentaram — `forms`, `grammar`, `collocations`, `confusoes`, `armadilha`, `curiosidade`,
+`origin_pt`. Metade do painel de estudo ficaria em branco. A Luna custa ~3× mais e entrega ~1,7×
+mais campo; em valor absoluto, dois centavos por item.
+
+Na quebra dos chips a diferença é de julgamento, não de quantidade: para *"looks lower middle-class
+to Billy"* a Luna devolve **`lower middle-class` [collocation]** — unidade que sobrevive fora da
+frase — e o gpt-4o-mini devolve `looks lower middle-class` [chunk], que é uma fatia arbitrária, mais
+`Billy` [word], que é nome de personagem. **E zero vazamento do contexto nos quatro cenários**: a
+correção da rodada anterior se confirma contra a API real.
+
+**⚠️ O contrato SAI MAIS BARATO.** Com esquema, a Luna gastou menos: 2.151 contra 2.398 tokens no
+item novo, e **1.583 contra 2.486** no caso com reencontro — 36% a menos. Faz sentido: com a forma
+dada, sobra menos coisa para o modelo decidir sozinho. O contrato se paga.
+
+**⚠️ E o `same_as` provou o ponto sozinho.** No cenário de reencontro **sem esquema**, o gpt-4o-mini
+simplesmente **omitiu o campo** (`same_as: undefined`) — o reencontro da Fase 3 falharia calado.
+**Com esquema, voltou `"m1"` corretamente.** É a medição do valor de structured outputs, no campo
+que quase ficou de fora do esquema.
+
+#### O bug que a bateria achou de brinde
+
+A Luna devolveu `lemma: "size"` para `digest-sized` — e `"digest"` noutra rodada, para o MESMO item.
+O guarda `aplicarLemaDaIA` (que exige parentesco real com a expressão) **recusou os dois**, como
+devia. Só que a regra da casa assumia e entregava **`digest-siz`** — não-palavra. O defeito se
+generaliza: `self-employed→self-employ`, `good-looking→good-look`, `old-fashioned→old-fashion`.
+
+**Causa**: `_lemaBase` foi feito para palavra simples, onde sabe as regras de sufixo do inglês.
+Aplicado ao composto inteiro, ele corta o fim como se fosse uma palavra só. **Corrigido**: composto
+com hífen não se poda. Custa quase nada — adjetivo composto praticamente não flexiona, então não há
+família para reunir —, e chave literal é melhor que chave inventada.
+
+⚠️ **O mesmo defeito de fundo existe em palavra simples** (`running→runn`, `making→mak`) e é
+**anterior a esta rodada**. Ficou como pendência própria porque exige migração do acervo — ver
+seção 9.
+
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 
 Pedido dele, ainda **não implementado**. Duas capacidades diferentes, que só parecem uma.
@@ -7854,13 +7921,25 @@ lugar só.
 - [ ] **A LEXA QUE LEU O LIVRO E VÊ A WEB** (2026-08-08) — especificação escrita na seção 8.2,
       nada implementado. Ordem sugerida: fase 1 da obra (zero IA), depois web search atrás de
       interruptor, depois fase 2. ⚠️ A regra do **spoiler** é a que não pode ser esquecida.
-- [ ] **RODAR `tools/teste-ia.mjs` COM CHAVE DE VERDADE** (2026-08-08). A bateria está pronta e o
-      modo `seco` (sem chave, sem custo) já passa. Falta o que só a API responde: se ela aceita os
-      7 esquemas sob `strict: true`, se a Luna preenche os 21 campos do sentido sem truncar, o
-      custo real por análise, e o comparativo Luna × gpt-4o-mini nos MESMOS prompts.
-      **Como**: `.env` na raiz (já ignorado pelo git) com `OPENAI_API_KEY=`, e
-      `set -a; . ./.env; set +a; node tools/teste-ia.mjs tudo`.
-      ⚠️ Vale uma chave separada com teto de gasto — descartável ao fim do teste.
+- [x] ~~Rodar `tools/teste-ia.mjs` com chave de verdade~~ — **feito em 2026-08-08**. 7/7 contratos
+      aceitos, nada truncado, e dois bugs encontrados. Resultados na seção 8.2 ("O que a API
+      respondeu"). Para repetir: `node tools/teste-ia.mjs tudo` (o script lê o `.env` sozinho).
+- [ ] **O REDUTOR DE LEMA COROA NÃO-PALAVRAS** (2026-08-08) — achado pela bateria, **anterior a
+      esta rodada** e maior que ela. `_lemaBase` pega cegamente `glossLemas(...)[1]`, e para
+      consoante dobrada ou 'e' mudo isso é a resposta errada:
+      `running→runn`, `getting→gett`, `stopping→stopp`, `planned→plann`, `hugged→hugg`,
+      `making→mak`, `coming→com`, `writing→writ`, `hoping→hop`.
+      **O candidato certo já está na lista** (`running` → `[running, runn, runne, run]`), só não é o
+      escolhido — e não existe índice fixo que acerte sempre: `carried→carry` e `falling→fall` são o
+      índice 1, `making→make` é o 2, `running→run` é o 3.
+      **Efeito**: o item mora no verbete debaixo de um teto que não é palavra, e "running" não se
+      junta a "run" — exatamente o que o lema existe para evitar.
+      **Correção recomendada**: o passo 1b do Porter (desdobrar consoante final; repor o 'e' mudo
+      quando a medida do radical for 1 e ele terminar em CVC) — que acerta `hoping→hope` **e**
+      `hopping→hop`, o par que qualquer regra ingênua erra.
+      ⚠️ **EXIGE MIGRAÇÃO, e é por isso que não entrou de carona**: `w.lemma` fica gravado no item
+      (com `lemma_de`), então corrigir a regra sem remigrar o acervo deixaria o "running" antigo sob
+      `runn` e o novo sob `run` — família rachada, que é o defeito em dobro. Merece rodada própria.
 - [ ] **O ACERVO JÁ CAPTURADO NO LEITOR ESTÁ COM O CONTEXTO ERRADO** (2026-08-08). Enquanto
       `_lerBlocoEmVolta` subia atrás do maior texto, **toda palavra pescada no leitor** guardou a
       abertura do capítulo como `context` — e esse contexto virou o exemplo do card e a base da

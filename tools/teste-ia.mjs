@@ -31,8 +31,26 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const CHAVE = process.env.OPENAI_API_KEY || ''
-const COTACAO = Number(process.env.USD_BRL || 5.40)   // só para a estimativa em reais
+
+// Lê o `.env` sozinho quando a variável não está no ambiente. Não é conveniência
+// à toa: o `.env` é editado no Bloco de Notas, que salva com quebra de linha do
+// Windows (CRLF) — e um `\r` grudado no fim da chave vira 401 sem explicação
+// nenhuma. Aqui a leitura corta o `\r`, as aspas e os espaços.
+function doEnv(nome) {
+  if (process.env[nome]) return String(process.env[nome]).trim()
+  try {
+    for (const linha of fs.readFileSync(path.join(RAIZ, '.env'), 'utf8').split(/\r?\n/)) {
+      const t = linha.trim()
+      if (!t || t.startsWith('#')) continue
+      const i = t.indexOf('=')
+      if (i > 0 && t.slice(0, i).trim() === nome) return t.slice(i + 1).trim().replace(/^["']|["']$/g, '')
+    }
+  } catch {}
+  return ''
+}
+
+const CHAVE = doEnv('OPENAI_API_KEY')
+const COTACAO = Number(doEnv('USD_BRL') || 5.40)   // só para a estimativa em reais
 
 const fonte = f => fs.readFileSync(path.join(RAIZ, f), 'utf8')
 

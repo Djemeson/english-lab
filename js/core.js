@@ -660,6 +660,20 @@ function _lemaBase(tok) {
   if (!t) return ''
   const irr = (typeof GLOSS_IRREG === 'object' && GLOSS_IRREG) ? GLOSS_IRREG[t] : null
   if (irr) return irr
+  // ⚠️ COMPOSTO COM HÍFEN NÃO SE PODA.
+  // O redutor foi feito para palavra simples, onde ele sabe as regras de
+  // sufixo do inglês ("running" → "run"). Aplicado ao composto inteiro, ele
+  // corta o fim como se fosse uma palavra só e devolve NÃO-PALAVRA:
+  //   digest-sized → digest-siz · self-employed → self-employ
+  //   good-looking → good-look  · old-fashioned → old-fashion
+  // O item ia morar no verbete debaixo de um teto que não existe em lugar
+  // nenhum. Encontrado em 2026-08-08 por `tools/teste-ia.mjs`: a Luna devolve
+  // "size" para "digest-sized", `aplicarLemaDaIA` (bem) recusa, e a regra da
+  // casa assumia — entregando "digest-siz".
+  // Não podar custa quase nada: adjetivo composto praticamente não flexiona,
+  // então não há família para reunir. E chave estável, ainda que literal, é
+  // melhor que chave inventada.
+  if (t.includes('-')) return t
   if (typeof glossLemas === 'function') {
     const cands = glossLemas(t, { estrito: true })
     // O primeiro candidato é a própria palavra; o segundo, quando existe, é a
