@@ -7911,7 +7911,35 @@ Agora cada item não reparado vem com o **motivo**, e são quatro, distintos e a
 não está no aparelho · o livro não abriu (com a mensagem) · nenhum capítulo rendeu texto (reimporte)
 · a palavra não aparece em lugar nenhum do livro. Os quatro provados no navegador.
 
-**Arquivos**: `js/ler.js`, `js/settings.js`, `index.html`, `css/styles.css`. `sw.js` → `englab-v183`.
+#### E o diagnóstico revelou outro defeito, mais antigo
+
+Com o motivo à vista, os dois itens dele eram **`tuck into`** e **`breeze through`** — os dois
+creditados a *Billy Summers · Chapter 1*, os dois ausentes do livro. Hipótese dele, e certeira:
+*"tuck into eu sei que é uma phrasal de tuck e eu mandei pra Preparar"*.
+
+Não é contexto perdido: é a **fonte ancestral** — o defeito corrigido no começo desta mesma sessão.
+Estes nasceram ANTES, pela família de outro item, e herdaram a obra e a cena dele.
+
+O reparo ganhou uma segunda categoria. Quando a palavra não está no livro, antes de desistir ele
+procura o **parente**: outro item com a cena IDÊNTICA e cuja palavra está nela. Achando, corrige a
+PROCEDÊNCIA (`OBRA_ESTUDO` · palavra do parente) e **remove a cena emprestada** — não há cena
+autêntica, porque a expressão não estava na página.
+
+⚠️ **Duas exigências, e as duas vieram de erro no teste:**
+
+- **Cena idêntica caractere a caractere.** "Não achei no livro" sozinho não prova herança: pode ser
+  grafia partida, aspas curvas ou palavra intercalada ("breeze RIGHT through").
+- **Parentesco léxico obrigatório.** O primeiro teste plantou um `zebra` dividindo a cena, e ele foi
+  atribuído ao `tuck` só por isso. Exigir lema em comum não é rigor decorativo — é o mecanismo:
+  quem herda cena sem ter a palavra nela vem da FAMÍLIA, e membro de família divide o núcleo com a
+  cabeça. Entre os candidatos vence o mais curto, porque `expandirFamilia` é chamada NO gerador.
+  Sem parente léxico, nada é reclassificado — é mais honesto dizer "não achei" do que inventar
+  procedência.
+
+Os chips nunca caem aqui: a unidade sai de dentro da frase, então a palavra ESTÁ na cena e o
+detector nem a acusa.
+
+**Arquivos**: `js/ler.js`, `js/settings.js`, `index.html`, `css/styles.css`. `sw.js` → `englab-v184`.
 
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 

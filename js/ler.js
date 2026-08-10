@@ -2910,6 +2910,44 @@ function reparoDiagnostico() {
   return { alvos, porObra, total: alvos.length }
 }
 
+// O PARENTE QUE LEGOU A CENA.
+// Procura, em todo o acervo, um item cuja cena seja EXATAMENTE esta e cuja
+// palavra esteja dentro dela. A igualdade exata é o ponto: parecido não prova
+// herança, idêntico prova — duas capturas independentes não produzem a mesma
+// frase caractere a caractere.
+// É assim que "tuck into" (sem `tuck into` na frase) encontra o "tuck" que lhe
+// emprestou a passagem, e com ele o nome que vira o "capítulo" da procedência.
+// ⚠️ E PARENTESCO LÉXICO É EXIGÊNCIA, não desempate — o teste mostrou por quê:
+// com uma cena compartilhada, um "zebra" qualquer era atribuído ao "tuck" só
+// por dividir a frase. Exigir lema em comum não é rigor decorativo, é o
+// mecanismo: quem herda cena SEM ter a palavra nela vem da FAMÍLIA de outro
+// item, e membro de família sempre divide o núcleo com a cabeça ("tuck into" ←
+// "tuck", "breeze through" ← "breeze").
+// Os chips não caem aqui: a unidade sai de dentro da frase, então a palavra
+// ESTÁ na cena e o detector nem a acusa.
+// Sem parente léxico, a história de herança não se sustenta — e aí é mais
+// honesto dizer "não achei no livro" do que inventar uma procedência.
+function _repAncestral(a) {
+  const ctx = _repEspacos(a.contextoAtual)
+  if (!ctx || typeof words === 'undefined') return null
+  const meus = new Set(_repNorm(a.palavra).split(' ').filter(Boolean).map(_repLema))
+  let melhor = null, melhorTam = Infinity
+  for (const w of words) {
+    if (w === a.w) continue
+    const palavra = String(w.word || '').trim()
+    if (!palavra) continue
+    const cenas = [w.context, ...(w.meanings || []).map(m => m && m.context)]
+    if (!cenas.some(c => _repEspacos(c) === ctx)) continue
+    if (!_repCasa(palavra, ctx)) continue
+    const dele = _repNorm(palavra).split(' ').filter(Boolean).map(_repLema)
+    if (!dele.some(x => meus.has(x))) continue
+    // A CABEÇA da família é a mais curta: `expandirFamilia` é chamada NUM item
+    // e gera os que orbitam em volta, então o gerador é o mais enxuto.
+    if (dele.length < melhorTam) { melhor = w; melhorTam = dele.length }
+  }
+  return melhor
+}
+
 // Acha o livro na estante pelo título BRUTO guardado no item. `obraNome` entra
 // porque o título pode ter sido limpo com IA depois da captura.
 function _repLivroDe(obra) {
@@ -2923,7 +2961,7 @@ function _repLivroDe(obra) {
 // o que ia acontecer antes de deixar acontecer.
 async function reparoExecutar({ simular = true, aoAndar = null } = {}) {
   const diag = reparoDiagnostico()
-  const rel = { total: diag.total, consertados: 0, unicos: 0, ambiguos: 0,
+  const rel = { total: diag.total, consertados: 0, unicos: 0, ambiguos: 0, ancestrais: 0,
                 semLivro: 0, semCapitulo: 0, naoAchados: 0,
                 amostras: [], obras: [], perdidos: [] }
   if (typeof epubAbrir !== 'function' || typeof BookDB === 'undefined') {
@@ -3007,6 +3045,38 @@ async function reparoExecutar({ simular = true, aoAndar = null } = {}) {
         break
       }
       if (!achou) {
+        // A PALAVRA NÃO ESTÁ NO LIVRO. Antes de desistir: e se ela nunca
+        // esteve? Até 2026-08-08 os chips e a família davam ao item novo a
+        // CENA E A OBRA do item de origem — a "fonte ancestral". "tuck into",
+        // nascido da família de "tuck", ficava jurando que veio de Billy
+        // Summers, com a passagem onde estava o "tuck".
+        // ⚠️ NÃO BASTA "não achei no livro" para concluir isso: pode ser
+        // grafia partida, aspas curvas, ou uma palavra intercalada
+        // ("breeze RIGHT through") que a busca não cobre. A prova é o PARENTE:
+        // outro item com a cena IDÊNTICA, e cuja palavra está nela. Cena igual
+        // não é coincidência — é herança.
+        const pai = _repAncestral(a)
+        if (pai) {
+          rel.ancestrais++
+          if (rel.amostras.length < 12) {
+            rel.amostras.push({ palavra: a.palavra, ancestral: pai.word,
+              antes: a.contextoAtual.slice(0, 70),
+              depois: `procedência corrigida: ${OBRA_ESTUDO} · ${pai.word} (a cena era do "${pai.word}", não desta expressão)` })
+          }
+          if (!simular) {
+            const dono = a.m || a.w
+            // Não há cena autêntica para devolver: esta expressão não estava
+            // na página. Manter a frase do parente é o que criou a mentira.
+            dono.context = ''
+            dono.context_pt = ''
+            dono.source_type = 'manual'
+            dono.source_title = OBRA_ESTUDO
+            dono.source_context = pai.word || ''
+          }
+          rel.consertados++
+          if (aoAndar) aoAndar(rel.consertados, diag.total)
+          continue
+        }
         rel.naoAchados++
         // O MOTIVO, e ele importa: "não achei a palavra" e "não consegui ler o
         // livro" pedem ações opostas — reimportar o arquivo, ou aceitar que o

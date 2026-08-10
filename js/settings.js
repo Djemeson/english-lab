@@ -470,6 +470,7 @@ async function repararContexto(conferir) {
     `<b>${pl(r.total, 'item está', 'itens estão')}</b> com a frase de outro lugar`,
     r.unicos   ? `<b>${r.unicos}</b> ${r.unicos === 1 ? 'tem' : 'têm'} uma única ocorrência no capítulo — reparo exato` : '',
     r.ambiguos ? `<b>${r.ambiguos}</b> ${r.ambiguos === 1 ? 'aparece' : 'aparecem'} mais de uma vez: fica a primeira (qual você marcou se perdeu junto com o contexto)` : '',
+    r.ancestrais ? `<b>${r.ancestrais}</b> ${r.ancestrais === 1 ? 'nasceu' : 'nasceram'} da família de outro item e ${r.ancestrais === 1 ? 'herdou' : 'herdaram'} a obra dele — a procedência passa a ser <b>${esc(OBRA_ESTUDO)}</b>, e a cena emprestada sai` : '',
     r.semCapitulo ? `<b>${r.semCapitulo}</b> com o capítulo em outro nome — procurei no livro inteiro` : '',
     r.naoAchados  ? `<b>${r.naoAchados}</b> não ${r.naoAchados === 1 ? 'foi encontrado' : 'foram encontrados'} no livro: ${r.naoAchados === 1 ? 'fica' : 'ficam'} como ${r.naoAchados === 1 ? 'está' : 'estão'}` : '',
     r.semLivro    ? `<b>${r.semLivro}</b> sem o arquivo neste aparelho — importe o .epub para reparar` : ''
