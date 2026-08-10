@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A BATERIA RODOU COM CHAVE DE VERDADE**. 19 chamadas, R$ 0,13.
+> Última atualização: 2026-08-08 — **O CONTEXTO VOLTOU PARA O LUGAR**. Enquanto o defeito do
+> `_lerBlocoEmVolta` durou, toda palavra pescada num livro guardou a ABERTURA DO CAPÍTULO como
+> contexto — e ela virou o exemplo do card e a base da análise. Entrou o reparo em Configurações:
+> **sem IA e sem custo**, ele abre o livro do `BookDB`, procura a palavra no capítulo e devolve a
+> frase de verdade. O detector é exato e não depende de adivinhar datas — **a palavra aparece na
+> própria frase dela?**. Ele ENTRA pelo "conferir sem mexer", que simula e mostra amostras de antes
+> e depois, porque trocar a frase de um item não tem volta. ⚠️ A tradução do contexto é apagada nos
+> reparados: ela traduzia a frase errada. ⚠️ Onde a palavra aparece várias vezes no capítulo fica a
+> primeira, e o relatório diz — qual delas ele marcou se perdeu junto com o contexto.
+> **E o Luna virou padrão também na instalação nova** (o `DEF_CFG` tinha ficado para trás).
+> `sw.js` → `englab-v182`. Ver 8.2 ("O contexto voltou para o lugar").
+>
+> Anterior: 2026-08-08 — **A BATERIA RODOU COM CHAVE DE VERDADE**. 19 chamadas, R$ 0,13.
 > **7/7 contratos aceitos** sob `strict: true`, **nada truncou** (a Luna gasta 1.583–2.486 tokens de
 > saída contra teto de 5.000), e o contrato saiu **mais barato**: com esquema ela gastou 36% menos
 > no caso com reencontro, porque sobra menos coisa para decidir sozinha. A troca de modelo se
@@ -7837,6 +7849,53 @@ família para reunir —, e chave literal é melhor que chave inventada.
 **anterior a esta rodada**. Ficou como pendência própria porque exige migração do acervo — ver
 seção 9.
 
+### O contexto voltou para o lugar (2026-08-08)
+
+O conserto do `_lerBlocoEmVolta` valia só dali para a frente. O que já estava salvo continuava com
+a abertura do capítulo por contexto — e esse texto não é enfeite: é o exemplo do card, a base da
+análise da IA e a frase que a Lexa lê.
+
+**O detector é exato, e essa foi a decisão que fez o resto ser simples**: em vez de adivinhar
+quando o defeito começou ou olhar o carimbo do item, pergunta-se
+
+> **a palavra aparece na própria frase dela?**
+
+Se não aparece, aquele contexto não é dela. Ponto. Tolerante à flexão pelos lemas, senão um item
+`fell in love` pareceria quebrado numa frase que diz "fall in love". Varre item **e sentido**: desde
+a Fase 2 a cena mora no sentido, e a do item é herança dos que vieram antes.
+
+**O reparo não usa IA.** O livro está no `BookDB`: abre, corta o capítulo em frases, acha a que
+contém a palavra e devolve. Agrupa por obra para abrir cada livro uma vez, e guarda o texto de cada
+capítulo para não reextrair.
+
+Detalhes que o teste obrigou a resolver:
+
+- **Abreviação quebrava a frase.** `"Mr. Summers sits in the lobby"` casa "ponto + espaço +
+  maiúscula" perfeitamente, e o item receberia uma frase decapitada. Num romance, "Mr." e "Dr."
+  estão em toda página. As abreviações e as iniciais soltas ("J. R. R. Tolkien") têm o ponto
+  escondido antes do corte e devolvido depois.
+- **Capítulo com outro nome não faz desistir.** A limpeza de títulos com IA mexe no
+  `source_context`; se o capítulo declarado não bate, procura no livro inteiro.
+- **A tradução do contexto é apagada** nos reparados. Ela traduzia a frase errada, e frase certa com
+  tradução de outra coisa é pior que o problema original. Vazio o app sabe tratar.
+- **Item não encontrado no livro não é tocado.** Fica como está, e o relatório o conta.
+- ⚠️ **Ambiguidade assumida**: quando a palavra aparece várias vezes no capítulo, fica a primeira.
+  Qual delas ele marcou se perdeu junto com o contexto — não há como saber. Mesmo no pior caso é
+  uma frase REAL do livro contendo a palavra, contra uma abertura que não a contém.
+
+**Ele entra pelo "conferir sem mexer"**, que simula e não grava: mostra a contagem por categoria e
+até 12 amostras de antes (riscado) e depois. Trocar a frase de um item é irreversível — a amostra é
+o que deixa ele decidir com o caso na mão.
+
+⚠️ **Armadilha nº 1 respeitada**: o motor mora em `ler.js` (LAZY) e o botão em `settings.js`
+(shell). `_reparoCarregar()` carrega `epub.js` + `ler.js` sob demanda e a guarda é por `typeof`.
+Provado no teste: o módulo não existia antes do clique e existia depois.
+
+**Cards não precisaram de migração**: `createSrsCard` fotografa o EXEMPLO, não o contexto — o
+contexto é lido do item na hora. Verificado antes de escrever qualquer coisa.
+
+**Arquivos**: `js/ler.js`, `js/settings.js`, `index.html`, `css/styles.css`. `sw.js` → `englab-v182`.
+
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 
 Pedido dele, ainda **não implementado**. Duas capacidades diferentes, que só parecem uma.
@@ -7940,15 +7999,10 @@ lugar só.
       ⚠️ **EXIGE MIGRAÇÃO, e é por isso que não entrou de carona**: `w.lemma` fica gravado no item
       (com `lemma_de`), então corrigir a regra sem remigrar o acervo deixaria o "running" antigo sob
       `runn` e o novo sob `run` — família rachada, que é o defeito em dobro. Merece rodada própria.
-- [ ] **O ACERVO JÁ CAPTURADO NO LEITOR ESTÁ COM O CONTEXTO ERRADO** (2026-08-08). Enquanto
-      `_lerBlocoEmVolta` subia atrás do maior texto, **toda palavra pescada no leitor** guardou a
-      abertura do capítulo como `context` — e esse contexto virou o exemplo do card e a base da
-      análise da IA. A correção vale só dali para a frente; o que já está salvo continua errado.
-      **Como consertar**: os capítulos estão no `BookDB`, então dá para varrer os itens de
-      `source_type === 'kindle'`, procurar a palavra no capítulo gravado e reescrever `context` com
-      a frase de verdade — item por item, sem IA. Vale um botão em Configurações, perto do
-      "devolver tudo para o Preparar". **Sintoma para reconhecer**: vários itens de livros
-      diferentes com a MESMA frase de contexto, sempre a primeira do capítulo.
+- [x] ~~O acervo já capturado no leitor está com o contexto errado~~ — **reparo entregue em
+      2026-08-08**, em Configurações. Sem IA, com simulação antes. Ver 8.2 ("O contexto voltou
+      para o lugar"). ⚠️ **Falta rodar com o acervo de verdade** — o ambiente de teste não tem
+      livro nem itens; o comportamento foi provado com um EPUB de mentira e o caminho real.
 - [ ] **USAR O BALÃO NO LEITOR E NO VÍDEO COM CONTEÚDO DE VERDADE** (2026-08-08). O balão foi
       provado no navegador por dois caminhos (seleção e família), e os cinco chamadores carregam
       sem erro — mas leitor e vídeo pedem livro aberto e episódio tocando, que o ambiente de teste

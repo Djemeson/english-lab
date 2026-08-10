@@ -423,6 +423,73 @@ async function generateMissingAudio() {
 //
 // `saber` não é tocado: o sentido que ele marcou como "conheço, não quero
 // drilar" nunca esteve na fila, então não há de onde devolvê-lo.
+// ================================================================
+// REPARAR O CONTEXTO DOS ITENS DO LEITOR
+// ================================================================
+// ⚠️ ARMADILHA Nº 1: o motor do reparo mora em `ler.js`, que é LAZY — este
+// arquivo é do shell e não pode citá-lo direto. Por isso os módulos são
+// carregados sob demanda ANTES da primeira chamada, e a guarda é por
+// `typeof`, não por fé. `epub.js` vem primeiro porque `ler.js` usa
+// `epubAbrir`, na mesma ordem do pacote 'ler' do `_LAZY`.
+async function _reparoCarregar() {
+  if (typeof reparoExecutar === 'function') return true
+  for (const f of ['js/epub.js', 'js/ler.js']) {
+    try { await _loadScript(f) } catch (e) { console.error(e); return false }
+  }
+  return typeof reparoExecutar === 'function'
+}
+
+// `conferir: true` simula — não grava nada. É o modo em que ele ENTRA, porque
+// trocar a frase de um item não tem volta e a amostra é o que deixa ele
+// decidir com o caso na mão em vez de no escuro.
+async function repararContexto(conferir) {
+  const saida = el('reparo-saida'); if (!saida) return
+  saida.innerHTML = `<p class="dz-nota"><span class="spinner"></span> abrindo os livros e procurando…</p>`
+  if (!(await _reparoCarregar())) {
+    saida.innerHTML = `<p class="dz-nota" style="color:var(--error)">Não consegui carregar o leitor. Recarregue a página.</p>`
+    return
+  }
+  let r
+  try { r = await reparoExecutar({ simular: !!conferir }) }
+  catch (e) { saida.innerHTML = `<p class="dz-nota" style="color:var(--error)">Falhou: ${esc(e.message)}</p>`; return }
+
+  if (r.erro) { saida.innerHTML = `<p class="dz-nota" style="color:var(--error)">${esc(r.erro)}</p>`; return }
+  if (!r.total) {
+    saida.innerHTML = `<p class="dz-nota">${ic('checkCircle','ic-sm')} Nenhum item com o contexto trocado — não há o que reparar.</p>`
+    return
+  }
+  if (!conferir) {
+    saida.innerHTML = `<p class="dz-nota">${ic('checkCircle','ic-sm')} <b>${r.consertados}</b> ${r.consertados === 1 ? 'item reparado' : 'itens reparados'}.</p>`
+    toast(`${r.consertados} ${r.consertados === 1 ? 'contexto devolvido' : 'contextos devolvidos'}`, 'success')
+    if (typeof renderReview === 'function') { try { renderReview() } catch (e) {} }
+    return
+  }
+
+  const pl = (n, s, p) => `${n} ${n === 1 ? s : p}`
+  const linhas = [
+    `<b>${pl(r.total, 'item está', 'itens estão')}</b> com a frase de outro lugar`,
+    r.unicos   ? `<b>${r.unicos}</b> ${r.unicos === 1 ? 'tem' : 'têm'} uma única ocorrência no capítulo — reparo exato` : '',
+    r.ambiguos ? `<b>${r.ambiguos}</b> ${r.ambiguos === 1 ? 'aparece' : 'aparecem'} mais de uma vez: fica a primeira (qual você marcou se perdeu junto com o contexto)` : '',
+    r.semCapitulo ? `<b>${r.semCapitulo}</b> com o capítulo em outro nome — procurei no livro inteiro` : '',
+    r.naoAchados  ? `<b>${r.naoAchados}</b> não ${r.naoAchados === 1 ? 'foi encontrado' : 'foram encontrados'} no livro: ${r.naoAchados === 1 ? 'fica' : 'ficam'} como ${r.naoAchados === 1 ? 'está' : 'estão'}` : '',
+    r.semLivro    ? `<b>${r.semLivro}</b> sem o arquivo neste aparelho — importe o .epub para reparar` : ''
+  ].filter(Boolean)
+
+  saida.innerHTML = `
+    <ul class="cost-bullets">${linhas.map(l => `<li>${l}</li>`).join('')}</ul>
+    ${r.amostras.length ? `<div class="reparo-amostras">
+      <p class="dz-nota">Como fica (${pl(r.amostras.length, 'exemplo', 'exemplos')}):</p>
+      ${r.amostras.map(a => `
+        <div class="reparo-amostra">
+          <b>${esc(a.palavra)}</b>${a.ocorrencias > 1 ? `<i> · ${a.ocorrencias}× no capítulo</i>` : ''}
+          <div class="reparo-antes">${esc(a.antes)}…</div>
+          <div class="reparo-depois">${esc(a.depois)}</div>
+        </div>`).join('')}
+    </div>` : ''}
+    ${r.consertados ? `<button class="btn btn-primary btn-sm" onclick="repararContexto(false)">${
+      ic('check','ic-sm')} Reparar ${pl(r.consertados, 'item', 'itens')}</button>` : ''}`
+}
+
 function _devolverContagem() {
   let itens = 0, sentidos = 0, cards = 0
   if (!Array.isArray(words)) return { itens, sentidos, cards }

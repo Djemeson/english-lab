@@ -5131,6 +5131,19 @@ body.ler-full .mobile-bottom-nav{display:none}
    nessa medida que ele funciona: um post-it por cima da página, não uma segunda
    página. O que cresceu não foi a necessidade, foi a minha mão — os chips e a
    conversa cabem aqui rolando, que é justamente o que um balão deve fazer. */
+/* AMOSTRA DO REPARO — antes e depois, um sobre o outro.
+   A frase velha fica riscada e apagada; a nova, viva. É o que deixa ele
+   conferir o acerto sem precisar abrir o livro. */
+.reparo-amostras{margin:var(--sp-3) 0}
+.reparo-amostra{
+  padding:var(--sp-2) 0;border-top:1px solid var(--border);
+  font-size:var(--fs-xs);line-height:1.5;
+}
+.reparo-amostra>b{color:var(--text)}
+.reparo-amostra i{color:var(--text3);font-size:var(--fs-3xs);font-style:normal}
+.reparo-antes{color:var(--text3);text-decoration:line-through;opacity:.75}
+.reparo-depois{color:var(--text);border-left:3px solid rgba(var(--primary-rgb),.5);padding-left:8px;margin-top:3px}
+
 #sel-menu.sel-exp{
   display:flex;flex-direction:column;align-items:stretch;gap:0;padding:0;
   width:min(27rem,calc(100vw - 16px));

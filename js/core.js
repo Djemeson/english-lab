@@ -96,7 +96,11 @@ function saveDeletedIds(ids) { localStorage.setItem(SK.deletedWords, JSON.string
 function markDeleted(id) { const ids = loadDeletedIds(); ids.add(id); saveDeletedIds(ids) }
 
 const DEF_CFG = {
-  aiProvider: 'openai', aiModel: 'gpt-4o-mini', ttsProvider: 'openai',
+  // ⚠️ O padrão de instalação NOVA. Ficou para trás quando a Luna virou o
+  // modelo do app: `migrarModeloPadrao()` conserta quem já existia, mas quem
+  // instalasse hoje nasceria no modelo antigo e só seria movido no boot
+  // seguinte. O padrão tem de ser o padrão nos dois caminhos.
+  aiProvider: 'openai', aiModel: 'gpt-5.6-luna', ttsProvider: 'openai',
   openaiKey: '', geminiKey: '', groqKey: '',
   aiModelProv: {},
   vidPT: '',        // modo de tradução no vídeo, lembrado entre sessões

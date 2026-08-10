@@ -2816,3 +2816,201 @@ function _lerNivBlocoHTML() {
     '</div>' +
     '<div id="ler-niv-corpo">' + _lerNivCorpoHTML() + '</div></div>'
 }
+
+// ================================================================
+// REPARO — a abertura do capítulo que usurpou toda frase
+// ================================================================
+// Enquanto `_lerBlocoEmVolta` subia atrás do MAIOR texto (e não do parágrafo),
+// toda palavra pescada no leitor guardava a abertura do capítulo como contexto.
+// A regra foi consertada em 2026-08-08, mas só vale dali para a frente: o que
+// já está salvo continua errado — e esse contexto virou o exemplo do card, a
+// base da análise e a frase que a Lexa lê.
+//
+// Este reparo desfaz o estrago SEM IA e SEM adivinhar datas: o livro está no
+// `BookDB`, então dá para procurar a palavra no capítulo gravado e devolver a
+// frase de verdade.
+
+function _repNorm(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s'-]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+// O texto do capítulo só tem os espaços normalizados: acento e caixa PRECISAM
+// sobreviver, senão a frase devolvida ao item viria descaracterizada.
+function _repEspacos(s) { return String(s || '').replace(/\s+/g, ' ').trim() }
+
+function _repLema(p) {
+  if (typeof glossLemas !== 'function') return p
+  const c = glossLemas(p, { estrito: true })
+  return (c && c[1]) || p
+}
+
+// O DETECTOR, e ele é exato: a palavra aparece na própria frase dela?
+// Não depende de saber quando o defeito começou nem de olhar o carimbo do
+// item — se o contexto não contém a palavra, o contexto não é dela.
+// Tolerante à flexão pelos lemas, senão um item "fell in love" pareceria
+// quebrado numa frase que diz "fall in love" e seria "consertado" à toa.
+function _repCasa(alvo, texto) {
+  const a = _repNorm(alvo), t = _repNorm(texto)
+  if (!a || !t) return false
+  if ((' ' + t + ' ').includes(' ' + a + ' ')) return true
+  const al = a.split(' ').map(_repLema), tl = t.split(' ').map(_repLema)
+  for (let i = 0; i + al.length <= tl.length; i++) {
+    if (al.every((x, k) => tl[i + k] === x)) return true
+  }
+  return false
+}
+
+// Corta o capítulo em frases: pontuação, espaço e maiúscula.
+// ⚠️ SÓ ISSO NÃO BASTA, e o teste pegou: "Mr. Summers sits in the lobby"
+// casa a regra perfeitamente e virava duas frases, entregando ao item uma
+// frase decapitada. Num romance, "Mr." e "Dr." estão em toda página.
+// As abreviações e as iniciais soltas ("J. R. R. Tolkien") têm o ponto
+// escondido antes do corte e devolvido depois — assim a regra continua
+// simples e elas não a acionam.
+const _REP_ABREV = /\b(mr|mrs|ms|dr|prof|st|sr|jr|vs|etc|inc|ltd|approx|e\.g|i\.e)\.\s/gi
+function _repFrases(texto) {
+  const OCULTO = ''
+  return _repEspacos(texto)
+    .replace(_REP_ABREV, m => m.replace(/\./g, OCULTO))
+    .replace(/\b([A-Z])\.\s/g, '$1' + OCULTO + ' ')
+    .split(/(?<=[.!?…])\s+(?=["“'(]?[A-Z])/)
+    .map(s => s.split(OCULTO).join('.').trim())
+    .filter(s => s.length >= 12)
+}
+
+// ---- 1. O DIAGNÓSTICO: de graça, sem abrir livro nenhum ---------
+// Varre item por item E sentido por sentido: um item pode ter a cena do topo
+// certa e a de um sentido errada. Desde a Fase 2 a cena mora no sentido, e a
+// do item é herança dos que vieram antes.
+function reparoDiagnostico() {
+  const alvos = []
+  for (const w of (typeof words !== 'undefined' ? words : [])) {
+    const palavra = String(w.word || '').trim()
+    if (!palavra) continue
+    const cenas = [{ dono: w }]
+    for (const m of (w.meanings || [])) if (m && m.context) cenas.push({ dono: m, m })
+    for (const c of cenas) {
+      const ctx = String(c.dono.context || '').trim()
+      if (!ctx) continue
+      if (_repCasa(palavra, ctx)) continue     // a palavra está lá: nada a fazer
+      alvos.push({
+        w, m: c.m || null, palavra, contextoAtual: ctx,
+        obra: String((c.m && c.m.source_title) || w.source_title || '').trim(),
+        cap:  String((c.m && c.m.source_context) || w.source_context || '').trim(),
+        tipo: String((c.m && c.m.source_type) || w.source_type || '').trim()
+      })
+    }
+  }
+  const porObra = new Map()
+  for (const a of alvos) {
+    const k = a.obra || '(sem obra)'
+    if (!porObra.has(k)) porObra.set(k, [])
+    porObra.get(k).push(a)
+  }
+  return { alvos, porObra, total: alvos.length }
+}
+
+// Acha o livro na estante pelo título BRUTO guardado no item. `obraNome` entra
+// porque o título pode ter sido limpo com IA depois da captura.
+function _repLivroDe(obra) {
+  if (typeof livros === 'undefined' || !obra) return null
+  const alvo = _repNorm(obraNome(obra)) || _repNorm(obra)
+  return livros.find(l => _repNorm(obraNome(l.title)) === alvo || _repNorm(l.title) === alvo) || null
+}
+
+// ---- 2. O REPARO ------------------------------------------------
+// `simular: true` não grava nada — só devolve o relatório. É assim que ele vê
+// o que ia acontecer antes de deixar acontecer.
+async function reparoExecutar({ simular = true, aoAndar = null } = {}) {
+  const diag = reparoDiagnostico()
+  const rel = { total: diag.total, consertados: 0, unicos: 0, ambiguos: 0,
+                semLivro: 0, semCapitulo: 0, naoAchados: 0, amostras: [], obras: [] }
+  if (typeof epubAbrir !== 'function' || typeof BookDB === 'undefined') {
+    rel.erro = 'o leitor de EPUB não está carregado'
+    return rel
+  }
+
+  for (const [obra, itens] of diag.porObra) {
+    const livro = _repLivroDe(obra)
+    const blob = livro ? await BookDB.get(livro.id).catch(() => null) : null
+    if (!livro || !blob) {
+      rel.semLivro += itens.length
+      rel.obras.push({ obra, itens: itens.length, estado: 'o arquivo não está neste aparelho' })
+      continue
+    }
+    let ep = null
+    try { ep = await epubAbrir(await blob.arrayBuffer()) } catch (e) {
+      rel.semLivro += itens.length
+      rel.obras.push({ obra, itens: itens.length, estado: 'não abriu: ' + e.message })
+      continue
+    }
+
+    // O texto de cada capítulo é lido UMA vez e reaproveitado por todos os
+    // itens dele: um livro tem dezenas de capítulos, e extrair é a parte cara.
+    const cache = new Map()
+    const textoDoCap = async i => {
+      if (cache.has(i)) return cache.get(i)
+      let t = ''
+      try {
+        const c = livro.chapters[i]
+        const html = c && c.href ? await ep.zip.texto(c.href) : ''
+        t = html ? _repEspacos(epubTextoLimpo(html)) : ''
+      } catch (e) {}
+      cache.set(i, t)
+      return t
+    }
+
+    let feitos = 0
+    for (const a of itens) {
+      // Primeiro o capítulo que o item diz ser o dele; se falhar, o livro
+      // inteiro. Título de capítulo muda (a limpeza com IA mexe nele), e
+      // desistir por causa disso seria deixar o item errado por formalidade.
+      const iDito = livro.chapters.findIndex(c => _repNorm(c.titulo) === _repNorm(a.cap))
+      const ordem = iDito >= 0
+        ? [iDito, ...livro.chapters.map((_, i) => i).filter(i => i !== iDito)]
+        : livro.chapters.map((_, i) => i)
+      if (iDito < 0) rel.semCapitulo++
+
+      let achou = null
+      for (const i of ordem) {
+        const txt = await textoDoCap(i)
+        if (!txt) continue
+        const frases = _repFrases(txt).filter(f => _repCasa(a.palavra, f))
+        if (!frases.length) continue
+        achou = { frase: frases[0].slice(0, 400), quantas: frases.length,
+                  cap: (livro.chapters[i] || {}).titulo || '' }
+        break
+      }
+      if (!achou) { rel.naoAchados++; continue }
+
+      // ⚠️ QUANDO A PALAVRA APARECE VÁRIAS VEZES NO CAPÍTULO, não há como saber
+      // qual delas ele marcou — a informação se perdeu junto com o contexto.
+      // Fica a primeira, e o relatório diz quantas eram. Mesmo no pior caso é
+      // uma frase REAL do livro contendo a palavra, contra uma abertura de
+      // capítulo que não a contém: a troca vale sempre.
+      if (achou.quantas === 1) rel.unicos++; else rel.ambiguos++
+      if (rel.amostras.length < 12) {
+        rel.amostras.push({ palavra: a.palavra, antes: a.contextoAtual.slice(0, 70),
+                            depois: achou.frase.slice(0, 90), ocorrencias: achou.quantas })
+      }
+      if (!simular) {
+        const dono = a.m || a.w
+        dono.context = achou.frase
+        // ⚠️ A TRADUÇÃO ERA DA FRASE ERRADA. Mantê-la seria trocar um erro
+        // visível por um pior: frase certa em cima da tradução de outra coisa.
+        // Vazio o app sabe tratar; incoerente, não.
+        dono.context_pt = ''
+        if (achou.cap && a.cap && _repNorm(achou.cap) !== _repNorm(a.cap)) dono.source_context = achou.cap
+      }
+      feitos++; rel.consertados++
+      if (aoAndar) aoAndar(rel.consertados, diag.total)
+    }
+    rel.obras.push({ obra, itens: itens.length, estado: `${feitos} localizados` })
+  }
+
+  if (!simular && rel.consertados) {
+    if (typeof saveWords === 'function') saveWords()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  }
+  return rel
+}

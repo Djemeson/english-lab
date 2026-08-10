@@ -717,6 +717,31 @@
       <!-- Espaço em disco (renderizado por renderEspacoLocal() em settings.js) -->
       <div id="set-espaco"></div>
 
+      <!-- REPARAR O CONTEXTO — manutenção do acervo, vizinha da de cima pelo
+           mesmo motivo. Diferente dela em uma coisa importante: esta MOSTRA
+           antes de fazer. O "conferir" é uma simulação que não grava nada,
+           porque trocar a frase de um item é irreversível e ele precisa ver a
+           amostra antes de autorizar. -->
+      <details class="danger-zone dz-suave" id="dz-reparo">
+        <summary>
+          <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          Reparar o contexto dos itens do leitor
+        </summary>
+        <div class="dz-corpo">
+          <p>Enquanto durou um defeito na leitura, <b>toda palavra pescada dentro de um livro guardou a
+             abertura do capítulo como contexto</b> — a mesma frase para todos, em vez daquela onde a
+             palavra estava. Essa frase virou o exemplo do card e a base da análise da IA.</p>
+          <p>O reparo <b>abre o livro que está neste aparelho</b>, procura a palavra no capítulo e devolve
+             a frase de verdade. Sem IA, sem custo. Só toca em item cuja palavra <b>não aparece</b> no
+             próprio contexto — o resto fica como está.</p>
+          <p class="dz-nota">A tradução do contexto é apagada nos itens reparados: ela traduzia a frase
+             errada, e frase certa com tradução de outra coisa é pior que o problema. Ela volta na
+             próxima análise. Exporte o backup acima se houver dúvida.</p>
+          <div id="reparo-saida"></div>
+          <button class="btn btn-secondary btn-sm" onclick="repararContexto(true)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Conferir sem mexer</button>
+        </div>
+      </details>
+
       <!-- DEVOLVER TUDO AO PREPARAR — fica AQUI, e não no Preparar, porque é
            manutenção do acervo, não estudo: o acervo foi montado no fluxo
            antigo e passa inteiro pelo novo uma vez só. Recolhido pelo mesmo
