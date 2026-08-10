@@ -332,9 +332,10 @@ async function selMenuExplicar() {
 function lexaFontesHTML(fontes) {
   if (!fontes || !fontes.length) return ''
   const dominio = u => { try { return new URL(u).hostname.replace(/^www\./, '') } catch { return u } }
-  return `<div class="lexa-fontes">${ic('globe','ic-sm')} ${fontes.slice(0, 5).map(f =>
-    `<a href="${escA(f.url)}" target="_blank" rel="noopener noreferrer" data-tip="${escA(f.titulo || f.url)}">${esc(dominio(f.url))}</a>`
-  ).join('')}</div>`
+  return `<div class="lexa-fontes"><b>${ic('globe','ic-sm')} buscou na internet</b>${
+    fontes.slice(0, 5).map(f =>
+      `<a href="${escA(f.url)}" target="_blank" rel="noopener noreferrer" data-tip="${escA(f.titulo || f.url)}">${esc(dominio(f.url))}</a>`
+    ).join('')}</div>`
 }
 
 async function _selExplicarPintar(corpo, c, comWeb) {
@@ -344,14 +345,14 @@ async function _selExplicarPintar(corpo, c, comWeb) {
   const sistema = lexaExplicar()
   const pergunta = `${c.frase ? `A frase é: "${c.frase}".\n` : ''}O aluno selecionou: "${c.txt}".
 Explique o que "${c.txt}" significa AQUI, em ${L.nameEn}. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real.`
-  let resp = '', fontes = []
+  let resp = '', fontes = [], buscou = false
   try {
     if (comWeb) {
       const r = await aiTextWeb({ sistema, pergunta, maxTokens: 600 })
-      resp = r.texto; fontes = r.fontes
+      resp = r.texto; fontes = r.fontes; buscou = !!r.buscou
       // Ofereceu e ele não usou? Acontece, e é o certo — mas então a resposta
       // saiu do que o modelo já sabia, e dizer o contrário seria mentir.
-      if (!r.buscou) fontes = []
+      if (!buscou) fontes = []
     } else {
       resp = await aiTextSeguro([
         { role: 'system', content: sistema },
@@ -363,17 +364,25 @@ Explique o que "${c.txt}" significa AQUI, em ${L.nameEn}. Se for gíria, marca, 
     return
   }
   if (!lexaBalaoVivo(corpo)) return
-  lexaWebRegistrar({ automatica: comWeb && !c._webManual, manual: !!c._webManual, buscou: !!fontes.length })
+  lexaWebRegistrar({ automatica: comWeb && !c._webManual, manual: !!c._webManual, buscou })
   c._webManual = false
-  corpo.innerHTML = lexaFormatar(resp) + lexaFontesHTML(fontes)
-  // ⚠️ A ESCOLHA MORA AQUI, no balão, e não em Configurações — pedido dele, e
-  // ele tem razão: a decisão "vale a pena buscar sozinha?" só faz sentido no
-  // instante em que ele acabou de ver uma resposta e sentir se ela bastou.
-  // Enterrada num painel de ajustes, ela seria tomada no vazio, longe do caso.
-  // Depois de uma busca é a hora ainda melhor: ele viu o resultado E o preço.
+  // ⚠️ "BUSCOU OU NÃO?" TEM DE ESTAR ESCRITO. Ele perguntou — *"o texto que
+  // aparece buscou na web? quando eu sei que buscou?"* — e a pergunta é a
+  // prova do defeito: eu mostrava só as fontes, então "não buscou" e "buscou
+  // sem citar" ficavam idênticos na tela. Numa resposta que ele vai usar para
+  // estudar, a procedência não pode ser adivinhação.
+  corpo.innerHTML = lexaFormatar(resp) + (buscou ? lexaFontesHTML(fontes) : '')
+  // ⚠️ E O BOTÃO APARECE SEMPRE QUE NÃO BUSCOU — não "sempre que eu não
+  // ofereci". Era este o meu erro de lógica: oferecendo a ferramenta e o
+  // modelo decidindo não usá-la, ele ficava sem o selo E sem o botão, ou seja,
+  // sem saber e sem poder fazer nada. Justo o caso em que ele mais quer o
+  // botão, que é quando a resposta veio do que o modelo já sabia.
   if (aiWebPodeUsar()) {
+    const rotulo = comWeb
+      ? `${ic('globe','ic-sm')} a Lexa achou que não precisava — procurar mesmo assim`
+      : `${ic('globe','ic-sm')} procurar na internet`
     corpo.insertAdjacentHTML('beforeend',
-      (comWeb ? '' : `<button class="lexa-web-btn" onclick="selMenuExplicarWeb()">${ic('globe','ic-sm')} procurar na internet</button>`)
+      (buscou ? '' : `<button class="lexa-web-btn" onclick="selMenuExplicarWeb()">${rotulo}</button>`)
       + lexaWebEscolhaHTML())
     lexaWebPintarCustos(corpo)
   }

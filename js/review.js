@@ -2291,10 +2291,28 @@ function prepAcharItem(palavra, lang) {
     for (const l of glossLemas(alvo, { estrito: true })) if (!formas.includes(l)) formas.push(l)
   }
   const mesmoIdioma = w => !lang || !w.lang || w.lang === lang
-  for (const f of formas) {
-    const k = norm(f)
+  const chaves = formas.map(norm)
+  // 1ª passada, barata: reduz o ALVO e compara com a palavra do item tal e qual.
+  for (const k of chaves) {
     const achado = words.find(w => mesmoIdioma(w) && norm(w.word || '') === k)
     if (achado) return achado
+  }
+  // ⚠️ 2ª passada: REDUZ TAMBÉM O ITEM.
+  // A busca reduzia só um dos lados — então o chip "pals" achava o item "pal",
+  // mas o chip "pal" NÃO achava o item salvo como "Pals" (que é como ele vem do
+  // livro, no plural). Assimetria silenciosa, e o preço dela é o pior possível:
+  // o chip aparece como novidade, ele clica, e nasce um item duplicado da
+  // mesma palavra — exatamente o que este achador existe para impedir.
+  // Fica em segunda passada porque custa uma redução por item do acervo, e a
+  // primeira já resolve a maioria.
+  if (typeof glossLemas !== 'function') return null
+  for (const w of words) {
+    if (!mesmoIdioma(w)) continue
+    const p = String(w.word || '').trim()
+    if (!p) continue
+    const suas = [norm(p), norm(w.lemma || '')].filter(Boolean)
+    for (const l of glossLemas(p, { estrito: true })) suas.push(norm(l))
+    if (suas.some(x => chaves.includes(x))) return w
   }
   return null
 }

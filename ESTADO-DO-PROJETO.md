@@ -8025,7 +8025,33 @@ Trocar o modo em silêncio seria tirar de volta a decisão que ele acabou de tom
 botão. Contabilidade: `_aiGuardarUso` já entendia `input_tokens`/`output_tokens`, então a busca
 entra na conta do app sem remendo.
 
-**Arquivos**: `js/ai.js`, `js/core.js`, `css/styles.css`, `tools/teste-ia.mjs`. `sw.js` → `englab-v186`.
+#### O primeiro uso apontou dois defeitos e uma assimetria
+
+**1. "Buscou ou não?" não estava escrito.** Ele perguntou — *"o texto que aparece buscou na web?
+quando eu sei que buscou?"* — e a pergunta É o defeito: eu mostrava só as fontes, então "não
+buscou" e "buscou sem citar" ficavam idênticos na tela. Numa resposta que vira material de estudo,
+a procedência não pode ser adivinhação. Entrou um selo explícito, **"buscou na internet"**, em
+verde, antes dos domínios.
+
+**2. O botão sumia justamente quando era mais necessário.** Meu erro de lógica: ele aparecia
+"sempre que eu não ofereci a ferramenta", quando o certo é **sempre que ela não buscou**. Oferecendo
+e o modelo decidindo não usar, ele ficava sem o selo E sem o botão — sem saber e sem poder fazer
+nada, no caso exato em que a resposta saiu da memória do modelo. Agora o botão aparece, e com o
+rótulo honesto: *"a Lexa achou que não precisava — procurar mesmo assim"*.
+
+**3. `prepAcharItem` reduzia só um dos lados.** Ele viu o chip "pals" oferecido como novidade tendo
+o item. A busca expandia o ALVO em formas e comparava com `w.word` LITERAL: então o chip "pals"
+achava o item "pal", mas o chip "pal" **não** achava o item salvo como "Pals" — que é justamente
+como ele vem do livro. Assimetria silenciosa, e o preço é o pior possível: o chip parece novidade,
+ele clica, e nasce um item duplicado da mesma palavra — o que este achador existe para impedir.
+Entrou uma 2ª passada que reduz também o item (só quando a 1ª, barata, falha). 6/6 no banco de
+prova, nos dois sentidos e com o irregular ("fell" acha "fall").
+
+O tique de "já é seu" ficou **miúdo e no canto**, como ele pediu — confirmação não é convite: o que
+precisa saltar na lista é o que ainda dá para estudar.
+
+**Arquivos**: `js/ai.js`, `js/core.js`, `js/review.js`, `css/styles.css`, `tools/teste-ia.mjs`.
+`sw.js` → `englab-v187`.
 
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 
