@@ -768,6 +768,11 @@ async function videoOvExplain() {
   const montar = c => {
     if (!vivo()) return
     corpo.innerHTML = c.html
+    if (typeof lexaWebRodape === 'function') {
+      lexaWebRodape(corpo, { buscou: !!c.buscou, fontes: c.fontes || [], ofereceu: !!c.ofereceu,
+        refazer: () => { if (typeof _revExplainCache !== 'undefined') _revExplainCache.delete(chave)
+                         window._vidWebForcar = true; videoOvExplain() } })
+    }
     if (typeof lexaChipsMontar === 'function') {
       // Os chips DO QUE ELE MARCOU. A fala e as falas em volta entram como
       // contexto, para a IA desambiguar — não como fonte de chip. Saindo da
@@ -797,14 +802,19 @@ ${trecho}
 
 A fala é: "${contexto}". O aluno selecionou: "${txt}".
 Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado, explique a imagem.`
-    const resp = await aiTextSeguro([
-      { role: 'system', content: sistema },
-      { role: 'user', content: pergunta }
-    ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
+    // A WEB VALE AQUI TAMBÉM: marca e referência cultural são o pão de cada
+    // dia da legenda de série — é onde a pergunta "o que é isso no mundo real"
+    // mais aparece.
+    const forcar = !!window._vidWebForcar; window._vidWebForcar = false
+    const rw = await lexaExplicarTexto({ sistema, pergunta, termo: txt, frase: contexto,
+                                         forcarWeb: forcar, maxTokens: 600 })
+    const resp = rw.texto   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
     // resposta vazia (qualquer modelo faz isso) NÃO pode virar cache — senão
     // a seleção fica muda para sempre; trata como erro e oferece re-tentar
     if (!resp || !resp.trim()) throw new Error('a IA devolveu uma resposta vazia')
-    const guardado = { html: lexaFormatar(resp), sistema, pergunta, resposta: resp }
+    const guardado = { html: lexaFormatar(resp), sistema, pergunta, resposta: resp,
+                       buscou: rw.buscou, fontes: rw.fontes,
+                       ofereceu: forcar || (typeof lexaWebAutomatica === 'function' && lexaWebAutomatica(txt, contexto)) }
     if (typeof _revExplainCache !== 'undefined') _revExplainCache.set(chave, guardado)
     montar(guardado)
   } catch (e) {

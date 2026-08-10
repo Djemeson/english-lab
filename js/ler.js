@@ -1125,6 +1125,100 @@ function _lerPersistirCaptura() {
 
 // ---- popup de seleção: Explicar / Estudar / Ouvir ----
 let _lerPopAlvo = '', _lerPopCtx = '', _lerPopTrecho = ''
+// A EXPLICACAO DO LEITOR, agora com nome proprio.
+// Era um `onclick` anonimo, e por isso o botao "procurar na internet" nao
+// tinha como refazer a MESMA explicacao: nao havia o que chamar de novo.
+// Com nome, o refazer e uma chamada com `forcarWeb`.
+// ⚠️ `de` carrega o que REFAZER precisa. Os `_lerPop*` são zerados por
+// `_lerFecharPopup()` logo abaixo — refazer lendo deles pediria explicação de
+// uma seleção que já não existe, e a Lexa responderia sobre o vazio.
+async function lerExplicarSelecao(pop, de) {
+  const alvo = (de && de.alvo) || _lerPopAlvo
+  const ctx  = (de && de.ctx)  || _lerPopCtx
+  const emVolta = (de && de.trecho !== undefined) ? de.trecho : _lerPopTrecho
+  // A EXPLICAÇÃO SAI DO BALÃOZINHO DE SELEÇÃO e vai para o BALÃO SUSPENSO da
+  // Lexa (`lexaBalaoAbrir`), que é o mesmo em todo o projeto. Ele cabe o que
+  // o popup não cabia — explicação + chips de todas as unidades + a conversa
+  // — sem cobrir a página, que é o ponto: a frase que gerou a dúvida continua
+  // ali atrás. O popup de seleção fecha, e com ele some toda a briga do vigia
+  // de seleção com o campo de texto da conversa.
+  // O balão nasce ANCORADO no popup: aparece onde a mão dele já estava.
+  // Refazendo não há popup: o balão fica onde já estava, para o texto não
+  // saltar de lugar embaixo dos olhos dele.
+  const antigo = document.getElementById('sel-menu')
+  const onde = pop ? pop.getBoundingClientRect() : (antigo ? antigo.getBoundingClientRect() : null)
+  _lerFecharPopup()
+  const corpo = lexaBalaoAbrir({
+    titulo: alvo,
+    frase: ctx,
+    fonte: [_lerLivro.title, (_lerLivro.chapters[_lerCap] || {}).titulo].filter(Boolean).join(' · '),
+    alvo: onde
+  })
+  corpo.innerHTML = `<div class="ler-pop-txt">${esc(lexaNome())} está lendo o trecho…</div>`
+  const vivo = () => lexaBalaoVivo(corpo)
+
+  // A figura vai em PARALELO com a IA e entra assim que chegar: a Wikipédia
+  // responde em ~0,6s e a explicação leva alguns segundos — fazer o texto
+  // esperar a foto seria trocar o essencial pelo acessório.
+  if (typeof wikiIlustracao === 'function') {
+    wikiIlustracao(alvo, (_lerLivro && _lerLivro.lang) || 'en').then(info => {
+    if (!info || !vivo()) return
+    if (!corpo.querySelector('.ll-wiki-fig')) corpo.insertAdjacentHTML('afterbegin', wikiFiguraHTML(info))
+    }).catch(() => {})
+  }
+
+  try {
+    const sistema = lexaPrompt()
+    // O TRECHO INTEIRO vai primeiro, e a frase depois. Sem o parágrafo, um
+    // pronome no começo da seleção fica órfão e a IA inventa o referente.
+    const trecho = (emVolta && emVolta.length > ctx.length) ? emVolta : ''
+    const pergunta = `O aluno está lendo "${_lerLivro.title}"${_lerLivro.author ? ', de ' + _lerLivro.author : ''}.${
+    trecho ? `\nTrecho em volta (use para resolver pronomes e referências): "${trecho}"` : ''}\nA frase é: "${ctx}". Ele selecionou: "${alvo}".\nExplique o que "${alvo}" significa AQUI, nesta passagem.`
+    // A WEB VALE AQUI TAMBÉM. O leitor é onde nome próprio e referência
+    // cultural mais aparecem — "Archie's Pals 'n' Gals" saiu daqui —, e a
+    // primeira versão da busca só valia no menu de seleção. Uma peça só
+    // (`lexaExplicarTexto`) decide se vai à rede, nos quatro caminhos.
+    const forcar = !!(de && de.web)
+    const r = await lexaExplicarTexto({ sistema, pergunta, termo: alvo, frase: ctx,
+                                  forcarWeb: forcar, maxTokens: 600 })
+    const t = r.texto
+    // Fechou o painel enquanto a IA respondia: não há mais onde escrever, e
+    // reabrir por conta própria seria o app decidindo por ele.
+    if (!vivo()) return
+    const txtEl = corpo.querySelector('.ler-pop-txt')
+    // innerHTML com `lexaFormatar`, não textContent: a resposta vem em
+    // markdown e o `textContent` a mostrava crua — `**pals** = "amigos"`,
+    // com os asteriscos na cara do aluno.
+    if (txtEl) txtEl.innerHTML = t ? lexaFormatar(t) : esc(`${lexaNome()} devolveu uma resposta vazia`)
+    if (typeof lexaWebRodape === 'function' && txtEl) {
+      lexaWebRodape(txtEl, { ...r,
+        ofereceu: forcar || (typeof lexaWebAutomatica === 'function' && lexaWebAutomatica(alvo, ctx)),
+        refazer: () => lerExplicarSelecao(null, { alvo, ctx, trecho: emVolta, web: true }) })
+    }
+    // OS CHIPS SÃO DO QUE ELE MARCOU. Já foram da frase inteira, e ele pegou:
+    // marcou "looks lower middle-class to Billy" e vieram "two miles",
+    // "downtown", "enter" — palavras da frase que ele não tinha marcado. A
+    // frase entra como CONTEXTO, para a IA desambiguar, e não como fonte de
+    // chip.
+    if (t && !corpo.querySelector('.lexa-chips-slot') && typeof lexaChipsMontar === 'function') {
+    lexaChipsMontar(corpo, {
+      trecho: alvo, contexto: [ctx, trecho].filter(Boolean).join(' ').slice(0, 700),
+      lang: _lerLivro.lang || 'en', fonte: _lerLivro.title,
+      origem: { source_type: 'kindle', source_title: _lerLivro.title,
+            source_context: (_lerLivro.chapters[_lerCap] || {}).titulo || '' }
+    })
+    }
+    // A conversa continua daqui: a explicação vira a primeira mensagem, então
+    // a pergunta seguinte já sabe o livro, a frase e o termo.
+    if (t && !corpo.querySelector('.lexa-chat') && typeof lexaChatMontar === 'function') {
+    lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: t })
+    }
+  } catch (e) {
+    const txtEl = vivo() && corpo.querySelector('.ler-pop-txt')
+    if (txtEl) txtEl.textContent = 'Não deu: ' + e.message
+  }
+}
+
 function _lerFecharPopup() { const p = el('ler-pop'); if (p) p.remove(); _lerPopAlvo = '' }
 
 function _lerAoSelecionar() {
@@ -1210,78 +1304,7 @@ function _lerAoSelecionar() {
   pop.querySelector('[data-p="img"]').onclick = () => lerAbrirBusca('img')
   pop.querySelector('[data-p="wiki"]').onclick = () => lerAbrirBusca('wiki')
   pop.querySelector('[data-p="web"]').onclick = () => lerAbrirBusca('web')
-  pop.querySelector('[data-p="exp"]').onclick = async () => {
-    const alvo = _lerPopAlvo, ctx = _lerPopCtx
-    // A EXPLICAÇÃO SAI DO BALÃOZINHO DE SELEÇÃO e vai para o BALÃO SUSPENSO da
-    // Lexa (`lexaBalaoAbrir`), que é o mesmo em todo o projeto. Ele cabe o que
-    // o popup não cabia — explicação + chips de todas as unidades + a conversa
-    // — sem cobrir a página, que é o ponto: a frase que gerou a dúvida continua
-    // ali atrás. O popup de seleção fecha, e com ele some toda a briga do vigia
-    // de seleção com o campo de texto da conversa.
-    // O balão nasce ANCORADO no popup: aparece onde a mão dele já estava.
-    const onde = pop.getBoundingClientRect()
-    _lerFecharPopup()
-    const corpo = lexaBalaoAbrir({
-      titulo: alvo,
-      frase: ctx,
-      fonte: [_lerLivro.title, (_lerLivro.chapters[_lerCap] || {}).titulo].filter(Boolean).join(' · '),
-      alvo: onde
-    })
-    corpo.innerHTML = `<div class="ler-pop-txt">${esc(lexaNome())} está lendo o trecho…</div>`
-    const vivo = () => lexaBalaoVivo(corpo)
-
-    // A figura vai em PARALELO com a IA e entra assim que chegar: a Wikipédia
-    // responde em ~0,6s e a explicação leva alguns segundos — fazer o texto
-    // esperar a foto seria trocar o essencial pelo acessório.
-    if (typeof wikiIlustracao === 'function') {
-      wikiIlustracao(alvo, (_lerLivro && _lerLivro.lang) || 'en').then(info => {
-        if (!info || !vivo()) return
-        if (!corpo.querySelector('.ll-wiki-fig')) corpo.insertAdjacentHTML('afterbegin', wikiFiguraHTML(info))
-      }).catch(() => {})
-    }
-
-    try {
-      const sistema = lexaPrompt()
-      // O TRECHO INTEIRO vai primeiro, e a frase depois. Sem o parágrafo, um
-      // pronome no começo da seleção fica órfão e a IA inventa o referente.
-      const trecho = (_lerPopTrecho && _lerPopTrecho.length > ctx.length) ? _lerPopTrecho : ''
-      const pergunta = `O aluno está lendo "${_lerLivro.title}"${_lerLivro.author ? ', de ' + _lerLivro.author : ''}.${
-        trecho ? `\nTrecho em volta (use para resolver pronomes e referências): "${trecho}"` : ''}\nA frase é: "${ctx}". Ele selecionou: "${alvo}".\nExplique o que "${alvo}" significa AQUI, nesta passagem.`
-      const t = await aiTextSeguro([
-        { role: 'system', content: sistema },
-        { role: 'user', content: pergunta }
-      ], { maxTokens: 600 })
-      // Fechou o painel enquanto a IA respondia: não há mais onde escrever, e
-      // reabrir por conta própria seria o app decidindo por ele.
-      if (!vivo()) return
-      const txtEl = corpo.querySelector('.ler-pop-txt')
-      // innerHTML com `lexaFormatar`, não textContent: a resposta vem em
-      // markdown e o `textContent` a mostrava crua — `**pals** = "amigos"`,
-      // com os asteriscos na cara do aluno.
-      if (txtEl) txtEl.innerHTML = t ? lexaFormatar(t) : esc(`${lexaNome()} devolveu uma resposta vazia`)
-      // OS CHIPS SÃO DO QUE ELE MARCOU. Já foram da frase inteira, e ele pegou:
-      // marcou "looks lower middle-class to Billy" e vieram "two miles",
-      // "downtown", "enter" — palavras da frase que ele não tinha marcado. A
-      // frase entra como CONTEXTO, para a IA desambiguar, e não como fonte de
-      // chip.
-      if (t && !corpo.querySelector('.lexa-chips-slot') && typeof lexaChipsMontar === 'function') {
-        lexaChipsMontar(corpo, {
-          trecho: alvo, contexto: [ctx, trecho].filter(Boolean).join(' ').slice(0, 700),
-          lang: _lerLivro.lang || 'en', fonte: _lerLivro.title,
-          origem: { source_type: 'kindle', source_title: _lerLivro.title,
-                    source_context: (_lerLivro.chapters[_lerCap] || {}).titulo || '' }
-        })
-      }
-      // A conversa continua daqui: a explicação vira a primeira mensagem, então
-      // a pergunta seguinte já sabe o livro, a frase e o termo.
-      if (t && !corpo.querySelector('.lexa-chat') && typeof lexaChatMontar === 'function') {
-        lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: t })
-      }
-    } catch (e) {
-      const txtEl = vivo() && corpo.querySelector('.ler-pop-txt')
-      if (txtEl) txtEl.textContent = 'Não deu: ' + e.message
-    }
-  }
+  pop.querySelector('[data-p="exp"]').onclick = () => lerExplicarSelecao(pop)
 }
 
 // Wikipédia e web: o que a IA não resolve bem. Nome de lugar, batalha, arma,

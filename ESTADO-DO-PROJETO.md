@@ -8050,8 +8050,29 @@ prova, nos dois sentidos e com o irregular ("fell" acha "fall").
 O tique de "já é seu" ficou **miúdo e no canto**, como ele pediu — confirmação não é convite: o que
 precisa saltar na lista é o que ainda dá para estudar.
 
-**Arquivos**: `js/ai.js`, `js/core.js`, `js/review.js`, `css/styles.css`, `tools/teste-ia.mjs`.
-`sw.js` → `englab-v187`.
+#### ⚠️ E a web valia em UM dos quatro caminhos
+
+Ele testou no livro e disse "mesma coisa" — com razão. **Eu tinha ligado a busca só no menu de
+seleção.** O leitor, o Preparar e o vídeo têm cada um o seu `aiTextSeguro`, e ficaram de fora — o
+leitor inclusive, que é onde ele mais lê e onde nome próprio mais aparece (o "Archie's Pals 'n'
+Gals" saiu de lá).
+
+É a lição que este projeto já aprendeu duas vezes nesta mesma sessão — com o balão e com os chips:
+**quando quatro telas fazem a mesma coisa, a peça é UMA e elas a chamam.** Entraram duas:
+
+- **`lexaExplicarTexto({ sistema, pergunta, termo, frase, forcarWeb })`** — decide sozinha se vai à
+  rede, registra o uso e devolve `{ texto, fontes, buscou }`. ⚠️ Se a web falhar, **cai para o
+  caminho de sempre**: ele veio perguntar o que a palavra significa, não testar a rede.
+- **`lexaWebRodape(corpo, { buscou, fontes, ofereceu, refazer })`** — o selo, o botão e a escolha.
+
+O leitor precisou de uma cirurgia a mais: o "Explicar" era um `onclick` anônimo, e por isso o botão
+não tinha o que chamar de novo. Virou `lerExplicarSelecao(pop, de)`. ⚠️ E o `de` não é enfeite —
+`_lerFecharPopup()` zera os `_lerPop*`, então refazer lendo deles pediria explicação de uma seleção
+que já não existe. No Preparar e no vídeo, o que a web trouxe entra **no cache**: reabrir pelo
+acerto de cache não pode perder a procedência.
+
+**Arquivos**: `js/ai.js`, `js/core.js`, `js/ler.js`, `js/review.js`, `js/video-study.js`,
+`css/styles.css`, `tools/teste-ia.mjs`. `sw.js` → `englab-v188`.
 
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 

@@ -338,72 +338,86 @@ function lexaFontesHTML(fontes) {
     ).join('')}</div>`
 }
 
-async function _selExplicarPintar(corpo, c, comWeb) {
+// ⚠️ A WEB TEM DE VALER NOS QUATRO CAMINHOS DE EXPLICAÇÃO, e a primeira versão
+// valia em UM: o menu de seleção. O leitor, o Preparar e o vídeo têm cada um o
+// seu `aiTextSeguro`, e ficaram de fora — justamente o leitor, que é onde ele
+// mais lê. Ele testou no livro e viu "mesma coisa", com razão.
+// A lição é a de sempre neste projeto: quando quatro telas fazem a mesma coisa,
+// a peça é UMA e elas a chamam. Foi assim com o balão, foi assim com os chips.
+
+// A explicação, decidindo sozinha se vai à web. Devolve o que os quatro
+// caminhos precisam para pintar.
+async function lexaExplicarTexto({ sistema, pergunta, termo, frase, forcarWeb, maxTokens = 600 }) {
+  const comWeb = !!forcarWeb || lexaWebAutomatica(termo, frase)
+  if (comWeb) {
+    try {
+      const r = await aiTextWeb({ sistema, pergunta, maxTokens })
+      lexaWebRegistrar({ automatica: !forcarWeb, manual: !!forcarWeb, buscou: r.buscou })
+      if (r.texto) return { texto: r.texto, fontes: r.buscou ? r.fontes : [], buscou: r.buscou }
+    } catch (e) {
+      // A web falhando NÃO pode calar a explicação: cai para o caminho de
+      // sempre. Ele veio perguntar o que a palavra significa, não testar a rede.
+      console.warn('[lexa] a busca na web falhou, seguindo sem ela:', e.message)
+    }
+  }
+  const t = await aiTextSeguro([
+    { role: 'system', content: sistema },
+    { role: 'user', content: pergunta }
+  ], { maxTokens })
+  lexaWebRegistrar({ automatica: false, manual: false, buscou: false })
+  return { texto: t, fontes: [], buscou: false }
+}
+
+// O rodapé da web: o selo (quando buscou), o botão (quando não buscou) e a
+// escolha de quando buscar sozinha. `refazer` é o que o botão chama para
+// repetir a MESMA explicação com a busca forçada.
+function lexaWebRodape(corpo, { buscou, fontes, refazer, ofereceu }) {
+  if (!corpo) return
+  if (buscou) corpo.insertAdjacentHTML('beforeend', lexaFontesHTML(fontes))
+  if (!aiWebPodeUsar()) return
+  if (!buscou && typeof refazer === 'function') {
+    const b = document.createElement('button')
+    b.className = 'lexa-web-btn'
+    b.innerHTML = ofereceu
+      ? `${ic('globe','ic-sm')} a Lexa achou que não precisava — procurar mesmo assim`
+      : `${ic('globe','ic-sm')} procurar na internet`
+    b.onclick = refazer
+    corpo.appendChild(b)
+  }
+  corpo.insertAdjacentHTML('beforeend', lexaWebEscolhaHTML())
+  lexaWebPintarCustos(corpo)
+}
+
+async function _selExplicarPintar(corpo, c, forcarWeb) {
   if (!lexaBalaoVivo(corpo)) return
-  corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(lexaNome())} está ${comWeb ? 'procurando na internet' : 'explicando'}…`
+  const ofereceu = !!forcarWeb || lexaWebAutomatica(c.txt, c.frase)
+  corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(lexaNome())} está ${ofereceu ? 'procurando na internet' : 'explicando'}…`
   const L = getLangDef(c.lang || 'en')
   const sistema = lexaExplicar()
-  const pergunta = `${c.frase ? `A frase é: "${c.frase}".\n` : ''}O aluno selecionou: "${c.txt}".
+  const pergunta = `${c.frase ? `A frase é: "${c.frase}".
+` : ''}O aluno selecionou: "${c.txt}".
 Explique o que "${c.txt}" significa AQUI, em ${L.nameEn}. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real.`
-  let resp = '', fontes = [], buscou = false
+  let r
   try {
-    if (comWeb) {
-      const r = await aiTextWeb({ sistema, pergunta, maxTokens: 600 })
-      resp = r.texto; fontes = r.fontes; buscou = !!r.buscou
-      // Ofereceu e ele não usou? Acontece, e é o certo — mas então a resposta
-      // saiu do que o modelo já sabia, e dizer o contrário seria mentir.
-      if (!buscou) fontes = []
-    } else {
-      resp = await aiTextSeguro([
-        { role: 'system', content: sistema },
-        { role: 'user', content: pergunta }
-      ], { maxTokens: 600 })
-    }
+    r = await lexaExplicarTexto({ sistema, pergunta, termo: c.txt, frase: c.frase, forcarWeb, maxTokens: 600 })
   } catch (e) {
     if (lexaBalaoVivo(corpo)) corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)}</span>`
     return
   }
   if (!lexaBalaoVivo(corpo)) return
-  lexaWebRegistrar({ automatica: comWeb && !c._webManual, manual: !!c._webManual, buscou })
-  c._webManual = false
-  // ⚠️ "BUSCOU OU NÃO?" TEM DE ESTAR ESCRITO. Ele perguntou — *"o texto que
-  // aparece buscou na web? quando eu sei que buscou?"* — e a pergunta é a
-  // prova do defeito: eu mostrava só as fontes, então "não buscou" e "buscou
-  // sem citar" ficavam idênticos na tela. Numa resposta que ele vai usar para
-  // estudar, a procedência não pode ser adivinhação.
-  corpo.innerHTML = lexaFormatar(resp) + (buscou ? lexaFontesHTML(fontes) : '')
-  // ⚠️ E O BOTÃO APARECE SEMPRE QUE NÃO BUSCOU — não "sempre que eu não
-  // ofereci". Era este o meu erro de lógica: oferecendo a ferramenta e o
-  // modelo decidindo não usá-la, ele ficava sem o selo E sem o botão, ou seja,
-  // sem saber e sem poder fazer nada. Justo o caso em que ele mais quer o
-  // botão, que é quando a resposta veio do que o modelo já sabia.
-  if (aiWebPodeUsar()) {
-    const rotulo = comWeb
-      ? `${ic('globe','ic-sm')} a Lexa achou que não precisava — procurar mesmo assim`
-      : `${ic('globe','ic-sm')} procurar na internet`
-    corpo.insertAdjacentHTML('beforeend',
-      (buscou ? '' : `<button class="lexa-web-btn" onclick="selMenuExplicarWeb()">${rotulo}</button>`)
-      + lexaWebEscolhaHTML())
-    lexaWebPintarCustos(corpo)
-  }
+  corpo.innerHTML = lexaFormatar(r.texto)
+  lexaWebRodape(corpo, { ...r, ofereceu, refazer: () => _selExplicarPintar(corpo, c, true) })
   if (typeof lexaChipsMontar === 'function' && c.frase) {
     lexaChipsMontar(corpo, { trecho: c.txt, contexto: c.frase, lang: c.lang || 'en',
       fonte: c.fonte || '', origem: c.origem || {} })
   }
   if (typeof lexaChatMontar === 'function') {
-    lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: resp })
+    lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: r.texto })
   }
 }
 
 // O botão: quando a resposta veio vaga, ele força a busca. É a válvula que
 // deixa o filtro automático poder ser conservador sem custar informação.
-function selMenuExplicarWeb() {
-  const c = _selMenuCtx
-  const corpo = document.getElementById('lexa-balao-corpo')
-  if (!c || !corpo) return
-  c._webManual = true
-  _selExplicarPintar(corpo, c, true)
-}
 
 // ---- A escolha, dentro do balão --------------------------------
 // Recolhida: quem não quer decidir nada continua lendo a resposta. Aberta,

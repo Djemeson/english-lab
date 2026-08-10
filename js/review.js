@@ -3109,6 +3109,13 @@ async function revSelExplain() {
   const montar = ctx2 => {
     if (!vivo()) return
     corpo.innerHTML = ctx2.html
+    // O rodapé da web entra ANTES dos chips: selo, botão e a escolha. Sai do
+    // que ficou GUARDADO, senão reabrir pelo cache perderia a procedência —
+    // a resposta apareceria sem dizer que tinha vindo da internet.
+    if (typeof lexaWebRodape === 'function') {
+      lexaWebRodape(corpo, { buscou: !!ctx2.buscou, fontes: ctx2.fontes || [], ofereceu: !!ctx2.ofereceu,
+        refazer: () => { _revExplainCache.delete(chave); window._revWebForcar = true; revSelExplain() } })
+    }
     if (typeof lexaChipsMontar === 'function') {
       // Os chips saem DO QUE ELE MARCOU; a frase entra só como contexto para a
       // IA desambiguar. Saindo da frase inteira, vinham chips de palavras que
@@ -3138,12 +3145,16 @@ async function revSelExplain() {
     const pergunta =
 `No item de estudo "${w ? w.word : ''}" (contexto: "${window._revSelCtx || (w && w.context) || ''}"), o aluno selecionou: "${txt}".
 Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado nesta expressão, explique a imagem.`
-    const resp = await aiTextSeguro([
-      { role: 'system', content: sistema },
-      { role: 'user', content: pergunta }
-    ], { maxTokens: 600 })   // teto folgado: 220 cortava a resposta no meio (só paga o que gerar)
+    // A WEB VALE AQUI TAMBÉM — uma peça só (`lexaExplicarTexto`) para os
+    // quatro caminhos de explicação. Teto folgado: 220 cortava no meio.
+    const forcar = !!window._revWebForcar; window._revWebForcar = false
+    const ofereceu = forcar || (typeof lexaWebAutomatica === 'function' && lexaWebAutomatica(txt, fraseDoItem))
+    const r = await lexaExplicarTexto({ sistema, pergunta, termo: txt, frase: fraseDoItem,
+                                        forcarWeb: forcar, maxTokens: 600 })
+    const resp = r.texto
     await pFig   // a figura já veio (é mais rápida que a IA); só junta
-    const guardado = { html: figura + lexaFormatar(resp), sistema, pergunta, resposta: resp }
+    const guardado = { html: figura + lexaFormatar(resp), sistema, pergunta, resposta: resp,
+                       buscou: r.buscou, fontes: r.fontes, ofereceu }
     _revExplainCache.set(chave, guardado)   // aiTextSeguro nunca devolve vazio: não cacheia silêncio
     montar(guardado)
   } catch (e) {
