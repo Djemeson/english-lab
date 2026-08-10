@@ -2496,8 +2496,16 @@ async function deleteWord(id) {
   if (!(await confirmModal({ title: 'Remover palavra', icon: 'trash', danger: true, confirmText: 'Remover',
     html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Remover <b>"${esc(w?.word || '(frase)')}"</b> permanentemente?</p>` }))) return
   markDeleted(id)
+  // ⚠️ OS CARDS VÃO JUNTO. Apagar a palavra e deixá-los era criar CARD ÓRFÃO:
+  // a revisão continuava cobrando uma palavra que não existe mais na
+  // biblioteca, e nada na tela explicava de onde ela vinha.
+  // O defeito veio à tona pela lógica dele: *"se o card tem a palavra, deve
+  // ter no word"* — é a invariante do modelo, e era esta função que a
+  // quebrava. O card é DERIVADO do item; sumindo a origem, some o derivado.
+  const orfaos = srsCards.filter(c => c.wordId === id).length
+  if (orfaos) { srsCards = srsCards.filter(c => c.wordId !== id); saveSrsCards() }
   words = words.filter(x => x.id !== id); saveWords()
-  toast('Removida', 'info')
+  toast(orfaos ? `Removida — e ${orfaos} ${orfaos === 1 ? 'card saiu' : 'cards saíram'} da revisão` : 'Removida', 'info')
   const next = words.find(x => ['pending_ai','pending_review'].includes(x.status) && x.id !== id)
   if (next) { activeWordId = next.id }
   else activeWordId = null

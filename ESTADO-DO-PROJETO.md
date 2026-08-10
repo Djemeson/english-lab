@@ -8097,7 +8097,32 @@ de `words`, o card fica na revisão, e o chip volta a se oferecer como novidade.
 dele, ter o card É ter a palavra — e é o ponto de vista dele que manda. `lexaJaEhSeu` agora olha os
 dois, com os mesmos lemas nos dois lados (o card guarda a forma capturada, "Pals").
 
-`sw.js` → `englab-v189`.
+#### O automático não insiste no que já se provou inútil
+
+Ele viu a mesma mensagem duas vezes no MESMO termo: *"olha a informação de que a Lexa decidiu de
+novo"*. É o pior caso possível — "Archie's Pals 'n' Gals" é nome próprio (o filtro dispara) mas é
+famoso o bastante para o modelo já saber (ele nunca busca). **Pedágio pago toda vez, resultado
+nenhum, para sempre.**
+
+Entrou uma memória por TERMO, que custa nada: se o automático ofereceu e não deu em busca, aquele
+termo sai do automático (`cfg.lexaWebVao`, teto de 300, normalizado por caixa e espaço). ⚠️ Só vale
+para a oferta AUTOMÁTICA — pedido dele à mão é decisão dele, e decisão dele não vira regra contra
+ele. O botão continua em toda explicação: o que se perde é a insistência, não a possibilidade.
+
+#### ⚠️ E a lógica dele achou um card órfão
+
+*"É uma questão de lógica: se o card tem a palavra, deve ter no `word`."* Está certo — é a
+invariante do modelo, o card é DERIVADO do item. E era `deleteWord` que a quebrava: apagava a
+palavra e **deixava os cards**, que continuavam cobrando revisão de algo que já não existe na
+biblioteca, sem nada na tela explicando de onde vinham.
+
+Corrigido: sumindo a origem, some o derivado — e o toast diz quantos cards saíram junto. A checagem
+de cards em `lexaJaEhSeu` fica como rede para os órfãos que já existem nos aparelhos dele.
+
+(O `pal` era engano dele — só o `gal` foi para estudo. Mas o caminho até lá pagou dois consertos
+reais: a simetria do `prepAcharItem` e este.)
+
+`sw.js` → `englab-v190`.
 
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 

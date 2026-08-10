@@ -353,6 +353,10 @@ async function lexaExplicarTexto({ sistema, pergunta, termo, frase, forcarWeb, m
     try {
       const r = await aiTextWeb({ sistema, pergunta, maxTokens })
       lexaWebRegistrar({ automatica: !forcarWeb, manual: !!forcarWeb, buscou: r.buscou })
+      // Ofereci sozinho e não deu em busca: este termo não volta ao automático.
+      // ⚠️ Só vale para a oferta AUTOMÁTICA — pedido dele à mão é decisão dele,
+      // e decisão dele não vira regra contra ele.
+      if (!forcarWeb && !r.buscou) lexaWebMarcarVao(termo)
       if (r.texto) return { texto: r.texto, fontes: r.buscou ? r.fontes : [], buscou: r.buscou }
     } catch (e) {
       // A web falhando NÃO pode calar a explicação: cai para o caminho de
@@ -1355,11 +1359,36 @@ function lexaWebSugestao(p) {
   }
   return ''
 }
+// ⚠️ E O AUTOMÁTICO NÃO INSISTE NO QUE JÁ SE PROVOU INÚTIL.
+// Ele viu a mesma mensagem duas vezes no MESMO termo — *"olha a informação de
+// que a Lexa decidiu de novo"* — e é o pior caso possível: "Archie's Pals 'n'
+// Gals" é nome próprio (o filtro dispara), mas é famoso o bastante para o
+// modelo já saber (ele nunca busca). Pedágio pago toda vez, resultado nenhum,
+// para sempre.
+// A memória é por TERMO e custa nada: se o automático já ofereceu e não deu em
+// busca, aquele termo sai do automático. O botão continua — o que se perde é a
+// insistência, não a possibilidade.
+const LEXA_WEB_VAO_TETO = 300
+function _lexaWebChave(t) { return String(t || '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 60) }
+function lexaWebFoiEmVao(termo) {
+  const k = _lexaWebChave(termo)
+  return !!k && Array.isArray(cfg.lexaWebVao) && cfg.lexaWebVao.includes(k)
+}
+function lexaWebMarcarVao(termo) {
+  const k = _lexaWebChave(termo); if (!k) return
+  const l = Array.isArray(cfg.lexaWebVao) ? cfg.lexaWebVao : (cfg.lexaWebVao = [])
+  if (l.includes(k)) return
+  l.push(k)
+  if (l.length > LEXA_WEB_VAO_TETO) l.splice(0, l.length - LEXA_WEB_VAO_TETO)
+  if (typeof saveCfg === 'function') saveCfg()
+}
+
 function lexaWebAutomatica(termo, frase) {
   if (!aiWebPodeUsar()) return false
   const m = lexaWebModo()
-  if (m === 'sempre') return true
   if (m === 'pedido') return false
+  if (lexaWebFoiEmVao(termo)) return false     // já custou uma vez sem render nada
+  if (m === 'sempre') return true
   return lexaCheiraMundoReal(termo, frase)
 }
 

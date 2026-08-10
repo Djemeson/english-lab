@@ -104,7 +104,7 @@ const DEF_CFG = {
   // A Lexa na internet: 'pedido' | 'auto' | 'sempre'. A escolha se faz no
   // BALÃO, na hora da dúvida — não há controle disto em Configurações, de
   // propósito (ver `lexaWebEscolhaHTML` em ai.js).
-  lexaWeb: 'auto', lexaWebUso: null,
+  lexaWeb: 'auto', lexaWebUso: null, lexaWebVao: null,
   openaiKey: '', geminiKey: '', groqKey: '',
   aiModelProv: {},
   vidPT: '',        // modo de tradução no vídeo, lembrado entre sessões
