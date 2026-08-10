@@ -16,7 +16,32 @@
 > escrito nele** (~R$ 0,015, da cotação guardada e do modelo ativo), e o selo verde "buscou na
 > internet" com as fontes clicáveis quando ele usa. ⚠️ O motivo dele estava na tela: o automático
 > disparava em "Archie's Pals 'n' Gals", pagava o pedágio de 4.436 tokens, e o modelo decidia não
-> buscar porque já sabia. `sw.js` → `englab-v191`.
+> buscar porque já sabia. #### Clicar tinha de mudar a resposta — e não mudava
+
+Ele apertou o botão e recebeu **a mesma coisa**: *"esperava riqueza de informações"*. Estava certo,
+e eram duas causas somadas:
+
+1. **`tool_choice: 'auto'`.** "Auto" é para quem não decidiu — e aqui quem decidiu foi ELE, no
+   clique. O modelo olhava um nome que já conhecia, dispensava a busca e devolvia o que já tinha:
+   ele pagava o pedágio e recebia a resposta de antes. Virou **`required`**. Pedido dele é ordem,
+   não sugestão.
+2. **O prompt era o mesmo.** `lexaExplicar()` manda responder em "2 a 4 frases, sem introdução" —
+   um teto que briga com a razão de ir à rua. Reaproveitá-lo garantia que a busca voltasse curta.
+
+Entrou `lexaExplicarWeb()`, que é outra tarefa: o que a coisa é no mundo real (tipo, autor, datas,
+onde circulava), dois ou três fatos que só a busca traz, e — o item que mais importa para quem lê
+literatura em outra língua — **o que um leitor nativo entende ao ver aquilo na cena e um
+estrangeiro não**: conotação, época, público, e a graça de o autor ter posto aquilo ali. O teto de
+tokens sobe junto (`max(maxTokens, 1100)`), senão a instrução pede 12 linhas e o orçamento corta na
+quinta.
+
+**Provado com chave real**, nos dois casos que ele tinha na tela: *Archie's Pals 'n' Gals* voltou
+com 1952–1991, 224 edições, o Double Digest de 1992 e o que "digest" queria dizer nas bancas
+(comics.org, archiecomics.com, wikipedia); *Zola* voltou com 1840–1902, o Naturalismo e
+*Thérèse Raquin* de dezembro de 1867 como terceiro romance (encyclopedia.com, catalogue.bnf.fr).
+**~2.000 caracteres contra ~300**, com fonte por afirmação.
+
+`sw.js` → `englab-v192`.
 >
 > Anterior: 2026-08-08 — **A LEXA VÊ A WEB, E A DECISÃO É DELE, NO BALÃO**. A busca só
 > existe na Responses API. Sondada com chave real, e o achado que decidiu o desenho não foi se

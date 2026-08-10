@@ -352,7 +352,17 @@ async function lexaExplicarTexto({ sistema, pergunta, termo, frase, forcarWeb, m
   const comWeb = !!forcarWeb
   if (comWeb) {
     try {
-      const r = await aiTextWeb({ sistema, pergunta, maxTokens })
+      // ⚠️ OUTRA TAREFA, OUTRO PROMPT E OUTRO TETO. Reaproveitar o prompt curto
+      // era garantir que a busca voltasse com a mesma resposta de antes: ele
+      // manda escrever 2 a 4 frases, e o motivo de ir à rede é justamente o
+      // que não cabe em quatro frases. O teto sobe junto, senão a instrução
+      // pede 12 linhas e o orçamento corta na quinta.
+      const r = await aiTextWeb({
+        sistema: (typeof lexaExplicarWeb === 'function') ? lexaExplicarWeb() : sistema,
+        pergunta: `${frase ? `Contexto em que ele encontrou: "${frase}".\n` : ''}O termo é: "${termo}".
+Procure e responda como manda a tarefa: o que é no mundo real, os fatos que só a busca traz, e sobretudo o que um leitor nativo entende ao ver isso aqui.`,
+        maxTokens: Math.max(maxTokens, 1100)
+      })
       if (r.texto) return { texto: r.texto, fontes: r.buscou ? r.fontes : [], buscou: r.buscou }
     } catch (e) {
       // A web falhando NÃO pode calar a explicação: cai para o caminho de
@@ -1221,6 +1231,34 @@ function aiWebPodeUsar() {
 //   'sempre' — em toda explicação. 5,3× o custo de todas, medido.
 // O botão manual existe nos três modos: é ele que deixa o filtro poder ser
 // conservador sem custar informação.
+// ⚠️ PEDIR BUSCA É PEDIR MAIS, NÃO O MESMO COM FONTE.
+// Ele clicou e recebeu a MESMA resposta — *"esperava riqueza de informações"*.
+// Tinha razão, e por duas causas somadas:
+//   1) `tool_choice: 'auto'` deixava o modelo RECUSAR a busca mesmo com ele
+//      pedindo. "Auto" é para quem não decidiu; ele decidiu ao clicar.
+//   2) o prompt continuava sendo o de sempre, que manda responder em "2 a 4
+//      frases, sem introdução" — um teto que briga com a razão de ir à rua.
+// Este prompt é outra tarefa, e mira no que a explicação curta não cobre: o
+// que um LEITOR NATIVO entende ao ver aquilo na cena. É essa a informação que
+// muda a leitura e que nenhum dicionário dá.
+function lexaExplicarWeb() {
+  return lexaSistema(`
+TAREFA AGORA: o aluno PEDIU busca na internet sobre algo que ele encontrou lendo.
+Ele JÁ TEM a explicação curta. Ele quer o que não coube nela — então não repita a glosa e não devolva duas frases.
+
+O QUE ENTREGAR, nesta ordem:
+1. O QUE É NO MUNDO REAL, concreto: que tipo de coisa, de quem, de quando, onde circula(va). Datas e nomes próprios são o ponto — é para isso que se foi à rede.
+2. DOIS OU TRÊS FATOS que só a busca traz e que o aluno não teria como saber.
+3. ⭐ O MAIS IMPORTANTE — O QUE UM NATIVO ENTENDE E UM ESTRANGEIRO NÃO: que conotação aquilo carrega (infantil, cafona, nostálgico, prestigioso, datado, regional), para quem era, o que citar aquilo SUGERE. Se o autor pôs ali de propósito — ironia, contraste, caracterização do personagem —, diga qual é a graça.
+4. Se a busca não achou nada confiável sobre o termo, diga isso em uma linha em vez de encher.
+
+COMO:
+- Português do Brasil. Blocos curtos ou lista — o que ler melhor.
+- Pode ocupar espaço: até umas 10 a 12 linhas. O que não pode é enrolar.
+- NUNCA invente data, autor ou fato. Sem fonte, não afirme.
+- Sem "é importante notar", sem "vale destacar", sem recapitular a pergunta.`)
+}
+
 // Texto com busca na web. Devolve `{ texto, fontes, buscou }` — as fontes vêm
 // nas anotações da resposta, e mostrá-las é metade do ganho: o que a web traz
 // de novo não é saber mais, é poder CONFERIR.
@@ -1235,7 +1273,12 @@ async function aiTextWeb({ sistema, pergunta, maxTokens = 700, timeoutMs }) {
     // reserva — só se paga o que for gerado.
     max_output_tokens: maxTokens + AI_FOLGA_RACIOCINIO,
     tools: [{ type: 'web_search' }],
-    tool_choice: 'auto'
+    // ⚠️ `required`, NÃO `auto`. "Auto" é para quem não decidiu — e aqui quem
+    // decidiu foi ELE, no clique. Com `auto`, o modelo olhava um nome que já
+    // conhecia, dispensava a busca e devolvia a mesma resposta de antes: ele
+    // pagava o pedágio e recebia o que já tinha. Pedido dele é ordem, não
+    // sugestão.
+    tool_choice: 'required'
   }, { timeoutMs, retries: 0, key: chat.key })
   const d = await res.json()
   _aiGuardarUso(d, chat.model)          // já entende input_tokens/output_tokens
