@@ -69,7 +69,22 @@ casual"*). O modelo ainda tentou colar uma citação; a rede do formatador a rem
 No rodapé, o domínio agora tem teto de largura: um endereço de CDN
 (`prd-boekdb.s3.eu-central-1.amazonaws.com`) sozinho quebrava a linha em duas.
 
-`sw.js` → `englab-v193`.
+#### Refazer não é reabrir (e o que a busca custa depois)
+
+Pergunta dele: *"toda interação nesse modo de busca vai consumir aquele custo maior? Parece que
+abriu outra interface com novo custo — a Lexa fecha seu painel e abre um novo do zero."*
+
+**Sobre o custo, não**: o pedágio é por CLIQUE. A conversa que continua no balão usa
+`aiTextSeguro`, sem ferramenta nenhuma — e continua sabendo o que a busca trouxe, porque a resposta
+da web entra como primeira mensagem do histórico. Pesquisa uma vez, conversa em cima à vontade.
+
+**Sobre a impressão, ele estava certo, e era um defeito.** O botão chamava a função de explicação
+inteira, que abria OUTRO balão: a conversa que ele tivesse tido morria junto, a posição saltava, e
+parecia uma segunda cobrança começando do zero. `lexaBalaoAbrir` ganhou `reusar`: havendo balão
+aberto, ele reaproveita o elemento e só troca o texto de dentro. Os três caminhos (leitor, Preparar
+e vídeo) pedem reuso ao refazer; abrir uma explicação NOVA continua criando balão novo.
+
+`sw.js` → `englab-v194`.
 >
 > Anterior: 2026-08-08 — **A LEXA VÊ A WEB, E A DECISÃO É DELE, NO BALÃO**. A busca só
 > existe na Responses API. Sondada com chave real, e o achado que decidiu o desenho não foi se

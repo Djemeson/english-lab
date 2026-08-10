@@ -1152,7 +1152,9 @@ async function lerExplicarSelecao(pop, de) {
     titulo: alvo,
     frase: ctx,
     fonte: [_lerLivro.title, (_lerLivro.chapters[_lerCap] || {}).titulo].filter(Boolean).join(' · '),
-    alvo: onde
+    alvo: onde,
+    // Refazendo pela web: o MESMO balão, só com texto novo.
+    reusar: !!(de && de.web)
   })
   corpo.innerHTML = `<div class="ler-pop-txt">${esc(lexaNome())} está lendo o trecho…</div>`
   const vivo = () => lexaBalaoVivo(corpo)

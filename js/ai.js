@@ -161,7 +161,17 @@ function _lexaRetangulo(alvo) {
 // balão suspenso a frase está logo ali atrás, na página; repeti-la só empurrava
 // a resposta para baixo. Os chamadores continuam passando porque é o mesmo
 // texto que vira `trecho` dos chips.
-function lexaBalaoAbrir({ titulo, frase, fonte, alvo, acoes }) {
+function lexaBalaoAbrir({ titulo, frase, fonte, alvo, acoes, reusar }) {
+  // ⚠️ REFAZER NÃO É REABRIR. Ele viu e nomeou: *"a Lexa fecha seu painel e
+  // abre um novo do zero"*. Era isso mesmo — o botão da web chamava a função
+  // inteira, que abria outro balão: a conversa que ele tivesse tido morria, a
+  // posição saltava, e parecia uma segunda cobrança começando. Reaproveitando
+  // o balão, o que muda é só o texto lá dentro.
+  const atual = document.getElementById('sel-menu')
+  if (reusar && atual && atual.classList.contains('sel-exp')) {
+    const c = atual.querySelector('.sel-exp-corpo')
+    if (c) { c.innerHTML = ''; return c }
+  }
   _selMenuFechar()
   const r = _lexaRetangulo(alvo)
   const p = document.createElement('div')

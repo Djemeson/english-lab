@@ -758,7 +758,8 @@ async function videoOvExplain() {
     titulo: `"${txt}"`,
     frase: contexto,
     fonte: (_vidCur && _vidCur.title) || '',
-    alvo: onde
+    alvo: onde,
+    reusar: !!window._vidWebForcar
   })
   const vivo = () => lexaBalaoVivo(corpo)
   const chave = 'vid|' + contexto + '|' + txt

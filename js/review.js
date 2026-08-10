@@ -3107,7 +3107,8 @@ async function revSelExplain() {
     titulo: `"${txt}"`,
     frase: fraseDoItem,
     fonte: [(w && w.word) || '', obraNome((w && w.source_title) || '')].filter(Boolean).join(' · '),
-    alvo: onde
+    alvo: onde,
+    reusar: !!window._revWebForcar
   })
   const vivo = () => lexaBalaoVivo(corpo)
   // Os chips e a conversa se montam do mesmo jeito, tendo a explicação vindo
