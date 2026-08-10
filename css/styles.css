@@ -5160,31 +5160,7 @@ body.ler-full .mobile-bottom-nav{display:none}
   background:transparent;border:1px dashed var(--border-strong);color:var(--text3);
 }
 .lexa-web-btn:hover{color:var(--text);border-style:solid;border-color:var(--primary)}
-
-/* A ESCOLHA DENTRO DO BALÃO — recolhida, porque quem só quer a resposta não
-   deve tropeçar num painel de ajustes. Aberta, as três posições com o preço de
-   cada uma: é o preço que torna a decisão possível. */
-.lexa-web-modo{margin-top:var(--sp-2)}
-.lexa-web-modo>summary{
-  display:inline-flex;align-items:center;gap:5px;cursor:pointer;list-style:none;
-  font-size:var(--fs-3xs);color:var(--text3);padding:2px 0;
-}
-.lexa-web-modo>summary::-webkit-details-marker{display:none}
-.lexa-web-modo>summary:hover{color:var(--text2)}
-.lexa-web-ops{display:flex;flex-direction:column;gap:4px;margin-top:6px}
-.lexa-web-op{
-  display:flex;align-items:baseline;gap:6px;cursor:pointer;text-align:left;
-  padding:5px 9px;border-radius:6px;font:inherit;font-size:var(--fs-3xs);
-  background:var(--surface2);border:1px solid var(--border);color:var(--text2);
-}
-.lexa-web-op i{margin-left:auto;color:var(--text3);font-style:normal;white-space:nowrap}
-.lexa-web-op:hover{border-color:var(--border-strong);color:var(--text)}
-/* A posição marcada usa o acento do tema — nunca cor fixa. */
-.lexa-web-op.on{
-  border-color:rgba(var(--primary-rgb),.65);
-  background:rgba(var(--primary-rgb),.10);color:var(--text);
-}
-.lexa-web-nota{margin:6px 0 0;font-size:var(--fs-3xs);color:var(--text3);line-height:1.45}
+.lexa-web-btn i{font-style:normal;opacity:.75;font-variant-numeric:tabular-nums}
 
 /* AMOSTRA DO REPARO — antes e depois, um sobre o outro.
    A frase velha fica riscada e apagada; a nova, viva. É o que deixa ele

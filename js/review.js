@@ -3121,7 +3121,7 @@ async function revSelExplain() {
     // que ficou GUARDADO, senão reabrir pelo cache perderia a procedência —
     // a resposta apareceria sem dizer que tinha vindo da internet.
     if (typeof lexaWebRodape === 'function') {
-      lexaWebRodape(corpo, { buscou: !!ctx2.buscou, fontes: ctx2.fontes || [], ofereceu: !!ctx2.ofereceu,
+      lexaWebRodape(corpo, { buscou: !!ctx2.buscou, fontes: ctx2.fontes || [],
         refazer: () => { _revExplainCache.delete(chave); window._revWebForcar = true; revSelExplain() } })
     }
     if (typeof lexaChipsMontar === 'function') {
@@ -3156,13 +3156,12 @@ Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultur
     // A WEB VALE AQUI TAMBÉM — uma peça só (`lexaExplicarTexto`) para os
     // quatro caminhos de explicação. Teto folgado: 220 cortava no meio.
     const forcar = !!window._revWebForcar; window._revWebForcar = false
-    const ofereceu = forcar || (typeof lexaWebAutomatica === 'function' && lexaWebAutomatica(txt, fraseDoItem))
     const r = await lexaExplicarTexto({ sistema, pergunta, termo: txt, frase: fraseDoItem,
                                         forcarWeb: forcar, maxTokens: 600 })
     const resp = r.texto
     await pFig   // a figura já veio (é mais rápida que a IA); só junta
     const guardado = { html: figura + lexaFormatar(resp), sistema, pergunta, resposta: resp,
-                       buscou: r.buscou, fontes: r.fontes, ofereceu }
+                       buscou: r.buscou, fontes: r.fontes }
     _revExplainCache.set(chave, guardado)   // aiTextSeguro nunca devolve vazio: não cacheia silêncio
     montar(guardado)
   } catch (e) {

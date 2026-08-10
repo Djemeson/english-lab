@@ -101,10 +101,6 @@ const DEF_CFG = {
   // instalasse hoje nasceria no modelo antigo e só seria movido no boot
   // seguinte. O padrão tem de ser o padrão nos dois caminhos.
   aiProvider: 'openai', aiModel: 'gpt-5.6-luna', ttsProvider: 'openai',
-  // A Lexa na internet: 'pedido' | 'auto' | 'sempre'. A escolha se faz no
-  // BALÃO, na hora da dúvida — não há controle disto em Configurações, de
-  // propósito (ver `lexaWebEscolhaHTML` em ai.js).
-  lexaWeb: 'auto', lexaWebUso: null, lexaWebVao: null,
   openaiKey: '', geminiKey: '', groqKey: '',
   aiModelProv: {},
   vidPT: '',        // modo de tradução no vídeo, lembrado entre sessões

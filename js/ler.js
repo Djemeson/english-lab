@@ -1192,7 +1192,6 @@ async function lerExplicarSelecao(pop, de) {
     if (txtEl) txtEl.innerHTML = t ? lexaFormatar(t) : esc(`${lexaNome()} devolveu uma resposta vazia`)
     if (typeof lexaWebRodape === 'function' && txtEl) {
       lexaWebRodape(txtEl, { ...r,
-        ofereceu: forcar || (typeof lexaWebAutomatica === 'function' && lexaWebAutomatica(alvo, ctx)),
         refazer: () => lerExplicarSelecao(null, { alvo, ctx, trecho: emVolta, web: true }) })
     }
     // OS CHIPS SÃO DO QUE ELE MARCOU. Já foram da frase inteira, e ele pegou:

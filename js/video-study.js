@@ -769,7 +769,7 @@ async function videoOvExplain() {
     if (!vivo()) return
     corpo.innerHTML = c.html
     if (typeof lexaWebRodape === 'function') {
-      lexaWebRodape(corpo, { buscou: !!c.buscou, fontes: c.fontes || [], ofereceu: !!c.ofereceu,
+      lexaWebRodape(corpo, { buscou: !!c.buscou, fontes: c.fontes || [],
         refazer: () => { if (typeof _revExplainCache !== 'undefined') _revExplainCache.delete(chave)
                          window._vidWebForcar = true; videoOvExplain() } })
     }
@@ -813,8 +813,7 @@ Explique o que "${txt}" significa AQUI. Se for gíria, marca, referência cultur
     // a seleção fica muda para sempre; trata como erro e oferece re-tentar
     if (!resp || !resp.trim()) throw new Error('a IA devolveu uma resposta vazia')
     const guardado = { html: lexaFormatar(resp), sistema, pergunta, resposta: resp,
-                       buscou: rw.buscou, fontes: rw.fontes,
-                       ofereceu: forcar || (typeof lexaWebAutomatica === 'function' && lexaWebAutomatica(txt, contexto)) }
+                       buscou: rw.buscou, fontes: rw.fontes }
     if (typeof _revExplainCache !== 'undefined') _revExplainCache.set(chave, guardado)
     montar(guardado)
   } catch (e) {

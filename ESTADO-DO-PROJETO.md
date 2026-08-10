@@ -7,7 +7,18 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A LEXA VÊ A WEB, E A DECISÃO É DELE, NO BALÃO**. A busca só
+> Última atualização: 2026-08-08 — **A WEB SÓ ACONTECE QUANDO ELE CLICA**. Decisão dele, e ela
+> apagou o que eu tinha construído nas rodadas anteriores: *"sobre a pesquisa web, ele nunca deve
+> ser automático. Só acontece quando eu clico."* Saíram o filtro de nome próprio, as três posições
+> de escolha, a projeção de custo por modo, os contadores e a memória do "não adiantou" — **tudo
+> removido, não desligado**: opção que ninguém deve escolher é código morto com aparência de
+> recurso. Sobrou o essencial, e ele ficou melhor: **um botão em toda explicação, com o preço
+> escrito nele** (~R$ 0,015, da cotação guardada e do modelo ativo), e o selo verde "buscou na
+> internet" com as fontes clicáveis quando ele usa. ⚠️ O motivo dele estava na tela: o automático
+> disparava em "Archie's Pals 'n' Gals", pagava o pedágio de 4.436 tokens, e o modelo decidia não
+> buscar porque já sabia. `sw.js` → `englab-v191`.
+>
+> Anterior: 2026-08-08 — **A LEXA VÊ A WEB, E A DECISÃO É DELE, NO BALÃO**. A busca só
 > existe na Responses API. Sondada com chave real, e o achado que decidiu o desenho não foi se
 > funciona — foi o preço: **só OFERECER a ferramenta custa 4.436 tokens de entrada, 5,3× o custo da
 > explicação, mesmo quando o modelo decide não buscar** (o manual da ferramenta entra no contexto
@@ -8122,7 +8133,30 @@ de cards em `lexaJaEhSeu` fica como rede para os órfãos que já existem nos ap
 (O `pal` era engano dele — só o `gal` foi para estudo. Mas o caminho até lá pagou dois consertos
 reais: a simetria do `prepAcharItem` e este.)
 
-`sw.js` → `englab-v190`.
+#### E então ele cortou o automático inteiro
+
+*"Sobre a pesquisa web, ele nunca deve ser automático. Só acontece quando eu clico."*
+
+Saíram: `lexaCheiraMundoReal` (o filtro), `LEXA_WEB_MODOS`/`lexaWebModo`/`lexaWebAutomatica` (as
+três posições), `lexaWebEscolhaHTML`/`lexaWebPintarCustos`/`lexaWebEscolher` (a escolha no balão),
+`lexaWebProjecao`/`lexaWebSugestao`/`lexaWebRegistrar` (os contadores e a proposta),
+`lexaWebFoiEmVao`/`lexaWebMarcarVao` (a memória do que não adiantou), as chaves `lexaWeb`,
+`lexaWebUso` e `lexaWebVao` do `DEF_CFG`, e o CSS do seletor.
+
+**Removido, não desligado.** Deixar tudo aquilo atrás de um padrão "pedido" seria manter um menu
+de opções que ninguém deve escolher — código morto com aparência de recurso, e a próxima pessoa a
+ler o arquivo pagaria por ele.
+
+O que ficou é menor e mais honesto: **o botão em toda explicação, com o preço nele** — `procurar na
+internet ~R$ 0,015`, calculado do modelo ativo e da cotação já guardada. Quem paga escolhe, e para
+escolher precisa ver; o preço tem de estar onde a mão dele está, não numa tela de ajustes que ele
+visitaria uma vez e esqueceria. Buscando, vem o selo e as fontes.
+
+⚠️ **A medição continua valendo e é o registro de por que isto é assim**: oferecer a ferramenta
+custa 4.436 tokens de entrada, buscando ou não. O automático transformava isso em gasto recorrente
+sem resultado no caso mais comum — nome próprio famoso, que o modelo já conhece.
+
+`sw.js` → `englab-v191`.
 
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 
