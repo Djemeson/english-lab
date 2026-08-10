@@ -2924,7 +2924,8 @@ function _repLivroDe(obra) {
 async function reparoExecutar({ simular = true, aoAndar = null } = {}) {
   const diag = reparoDiagnostico()
   const rel = { total: diag.total, consertados: 0, unicos: 0, ambiguos: 0,
-                semLivro: 0, semCapitulo: 0, naoAchados: 0, amostras: [], obras: [] }
+                semLivro: 0, semCapitulo: 0, naoAchados: 0,
+                amostras: [], obras: [], perdidos: [] }
   if (typeof epubAbrir !== 'function' || typeof BookDB === 'undefined') {
     rel.erro = 'o leitor de EPUB não está carregado'
     return rel
@@ -2936,52 +2937,87 @@ async function reparoExecutar({ simular = true, aoAndar = null } = {}) {
     if (!livro || !blob) {
       rel.semLivro += itens.length
       rel.obras.push({ obra, itens: itens.length, estado: 'o arquivo não está neste aparelho' })
+      for (const a of itens) rel.perdidos.push({ palavra: a.palavra, obra, motivo: 'o arquivo do livro não está neste aparelho' })
       continue
     }
-    let ep = null
-    try { ep = await epubAbrir(await blob.arrayBuffer()) } catch (e) {
+
+    // ⚠️ NEM TODO LIVRO É EPUB. Importado como .txt ou .html, o livro não tem
+    // `href` de capítulo — o arquivo INTEIRO é o texto, e os capítulos saem de
+    // `textoParaCapitulos`, exatamente como o leitor faz ao abrir. Sem este
+    // ramo, `href` vazio devolvia texto vazio em todo capítulo e o reparo
+    // dizia "não achei" para um livro que estava ali inteiro.
+    let ep = null, txtCaps = null
+    try {
+      const buf = await blob.arrayBuffer()
+      if (livro.format === 'epub') ep = await epubAbrir(buf)
+      else {
+        const txt = new TextDecoder('utf-8').decode(buf)
+        const ehHtml = /^\s*(<!doctype html|<html)/i.test(txt)
+        txtCaps = textoParaCapitulos(ehHtml ? epubTextoLimpo(txt) : txt)
+      }
+    } catch (e) {
       rel.semLivro += itens.length
       rel.obras.push({ obra, itens: itens.length, estado: 'não abriu: ' + e.message })
+      for (const a of itens) rel.perdidos.push({ palavra: a.palavra, obra, motivo: 'o livro não abriu: ' + e.message })
       continue
     }
 
     // O texto de cada capítulo é lido UMA vez e reaproveitado por todos os
     // itens dele: um livro tem dezenas de capítulos, e extrair é a parte cara.
     const cache = new Map()
+    // ⚠️ ENGOLIR A FALHA DE EXTRAÇÃO era o pior tipo de silêncio: o relatório
+    // dizia "a palavra não está no livro" quando a verdade era "eu não
+    // consegui ler o livro". Duas causas opostas com a mesma cara.
+    let falhaLeitura = ''
     const textoDoCap = async i => {
       if (cache.has(i)) return cache.get(i)
       let t = ''
       try {
-        const c = livro.chapters[i]
-        const html = c && c.href ? await ep.zip.texto(c.href) : ''
-        t = html ? _repEspacos(epubTextoLimpo(html)) : ''
-      } catch (e) {}
+        if (txtCaps) t = _repEspacos(epubTextoLimpo((txtCaps[i] || {}).html || ''))
+        else {
+          const c = livro.chapters[i]
+          const html = c && c.href ? await ep.zip.texto(c.href) : ''
+          t = html ? _repEspacos(epubTextoLimpo(html)) : ''
+        }
+      } catch (e) { falhaLeitura = falhaLeitura || (e.message || 'erro ao ler o capítulo') }
       cache.set(i, t)
       return t
     }
+    const quantosCaps = txtCaps ? txtCaps.length : livro.chapters.length
 
     let feitos = 0
     for (const a of itens) {
       // Primeiro o capítulo que o item diz ser o dele; se falhar, o livro
       // inteiro. Título de capítulo muda (a limpeza com IA mexe nele), e
       // desistir por causa disso seria deixar o item errado por formalidade.
-      const iDito = livro.chapters.findIndex(c => _repNorm(c.titulo) === _repNorm(a.cap))
-      const ordem = iDito >= 0
-        ? [iDito, ...livro.chapters.map((_, i) => i).filter(i => i !== iDito)]
-        : livro.chapters.map((_, i) => i)
+      const tituloDoCap = i => ((txtCaps ? txtCaps[i] : livro.chapters[i]) || {}).titulo || ''
+      const todos = Array.from({ length: quantosCaps }, (_, i) => i)
+      const iDito = todos.findIndex(i => _repNorm(tituloDoCap(i)) === _repNorm(a.cap))
+      const ordem = iDito >= 0 ? [iDito, ...todos.filter(i => i !== iDito)] : todos
       if (iDito < 0) rel.semCapitulo++
 
-      let achou = null
+      let achou = null, comTexto = 0
       for (const i of ordem) {
         const txt = await textoDoCap(i)
         if (!txt) continue
+        comTexto++
         const frases = _repFrases(txt).filter(f => _repCasa(a.palavra, f))
         if (!frases.length) continue
-        achou = { frase: frases[0].slice(0, 400), quantas: frases.length,
-                  cap: (livro.chapters[i] || {}).titulo || '' }
+        achou = { frase: frases[0].slice(0, 400), quantas: frases.length, cap: tituloDoCap(i) }
         break
       }
-      if (!achou) { rel.naoAchados++; continue }
+      if (!achou) {
+        rel.naoAchados++
+        // O MOTIVO, e ele importa: "não achei a palavra" e "não consegui ler o
+        // livro" pedem ações opostas — reimportar o arquivo, ou aceitar que o
+        // item veio de outro lugar. Sem distinguir, o relatório mente por
+        // omissão.
+        rel.perdidos.push({ palavra: a.palavra, obra, cap: a.cap,
+          motivo: falhaLeitura ? 'o livro não abriu direito: ' + falhaLeitura
+                : !comTexto ? `nenhum dos ${quantosCaps} capítulos rendeu texto — reimporte o arquivo`
+                : 'a palavra não aparece em lugar nenhum do livro' })
+        continue
+      }
 
       // ⚠️ QUANDO A PALAVRA APARECE VÁRIAS VEZES NO CAPÍTULO, não há como saber
       // qual delas ele marcou — a informação se perdeu junto com o contexto.

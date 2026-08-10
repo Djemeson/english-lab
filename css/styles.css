@@ -5143,6 +5143,7 @@ body.ler-full .mobile-bottom-nav{display:none}
 .reparo-amostra i{color:var(--text3);font-size:var(--fs-3xs);font-style:normal}
 .reparo-antes{color:var(--text3);text-decoration:line-through;opacity:.75}
 .reparo-depois{color:var(--text);border-left:3px solid rgba(var(--primary-rgb),.5);padding-left:8px;margin-top:3px}
+.reparo-motivo{color:var(--text2);border-left:3px solid var(--border-strong);padding-left:8px;margin-top:3px}
 
 #sel-menu.sel-exp{
   display:flex;flex-direction:column;align-items:stretch;gap:0;padding:0;

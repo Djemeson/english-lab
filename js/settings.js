@@ -475,8 +475,24 @@ async function repararContexto(conferir) {
     r.semLivro    ? `<b>${r.semLivro}</b> sem o arquivo neste aparelho — importe o .epub para reparar` : ''
   ].filter(Boolean)
 
+  // ⚠️ QUEM NÃO FOI REPARADO PRECISA DIZER POR QUÊ. "Não encontrado no livro"
+  // sozinho é um beco: some a informação de que talvez o livro é que não abriu,
+  // e ele fica sem saber se reimporta o arquivo ou se o item veio de outro
+  // lugar. O motivo por item é o que transforma o relatório em ação.
+  const perdidos = (r.perdidos || []).length ? `
+    <div class="reparo-amostras">
+      <p class="dz-nota">Não deu para reparar:</p>
+      ${r.perdidos.slice(0, 15).map(p => `
+        <div class="reparo-amostra">
+          <b>${esc(p.palavra)}</b>${p.obra ? `<i> · ${esc(obraNome(p.obra))}${p.cap ? ' · ' + esc(p.cap) : ''}</i>` : ''}
+          <div class="reparo-motivo">${esc(p.motivo)}</div>
+        </div>`).join('')}
+      ${r.perdidos.length > 15 ? `<p class="dz-nota">…e mais ${r.perdidos.length - 15}</p>` : ''}
+    </div>` : ''
+
   saida.innerHTML = `
     <ul class="cost-bullets">${linhas.map(l => `<li>${l}</li>`).join('')}</ul>
+    ${perdidos}
     ${r.amostras.length ? `<div class="reparo-amostras">
       <p class="dz-nota">Como fica (${pl(r.amostras.length, 'exemplo', 'exemplos')}):</p>
       ${r.amostras.map(a => `

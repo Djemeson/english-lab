@@ -7894,7 +7894,24 @@ Provado no teste: o módulo não existia antes do clique e existia depois.
 **Cards não precisaram de migração**: `createSrsCard` fotografa o EXEMPLO, não o contexto — o
 contexto é lido do item na hora. Verificado antes de escrever qualquer coisa.
 
-**Arquivos**: `js/ler.js`, `js/settings.js`, `index.html`, `css/styles.css`. `sw.js` → `englab-v182`.
+#### O primeiro uso real achou duas cegueiras minhas
+
+Ele rodou o "conferir" e voltou **2 itens detectados, 2 não encontrados no livro** — nenhum
+reparado. O relatório estava certo em não mexer e **errado em não explicar**:
+
+1. **Nem todo livro é EPUB.** Importado como `.txt` ou `.html`, o livro não tem `href` de capítulo:
+   o arquivo INTEIRO é o texto e os capítulos saem de `textoParaCapitulos`. Sem esse ramo, `href`
+   vazio devolvia texto vazio em TODO capítulo, e o reparo dizia "não achei" para um livro que
+   estava ali inteiro.
+2. **Eu engolia a falha de extração** (`catch (e) {}`). O relatório dizia *"a palavra não está no
+   livro"* quando a verdade podia ser *"eu não consegui ler o livro"* — duas causas opostas, que
+   pedem ações opostas, com a mesma cara.
+
+Agora cada item não reparado vem com o **motivo**, e são quatro, distintos e acionáveis: o arquivo
+não está no aparelho · o livro não abriu (com a mensagem) · nenhum capítulo rendeu texto (reimporte)
+· a palavra não aparece em lugar nenhum do livro. Os quatro provados no navegador.
+
+**Arquivos**: `js/ler.js`, `js/settings.js`, `index.html`, `css/styles.css`. `sw.js` → `englab-v183`.
 
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 
