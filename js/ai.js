@@ -74,7 +74,17 @@ function lexaFormatar(txt) {
   const escapado = (typeof esc === 'function' ? esc(txt) : String(txt || ''))
   // Marcador de lista ANTES do itálico: "* item" não é ênfase, e sem isto o
   // asterisco solto engoliria o resto da linha.
-  return lexaInline(escapado.replace(/^\s*\*\s+/gm, '• '))
+  // ⚠️ LINK DE MARKDOWN NÃO PASSA CRU. Sem isto, a citação que o modelo cola no
+  // meio do texto — `([catalogue.bnf.fr](https://…?utm_source=openai))` —
+  // aparecia inteira na tela, colchete, parêntese e URL, várias vezes por
+  // resposta. Foi metade do que ele chamou de "vômito de informação".
+  // A fonte não se perde: ela já sai no rodapé, em chip clicável.
+  const semLinks = escapado
+    .replace(/\(\s*\[[^\]\n]*\]\([^)\n]*\)\s*\)/g, '')   // a citação entre parênteses, inteira
+    .replace(/\[([^\]\n]+)\]\([^)\n]*\)/g, '$1')          // link solto: fica só o texto
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+([.,;:!?])/g, '$1')
+  return lexaInline(semLinks.replace(/^\s*\*\s+/gm, '• '))
     .replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>')
 }
 
@@ -1241,22 +1251,32 @@ function aiWebPodeUsar() {
 // Este prompt é outra tarefa, e mira no que a explicação curta não cobre: o
 // que um LEITOR NATIVO entende ao ver aquilo na cena. É essa a informação que
 // muda a leitura e que nenhum dicionário dá.
+// ⚠️ E O PROMPT NÃO PODE TER FORMULÁRIO DENTRO.
+// A primeira versão listava "1. o que é / 2. fatos / 3. ⭐ o que um nativo
+// entende", e o modelo devolveu exatamente isso: títulos em negrito,
+// estrelinha, bullets e um bloco final reexplicando a cena. Ele resumiu em uma
+// palavra — *"vômito de informação"* — e pediu o oposto: *"quero a
+// personalidade da Lexa me apresentando as informações"*.
+// A lição serve para todo prompt deste app: ESTRUTURA NO PEDIDO VIRA ESTRUTURA
+// NA RESPOSTA. Se eu quero conversa, tenho de pedir em prosa e proibir a
+// moldura — e dizer o que ela NÃO deve repetir, porque a explicação curta já
+// falou da cena.
 function lexaExplicarWeb() {
   return lexaSistema(`
-TAREFA AGORA: o aluno PEDIU busca na internet sobre algo que ele encontrou lendo.
-Ele JÁ TEM a explicação curta. Ele quer o que não coube nela — então não repita a glosa e não devolva duas frases.
+TAREFA AGORA: ele pediu que você fosse à internet sobre algo que encontrou lendo.
+Ele JÁ leu sua explicação curta e JÁ entendeu o que a coisa faz na frase. O que falta é o MUNDO por trás — e é isso que você foi buscar.
 
-O QUE ENTREGAR, nesta ordem:
-1. O QUE É NO MUNDO REAL, concreto: que tipo de coisa, de quem, de quando, onde circula(va). Datas e nomes próprios são o ponto — é para isso que se foi à rede.
-2. DOIS OU TRÊS FATOS que só a busca traz e que o aluno não teria como saber.
-3. ⭐ O MAIS IMPORTANTE — O QUE UM NATIVO ENTENDE E UM ESTRANGEIRO NÃO: que conotação aquilo carrega (infantil, cafona, nostálgico, prestigioso, datado, regional), para quem era, o que citar aquilo SUGERE. Se o autor pôs ali de propósito — ironia, contraste, caracterização do personagem —, diga qual é a graça.
-4. Se a busca não achou nada confiável sobre o termo, diga isso em uma linha em vez de encher.
+ESCREVA COMO VOCÊ FALA, em prosa: no máximo dois parágrafos curtos, corridos.
+Dissolva na conversa o que a busca trouxe — o que a coisa é de verdade, de quem, de quando —, e termine pelo que mais interessa a quem lê numa língua que não é a sua: o que um nativo SENTE ao topar com aquilo. Se soa infantil, cafona, nostálgico, canônico, datado, regional, caro, brega. É essa camada que não está em dicionário nenhum.
 
-COMO:
-- Português do Brasil. Blocos curtos ou lista — o que ler melhor.
-- Pode ocupar espaço: até umas 10 a 12 linhas. O que não pode é enrolar.
-- NUNCA invente data, autor ou fato. Sem fonte, não afirme.
-- Sem "é importante notar", sem "vale destacar", sem recapitular a pergunta.`)
+PROIBIDO, e isto é para valer:
+- Título, subtítulo, negrito de seção, "1.", "2.", bullet, traço no começo da linha, estrela, emoji. NADA de lista. Prosa.
+- URL, link, domínio ou citação entre parênteses. O app mostra as fontes embaixo sozinho; repetir suja a leitura.
+- Reexplicar a cena, o personagem ou o que a frase quer dizer. Isso já foi dado, e repetir é o que mais irrita.
+- "É importante notar", "vale destacar", recapitular a pergunta.
+- Inventar data, nome ou fato. Sem fonte, não afirme — e se a busca não achou nada firme, diga isso numa frase e pare.
+
+Umas 6 a 8 linhas no total. Rico e coeso, não extenso.`)
 }
 
 // Texto com busca na web. Devolve `{ texto, fontes, buscou }` — as fontes vêm

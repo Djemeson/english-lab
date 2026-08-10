@@ -41,7 +41,35 @@ com 1952–1991, 224 edições, o Double Digest de 1992 e o que "digest" queria 
 *Thérèse Raquin* de dezembro de 1867 como terceiro romance (encyclopedia.com, catalogue.bnf.fr).
 **~2.000 caracteres contra ~300**, com fonte por afirmação.
 
-`sw.js` → `englab-v192`.
+#### E aí veio o vômito de informação
+
+A resposta ficou rica e ficou horrível: títulos em negrito, estrelinha, bullets, URLs cruas
+repetidas no meio do texto e um bloco final reexplicando a cena. Ele resumiu bem —
+*"quero a personalidade da Lexa me apresentando as informações, não esse vômito"*. Duas causas:
+
+**1. O formatador não convertia link de markdown.** `lexaInline` cuida de negrito, itálico, código
+e sublinhado — e nunca de `[texto](url)`. Então a citação que o modelo cola no meio do texto,
+`([catalogue.bnf.fr](https://…?utm_source=openai))`, aparecia INTEIRA na tela, colchete, parêntese
+e URL, várias vezes por resposta. Agora `lexaFormatar` remove a citação entre parênteses e reduz o
+link solto ao texto. A fonte não se perde: já sai no rodapé, em chip clicável.
+
+**2. ⚠️ ESTRUTURA NO PEDIDO VIRA ESTRUTURA NA RESPOSTA.** Meu prompt listava
+*"1. o que é / 2. fatos / 3. ⭐ o que um nativo entende"* — e o modelo devolveu exatamente aquilo,
+com estrela e tudo. Se eu quero conversa, tenho de pedir em prosa e **proibir a moldura**: sem
+título, sem bullet, sem traço no começo da linha, sem emoji. E dizer o que ela NÃO deve repetir,
+porque a explicação curta já tratou da cena — reexplicá-la era o que mais irritava.
+
+A lição vale para todo prompt deste app, não só para este.
+
+**Provado com chave real** no mesmo caso: **832 caracteres contra 2.091**, dois parágrafos
+corridos, zero URL, zero colchete, zero bullet — e a camada que interessa preservada
+(*"para um nativo, Zola soa canônico, francês e um pouco pesado… não é uma referência infantil nem
+casual"*). O modelo ainda tentou colar uma citação; a rede do formatador a removeu.
+
+No rodapé, o domínio agora tem teto de largura: um endereço de CDN
+(`prd-boekdb.s3.eu-central-1.amazonaws.com`) sozinho quebrava a linha em duas.
+
+`sw.js` → `englab-v193`.
 >
 > Anterior: 2026-08-08 — **A LEXA VÊ A WEB, E A DECISÃO É DELE, NO BALÃO**. A busca só
 > existe na Responses API. Sondada com chave real, e o achado que decidiu o desenho não foi se

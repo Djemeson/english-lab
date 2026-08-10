@@ -5149,6 +5149,10 @@ body.ler-full .mobile-bottom-nav{display:none}
 .lexa-fontes a{
   color:var(--text2);text-decoration:none;
   padding:2px 7px;border:1px solid var(--border);border-radius:20px;
+  /* Domínio de CDN é quilométrico (`prd-boekdb.s3.eu-central-1.amazonaws.com`)
+     e sozinho quebrava o rodapé em duas linhas. O que importa aqui é
+     RECONHECER a procedência de relance; o endereço inteiro fica no tooltip. */
+  max-width:11rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .lexa-fontes a:hover{color:var(--text);border-color:var(--primary);background:rgba(var(--primary-rgb),.08)}
 /* O convite para buscar: presente sem se impor — ele custa dinheiro, então não
