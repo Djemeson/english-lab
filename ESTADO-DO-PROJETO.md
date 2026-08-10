@@ -7939,7 +7939,35 @@ autêntica, porque a expressão não estava na página.
 Os chips nunca caem aqui: a unidade sai de dentro da frase, então a palavra ESTÁ na cena e o
 detector nem a acusa.
 
-**Arquivos**: `js/ler.js`, `js/settings.js`, `index.html`, `css/styles.css`. `sw.js` → `englab-v184`.
+#### ⚠️ E o acervo real quase perdeu um item por causa do detector
+
+Rodando de novo, o relatório propôs "consertar" o **`tuck into`** — cuja cena era
+*"Billy tucks his digest into his back pocket"*. A expressão está inteira ali: só com o objeto no
+meio, que é a sintaxe **normal** do phrasal separável (tuck sth into, pick sth up, put sth on).
+
+O detector exigia as palavras COLADAS. Exigir contiguidade é declarar quebrado justamente o uso
+mais comum da língua — e o estrago seria real: o item perderia uma cena legítima do livro e seria
+recarimbado como "Do seu estudo". **O reparo destruiria dado correto.**
+
+Duas correções em `_repCasa`:
+
+1. **Folga de até 3 palavras** entre os termos, mantendo a ORDEM obrigatória (sem ordem, "let the
+   cat out of the bag" casaria com qualquer frase que espalhasse essas palavras).
+2. **Comparação por CONJUNTO de candidatos**, não pelo lema eleito. O redutor da casa coroa
+   não-palavra em consoante dobrada e 'e' mudo (`breezed` → `breez`) — a pendência registrada
+   acima —, e por isso "breeze through" não casava com "she breezed right through". A lista de
+   candidatos SEMPRE contém a forma boa; o defeito é só na hora de eleger uma. Para COMPARAR não é
+   preciso eleger: basta as listas se cruzarem. Assim o reparo deixou de depender de um conserto
+   que exige migração.
+
+⚠️ **A lição de calibragem**: aqui errar para o lado de NÃO MEXER é sempre o lado certo. Um item
+não reparado continua com a frase velha, visível e corrigível depois; um item reparado errado perde
+uma cena real do livro. O detector foi afrouxado de propósito.
+
+**13 casos no banco de prova**, incluindo os quatro phrasals separados, o composto com hífen, a
+ordem invertida, as palavras espalhadas e a folga estourada. E o caso dele deixou de ser acusado.
+
+**Arquivos**: `js/ler.js`, `js/settings.js`, `index.html`, `css/styles.css`. `sw.js` → `englab-v185`.
 
 ### ESPECIFICAÇÃO — a Lexa que leu o livro, e que vê a web (2026-08-08)
 

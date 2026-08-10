@@ -2838,10 +2838,21 @@ function _repNorm(s) {
 // sobreviver, senão a frase devolvida ao item viria descaracterizada.
 function _repEspacos(s) { return String(s || '').replace(/\s+/g, ' ').trim() }
 
-function _repLema(p) {
-  if (typeof glossLemas !== 'function') return p
+// ⚠️ AQUI COMPARA-SE POR CONJUNTO DE CANDIDATOS, não pelo lema "escolhido".
+// O redutor da casa coroa não-palavra em consoante dobrada e 'e' mudo
+// (`breezed` → `breez`, `running` → `runn`) — está registrado como pendência
+// própria, porque consertá-lo exige remigrar o acervo. Só que a lista de
+// candidatos SEMPRE contém a forma boa (`breezed` → [breezed, breez, breeze]);
+// o defeito é só na hora de eleger UMA. Para COMPARAR, então, não é preciso
+// eleger: basta as duas listas se cruzarem. O caso real: "breeze through"
+// contra "she breezed right through" falhava por causa disso.
+function _repLemas(p) {
+  if (typeof glossLemas !== 'function') return [p]
   const c = glossLemas(p, { estrito: true })
-  return (c && c[1]) || p
+  return (c && c.length) ? c : [p]
+}
+function _repIgualTok(cands, tok) {
+  return cands.includes(tok) || _repLemas(tok).some(x => cands.includes(x))
 }
 
 // O DETECTOR, e ele é exato: a palavra aparece na própria frase dela?
@@ -2849,13 +2860,38 @@ function _repLema(p) {
 // item — se o contexto não contém a palavra, o contexto não é dela.
 // Tolerante à flexão pelos lemas, senão um item "fell in love" pareceria
 // quebrado numa frase que diz "fall in love" e seria "consertado" à toa.
+// ⚠️ O PHRASAL VERB SE PARTE, E ISSO QUASE CUSTOU UM ITEM CERTO.
+// A primeira versão exigia as palavras COLADAS e na ordem. Aí ele rodou com o
+// acervo de verdade e o relatório propôs "consertar" o `tuck into`, cuja cena
+// era *"Billy tucks his digest into his back pocket"* — onde a expressão está
+// inteira, só com o objeto no meio. É a sintaxe NORMAL do phrasal separável
+// (tuck sth into, pick sth up, put sth on): exigir contiguidade é declarar
+// quebrado justamente o uso mais comum da língua.
+// O estrago seria real: o item perderia uma cena legítima do livro e viraria
+// "Do seu estudo". Por isso a folga entre os termos — e por isso ela é
+// generosa: aqui, errar para o lado de NÃO MEXER é sempre o lado certo.
+const _REP_FOLGA = 3   // palavras que podem se meter entre os termos
 function _repCasa(alvo, texto) {
   const a = _repNorm(alvo), t = _repNorm(texto)
   if (!a || !t) return false
   if ((' ' + t + ' ').includes(' ' + a + ' ')) return true
-  const al = a.split(' ').map(_repLema), tl = t.split(' ').map(_repLema)
-  for (let i = 0; i + al.length <= tl.length; i++) {
-    if (al.every((x, k) => tl[i + k] === x)) return true
+  const al = a.split(' ').filter(Boolean).map(_repLemas), tl = t.split(' ').filter(Boolean)
+  if (!al.length) return false
+  // Os termos na ORDEM, cada um até `_REP_FOLGA` palavras depois do anterior.
+  // A ordem continua obrigatória: sem ela, "let the cat out of the bag" casaria
+  // com qualquer frase que espalhasse essas palavras por acaso.
+  for (let i = 0; i < tl.length; i++) {
+    if (!_repIgualTok(al[0], tl[i])) continue
+    let pos = i, ok = true
+    for (let k = 1; k < al.length; k++) {
+      let achou = -1
+      for (let j = pos + 1; j <= Math.min(pos + 1 + _REP_FOLGA, tl.length - 1); j++) {
+        if (_repIgualTok(al[k], tl[j])) { achou = j; break }
+      }
+      if (achou < 0) { ok = false; break }
+      pos = achou
+    }
+    if (ok) return true
   }
   return false
 }
@@ -2930,7 +2966,10 @@ function reparoDiagnostico() {
 function _repAncestral(a) {
   const ctx = _repEspacos(a.contextoAtual)
   if (!ctx || typeof words === 'undefined') return null
-  const meus = new Set(_repNorm(a.palavra).split(' ').filter(Boolean).map(_repLema))
+  // Mesma lógica de conjunto do `_repCasa`: "breeze through" tem de reconhecer
+  // "breeze" como parente mesmo quando o redutor erra a forma eleita.
+  const meus = new Set()
+  for (const tok of _repNorm(a.palavra).split(' ').filter(Boolean)) _repLemas(tok).forEach(x => meus.add(x))
   let melhor = null, melhorTam = Infinity
   for (const w of words) {
     if (w === a.w) continue
@@ -2939,8 +2978,9 @@ function _repAncestral(a) {
     const cenas = [w.context, ...(w.meanings || []).map(m => m && m.context)]
     if (!cenas.some(c => _repEspacos(c) === ctx)) continue
     if (!_repCasa(palavra, ctx)) continue
-    const dele = _repNorm(palavra).split(' ').filter(Boolean).map(_repLema)
-    if (!dele.some(x => meus.has(x))) continue
+    const toks = _repNorm(palavra).split(' ').filter(Boolean)
+    if (!toks.some(tok => _repLemas(tok).some(x => meus.has(x)))) continue
+    const dele = toks
     // A CABEÇA da família é a mais curta: `expandirFamilia` é chamada NUM item
     // e gera os que orbitam em volta, então o gerador é o mais enxuto.
     if (dele.length < melhorTam) { melhor = w; melhorTam = dele.length }
