@@ -8406,20 +8406,18 @@ lugar só.
       Preparar**: leitor, Netflix, Kindle, documento, mídia, vídeo, podcast e Assistente.
 - [x] ~~Captura repetida no vídeo duplica o item~~ — **corrigido em 2026-08-08**: usa
       `prepAcharItem` + `prepararNovoSentido`, como o leitor. Ver 8.2 ("O reencontro no vídeo").
-- [ ] **PROVAR OS CHIPS DA FRASE COM IA DE VERDADE** (2026-08-08). A quebra, os filtros (flexão,
-      determinante, tamanho) e o clique foram exercitados com `aiJSON` mockado. Falta ver, com
-      chave: **(a)** se a IA respeita *"a unidade tem de sobreviver FORA desta frase"* ou continua
-      devolvendo fatia de frase como bloco; **(b)** se ela escreve a unidade na forma que aparece
-      no texto ou na de citação (o filtro cobre o segundo caso, mas só no primeiro termo);
-      **(c)** o custo real — é uma chamada a mais por explicação.
-- [ ] **PROVAR OS CAMPOS NOVOS COM IA DE VERDADE** (2026-08-08). Todo o fluxo das 4 fatias foi
-      exercitado com `aiJSON` mockado — o ambiente de teste não tem chave. Falta o que só a chave
-      diz: **(a) o tamanho real da resposta** (o teto é 5000 e o comentário no código diz que 2800
-      truncava com 2-3 sentidos × 3 exemplos; desde "um sentido por encontro" sobrou orçamento,
-      mas 7 campos novos ainda não foram medidos); **(b) se `armadilha` e `curiosidade` respeitam
-      o "vazio é resposta válida"** ou viram enchimento — são os dois mais fáceis de um modelo
-      barato encher de conversa fiada; **(c) o DeepSeek**, onde o `aiJSON` cai para texto livre e
-      cada campo novo é superfície nova para quebrar.
+- [x] ~~Provar os chips da frase com IA de verdade~~ — **feito em 2026-08-08** por
+      `tools/teste-ia.mjs chips`, com o caso real do vazamento. (a) A regra "a unidade tem de
+      sobreviver FORA desta frase" **é respeitada pela Luna** (devolveu `lower middle-class`) e
+      **não pelo gpt-4o-mini**, que devolveu a fatia `looks lower middle-class` e ainda um nome de
+      personagem — mais um argumento para a troca de modelo. (b) O enum do `type` segurou nos
+      quatro cenários. (c) Custo real: ~R$ 0,003 por quebra.
+- [x] ~~Provar os campos novos com IA de verdade~~ — **feito em 2026-08-08** por
+      `tools/teste-ia.mjs analise`. (a) Tamanho real: 6.300 tokens de entrada e 1.583–2.486 de
+      saída, **nada truncou** contra o teto de 5.000. (b) `armadilha` e `curiosidade` voltaram
+      vazias quando não havia o que dizer — o "vazio é resposta válida" se sustenta. (c) O item do
+      DeepSeek caducou: o fornecedor saiu. ⚠️ O que sobrou é a comparação de QUALIDADE: a Luna
+      preenche 17–18 dos 21 campos contra 9–12 do gpt-4o-mini.
 - [ ] **CONTAR NO LIVRO com um EPUB de verdade** (2026-08-08). A leitura do `BookDB`, as flexões e
       o cache foram exercitados, mas o caminho feliz (livro presente) só foi provado pelo erro
       tratado ("o arquivo do livro não está mais neste aparelho"). Testar com *Flags on the Bayou*
@@ -8456,12 +8454,10 @@ lugar só.
       triagem por nível (a do print), onde ele marca as 421 de uma vez: lá não há frase sob o
       cursor, então não há passagem para checar. Se incomodar, o caminho é outro — desmarcar
       pelo grupo, que já existe.
-- [ ] **PROVAR O `same_as` COM IA DE VERDADE** (Fase 3). O bloco do reencontro entrou no
-      prompt e o merge já prefere o campo, mas nada disso rodou com chave: o ambiente de teste
-      não tem. O teste: ter `fall` = "cair", reencontrar `fall` num contexto de "fracassar" e
-      conferir (a) que a IA devolve `same_as: null` para o novo e o id certo para o antigo, e
-      (b) que o sentido velho **não é duplicado**. ⚠️ Com DeepSeek o `aiJSON` cai para texto
-      livre — vale medir se o campo sobrevive; se não, a rede do casamento por texto assume.
+- [x] ~~Provar o `same_as` com IA de verdade~~ — **feito em 2026-08-08**, e ele provou mais que
+      si mesmo: no cenário de reencontro **sem esquema**, o gpt-4o-mini simplesmente OMITIU o
+      campo (o merge falharia calado); **com esquema**, os três modelos devolveram o id certo.
+      É a medição do valor de structured outputs.
 - [x] ~~O lema não cobre tudo~~ — **estendido ao máximo em 2026-08-08** (ver 8.2, item 5):
       regra de cabeça inicial/final por tipo + IA devolvendo `lemma` validado. Medido em 30/31
       casos difíceis. O que **sobra** e é limite conhecido, não pendência:
