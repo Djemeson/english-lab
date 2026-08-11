@@ -609,7 +609,7 @@ async function migrarMidia(conferir) {
   })
   if (r.erro) { saida.innerHTML = `<p class="dz-nota" style="color:var(--error)">${esc(r.erro)}</p>`; return }
   saida.innerHTML = `<p class="dz-nota">${ic('checkCircle','ic-sm')}
-    <b>${r.audio}</b> áudio${r.audio === 1 ? '' : 's'} e <b>${r.images}</b> imagem${r.images === 1 ? '' : 's'} movidos
+    <b>${r.audio}</b> ${r.audio === 1 ? 'áudio' : 'áudios'} e <b>${r.images}</b> ${r.images === 1 ? 'imagem' : 'imagens'} movidos
     (${kb(r.bytes)}).${r.falhas ? ` <b>${r.falhas}</b> não foram e continuam no banco — rode de novo.` : ''}</p>`
   toast('Mídia movida para o espaço de arquivos', 'success')
 }

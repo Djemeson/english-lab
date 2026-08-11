@@ -7,7 +7,13 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (8ª) — **O STORAGE ESTÁ DE PÉ**. Plano Blaze ativo, bucket
+> Última atualização: 2026-08-11 (9ª) — **ÁUDIO E IMAGEM SAÍRAM DE DENTRO DO BANCO**. 59
+> áudios, 5,5 MB, banco em zero — e o teste de "aparelho novo" trouxe **59/59 byte a byte**.
+> ⚠️ O teste com arquivo descartável pegou **dois defeitos antes de qualquer dado se mover**:
+> a regra barrava o DELETE (teto de tamanho num caso sem arquivo novo) e faltava liberar CORS.
+> Sem isso a migração teria apagado do banco sem conseguir ler de volta. **Detalhes em §8.12.**
+>
+> Última atualização anterior: 2026-08-11 (8ª) — **O STORAGE ESTÁ DE PÉ**. Plano Blaze ativo, bucket
 > criado em **US-EAST1** e regras publicadas e testadas (caminho próprio permite, caminho de
 > outra pessoa nega). ⚠️ A região contrariou minha recomendação: a tela mostrou que a cota
 > gratuita de 5 GB só vale nos EUA, e São Paulo cobraria desde o primeiro byte. **Falta o
@@ -9182,6 +9188,68 @@ risco** e mandam preceder de backup. Fazer isso com pouco espaço para testar ao
 furar a regra nº 5 — e sync pela metade quebra o app dele de verdade. Fica como a próxima
 fatia, inteira.
 
+## 8.12 Áudio e imagem saíram de dentro do banco (2026-08-11)
+
+**Migrado com o acervo real: 59 áudios, 5,5 MB, e o banco ficou em zero.**
+
+Eles moravam em `collection('audio')` e `collection('images')`, com o base64 no campo `data`.
+O Firestore tem teto de **1 MB por documento** e cobra por operação: áudio um pouco maior
+simplesmente não subia, e cada sincronização relia tudo. Porta-luvas fazendo as vezes de
+porta-malas.
+
+### O teste pegou dois defeitos ANTES de qualquer dado se mover
+
+Rodei o ciclo completo com um arquivo descartável antes de tocar no acervo. Subir e listar
+passaram; **baixar e apagar falharam**. Se a migração tivesse rodado direto, ela teria copiado
+e apagado do banco — e o app **não conseguiria trazer os áudios de volta**. Ele ficaria sem
+áudio nenhum em qualquer outro aparelho.
+
+1. ⚠️ **`allow write` com teto de tamanho barrava o DELETE.** A regra era
+   `allow write: … && request.resource.size < 50MB`. No delete **não existe recurso novo**,
+   então `request.resource` é nulo, a comparação não fecha e o Google nega. Separado em
+   `allow create, update` (com o teto) e `allow delete` (sem).
+2. ⚠️ **CORS.** O bucket nasce recusando pedido vindo de outra origem, e `getDownloadURL` +
+   `fetch` dava *"Failed to fetch"*. Resolvido pelo **Cloud Shell** (o console do Firebase não
+   expõe isso), liberando só GET para as origens do app:
+
+```
+gcloud storage buckets update gs://english-lab-726e7.firebasestorage.app --cors-file=…
+origens: english-lab-seven.vercel.app, djemeson.github.io, localhost:8765 e :8766
+```
+
+### A trava que protege a transição
+
+**O pull lê dos DOIS lugares.** O que já estava gravado continua no banco até a migração rodar;
+se o pull passasse a ler só o Storage, trocar de aparelho traria acervo sem áudio nenhum. O
+legado entra primeiro e o Storage sobrescreve, porque é ele que tem a versão nova quando os
+dois têm a mesma chave.
+
+E a migração **sobe e só então apaga**, nessa ordem: falha no meio deixa cópia sobrando, nunca
+buraco — e cópia sobrando é inofensiva justamente porque o pull lê dos dois.
+
+### Conferido ao vivo, com o acervo real
+
+| teste | resultado |
+|---|---|
+| ciclo subir → listar → baixar → apagar (chave com barra e acento) | ✓ conteúdo idêntico |
+| migração | **59 áudios, 5,5 MB** |
+| documentos restantes no banco (lido pelo terminal, prova independente) | **0 áudios, 0 imagens** |
+| **aparelho novo**: zerar o local e baixar tudo de volta | **59/59 byte a byte, em 17 s** |
+
+O teste do aparelho novo foi feito com cópia em memória antes de zerar, e o acervo dele foi
+restaurado ao fim (59 áudios, todos idênticos). Zero erro de console.
+
+### Dois buracos vizinhos, consertados junto
+
+`fbWipeMedia` e `fbWipeCloud` apagavam **só os documentos**. Depois desta mudança isso deixaria
+os arquivos na nuvem depois de ele mandar apagar tudo — a pior forma de errar, porque ele sai
+achando que limpou. Os dois passaram a limpar o Storage também.
+
+E `initFirebase` é tolerante de propósito: se o script de arquivos não carregar, o app continua
+inteiro e a leitura do caminho antigo segue de pé.
+
+`sw.js` → `englab-v210`.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -9216,10 +9284,8 @@ fatia, inteira.
       arrastar o arquivo, em vez de falhar em silêncio. **Recomendação: (c) primeiro** — custo
       zero, sem permissão nova, e resolve o sintoma que realmente dói. A nuvem entra depois, se
       o vaivém incomodar.
-- [ ] **ÁUDIO E IMAGEM MORAM DENTRO DO FIRESTORE** (`collection('audio')`, `collection('images')`,
-      com o conteúdo no campo `data`). O Firestore tem teto de 1 MB por documento e cobra por
-      operação — não é lugar de blob. Independe da decisão acima, mas o mesmo conserto resolveria
-      os dois.
+- [x] ~~Áudio e imagem moram dentro do Firestore~~ — **migrado em 2026-08-11**: 59 áudios,
+      5,5 MB, banco em zero, e o teste de "aparelho novo" devolveu 59/59 idênticos. Ver §8.12.
 
 ### Dívida — código que a gente sabe que está torto
 
