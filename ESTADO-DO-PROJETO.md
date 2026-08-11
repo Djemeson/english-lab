@@ -8922,6 +8922,22 @@ Firestore.
 
 ### Dívida — código que a gente sabe que está torto
 
+- [ ] **A LINHA DE SINÔNIMO VIRA "FRASE" DO ITEM** (achado em 2026-08-11 com o acervo real,
+      `node tools/acervo.mjs lista`). **7 dos 21 itens parados na fila** têm, no lugar da
+      frase, uma **explicação em português**: `busty` → *"busty sinônimo mais comum e direto;
+      bosomy soa mais literário"*; também `buxom`, `stash`, `pageantry`, `westward`, `western`,
+      `exploit`. Todos nasceram de seleção feita na seção de família/sinônimos do Estudar.
+      **Causa raiz:** `_dosSelContexto` (`dossie.js` ~1517) — fora dos exemplos, ele pega "a
+      linha em volta" e a lista de seletores inclui `.dosf-fam-txt` e `.dosf-coloc`, que são
+      **glosas bilíngues**, não frases do idioma. O comentário ali já antecipa metade do
+      problema ("uma seção inteira não é frase"), mas a linha de sinônimo também não é.
+      **Consequência:** o `context` é o que a Lexa recebe como cena da palavra — ela vai
+      analisar `busty` com um texto em português como contexto, e o card nasce ilustrado por
+      uma explicação. Conserto provável: quando a linha escolhida não for do idioma do item
+      (ou vier desses dois seletores), nascer **sem frase**, como já acontece com
+      `tuck one's tail between one's legs` — vazio é melhor que errado. ⚠️ Os 7 já gravados
+      precisam de varredura à parte; `removerFraseAlheia` só aparece para item com `from`.
+
 - [ ] **ITEM DERIVADO HERDA A FONTE DO PAI SEM TER ESTADO LÁ** (achado com dado real,
       2026-08-10). `tuck in` nasceu da análise da Lexa como parente de `tuck` e ficou com
       `source_type: kindle` + `source_title: Billy Summers` + `source_context: Chapter 1`, mas

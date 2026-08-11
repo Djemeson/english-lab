@@ -284,6 +284,43 @@ async function procedencia(a) {
   if (!n) console.log('nenhum candidato pelo teste textual')
 }
 
+// O ACERVO INTEIRO, agrupado por onde o item mora. O `resumo` dá os números e
+// o `familia` dá o parentesco; faltava simplesmente VER a lista — e é ela que
+// mostra, por exemplo, quantos itens estão parados na fila da análise.
+const _EST = [
+  ['pending_ai',     'AGUARDANDO IA'],
+  ['pending_review', 'NO PREPARAR'],
+  ['in_study',       'NO ESTUDO'],
+  ['in_srs',         'NA REVISÃO'],
+  ['skipped',        'PULADOS']
+]
+async function lista(a) {
+  const w = await a.words()
+  const cards = await a.cards()
+  const nCards = id => cards.filter(c => c.wordId === id).length
+  const vistos = new Set()
+  for (const [estado, rotulo] of _EST) {
+    const grupo = w.filter(x => x.status === estado)
+    grupo.forEach(x => vistos.add(x.id))
+    if (!grupo.length) continue
+    tit(`${rotulo} (${grupo.length})`)
+    for (const x of grupo) {
+      const ms = (x.meanings || []).filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em)
+      const c = nCards(x.id)
+      console.log(`\n• ${x.word}${x.type ? '  [' + x.type + ']' : ''}${c ? '  ' + c + ' card' + (c > 1 ? 's' : '') : ''}`)
+      console.log(`  ${x.source_title || '(sem obra)'}${x.source_context ? ' · ' + x.source_context : ''}  [${x.source_type || '?'}]`)
+      if (ms.length) console.log(`  sentidos: ${ms.map(m => m.meaning_pt).join(' | ')}`)
+      else console.log('  sentidos: (nenhum — não analisado)')
+      if (x.context) console.log(`  "${String(x.context).replace(/\s+/g, ' ').slice(0, 110)}"`)
+    }
+  }
+  const sobra = w.filter(x => !vistos.has(x.id))
+  if (sobra.length) {
+    tit(`ESTADO DESCONHECIDO (${sobra.length})`)
+    sobra.forEach(x => console.log(`• ${x.word} → status "${x.status}"`))
+  }
+}
+
 async function bruto(a, nome) {
   const d = await a.doc(nome || 'words')
   console.log(JSON.stringify(d, null, 1).slice(0, 40000))
@@ -297,10 +334,11 @@ const a = new Acervo(cred, await token(cred))
 await a.acharUid()
 
 if (modo === 'resumo') await resumo(a)
+else if (modo === 'lista') await lista(a)
 else if (modo === 'familia') await familia(a)
 else if (modo === 'item') await item(a, arg || 'tuck')
 else if (modo === 'procedencia') await procedencia(a)
 else if (modo === 'bruto') await bruto(a, arg)
-else if (modo === 'tudo') { await resumo(a); await familia(a); await procedencia(a) }
-else { console.log('modos: resumo | familia | item <palavra> | procedencia | bruto <doc> | tudo') }
+else if (modo === 'tudo') { await resumo(a); await lista(a); await familia(a); await procedencia(a) }
+else { console.log('modos: resumo | lista | familia | item <palavra> | procedencia | bruto <doc> | tudo') }
 nl()
