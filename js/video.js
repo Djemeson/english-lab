@@ -364,6 +364,18 @@ async function videoOpenPlayer(v) {
     }
   })
   player.addEventListener('timeupdate', _vidOnTime)
+  // ⚠️ O GLOSSÁRIO NAS DUAS SUPERFÍCIES DE TEXTO DO VÍDEO — a legenda sobre a
+  // imagem e o transcript ao lado. O leitor, o Preparar e o Assistente já
+  // tinham; a legenda ficou de fora por medo do repinte, e o medo era do
+  // problema errado: `glossAtivar` põe UM ouvinte no contêiner e acha a palavra
+  // por COORDENADA, então repintar os filhos não deixa ouvinte órfão nenhum.
+  // Ativar UMA vez basta (a própria função tem o guarda `_glossOn`), e é aqui
+  // que "uma vez" acontece: na montagem do player.
+  if (typeof glossAtivar === 'function') {
+    const ov = el('vid-ov'), tr = el('vid-transcript')
+    if (ov) glossAtivar(ov)
+    if (tr) glossAtivar(tr)
+  }
 
   // ---- Retomar de onde parou ----
   // A posição é salva a cada ~5s de reprodução (e no pause/saída). Na volta,
@@ -561,6 +573,13 @@ function _vidUpdateOverlay() {
   if (!en || !pt) return
   const pop = el('vid-ov-pop')
   if (pop && !pop.classList.contains('hidden')) return   // seleção em curso
+  // ⚠️ E O GLOSSÁRIO CONGELA A LEGENDA PELO MESMO MOTIVO. Era esta a
+  // dificuldade real de trazer o glossário para cá — e não os ouvintes, como
+  // a pendência supunha: `glossAtivar` põe UM ouvinte no contêiner e acha a
+  // palavra por coordenada, então repintar os filhos não órfã nada. O que
+  // quebra é a FRASE mudar debaixo de um balão aberto: a glosa continua na
+  // tela descrevendo uma palavra que já saiu dali.
+  if (typeof glossAberto === 'function' && glossAberto()) return
   const cue = _vidCueIdx >= 0 ? _vidCues[_vidCueIdx] : null
   const showEN = _vidOverlayOn && cue
   en.textContent = showEN ? cue.t : ''

@@ -449,6 +449,11 @@ function _glossAgendarFechar() {
   _glossFecharTimer = setTimeout(glossFechar, GLOSS_GRACA)
 }
 
+// Há balão de glossário aberto AGORA? Quem repinta texto sob o cursor
+// precisa saber: puxar a frase debaixo de um balão aberto faz a glosa
+// mentir — ela passa a descrever uma palavra que não está mais ali.
+function glossAberto() { return !!_glossBalao }
+
 function glossFechar() {
   clearTimeout(_glossFecharTimer)
   clearTimeout(_glossTimer)

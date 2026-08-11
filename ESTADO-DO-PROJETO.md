@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A UNIDADE AVISA NA HORA DA CAPTURA**. Capturando `fall` de uma
+> Última atualização: 2026-08-08 — **O GLOSSÁRIO CHEGOU AO VÍDEO**. Leitor, Preparar e Assistente já
+> tinham; a legenda ficou de fora por medo do repinte a cada segundo — e **o medo era do problema
+> errado**. `glossAtivar` põe UM ouvinte no contêiner e acha a palavra por COORDENADA, não por span:
+> repintar os filhos não deixa ouvinte órfão nenhum. O que quebra de verdade é a FRASE mudar
+> debaixo de um balão aberto — a glosa fica na tela descrevendo uma palavra que já saiu dali.
+> A solução é o padrão que a própria tela já usava para o popup de seleção: **congelar a legenda
+> enquanto o balão está aberto** (`glossAberto()`). Vale nas duas superfícies de texto do vídeo, a
+> legenda sobre a imagem e o transcript ao lado. `sw.js` → `englab-v200`.
+>
+> Anterior: 2026-08-08 — **A UNIDADE AVISA NA HORA DA CAPTURA**. Capturando `fall` de uma
 > frase que traz `fall in love`, que ele já estuda, nascia um item competindo com a expressão no
 > verbete — o mesmo sentido em dois tetos. O app já percebia, mas **só avisava quando ele abrisse o
 > item no Preparar**: tarde demais, porque a essa altura ele já passou da cena e perdeu o motivo de
@@ -8283,6 +8292,31 @@ sem resultado no caso mais comum — nome próprio famoso, que o modelo já conh
 
 `sw.js` → `englab-v191`.
 
+### O glossário chegou ao vídeo (2026-08-08)
+
+A pendência dizia que a legenda ficou de fora porque "se re-renderiza a cada segundo". Verdade — mas
+o problema que isso causa **não é o que a pendência supunha**.
+
+`glossAtivar` não põe ouvinte em palavra nenhuma: põe **UM** `pointermove` no contêiner e descobre a
+palavra por **coordenada** (`glossPalavraNoPonto(x, y)`), lendo o DOM no instante do movimento.
+Repintar os filhos, então, não órfã nada — o contêiner continua o mesmo. Ativar uma vez na montagem
+do player basta, e a própria função tem o guarda `_glossOn` contra chamada repetida.
+
+⚠️ **O que quebra de verdade é a FRASE MUDAR DEBAIXO DE UM BALÃO ABERTO.** A glosa fica na tela
+descrevendo uma palavra que já saiu dali — mentira silenciosa, do tipo que este projeto vem caçando
+o dia todo. E a solução já estava na mesma função: `_vidUpdateOverlay` **já congelava** a legenda
+enquanto o popup de seleção estivesse aberto. Faltava a mesma cortesia para o glossário —
+`glossAberto()`, exposto em `glossario.js`.
+
+Vale nas **duas** superfícies de texto do vídeo: a legenda sobre a imagem (`#vid-ov`) e o transcript
+ao lado (`#vid-transcript`).
+
+**Provado no navegador**: `glossAberto` existe, o repintor pergunta antes de escrever, as duas
+superfícies são ativadas na montagem, a legenda congela com o balão aberto e volta a pintar quando
+ele fecha.
+
+**Arquivos**: `js/glossario.js`, `js/video.js`. `sw.js` → `englab-v200`.
+
 ### A unidade avisa na hora da captura (2026-08-08)
 
 `unidadeJaEstudada` já existia e já detectava o caso: ele captura `fall` de uma frase que traz
@@ -8639,9 +8673,9 @@ lugar só.
       livro de 40 capítulos isso vira 40 confirmações. Só vale depois de saber o custo REAL de
       um capítulo (pendência acima); com o número na mão dá para oferecer "ler os próximos 5"
       com o total na frente.
-- [ ] **GLOSSÁRIO na legenda do vídeo** (`video-subs.js`). Leitor, Revisar e Assistente já
-      chamam `glossAtivar`; a legenda ficou de fora porque ela se re-renderiza a cada segundo e
-      precisa de um ponto de ligação estável — do contrário vira listener novo por quadro.
+- [x] ~~Glossário na legenda do vídeo~~ — **feito em 2026-08-08**, na legenda e no transcript.
+      O obstáculo real não era o repinte (o ouvinte é um só, no contêiner) e sim a frase mudar
+      sob um balão aberto. Ver 8.2.
 - [ ] **Wiktionary como último recurso NO CLIQUE** (nunca no hover). Aquele ~1 s é inaceitável
       passando o mouse e perfeitamente aceitável clicando: seria o "não achei no seu material"
       para palavra que ainda não é card. Inglês→inglês, então é apoio, não tradução.
