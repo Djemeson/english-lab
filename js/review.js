@@ -1252,6 +1252,98 @@ let sidebarStatusFilter = 'all'
 // chamá-lo. Ficava só dentro do renderReview(), e quem saía pelo "pular" (ou,
 // agora, pelo "enviar") deixava para trás um cabeçalho dizendo um número que
 // já não era verdade.
+// ================================================================
+// A SEMENTE PARA QUEM CHEGOU SEM ELA
+// ================================================================
+// O leitor manda a glosa da passagem junto com a captura (`_seedMeaning`), e a
+// análise nasce sabendo QUAL sentido procurar em vez de redescobri-lo com menos
+// contexto do que quem o encontrou. Netflix, Kindle e vídeo entregavam a
+// palavra crua — a mesma palavra, o mesmo trabalho, resultado pior.
+//
+// ⚠️ UMA PEÇA SÓ, NÃO UMA POR FONTE. A pendência falava em "pré-análise do
+// lote" para o vídeo e outra para a extensão; seriam dois mecanismos para o
+// mesmo problema, e um terceiro no dia em que entrasse uma fonte nova. O que
+// define a necessidade não é de onde veio: é o item estar na fila, ter cena e
+// não ter glosa. Isso se pergunta uma vez, para todos.
+//
+// ⚠️ E NÃO RODA SOZINHA. Custa uma chamada, e gastar o dinheiro dele sem
+// perguntar não se faz — é a mesma regra que ele cravou para a busca na web.
+// O convite segue o padrão que o app já usa em "Limpar títulos com IA": só
+// aparece quando há o que fazer, e diz que é UMA chamada.
+function sementesPendentes() {
+  if (!Array.isArray(words)) return []
+  return words.filter(w =>
+    w.status === 'pending_ai' &&
+    String(w.word || '').trim() &&
+    String(w.context || '').trim() &&
+    !String(w._seedMeaning || '').trim() &&
+    !(w.meanings || []).some(m => m && m.meaning_pt))
+}
+
+let _semeandoBusy = false
+
+async function semearCapturas() {
+  if (_semeandoBusy) return
+  const todos = sementesPendentes()
+  if (!todos.length) { toast('Nada a preparar — as capturas já têm glosa', 'info'); return }
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error')
+    showSection('configuracoes'); return
+  }
+  // Uma chamada POR IDIOMA: as regras lexicais e o nome da língua entram no
+  // prompt, e misturar inglês com espanhol num pedido só é pedir confusão.
+  // Teto de 40 por chamada — acima disso a resposta começa a truncar.
+  const porLang = new Map()
+  for (const w of todos.slice(0, 120)) {
+    const l = wordLang(w)
+    if (!porLang.has(l)) porLang.set(l, [])
+    if (porLang.get(l).length < 40) porLang.get(l).push(w)
+  }
+  _semeandoBusy = true
+  _prepAtualizarCabecalho()
+  let n = 0
+  try {
+    for (const [lang, lote] of porLang) {
+      const L = getLangDef(lang)
+      const PROMPT = `For each item below, give the meaning it has IN ITS OWN sentence — not the most common meaning of the word.
+
+${lote.map((w, i) => `${i + 1}. "${w.word}" — sentence: "${String(w.context).slice(0, 300)}"`).join('\n')}
+
+Return ONLY this JSON, one entry per item, in the SAME order:
+{"itens":[{"n":1,"gloss":"o sentido NESTA frase, português do Brasil, máx 6 palavras"}]}
+
+Rules:
+- The gloss is what the term means THERE. A word with several meanings gets the one the sentence selected.
+- CITATION FORM in Portuguese: verbs in the infinitive, adjectives masculine singular, nouns singular.
+- If the sentence does not disambiguate, give the most likely reading and keep it short.
+- "gloss" is never empty: it is the seed of the analysis that comes next.
+${typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(lang, 'glosa') : ''}
+The language of the items is ${L.nameEn}.`
+      const r = await aiJSON(PROMPT, { maxTokens: 1400, schema: ESQ.sementes, schemaNome: 'sementes' })
+      for (const it of (Array.isArray(r && r.itens) ? r.itens : [])) {
+        const w = lote[(Number(it.n) || 0) - 1]
+        const g = String(it && it.gloss || '').trim()
+        if (!w || !g) continue
+        w._seedMeaning = g
+        n++
+      }
+    }
+    if (n) {
+      saveWords()
+      if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+      toast(`${n} ${n === 1 ? 'captura preparada' : 'capturas preparadas'} — a análise já sabe qual sentido procurar`, 'success')
+    } else {
+      toast('A IA não devolveu glosa nenhuma', 'warning')
+    }
+  } catch (e) {
+    toast('Não deu: ' + (e.message || 'erro'), 'error')
+  } finally {
+    _semeandoBusy = false
+    _prepAtualizarCabecalho()
+    renderReview()
+  }
+}
+
 function _prepAtualizarCabecalho() {
   const sub = el('review-header-sub')
   if (!sub) return
@@ -1268,9 +1360,16 @@ function _prepAtualizarCabecalho() {
   const slot = el('prep-unidades-slot')
   if (slot) {
     const n = varrerUnidades().length
-    slot.innerHTML = n ? `<button class="btn btn-ghost btn-sm" onclick="abrirVarreduraUnidades()"
+    const s = sementesPendentes().length
+    // MESMA REGRA DO VIZINHO: só existe quando há o que fazer. E diz que é UMA
+    // chamada — quem paga tem de saber o tamanho do pedido antes de aceitá-lo.
+    const semear = s ? `<button class="btn btn-ghost btn-sm" ${_semeandoBusy ? 'disabled' : ''} onclick="semearCapturas()"
+      data-tip="Capturas do Netflix, do Kindle e do vídeo chegam sem glosa. Uma chamada dá a cada uma o sentido que ela tem na própria frase — e a análise seguinte nasce sabendo qual procurar, em vez de redescobrir com menos contexto.">
+      ${_semeandoBusy ? '<span class="spinner"></span> preparando…'
+        : ic('sparkles') + `Preparar capturas <span class="badge">${s}</span>`}</button>` : ''
+    slot.innerHTML = semear + (n ? `<button class="btn btn-ghost btn-sm" onclick="abrirVarreduraUnidades()"
       data-tip="Sentidos que parecem pertencer a uma expressão inteira (como 'apaixonar-se' em 'fall'), e não à palavra sozinha">
-      ${ic('layers')}Expressões presas <span class="badge">${n}</span></button>` : ''
+      ${ic('layers')}Expressões presas <span class="badge">${n}</span></button>` : '')
   }
 }
 

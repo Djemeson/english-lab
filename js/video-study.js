@@ -198,6 +198,11 @@ Responda:
       w.type = r.type || 'word'
       w.type_label = r.type_label || ''
       w.ai_processed = true
+      // ⚠️ A SEMENTE TAMBÉM AQUI. Esta captura JÁ pagou uma chamada para
+      // descobrir o sentido na cena — e no reencontro ela era passada adiante
+      // (`prepararNovoSentido(..., { glosa })`), mas no item NOVO se perdia: a
+      // análise do Preparar redescobria do zero o que já estava pago.
+      w._seedMeaning = r.meaning_pt || ''
       w.meanings = [{
         // ⚠️ `id` NÃO É OPCIONAL. Ele é a identidade card↔sentido desde a 93ª
         // rodada, e este caminho nascia sem ele: o card saía com `meaningId: ''`

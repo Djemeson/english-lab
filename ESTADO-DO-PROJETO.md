@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O LEMA PAROU DE INVENTAR PALAVRA**. Era a única dívida de
+> Última atualização: 2026-08-08 — **A SEMENTE CHEGOU AO VÍDEO E À EXTENSÃO**. O leitor mandava a
+> glosa da passagem junto com a captura, e a análise nascia sabendo QUAL sentido procurar; Netflix,
+> Kindle e vídeo entregavam a palavra crua — a mesma palavra, o mesmo trabalho, resultado pior.
+> ⚠️ **Uma peça só, não uma por fonte**: a pendência pedia "pré-análise do lote" para o vídeo e
+> outra para a extensão, o que seriam dois mecanismos para o mesmo problema (e um terceiro na
+> próxima fonte). O que define a necessidade não é a procedência — é o item estar na fila, ter cena
+> e não ter glosa. ⚠️ **E não roda sozinha**: é um convite no cabeçalho do Preparar, que só aparece
+> quando há o que fazer e diz que é UMA chamada — a regra que ele cravou para a web vale para todo
+> gasto. Medido com chave real: **US$ 0,0004 para 5 itens**, e as glosas são as da cena
+> (`snuff`→"extinguir", não "rapé"; `cover`→"substituir", não "cobrir"). De brinde, o vídeo parou
+> de jogar fora a glosa que ele já pagava na captura. `sw.js` → `englab-v197`.
+>
+> Anterior: 2026-08-08 — **O LEMA PAROU DE INVENTAR PALAVRA**. Era a única dívida de
 > código da lista: `_lemaBase` pegava cegamente `glossLemas(...)[1]`, e para `-ed`/`-ing` esse
 > candidato é o RADICAL CRU — `running`→`runn`, `making`→`mak`, `stopping`→`stopp`. Não-palavras
 > virando o teto do verbete, e **"running" deixando de se juntar a "run"**, que é justamente o que
@@ -8250,6 +8262,47 @@ sem resultado no caso mais comum — nome próprio famoso, que o modelo já conh
 
 `sw.js` → `englab-v191`.
 
+### A semente chegou ao vídeo e à extensão (2026-08-08)
+
+O leitor mandava a glosa da passagem junto com a captura (`_seedMeaning`), e a análise do Preparar
+nascia sabendo qual sentido procurar em vez de redescobri-lo com menos contexto do que quem o
+encontrou. **Netflix, Kindle e vídeo entregavam a palavra crua** — mesma palavra, mesmo trabalho,
+resultado pior.
+
+⚠️ **UMA PEÇA SÓ, NÃO UMA POR FONTE.** A pendência pedia "pré-análise do lote" para o vídeo e outra
+para a extensão. Seriam dois mecanismos para o mesmo problema, e um terceiro no dia em que entrasse
+uma fonte nova. O que define a necessidade **não é de onde veio**: é o item estar na fila
+(`pending_ai`), ter cena e não ter glosa. Isso se pergunta uma vez, para todos —
+`sementesPendentes()`.
+
+⚠️ **E NÃO RODA SOZINHA.** Custa uma chamada, e gastar o dinheiro dele sem perguntar não se faz — é
+a mesma regra que ele cravou para a busca na web. O convite segue o padrão que o app já usa em
+"Limpar títulos com IA": mora no cabeçalho do Preparar, só aparece quando há o que fazer, traz a
+contagem e diz que é UMA chamada. Uma por idioma, na verdade, com teto de 40 itens: misturar inglês
+com espanhol num pedido só é pedir confusão, e acima de 40 a resposta começa a truncar.
+
+A resposta liga glosa a item **pelo número da linha** (`n`), não pela ordem de chegada — o modelo
+pode devolver fora de ordem, e ligar por posição colocaria a glosa de um na cabeça de outro.
+Esquema estrito (`ESQ.sementes`) garante que `n` e `gloss` venham sempre.
+
+**Medido com chave real**: 5 itens, 320→284 tokens, **US$ 0,0004** (~R$ 0,002). E o que importa —
+as glosas são as **da cena**, não as do dicionário:
+
+| termo | frase | glosa |
+|---|---|---|
+| `snuff` | *"The host snuffs the torch…"* | **extinguir** (não "rapé") |
+| `cover` | *"He had to cover for his partner"* | **substituir** (não "cobrir") |
+| `grand` | *"It was a grand experience"* | **excelente** |
+| `get away` | *"…get away with the car"* | **fugir com o carro** |
+
+#### E o vídeo jogava fora o que já tinha pago
+
+Achado no caminho: `videoCreateCard` faz **uma chamada de IA na captura** para descobrir o sentido
+na cena. No **reencontro** ela era passada adiante (`prepararNovoSentido(..., { glosa })`), mas no
+item **novo** se perdia — a análise do Preparar redescobria do zero o que já estava pago. Uma linha.
+
+**Arquivos**: `js/review.js`, `js/ai.js`, `js/video-study.js`. `sw.js` → `englab-v197`.
+
 ### O lema parou de inventar palavra (2026-08-08)
 
 Era a única dívida de código da lista de pendências, achada pela bateria de IA.
@@ -8486,8 +8539,10 @@ lugar só.
       triagem por nível (a do print), onde ele marca as 421 de uma vez: lá não há frase sob o
       cursor, então não há passagem para checar. Se incomodar, o caminho é outro — desmarcar
       pelo grupo, que já existe.
-- [ ] **LEVAR A SEMENTE PARA O VÍDEO E PARA A EXTENSÃO** — só o leitor foi ligado. Ver o fim
-      da 8.2 para o caminho (pré-análise do LOTE, não do capítulo).
+- [x] ~~Levar a semente para o vídeo e para a extensão~~ — **feito em 2026-08-08**, e com UMA
+      peça para as três fontes em vez de uma por fonte. Convite no cabeçalho do Preparar, que
+      não roda sozinho. Ver 8.2. ⚠️ **Falta usar com capturas de verdade** — provado com lote
+      sintético na API real (as glosas vieram da cena) e com acervo de mentira no navegador.
 - [ ] **A FAMÍLIA SÓ APARECE NO PREPARAR.** O dossiê (Estudar) e o glossário da Biblioteca
       mostram o mesmo item sem dizer de onde ele veio. `familiaDoItem` e `irParaItem` são
       genéricos e não-lazy — é só chamar de lá. Ficou fora por serem duas telas com layout

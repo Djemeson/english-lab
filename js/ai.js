@@ -1450,6 +1450,11 @@ ESQ.quebra = S.obj({
   }))
 })
 
+// A SEMENTE DAS CAPTURAS — a glosa que cada uma tem na própria frase.
+ESQ.sementes = S.obj({
+  itens: S.lista(S.obj({ n: S.num(), gloss: S.txt() }))
+})
+
 // O TÍTULO LIMPO DA OBRA.
 ESQ.obras = S.obj({
   obras: S.lista(S.obj({ bruto: S.txt(), titulo: S.txt(), autor: S.txt() }))
