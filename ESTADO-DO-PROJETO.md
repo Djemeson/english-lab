@@ -8844,7 +8844,22 @@ no livro — teriam sido expulsos da obra por engano. E o caminho mais important
 Custo: ~1,7 s para varrer 3 candidatos num EPUB de 4 MB (a primeira abertura domina; o cache
 `_obrTexto`/`_obrLivro` cobre o resto). Roda só quando ele aperta.
 
-`sw.js` → `englab-v203`.
+**RODOU NO ACERVO REAL DELE, e o resultado fecha o argumento.** Antes, no modo textual, a tela
+dizia *"1 item vai mudar de obra: tuck in → Do seu estudo"*. Com o livro aberto — o EPUB está
+no aparelho dele —, a mesma tela diz **"Nenhum item com a obra errada"** e *"1 ficou como está
+— a frase não usa a expressão, mas ela está no livro"*. Se ele tivesse apertado "Arrumar" na
+versão anterior, `tuck in` teria perdido a obra por engano. **O acervo dele está limpo; não há
+o que aplicar.**
+
+⚠️ **E o texto do painel teve de ser reescrito por causa disso.** Ele explicava a ferramenta com
+o exemplo do `tuck in` — *"só que tuck in não aparece nesse capítulo"* — e a ferramenta acabara
+de decidir **preservar** exatamente esse item. Um painel que ensina com um caso que ele mesmo
+não corrige treina o usuário a desconfiar do resultado. A regra agora está dita como ela é:
+**a pergunta é "está no livro?", nunca "está neste capítulo?"** — e o `tuck in` no *Chapter 20*
+aparece no texto como a razão de achar no livro **proteger sem reatribuir**, que era o papel
+que ele já tinha no código.
+
+`sw.js` → `englab-v204`.
 
 ## 9. Pendências / a verificar
 
