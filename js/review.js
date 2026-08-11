@@ -1873,10 +1873,15 @@ function _fraseAlheiaHtml(w) {
   // A glosa vem primeiro: ela CONTÉM a expressão, então passaria batido pelo
   // teste de baixo e ficaria sem aviso nenhum.
   if (_glosaComoFrase(w)) {
+    // ⚠️ O AVISO NÃO PODE COBRAR UMA AÇÃO QUE O APP JÁ TOMOU. A primeira versão
+    // dizia "a análise sairia pior com ela" — verdade antes da rede em
+    // `analyzeWordDirect`, mentira depois dela, e o custo da mentira é ele
+    // limpar sete cards achando que precisa. Aqui o texto diz o que É: a
+    // análise já ignora, e remover é arrumação, não pré-requisito.
     return `<div class="mi-unidade" style="margin-top:var(--sp-3)">
-      <div class="miu-txt">${ic('alert','ic-sm')}<span>Isto não é uma frase: é a <b>explicação</b> que apareceu na família de outro item. Como exemplo de <b>${esc(w.word)}</b> ela não serve, e a análise sairia pior com ela.</span></div>
-      <button class="btn btn-secondary btn-sm" onclick="removerFraseAlheia('${w.id}')"
-        data-tip="Tira o texto deste item. Melhor sem frase do que com a frase errada.">${ic('trash','ic-sm')}Remover</button>
+      <div class="miu-txt">${ic('alert','ic-sm')}<span>Isto não é uma frase: é a <b>explicação</b> que apareceu na família de outro item. <b>A análise já ignora este texto</b> — pode analisar direto. Remover é só para o item não ficar com ela guardada.</span></div>
+      <button class="btn btn-ghost btn-sm" onclick="removerFraseAlheia('${w.id}')"
+        data-tip="Opcional: tira o texto do item. A análise não usa ele de qualquer forma.">${ic('trash','ic-sm')}Remover</button>
     </div>`
   }
   if (!w.from) return ''

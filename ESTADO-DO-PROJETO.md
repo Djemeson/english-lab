@@ -8973,7 +8973,16 @@ uma frase: é a explicação que apareceu na família de outro item") com o bot�
 esses itens não têm pai, e pôr o teste da glosa **antes** do outro: a glosa contém a
 expressão, então passaria batido pelo `_fraseServeParaExpressao` e ficaria sem aviso nenhum.
 
-`sw.js` → `englab-v205`.
+⚠️ **E o aviso teve de ser reescrito depois de ele ver a tela.** A primeira versão dizia
+*"a análise sairia pior com ela"* — verdade antes da rede em `analyzeWordDirect`, **mentira
+depois dela**. O custo da mentira era concreto: ele limparia sete cards achando que era
+pré-requisito para analisar. Agora o texto diz o que é — *"a análise já ignora este texto —
+pode analisar direto"* — e o botão virou `btn-ghost`, porque a ação é arrumação, não etapa.
+**É o mesmo defeito do painel de procedência (§8.5): a tela ensinando com um caso que o
+próprio app já resolve.** Duas vezes no mesmo dia — depois de blindar um caminho, reler o
+que a tela promete.
+
+`sw.js` → `englab-v206`.
 
 ## 9. Pendências / a verificar
 
