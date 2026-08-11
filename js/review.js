@@ -2155,14 +2155,19 @@ function _separarSentidoExec(wordId, mi, nomeRaw) {
   // "apaixonar-se": herdar a frase às cegas deixava o card de "fall in love"
   // ilustrado por uma citação sobre patos e musgo-espanhol. O teste é o mesmo
   // do aviso de captura: a frase contém o material da expressão?
-  const ctxServe = _fraseServeParaExpressao(w.context, nome)
+  // A MESMA PERGUNTA decide a frase E a fonte: se a cena do pai não é desta
+  // expressão, ela não veio daquela obra. Herdar só metade — frase limpa, obra
+  // do pai — era o que punha "tuck in" no grupo do Chapter 1 de um livro onde
+  // ele não aparece.
+  const origem = _origemDoDerivado(w, nome)
+  const ctxServe = origem.serve
   const alvo = ja || createWord({
     word: nome,
     context: ctxServe ? (w.context || '') : '',
     context_pt: ctxServe ? (w.context_pt || '') : '',
-    source_type: w.source_type || 'manual',
-    source_title: w.source_title || '',
-    source_context: w.source_context || '',
+    source_type: origem.source_type,
+    source_title: origem.source_title,
+    source_context: origem.source_context,
     lang: wordLang(w),
     no_break: true
   })
@@ -2611,8 +2616,19 @@ async function deleteWord(id) {
   // quebrava. O card é DERIVADO do item; sumindo a origem, some o derivado.
   const orfaos = srsCards.filter(c => c.wordId === id).length
   if (orfaos) { srsCards = srsCards.filter(c => c.wordId !== id); saveSrsCards() }
+  // ⚠️ E OS FILHOS TAMBÉM. Mesmo defeito dos cards, outra ponta: "to his face"
+  // nasceu de "But not to his face" e continuou apontando para ele depois que
+  // o pai foi removido. Aqui o filho NÃO vai junto — ele é item legítimo por si
+  // (a expressão existe independentemente da frase que a revelou); o que morre
+  // é só o link. O `from.word` fica, porque é ele que explica de onde veio a
+  // frase colada no item — ver `_fraseAlheiaHtml`.
+  const filhos = words.filter(x => x.from && x.from.id === id)
+  for (const f of filhos) { delete f.from.id; f.updated_at = new Date().toISOString() }
   words = words.filter(x => x.id !== id); saveWords()
-  toast(orfaos ? `Removida — e ${orfaos} ${orfaos === 1 ? 'card saiu' : 'cards saíram'} da revisão` : 'Removida', 'info')
+  const avisos = []
+  if (orfaos) avisos.push(`${orfaos} ${orfaos === 1 ? 'card saiu' : 'cards saíram'} da revisão`)
+  if (filhos.length) avisos.push(`${filhos.length} ${filhos.length === 1 ? 'item que nasceu dela ficou' : 'itens que nasceram dela ficaram'} sem o vínculo`)
+  toast(avisos.length ? `Removida — e ${avisos.join('; ')}` : 'Removida', 'info')
   const next = words.find(x => ['pending_ai','pending_review'].includes(x.status) && x.id !== id)
   if (next) { activeWordId = next.id }
   else activeWordId = null
@@ -2915,12 +2931,18 @@ function revBreakStudy(wordId) {
     // O item criado PODE ser triado de novo (um phrasal pode conter uma
     // palavra desconhecida) — mas o filtro do fetch limita os chips ao que
     // está DENTRO dele, nunca à frase original.
+    // Terceira porta de item derivado, mesma rede das outras duas. Aqui ela
+    // quase nunca vai barrar — parte de uma palavra só passa sempre, por
+    // definição de `_fraseServeParaExpressao`, e o raio-X recorta da própria
+    // frase. Mas quem recorta é a IA, e o dia em que ela devolver uma unidade
+    // que não está ali, o item não nasce carimbado com a obra errada.
+    const origem = _origemDoDerivado(w, it.expr)
     const nova = createWord({
       word: it.expr,
-      context: w.context || '',
-      source_type: w.source_type || 'manual',
-      source_title: w.source_title || '',
-      source_context: w.source_context || '',
+      context: origem.serve ? (w.context || '') : '',
+      source_type: origem.source_type,
+      source_title: origem.source_title,
+      source_context: origem.source_context,
       lang: wordLang(w)
     })
     if (it.type !== 'word') nova.type = it.type === 'chunk' ? 'collocation' : it.type
@@ -3098,11 +3120,17 @@ async function revExprAdotar(wordId, i) {
   const it = (_revExprCache.get(wordId) || [])[i]; if (!it) return
   const igual = s => String(s || '').trim().toLowerCase()
   const ja = words.find(x => x.id !== w.id && igual(x.word) === igual(it.expr))
+  // A rede vale aqui também. O fluxo diz "nesta frase, X faz parte de:", então
+  // o normal é a expressão estar mesmo na frase — mas quem apontou foi a IA, e
+  // quando ela erra o item nasce jurando que veio do livro. Custo do teste:
+  // nenhum; preço de não fazê-lo: obra errada colada no item para sempre.
+  const origem = _origemDoDerivado(w, it.expr)
   const alvo = ja || createWord({
     word: it.expr,
-    context: w.context || '', context_pt: w.context_pt || '',
-    source_type: w.source_type || 'manual', source_title: w.source_title || '',
-    source_context: w.source_context || '', lang: wordLang(w), no_break: true
+    context: origem.serve ? (w.context || '') : '',
+    context_pt: origem.serve ? (w.context_pt || '') : '',
+    source_type: origem.source_type, source_title: origem.source_title,
+    source_context: origem.source_context, lang: wordLang(w), no_break: true
   })
   if (!ja) {
     alvo.type = it.type
@@ -3217,6 +3245,78 @@ function _revFraseEmVolta(bloco, alvo) {
 // dentro de um deles fazia o item novo nascer jurando que veio do livro.
 // A comparação é tolerante nos dois sentidos porque o bloco lido do DOM pode
 // trazer um pedaço a mais ou a menos que o `context` guardado.
+// A PROCEDÊNCIA SEGUE A CENA, NÃO O PARENTESCO. Irmã da função abaixo, para o
+// item que nasce de OUTRO ITEM (sentido separado, expressão adotada).
+//
+// O defeito apareceu com o acervo real: "tuck in" nasceu da análise de "tuck"
+// como sentido próprio e herdou `kindle` + `Billy Summers` + `Chapter 1` do
+// pai — só que "tuck in" NÃO aparece no livro (`obraBuscar` devolve zero até
+// onde ele leu). No Estudar a expressão sentava no grupo do Chapter 1 fingindo
+// ser uma captura, e a memória da obra ia procurá-la num livro onde ela não
+// está. O código já era cuidadoso com a FRASE dois passos antes; a fonte
+// passava sem teste nenhum, e é a fonte que decide o agrupamento.
+//
+// O teste é o mesmo do aviso de captura e o mesmo do Preparar: a frase do pai
+// contém o material desta expressão? Se contém, ela esteve mesmo lá e a obra
+// vem junto. Se não, a expressão nasceu do estudo — e `OBRA_ESTUDO` é
+// exatamente o rótulo que o projeto já usa para isso.
+function _origemDoDerivado(w, expr) {
+  const serve = typeof _fraseServeParaExpressao === 'function'
+    ? _fraseServeParaExpressao(w && w.context, expr)
+    : false
+  return serve
+    ? { serve: true,
+        source_type:    (w && w.source_type) || 'manual',
+        source_title:   (w && w.source_title) || '',
+        source_context: (w && w.source_context) || '' }
+    : { serve: false,
+        source_type: 'manual', source_title: OBRA_ESTUDO,
+        source_context: (w && w.word) || '' }
+}
+
+// E O QUE JÁ ESTÁ GRAVADO. Conserto de código não limpa dado velho — a lição
+// da 50ª, que este arquivo já repete duas vezes. Os derivados criados antes da
+// regra acima continuam carimbados com a obra do pai, e no acervo real isso é
+// o "tuck in" sentado no Chapter 1 de um livro onde ele não aparece.
+//
+// Conservadora de propósito, três guardas antes de mexer:
+//   1. só item com `from` — quem foi capturado direto não é assunto daqui;
+//   2. só se a obra for a MESMA do pai — obra diferente é escolha dele, não
+//      herança;
+//   3. só se a frase não servir para a expressão — se serve, ele esteve lá.
+// E ninguém aplica nada sozinho: devolve `mexeu`/`exemplos` para a tela
+// mostrar antes, igual `migrarLemas`.
+function migrarProcedenciaHerdada() {
+  if (typeof words === 'undefined' || !Array.isArray(words)) return { mexeu: 0, exemplos: [] }
+  const mudancas = []
+  for (const w of words) {
+    if (!w || !w.from) continue
+    const titulo = String(w.source_title || '').trim()
+    if (!titulo || titulo === OBRA_ESTUDO) continue
+    const pai = w.from.id ? words.find(x => x.id === w.from.id) : null
+    // Pai já apagado: não dá para comparar, e o `from` sozinho já diz que o
+    // item nasceu de outro. A guarda 3 continua valendo e é ela que decide.
+    if (pai && String(pai.source_title || '').trim() !== titulo) continue
+    if (_fraseServeParaExpressao(w.context, w.word)) continue
+    mudancas.push({ w, de: titulo, pai: (pai && pai.word) || (w.from.word || '') })
+  }
+  return {
+    mexeu: mudancas.length,
+    exemplos: mudancas.slice(0, 12).map(m => ({ palavra: m.w.word, de: m.de, pai: m.pai })),
+    aplicar() {
+      for (const m of mudancas) {
+        m.w.source_type = 'manual'
+        m.w.source_title = OBRA_ESTUDO
+        m.w.source_context = m.pai || ''
+        m.w.updated_at = new Date().toISOString()
+      }
+      if (mudancas.length) saveWords()
+      if (mudancas.length && typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+      return mudancas.length
+    }
+  }
+}
+
 function _revOrigemDaFrase(w, frase) {
   const n = t => String(t || '').replace(/\s+/g, ' ').trim()
   const a = n(frase), b = n(w && w.context)

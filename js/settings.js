@@ -463,6 +463,45 @@ function arrumarLemas(conferir) {
       ic('check','ic-sm')} Arrumar ${pl(r.mexeu, 'item', 'itens')}</button>`
 }
 
+// A OBRA QUE VEIO DE CARONA. Irmã da de cima, mesmo contrato e mesmo cuidado:
+// mudar a procedência REAGRUPA o item no Estudar — ele sai de baixo do livro e
+// vai para "Do seu estudo" —, então mostra antes e só mexe se ele mandar.
+// `migrarProcedenciaHerdada` mora em `review.js`, que é SHELL: pode chamar
+// direto, sem a dança do lazy que o reparo do contexto exige logo abaixo.
+function arrumarProcedencia(conferir) {
+  const saida = el('proc-saida'); if (!saida) return
+  if (typeof migrarProcedenciaHerdada !== 'function') {
+    saida.innerHTML = `<p class="dz-nota" style="color:var(--error)">Recarregue a página e tente de novo.</p>`
+    return
+  }
+  const r = migrarProcedenciaHerdada()
+  if (!r.mexeu) {
+    saida.innerHTML = `<p class="dz-nota">${ic('checkCircle','ic-sm')} Nenhum item com obra herdada indevidamente — não há o que arrumar.</p>`
+    return
+  }
+  if (!conferir) {
+    const n = r.aplicar()
+    saida.innerHTML = `<p class="dz-nota">${ic('checkCircle','ic-sm')} <b>${n}</b> ${n === 1 ? 'item arrumado' : 'itens arrumados'}.</p>`
+    toast(`${n} ${n === 1 ? 'procedência corrigida' : 'procedências corrigidas'}`, 'success')
+    if (typeof renderReview === 'function') { try { renderReview() } catch (e) {} }
+    if (typeof renderDashboard === 'function') { try { renderDashboard() } catch (e) {} }
+    return
+  }
+  const pl = (n, s, p) => `${n} ${n === 1 ? s : p}`
+  saida.innerHTML = `
+    <ul class="cost-bullets"><li><b>${pl(r.mexeu, 'item vai mudar', 'itens vão mudar')}</b> de obra</li></ul>
+    <div class="reparo-amostras">
+      <p class="dz-nota">Como fica${r.exemplos.length < r.mexeu ? ` (${r.exemplos.length} de ${r.mexeu})` : ''}:</p>
+      ${r.exemplos.map(e => `<div class="reparo-amostra">
+        <b>${esc(e.palavra)}</b>
+        <div class="reparo-antes">${esc(e.de)}</div>
+        <div class="reparo-depois">${esc(OBRA_ESTUDO)}${e.pai ? ' · ' + esc(e.pai) : ''}</div>
+      </div>`).join('')}
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="arrumarProcedencia(false)">${
+      ic('check','ic-sm')} Arrumar ${pl(r.mexeu, 'item', 'itens')}</button>`
+}
+
 // ================================================================
 // REPARAR O CONTEXTO DOS ITENS DO LEITOR
 // ================================================================

@@ -23,6 +23,7 @@ async function initApp() {
   // da existência do card, e sem os cards em memória marcaria tudo como não
   // estudado. Idempotente — só toca em sentido que ainda não tem estado.
   migrarEstadosDeSentido()
+  migrarParentescoOrfao()  // `from` apontando para item apagado: o id sai, o nome fica
   mountLangSelector('lang-selector-add')  // seletor de idioma ativo (Adicionar)
   mountLangSelector('lang-selector-asst') // seletor de idioma ativo (Assistente)
   renderDashboard()

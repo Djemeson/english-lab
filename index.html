@@ -739,6 +739,30 @@
         </div>
       </details>
 
+      <!-- PROCEDÊNCIA HERDADA — mesma família das outras: manutenção do acervo,
+           recolhida, conferência antes, sem IA. -->
+      <details class="danger-zone dz-suave" id="dz-procedencia">
+        <summary>
+          <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 3 5v14c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5z"/><path d="M12 6.5V20"/></svg>
+          Arrumar a obra dos itens que nasceram de outros
+        </summary>
+        <div class="dz-corpo">
+          <p>Quando um <b>sentido é separado</b> ou uma <b>expressão é adotada</b>, o item novo
+             nasce a partir de outro. Até agora ele copiava a <b>obra do pai</b> sem conferir se
+             tinha mesmo estado lá.</p>
+          <p>É como <i>tuck in</i>, que saiu da análise de <i>tuck</i> e ficou marcado como
+             <b>Billy Summers · Chapter 1</b> — só que <i>tuck in</i> <b>não aparece nesse
+             capítulo</b>. No Estudar ele senta no grupo do livro fingindo ser uma captura, e a
+             Lexa vai procurar a expressão num livro onde ela não está.</p>
+          <p class="dz-nota">A regra já foi corrigida, mas a obra fica <b>gravada</b> em cada item.
+             Só mexe em quem nasceu de outro item, herdou a obra <b>igual à do pai</b> e cuja frase
+             <b>não usa a expressão</b> — a procedência passa a ser <b>Do seu estudo</b>. Sem IA,
+             sem custo.</p>
+          <div id="proc-saida"></div>
+          <button class="btn btn-secondary btn-sm" onclick="arrumarProcedencia(true)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Conferir sem mexer</button>
+        </div>
+      </details>
+
       <!-- REPARAR O CONTEXTO — manutenção do acervo, vizinha da de cima pelo
            mesmo motivo. Diferente dela em uma coisa importante: esta MOSTRA
            antes de fazer. O "conferir" é uma simulação que não grava nada,

@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-10 — **A LEXA FOI TESTADA COM O LIVRO DE VERDADE**. Ele deu
+> Última atualização: 2026-08-11 — **A RODADA DO PARENTESCO**. Os três defeitos que o dado
+> real acusou eram a mesma causa raiz em três pontas: o elo entre item pai e item filho estava
+> frouxo. Agora `deleteWord` promove os filhos em vez de deixar ponteiro morto (o `id` sai,
+> `from.word` fica — é ele que sustenta o aviso da frase alheia), e a procedência **segue a
+> cena, não o parentesco**: `_origemDoDerivado` faz a mesma pergunta que já decidia a frase e
+> passou a decidir também a obra, nas **três** portas de item derivado. Duas migrações
+> idempotentes para o dado já gravado, uma no boot e outra com botão e conferência antes.
+> ⚠️ Uma delas espera ele apertar. **Detalhes em §8.4.**
+>
+> Última atualização anterior: 2026-08-10 — **A LEXA FOI TESTADA COM O LIVRO DE VERDADE**. Ele deu
 > acesso ao app no ar e ao EPUB de *Billy Summers*; montei a bancada (fio da sincronização
 > cortado, dado real injetado num sandbox em `localhost`, tudo apagado no fim) e a memória da
 > obra passou: `obraBuscar` achou a cena exata dos 10 itens testados, a **regra do spoiler
@@ -8716,6 +8725,73 @@ dedicatória e epígrafe):
   parentesco do bug dos cards órfãos.
 - `tuck` continua com os dois sentidos que foram desdobrados em `tuck in` e `tuck into`.
 
+## 8.4 A rodada do parentesco (2026-08-11)
+
+Os três defeitos que o dado real acusou não eram três coisas: eram **a mesma causa raiz em
+três pontas — o elo entre item pai e item filho estava frouxo**. Um item derivado copiava do
+pai o que não devia, e continuava apontando para ele depois que ele morria.
+
+**1. O ponteiro sobrevivia ao alvo.** `deleteWord` já limpava os cards órfãos (conserto da
+rodada anterior, nascido da lógica dele: *"se o card tem a palavra, deve ter no word"*), mas
+**não olhava para os filhos**. Agora olha: os filhos **não vão junto** — a expressão é item
+legítimo por si, independentemente da frase que a revelou —, o que morre é só o link.
+
+⚠️ **O `id` sai, mas `word` e `rel` FICAM.** Apagar o `from` inteiro seria mais limpo e
+estaria errado: é o `from.word` que `_fraseAlheiaHtml` usa para dizer *"esta frase veio de X e
+não usa Y"* e oferecer a tesoura. Apagar o campo calaria o aviso justamente nos itens que mais
+precisam dele. `familiaDoItem` já aguentava o pai nulo, então nada mais precisou mudar.
+
+**2. A procedência vinha de carona.** Em `separarSentido` o código já era cuidadoso com a
+FRASE (`_fraseServeParaExpressao` — não herda cena que não serve), mas a **fonte** passava sem
+teste nenhum, e é a fonte que decide o agrupamento no Estudar. Daí `tuck in` sentado em *Billy
+Summers · Chapter 1* sem aparecer no capítulo. Agora a MESMA pergunta decide as duas coisas,
+via `_origemDoDerivado(w, expr)`: a frase do pai contém o material desta expressão? Sim → a
+obra vem junto; não → `OBRA_ESTUDO`, que é o rótulo que o projeto já usava para isso em
+`_revOrigemDaFrase`, `dossie.js` e `_repAncestral`.
+
+**Aplicado nas TRÊS portas de item derivado**, não só na que apareceu: `separarSentido`,
+`revExprAdotar` e `revBreakStudy` (raio-X). No raio-X a rede quase nunca vai barrar — parte de
+uma palavra só passa sempre, por construção de `_fraseServeParaExpressao` — e é exatamente por
+isso que custa nada deixá-la lá para o dia em que a IA devolver uma unidade que não está na
+frase.
+
+**3. `migrarProcedenciaHerdada()`** para o que já está gravado (a lição da 50ª: conserto de
+código não limpa dado velho). Três guardas antes de tocar em qualquer item: só quem tem
+`from`; só se a obra for **igual à do pai** (obra diferente é escolha dele, não herança); só
+se a frase não servir. Contrato igual ao de `migrarLemas` — `{ mexeu, exemplos, aplicar() }`
+— e botão em Configurações com conferência antes, porque **mudar a procedência reagrupa o item
+na tela** e fazer isso sozinho seria abuso.
+
+**Conferido no navegador, com os casos que o acervo real produziu:**
+
+| entrada | resultado |
+|---|---|
+| `tuck into` ← *"Billy tucks his digest **into** his back pocket"* | herda o livro ✓ |
+| `tuck in` ← mesma frase | **Do seu estudo · tuck** ✓ |
+| `to his face` ← *"But not **to his face**"* (raio-X) | herda o livro ✓ (sem regressão) |
+| `fall in love` ← *"in the late **fall**, the sky is a clear blue"* | **Do seu estudo** ✓ |
+| item com obra **diferente** da do pai | intocado ✓ (guarda 2) |
+| item **sem** `from` | nem olhado ✓ (guarda 1) |
+
+As duas migrações são **idempotentes** (segunda passada = 0) e `deleteWord` foi exercitado com
+`confirmModal` stubado: pai removido, 2 cards fora, 2 filhos preservados com `from.word`
+intacto. Zero erro de console; nenhum overflow; ícone SVG, sem emoji.
+
+**Fica registrado o que NÃO foi feito:** a migração decide pela frase, não pelo livro. Agora
+que `obraBuscar` existe e é barata com cache quente, ela **poderia conferir no EPUB** se a
+expressão está mesmo na obra antes de tirar a procedência — bem mais preciso que o teste
+textual, e resolveria o caso ambíguo do item de uma palavra sem frase nenhuma. Ficou de fora
+por tamanho: `ler.js` é LAZY e a migração vive no shell, então isso exige a mesma dança que o
+reparo do contexto já faz. Está em §9.
+
+**E o terceiro defeito que eu tinha registrado — o sentido desdobrado que fica no pai — eu
+diagnostiquei mal.** O código já marca `m.moved_to = alvo.id` e alimenta `w.spun_off`
+([review.js:2181](js/review.js:2181)). Ou o `tuck` do acervo dele não nasceu por esse caminho,
+ou a marca existe e a tela a ignora. Como o ambiente de teste já tinha sido limpo, não dava
+para conferir. **Continua em §9 como diagnóstico, não como conserto.**
+
+`sw.js` → `englab-v202`.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -8730,18 +8806,25 @@ dedicatória e epígrafe):
 - [ ] **ITEM DERIVADO HERDA A FONTE DO PAI SEM TER ESTADO LÁ** (achado com dado real,
       2026-08-10). `tuck in` nasceu da análise da Lexa como parente de `tuck` e ficou com
       `source_type: kindle` + `source_title: Billy Summers` + `source_context: Chapter 1`, mas
-      **não aparece no livro** até onde ele leu (`obraBuscar` devolve 0). No Estudar ele senta
-      no grupo do *Chapter 1* como se tivesse sido capturado ali. Ou o derivado ganha fonte
-      própria (`OBRA_ESTUDO`, já existe), ou ganha uma marca de "veio da família" para o
-      agrupamento não contá-lo como captura. **Mexe em três telas — não é conserto de
-      passagem.**
-- [ ] **`to his face` APONTA PARA UM PAI QUE NÃO EXISTE** (`from.id = 'mskdbptx053bj'`).
-      Mesmo parentesco do bug dos cards órfãos: ponteiro sobrevive ao alvo. Falta a varredura
-      que limpa `from` apontando para item apagado — e decidir se o filho vira raiz ou é
-      apagado junto.
-- [ ] **`tuck` GUARDA OS SENTIDOS QUE FORAM DESDOBRADOS.** Os dois sentidos que viraram
-      `tuck in` e `tuck into` continuam em `pronto` dentro do pai, com o mesmo contexto.
-      Desdobrar deveria marcar o sentido de origem como movido; hoje ele aparece duas vezes.
+      **não aparece no livro** até onde ele leu (`obraBuscar` devolve 0). ✅ **CORRIGIDO em
+      2026-08-11** — `_origemDoDerivado`, aplicado nas três portas, **com migração** para o
+      dado velho. Ver §8.4. ⚠️ **Falta ele apertar "Arrumar a obra dos itens que nasceram de
+      outros"** em Configurações — o botão está lá, mas quem aperta é ele.
+- [x] ~~`to his face` aponta para um pai que não existe~~ — **corrigido em 2026-08-11**:
+      `deleteWord` promove os filhos (o `id` sai, `word` e `rel` ficam) e
+      `migrarParentescoOrfao()` roda no boot para o dado já gravado. Ver §8.4.
+- [ ] **A MIGRAÇÃO DE PROCEDÊNCIA DECIDE PELA FRASE, NÃO PELO LIVRO** (2026-08-11). Com
+      `obraBuscar` pronto e barato (4 ms com cache quente), dava para **conferir no EPUB** se a
+      expressão está mesmo na obra antes de tirar a procedência — mais preciso que o teste
+      textual, e resolveria o caso ambíguo do item de **uma palavra sem frase nenhuma**, que
+      hoje perde a obra por falta de evidência. Custo: `ler.js` é LAZY e a migração mora no
+      shell, então exige a mesma dança que o reparo do contexto já faz em `settings.js`.
+- [ ] **CONFIRMAR SE O SENTIDO DESDOBRADO REALMENTE FICA NO PAI** — diagnóstico, não conserto.
+      ⚠️ Eu registrei isso como defeito em 2026-08-10 e **diagnostiquei mal**: o código já marca
+      `m.moved_to = alvo.id` e alimenta `w.spun_off` (`review.js` ~2181). No acervo dele, `tuck`
+      aparecia com os dois sentidos em `pronto` — ou eles não nasceram por esse caminho, ou a
+      marca existe e a tela a ignora. **Responder na próxima vez que a bancada com dado real
+      subir**, olhando o `moved_to` dos `meanings` de `tuck` antes de qualquer conclusão.
 - [ ] **`## 9. Pendências` APARECE DUAS VEZES** no arquivo (duas seções com o mesmo título).
       Higiene: fundir numa só, senão item novo entra na cópia errada e some.
 - [ ] **OS OUTROS 20 `aiJSON` AINDA NÃO TÊM ESQUEMA** (2026-08-08). Sete dos 27 ganharam contrato de

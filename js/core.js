@@ -1244,6 +1244,31 @@ function familiaDoItem(w) {
   return { pai, filhos }
 }
 
+// ⚠️ O PONTEIRO SOBREVIVIA AO ALVO. Apagar o pai deixava o filho apontando para
+// um id que não existe mais — o MESMO parentesco do bug dos cards órfãos, e
+// achado do mesmo jeito: no acervo real, "to his face" apontava para "But not
+// to his face", item que ele já tinha removido. `familiaDoItem` aguenta (o pai
+// volta nulo e a fileira some), mas o dado continua mentindo, e a próxima tela
+// que confiar no `from.id` erra de novo.
+//
+// O `id` some; `word` e `rel` FICAM. A frase "veio de X" costuma ser a única
+// pista de onde ele viu aquilo, e é exatamente ela que `_fraseAlheiaHtml`
+// mostra para oferecer a tesoura — apagar o `from` inteiro calaria o aviso.
+//
+// Idempotente de propósito: roda no boot, e a nuvem é a fonte da verdade — se
+// um pull trouxer o ponteiro velho de volta, a varredura seguinte limpa outra
+// vez, sem custo e sem perder nada.
+function migrarParentescoOrfao() {
+  if (!Array.isArray(words) || !words.length) return 0
+  const vivos = new Set(words.map(w => w.id))
+  let n = 0
+  for (const w of words) {
+    if (w && w.from && w.from.id && !vivos.has(w.from.id)) { delete w.from.id; n++ }
+  }
+  if (n) saveWords()
+  return n
+}
+
 // Onde o item mora AGORA decide para onde o clique leva: cada estado tem uma
 // tela só dele desde o fluxo de 4 etapas. Mandar para a tela errada é pior do
 // que não ter link nenhum — o usuário procura e não acha.
