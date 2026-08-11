@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A GLOSA AGORA NASCE NA CAPTURA, DENTRO DA EXTENSÃO**.
+> Última atualização: 2026-08-10 — **A LEXA FOI TESTADA COM O LIVRO DE VERDADE**. Ele deu
+> acesso ao app no ar e ao EPUB de *Billy Summers*; montei a bancada (fio da sincronização
+> cortado, dado real injetado num sandbox em `localhost`, tudo apagado no fim) e a memória da
+> obra passou: `obraBuscar` achou a cena exata dos 10 itens testados, a **regra do spoiler
+> barrou 19 ocorrências** em 5 termos — `mine` tem 3 até onde ele leu e 13 no livro inteiro,
+> a mais recente no *Chapter 24* —, `reparoDiagnostico()` deu 0 e a busca com cache quente
+> custa 4 ms. O dado real também acusou três defeitos novos (item derivado que herda a fonte
+> do pai, ponteiro `from` órfão, sentido desdobrado que fica no pai). **Detalhes em §8.3.**
+>
+> Última atualização anterior: 2026-08-08 — **A GLOSA AGORA NASCE NA CAPTURA, DENTRO DA EXTENSÃO**.
 > ⚠️ **E isto começou com um erro meu de fato**: eu afirmei que a extensão não tinha acesso à IA e
 > desenhei em cima disso. Ele desconfiou — *"mas e como ele roda as traduções em tempo real?"* — e
 > estava certo: `extension/background.js` é um cliente de IA completo, com quatro fornecedores,
@@ -8644,6 +8653,69 @@ lote nela, em "Traduzir legenda inteira"); para a extensão, o app glosa **em lo
 capturas chegarem** — padrão que o `add.js` já usa no Kindle e na Mídia. A chave fica num
 lugar só.
 
+## 8.3 A bancada de testes com dado real (2026-08-10)
+
+Ele deu acesso ao app **no ar** para eu testar com o acervo dele, do jeito que já fazemos no
+n8n: monta, testa, desfaz. Isso mudou o que "verificado" significa aqui — até esta rodada,
+tudo que dependia de livro de verdade morria na frase *"só o uso com dado real responde"*.
+
+**O arranjo (repetir assim nas próximas vezes):**
+
+1. **Aba da Vercel, logado, com o fio da sincronização CORTADO.** Antes de tocar em
+   qualquer coisa: `_fbUser = null` e `fbPushData` / `fbForcePush` / `fbPushAll` trocados
+   por tocos que só logam e devolvem `false` (os originais ficam guardados em
+   `window.__fbPushData` etc.). Conferido na prática: alterei e salvei um item de propósito
+   e **nenhuma** requisição saiu para o Firestore. Sem isso, um teste vira escrita na conta
+   dele.
+2. **O arquivo do livro NÃO vem pela nuvem.** `BookDB` mora no IndexedDB e o Firestore tem
+   teto de 1 MB por documento — só os metadados sincronizam. Na aba da Vercel o EPUB não
+   existe (`arquivoDoLivroNesteAparelho: false`), e 4 MB não passam por chamada de
+   ferramenta. **Solução:** extrair um pacote enxuto do acervo real (itens + a entrada da
+   estante com os `chapters` e o `pos`), injetar no **localhost:8766** — que serve a raiz do
+   repositório e portanto alcança `_dados-de-teste/` na mesma origem — e gravar o EPUB no
+   `BookDB` com `BookDB.set(id, blob)`. Origem separada, sandbox limpo, `_fbUser` falso de
+   nascença.
+3. **No fim, apagar tudo:** `localStorage`, `sessionStorage`, todos os IndexedDB, service
+   workers e caches **das duas origens**, e sair da conta na aba da Vercel.
+
+**O que o livro de verdade respondeu** (*Billy Summers*, 4.115.647 bytes, 35 partes,
+`pos.cap = 5` — o índice 5 do spine é o "Chapter 1"; os cinco antes são capa, rosto,
+dedicatória e epígrafe):
+
+- **`obraBuscar` acha a cena certa nos 10 itens testados**, com a frase exata do livro —
+  inclusive os casos que já tinham me mordido: `breeze through` → *"Macintosh breezes
+  through the pages"*, `stand still` → *"how time stands still there"*, `tuck` → *"Billy
+  tucks his digest into his back pocket"*. A comparação por **conjunto** de candidatos de
+  lema, e não por um lema só, é o que faz isso funcionar.
+- **A regra do spoiler barra de verdade.** Em cinco termos, **19 ocorrências** ficaram para
+  trás do teto — `mine` tem 3 até onde ele leu e **13** no livro inteiro, com a mais recente
+  no *Chapter 24*. Sem o teto, pedir ajuda numa palavra entregaria o fim do livro.
+- **Custo:** abrir o EPUB e limpar um capítulo leva ~1 s na primeira vez; com o cache quente
+  (`_obrTexto`, `_obrLivro`) uma varredura completa até o capítulo lido leva **4 ms**.
+- **`obraMontarEco` não repete a frase que já está na tela.** Em `bosomy`, cuja única
+  aparição no livro é a própria cena do item, o bloco simplesmente não aparece — e a rede é
+  dupla: o filtro por frase idêntica **e** o desconto no total. Bom, porque o contexto salvo
+  costuma vir truncado (*"Archie and his bosomy"* contra *"Archie and his bosomy gal
+  pals."*) e o filtro sozinho erraria.
+- **`_repCasa` separa `tuck in` de `tuck into`**: não casa com *"tucks his digest into"* e
+  casa com *"tucks the blanket in around her"*. A folga de até 3 palavras no meio não
+  afrouxou a precisão a ponto de confundir duas phrasal verbs irmãs.
+- **`reparoDiagnostico()` = 0 e `sementesPendentes()` = 0** no acervo real, agora com o
+  livro na mão. A migração de lemas já estava aplicada (`padding` → `pad`, nenhum lema
+  malformado sobrando).
+
+**O que o dado real mostrou e ainda não está resolvido** — está em §9:
+
+- `tuck in` **não existe no livro** até onde ele leu: nasceu da análise da Lexa como parente
+  de `tuck`, não de uma captura. Mesmo assim herdou `source_type: kindle` e
+  `source_title: Billy Summers` do pai, então aparece no Estudar agrupado sob *Chapter 1*
+  como se tivesse sido capturado ali. Contexto vazio, aliás, é ignorado de propósito pelo
+  reparo (`if (!ctx) continue`) — e está certo: não há cena para achar, e inventar uma seria
+  pior que não ter.
+- `to his face` aponta `from.id = 'mskdbptx053bj'`, item que não existe mais — o mesmo
+  parentesco do bug dos cards órfãos.
+- `tuck` continua com os dois sentidos que foram desdobrados em `tuck in` e `tuck into`.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -8655,6 +8727,23 @@ lugar só.
 
 ### Dívida — código que a gente sabe que está torto
 
+- [ ] **ITEM DERIVADO HERDA A FONTE DO PAI SEM TER ESTADO LÁ** (achado com dado real,
+      2026-08-10). `tuck in` nasceu da análise da Lexa como parente de `tuck` e ficou com
+      `source_type: kindle` + `source_title: Billy Summers` + `source_context: Chapter 1`, mas
+      **não aparece no livro** até onde ele leu (`obraBuscar` devolve 0). No Estudar ele senta
+      no grupo do *Chapter 1* como se tivesse sido capturado ali. Ou o derivado ganha fonte
+      própria (`OBRA_ESTUDO`, já existe), ou ganha uma marca de "veio da família" para o
+      agrupamento não contá-lo como captura. **Mexe em três telas — não é conserto de
+      passagem.**
+- [ ] **`to his face` APONTA PARA UM PAI QUE NÃO EXISTE** (`from.id = 'mskdbptx053bj'`).
+      Mesmo parentesco do bug dos cards órfãos: ponteiro sobrevive ao alvo. Falta a varredura
+      que limpa `from` apontando para item apagado — e decidir se o filho vira raiz ou é
+      apagado junto.
+- [ ] **`tuck` GUARDA OS SENTIDOS QUE FORAM DESDOBRADOS.** Os dois sentidos que viraram
+      `tuck in` e `tuck into` continuam em `pronto` dentro do pai, com o mesmo contexto.
+      Desdobrar deveria marcar o sentido de origem como movido; hoje ele aparece duas vezes.
+- [ ] **`## 9. Pendências` APARECE DUAS VEZES** no arquivo (duas seções com o mesmo título).
+      Higiene: fundir numa só, senão item novo entra na cópia errada e some.
 - [ ] **OS OUTROS 20 `aiJSON` AINDA NÃO TÊM ESQUEMA** (2026-08-08). Sete dos 27 ganharam contrato de
       forma — os de maior valor e forma estável. Faltam os de `add.js` (6), `audio.js` (5),
       `consulta.js`, `ler.js` (2), `study.js`, `video-study.js` e dois de `review.js`. Não é
