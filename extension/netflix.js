@@ -86,6 +86,36 @@ function salvarCaptura(word, context) {
     pend.push({ word, context, title: titulo(), ts: Date.now() })
     return pedirExt(() => chrome.storage.local.set({ pend }))
   }).catch(() => {})
+  // A GLOSA VAI JUNTO, e e AQUI que ela custa menos e vale mais: a fala
+  // inteira esta na mao neste segundo. Chegando crua ao Preparar, a analise
+  // escolhe o sentido MAIS COMUM da palavra -- e num "snuffs the torch" isso
+  // vira "rape" em vez de "apagar".
+  // ⚠️ Em segundo plano de proposito: a captura NAO espera a IA. O aviso ja
+  // piscou, ele ja voltou para a cena, e travar o clique por causa de um
+  // bilhete seria trocar o essencial pelo acessorio. Falhando, a captura
+  // continua valendo -- so chega sem bilhete, como chegava antes.
+  if (word) _glosarDepois(word, context)
+}
+
+// Guarda a glosa DENTRO da captura ja salva, achando-a pelo carimbo de tempo.
+// Reescrever a fila inteira seria correr contra outra captura em voo.
+function _glosarDepois(word, context) {
+  const marca = Date.now()
+  pedirExt(() => chrome.runtime.sendMessage({ type: 'ai-glosar', itens: [{ word, context }] }))
+    .then(resp => {
+      const g = resp && resp.ok && (resp.glosas || [])[0]
+      if (!g) return
+      return pedirExt(() => chrome.storage.local.get({ pend: [] })).then(r => {
+        const pend = (r && r.pend) || []
+        // O mais recente com esta palavra e sem glosa: e o que acabou de entrar.
+        for (let i = pend.length - 1; i >= 0; i--) {
+          if (pend[i].word === word && !pend[i].gloss && Math.abs((pend[i].ts || 0) - marca) < 120000) {
+            pend[i].gloss = g
+            return pedirExt(() => chrome.storage.local.set({ pend }))
+          }
+        }
+      })
+    }).catch(() => {})
 }
 function piscar(el) { el.classList.add('englab-ok'); setTimeout(() => el.classList.remove('englab-ok'), 600) }
 

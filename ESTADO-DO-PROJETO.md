@@ -7,7 +7,21 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O GLOSSÁRIO CHEGOU AO VÍDEO**. Leitor, Preparar e Assistente já
+> Última atualização: 2026-08-08 — **A GLOSA AGORA NASCE NA CAPTURA, DENTRO DA EXTENSÃO**.
+> ⚠️ **E isto começou com um erro meu de fato**: eu afirmei que a extensão não tinha acesso à IA e
+> desenhei em cima disso. Ele desconfiou — *"mas e como ele roda as traduções em tempo real?"* — e
+> estava certo: `extension/background.js` é um cliente de IA completo, com quatro fornecedores,
+> retry e freio de 429, e já fazia `ai-traduzir` e `ai-explicar`. Eu tinha assumido em vez de olhar.
+> Com isso a pergunta deixou de ser "automático ou botão" e virou **onde**: entrou `ai-glosar`, e a
+> captura da Netflix e do Kindle já sai com o bilhete — no segundo em que a fala inteira está na
+> mão, que é o contexto mais rico que vai existir. Em segundo plano, porque a captura não pode
+> esperar a IA; no Kindle, agrupada por meio segundo de pausa, porque destaque vem em rajada.
+> ⚠️ E o `_englabReceber` passou a LER o campo: sem isso a chamada seria paga e jogada fora na
+> porta. **O DeepSeek também saiu da extensão** — ela espelhava a tabela do app e ficou para trás,
+> então a "primeira chave disponível" podia escolher, em silêncio, um fornecedor aposentado.
+> `sw.js` → `englab-v201` · extensão → `3.12.0`.
+>
+> Anterior: 2026-08-08 — **O GLOSSÁRIO CHEGOU AO VÍDEO**. Leitor, Preparar e Assistente já
 > tinham; a legenda ficou de fora por medo do repinte a cada segundo — e **o medo era do problema
 > errado**. `glossAtivar` põe UM ouvinte no contêiner e acha a palavra por COORDENADA, não por span:
 > repintar os filhos não deixa ouvinte órfão nenhum. O que quebra de verdade é a FRASE mudar
@@ -8291,6 +8305,51 @@ custa 4.436 tokens de entrada, buscando ou não. O automático transformava isso
 sem resultado no caso mais comum — nome próprio famoso, que o modelo já conhece.
 
 `sw.js` → `englab-v191`.
+
+### A glosa nasce na captura, dentro da extensão (2026-08-08)
+
+⚠️ **Esta rodada começou com um erro meu de FATO, não de julgamento.** Ao explicar por que a
+preparação das capturas era um botão no Preparar, afirmei que *"a extensão não tem chave de IA nem
+sabe falar com a OpenAI — ela só recorta a palavra e a frase"*. Ele desconfiou na hora: *"mas e como
+ele roda as traduções em tempo real? A IA é usada, então a API está sendo usada."*
+
+Ele estava certo. `extension/background.js` é um **service worker que é um cliente de IA completo**:
+quatro fornecedores, chave espelhada do app pela ponte, retry, freio global de 429, timeout. E já
+fazia duas chamadas — `ai-traduzir` (a legenda em tempo real) e `ai-explicar` (a Lexa na Netflix).
+
+Eu **assumi em vez de olhar**, e pior: usei a suposição para justificar uma decisão de desenho. A
+correção é a lição — verificar antes de afirmar, ainda mais quando a afirmação sustenta uma escolha.
+
+#### O que mudou
+
+A pergunta deixou de ser "automático ou botão" e virou **onde**. Entrou `ai-glosar` no
+`background.js`, e a captura já sai com o bilhete:
+
+- **Netflix**: uma palavra por clique, glosada na hora.
+- **Kindle**: destaque vem em rajada, então agrupa por **meio segundo de pausa** — uma chamada por
+  destaque seria dezenas numa sessão, e o custo de uma chamada quase não muda com 1 ou 20 itens.
+
+⚠️ **Em segundo plano, sempre.** A captura NÃO espera a IA: o aviso já piscou, ele já voltou para a
+cena, e travar o clique por causa de um bilhete seria trocar o essencial pelo acessório. Falhando,
+a captura continua valendo — só chega sem bilhete, como chegava antes.
+
+⚠️ **E a glosa é gravada DENTRO da captura já salva**, achando-a pelo carimbo de tempo (Netflix) ou
+pelo par palavra+frase (Kindle). Reescrever a fila inteira seria correr contra outra captura em voo.
+
+⚠️ **`_englabReceber` passou a LER o campo.** Sem isso a chamada seria paga na extensão e jogada
+fora na porta do app — e a análise voltaria a escolher o sentido mais comum, que num
+*"snuffs the torch"* é "rapé" em vez de "apagar". Captura antiga, sem `gloss`, segue o caminho de
+sempre; o botão do Preparar continua para ela.
+
+#### O DeepSeek também estava lá
+
+A tabela de fornecedores da extensão **espelha** a do app e ficou para trás quando o DeepSeek saiu,
+hoje de manhã. Com a chave dele ainda espelhada, o fallback "primeira chave disponível" podia
+escolher em silêncio um fornecedor aposentado. Saiu, e o modelo padrão virou Luna, como no app.
+Ficou comentado que as duas tabelas andam juntas.
+
+**Arquivos**: `extension/background.js`, `extension/netflix.js`, `extension/kindle.js`,
+`extension/manifest.json`, `js/core.js`. `sw.js` → `englab-v201` · extensão → `3.12.0`.
 
 ### O glossário chegou ao vídeo (2026-08-08)
 

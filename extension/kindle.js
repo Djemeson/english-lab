@@ -132,8 +132,45 @@ function salvarCaptura(word, context) {
     // seleção que o navegador dispara de novo ao soltar o botão).
     if (pend.some(p => p.word === item.word && p.context === item.context)) return true
     pend.push(item)
-    return pedirExt(() => chrome.storage.local.set({ pend })).then(() => true)
+    return pedirExt(() => chrome.storage.local.set({ pend })).then(() => {
+      // A GLOSA VAI JUNTO, em segundo plano. No Kindle a leitura e continua e
+      // ele destaca uma palavra atras da outra: esperar a IA a cada destaque
+      // atrapalharia justamente o que o app existe para nao atrapalhar.
+      // Falhando, a captura continua valendo -- so chega sem bilhete.
+      if (item.word) _glosarDepois(item)
+      return true
+    })
   }).catch(() => false)
+}
+
+// ⚠️ AGRUPA POR JANELA DE TEMPO. Uma chamada por destaque seria dezenas de
+// chamadas numa sessao de leitura -- e o custo de uma chamada quase nao muda
+// com 1 ou 20 itens dentro. Meio segundo parado e o sinal de que ele parou de
+// destacar; ate la, tudo o que chegar entra no mesmo lote.
+let _kGlosaFila = [], _kGlosaTimer = null
+function _glosarDepois(item) {
+  _kGlosaFila.push(item)
+  clearTimeout(_kGlosaTimer)
+  _kGlosaTimer = setTimeout(() => {
+    const lote = _kGlosaFila.splice(0, 40)
+    if (!lote.length) return
+    pedirExt(() => chrome.runtime.sendMessage({
+      type: 'ai-glosar', itens: lote.map(i => ({ word: i.word, context: i.context })) }))
+      .then(resp => {
+        if (!resp || !resp.ok) return
+        const glosas = resp.glosas || []
+        return pedirExt(() => chrome.storage.local.get({ pend: [] })).then(r => {
+          const pend = (r && r.pend) || []
+          let mexeu = false
+          lote.forEach((it, i) => {
+            const g = glosas[i]; if (!g) return
+            const alvo = pend.find(p => p.word === it.word && p.context === it.context && !p.gloss)
+            if (alvo) { alvo.gloss = g; mexeu = true }
+          })
+          if (mexeu) return pedirExt(() => chrome.storage.local.set({ pend }))
+        })
+      }).catch(() => {})
+  }, 500)
 }
 function desfazerUltima() {
   return pedirExt(() => chrome.storage.local.get({ pend: [] })).then(r => {

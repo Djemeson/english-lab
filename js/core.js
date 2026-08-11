@@ -285,12 +285,19 @@ function _englabReceber(items) {
     if (words.some(w => (w.word || '') === alvo && (w.context || '') === context)) continue
     const tipo = _EXT_FONTES[it.source_type] ? it.source_type : 'series'
     tipos.add(tipo)
-    createWord({
+    const w = createWord({
       word: alvo, context,
       source_type: tipo,
       source_title: String(it.title || _EXT_FONTES[tipo].titulo).slice(0, 120),
       lang: (typeof LANGS === 'object' && LANGS[it.lang]) ? it.lang : 'en'
     })
+    // ⚠️ A GLOSA VEM JUNTO desde 2026-08-08: a extensão passou a perguntar à IA
+    // o que a palavra significa NAQUELA FALA, no momento da captura, quando o
+    // contexto está mais rico do que jamais estará de novo. Ignorá-la aqui
+    // jogaria fora uma chamada já paga — e a análise voltaria a escolher o
+    // sentido mais comum, que num "snuffs the torch" é "rapé" em vez de
+    // "apagar". Captura antiga, sem `gloss`, segue o caminho de sempre.
+    if (w && it.gloss) w._seedMeaning = String(it.gloss).trim().slice(0, 120)
     n++
   }
   if (n) {

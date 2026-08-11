@@ -7,8 +7,13 @@
 'use strict'
 
 const PROV = {
-  openai:   { url: 'https://api.openai.com/v1/chat/completions', key: 'openaiKey', model: 'gpt-4o-mini' },
-  deepseek: { url: 'https://api.deepseek.com/chat/completions', key: 'deepseekKey', model: 'deepseek-v4-flash' },
+  // ⚠️ ESTA TABELA ESPELHA A DO APP (`AI_PROVIDERS`, em js/ai.js) e tem de
+  // andar junto com ela. O DeepSeek saiu de lá em 2026-08-08 e continuava
+  // aqui: com a chave dele ainda espelhada, a extensão escolheria um
+  // fornecedor que ele aposentou — e a "primeira chave disponível" do
+  // fallback abaixo faria isso sozinha, em silêncio.
+  // O modelo padrão também mudou: Luna, como no app.
+  openai:   { url: 'https://api.openai.com/v1/chat/completions', key: 'openaiKey', model: 'gpt-5.6-luna' },
   gemini:   { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', key: 'geminiKey', model: 'gemini-2.5-flash-lite' },
   groq:     { url: 'https://api.groq.com/openai/v1/chat/completions', key: 'groqKey', model: 'llama-3.3-70b-versatile' }
 }
@@ -136,6 +141,11 @@ TAREFA AGORA: explicar um trecho para o aluno, em português do Brasil.
 // Mesma âncora anti-literal do app (não traduzir palavra por palavra)
 // CÓPIA das regras lexicais do app (lang.js → promptRegrasLexicais 'traducao')
 // — o service worker não enxerga o código do Language Lab. Mudou lá, muda aqui.
+// A glosa é UMA LINHA por item, numerada — mesmo formato da tradução, e pelo
+// mesmo motivo: texto numerado sobrevive a modelo que ignora JSON, e aqui não
+// há `response_format` (a extensão fala com quatro fornecedores).
+const SIS_GLOSA = 'Você prepara capturas de vocabulário para um brasileiro. Para cada item, diga o que o termo significa NAQUELA FRASE — não o sentido mais comum da palavra. Exemplo: em "the host snuffs the torch", "snuff" é "apagar", nunca "rapé". Use forma de citação em português: verbo no infinitivo, adjetivo no masculino singular, substantivo no singular. No máximo 6 palavras. Responda SÓ as glosas, uma por linha, mantendo o número: "1. glosa". Nada além disso.'
+
 const SIS_TRAD = 'Você traduz legendas de séries/filmes para estudo de inglês. Traduza cada fala numerada para português do Brasil, natural e curto. Traduza o SENTIDO na cena, nunca palavra por palavra ("we\'ll get you in" = "a gente te encaixa", não "colocar você dentro"). Decida O QUE a coisa É na frase e use a palavra portuguesa DAQUILO — "barrel" de fuzil é "cano", nunca "barril"; jamais fique em cima do muro entre dois domínios. Teste: devolva sua tradução à frase — se ela parar de dizer o que o inglês diz, está errada. Palavrões fazem parte do diálogo: traduza fielmente. Responda SÓ as traduções, uma por linha, mantendo o número: "1. tradução". Nada além disso.'
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -160,6 +170,27 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         ], 600)
         if (!resp) throw new Error('a IA devolveu uma resposta vazia')
         sendResponse({ ok: true, texto: resp })
+      } else if (msg.type === 'ai-glosar') {
+        // A GLOSA NA HORA DA CAPTURA — o bilhete que a análise do app vai ler.
+        // Aqui é o melhor momento que existe: a fala inteira está na mão,
+        // naquele segundo, com o contexto mais rico que vai haver. Chegando
+        // crua ao Preparar, a análise escolhe o sentido MAIS COMUM da palavra
+        // — e num "snuffs the torch" isso vira "rapé" em vez de "apagar".
+        // Uma chamada para o lote todo: o Kindle entrega dezenas de destaques
+        // de uma vez, e uma chamada por palavra seria dezenas de chamadas.
+        const itens = (msg.itens || []).slice(0, 40)
+        if (!itens.length) { sendResponse({ ok: true, glosas: [] }); return }
+        const linhas = itens.map((it, i) => `${i + 1}. "${it.word}" — frase: "${String(it.context || '').slice(0, 300)}"`).join('\n')
+        const resp = await chamar([
+          { role: 'system', content: SIS_GLOSA },
+          { role: 'user', content: linhas }
+        ], 60 * itens.length + 200)
+        const mapa = {}
+        for (const ln of String(resp || '').split('\n')) {
+          const m = ln.match(/^\s*\**\s*(\d+)\s*[.):\-]+\**\s*(.+)$/)
+          if (m) mapa[+m[1]] = m[2].trim().replace(/^\*+|\*+$/g, '')
+        }
+        sendResponse({ ok: true, glosas: itens.map((_, i) => mapa[i + 1] || '') })
       } else {
         sendResponse({ ok: false, erro: 'tipo desconhecido' })
       }
