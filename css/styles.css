@@ -618,6 +618,21 @@ select option{background:var(--surface)}
 .vru-alvo{color:var(--primary)}
 .vru-sub{font-size:var(--fs-xs);color:var(--text3);margin-top:2px;line-height:1.5}
 .vru-sub b{color:var(--text2)}
+/* A FAIXA DO ACHADO ÚNICO — mora no Preparar, não num modal. Discreta de
+   propósito: é sugestão, não alarme, e vai conviver com a lista embaixo. */
+.prep-faixa-un{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-3);
+  margin:var(--sp-3) 0 0;padding:var(--sp-3);
+  border:1px solid var(--border);border-left:3px solid rgba(var(--primary-rgb),.5);
+  border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.04);
+}
+.pfu-txt{min-width:0;flex:1}
+.pfu-top{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;
+  font-size:var(--fs-sm);color:var(--text)}
+.pfu-top .ic{color:var(--primary)}
+@media (max-width:640px){
+  .prep-faixa-un{flex-direction:column;align-items:stretch}
+}
 .vru-vazio{
   display:flex;align-items:center;gap:var(--sp-2);
   font-size:var(--fs-sm);color:var(--text2);padding:var(--sp-4) 0;

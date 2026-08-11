@@ -7,7 +7,14 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (5ª) — **A VARREDURA DE UNIDADES GANHOU O "NÃO"**. O modal só
+> Última atualização: 2026-08-11 (6ª) — **DUAS ARESTAS DE TELA**. Sumiu o segundo botão
+> "Analisar com IA" (era idêntico ao do card), e o achado único da varredura virou **faixa no
+> Preparar** em vez de modal de tela cheia. ⚠️ No caminho, uma porta quase ficou trancada: com
+> a faixa assumindo o caso de um item, dispensar o último achado zerava a fila e escondia o
+> botão que abre o único lugar com "Trazer de volta" — o botão agora também aparece quando há
+> algo dispensado. **Detalhes em §8.9.**
+>
+> Última atualização anterior: 2026-08-11 (5ª) — **A VARREDURA DE UNIDADES GANHOU O "NÃO"**. O modal só
 > tinha "Fechar": discordar de um achado não era possível, então ele voltaria para sempre — e
 > aviso que não some treina o usuário a ignorar a tela inteira. Agora cada item tem **"Não é
 > isso"**, com contador e **"Trazer de volta"**. Entrou também a **frase que motivou a
@@ -9025,6 +9032,37 @@ demais — caberia uma faixa discreta no Preparar, deixando o modal para 2+.
 
 `sw.js` → `englab-v207`.
 
+## 8.9 Duas arestas de tela, e a porta que quase ficou trancada (2026-08-11)
+
+As duas pendências abertas na rodada anterior, fechadas.
+
+**1. O botão duplicado.** No estado "aguardando IA", "Analisar com IA" aparecia na barra de
+ações **e** no corpo do card — mesmo rótulo, mesma ação, mesmo item. Dois botões idênticos
+fazem o usuário procurar a diferença que não existe. Ficou o **do card**: é ele que muda de
+rótulo conforme o caso ("Analisar a frase inteira") e convive com a triagem do raio-X, e o
+card nesse estado é curto, então o botão está sempre à vista. A barra fica vazia — como já
+ficava em outros estados.
+
+**2. Modal para um achado só.** Abrir tela cheia, ler, decidir e fechar é caro demais para uma
+decisão de dois cliques. Agora, com **um** achado, uma **faixa** no Preparar traz a mesma
+informação do modal — de onde vem, para onde vai, a cena e as duas saídas — sem tirar ele da
+tela. A partir de **dois**, o botão do cabeçalho e o modal voltam.
+
+⚠️ **E aqui quase ficou uma porta trancada.** O botão do cabeçalho só aparecia quando havia
+fila; com a faixa assumindo o caso de um item, ele passou a aparecer só a partir de dois. Só
+que **dispensar o único achado zera a fila** — e o "Trazer de volta" mora dentro do modal, que
+só o botão abre. O usuário dispensaria por engano e ficaria sem caminho de volta. **O botão
+agora também aparece quando existe algo dispensado**, mesmo com a fila vazia, e nesse caso
+sem o número.
+
+**Conferido ao vivo, o ciclo inteiro:** com 1 achado a faixa aparece, o botão some e nenhum
+modal abre; dispensar faz a faixa sumir **e o botão voltar**; pelo modal os dispensados
+continuam acessíveis; trazer de volta faz a faixa reaparecer; com 2 achados a faixa some e o
+botão volta com o número. No card, sobrou **um** "Analisar com IA", e o estado "pronta" ficou
+intacto. Zero erro de console, sem transbordo, sem emoji.
+
+`sw.js` → `englab-v208`.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -9036,15 +9074,11 @@ demais — caberia uma faixa discreta no Preparar, deixando o modal para 2+.
 
 ### Dívida — código que a gente sabe que está torto
 
-- [ ] **DOIS BOTÕES "ANALISAR COM IA" NA MESMA TELA** (2026-08-11, visto num print dele).
-      No estado `pending_ai` o botão aparece na barra de ações E no corpo do card, os dois
-      chamando a mesma coisa para o mesmo item. Não é bug — é ruído, do tipo que ele já
-      reclamou antes. Decidir qual fica: o do card é mais visível e explica o contexto; o da
-      barra é consistente com os outros estados. **Não mexer no meio de um fluxo dele** —
-      recolher o botão errado tira a ação de onde a mão já está acostumada.
-- [ ] **MODAL DE TELA CHEIA PARA UM ACHADO SÓ** (2026-08-11). A varredura de unidades abre um
-      modal mesmo quando há **um** item — peso demais para a decisão. Uma faixa discreta no
-      topo do Preparar resolveria, deixando o modal para 2 ou mais.
+- [x] ~~Dois botões "Analisar com IA" na mesma tela~~ — **resolvido em 2026-08-11**: ficou o do
+      card, que muda de rótulo conforme o caso e convive com a triagem do raio-X. A barra fica
+      vazia em `pending_ai`. Ver §8.9.
+- [x] ~~Modal de tela cheia para um achado só~~ — **resolvido em 2026-08-11**: com um achado a
+      faixa resolve no Preparar; a partir de dois, o modal volta. Ver §8.9.
 
 - [x] ~~A linha de sinônimo vira "frase" do item~~ — **corrigido em 2026-08-11**, na origem e
       nos quatro consumidores. Ver §8.7. ⚠️ Os 7 já gravados continuam com o texto: o app

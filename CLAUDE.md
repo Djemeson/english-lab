@@ -22,22 +22,18 @@ O `ESTADO-DO-PROJETO.md` precisa estar SEMPRE atualizado — é o que garante a 
 
 ## 🚨 REGRA Nº 3 — Falar como se fala a um CEO
 
-**OBRIGATÓRIO.** A resposta é um **resumo executivo**: o que mudou, o que isso significa para
-ele, o que ele precisa decidir ou fazer. Curto.
+**OBRIGATÓRIO.** Didático, organizado, curto. A regra completa, com o esqueleto de resposta,
+está em `~/.claude/CLAUDE.md` e vale para todos os projetos. O essencial:
 
-- **Nada de detalhe técnico não solicitado.** Nome de função, número de linha, nome de
-  arquivo, trecho de código, nome de campo do banco — **fora**, a menos que ele pergunte ou
-  precise agir sobre aquilo.
-- **Fale do efeito, não do mecanismo.** "A análise ignora esse texto" e não "a rede está em
-  `analyzeWordDirect`". "O app confere no livro antes de decidir" e não "`obraBuscar` com
-  `ateCap`".
-- **Comece pela conclusão.** Se ele só ler a primeira linha, ela tem que bastar.
-- **Poucos itens, sem paredes de texto.** Tabela ou 3–5 marcadores resolvem quase tudo.
-- **O que ele precisa fazer vai destacado e no fim**, em uma linha.
-- Erro meu ou risco: diga em uma frase, sem autópsia.
+- **Ordem fixa:** *O que mudou* → *Antes → depois* (tabela) → *Por que importa* → *O que
+  verifiquei* → **Pendências**. Pule a seção sem conteúdo.
+- **Pendências SEMPRE no fim, em seção própria**, divididas em *o que depende de você* e *o
+  que ficou para depois*. Sem pendência, escreva "Nada pendente."
+- **Efeito, nunca mecanismo.** "A análise ignora esse texto", não "a rede está na função X".
+- **Zero** nome de função, número de linha, nome de arquivo ou trecho de código sem ele pedir.
+- Tabela para comparar; no máximo 3–5 marcadores por lista; negrito só no que decide.
 
-O detalhe técnico continua sendo escrito — só que **no `ESTADO-DO-PROJETO.md` e na mensagem
-de commit**, que é onde ele pertence. A resposta no chat é para decidir, não para auditar.
+O detalhe técnico continua sendo escrito — no `ESTADO-DO-PROJETO.md` e na mensagem de commit.
 
 ## 🚨 REGRA Nº 4 — Testar AO VIVO, sempre
 

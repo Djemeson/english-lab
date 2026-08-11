@@ -1212,6 +1212,10 @@ function _vruFrase(frase, unidade) {
 
 function _varreduraRefresh() {
   if (document.getElementById('el-varredura-modal')) abrirVarreduraUnidades(true)
+  // A faixa do achado único vive fora do modal e precisa acompanhar: sem isto,
+  // dispensar pelo modal deixava a faixa velha na tela atrás dele.
+  if (typeof _prepFaixaUnidade === 'function') _prepFaixaUnidade()
+  if (typeof _prepAtualizarCabecalho === 'function') { try { _prepAtualizarCabecalho() } catch (e) {} }
 }
 
 function abrirVarreduraUnidades(reabrindo) {
@@ -1442,10 +1446,49 @@ function _prepAtualizarCabecalho() {
       data-tip="Capturas do Netflix, do Kindle e do vídeo chegam sem glosa. Uma chamada dá a cada uma o sentido que ela tem na própria frase — e a análise seguinte nasce sabendo qual procurar, em vez de redescobrir com menos contexto.">
       ${_semeandoBusy ? '<span class="spinner"></span> preparando…'
         : ic('sparkles') + `Preparar capturas <span class="badge">${s}</span>`}</button>` : ''
-    slot.innerHTML = semear + (n ? `<button class="btn btn-ghost btn-sm" onclick="abrirVarreduraUnidades()"
+    // ⚠️ COM UM ACHADO SÓ, O BOTÃO SOME e a faixa resolve ali mesmo. Modal de
+    // tela cheia para uma decisão de dois cliques é peso demais: ele tem de
+    // abrir, ler, decidir e fechar. A partir de dois, a lista se justifica e o
+    // botão volta.
+    // ⚠️ E O BOTÃO TAMBÉM VOLTA QUANDO HÁ DISPENSADOS, mesmo com a fila vazia:
+    // sem isso, dispensar o último achado trancava o "Trazer de volta" dentro
+    // de um modal sem porta. Aí ele mostra o total, não só a fila.
+    const nDisp = varrerUnidades(true).filter(x => x.dispensada).length
+    const mostrar = n > 1 || nDisp > 0
+    slot.innerHTML = semear + (mostrar ? `<button class="btn btn-ghost btn-sm" onclick="abrirVarreduraUnidades()"
       data-tip="Sentidos que parecem pertencer a uma expressão inteira (como 'apaixonar-se' em 'fall'), e não à palavra sozinha">
-      ${ic('layers')}Expressões presas <span class="badge">${n}</span></button>` : '')
+      ${ic('layers')}Expressões presas${n ? ` <span class="badge">${n}</span>` : ''}</button>` : '')
   }
+  _prepFaixaUnidade()
+}
+
+// A FAIXA DO ACHADO ÚNICO. Mesma informação do modal — de onde vem, para onde
+// vai, a cena e as duas saídas —, sem tirar ele da tela onde já está.
+function _prepFaixaUnidade() {
+  const faixa = el('prep-unidade-faixa')
+  if (!faixa) return
+  const achados = varrerUnidades()
+  if (achados.length !== 1) { faixa.innerHTML = ''; return }
+  const a = achados[0]
+  faixa.innerHTML = `
+    <div class="prep-faixa-un">
+      <div class="pfu-txt">
+        <div class="pfu-top">${ic('layers','ic-sm')}<b>${esc(a.palavra)}</b>
+          <span class="vru-seta">${ic('arrowRight','ic-sm')}</span>
+          <b class="vru-alvo">${esc(a.un.unidade)}</b></div>
+        <div class="vru-sub">${esc(a.meaning_pt)} — só existe com <b>${esc(a.un.extra)}</b>${
+          a.un.fonte === 'ia' ? ' (apontado pela própria IA)' : ''}</div>
+        ${a.frase ? `<div class="vru-frase">“${_vruFrase(a.frase, a.un.unidade)}”</div>` : ''}
+      </div>
+      <div class="vru-acoes">
+        <button class="btn btn-secondary btn-sm" onclick="separarSentido('${a.wordId}',${a.mi})"
+          data-tip="Cria a expressão como item próprio e tira este sentido da palavra sozinha">${
+          ic('layers','ic-sm')}Criar “${esc(a.un.unidade)}”</button>
+        <button class="btn btn-ghost btn-sm" onclick="dispensarUnidade('${a.wordId}',${a.mi})"
+          data-tip="Some daqui. Dá para trazer de volta pelo modal quando houver outros.">${
+          ic('x','ic-sm')}Não é isso</button>
+      </div>
+    </div>`
 }
 
 function renderReview() {
@@ -1573,8 +1616,14 @@ function renderWcToolbarLeft() {
         <button class="btn btn-ghost btn-sm" onclick="refazerAnalise('${w.id}')" data-tip="A análise está errada? Descarta os significados atuais e refaz do zero">${ic('undo')}Refazer do zero</button>
         ${podeEnviar ? `<button class="btn btn-ghost btn-sm wct-atalho" onclick="saveToSrs('${w.id}')" data-tip="Atalho: pula a leitura do dossiê e joga os ${totalCards} card${totalCards!==1?'s':''} direto na repetição espaçada">${ic('arrowRight')}Pular para a Revisão</button>` : ''}`
     } else if (w.status === 'pending_ai') {
-      leftEl.innerHTML = `
-        <button class="btn btn-primary btn-sm" onclick="analyzeWord('${w.id}')" data-tip="Analisa esta palavra com IA: significados, exemplos, nível e registro">${ic('sparkles')}Analisar com IA</button>`
+      // ⚠️ A BARRA FICA VAZIA AQUI DE PROPÓSITO. Este botão era um segundo
+      // "Analisar com IA" idêntico ao que o corpo do card já mostra em
+      // destaque, chamando a mesma coisa para o mesmo item — dois botões
+      // iguais na mesma tela fazem o usuário procurar a diferença que não
+      // existe. O do card fica porque é ele que muda de rótulo conforme o
+      // caso ("Analisar a frase inteira") e convive com a triagem do raio-X;
+      // e o card em `pending_ai` é curto, então o botão está sempre à vista.
+      leftEl.innerHTML = ''
     } else {
       leftEl.innerHTML = ''
     }
