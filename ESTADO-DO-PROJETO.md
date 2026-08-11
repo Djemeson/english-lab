@@ -7,7 +7,13 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (9ª) — **ÁUDIO E IMAGEM SAÍRAM DE DENTRO DO BANCO**. 59
+> Última atualização: 2026-08-11 (10ª) — **O LIVRO PASSOU A ACOMPANHAR O USUÁRIO**. A
+> pendência que começou esta conversa, fechada: o EPUB sobe ao ser importado e **é buscado na
+> nuvem antes de o app desistir**. Testado ida e volta com o livro real — 3,92 MB, subiu em
+> 11 s pelo localhost e **baixou em 3 s na Vercel, que nunca teve o arquivo**, com a memória da
+> obra funcionando em seguida. **Detalhes em §8.13.**
+>
+> Última atualização anterior: 2026-08-11 (9ª) — **ÁUDIO E IMAGEM SAÍRAM DE DENTRO DO BANCO**. 59
 > áudios, 5,5 MB, banco em zero — e o teste de "aparelho novo" trouxe **59/59 byte a byte**.
 > ⚠️ O teste com arquivo descartável pegou **dois defeitos antes de qualquer dado se mover**:
 > a regra barrava o DELETE (teto de tamanho num caso sem arquivo novo) e faltava liberar CORS.
@@ -9249,6 +9255,43 @@ E `initFirebase` é tolerante de propósito: se o script de arquivos não carreg
 inteiro e a leitura do caminho antigo segue de pé.
 
 `sw.js` → `englab-v210`.
+
+## 8.13 O livro passou a acompanhar o usuário (2026-08-11)
+
+**A pendência que começou toda esta conversa, fechada e testada com o EPUB real.**
+
+O arquivo morava só no IndexedDB do aparelho onde foi aberto. Trocar de máquina ou limpar o
+navegador matava a memória da obra — e ela nem explicava por quê. Foi exatamente isso que
+travou o teste na Vercel semanas atrás (`arquivoDoLivroNesteAparelho: false`).
+
+⚠️ **As funções moram no SHELL** (`firebase.js`), não em `ler.js`: quem precisa do arquivo é o
+leitor (lazy) **e** a memória da obra, que o Estudar também usa. Símbolo lazy chamado do shell
+é a armadilha nº 1 deste projeto.
+
+**As quatro pontas do ciclo de vida:**
+
+| quando | o que passou a acontecer |
+|---|---|
+| importar | sobe em segundo plano — importar não fica esperando rede |
+| **abrir** | **procura na nuvem antes de desistir** (era aqui o buraco) |
+| memória da obra | idem, senão o Estudar diria "não está aqui" com o livro guardado |
+| apagar | leva a cópia da nuvem junto — ele mandou tirar da estante, não esconder |
+
+**Conferido com o livro dele, ida e volta entre dois aparelhos:**
+
+| teste | resultado |
+|---|---|
+| subir (pelo localhost, que alcança o arquivo) | **3,92 MB em 11 s** |
+| baixar na Vercel, que **nunca teve** o arquivo | **3,92 MB em 3 s** |
+| memória da obra rodando com o livro baixado | `gal` 2×, `breeze through` 1×, `mine` 3× ✓ |
+
+Zero erro de console. O `pos.cap = 5` continua respeitado — a regra do spoiler não mudou.
+
+**Nota de bastidor:** o login em `localhost` não passa (o endereço não está nos domínios
+autorizados do Firebase Auth), e eu não ia mexer nisso só para testar. **Ele fez o login à
+mão** e destravou o caminho — foi assim que o arquivo subiu.
+
+`sw.js` → `englab-v211`.
 
 ## 9. Pendências / a verificar
 
