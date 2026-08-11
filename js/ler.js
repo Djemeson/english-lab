@@ -172,6 +172,9 @@ async function _lerImportarUm(file) {
   if (!meta.chapters.length) throw new Error('não achei texto legível nesse arquivo')
 
   await BookDB.set(id, new Blob([buf]))
+  // Sobe em segundo plano: importar um livro não pode ficar esperando rede, e
+  // se falhar ele continua com o arquivo aqui — a próxima abertura tenta de novo.
+  if (typeof livroGarantirNaNuvem === 'function') livroGarantirNaNuvem(id)
   livros.push({
     id, ...meta,
     totalWords: meta.chapters.reduce((s, c) => s + (c.words || 0), 0),
@@ -229,6 +232,9 @@ async function lerExcluir(id) {
            Os <b>cards que você já criou continuam</b> — eles vivem em Estudar/Revisar, não aqui.</p>`
   }))) return
   await BookDB.del(id)
+  // A cópia da nuvem vai junto. Apagar só a daqui deixaria o livro voltando
+  // sozinho na próxima abertura — ele mandou tirar da estante, não esconder.
+  if (typeof livroApagarDaNuvem === 'function') await livroApagarDaNuvem(id)
   // Tudo que é derivado do livro morre com ele: as leituras de capítulo
   // (`pre:`), a classificação por nível (`niv:`) e as marcas da triagem
   // (`nivmarca:`). Sem isto ficariam órfãs no IndexedDB para sempre — ninguém
@@ -253,11 +259,21 @@ async function lerExcluir(id) {
 // ================================================================
 async function lerAbrir(id) {
   const l = livroPorId(id); if (!l) return
-  const blob = await BookDB.get(id)
+  // ⚠️ ANTES DE DESISTIR, PROCURA NA NUVEM. Este era o buraco que fazia o livro
+  // não acompanhar o usuário: em aparelho novo o arquivo não existe, e o app
+  // mandava "importe o .epub de novo" mesmo tendo uma cópia guardada.
+  let blob = await BookDB.get(id)
+  if (!blob && typeof livroGarantirLocal === 'function') {
+    toast('Buscando o arquivo na sua nuvem…', 'info')
+    blob = await livroGarantirLocal(id)
+    if (blob) toast(`"${l.title}" baixado para este aparelho`, 'success')
+  }
   if (!blob) {
-    toast('O arquivo deste livro não está neste aparelho. Importe o .epub de novo.', 'warning')
+    toast('O arquivo deste livro não está neste aparelho nem na sua nuvem. Importe o .epub de novo.', 'warning')
     return
   }
+  // Guarda a subida para o caso do livro ter entrado antes de existir nuvem.
+  if (typeof livroGarantirNaNuvem === 'function') livroGarantirNaNuvem(id)
   const buf = await blob.arrayBuffer()
   try {
     if (l.format === 'epub') {
@@ -3251,8 +3267,11 @@ function obraAteOndeLeu(livro) {
 
 async function _obrAbrir(livro) {
   if (_obrLivro.has(livro.id)) return _obrLivro.get(livro.id)
-  const blob = await BookDB.get(livro.id)
-  if (!blob) throw new Error('o arquivo do livro não está neste aparelho')
+  // A memória da obra também busca na nuvem: sem isto, o Estudar continuaria
+  // dizendo "não está neste aparelho" mesmo com o livro guardado lá.
+  let blob = await BookDB.get(livro.id)
+  if (!blob && typeof livroGarantirLocal === 'function') blob = await livroGarantirLocal(livro.id)
+  if (!blob) throw new Error('o arquivo do livro não está neste aparelho nem na sua nuvem')
   const buf = await blob.arrayBuffer()
   let dados
   if (livro.format === 'epub') {

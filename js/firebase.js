@@ -98,6 +98,64 @@ async function mediaBaixarTodos(tipo, aoAndar) {
   return saida
 }
 
+// ================================================================
+// O ARQUIVO DO LIVRO NA NUVEM
+// ================================================================
+// O EPUB morava só no IndexedDB do aparelho onde foi aberto: trocar de máquina
+// ou limpar o navegador matava a memória da obra, e ela nem explicava por quê.
+// Não subia junto com o resto porque o Firestore tem teto de 1 MB por documento
+// e um livro tem megabytes — agora tem lugar próprio.
+//
+// ⚠️ Mora aqui, no SHELL, e não em `ler.js`: quem precisa do arquivo é o leitor
+// (lazy) E a memória da obra, que o Estudar também usa. Símbolo de arquivo lazy
+// chamado do shell é a armadilha nº 1 deste projeto.
+function _livroRef(id) {
+  if (!_fbStore || !_fbUser) return null
+  return _fbStore.ref(`users/${_fbUser.uid}/livros/${encodeURIComponent(id)}`)
+}
+
+async function livroNaNuvem(id) {
+  const r = _livroRef(id); if (!r) return false
+  try { await r.getMetadata(); return true } catch (e) { return false }
+}
+
+// Sobe só se ainda não estiver lá. Silencioso de propósito: é conveniência de
+// fundo, e um erro aqui não pode atrapalhar quem só quer ler o livro.
+async function livroGarantirNaNuvem(id) {
+  try {
+    const r = _livroRef(id); if (!r) return false
+    if (await livroNaNuvem(id)) return true
+    const blob = await BookDB.get(id)
+    if (!blob) return false
+    await r.put(blob)
+    console.log(`[Firebase] livro ${id} guardado na nuvem (${Math.round(blob.size / 1048576 * 10) / 10} MB)`)
+    return true
+  } catch (e) {
+    console.warn('[Firebase] livro não subiu:', e.code || e.message)
+    return false
+  }
+}
+
+// Traz de volta quando o arquivo não está NESTE aparelho. Devolve o blob (já
+// gravado no IndexedDB) ou null — quem chama decide o que dizer ao usuário.
+async function livroGarantirLocal(id, aoAndar) {
+  try {
+    const jaTem = await BookDB.get(id)
+    if (jaTem) return jaTem
+    const r = _livroRef(id); if (!r) return null
+    if (aoAndar) aoAndar('procurando na nuvem')
+    const url = await r.getDownloadURL()
+    if (aoAndar) aoAndar('baixando o livro')
+    const blob = await (await fetch(url)).blob()
+    await BookDB.set(id, blob)
+    return blob
+  } catch (e) { return null }
+}
+
+async function livroApagarDaNuvem(id) {
+  try { const r = _livroRef(id); if (r) await r.delete() } catch (e) {}
+}
+
 // Só os NOMES, para saber o que já está lá sem baixar nada.
 async function mediaChavesNaNuvem(tipo) {
   if (!_fbStore || !_fbUser) return new Set()
@@ -799,7 +857,7 @@ async function fbWipeCloud() {
     // arquivos na nuvem depois de ele mandar apagar tudo — a pior forma de
     // errar, porque ele sai achando que limpou.
     let arquivos = 0
-    for (const tipo of ['audio', 'images']) {
+    for (const tipo of ['audio', 'images', 'livros']) {
       if (!_fbStore) break
       try {
         const r = await _fbStore.ref(`users/${_fbUser.uid}/${tipo}`).listAll()
