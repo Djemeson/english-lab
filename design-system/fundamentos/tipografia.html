@@ -1,0 +1,146 @@
+<!-- @dsCard group="Fundamentos" name="Tipografia" subtitle="A serifada sai da decoração e vira estrutura" -->
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Tipografia — Tinta</title>
+<style>
+:root{
+  --paper:#F5F2EA;--surface:#fff;--surface2:#F7F3EA;--surface3:#E6DDCB;
+  --ink:#16130E;--ink2:#4A4337;--ink3:#7D7364;
+  --line:rgba(22,19,14,.18);--line-strong:rgba(22,19,14,.34);
+  --primary:#C2410C;--ia-2:#E8177B;
+  --r:14px;--r-sm:10px;--r-pill:999px;
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --display:'Newsreader',Georgia,'Times New Roman',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--paper);color:var(--ink);
+  padding:32px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);font-weight:600;margin-bottom:6px}
+h1{font-family:var(--display);font-size:2.1rem;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+h1 em{font-style:normal;color:var(--primary)}
+.lead{color:var(--ink2);font-size:.95rem;max-width:66ch;margin-top:10px}
+h2{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);
+  font-weight:700;margin:36px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+
+.esp{display:flex;align-items:baseline;gap:18px;padding:11px 0;border-bottom:1px solid var(--line)}
+.esp .tk{font-family:ui-monospace,Menlo,monospace;font-size:.72rem;color:var(--primary);
+  font-weight:600;width:88px;flex-shrink:0}
+.esp .px{font-size:.7rem;color:var(--ink3);width:56px;flex-shrink:0;
+  font-variant-numeric:tabular-nums;text-align:right}
+.esp .am{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.esp .uso{font-size:.72rem;color:var(--ink3);margin-left:auto;flex-shrink:0;padding-left:14px}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:6px}
+@media (max-width:820px){.duo{grid-template-columns:1fr}}
+.face{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px}
+.face .nome{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700}
+.face .spec{font-size:.74rem;color:var(--ink2);margin-top:3px}
+.face .mostra{margin-top:14px;line-height:1.05;letter-spacing:-.02em}
+.face .glifos{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);
+  font-size:.8rem;color:var(--ink3);letter-spacing:.06em}
+.face .papel{margin-top:12px;font-size:.8rem;color:var(--ink2);line-height:1.5}
+.face .papel b{color:var(--ink)}
+
+.demo{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:24px 26px;margin-top:6px}
+.demo .k{font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700}
+.demo .w{font-family:var(--display);font-size:2.6rem;font-weight:600;line-height:1;
+  letter-spacing:-.03em;margin-top:5px}
+.demo .ipa{font-family:ui-monospace,Menlo,monospace;font-size:.85rem;color:var(--ink3);margin-top:5px}
+.demo .sep{height:1px;background:var(--line);margin:18px 0}
+.demo .m{font-size:1.02rem;color:var(--ink);font-weight:500}
+.demo .d{font-size:.87rem;color:var(--ink2);margin-top:5px;max-width:56ch}
+.demo .ex{margin-top:14px;padding:13px 15px;background:var(--surface2);
+  border-radius:var(--r-sm);border-left:2px solid var(--line-strong)}
+.demo .ex .en{font-size:.92rem;line-height:1.5}
+.demo .ex .en b{color:var(--primary);font-weight:600}
+.demo .ex .pt{font-size:.82rem;color:var(--ink3);margin-top:4px;font-style:italic}
+.chips{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap}
+.chip{font-size:.68rem;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);
+  background:var(--surface3);color:var(--ink2)}
+
+.rules{margin-top:14px;font-size:.85rem;color:var(--ink2);max-width:72ch}
+.rules li{margin:8px 0 8px 18px}
+.rules b{color:var(--ink)}
+.callout{margin-top:18px;padding:14px 16px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--primary);
+  font-size:.85rem;color:var(--ink2);max-width:72ch}
+.callout b{color:var(--ink)}
+</style></head><body>
+
+<div class="eyebrow">Fundamentos · 04</div>
+<h1>Tipografia — a serifada deixa de ser <em>enfeite</em></h1>
+<p class="lead">O app já carrega a Newsreader, mas ela aparece em cinco lugares soltos
+(título de página, palavra do card, números grandes). Aqui ela ganha uma regra única e
+memorável: <b>serifada é a língua que se estuda; sem serifa é o aplicativo falando</b>. Toda
+palavra em inglês, todo número que é resultado, toda frase do acervo — serifada. Botão, rótulo,
+menu, aviso — sem serifa. Nunca se decide caso a caso de novo.</p>
+
+<h2>As duas famílias</h2>
+<div class="duo">
+  <div class="face">
+    <div class="nome">Newsreader · display</div>
+    <div class="spec">600 · a matéria de estudo</div>
+    <div class="mostra" style="font-family:var(--display);font-size:3.1rem;font-weight:600">Aa Gg</div>
+    <div class="glifos" style="font-family:var(--display)">fall in love · 1.284 · 89%</div>
+    <div class="papel"><b>Onde entra:</b> a palavra estudada, a frase do livro, o número que é
+      resultado, o título da tela. Se está em inglês ou é um resultado, é serifada.</div>
+  </div>
+  <div class="face">
+    <div class="nome">Inter · interface</div>
+    <div class="spec">400 / 500 / 600 / 700 · o aplicativo</div>
+    <div class="mostra" style="font-size:3.1rem;font-weight:600">Aa Gg</div>
+    <div class="glifos">Enviar para o Estudo · travando · 12 dias</div>
+    <div class="papel"><b>Onde entra:</b> botão, menu, rótulo, aviso, ajuda, tradução em
+      português. Tudo que é o app conversando com você.</div>
+  </div>
+</div>
+
+<h2>A escada — 10 degraus, nenhum a mais</h2>
+<div class="esp"><span class="tk">--fs-3xs</span><span class="px">10 px</span><span class="am" style="font-size:10px">Enviado para o Estudo</span><span class="uso">selo</span></div>
+<div class="esp"><span class="tk">--fs-2xs</span><span class="px">11 px</span><span class="am" style="font-size:11px">PALAVRA DO DIA</span><span class="uso">sobrancelha</span></div>
+<div class="esp"><span class="tk">--fs-xs</span><span class="px">12 px</span><span class="am" style="font-size:12px">travando na memória</span><span class="uso">rótulo</span></div>
+<div class="esp"><span class="tk">--fs-sm</span><span class="px">13 px</span><span class="am" style="font-size:13px">Separar em item próprio</span><span class="uso">botão pequeno</span></div>
+<div class="esp"><span class="tk">--fs-md</span><span class="px">14 px</span><span class="am" style="font-size:14px">Sua evolução no inglês</span><span class="uso">apoio</span></div>
+<div class="esp"><span class="tk">--fs-base</span><span class="px">15 px</span><span class="am" style="font-size:15px">O texto corrido da interface</span><span class="uso">corpo</span></div>
+<div class="esp"><span class="tk">--fs-lg</span><span class="px">18 px</span><span class="am" style="font-size:18px">aconchegar alguém na cama</span><span class="uso">significado</span></div>
+<div class="esp"><span class="tk">--fs-xl</span><span class="px">22 px</span><span class="am" style="font-family:var(--display);font-size:22px;font-weight:600">Preparar</span><span class="uso">título de tela</span></div>
+<div class="esp"><span class="tk">--fs-2xl</span><span class="px">30 px</span><span class="am" style="font-family:var(--display);font-size:30px;font-weight:600">to tuck in</span><span class="uso">palavra do card</span></div>
+<div class="esp"><span class="tk">--fs-3xl</span><span class="px">40 px</span><span class="am" style="font-family:var(--display);font-size:40px;font-weight:600">147</span><span class="uso">o número herói</span></div>
+
+<h2>Como fica junto — um item do dossiê</h2>
+<div class="demo">
+  <div class="k">verbo separável · Chapter 20</div>
+  <div class="w">to tuck in</div>
+  <div class="ipa">/tʌk ɪn/</div>
+  <div class="sep"></div>
+  <div class="m">Aconchegar alguém na cama</div>
+  <div class="d">Ajeitar a coberta em volta de quem vai dormir — quase sempre uma criança.
+    É gesto de cuidado, não de arrumação.</div>
+  <div class="ex">
+    <div class="en">She would <b>tuck</b> him <b>in</b> and read one page, never two.</div>
+    <div class="pt">Ela o aconchegava na cama e lia uma página, nunca duas.</div>
+  </div>
+  <div class="chips"><span class="chip">britânico</span><span class="chip">informal</span><span class="chip">B1</span></div>
+</div>
+
+<h2>As regras</h2>
+<ul class="rules">
+  <li><b>Serifada = inglês e resultado. Sem serifa = o app.</b> Uma linha, sem exceção, e ela
+      sozinha já dá identidade à tela inteira.</li>
+  <li><b>Nada em CAIXA ALTA além da sobrancelha</b> de 11&nbsp;px. Rótulo em versal com
+      espaçamento é caro de ler e o app usa em quatro lugares seguidos.</li>
+  <li><b>Peso 700 é raro.</b> Na serifada, 600 já pesa o bastante; 700 fecha os contraformas
+      e suja no tamanho grande.</li>
+  <li><b>Só três tamanhos por tela.</b> Se você precisou de um quarto, o problema é o arranjo,
+      não a fonte.</li>
+</ul>
+
+<div class="callout"><b>Por que isso importa aqui mais que em outro app.</b> Este é um
+aplicativo de <i>leitura</i>. A palavra em inglês não é um dado, é o objeto de estudo — merece
+o tratamento que um livro daria. Quando a serifada aparece só em título decorativo, ela vira
+enfeite; quando ela marca <b>o que se estuda</b>, ela vira mapa.</div>
+
+</body></html>

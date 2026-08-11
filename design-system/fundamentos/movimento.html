@@ -1,0 +1,181 @@
+<!-- @dsCard group="Fundamentos" name="Movimento" subtitle="O eixo que o projeto nunca teve — passe o mouse nas amostras" -->
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Movimento — Tinta</title>
+<style>
+:root{
+  --paper:#F5F2EA;--surface:#fff;--surface2:#F7F3EA;--surface3:#E6DDCB;
+  --ink:#16130E;--ink2:#4A4337;--ink3:#7D7364;
+  --line:rgba(22,19,14,.18);--line-strong:rgba(22,19,14,.34);
+  --primary:#C2410C;--primary-d:#9A340A;--primary-bright:#F2661F;
+  --ia-2:#E8177B;
+  --dur-1:120ms;--dur-2:220ms;--dur-3:420ms;
+  --ease-out:cubic-bezier(.2,.8,.3,1);
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);
+  --r:14px;--r-sm:10px;--r-pill:999px;
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --display:'Newsreader',Georgia,'Times New Roman',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--paper);color:var(--ink);
+  padding:32px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);font-weight:600;margin-bottom:6px}
+h1{font-family:var(--display);font-size:2.1rem;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+h1 em{font-style:normal;color:var(--primary)}
+.lead{color:var(--ink2);font-size:.95rem;max-width:64ch;margin-top:10px}
+h2{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);
+  font-weight:700;margin:36px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.hint{font-size:.8rem;color:var(--ink3);margin-top:10px}
+.hint b{color:var(--primary)}
+
+table{border-collapse:collapse;width:100%;font-size:.83rem}
+th{text-align:left;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700;padding:0 14px 8px 0;border-bottom:1px solid var(--line)}
+td{padding:10px 14px 10px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td.k{font-family:ui-monospace,Menlo,monospace;font-size:.76rem;color:var(--primary);
+  font-weight:600;white-space:nowrap}
+td.v{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+
+/* pista de demonstração das curvas */
+.pista{display:flex;flex-direction:column;gap:12px;margin-top:6px}
+.trilho{position:relative;height:34px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--line);overflow:hidden;cursor:pointer}
+.trilho .rot{position:absolute;left:4px;top:4px;font-size:.68rem;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);z-index:2;
+  padding:3px 8px;pointer-events:none}
+.bola{position:absolute;top:5px;left:4px;width:24px;height:24px;border-radius:50%;
+  background:var(--primary);box-shadow:0 2px 8px rgba(194,65,12,.4)}
+.trilho.correndo .bola{animation:corre 1400ms var(--curva) forwards}
+@keyframes corre{to{left:calc(100% - 28px)}}
+
+.grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:14px;margin-top:4px}
+.demo{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:18px 16px;text-align:center}
+.demo .cap{font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700;margin-bottom:12px}
+.demo .desc{font-size:.76rem;color:var(--ink2);margin-top:12px;line-height:1.45}
+
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border:none;
+  border-radius:var(--r-pill);background:var(--primary);color:#fff;font:inherit;
+  font-size:.86rem;font-weight:600;cursor:pointer;
+  box-shadow:0 2px 8px rgba(194,65,12,.28);
+  transition:transform var(--dur-2) var(--ease-out),
+             box-shadow var(--dur-2) var(--ease-out),
+             background-color var(--dur-1) linear}
+.btn:hover{transform:translateY(-2px);background:var(--primary-d);
+  box-shadow:0 8px 22px rgba(194,65,12,.4)}
+.btn:active{transform:translateY(0) scale(.97);transition-duration:var(--dur-1)}
+
+.card-lift{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:16px;cursor:pointer;
+  transition:transform var(--dur-2) var(--ease-out),
+             box-shadow var(--dur-2) var(--ease-out),
+             border-color var(--dur-2) var(--ease-out)}
+.card-lift:hover{transform:translateY(-3px);border-color:var(--line-strong);
+  box-shadow:0 10px 26px rgba(22,19,14,.13)}
+.card-lift .n{font-family:var(--display);font-size:1.9rem;font-weight:600;line-height:1}
+.card-lift .l{font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700;margin-top:4px}
+
+.tick{width:44px;height:44px;border-radius:50%;background:#2F7D4F;margin:0 auto;
+  display:grid;place-items:center;cursor:pointer}
+.tick svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:3;
+  stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:26;stroke-dashoffset:26}
+.tick.on{animation:pop 420ms var(--ease-spring)}
+.tick.on svg{animation:risca 340ms var(--ease-out) 90ms forwards}
+@keyframes pop{0%{transform:scale(.6)}100%{transform:scale(1)}}
+@keyframes risca{to{stroke-dashoffset:0}}
+
+.callout{margin-top:18px;padding:14px 16px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--primary);
+  font-size:.85rem;color:var(--ink2);max-width:72ch}
+.callout b{color:var(--ink)}
+.rules{margin-top:12px;font-size:.85rem;color:var(--ink2);max-width:72ch}
+.rules li{margin:7px 0 7px 18px}
+.rules b{color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+
+<div class="eyebrow">Fundamentos · 02</div>
+<h1>Movimento — o eixo que <em>não existia</em></h1>
+<p class="lead">O CSS de hoje tem transições, mas soltas: <code>.12s</code>, <code>.3s</code>,
+<code>.35s</code> espalhadas sem escada, e a maior parte dos elementos sem nenhuma. O app tem
+escada de tipografia, de espaço, de camada e de <i>breakpoint</i> — e nenhuma de tempo. É por
+isso que ele parece parado: <b>não é falta de animação, é falta de resposta</b>.</p>
+
+<h2>A escada de tempo</h2>
+<table>
+  <tr><th>Token</th><th>Valor</th><th>Para quê</th></tr>
+  <tr><td class="k">--dur-1</td><td class="v">120&nbsp;ms</td>
+      <td>Resposta imediata: cor, opacidade, o afundar do clique. Abaixo disso o olho não
+          registra; acima, parece atraso.</td></tr>
+  <tr><td class="k">--dur-2</td><td class="v">220&nbsp;ms</td>
+      <td>Deslocamento curto: o card que sobe no <i>hover</i>, o botão que levanta. É o degrau
+          padrão — na dúvida, use este.</td></tr>
+  <tr><td class="k">--dur-3</td><td class="v">420&nbsp;ms</td>
+      <td>Entrada e saída de painel, modal, gaveta. Coisa grande precisa de tempo para o olho
+          acompanhar de onde veio.</td></tr>
+  <tr><td class="k">--dur-live</td><td class="v">9&nbsp;s</td>
+      <td>Respiração contínua das superfícies de IA. Só elas.</td></tr>
+</table>
+
+<h2>As três curvas</h2>
+<div class="pista">
+  <div class="trilho" style="--curva:linear"><span class="rot">linear — proibida</span><span class="bola"></span></div>
+  <div class="trilho" style="--curva:cubic-bezier(.2,.8,.3,1)"><span class="rot">ease-out — o padrão</span><span class="bola"></span></div>
+  <div class="trilho" style="--curva:cubic-bezier(.34,1.56,.64,1)"><span class="rot">spring — só confirmação</span><span class="bola"></span></div>
+</div>
+<p class="hint">Clique em qualquer trilho para rodar. <b>Linear é proibida em interface</b> —
+nada no mundo físico parte e para na mesma velocidade, e o olho lê isso como robótico.</p>
+
+<h2>Onde o movimento entra</h2>
+<div class="grade">
+  <div class="demo">
+    <div class="cap">Ação</div>
+    <button class="btn">Enviar para o Estudo</button>
+    <div class="desc">Levanta 2&nbsp;px no hover, afunda no clique. O afundar é mais rápido que
+      o levantar — peso.</div>
+  </div>
+  <div class="demo">
+    <div class="cap">Card clicável</div>
+    <div class="card-lift"><div class="n">147</div><div class="l">para revisar</div></div>
+    <div class="desc">Sobe 3&nbsp;px e a borda firma. Diz "isto é clicável" sem escrever nada.</div>
+  </div>
+  <div class="demo">
+    <div class="cap">Confirmação</div>
+    <div class="tick" id="tick"><svg viewBox="0 0 24 24"><path d="M4 12.5l5.2 5.2L20 6.5"/></svg></div>
+    <div class="desc">Único lugar onde a curva passa do alvo e volta. Clique para ver.</div>
+  </div>
+</div>
+
+<h2>As regras</h2>
+<ul class="rules">
+  <li><b>Movimento responde, não decora.</b> Toda animação aqui é consequência de um gesto seu.
+      A única exceção é a superfície de IA — e ela é exceção de propósito, para ser reconhecível.</li>
+  <li><b>Nunca anime <code>width</code>, <code>height</code>, <code>top</code> ou
+      <code>left</code></b> em algo que o usuário vê. Só <code>transform</code> e
+      <code>opacity</code>: são as duas que a placa de vídeo faz sozinha, sem travar.</li>
+  <li><b>Sair é mais rápido que entrar.</b> Fechar um painel em 420&nbsp;ms parece que ele
+      não quer sair. Entrada <code>--dur-3</code>, saída <code>--dur-2</code>.</li>
+  <li><b>Uma coisa se move por vez.</b> Se o card sobe, a sombra e a borda acompanham no mesmo
+      tempo e na mesma curva — senão viram três animações brigando.</li>
+</ul>
+
+<div class="callout"><b>Por que isso resolve o "apagado" tanto quanto a cor.</b> Uma interface
+que não reage parece uma imagem. O olho testa a tela do mesmo jeito que a mão testa uma
+maçaneta: mexe um pouco para ver se responde. Hoje o app quase não responde — passar o mouse
+sobre um card do painel não muda nada. Corrigir isso não custa cor nenhuma e é metade da
+sensação de "vivo".</div>
+
+<script>
+document.querySelectorAll('.trilho').forEach(function(t){
+  t.addEventListener('click', function(){
+    t.classList.remove('correndo'); void t.offsetWidth; t.classList.add('correndo');
+  });
+});
+var tick = document.getElementById('tick');
+tick.addEventListener('click', function(){
+  tick.classList.remove('on'); void tick.offsetWidth; tick.classList.add('on');
+});
+</script>
+</body></html>

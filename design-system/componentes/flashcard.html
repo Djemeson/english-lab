@@ -1,0 +1,219 @@
+<!-- @dsCard group="Componentes" name="Flashcard do SRS" subtitle="A tela onde ele passa mais tempo — clique no card para virar" -->
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Flashcard — Tinta</title>
+<style>
+:root{
+  --paper:#F5F2EA;--surface:#fff;--surface2:#F7F3EA;--surface3:#E6DDCB;
+  --ink:#16130E;--ink2:#4A4337;--ink3:#7D7364;
+  --line:rgba(22,19,14,.18);--line-strong:rgba(22,19,14,.34);
+  --primary:#C2410C;--primary-d:#9A340A;--primary-bright:#F2661F;
+  --ok:#2F7D4F;--warn:#A66A00;--err:#B3261E;--ia-2:#E8177B;
+  --dur-1:120ms;--dur-2:220ms;--dur-3:420ms;
+  --ease-out:cubic-bezier(.2,.8,.3,1);--ease-spring:cubic-bezier(.34,1.56,.64,1);
+  --r:14px;--r-sm:10px;--r-pill:999px;
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --display:'Newsreader',Georgia,'Times New Roman',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--paper);color:var(--ink);
+  padding:32px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);font-weight:600;margin-bottom:6px}
+h1{font-family:var(--display);font-size:2.1rem;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+h1 em{font-style:normal;color:var(--primary)}
+.lead{color:var(--ink2);font-size:.95rem;max-width:66ch;margin-top:10px}
+h2{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);
+  font-weight:700;margin:34px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.hint{font-size:.8rem;color:var(--ink3);margin-top:12px}
+.hint b{color:var(--primary)}
+
+/* ── a barra de progresso da sessão: o que hoje não existe ── */
+.sessao{max-width:560px;margin:0 auto}
+.trilha{display:flex;gap:3px;margin-bottom:6px}
+.trilha i{height:4px;flex:1;border-radius:2px;background:var(--surface3);display:block}
+.trilha i.feito{background:var(--ink)}
+.trilha i.agora{background:var(--primary);box-shadow:0 0 0 2px rgba(194,65,12,.18)}
+.contas{display:flex;justify-content:space-between;font-size:.72rem;color:var(--ink3);
+  margin-bottom:16px}
+.contas b{color:var(--ink2);font-variant-numeric:tabular-nums}
+
+/* ── o card ── */
+.palco{perspective:1400px}
+.card{position:relative;min-height:290px;cursor:pointer;
+  transform-style:preserve-3d;
+  transition:transform 520ms cubic-bezier(.35,.9,.3,1)}
+.card.virado{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:0 2px 6px rgba(22,19,14,.06),0 14px 40px rgba(22,19,14,.10);
+  padding:30px 32px;display:flex;flex-direction:column}
+.face.verso{transform:rotateY(180deg)}
+
+.topo{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.fonte{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700}
+.tipo{font-size:.68rem;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);
+  background:var(--surface2);border:1px solid var(--line);color:var(--ink2)}
+
+.miolo{flex:1;display:flex;flex-direction:column;justify-content:center;
+  align-items:center;text-align:center;padding:14px 0}
+.palavra{font-family:var(--display);font-size:2.9rem;font-weight:600;
+  letter-spacing:-.03em;line-height:1.02}
+.ipa{font-family:ui-monospace,Menlo,monospace;font-size:.84rem;color:var(--ink3);margin-top:7px}
+.frase{margin-top:20px;font-family:var(--display);font-size:1.08rem;color:var(--ink2);
+  max-width:42ch;line-height:1.55;font-style:italic}
+.frase b{color:var(--ink);font-style:normal;font-weight:600;
+  box-shadow:inset 0 -.42em 0 rgba(242,102,31,.24)}
+
+.rodape{display:flex;justify-content:center;align-items:center;gap:7px;
+  font-size:.74rem;color:var(--ink3);padding-top:12px;border-top:1px solid var(--line)}
+.tecla{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;
+  border-radius:5px;background:var(--surface2);border:1px solid var(--line-strong);
+  font-size:.66rem;font-weight:700;color:var(--ink2);
+  box-shadow:0 1px 0 var(--line-strong)}
+
+/* verso */
+.verso .miolo{justify-content:flex-start;text-align:left;align-items:stretch;padding-top:4px}
+.verso .sig{font-size:1.3rem;font-weight:600;letter-spacing:-.01em}
+.verso .def{font-size:.87rem;color:var(--ink2);margin-top:6px;line-height:1.55}
+.verso .ex{margin-top:16px;padding:13px 15px;background:var(--surface2);
+  border-radius:var(--r-sm);border-left:2px solid var(--primary)}
+.verso .ex .en{font-family:var(--display);font-size:.98rem;line-height:1.5}
+.verso .ex .en b{color:var(--primary);font-weight:600;font-style:normal}
+.verso .ex .pt{font-size:.8rem;color:var(--ink3);margin-top:5px}
+.verso .chips{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap}
+.verso .chips span{font-size:.68rem;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);
+  background:var(--surface2);border:1px solid var(--line);color:var(--ink2)}
+
+/* ── as quatro notas ── */
+.notas{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:16px}
+.nota{padding:12px 8px 10px;border-radius:var(--r-sm);border:1px solid var(--line);
+  background:var(--surface);cursor:pointer;font:inherit;text-align:center;
+  transition:transform var(--dur-2) var(--ease-out),
+             box-shadow var(--dur-2) var(--ease-out),
+             border-color var(--dur-1) linear,background var(--dur-1) linear}
+.nota .n{font-size:.84rem;font-weight:700;letter-spacing:-.01em}
+.nota .t{font-family:var(--display);font-size:.86rem;color:var(--ink3);margin-top:2px;
+  font-variant-numeric:tabular-nums}
+.nota:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(22,19,14,.14)}
+.nota:active{transform:translateY(-1px) scale(.98);transition-duration:var(--dur-1)}
+.nota.errei:hover{border-color:var(--err);background:rgba(179,38,30,.05)}
+.nota.errei:hover .n{color:var(--err)}
+.nota.dificil:hover{border-color:var(--warn);background:rgba(166,106,0,.05)}
+.nota.dificil:hover .n{color:var(--warn)}
+.nota.bom{border-color:var(--line-strong)}
+.nota.bom:hover{border-color:var(--ok);background:rgba(47,125,79,.06)}
+.nota.bom:hover .n{color:var(--ok)}
+.nota.facil:hover{border-color:var(--ink);background:var(--surface2)}
+.nota .k{display:block;font-size:.6rem;color:var(--ink3);margin-top:5px;
+  letter-spacing:.06em;font-weight:600}
+
+table{border-collapse:collapse;width:100%;font-size:.84rem;margin-top:6px}
+th{text-align:left;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700;padding:0 14px 8px 0;border-bottom:1px solid var(--line)}
+td{padding:11px 14px 11px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink2)}
+td:first-child{color:var(--ink);font-weight:600;white-space:nowrap}
+.callout{margin-top:18px;padding:14px 16px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--primary);
+  font-size:.85rem;color:var(--ink2);max-width:72ch}
+.callout b{color:var(--ink)}
+@media (prefers-reduced-motion:reduce){.card{transition-duration:.01ms}}
+</style></head><body>
+
+<div class="eyebrow">Componentes · 02</div>
+<h1>O flashcard — a tela onde ele <em>mora</em></h1>
+<p class="lead">Revisar é onde o tempo é gasto de verdade: centenas de cartões por semana, um
+gesto repetido até virar reflexo. É a tela que mais merece caráter — e a que hoje tem menos.
+Aqui a palavra vira o objeto: serifada, grande, sozinha no meio do papel, com a frase original
+embaixo e um grifo de tinta na palavra-alvo.</p>
+
+<div class="sessao">
+  <div class="trilha">
+    <i class="feito"></i><i class="feito"></i><i class="feito"></i><i class="feito"></i>
+    <i class="feito"></i><i class="feito"></i><i class="agora"></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+  </div>
+  <div class="contas">
+    <span><b>7</b> de <b>18</b> nesta rodada</span>
+    <span>novos <b>4</b> · revisão <b>11</b> · aprendendo <b>3</b></span>
+  </div>
+
+  <div class="palco">
+    <div class="card" id="card">
+      <!-- frente -->
+      <div class="face">
+        <div class="topo">
+          <span class="fonte">The Hobbit · Chapter 20</span>
+          <span class="tipo">verbo separável</span>
+        </div>
+        <div class="miolo">
+          <div class="palavra">tuck in</div>
+          <div class="ipa">/tʌk ɪn/</div>
+          <div class="frase">She would <b>tuck</b> him <b>in</b> and read one page, never two.</div>
+        </div>
+        <div class="rodape">Clique ou <span class="tecla">espaço</span> para ver a resposta</div>
+      </div>
+      <!-- verso -->
+      <div class="face verso">
+        <div class="topo">
+          <span class="fonte">The Hobbit · Chapter 20</span>
+          <span class="tipo">verbo separável</span>
+        </div>
+        <div class="miolo">
+          <div class="sig">Aconchegar alguém na cama</div>
+          <div class="def">Ajeitar a coberta em volta de quem vai dormir — quase sempre uma
+            criança. É gesto de cuidado, não de arrumação.</div>
+          <div class="ex">
+            <div class="en">She would <b>tuck</b> him <b>in</b> and read one page, never two.</div>
+            <div class="pt">Ela o aconchegava na cama e lia uma página, nunca duas.</div>
+          </div>
+          <div class="chips"><span>britânico</span><span>informal</span><span>B1</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notas">
+    <button class="nota errei"><div class="n">Errei</div><div class="t">10 min</div><span class="k">1</span></button>
+    <button class="nota dificil"><div class="n">Difícil</div><div class="t">2 d</div><span class="k">2</span></button>
+    <button class="nota bom"><div class="n">Bom</div><div class="t">6 d</div><span class="k">3</span></button>
+    <button class="nota facil"><div class="n">Fácil</div><div class="t">14 d</div><span class="k">4</span></button>
+  </div>
+  <p class="hint" style="text-align:center"><b>Clique no card para virar.</b> Passe o mouse nas quatro notas.</p>
+</div>
+
+<h2>O que mudou</h2>
+<table>
+  <tr><th>Decisão</th><th>Motivo</th></tr>
+  <tr><td>A trilha da sessão</td>
+      <td>Hoje não existe. Dezoito tracinhos no topo dizem "falta pouco" sem ocupar linha de
+          texto — e é o que segura a pessoa até o fim da rodada.</td></tr>
+  <tr><td>Virar de verdade</td>
+      <td>O card gira em 3D em 520&nbsp;ms. Hoje a resposta simplesmente aparece. Girar diz que
+          é <i>o mesmo</i> cartão pelo outro lado — o gesto de um baralho físico.</td></tr>
+  <tr><td>Grifo de tinta na frase</td>
+      <td>A palavra-alvo ganha um traço laranja translúcido por baixo, como marca-texto. Hoje ela
+          fica em negrito comum e some no meio da frase.</td></tr>
+  <tr><td>O intervalo vem antes</td>
+      <td>"Bom · 6 d" já no botão, na serifada. Ver o custo da escolha antes de escolher é o que
+          faz a nota ser honesta.</td></tr>
+  <tr><td>Cor só no hover</td>
+      <td>Quatro botões coloridos o tempo todo cansam em vinte cartões. Em repouso são neutros;
+          a cor aparece quando o cursor decide.</td></tr>
+  <tr><td>A tecla à mostra</td>
+      <td>1&nbsp;2&nbsp;3&nbsp;4 embaixo de cada nota. Quem revisa 150 cartões larga o mouse no
+          terceiro dia — mas só se souber que dá.</td></tr>
+</table>
+
+<div class="callout"><b>O que deliberadamente NÃO tem aqui.</b> Nenhuma cor de IA, nenhum
+gradiente animado, nenhum brilho. Esta é a tela de concentração — o movimento dela responde
+ao gesto e para. <b>Superfície viva é para onde a IA age; aqui quem age é você.</b></div>
+
+<script>
+var card = document.getElementById('card');
+card.addEventListener('click', function(){ card.classList.toggle('virado'); });
+document.addEventListener('keydown', function(e){
+  if (e.code === 'Space'){ e.preventDefault(); card.classList.toggle('virado'); }
+});
+</script>
+</body></html>

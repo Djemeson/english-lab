@@ -2649,11 +2649,23 @@ body.sb-collapsed #fb-user-photo{margin:0}
     border-radius: var(--radius) var(--radius) 0 0;
     padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px));
     z-index: calc(var(--z-nav) + 2);
-    transform: translateY(110%);
+    /* ⚠️ 100% NÃO BASTA, E 110% TAMBÉM NÃO. A gaveta está ancorada em
+       `bottom: 68px` (a altura da barra), então descer só a própria altura
+       ainda deixa 68px dela dentro da tela — uma faixa branca por cima da
+       barra, que foi o que ele viu no celular. Tem de descer a altura INTEIRA
+       MAIS o deslocamento da âncora. Meu teste não pegou porque eu medi a
+       gaveta ABERTA; a fechada nunca foi olhada. */
+    transform: translateY(calc(100% + 68px));
     transition: transform .22s cubic-bezier(.32,.72,0,1);
     box-shadow: var(--shadow-up);
+    visibility: hidden;                 /* não intercepta toque quando fechada */
+    transition: transform .22s cubic-bezier(.32,.72,0,1), visibility 0s linear .22s;
   }
-  .nav-mais.aberta { transform: translateY(0); }
+  .nav-mais.aberta {
+    transform: translateY(0);
+    visibility: visible;
+    transition: transform .22s cubic-bezier(.32,.72,0,1), visibility 0s;
+  }
 
   /* Alça: diz "isto sobe de baixo e dá para fechar" sem precisar de texto. */
   .nav-mais-alca {

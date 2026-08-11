@@ -9326,6 +9326,18 @@ tela e parecia que a regra `.aberta` não aplicava. Forçando `getAnimations().f
 estado final é exato: a base da gaveta bate **744 = 744** com o topo da barra. **Medição de
 transição em aba oculta não vale.**
 
+⚠️ **E o bug de verdade, que o celular dele mostrou e o meu teste não:** a gaveta fechada
+aparecia como uma faixa branca por cima da barra. Causa: ela está ancorada em `bottom: 68px`,
+então `translateY(110%)` desce só 1,1× a própria altura — **faltavam os 68px da âncora**, e era
+exatamente essa faixa que sobrava (110% de 199px = 219px, quando o necessário eram 267px).
+Corrigido para `translateY(calc(100% + 68px))`, mais `visibility: hidden` para ela não
+interceptar toque enquanto fechada.
+
+**A lição é sobre o teste, não sobre o CSS:** eu medi a gaveta **aberta** e dei por conferido.
+O estado fechado — que é o que ele vê 99% do tempo — nunca foi olhado. **Componente que abre e
+fecha tem DOIS estados, e o padrão é o fechado.** Agora medido nos dois, em 375px e 360px:
+fechada com topo em 812 (= fundo da tela, zero pixel invadindo), aberta encostando em 744.
+
 ### O podcast: o arquivo e, principalmente, a legenda
 
 O uso dele é *"um por vez: baixa, estuda, apaga"*, e a dor é começar num aparelho e não poder

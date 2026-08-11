@@ -1,0 +1,202 @@
+<!-- @dsCard group="Componentes" name="Botões e chips" subtitle="Hoje vs. Tinta — passe o mouse nas duas colunas para sentir a diferença" -->
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Botões e chips — Tinta</title>
+<style>
+:root{
+  --paper:#F5F2EA;--surface:#fff;--surface2:#F7F3EA;--surface3:#E6DDCB;
+  --ink:#16130E;--ink2:#4A4337;--ink3:#7D7364;
+  --line:rgba(22,19,14,.18);--line-strong:rgba(22,19,14,.34);
+  --primary:#C2410C;--primary-d:#9A340A;--primary-bright:#F2661F;
+  --ok:#2F7D4F;--warn:#A66A00;--err:#B3261E;
+  --ia-1:#FF6B1A;--ia-2:#E8177B;--ia-3:#6D28D9;--ia-4:#0D9488;
+  --dur-1:120ms;--dur-2:220ms;
+  --ease-out:cubic-bezier(.2,.8,.3,1);--ease-spring:cubic-bezier(.34,1.56,.64,1);
+  --r:14px;--r-sm:10px;--r-pill:999px;
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --display:'Newsreader',Georgia,'Times New Roman',serif;
+  /* tema Papel de hoje, para a coluna da esquerda ser honesta */
+  --h-surface:#fff;--h-surface2:#F0EDE4;--h-surface3:#E6E1D4;
+  --h-border:rgba(40,35,25,.10);--h-border-s:rgba(40,35,25,.18);
+  --h-text:#241F17;--h-text2:#5C5445;--h-text3:#766D5B;
+  --h-primary:#2E4BC6;--h-purple:#7C5CBF;--h-warn:#B8860B;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--paper);color:var(--ink);
+  padding:32px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);font-weight:600;margin-bottom:6px}
+h1{font-family:var(--display);font-size:2.1rem;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+h1 em{font-style:normal;color:var(--primary)}
+.lead{color:var(--ink2);font-size:.95rem;max-width:66ch;margin-top:10px}
+h2{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);
+  font-weight:700;margin:34px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+
+.split{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:860px){.split{grid-template-columns:1fr}}
+.col{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+.col.hoje{background:#F6F4EF}
+.col > .tag{display:inline-block;font-size:.66rem;letter-spacing:.11em;text-transform:uppercase;
+  font-weight:700;margin-bottom:14px;padding:4px 11px;border-radius:var(--r-pill)}
+.tag.a{background:var(--surface3);color:var(--ink2)}
+.tag.b{background:var(--primary);color:#fff}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.row + .row{margin-top:12px}
+.cap{font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);
+  font-weight:700;margin:16px 0 8px}
+.col.hoje .cap{color:var(--h-text3)}
+
+/* ══ COMO ESTÁ HOJE ══ */
+.hb{display:inline-flex;align-items:center;gap:7px;padding:9px 17px;border-radius:11px;
+  font:inherit;font-size:.84rem;font-weight:600;cursor:pointer;border:none;
+  min-height:36px;transition:transform .15s ease,box-shadow .2s ease}
+.hb-primary{background:linear-gradient(135deg,#2E4BC6,#5B76E0);color:#fff;
+  box-shadow:0 4px 14px rgba(46,75,198,.35)}
+.hb-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(46,75,198,.5)}
+.hb-secondary{background:var(--h-surface2);color:var(--h-text);border:1px solid var(--h-border-s)}
+.hb-secondary:hover{background:var(--h-surface3);transform:translateY(-1px)}
+.hb-ghost{background:transparent;color:var(--h-text2);border:1px solid var(--h-border)}
+.hb-ghost:hover{background:var(--h-surface2);color:var(--h-text);transform:translateY(-1px)}
+.hb-srs{background:color-mix(in srgb,var(--h-purple) 15%,transparent);color:var(--h-purple);
+  border:1px solid color-mix(in srgb,var(--h-purple) 35%,transparent)}
+.hc{display:inline-block;font-size:.7rem;font-weight:600;padding:3px 9px;border-radius:8px}
+.hc.inf{background:color-mix(in srgb,var(--h-warn) 15%,transparent);color:var(--h-warn)}
+.hc.lvl{background:rgba(46,75,198,.15);color:var(--h-primary)}
+.hc.lang{background:rgba(46,75,198,.14);color:var(--h-primary)}
+
+/* ══ A PROPOSTA ══ */
+.b{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:var(--r-pill);
+  font:inherit;font-size:.85rem;font-weight:600;cursor:pointer;border:1px solid transparent;
+  min-height:38px;letter-spacing:-.005em;position:relative;
+  transition:transform var(--dur-2) var(--ease-out),
+             box-shadow var(--dur-2) var(--ease-out),
+             background-color var(--dur-1) linear,
+             border-color var(--dur-1) linear}
+.b:active{transform:translateY(0) scale(.975);transition-duration:var(--dur-1)}
+.b svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2.1;
+  stroke-linecap:round;stroke-linejoin:round;
+  transition:transform var(--dur-2) var(--ease-out)}
+.b-primary{background:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(194,65,12,.3)}
+.b-primary:hover{background:var(--primary-d);transform:translateY(-2px);
+  box-shadow:0 9px 24px rgba(194,65,12,.42)}
+.b-primary:hover svg{transform:translateX(3px)}
+.b-ink{background:var(--ink);color:#fff;box-shadow:0 2px 8px rgba(22,19,14,.24)}
+.b-ink:hover{transform:translateY(-2px);box-shadow:0 9px 24px rgba(22,19,14,.3)}
+.b-sec{background:var(--surface);color:var(--ink);border-color:var(--line-strong)}
+.b-sec:hover{background:var(--surface2);border-color:var(--ink3);transform:translateY(-2px);
+  box-shadow:0 6px 18px rgba(22,19,14,.1)}
+.b-ghost{background:transparent;color:var(--ink2);border-color:transparent}
+.b-ghost:hover{background:var(--surface2);color:var(--ink);border-color:var(--line)}
+.b-ok{background:var(--ok);color:#fff;box-shadow:0 2px 8px rgba(47,125,79,.3)}
+.b-ok:hover{transform:translateY(-2px);box-shadow:0 9px 24px rgba(47,125,79,.4)}
+.b-danger{background:transparent;color:var(--err);border-color:rgba(179,38,30,.4)}
+.b-danger:hover{background:var(--err);color:#fff;border-color:var(--err)}
+.b:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
+
+/* chip: agora carrega significado, não só cor */
+.c{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:600;
+  padding:4px 11px;border-radius:var(--r-pill);background:var(--surface2);
+  color:var(--ink2);border:1px solid var(--line);
+  transition:border-color var(--dur-1) linear,background var(--dur-1) linear}
+.c::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;
+  opacity:.75;flex-shrink:0}
+.c:hover{border-color:var(--line-strong);background:var(--surface3)}
+.c.br{color:#7A4B00}.c.us{color:#1F5C7A}
+.c.inf{color:var(--warn)}.c.form{color:#5B3FA8}.c.gir{color:var(--err)}
+.c.a{color:var(--ok)}.c.b{color:#1F5C7A}.c.cc{color:#5B3FA8}
+.c.novo{background:var(--ink);color:#fff;border-color:var(--ink)}
+.c.novo::before{background:var(--primary-bright);opacity:1}
+.c.alerta{color:var(--primary);border-color:rgba(194,65,12,.4);background:rgba(194,65,12,.06)}
+
+.nota{margin-top:12px;font-size:.8rem;color:var(--ink3)}
+table{border-collapse:collapse;width:100%;font-size:.84rem;margin-top:6px}
+th{text-align:left;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700;padding:0 14px 8px 0;border-bottom:1px solid var(--line)}
+td{padding:11px 14px 11px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink2)}
+td:first-child{color:var(--ink);font-weight:600;white-space:nowrap}
+.callout{margin-top:18px;padding:14px 16px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--primary);
+  font-size:.85rem;color:var(--ink2);max-width:72ch}
+.callout b{color:var(--ink)}
+</style></head><body>
+
+<div class="eyebrow">Componentes · 01</div>
+<h1>Botões e chips — <em>peso, não gradiente</em></h1>
+<p class="lead">O botão de hoje tem gradiente e sombra colorida — o vocabulário visual de 2018.
+O da proposta é chapado, com peso de tinta: sobe 2&nbsp;px no <i>hover</i>, afunda no clique, e a
+seta anda junto. <b>A sensação de qualidade vem da resposta ao gesto, não do degradê.</b></p>
+
+<div class="split">
+  <div class="col hoje">
+    <span class="tag a">Hoje</span>
+    <div class="cap">ações</div>
+    <div class="row">
+      <button class="hb hb-primary">Enviar para o Estudo</button>
+      <button class="hb hb-secondary">Pular para a Revisão</button>
+      <button class="hb hb-ghost">Cancelar</button>
+    </div>
+    <div class="row"><button class="hb hb-srs">Adicionar ao SRS</button></div>
+    <div class="cap">chips</div>
+    <div class="row">
+      <span class="hc lang">EN</span><span class="hc inf">informal</span>
+      <span class="hc lvl">B1</span><span class="hc lvl">britânico</span>
+    </div>
+    <p class="nota" style="color:var(--h-text3)">Quatro chips, três cores, nenhuma regra
+      dizendo o que cada cor significa — "britânico" e "B1" usam o mesmo azul.</p>
+  </div>
+
+  <div class="col">
+    <span class="tag b">Tinta</span>
+    <div class="cap">ações</div>
+    <div class="row">
+      <button class="b b-primary">Enviar para o Estudo
+        <svg viewBox="0 0 24 24"><path d="M5 12h13M12 5l7 7-7 7"/></svg></button>
+      <button class="b b-sec">Pular para a Revisão</button>
+      <button class="b b-ghost">Cancelar</button>
+    </div>
+    <div class="row">
+      <button class="b b-ink">Marcar como estudei</button>
+      <button class="b b-ok">Bom</button>
+      <button class="b b-danger">Excluir item</button>
+    </div>
+    <div class="cap">chips — cor com significado fixo</div>
+    <div class="row">
+      <span class="c br">britânico</span><span class="c us">americano</span>
+      <span class="c inf">informal</span><span class="c form">formal</span>
+      <span class="c gir">gíria</span>
+    </div>
+    <div class="row">
+      <span class="c a">A2</span><span class="c b">B1</span><span class="c cc">C1</span>
+      <span class="c novo">novo</span><span class="c alerta">travando</span>
+    </div>
+    <p class="nota"><b>Uma família por eixo:</b> variedade tem seu tom, registro tem o dele,
+      nível tem o dele. O ponto colorido à esquerda carrega a cor, o texto fica em tinta — assim
+      o chip nunca reprova contraste.</p>
+  </div>
+</div>
+
+<h2>O que mudou e por quê</h2>
+<table>
+  <tr><th>Decisão</th><th>Motivo</th></tr>
+  <tr><td>Gradiente fora</td>
+      <td>O degradê 135° com sombra da mesma cor é o carimbo de template. Cor chapada com sombra
+          neutra parece impresso — combina com a base de papel.</td></tr>
+  <tr><td>Cápsula, não retângulo</td>
+      <td>Raio total nos botões e chips, raio médio (14&nbsp;px) só nos contêineres. Duas formas
+          claras em vez de seis raios parecidos brigando.</td></tr>
+  <tr><td>A seta anda</td>
+      <td>3&nbsp;px para a direita no <i>hover</i>. Custa uma linha e diz "isto leva a algum
+          lugar" melhor do que qualquer rótulo.</td></tr>
+  <tr><td>"Excluir" é contorno</td>
+      <td>Ação destrutiva não merece o peso visual de uma ação principal — ela só fica cheia
+          quando o cursor está em cima e você já decidiu.</td></tr>
+  <tr><td>Chip com ponto</td>
+      <td>Hoje o chip é texto colorido sobre fundo da mesma cor a 15% — o pior caso de contraste
+          do app. O ponto carrega a cor, o texto fica legível.</td></tr>
+</table>
+
+<div class="callout"><b>O botão roxo de SRS some.</b> Hoje existe um <code>.btn-srs</code> roxo
+que não pertence a nenhuma família — nem primário, nem secundário, nem perigo. Roxo ali não
+significa nada, só sobrou. Na proposta ele vira secundário comum: <b>uma cor a menos é uma
+decisão a menos para o olho.</b></div>
+
+</body></html>

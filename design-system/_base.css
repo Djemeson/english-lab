@@ -1,0 +1,75 @@
+/* ============================================================
+   TINTA — tokens da proposta visual do English Lab
+   Base: tema "Papel" (o que o Djemeson usa), com identidade.
+   Todo valor aqui foi medido antes de entrar: ver contraste
+   anotado ao lado. Nada entrou "no olho".
+   ============================================================ */
+:root{
+  /* --- superfície: papel --- */
+  --paper:      #F5F2EA;
+  --surface:    #FFFFFF;
+  --surface2:   #F7F3EA;
+  --surface3:   #E6DDCB;   /* 1.35 vs surface — antes era 1.13 */
+
+  /* --- tinta: a cor estrutural --- */
+  --ink:        #16130E;   /* 18.52 sobre surface */
+  --ink2:       #4A4337;   /*  9.77 — secundário de verdade */
+  --ink3:       #7D7364;   /*  4.66 — terciário; 2.10 contra o secundário
+                                (antes os dois níveis tinham 1.27 entre si,
+                                 ou seja: eram o mesmo nível) */
+
+  --line:        rgba(22,19,14,.18);  /* 1.47 vs surface — antes 1.23 */
+  --line-strong: rgba(22,19,14,.34);  /* 2.19 */
+
+  /* --- acento: laranja queimado --- */
+  --primary:        #C2410C;  /* 5.18 nos dois sentidos: passa AA como texto
+                                 E como fundo de botão com texto branco */
+  --primary-d:      #9A340A;
+  --primary-bright: #F2661F;  /* decorativo: brilho, halo, hover */
+  --primary-rgb:    194,65,12;
+
+  /* --- semânticas --- */
+  --ok:    #2F7D4F;
+  --warn:  #A66A00;
+  --err:   #B3261E;
+
+  /* --- as cores da IA: paleta PRÓPRIA, que não é a do app ---
+     A IA não usa o acento da interface. Ela tem cor própria, e é por isso
+     que dá para reconhecer o que é IA sem ler o rótulo. */
+  --ia-1: #FF6B1A;  /* laranja  */
+  --ia-2: #E8177B;  /* magenta  */
+  --ia-3: #6D28D9;  /* violeta  */
+  --ia-4: #0D9488;  /* turquesa */
+
+  /* --- MOVIMENTO: o eixo que o projeto não tinha ---
+     O CSS atual tem transições soltas (.12s, .35s, .3s) sem escada.
+     Estes quatro degraus cobrem tudo. */
+  --dur-1: 120ms;   /* resposta imediata: cor, opacidade */
+  --dur-2: 220ms;   /* deslocamento curto: hover, lift */
+  --dur-3: 420ms;   /* entrada/saída de painel */
+  --dur-live: 9s;   /* respiração contínua das superfícies vivas */
+
+  --ease-out:    cubic-bezier(.2,.8,.3,1);     /* padrão: sai rápido, chega macio */
+  --ease-spring: cubic-bezier(.34,1.56,.64,1); /* confirmação: passa e volta */
+  --ease-live:   cubic-bezier(.4,0,.6,1);      /* vai e volta sem começo nem fim */
+
+  /* --- forma --- */
+  --r:      14px;
+  --r-sm:   10px;
+  --r-pill: 999px;
+
+  --shadow-1: 0 1px 2px rgba(22,19,14,.06), 0 2px 8px rgba(22,19,14,.05);
+  --shadow-2: 0 2px 4px rgba(22,19,14,.07), 0 10px 28px rgba(22,19,14,.09);
+  --shadow-ink: 0 8px 28px rgba(194,65,12,.28);
+
+  --font:    'Inter', system-ui, -apple-system, sans-serif;
+  --display: 'Newsreader', Georgia, 'Times New Roman', serif;
+}
+
+/* Quem pede menos movimento, recebe menos movimento. Não é opcional. */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:.01ms !important; animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+  }
+}

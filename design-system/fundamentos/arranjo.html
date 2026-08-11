@@ -1,0 +1,205 @@
+<!-- @dsCard group="Fundamentos" name="Arranjo da informação" subtitle="O Painel de hoje ao lado da proposta — mesma informação, outra hierarquia" -->
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Arranjo — Tinta</title>
+<style>
+:root{
+  --paper:#F5F2EA;--surface:#fff;--surface2:#F7F3EA;--surface3:#E6DDCB;
+  --ink:#16130E;--ink2:#4A4337;--ink3:#7D7364;
+  --line:rgba(22,19,14,.18);--line-strong:rgba(22,19,14,.34);
+  --primary:#C2410C;--primary-d:#9A340A;--primary-bright:#F2661F;
+  --ia-2:#E8177B;
+  --dur-2:220ms;--ease-out:cubic-bezier(.2,.8,.3,1);
+  --r:14px;--r-sm:10px;--r-pill:999px;
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --display:'Newsreader',Georgia,'Times New Roman',serif;
+
+  /* tokens do tema PAPEL como está hoje, para a coluna da esquerda ser honesta */
+  --hoje-bg:#F6F4EF;--hoje-surface:#fff;--hoje-border:rgba(40,35,25,.10);
+  --hoje-text:#241F17;--hoje-text2:#5C5445;--hoje-text3:#766D5B;
+  --hoje-primary:#2E4BC6;--hoje-glow:rgba(46,75,198,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--paper);color:var(--ink);
+  padding:32px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);font-weight:600;margin-bottom:6px}
+h1{font-family:var(--display);font-size:2.1rem;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+h1 em{font-style:normal;color:var(--primary)}
+.lead{color:var(--ink2);font-size:.95rem;max-width:66ch;margin-top:10px}
+
+.split{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:30px;align-items:start}
+@media (max-width:900px){.split{grid-template-columns:1fr}}
+.pane{min-width:0}
+.pane > .tag{display:inline-flex;align-items:center;gap:7px;font-size:.68rem;
+  letter-spacing:.11em;text-transform:uppercase;font-weight:700;margin-bottom:11px;
+  padding:4px 11px;border-radius:var(--r-pill)}
+.tag.a{background:var(--surface3);color:var(--ink2)}
+.tag.b{background:var(--primary);color:#fff}
+.frame{border-radius:var(--r);overflow:hidden;border:1px solid var(--line);
+  box-shadow:0 2px 10px rgba(22,19,14,.07)}
+
+/* ══════ COLUNA A — como está hoje (tema Papel, fiel) ══════ */
+.hoje{background:var(--hoje-bg);padding:18px;font-size:14px;color:var(--hoje-text)}
+.hoje .ph h2{font-size:1.4rem;font-weight:700;letter-spacing:-.3px;color:var(--hoje-text)}
+.hoje .ph p{color:var(--hoje-text2);font-size:.88rem;margin-top:2px}
+.hoje .action{background:var(--hoje-glow);border:1px solid rgba(46,75,198,.35);
+  border-radius:14px;padding:16px 18px;display:flex;align-items:center;
+  justify-content:space-between;margin:18px 0 12px}
+.hoje .action .num{font-size:2.1rem;font-weight:700;color:var(--hoje-primary);line-height:1}
+.hoje .action .sub{font-size:.82rem;color:var(--hoje-text2);margin-top:3px}
+.hoje .btn{background:linear-gradient(135deg,#2E4BC6,#5B76E0);color:#fff;border:none;
+  padding:9px 17px;border-radius:11px;font:inherit;font-size:.8rem;font-weight:600}
+.hoje .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.hoje .mc{background:var(--hoje-surface);border:1px solid var(--hoje-border);
+  border-radius:11px;padding:11px 12px;display:flex;gap:9px;align-items:center}
+.hoje .mc .ico{width:28px;height:28px;border-radius:9px;flex-shrink:0;
+  background:rgba(46,75,198,.10);display:grid;place-items:center}
+.hoje .mc .ico i{width:12px;height:12px;border-radius:3px;background:var(--hoje-primary);
+  display:block;opacity:.75}
+.hoje .mc .val{font-size:1.15rem;font-weight:700;line-height:1.1}
+.hoje .mc .lbl{font-size:.6rem;color:var(--hoje-text3);text-transform:uppercase;
+  letter-spacing:.05em;font-weight:600;margin-top:1px}
+
+/* ══════ COLUNA B — a proposta ══════ */
+.nova{background:var(--paper);padding:18px;font-size:14px}
+.nova .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.nova .ph h2{font-family:var(--display);font-size:1.55rem;font-weight:600;
+  letter-spacing:-.02em;line-height:1.1}
+.nova .ph .date{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700;padding-top:6px;white-space:nowrap}
+
+.hero{margin:20px 0 0;padding:22px 22px 20px;border-radius:var(--r);
+  background:var(--ink);color:#fff;position:relative;overflow:hidden}
+.hero::after{content:'';position:absolute;right:-60px;top:-70px;width:230px;height:230px;
+  border-radius:50%;background:radial-gradient(circle,var(--primary-bright),transparent 68%);
+  opacity:.34;pointer-events:none}
+.hero .k{font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(255,255,255,.62);font-weight:700}
+.hero .big{font-family:var(--display);font-size:3.6rem;font-weight:600;line-height:.92;
+  margin-top:6px;letter-spacing:-.03em}
+.hero .big small{font-size:1rem;font-family:var(--font);font-weight:500;
+  color:rgba(255,255,255,.72);margin-left:9px;letter-spacing:0}
+.hero .go{margin-top:16px;display:inline-flex;align-items:center;gap:8px;
+  background:var(--primary);color:#fff;border:none;padding:11px 22px;
+  border-radius:var(--r-pill);font:inherit;font-size:.86rem;font-weight:600;cursor:pointer;
+  box-shadow:0 4px 16px rgba(194,65,12,.45);
+  transition:transform var(--dur-2) var(--ease-out),box-shadow var(--dur-2) var(--ease-out)}
+.hero .go:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(194,65,12,.6)}
+.hero .streak{position:absolute;right:20px;bottom:18px;font-size:.72rem;
+  color:rgba(255,255,255,.72);display:flex;align-items:center;gap:6px}
+.hero .streak b{font-family:var(--display);font-size:1.3rem;color:#fff;font-weight:600}
+
+.linha{display:flex;align-items:stretch;margin-top:14px;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.linha .cel{flex:1;padding:13px 15px;border-right:1px solid var(--line);min-width:0;
+  transition:background var(--dur-2) var(--ease-out)}
+.linha .cel:last-child{border-right:none}
+.linha .cel:hover{background:var(--surface2)}
+.linha .cel .v{font-family:var(--display);font-size:1.5rem;font-weight:600;line-height:1;
+  letter-spacing:-.02em}
+.linha .cel .l{font-size:.72rem;color:var(--ink3);margin-top:3px}
+.linha .cel.alerta .v{color:var(--primary)}
+
+.frase{margin-top:14px;padding:15px 17px;background:var(--surface);border:1px solid var(--line);
+  border-left:3px solid var(--ia-2);border-radius:var(--r-sm)}
+.frase .k{font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700}
+.frase .w{font-family:var(--display);font-size:1.25rem;font-weight:600;margin-top:4px}
+.frase .m{font-size:.8rem;color:var(--ink2);margin-top:2px}
+
+/* ══════ o argumento ══════ */
+h3{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);
+  font-weight:700;margin:38px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+th{text-align:left;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink3);font-weight:700;padding:0 14px 8px 0;border-bottom:1px solid var(--line)}
+td{padding:11px 14px 11px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink2)}
+td:first-child{color:var(--ink);font-weight:600;white-space:nowrap}
+.callout{margin-top:18px;padding:14px 16px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--primary);
+  font-size:.85rem;color:var(--ink2);max-width:72ch}
+.callout b{color:var(--ink)}
+</style></head><body>
+
+<div class="eyebrow">Fundamentos · 03</div>
+<h1>Arranjo — quatro números gritando <em>viram silêncio</em></h1>
+<p class="lead">A mesma informação, os mesmos dados, o mesmo espaço. O que muda é <b>quem manda
+na tela</b>. Hoje o Painel abre com quatro cartões do mesmo tamanho, com a mesma borda, o mesmo
+ícone e o mesmo peso — e quando tudo tem a mesma importância, nada tem.</p>
+
+<div class="split">
+  <!-- ─────────── HOJE ─────────── -->
+  <div class="pane">
+    <span class="tag a">Hoje</span>
+    <div class="frame"><div class="hoje">
+      <div class="ph"><h2>Painel</h2><p>Sua evolução no inglês</p></div>
+      <div class="action">
+        <div><div class="num">147</div><div class="sub">cartões para revisar hoje</div></div>
+        <button class="btn">Estudar agora</button>
+      </div>
+      <div class="grid4">
+        <div class="mc"><span class="ico"><i></i></span><div><div class="val">1.284</div><div class="lbl">Palavras</div></div></div>
+        <div class="mc"><span class="ico"><i></i></span><div><div class="val">89%</div><div class="lbl">Acerto</div></div></div>
+        <div class="mc"><span class="ico"><i></i></span><div><div class="val">12</div><div class="lbl">Sequência</div></div></div>
+        <div class="mc"><span class="ico"><i></i></span><div><div class="val">7</div><div class="lbl">Travando</div></div></div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ─────────── PROPOSTA ─────────── -->
+  <div class="pane">
+    <span class="tag b">Tinta</span>
+    <div class="frame"><div class="nova">
+      <div class="ph"><h2>Bom dia, Djemeson</h2><span class="date">Ter · 11 ago</span></div>
+      <div class="hero">
+        <div class="k">para revisar hoje</div>
+        <div class="big">147<small>cartões · ~18 min</small></div>
+        <button class="go">Começar
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7 7-7 7"/></svg>
+        </button>
+        <div class="streak"><b>12</b> dias seguidos</div>
+      </div>
+      <div class="linha">
+        <div class="cel"><div class="v">1.284</div><div class="l">palavras</div></div>
+        <div class="cel"><div class="v">89%</div><div class="l">de acerto</div></div>
+        <div class="cel alerta"><div class="v">7</div><div class="l">travando</div></div>
+      </div>
+      <div class="frase">
+        <div class="k">palavra do dia</div>
+        <div class="w">to tuck in</div>
+        <div class="m">aconchegar alguém na cama — <i>Chapter 20</i></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<h3>O que mudou, item a item</h3>
+<table>
+  <tr><th>Decisão</th><th>Por quê</th></tr>
+  <tr><td>Um herói, não quatro</td>
+      <td>O Painel responde a <i>uma</i> pergunta: "estudo o quê agora?". O 147 vira o maior
+          elemento da tela, em preto-tinta cheio, e os outros números descem para uma faixa
+          calma. Hierarquia é decidir o que <b>não</b> é importante.</td></tr>
+  <tr><td>Os números viram gráfico</td>
+      <td>Na serifada, grandes, sem ícone ao lado. O ícone genérico em quadradinho colorido não
+          informava nada — só ocupava 28&nbsp;px e repetia quatro vezes.</td></tr>
+  <tr><td>De 4 cartões para 3 células</td>
+      <td>"Sequência" saiu da faixa e virou o selo dentro do herói, onde ela realmente
+          significa algo. Menos caixas, mais respiro.</td></tr>
+  <tr><td>Rótulo em caixa baixa</td>
+      <td><span style="text-transform:uppercase;letter-spacing:.05em;font-size:.7rem">PALAVRAS</span>
+          repetido quatro vezes é ruído tipográfico. "palavras" lê mais rápido e pesa menos.</td></tr>
+  <tr><td>O cabeçalho cumprimenta</td>
+      <td>"Painel — sua evolução no inglês" é o app se descrevendo. "Bom dia, Djemeson" é o app
+          falando com você. É de graça e muda o tom da tela inteira.</td></tr>
+  <tr><td>Uma borda de acento por tela</td>
+      <td>A tarja magenta na palavra do dia é o único traço de cor da IA aqui — e por ser único,
+          o olho vai nele.</td></tr>
+</table>
+
+<div class="callout"><b>O padrão que se repete no app inteiro.</b> Preparar, Estudar, Revisar e
+Biblioteca têm o mesmo vício: uma grade de caixas iguais, cada uma com borda de 1&nbsp;px quase
+invisível, e a informação principal com o mesmo peso do rodapé do cartão. A correção é sempre a
+mesma — <b>escolher a pergunta que a tela responde e dar a ela o dobro de tudo</b>.</div>
+
+</body></html>

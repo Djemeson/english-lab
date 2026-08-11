@@ -1,0 +1,287 @@
+<!-- @dsCard group="Componentes" name="Superfície de IA viva" subtitle="Tinta derramada — o cursor comanda o movimento. Passe o mouse e arraste." -->
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Superfície de IA viva</title>
+<style>
+@property --spin{syntax:'<angle>';inherits:true;initial-value:0deg}
+:root{
+  --paper:#F5F2EA;--surface:#fff;--surface2:#F7F3EA;--surface3:#E6DDCB;
+  --ink:#16130E;--ink2:#4A4337;--ink3:#7D7364;
+  --line:rgba(22,19,14,.18);--line-strong:rgba(22,19,14,.34);
+  --primary:#C2410C;
+  --ia-1:#FF6B1A;--ia-2:#E8177B;--ia-3:#6D28D9;--ia-4:#0D9488;
+  --r:14px;--r-sm:10px;--r-pill:999px;
+  --dur-1:120ms;--dur-2:220ms;--dur-3:420ms;
+  --ease-out:cubic-bezier(.2,.8,.3,1);
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --display:'Newsreader',Georgia,'Times New Roman',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--paper);color:var(--ink);
+  padding:32px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);font-weight:600;margin-bottom:6px}
+h1{font-family:var(--display);font-size:2.1rem;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+h1 em{font-style:normal;background:linear-gradient(92deg,var(--ia-1),var(--ia-2) 45%,var(--ia-3));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{color:var(--ink2);font-size:.95rem;max-width:64ch;margin-top:10px}
+h2{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);
+  font-weight:700;margin:36px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.hint{font-size:.8rem;color:var(--ink3);margin-top:8px}
+.hint b{color:var(--primary)}
+
+/* ══════════════════════════════════════════════════════════════
+   A SUPERFÍCIE VIVA
+   Três camadas empilhadas:
+     1. o giro contínuo  — respira sozinha, mesmo parada
+     2. o farol do cursor — segue o ponteiro com atraso
+     3. as gotas         — depositadas ao arrastar, crescem e secam
+   ══════════════════════════════════════════════════════════════ */
+.ia{
+  --px:50%; --py:50%;        /* posição do cursor (definida pelo JS) */
+  --vx:0px; --vy:0px;        /* velocidade do arrasto → desloca a tinta */
+  --wake:0;                  /* 0 = repouso, 1 = atiçada */
+  position:relative;overflow:hidden;isolation:isolate;
+  border:none;cursor:pointer;font:inherit;color:#fff;
+  background:#2b1206;
+  transition:transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+}
+.ia::before{  /* 1 + 2 — o giro e o farol */
+  content:'';position:absolute;inset:-40%;z-index:-2;
+  background:
+    radial-gradient(38% 46% at calc(var(--px) + var(--vx)) calc(var(--py) + var(--vy)),
+      var(--ia-1) 0%, transparent 62%),
+    radial-gradient(42% 50% at calc(100% - var(--px) - var(--vx)) var(--py),
+      var(--ia-2) 0%, transparent 66%),
+    radial-gradient(46% 54% at var(--px) calc(100% - var(--py) + var(--vy)),
+      var(--ia-3) 0%, transparent 68%),
+    conic-gradient(from var(--spin) at 50% 50%,
+      var(--ia-4), var(--ia-1), var(--ia-2), var(--ia-3), var(--ia-4));
+  filter:blur(calc(14px + 10px * var(--wake))) saturate(calc(1.15 + .45 * var(--wake)));
+  animation:spin 9s linear infinite;
+  transition:filter var(--dur-3) var(--ease-out);
+  will-change:filter;
+}
+.ia::after{  /* brilho de vidro: dá volume e mantém o texto legível */
+  content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(70% 100% at 22% 0%, rgba(255,255,255,.34), transparent 62%),
+    linear-gradient(180deg, transparent 45%, rgba(20,8,2,.30));
+}
+@keyframes spin{to{--spin:360deg}}
+.ia:hover{--wake:1}
+.ia:active{transform:scale(.985)}
+
+/* as gotas de tinta */
+.drop{position:absolute;z-index:-1;border-radius:50%;pointer-events:none;
+  mix-blend-mode:screen;filter:blur(9px);
+  animation:spill 1500ms cubic-bezier(.15,.7,.3,1) forwards}
+@keyframes spill{
+  0%  {transform:translate(-50%,-50%) scale(.15);opacity:.95}
+  70% {opacity:.55}
+  100%{transform:translate(-50%,-50%) scale(2.6);opacity:0}
+}
+
+/* ── o botão grande ─────────────────────────────────────────── */
+.ia-btn{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:13px 26px;border-radius:var(--r-pill);
+  font-size:.95rem;font-weight:600;letter-spacing:-.01em;
+  box-shadow:0 4px 18px rgba(232,23,123,.22), 0 1px 2px rgba(22,19,14,.2);
+}
+.ia-btn:hover{box-shadow:0 10px 34px rgba(232,23,123,.36), 0 2px 4px rgba(22,19,14,.2)}
+.ia-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;
+  stroke-linecap:round;stroke-linejoin:round;
+  transition:transform var(--dur-2) var(--ease-out)}
+.ia-btn:hover svg{transform:rotate(-14deg) scale(1.12)}
+
+/* ── o ícone pequeno (o que vai no meio da lista) ───────────── */
+.ia-ico{
+  width:34px;height:34px;border-radius:11px;
+  display:inline-flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px rgba(109,40,217,.24);
+}
+.ia-ico svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* ── o painel (a resposta da IA nasce dentro dele) ──────────── */
+.ia-panel{
+  width:100%;max-width:440px;min-height:132px;border-radius:var(--r);
+  padding:20px 22px;text-align:left;display:block;cursor:crosshair;
+  box-shadow:0 6px 26px rgba(22,19,14,.16)}
+.ia-panel .t{font-family:var(--display);font-size:1.25rem;font-weight:600;
+  text-shadow:0 1px 12px rgba(20,8,2,.5)}
+.ia-panel .s{font-size:.84rem;opacity:.92;margin-top:5px;max-width:34ch;
+  text-shadow:0 1px 10px rgba(20,8,2,.5)}
+
+/* ── estado processando: a tinta ferve ─────────────────────── */
+.ia.pensando{--wake:1}
+.ia.pensando::before{animation:spin 2.6s linear infinite}
+.ia.pensando::after{background:
+  radial-gradient(70% 100% at 22% 0%, rgba(255,255,255,.34), transparent 62%),
+  linear-gradient(180deg, transparent 45%, rgba(20,8,2,.30));
+  animation:pulso 1.3s var(--ease-out) infinite}
+@keyframes pulso{0%,100%{opacity:1}50%{opacity:.62}}
+
+/* ── a variante DISCRETA: tinta contida, para não gritar ───── */
+.ia-quieta{
+  display:inline-flex;align-items:center;gap:9px;
+  padding:9px 17px;border-radius:var(--r-pill);
+  background:var(--surface);color:var(--ink);
+  border:1px solid var(--line-strong);cursor:pointer;font:inherit;
+  font-size:.86rem;font-weight:600;position:relative;overflow:hidden;
+  transition:border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out)}
+.ia-quieta .orb{width:15px;height:15px;border-radius:50%;flex-shrink:0;
+  background:conic-gradient(from var(--spin), var(--ia-1),var(--ia-2),var(--ia-3),var(--ia-4),var(--ia-1));
+  animation:spin 9s linear infinite;
+  box-shadow:0 0 0 0 rgba(232,23,123,0);
+  transition:box-shadow var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out)}
+.ia-quieta:hover{border-color:transparent;
+  box-shadow:0 0 0 1.5px var(--ia-2), 0 6px 20px rgba(232,23,123,.20)}
+.ia-quieta:hover .orb{transform:scale(1.22);box-shadow:0 0 12px 2px rgba(232,23,123,.5);
+  animation-duration:2.6s}
+
+/* ── layout da demonstração ─────────────────────────────────── */
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:18px;margin-top:6px}
+.stack{display:flex;flex-direction:column;gap:7px;align-items:flex-start}
+.cap{font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+.rules{margin-top:14px;font-size:.85rem;color:var(--ink2);max-width:70ch}
+.rules li{margin:7px 0 7px 18px}
+.rules b{color:var(--ink)}
+.callout{margin-top:18px;padding:14px 16px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--ia-2);
+  font-size:.85rem;color:var(--ink2);max-width:70ch}
+.callout b{color:var(--ink)}
+@media (prefers-reduced-motion:reduce){
+  .ia::before,.ia-quieta .orb{animation:none}
+  .drop{display:none}
+}
+</style></head><body>
+
+<div class="eyebrow">Componentes · o personagem principal</div>
+<h1>A IA tem <em>cor própria, e ela se mexe</em></h1>
+<p class="lead">Hoje o botão "Analisar com IA" é um botão. Nada no app diz que ali dentro mora
+outra coisa. Aqui a IA ganha superfície própria: quatro cores que giram sem parar, e
+que <b>obedecem ao cursor</b> — passe o mouse por cima, e arraste com o botão pressionado
+para derramar tinta.</p>
+
+<h2>Ação principal — "Analisar com IA"</h2>
+<div class="row">
+  <div class="stack">
+    <button class="ia ia-btn" data-live>
+      <svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg>
+      Analisar com IA
+    </button>
+    <span class="cap">repouso → hover → arrasto</span>
+  </div>
+  <div class="stack">
+    <button class="ia ia-btn pensando" data-live>
+      <svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg>
+      Analisando…
+    </button>
+    <span class="cap">processando: a tinta ferve</span>
+  </div>
+</div>
+<p class="hint">Segure o botão do mouse e arraste sobre eles. <b>A direção do arrasto empurra a tinta</b>, e cada gota fica onde caiu até secar.</p>
+
+<h2>Ícone — onde a IA aparece no meio da lista</h2>
+<div class="row">
+  <div class="stack">
+    <span class="ia ia-ico" data-live>
+      <svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8"/></svg>
+    </span>
+    <span class="cap">ícone vivo</span>
+  </div>
+  <div class="stack">
+    <button class="ia-quieta"><span class="orb"></span>Explicar esta frase</button>
+    <span class="cap">variante discreta</span>
+  </div>
+  <div class="stack">
+    <button class="ia-quieta"><span class="orb"></span>Faz parte de uma expressão?</button>
+    <span class="cap">ação de custo — pede clique</span>
+  </div>
+</div>
+<p class="hint">A variante discreta é <b>a regra, não a exceção</b>: dentro de uma lista de vinte itens, vinte superfícies vivas viram carnaval. Ali a cor fica só no orbe de 15px — e é ele que se atiça no hover.</p>
+
+<h2>Painel — quando a IA ocupa espaço</h2>
+<div class="row">
+  <div class="ia ia-panel" data-live>
+    <div class="t">Pergunte qualquer coisa</div>
+    <div class="s">O Assistente lê o seu acervo inteiro: o que você já estuda, o que está travando e de que livro cada palavra veio.</div>
+  </div>
+</div>
+
+<h2>As regras que impedem isso de virar caricatura</h2>
+<ul class="rules">
+  <li><b>Só a IA se move em cor.</b> Nenhum outro elemento do app ganha gradiente animado — é
+      isso que faz o movimento significar alguma coisa em vez de ser enfeite.</li>
+  <li><b>Superfície viva grande: no máximo uma por tela.</b> Duas competem, três viram ruído.
+      Na dúvida, use a variante discreta.</li>
+  <li><b>Em repouso o giro é lento</b> (9&nbsp;s por volta) e o desfoque é alto. A energia só
+      sobe quando o cursor chega. Movimento constante e rápido cansa em três minutos.</li>
+  <li><b>Texto sobre tinta é sempre branco com sombra</b>, e nunca uma das quatro cores. As
+      cores da IA são preenchimento — jamais tipografia.</li>
+  <li><b>Quem pede menos movimento recebe menos movimento.</b> Com <i>prefers-reduced-motion</i>
+      o giro para, as gotas somem e sobra o gradiente estático. Sem exceção.</li>
+</ul>
+
+<div class="callout"><b>Por que "tinta derramada" e não "brilho".</b> Brilho pulsante é o
+clichê de IA de 2023 e já lê como enfeite genérico. Tinta tem massa: ela cai onde você soltou,
+espalha na direção em que você arrastou e seca. É <i>o seu gesto que fica registrado</i> na
+superfície — e isso é o oposto de um efeito que roda igual para todo mundo.</div>
+
+<script>
+(function(){
+  var reduz = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var CORES = ['#FF6B1A','#E8177B','#6D28D9','#0D9488'];
+
+  document.querySelectorAll('[data-live]').forEach(function(el){
+    var lx=0, ly=0, arrastando=false, ultimaGota=0;
+
+    el.addEventListener('pointermove', function(e){
+      var r = el.getBoundingClientRect();
+      var x = (e.clientX - r.left) / r.width  * 100;
+      var y = (e.clientY - r.top)  / r.height * 100;
+
+      // velocidade do gesto -> deslocamento da tinta (o arrasto COMANDA)
+      var vx = Math.max(-26, Math.min(26, (x - lx) * (arrastando ? 2.6 : 0.9)));
+      var vy = Math.max(-26, Math.min(26, (y - ly) * (arrastando ? 2.6 : 0.9)));
+      lx = x; ly = y;
+
+      el.style.setProperty('--px', x + '%');
+      el.style.setProperty('--py', y + '%');
+      el.style.setProperty('--vx', vx + '%');
+      el.style.setProperty('--vy', vy + '%');
+
+      if (arrastando && !reduz && e.timeStamp - ultimaGota > 90){
+        ultimaGota = e.timeStamp;
+        derramar(el, e.clientX - r.left, e.clientY - r.top);
+      }
+    });
+
+    el.addEventListener('pointerdown', function(e){
+      arrastando = true;
+      if (el.setPointerCapture) { try{ el.setPointerCapture(e.pointerId); }catch(_){} }
+      var r = el.getBoundingClientRect();
+      if (!reduz) derramar(el, e.clientX - r.left, e.clientY - r.top, 1.5);
+    });
+    ['pointerup','pointercancel','pointerleave'].forEach(function(ev){
+      el.addEventListener(ev, function(){ arrastando = false; });
+    });
+    el.addEventListener('pointerleave', function(){
+      // a tinta volta devagar para o centro em vez de dar um salto
+      el.style.setProperty('--vx','0px'); el.style.setProperty('--vy','0px');
+    });
+  });
+
+  function derramar(el, x, y, forca){
+    var d = document.createElement('span');
+    var tam = (34 + Math.random()*46) * (forca || 1);
+    d.className = 'drop';
+    d.style.cssText = 'left:'+x+'px;top:'+y+'px;width:'+tam+'px;height:'+tam+'px;'
+      + 'background:' + CORES[(Math.random()*CORES.length)|0];
+    el.appendChild(d);
+    setTimeout(function(){ d.remove(); }, 1500);
+  }
+})();
+</script>
+</body></html>
