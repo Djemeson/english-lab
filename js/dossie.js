@@ -1232,6 +1232,7 @@ function _dosFocoCabecalho(w, m, feito, ctx) {
         ${feito ? `<span class="dos-selo">${ic('check','ic-sm')} estudado</span>` : ''}
       </div>
       <div class="dos-chips">${_dosChips(w, m)}</div>
+      ${(typeof _familiaHtml === 'function' ? _familiaHtml(w) : '')}
       ${obra ? `<div class="dosf-fonte">${ic('bookOpen','ic-sm')}
         ${ctx ? `<a href="#dosf-passagem" onclick="return _dosFocoIrPassagem(event)">` : '<span>'}
         ${esc(obra)}${cap ? ' · ' + esc(cap) : ''}

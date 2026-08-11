@@ -1859,12 +1859,20 @@ function _famChip(item, papel) {
     data-tip="${papel} · ${_FAM_ESTADO[item.status] || item.status} — clique para abrir">
     ${ic(papel === 'veio de' ? 'chevronLeft' : 'chevronRight','ic-sm')}${esc(item.word || '(frase)')}</button>`
 }
+// ⚠️ O RÓTULO É DINÂMICO, e não por capricho: no Estudar existe uma seção
+// chamada "A família deste item" — as expressões que a IA gera em volta da
+// palavra —, e ela é OUTRA COISA. Esta aqui é parentesco entre ITENS do
+// acervo: quem nasceu de quem. Duas coisas diferentes com o mesmo nome na
+// mesma tela é confusão garantida.
+// Dizendo "Nasceu de" ou "Saíram daqui" o rótulo já é a informação, e a
+// colisão deixa de existir sozinha.
 function _familiaHtml(w) {
   if (typeof familiaDoItem !== 'function') return ''
   const { pai, filhos } = familiaDoItem(w)
   if (!pai && !filhos.length) return ''
+  const rotulo = pai && filhos.length ? 'Parentesco' : pai ? 'Nasceu de' : 'Saíram daqui'
   return `<div class="wc-familia">
-    <span class="wcf-lbl">${ic('layers','ic-sm')}Família</span>
+    <span class="wcf-lbl">${ic('layers','ic-sm')}${rotulo}</span>
     ${pai ? _famChip(pai, 'veio de') : ''}
     ${filhos.map(f => _famChip(f, 'saiu daqui')).join('')}
   </div>`

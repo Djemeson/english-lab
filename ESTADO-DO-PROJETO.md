@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A SEMENTE CHEGOU AO VÍDEO E À EXTENSÃO**. O leitor mandava a
+> Última atualização: 2026-08-08 — **O PARENTESCO APARECE NAS TRÊS TELAS**. O Preparar dizia de
+> onde o item veio — que `booklet` nasceu da família de `digest-sized`, que `fall in love` saiu de
+> `fall` —, e o Estudar e a Biblioteca mostravam o mesmo item **mudo**. A peça já era genérica e
+> mora no shell (`_familiaHtml`, `familiaDoItem`, `irParaItem`): as duas telas passaram a chamá-la,
+> com o MESMO desenho, em vez de ganharem cada uma o seu. ⚠️ **O rótulo virou dinâmico** — "Nasceu
+> de", "Saíram daqui" ou "Parentesco" —, e não por capricho: no Estudar já existe uma seção "A
+> família deste item" (as expressões que a IA gera), que é outra coisa. Duas coisas diferentes com
+> o mesmo nome na mesma tela é confusão garantida; dizendo o que é, a colisão some sozinha.
+> `sw.js` → `englab-v198`.
+>
+> Anterior: 2026-08-08 — **A SEMENTE CHEGOU AO VÍDEO E À EXTENSÃO**. O leitor mandava a
 > glosa da passagem junto com a captura, e a análise nascia sabendo QUAL sentido procurar; Netflix,
 > Kindle e vídeo entregavam a palavra crua — a mesma palavra, o mesmo trabalho, resultado pior.
 > ⚠️ **Uma peça só, não uma por fonte**: a pendência pedia "pré-análise do lote" para o vídeo e
@@ -8262,6 +8272,38 @@ sem resultado no caso mais comum — nome próprio famoso, que o modelo já conh
 
 `sw.js` → `englab-v191`.
 
+### O parentesco aparece nas três telas (2026-08-08)
+
+Um item guarda em `from` de qual outro nasceu — o sentido separado (`fall in love` de `fall`), a
+parte escolhida no raio-X, o membro da família mandado ao Preparar. O **Preparar** mostrava isso; o
+**Estudar** e a **Biblioteca** mostravam o mesmo item mudo, e o aluno abria `booklet` sem saber que
+ele tem parentes ali do lado.
+
+**A peça já era genérica e já morava no shell** — `familiaDoItem` e `irParaItem` em `core.js`,
+`_familiaHtml` e `_famChip` em `review.js`. A pendência dizia que ficou de fora "por serem duas
+telas com layout próprio, não por dificuldade", e era isso mesmo: as duas passaram a chamar a MESMA
+função. Informação igual com desenho igual, em vez de três variantes que envelhecem separadas — só
+a margem muda, porque cada tela a encaixa num lugar diferente da moldura.
+
+⚠️ **O rótulo virou dinâmico**, e é a parte que resolve um problema real: no Estudar já existe uma
+seção chamada **"A família deste item"** — as expressões que a IA gera em volta da palavra —, e ela
+é OUTRA COISA. Esta aqui é parentesco entre ITENS do acervo. Duas coisas diferentes com o mesmo
+nome na mesma tela é confusão garantida. Agora o rótulo é a informação:
+
+| situação | rótulo |
+|---|---|
+| só tem pai | **Nasceu de** |
+| só tem filhos | **Saíram daqui** |
+| tem os dois | **Parentesco** |
+
+E o clique continua indo para onde o item MORA (`irParaItem` decide pelo estado): Preparar, Estudar
+ou o verbete. Mandar para a tela errada é pior que não ter link — o usuário procura e não acha.
+
+**Provado no navegador** com pai, filho, neto e um item sem parentesco: os três rótulos corretos, os
+chips certos em cada caso, o item solto não pintando nada, e as três telas chamando a mesma função.
+
+**Arquivos**: `js/review.js`, `js/dossie.js`, `js/audio.js`, `css/styles.css`. `sw.js` → `englab-v198`.
+
 ### A semente chegou ao vídeo e à extensão (2026-08-08)
 
 O leitor mandava a glosa da passagem junto com a captura (`_seedMeaning`), e a análise do Preparar
@@ -8543,10 +8585,9 @@ lugar só.
       peça para as três fontes em vez de uma por fonte. Convite no cabeçalho do Preparar, que
       não roda sozinho. Ver 8.2. ⚠️ **Falta usar com capturas de verdade** — provado com lote
       sintético na API real (as glosas vieram da cena) e com acervo de mentira no navegador.
-- [ ] **A FAMÍLIA SÓ APARECE NO PREPARAR.** O dossiê (Estudar) e o glossário da Biblioteca
-      mostram o mesmo item sem dizer de onde ele veio. `familiaDoItem` e `irParaItem` são
-      genéricos e não-lazy — é só chamar de lá. Ficou fora por serem duas telas com layout
-      próprio, não por dificuldade.
+- [x] ~~A família só aparece no Preparar~~ — **feito em 2026-08-08**: Estudar e Biblioteca
+      passaram a chamar a mesma peça, com rótulo dinâmico para não colidir com a "família do
+      item" que a IA gera. Ver 8.2.
 - [ ] **A CAPTURA AVISA NO PREPARAR, NÃO NA HORA DO CLIQUE.** O aviso ("a frase contém *fall in
       love*") aparece quando ele abre o item no Preparar — não no balão do leitor/vídeo, onde a
       captura de fato acontece. `unidadeJaEstudada(w)` é de graça e serve igual lá; falta só o

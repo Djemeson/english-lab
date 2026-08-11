@@ -948,6 +948,14 @@ function glossWordHtml(g, TYPE) {
     </div>`
   }).join('')
 
+  // ⚠️ O PARENTESCO TAMBÉM AQUI. O verbete mostrava o item mudo: ele abria
+  // "booklet" e nada dizia que aquilo nasceu da família de "digest-sized", nem
+  // que "fall in love" saiu de "fall". A peça é a MESMA do Preparar
+  // (`_familiaHtml`, em review.js, que é shell) — uma linguagem visual só para
+  // a mesma informação, em vez de três desenhos que envelhecem separados.
+  const wItem = (typeof words !== 'undefined' ? words : []).find(x => x.id === g.wordId)
+  const famHtml = (wItem && typeof _familiaHtml === 'function') ? _familiaHtml(wItem) : ''
+
   return `<div class="gloss-word" id="gloss-w-${g.wordId}">
     <div class="gloss-word-head">
       <div class="gloss-word-title">
@@ -961,6 +969,7 @@ function glossWordHtml(g, TYPE) {
         <span class="gloss-count-chip">${ic('layers', 'ic-sm')} ${senses.length} sentido${senses.length !== 1 ? 's' : ''}</span>
       </div>
     </div>
+    ${famHtml}
     <div class="gloss-senses">${sensesHtml}</div>
   </div>`
 }

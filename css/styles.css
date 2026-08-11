@@ -584,6 +584,11 @@ select option{background:var(--surface)}
 .wcf-chip:hover{border-color:var(--primary);color:var(--primary);background:rgba(var(--primary-rgb),.08)}
 .wcf-chip .ic{width:13px;height:13px;color:var(--text3)}
 .wcf-chip:hover .ic{color:var(--primary)}
+/* A MESMA fileira serve às três telas — Preparar, Estudar e Biblioteca —, e é
+   de propósito: informação igual com desenho igual. Só a margem muda, porque
+   cada uma a encaixa num lugar diferente da moldura. */
+.dosf-cab .wc-familia{margin-top:var(--sp-2)}
+.gloss-word .wc-familia{margin:0 0 var(--sp-3);padding-top:var(--sp-2);border-top:1px dashed var(--border)}
 
 /* ---- Varredura: os sentidos presos a uma expressão, em toda a base ---- */
 .vru-box{max-width:640px;width:100%}
