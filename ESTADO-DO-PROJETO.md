@@ -8351,26 +8351,21 @@ lugar só.
 
 ## 9. Pendências / a verificar
 
-- [x] ~~Fonte ancestral: item nascido de exemplo herdava a obra~~ — **corrigido em 2026-08-08**.
-      `selMenuAtivar` passa o nó da seleção; `_dosSelContexto` (dossie.js) decide pela REGIÃO da
-      página. Varrido e corrigido nos outros dois lugares com o mesmo defeito:
-      `dossieFamiliaPreparar` e `revSelExplain`. Ver o topo deste arquivo.
-- [x] ~~"Explicar" abria painel em vez do modo suspenso~~ — **corrigido em 2026-08-08**: a resposta
-      nasce no próprio balão (`#sel-menu.sel-exp`), com botões de Preparar, expandir e fechar.
-- [x] ~~O leitor ainda abre o painel no "Explicar"~~ — **resolvido em 2026-08-08**, e ele fechou a
-      questão para o projeto inteiro: o painel foi REMOVIDO e o balão virou a única casa da Lexa
-      nas cinco telas. Ver 8.2 ("O balão é a única casa da Lexa").
+> ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
+> ninguém lê e ela deixa de proteger. Saíram as verificações de rodadas antigas que o uso
+> diário já respondeu, as que caducaram com a evolução do projeto (o "nenhum EPUB comercial
+> passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
+> tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
+> **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Dívida — código que a gente sabe que está torto
+
 - [ ] **OS OUTROS 20 `aiJSON` AINDA NÃO TÊM ESQUEMA** (2026-08-08). Sete dos 27 ganharam contrato de
       forma — os de maior valor e forma estável. Faltam os de `add.js` (6), `audio.js` (5),
       `consulta.js`, `ler.js` (2), `study.js`, `video-study.js` e dois de `review.js`. Não é
       urgente: sem esquema o comportamento é exatamente o de antes. **O caminho é conhecido**:
       escrever o `ESQ.*`, passar `{ schema, schemaNome }` e rodar `_esqConfere` contra o trecho do
       prompt — ⚠️ **nunca passar esquema sem conferir**, porque campo esquecido vira campo proibido.
-- [x] ~~A Lexa que leu o livro e vê a web~~ — **as duas entregues em 2026-08-08**. A web só no
-      clique; a obra com a regra do spoiler e o eco entrando antes da IA. Ver 8.2.
-      ⚠️ **Falta usar com um livro de verdade**: o comportamento foi provado com um EPUB de
-      mentira de quatro capítulos. Com *Billy Summers* aberto, conferir se a busca em um livro
-      grande responde rápido o bastante para não atrasar a explicação.
 - [ ] **O REDUTOR DE LEMA COROA NÃO-PALAVRAS** (2026-08-08) — achado pela bateria, **anterior a
       esta rodada** e maior que ela. `_lemaBase` pega cegamente `glossLemas(...)[1]`, e para
       consoante dobrada ou 'e' mudo isso é a resposta errada:
@@ -8387,186 +8382,15 @@ lugar só.
       ⚠️ **EXIGE MIGRAÇÃO, e é por isso que não entrou de carona**: `w.lemma` fica gravado no item
       (com `lemma_de`), então corrigir a regra sem remigrar o acervo deixaria o "running" antigo sob
       `runn` e o novo sob `run` — família rachada, que é o defeito em dobro. Merece rodada própria.
-- [x] ~~O acervo já capturado no leitor está com o contexto errado~~ — **reparo entregue em
-      2026-08-08**, em Configurações. Sem IA, com simulação antes. Ver 8.2 ("O contexto voltou
-      para o lugar"). ⚠️ **Falta rodar com o acervo de verdade** — o ambiente de teste não tem
-      livro nem itens; o comportamento foi provado com um EPUB de mentira e o caminho real.
-- [ ] **USAR O BALÃO NO LEITOR E NO VÍDEO COM CONTEÚDO DE VERDADE** (2026-08-08). O balão foi
-      provado no navegador por dois caminhos (seleção e família), e os cinco chamadores carregam
-      sem erro — mas leitor e vídeo pedem livro aberto e episódio tocando, que o ambiente de teste
-      não tem. Falta ver: se a ilustração da Wikipédia cabe bem lá dentro, se a conversa tem
-      espaço confortável no celular, e se o balão ancorado no popup do vídeo atrapalha a legenda.
-- [ ] **`OBRA_ESTUDO` cria um grupo novo no Estudar** (2026-08-08). Itens pescados de exemplos e da
-      família passam a se juntar sob a pasta *"Do seu estudo"*, com o item de origem por capítulo.
-      É o desenho pretendido (procedência honesta), mas só o uso dirá se essa pasta vira um
-      depósito grande demais. Ela é excluída da limpeza de títulos com IA nos dois pontos
-      (`resolverNomesDeObra` e `_dosObrasSujasHTML`).
-- [x] ~~O Assistente pula o Preparar~~ — **corrigido em 2026-08-08**, a pedido dele, logo depois
-      da varredura. Ver 8.2 ("O Assistente também entrou na fila"). **Agora TODA fonte para no
-      Preparar**: leitor, Netflix, Kindle, documento, mídia, vídeo, podcast e Assistente.
-- [x] ~~Captura repetida no vídeo duplica o item~~ — **corrigido em 2026-08-08**: usa
-      `prepAcharItem` + `prepararNovoSentido`, como o leitor. Ver 8.2 ("O reencontro no vídeo").
-- [x] ~~Provar os chips da frase com IA de verdade~~ — **feito em 2026-08-08** por
-      `tools/teste-ia.mjs chips`, com o caso real do vazamento. (a) A regra "a unidade tem de
-      sobreviver FORA desta frase" **é respeitada pela Luna** (devolveu `lower middle-class`) e
-      **não pelo gpt-4o-mini**, que devolveu a fatia `looks lower middle-class` e ainda um nome de
-      personagem — mais um argumento para a troca de modelo. (b) O enum do `type` segurou nos
-      quatro cenários. (c) Custo real: ~R$ 0,003 por quebra.
-- [x] ~~Provar os campos novos com IA de verdade~~ — **feito em 2026-08-08** por
-      `tools/teste-ia.mjs analise`. (a) Tamanho real: 6.300 tokens de entrada e 1.583–2.486 de
-      saída, **nada truncou** contra o teto de 5.000. (b) `armadilha` e `curiosidade` voltaram
-      vazias quando não havia o que dizer — o "vazio é resposta válida" se sustenta. (c) O item do
-      DeepSeek caducou: o fornecedor saiu. ⚠️ O que sobrou é a comparação de QUALIDADE: a Luna
-      preenche 17–18 dos 21 campos contra 9–12 do gpt-4o-mini.
-- [ ] **CONTAR NO LIVRO com um EPUB de verdade** (2026-08-08). A leitura do `BookDB`, as flexões e
-      o cache foram exercitados, mas o caminho feliz (livro presente) só foi provado pelo erro
-      tratado ("o arquivo do livro não está mais neste aparelho"). Testar com *Flags on the Bayou*
-      aberto na estante e conferir se a contagem bate com a busca do leitor.
-- [ ] **USAR O MODO FOCO COM UM CAPÍTULO DE VERDADE** (2026-08-08). O percurso foi provado no
-      navegador com 4 itens semeados: retrato estável, setas sem pular, "Estudei" mandando para a
-      revisão, pausa do erro, atalho e volta. Falta o que só o uso diz — se **os três exemplos**
-      no foco são leitura boa ou parede, se o rodapé fica à mão no celular, e se a lista compacta
-      (dois exemplos) já basta ou também quer os três.
-- [ ] **DECIDIR: 3 exemplos = 3 CARDS?** (aberto desde a rodada do "um sentido por encontro").
-      Um sentido com 3 exemplos vira **3 cards** no SRS — confirmado de novo neste teste
-      (2 sentidos estudados → 6 cards). Com a captura já enxugada para um sentido por encontro,
-      talvez o multiplicador que sobra seja este. É **uma linha** na criação do card; o que falta
-      é ele decidir se quer um card com 3 exemplos ou 3 cards com um exemplo cada.
-- [x] ~~A pausa do erro no celular~~ — **medido e corrigido na mesma rodada** (2026-08-08): em
-      375×812 o "Entendi — próximo" nascia em y=815 (fora da tela) e, depois de rolar, ficava
-      embaixo da barra fixa de navegação. Resolvido com `scrollIntoView({block:'nearest'})` na
-      pausa + `scroll-margin-bottom: 84px` no celular. Medido de novo: botão em 632→728, barra
-      começa em 744, e a cena do livro continua inteira na tela.
-- [x] ~~Medir a pré-análise com IA de verdade (`barrel` → "cano"?)~~ — **FEITO e PASSOU**
-      (confirmado pelo Djemeson em 2026-08-07). ⚠️ **Não refazer este teste.** É o que
-      autorizou a glosa da pré-análise a virar semente do sentido (ver 8.2, Fase 1).
-- [x] ~~FASE 2 (estado por sentido) e FASE 3 (lema, verbete, reencontro por IA, fundir)~~ —
-      **FEITAS em 2026-08-08**. O plano das três fases está inteiro na 8.2.
-- [ ] **PROVAR O "O QUE É AQUI?" COM IA DE VERDADE** (Fase 4). O fluxo inteiro foi exercitado
-      com a `aiJSON` mockada — o ambiente de teste não tem chave. O teste que vale: marcar
-      `cover` como conhecida, achar no livro um `cover for` e conferir (a) se a IA devolve a
-      EXPRESSÃO e não a palavra, (b) se a glosa é a da passagem e (c) o custo real da chamada.
-      ⚠️ Com DeepSeek o `aiJSON` cai para texto livre — vale ver se `expr`/`tipo` sobrevivem.
-      Note que o `mesma` do modelo é ignorado de propósito: quem decide é a comparação dos
-      textos, justamente porque booleano volta como `"true"`/`"sim"`/`1` conforme o fornecedor.
-- [ ] **O BOTÃO SÓ EXISTE NO GLOSSÁRIO** (Fase 4). Vale no leitor, na legenda do vídeo, no
-      Assistente e no Preparar — em toda tela que chama `glossAtivar`. **Não** vale na tela de
-      triagem por nível (a do print), onde ele marca as 421 de uma vez: lá não há frase sob o
-      cursor, então não há passagem para checar. Se incomodar, o caminho é outro — desmarcar
-      pelo grupo, que já existe.
-- [x] ~~Provar o `same_as` com IA de verdade~~ — **feito em 2026-08-08**, e ele provou mais que
-      si mesmo: no cenário de reencontro **sem esquema**, o gpt-4o-mini simplesmente OMITIU o
-      campo (o merge falharia calado); **com esquema**, os três modelos devolveram o id certo.
-      É a medição do valor de structured outputs.
-- [x] ~~O lema não cobre tudo~~ — **estendido ao máximo em 2026-08-08** (ver 8.2, item 5):
-      regra de cabeça inicial/final por tipo + IA devolvendo `lemma` validado. Medido em 30/31
-      casos difíceis. O que **sobra** e é limite conhecido, não pendência:
-      **(a)** ambiguidade real de forma (`leaves` = *leaf* ou *leave*) — só o contexto resolve,
-      e é a IA quem resolve; **(b)** derivação continua **fora de propósito** — `glossLemas`
-      exclui `-er`/`-est`/`-ly` porque "teacher" não é "teach" e "hardly" não é "hard"; juntar
-      essas famílias reintroduziria a classe de erro das rodadas 163-167.
-- [ ] **ZONA DE PERIGO — conferir num aparelho com dado real.** O "apagar tudo" ganhou o que
-      faltava (bases `english-lab-books` e `el-video-db` inteiras, as chaves soltas do
-      localStorage e recarregamento no fim). Foi exercitado com dado sintético; num aparelho
-      com livros e podcasts baixados, vale confirmar que a estante e os episódios somem mesmo
-      e que o app volta limpo.
-- [ ] **LEVAR A SEMENTE PARA O VÍDEO E PARA A EXTENSÃO** — só o leitor foi ligado. Ver o fim
-      da 8.2 para o caminho (pré-análise do LOTE, não do capítulo).
-- [ ] **USAR O REENCONTRO COM DADO REAL.** A Fase 1 foi exercitada ao vivo, mas com item
-      sintético e pré-análise injetada na mão. Falta o teste de verdade: ler um capítulo com a
-      pré-análise ligada, esbarrar numa palavra que você já estuda com outro sentido, e ver
-      (a) se o balão acusa, (b) se "Outro sentido" leva ao Preparar com a semente certa e
-      (c) se a análise **preserva** o sentido antigo em vez de trocá-lo.
-
-### De quem é o sentido (92ª + 93ª) — o que fechou e o que sobrou
-
-**As seis pendências da 92ª foram fechadas na 93ª** (ver seção 8): fonte única da regra nos 5
-prompts, `meaningId` no lugar da posição, as duas camadas da captura, a família na tela, a saída
-para os cards já na Revisão e o detector também à esquerda. O que continua aberto:
-
-- [ ] **A FAMÍLIA SÓ APARECE NO PREPARAR.** O dossiê (Estudar) e o glossário da Biblioteca
-      mostram o mesmo item sem dizer de onde ele veio. `familiaDoItem` e `irParaItem` são
-      genéricos e não-lazy — é só chamar de lá. Ficou fora por serem duas telas com layout
-      próprio, não por dificuldade.
-- [ ] **A CAPTURA AVISA NO PREPARAR, NÃO NA HORA DO CLIQUE.** O aviso ("a frase contém *fall in
-      love*") aparece quando ele abre o item no Preparar — não no balão do leitor/vídeo, onde a
-      captura de fato acontece. `unidadeJaEstudada(w)` é de graça e serve igual lá; falta só o
-      lugar na UI daquelas telas.
-- [ ] **`imageKey` AINDA USA A POSIÇÃO** (`img_wordId_meaningIdx`). Mantido de propósito: trocar
-      a chave orfanaria toda imagem já gerada. Se um dia valer, precisa de migração das chaves no
-      `ImageDB`, não de uma troca no código.
 - [ ] **A COBERTURA DO DETECTOR À ESQUERDA É ESTREITA.** Exige 2+ palavras iguais e falha quando
       o possessivo varia ("make up **your/his** mind" a partir de "mind"). É deliberado — a
       alternativa é falso positivo em série —, mas significa que expressão com encaixe no meio
       continua dependendo do olho dele ou do "Faz parte de uma expressão?".
 - [ ] **VARREDURA SÓ RODA NA BASE LOCAL DE `words`.** Item cujo `words[]` foi apagado mas que
       ainda tem cards no SRS (snapshot) não é varrido. Não deve ser comum, mas existe.
-
-### Design / CSS — o que a 91ª rodada deixou aberto de propósito
-
-A revisão de design foi dividida em três rodadas. **As três estão fechadas.**
-
-- [x] ~~**RODADA A — AS ESCADAS**~~ — feita (espaço, camada, breakpoint + o bug do modal
-      atravessado pela barra no celular + o código morto da sidebar).
-- [x] ~~**RODADA B — FOCO DE TECLADO E ALVO DE TOQUE**~~ — feita. Anel de foco global, os 34
-      campos com nome acessível (24 `label for` + 10 `aria-label`, incluindo os gerados por JS
-      em 13 arquivos) e 44px no ponteiro grosseiro. Ver seção 8 (91ª rodada, parte B).
-- [x] ~~**RODADA C — OS ESTILOS INLINE**~~ — feita, **mas não como estava escrito aqui**. A
-      premissa ("390 estilos inline = 390 vazamentos de tema") era FALSA: 236 são só layout, 157
-      já usavam `var(--)` e só **6** prendiam cor. O defeito real estava no CSS (51 literais fora
-      dos blocos de tema) — inclusive `.stat-card` com borda invisível em 2 dos 6 temas. Ver
-      seção 8 (91ª rodada, parte C). **Lição registrada: medir antes de aceitar a própria
-      pendência da rodada anterior.**
-- [ ] **ESPAÇAMENTO NO RESTO DO ARQUIVO.** Os `--sp-*` foram aplicados na faixa compartilhada e
-      na camada de reskin (113 usos). O CSS específico de cada seção (vídeo, leitor, dossiê,
-      assistente) ainda usa literais. Não é urgente e **não deve ser feito em varredura cega**:
-      parte daquelas medidas é calibrada no olho e perde ao ser arredondada.
-- [ ] **DUAS REGRAS `@media (hover:none)` separadas** (uma esconde `.ler-seta`, a outra também).
-      Sobreposição inofensiva, mas são o mesmo caso — vale unir quando alguém passar por ali.
-- [ ] **`.btn-sm` ficou em 40px no toque, não 44px** (rodada B). Foi decisão consciente: ele vive
-      em fileiras densas (ações do dossiê, linha do card, rodapé de lista) e 44px ali quebraria a
-      linha em duas. No dia em que essas fileiras virarem coluna no celular, sobe para 44 e o app
-      passa a cumprir o alvo de toque em todo botão.
-- [ ] **MOVIMENTO E CONTRASTE ainda não têm tratamento completo** (achado na rodada B, deixado
-      fora de propósito). Há só **duas** regras `prefers-reduced-motion` para um app cheio de
-      transição e animação, e **zero** `prefers-contrast`. Não é urgente, mas é o mesmo tipo de
-      lacuna que o foco de teclado era: invisível para quem não precisa, bloqueante para quem
-      precisa.
-- [ ] **O anel de foco pode ser cortado por ancestral com `overflow:hidden`** (ex.: `.card-box`).
-      O outline não é cortado pelo overflow do PRÓPRIO elemento, mas é pelo do pai. Não foi visto
-      acontecendo; se aparecer, a saída é `outline-offset` negativo naquele componente específico
-      — não mexer na regra global.
-
-- [x] ~~Ligar a seção dos dossiês, renomear as seções e decidir o portão~~ — **feito na 90ª
-      rodada** (2026-08-07). Ver 8.1: está tudo lá, inclusive por que os arquivos NÃO foram
-      renomeados.
-- [ ] **O DOSSIÊ AINDA NÃO MOSTRA ÁUDIO NEM IMAGEM** (90ª rodada). O material tem os dois
-      (`AudioDB`, `ImageDB`) e a tela só mostra texto. É a diferença entre ler o material e
-      *estudar* o material. Ficou de fora por ser decisão de layout própria — um botão de ouvir
-      por exemplo, e a ilustração do sentido no cabeçalho do item.
-- [ ] **USAR O FLUXO NOVO COM DADO REAL** (90ª rodada). Tudo foi exercitado ao vivo, mas com 5
-      itens sintéticos. Com a base de verdade, conferir três coisas: (a) a **costura do legado**
-      (`_dossieCosturarLegado`) marcou como estudado exatamente o que já está no SRS — abrir a
-      seção e ver se algum dossiê antigo aparece com pendência que não existe; (b) a grade não
-      fica gigante demais (um livro com 40 capítulos = 40 cartões — se incomodar, agrupar por
-      obra e abrir os capítulos dentro); (c) a busca continua instantânea com centenas de itens
-      (`_dosItemTexto` remonta o texto a cada tecla; se pesar, cachear por `id`+`updated_at`).
-- [ ] **ENVIAR OS 97 ITENS QUE JÁ ESTÃO PRONTOS** (90ª rodada). Com o status `in_study`, os
-      itens antigos em `pending_review` continuam **no Preparar esperando envio** — é o certo,
-      mas são muitos de uma vez. Se for chato item a item, use "Selecionar todas" + "Enviar
-      para o Estudo" (o lote já funciona); e se ainda assim incomodar, vale um "enviar todos
-      os prontos deste capítulo" na própria barra.
 - [ ] **`saveAllToSrs()` é CÓDIGO MORTO** (achado na 90ª): a função existe em `review.js` (~402)
       e procura o botão `btn-save-all-srs`, que não existe mais no HTML. Não foi removida nesta
       rodada por ser anterior a ela e não atrapalhar; ao mexer no Preparar, apagar.
-- [ ] **RENOMEAR OS ARQUIVOS `review.js`/`study.js`** — decidido NÃO fazer na 90ª. Só vale se um
-      dia o custo de lembrar "review.js é Preparar" superar o de perder o histórico do git e
-      mexer na lista do service worker. Registrado para não virar dúvida recorrente.
-
-- [x] ~~GLOSSÁRIO CAMADA 1 — dicionário bilíngue embarcado~~ — **medido e RECUSADO** na 83ª
-      rodada. Cabia (0,26 MB comprimido) e cobria 91,5% do texto, mas erra `barrel`, `bore` e
-      `yank` e não tem `animus` nem `tire`. Substituído pela **pré-análise do capítulo**.
-      ⚠️ **Não refazer este estudo** — os números, as fontes e o porquê estão no item 176.
 - [ ] **ENDURECER OS DOIS LOTES DO `add.js` CONTRA RENUMERAÇÃO** (risco achado na varredura da
       83ª, NÃO é bug observado). Os prompts do lote do Kindle (`add.js` ~481) e da Mídia (~815)
       pedem `{"i":<n>}` e casam pelo VALOR do índice, então **item pulado não desloca nada** —
@@ -8575,12 +8399,53 @@ A revisão de design foi dividida em três rodadas. **As três estão fechadas.*
       porque o lote do Kindle imprime índices ABSOLUTOS (ex.: "47.", não "1."), que desencorajam
       a renumeração. A blindagem definitiva é a mesma da pré-análise: **pedir o texto de volta e
       casar por ele**. Não foi feito nesta rodada porque mexe em dois fluxos que funcionam.
-- [ ] **USAR A PRÉ-ANÁLISE COM A IA DE VERDADE** (83ª rodada). Toda a camada 1 foi validada com
-      dados sintéticos — o ambiente de teste não tem chave. Falta rodar "Ler este capítulo com
-      a IA" num capítulo real e conferir: (a) se o custo cobrado bate com o estimado no modal;
-      (b) se a glosa de `barrel` naquela frase sai **cano** e não "barril" — é o teste que
-      justifica a rodada inteira; (c) quantos itens a IA deixa de devolver (o toast já conta os
-      perdidos). ⚠️ Com DeepSeek o `aiJSON` cai para texto livre: vale medir a perda com ele.
+- [ ] **TIRAR OS PREÇOS DE TRANSCRIÇÃO DO HTML** (achado na 90ª). O seletor `cfg-stt-provider`
+      tem "whisper-large-v3-turbo (US$ 0,04/h)" e "whisper-1 (US$ 0,36/h)" **escritos à mão** no
+      `index.html`. Hoje estão certos, mas é exatamente o padrão que fez o seletor de imagens
+      continuar anunciando `gpt-image-1` depois da troca. O conserto é o mesmo: um catálogo
+      (como `AI_IMG`) e um `updateSttProviderOptions()` que monta a partir dele.
+- [ ] **Backup JSON ainda não leva `knownWords`/`ignoredWords`** (visto na 77ª rodada ao incluir
+      o histórico do Kindle no Exportar/Importar). Quem restaurar um backup perde a triagem de
+      "palavras que já conheço". Não entrou nesta rodada por precisar de decisão de merge
+      própria (união? substituição? o que fazer com palavra que virou card depois?).
+- [ ] **REMOVER o botão temporário "Completar dados (IA)"** (`#lib-fill-origin-btn` no index.html +
+      função `fillMissingAll` em audio.js — sucessora do antigo "Preencher origem"/`fillOriginsAll`)
+      depois de rodar o backfill de IPA/categoria/nível/origem nos cards antigos.
+
+### Decisões que dependem de você
+
+- [ ] **`OBRA_ESTUDO` cria um grupo novo no Estudar** (2026-08-08). Itens pescados de exemplos e da
+      família passam a se juntar sob a pasta *"Do seu estudo"*, com o item de origem por capítulo.
+      É o desenho pretendido (procedência honesta), mas só o uso dirá se essa pasta vira um
+      depósito grande demais. Ela é excluída da limpeza de títulos com IA nos dois pontos
+      (`resolverNomesDeObra` e `_dosObrasSujasHTML`).
+- [ ] **DECIDIR: 3 exemplos = 3 CARDS?** (aberto desde a rodada do "um sentido por encontro").
+      Um sentido com 3 exemplos vira **3 cards** no SRS — confirmado de novo neste teste
+      (2 sentidos estudados → 6 cards). Com a captura já enxugada para um sentido por encontro,
+      talvez o multiplicador que sobra seja este. É **uma linha** na criação do card; o que falta
+      é ele decidir se quer um card com 3 exemplos ou 3 cards com um exemplo cada.
+
+### O que falta construir
+
+- [ ] **O BOTÃO SÓ EXISTE NO GLOSSÁRIO** (Fase 4). Vale no leitor, na legenda do vídeo, no
+      Assistente e no Preparar — em toda tela que chama `glossAtivar`. **Não** vale na tela de
+      triagem por nível (a do print), onde ele marca as 421 de uma vez: lá não há frase sob o
+      cursor, então não há passagem para checar. Se incomodar, o caminho é outro — desmarcar
+      pelo grupo, que já existe.
+- [ ] **LEVAR A SEMENTE PARA O VÍDEO E PARA A EXTENSÃO** — só o leitor foi ligado. Ver o fim
+      da 8.2 para o caminho (pré-análise do LOTE, não do capítulo).
+- [ ] **A FAMÍLIA SÓ APARECE NO PREPARAR.** O dossiê (Estudar) e o glossário da Biblioteca
+      mostram o mesmo item sem dizer de onde ele veio. `familiaDoItem` e `irParaItem` são
+      genéricos e não-lazy — é só chamar de lá. Ficou fora por serem duas telas com layout
+      próprio, não por dificuldade.
+- [ ] **A CAPTURA AVISA NO PREPARAR, NÃO NA HORA DO CLIQUE.** O aviso ("a frase contém *fall in
+      love*") aparece quando ele abre o item no Preparar — não no balão do leitor/vídeo, onde a
+      captura de fato acontece. `unidadeJaEstudada(w)` é de graça e serve igual lá; falta só o
+      lugar na UI daquelas telas.
+- [ ] **O DOSSIÊ AINDA NÃO MOSTRA ÁUDIO NEM IMAGEM** (90ª rodada). O material tem os dois
+      (`AudioDB`, `ImageDB`) e a tela só mostra texto. É a diferença entre ler o material e
+      *estudar* o material. Ficou de fora por ser decisão de layout própria — um botão de ouvir
+      por exemplo, e a ilustração do sentido no cabeçalho do item.
 - [ ] **PRÉ-ANÁLISE DO LIVRO INTEIRO, não só do capítulo.** Hoje é um capítulo por vez, e num
       livro de 40 capítulos isso vira 40 confirmações. Só vale depois de saber o custo REAL de
       um capítulo (pendência acima); com o número na mão dá para oferecer "ler os próximos 5"
@@ -8591,18 +8456,110 @@ A revisão de design foi dividida em três rodadas. **As três estão fechadas.*
 - [ ] **Wiktionary como último recurso NO CLIQUE** (nunca no hover). Aquele ~1 s é inaceitável
       passando o mouse e perfeitamente aceitável clicando: seria o "não achei no seu material"
       para palavra que ainda não é card. Inglês→inglês, então é apoio, não tradução.
-- [ ] **ENCOLHER O PAINEL DE CONTROLES DA NETFLIX** (tentado e REMOVIDO na 101ª). É o que o
-      Language Reactor faz para a legenda poder descer mais: com ele ativo a barra de progresso
-      fica a ~87px do chão, sem ele a ~110px. Tentei `[data-uia="controls-standard"]`,
-      `.watch-video--bottom-controls-container` e `.PlayerControlsNeo__*` — **nenhum casou**, a
-      regra não fazia nada, e código morto fingindo que funciona é pior que ausência. Para
-      refazer é preciso o **nome real da classe do container**, pego no inspetor da página
-      (F12 → selecionar a área dos controles). Sem isso é chute.
-- [ ] **TIRAR OS PREÇOS DE TRANSCRIÇÃO DO HTML** (achado na 90ª). O seletor `cfg-stt-provider`
-      tem "whisper-large-v3-turbo (US$ 0,04/h)" e "whisper-1 (US$ 0,36/h)" **escritos à mão** no
-      `index.html`. Hoje estão certos, mas é exatamente o padrão que fez o seletor de imagens
-      continuar anunciando `gpt-image-1` depois da troca. O conserto é o mesmo: um catálogo
-      (como `AI_IMG`) e um `updateSttProviderOptions()` que monta a partir dele.
+- [ ] **Ilustração da Wikipédia ainda não está no vídeo nem no Assistente** (79ª rodada, item
+      158). A função é a mesma (`wikiIlustracao` + `wikiFiguraHTML`, em `js/ai.js`, não-lazy) —
+      falta só chamar no `video-study.js` e na resposta do chat. Ficou de fora porque cada tela
+      tem markup próprio de popup e cada uma precisa de teste próprio.
+- [ ] **Imagem para palavra ABSTRATA continua sem resposta.** O portão da Wikipédia
+      (deliberadamente) não devolve nada para "seethed", "faltered", "grand experience". Os dois
+      caminhos possíveis: (a) buscador de imagens com chave (Google CSE/Bing) — resultado real,
+      mas exige chave e tem custo; (b) **gerar** a imagem com a IA, que o app JÁ faz nos cards
+      (`buildImageScene`, 11ª rodada) — funciona para qualquer palavra, mas custa
+      US$ 0,01–0,04 por imagem, então teria de ser sob clique, nunca automático.
+- [ ] (Opcional) Avaliar implementar os outros mockups do mesmo projeto Claude Design
+      ("Redesign da aba"): `Adicionar - Mídia.dc.html`, `Canvas.dc.html`, `Estudar.dc.html`
+      e `Gamificação.dc.html` (este último provavelmente cobre um sistema de conquistas mais
+      rico que os 6 marcos simples do Dashboard).
+- [ ] (Opcional) varredura final para mover qualquer símbolo restante de arquivos lazy
+      usado fora deles.
+- [ ] (Opcional) Enriquecimento em lote dos itens importados: hoje cada item vem com 1 sentido +
+      3 exemplos (3 cards) do doc; o botão "Re-analisar" (já sensível à fonte) expande para TODOS
+      os sentidos. Avaliar se vale um "Enriquecer todos" automático na Mídia.
+
+### Só o uso com dado real responde
+
+- [ ] **USAR O BALÃO NO LEITOR E NO VÍDEO COM CONTEÚDO DE VERDADE** (2026-08-08). O balão foi
+      provado no navegador por dois caminhos (seleção e família), e os cinco chamadores carregam
+      sem erro — mas leitor e vídeo pedem livro aberto e episódio tocando, que o ambiente de teste
+      não tem. Falta ver: se a ilustração da Wikipédia cabe bem lá dentro, se a conversa tem
+      espaço confortável no celular, e se o balão ancorado no popup do vídeo atrapalha a legenda.
+- [ ] **USAR O MODO FOCO COM UM CAPÍTULO DE VERDADE** (2026-08-08). O percurso foi provado no
+      navegador com 4 itens semeados: retrato estável, setas sem pular, "Estudei" mandando para a
+      revisão, pausa do erro, atalho e volta. Falta o que só o uso diz — se **os três exemplos**
+      no foco são leitura boa ou parede, se o rodapé fica à mão no celular, e se a lista compacta
+      (dois exemplos) já basta ou também quer os três.
+- [ ] **PROVAR O "O QUE É AQUI?" COM IA DE VERDADE** (Fase 4). O fluxo inteiro foi exercitado
+      com a `aiJSON` mockada — o ambiente de teste não tem chave. O teste que vale: marcar
+      `cover` como conhecida, achar no livro um `cover for` e conferir (a) se a IA devolve a
+      EXPRESSÃO e não a palavra, (b) se a glosa é a da passagem e (c) o custo real da chamada.
+      ⚠️ Com DeepSeek o `aiJSON` cai para texto livre — vale ver se `expr`/`tipo` sobrevivem.
+      Note que o `mesma` do modelo é ignorado de propósito: quem decide é a comparação dos
+      textos, justamente porque booleano volta como `"true"`/`"sim"`/`1` conforme o fornecedor.
+- [ ] **ZONA DE PERIGO — conferir num aparelho com dado real.** O "apagar tudo" ganhou o que
+      faltava (bases `english-lab-books` e `el-video-db` inteiras, as chaves soltas do
+      localStorage e recarregamento no fim). Foi exercitado com dado sintético; num aparelho
+      com livros e podcasts baixados, vale confirmar que a estante e os episódios somem mesmo
+      e que o app volta limpo.
+- [ ] **USAR O REENCONTRO COM DADO REAL.** A Fase 1 foi exercitada ao vivo, mas com item
+      sintético e pré-análise injetada na mão. Falta o teste de verdade: ler um capítulo com a
+      pré-análise ligada, esbarrar numa palavra que você já estuda com outro sentido, e ver
+      (a) se o balão acusa, (b) se "Outro sentido" leva ao Preparar com a semente certa e
+      (c) se a análise **preserva** o sentido antigo em vez de trocá-lo.
+- [ ] **USAR A PRÉ-ANÁLISE COM A IA DE VERDADE** (83ª rodada). Toda a camada 1 foi validada com
+      dados sintéticos — o ambiente de teste não tem chave. Falta rodar "Ler este capítulo com
+      a IA" num capítulo real e conferir: (a) se o custo cobrado bate com o estimado no modal;
+      (b) se a glosa de `barrel` naquela frase sai **cano** e não "barril" — é o teste que
+      justifica a rodada inteira; (c) quantos itens a IA deixa de devolver (o toast já conta os
+      perdidos). ⚠️ Com DeepSeek o `aiJSON` cai para texto livre: vale medir a perda com ele.
+- [ ] **Firebase bloqueado por extensão do navegador** (visto na 170ª): `ERR_BLOCKED_BY_CLIENT`
+      em `firestore.googleapis.com`. A sincronização está falhando em silêncio nesse navegador
+      — vale liberar o domínio no bloqueador, ou o app passar a avisar quando o sync falhar
+      por bloqueio (hoje ele só marca o ponto como erro, sem dizer por quê).
+- [ ] **Pintura em capítulo gigante não foi medida.** `_lerRepintar()` percorre todos os nós de
+      texto do capítulo; testado com 4 mil palavras (instantâneo), não com 20 mil.
+- [ ] **Capa**: a extração foi exercitada, mas com PNG inválido de propósito na fixture (o
+      caminho de erro devolve `''` corretamente). Falta ver uma capa real virando miniatura.
+- [ ] **KINDLE — rodar com o `vocab.db` REAL do aparelho** (77ª rodada). O leitor de SQLite foi
+      validado com fixtures fiéis ao esquema (WORDS/LOOKUPS/BOOK_INFO, 4096 e 512 bytes/página,
+      UTF-8 e UTF-16, overflow de 6,7 KB) e a importação foi exercitada no navegador de ponta a
+      ponta — mas **nenhum arquivo saído de um Kindle de verdade passou por aqui ainda**.
+      Ao ligar o cabo, conferir três coisas: (a) o Windows 11 monta o Kindle como **MTP**, não
+      como unidade — se o seletor de arquivos não abrir a pasta `system`, copie o `vocab.db`
+      para a Área de Trabalho antes; (b) `system` é **pasta oculta**; (c) o `stem` do Kindle é
+      mesmo o lema esperado (se vier flexionado demais, trocar para `word`).
+- [ ] **KINDLE — testar a extensão em `read.amazon.com` com um livro aberto** (77ª rodada). A
+      lógica pura (recorte da frase, título, fila, dedupe, desfazer) está coberta por teste
+      automatizado, mas os **seletores do leitor da Amazon** não foram vistos ao vivo. Se o
+      contexto vier estranho, o ponto a ajustar é `blocoDaSelecao()` em `extension/kindle.js`.
+      Verificar também se a pílula não briga com o dicionário nativo da Amazon.
+- [ ] **PODCAST — rodar um episódio de verdade de ponta a ponta** (76ª rodada): busque um
+      programa, importe um episódio e rode **"Criar legenda com IA"** com a chave da **Groq**
+      (episódio de 1h ≈ R$ 0,15 na Groq contra ~R$ 1,35 na OpenAI). Depois conferir: a legenda
+      nasce sincronizada? A régua de falas acompanha? O card com o áudio real sai com a voz do
+      apresentador? (A gravação de áudio já foi validada tecnicamente — 19 KB reais capturados
+      do mp3 — mas nenhum card de podcast foi criado ainda de verdade.)
+- [ ] **PODCAST — programa com transcrição publicada**: o caminho `<podcast:transcript>` foi
+      validado com feed sintético (VTT preferido ao JSON, JSON palavra-a-palavra virando falas),
+      mas **nenhum feed real com transcrição foi testado**. Ao achar um, conferir a sincronia.
+- [ ] **PODCAST — testar o sync de programas em 2 aparelhos**: adicionar um programa num,
+      conferir que aparece no outro, e **tirar** num e conferir que some no outro (a adoção da
+      nuvem propaga exclusão). Backup — Exportar JSON — antes.
+- [ ] **Testar o player "Ouvir playlist" com áudio real** (a validação desta sessão usou TTS
+      falso para provar que pular durante a fala não pula card): abrir a Biblioteca, tocar nos
+      3 modos (Completo / Desafio / Só o idioma), pular e voltar durante a fala, e conferir que
+      a tradução em PT sai no modo Desafio só depois da pausa de recall.
+- [ ] **Testar ao vivo a importação de documento** (subir o `survivor-vocabulario-ingles.md`):
+      confirmar que extrai os termos, que "snuff" sai como "apagar a tocha" e que os cards entram
+      em "pendente de revisão" já com significado/exemplo. Fazer backup (Exportar JSON) antes.
+- [ ] **Testar PDF** (pdf.js do CDN) — precisa de internet na primeira leitura; depois cacheia.
+- [ ] **Testar ao vivo a preservação de exemplos curados** (após deploy + hard-refresh; backup —
+      Exportar JSON — antes): (1) com a leva `A1.1-leva-01.md` já importada em Revisar, clicar
+      "Re-analisar" numa palavra (ex.: "hablar") e conferir que as frases/significado curados NÃO
+      mudam, só campos vazios (origem etc.) são completados; (2) na Biblioteca, rodar "Completar
+      dados (IA)" e conferir que só preenche o que faltava, sem tocar em frases nem no agendamento.
+
+### Avaliações de modelo — quando der, sem pressa
+
 - [ ] **MEDIR O `gpt-image-1-mini`** (90ª rodada). A saída dele é US$ 8/1M — 5× abaixo do
       gpt-image-1 e 3,75× abaixo do image-2 — e ele pode ser o mais barato do catálogo para
       ilustrar card. Mas a OpenAI **não publica a tabela por imagem** dele, então cotar seria
@@ -8626,169 +8583,122 @@ A revisão de design foi dividida em três rodadas. **As três estão fechadas.*
       "separe as sílabas". Isso é ganho **pedagógico**, não econômico: seria um botão extra no
       card ("ouvir devagar / com ênfase"), convivendo com o `gpt-4o-mini-tts` atual, não
       substituindo. Custa 2× por minuto e o modelo é *Preview* — só vale se o uso for pontual.
-- [ ] **Gemini 3.5 Live Translate — anotado, sem plano** (81ª). Tradução fala→fala em tempo
-      real, 70+ idiomas, US$ 3,50 in / 21,00 out. Abriria "conversar e ser entendido na hora",
-      mas é **Live API por WebSocket** (nada parecido com o que o app faz hoje), preço de outra
-      ordem de grandeza e status *Preview*. Registrado para não se perder; não priorizado.
-- [ ] **DESCOBRIR POR QUE O DEEPSEEK NÃO RESPONDE** (170ª rodada). No teste de 06/08, as 4
-      chamadas JSON dele caíram no fallback da OpenAI. Agora o motivo aparece no console e um
-      toast avisa. Rodar de novo e ler a mensagem: se for `model not found`, o ID
-      `deepseek-v4-flash` mudou; se for 401/402, é chave ou saldo; se for "resposta vazia ou
-      fora do formato", é o modelo devolvendo texto não-JSON e aí o caminho é o de sempre
-      (prompt mais explícito ou parser mais tolerante).
-- [ ] **Firebase bloqueado por extensão do navegador** (visto na 170ª): `ERR_BLOCKED_BY_CLIENT`
-      em `firestore.googleapis.com`. A sincronização está falhando em silêncio nesse navegador
-      — vale liberar o domínio no bloqueador, ou o app passar a avisar quando o sync falhar
-      por bloqueio (hoje ele só marca o ponto como erro, sem dizer por quê).
+
+### Acabamento visual e acessibilidade
+
+- [ ] **ESPAÇAMENTO NO RESTO DO ARQUIVO.** Os `--sp-*` foram aplicados na faixa compartilhada e
+      na camada de reskin (113 usos). O CSS específico de cada seção (vídeo, leitor, dossiê,
+      assistente) ainda usa literais. Não é urgente e **não deve ser feito em varredura cega**:
+      parte daquelas medidas é calibrada no olho e perde ao ser arredondada.
+- [ ] **DUAS REGRAS `@media (hover:none)` separadas** (uma esconde `.ler-seta`, a outra também).
+      Sobreposição inofensiva, mas são o mesmo caso — vale unir quando alguém passar por ali.
+- [ ] **MOVIMENTO E CONTRASTE ainda não têm tratamento completo** (achado na rodada B, deixado
+      fora de propósito). Há só **duas** regras `prefers-reduced-motion` para um app cheio de
+      transição e animação, e **zero** `prefers-contrast`. Não é urgente, mas é o mesmo tipo de
+      lacuna que o foco de teclado era: invisível para quem não precisa, bloqueante para quem
+      precisa.
+- [ ] **O anel de foco pode ser cortado por ancestral com `overflow:hidden`** (ex.: `.card-box`).
+      O outline não é cortado pelo overflow do PRÓPRIO elemento, mas é pelo do pai. Não foi visto
+      acontecendo; se aparecer, a saída é `outline-offset` negativo naquele componente específico
+      — não mexer na regra global.
+
+### Já resolvidas
+
+- [x] ~~Fonte ancestral: item nascido de exemplo herdava a obra~~ — **corrigido em 2026-08-08**.
+      `selMenuAtivar` passa o nó da seleção; `_dosSelContexto` (dossie.js) decide pela REGIÃO da
+      página. Varrido e corrigido nos outros dois lugares com o mesmo defeito:
+      `dossieFamiliaPreparar` e `revSelExplain`. Ver o topo deste arquivo.
+- [x] ~~"Explicar" abria painel em vez do modo suspenso~~ — **corrigido em 2026-08-08**: a resposta
+      nasce no próprio balão (`#sel-menu.sel-exp`), com botões de Preparar, expandir e fechar.
+- [x] ~~O leitor ainda abre o painel no "Explicar"~~ — **resolvido em 2026-08-08**, e ele fechou a
+      questão para o projeto inteiro: o painel foi REMOVIDO e o balão virou a única casa da Lexa
+      nas cinco telas. Ver 8.2 ("O balão é a única casa da Lexa").
+- [x] ~~A Lexa que leu o livro e vê a web~~ — **as duas entregues em 2026-08-08**. A web só no
+      clique; a obra com a regra do spoiler e o eco entrando antes da IA. Ver 8.2.
+      ⚠️ **Falta usar com um livro de verdade**: o comportamento foi provado com um EPUB de
+      mentira de quatro capítulos. Com *Billy Summers* aberto, conferir se a busca em um livro
+      grande responde rápido o bastante para não atrasar a explicação.
+- [x] ~~O acervo já capturado no leitor está com o contexto errado~~ — **reparo entregue em
+      2026-08-08**, em Configurações. Sem IA, com simulação antes. Ver 8.2 ("O contexto voltou
+      para o lugar"). ⚠️ **Falta rodar com o acervo de verdade** — o ambiente de teste não tem
+      livro nem itens; o comportamento foi provado com um EPUB de mentira e o caminho real.
+- [x] ~~O Assistente pula o Preparar~~ — **corrigido em 2026-08-08**, a pedido dele, logo depois
+      da varredura. Ver 8.2 ("O Assistente também entrou na fila"). **Agora TODA fonte para no
+      Preparar**: leitor, Netflix, Kindle, documento, mídia, vídeo, podcast e Assistente.
+- [x] ~~Captura repetida no vídeo duplica o item~~ — **corrigido em 2026-08-08**: usa
+      `prepAcharItem` + `prepararNovoSentido`, como o leitor. Ver 8.2 ("O reencontro no vídeo").
+- [x] ~~Provar os chips da frase com IA de verdade~~ — **feito em 2026-08-08** por
+      `tools/teste-ia.mjs chips`, com o caso real do vazamento. (a) A regra "a unidade tem de
+      sobreviver FORA desta frase" **é respeitada pela Luna** (devolveu `lower middle-class`) e
+      **não pelo gpt-4o-mini**, que devolveu a fatia `looks lower middle-class` e ainda um nome de
+      personagem — mais um argumento para a troca de modelo. (b) O enum do `type` segurou nos
+      quatro cenários. (c) Custo real: ~R$ 0,003 por quebra.
+- [x] ~~Provar os campos novos com IA de verdade~~ — **feito em 2026-08-08** por
+      `tools/teste-ia.mjs analise`. (a) Tamanho real: 6.300 tokens de entrada e 1.583–2.486 de
+      saída, **nada truncou** contra o teto de 5.000. (b) `armadilha` e `curiosidade` voltaram
+      vazias quando não havia o que dizer — o "vazio é resposta válida" se sustenta. (c) O item do
+      DeepSeek caducou: o fornecedor saiu. ⚠️ O que sobrou é a comparação de QUALIDADE: a Luna
+      preenche 17–18 dos 21 campos contra 9–12 do gpt-4o-mini.
+- [x] ~~CONTAR NO LIVRO com um EPUB de verdade~~ — **caducou**: a peça foi REFEITA em 08/08 sobre o motor da obra (com corte de spoiler e trechos); o teste que importa agora é o do item novo, logo acima.
+- [x] ~~A pausa do erro no celular~~ — **medido e corrigido na mesma rodada** (2026-08-08): em
+      375×812 o "Entendi — próximo" nascia em y=815 (fora da tela) e, depois de rolar, ficava
+      embaixo da barra fixa de navegação. Resolvido com `scrollIntoView({block:'nearest'})` na
+      pausa + `scroll-margin-bottom: 84px` no celular. Medido de novo: botão em 632→728, barra
+      começa em 744, e a cena do livro continua inteira na tela.
+- [x] ~~Medir a pré-análise com IA de verdade (`barrel` → "cano"?)~~ — **FEITO e PASSOU**
+      (confirmado pelo Djemeson em 2026-08-07). ⚠️ **Não refazer este teste.** É o que
+      autorizou a glosa da pré-análise a virar semente do sentido (ver 8.2, Fase 1).
+- [x] ~~FASE 2 (estado por sentido) e FASE 3 (lema, verbete, reencontro por IA, fundir)~~ —
+      **FEITAS em 2026-08-08**. O plano das três fases está inteiro na 8.2.
+- [x] ~~Provar o `same_as` com IA de verdade~~ — **feito em 2026-08-08**, e ele provou mais que
+      si mesmo: no cenário de reencontro **sem esquema**, o gpt-4o-mini simplesmente OMITIU o
+      campo (o merge falharia calado); **com esquema**, os três modelos devolveram o id certo.
+      É a medição do valor de structured outputs.
+- [x] ~~O lema não cobre tudo~~ — **estendido ao máximo em 2026-08-08** (ver 8.2, item 5):
+      regra de cabeça inicial/final por tipo + IA devolvendo `lemma` validado. Medido em 30/31
+      casos difíceis. O que **sobra** e é limite conhecido, não pendência:
+      **(a)** ambiguidade real de forma (`leaves` = *leaf* ou *leave*) — só o contexto resolve,
+      e é a IA quem resolve; **(b)** derivação continua **fora de propósito** — `glossLemas`
+      exclui `-er`/`-est`/`-ly` porque "teacher" não é "teach" e "hardly" não é "hard"; juntar
+      essas famílias reintroduziria a classe de erro das rodadas 163-167.
+- [x] ~~**RODADA A — AS ESCADAS**~~ — feita (espaço, camada, breakpoint + o bug do modal
+      atravessado pela barra no celular + o código morto da sidebar).
+- [x] ~~**RODADA B — FOCO DE TECLADO E ALVO DE TOQUE**~~ — feita. Anel de foco global, os 34
+      campos com nome acessível (24 `label for` + 10 `aria-label`, incluindo os gerados por JS
+      em 13 arquivos) e 44px no ponteiro grosseiro. Ver seção 8 (91ª rodada, parte B).
+- [x] ~~**RODADA C — OS ESTILOS INLINE**~~ — feita, **mas não como estava escrito aqui**. A
+      premissa ("390 estilos inline = 390 vazamentos de tema") era FALSA: 236 são só layout, 157
+      já usavam `var(--)` e só **6** prendiam cor. O defeito real estava no CSS (51 literais fora
+      dos blocos de tema) — inclusive `.stat-card` com borda invisível em 2 dos 6 temas. Ver
+      seção 8 (91ª rodada, parte C). **Lição registrada: medir antes de aceitar a própria
+      pendência da rodada anterior.**
+- [x] ~~Ligar a seção dos dossiês, renomear as seções e decidir o portão~~ — **feito na 90ª
+      rodada** (2026-08-07). Ver 8.1: está tudo lá, inclusive por que os arquivos NÃO foram
+      renomeados.
+- [x] ~~USAR O FLUXO NOVO COM DADO REAL~~ — encerrada em 2026-08-08 na limpeza da lista: o fluxo de 4 etapas foi percorrido inteiro nesta sessão, com o acervo de verdade.
+- [x] ~~ENVIAR OS 97 ITENS QUE JÁ ESTÃO PRONTOS~~ — **caducou**: o "devolver tudo ao Preparar" desta sessão zerou o cenário: não há mais fila de `pending_review` legada.
+- [x] ~~GLOSSÁRIO CAMADA 1 — dicionário bilíngue embarcado~~ — **medido e RECUSADO** na 83ª
+      rodada. Cabia (0,26 MB comprimido) e cobria 91,5% do texto, mas erra `barrel`, `bore` e
+      `yank` e não tem `animus` nem `tire`. Substituído pela **pré-análise do capítulo**.
+      ⚠️ **Não refazer este estudo** — os números, as fontes e o porquê estão no item 176.
+- [x] ~~DESCOBRIR POR QUE O DEEPSEEK NÃO RESPONDE~~ — encerrada em 2026-08-08 na limpeza da lista: o DeepSeek saiu do app.
 - [x] ~~REFAZER OS DOIS CASOS DA 163ª RODADA~~ — **feito em 06/08 e PASSOU** nos modelos da
       OpenAI (ver 170ª rodada). Falta só refazer com o DeepSeek de fato respondendo.
-
-- [ ] **(histórico) REFAZER OS DOIS CASOS DA 163ª RODADA COM O DEEPSEEK.** As correções são de PROMPT e não
-      puderam ser testadas (o ambiente de teste não tem chave de IA). Repetir exatamente:
-      (a) mandar `"we began to tire of the mud"` para o Revisar e conferir se a glosa de
-      "tire of" agora é "cansar-se de" e se "the mud" sumiu das colocações;
-      (b) analisar `does` com o contexto `"The boat ride does add time to the trip"` e conferir
-      se o primeiro significado é o auxiliar enfático ("de fato, realmente") com exemplos de
-      ênfase — e não "fazer, executar" com "she does the laundry".
-      Se o DeepSeek ainda escorregar, o próximo passo é o mesmo da 49ª rodada: rede de segurança
-      no código (validar a resposta e repetir na OpenAI só nesse item).
-      ⚠️ **Use "Refazer do zero", não "Re-analisar"** — o "Re-analisar" preserva o que já tem
-      exemplos, então devolveria o mesmo erro (foi exatamente o que aconteceu na 164ª rodada).
-      Terceiro caso a refazer: `"a bayonet mounted on the tip of its barrel"` → o significado
-      tem de ser **"ponta do cano"** (fuzil), nunca "barril".
-
-### LER — buracos conhecidos (79ª rodada)
-
-- [ ] **Nenhum EPUB comercial de verdade passou por aqui.** O parser foi validado com fixtures
-      fiéis (EPUB 3 com `nav`, EPUB 2 com `.ncx`, subpasta, entrada STORED, capa, acentuação,
-      capítulo de 4 mil palavras) e a leitura foi exercitada ao vivo no navegador — mas um livro
-      real tem 300 arquivos, CSS complicado e notas de rodapé. **Primeiro teste a fazer**: um
-      `.epub` do Standard Ebooks (bem diagramado) e um da sua estante.
-- [ ] **EPUB com DRM não abre e não vai abrir.** Livro comprado na Amazon/Kobo com proteção é
-      um arquivo cifrado; o leitor mostra erro de formato. Isso não é bug — é o desenho.
-- [ ] **PDF não é suportado.** Precisaria do pdf.js (~1 MB) e o texto de PDF vem sem estrutura
-      (quebra de linha por posição, não por parágrafo), o que estragaria a captura de frase.
-      Se for necessário, o caminho barato é converter para EPUB antes.
+- [x] ~~(histórico) REFAZER OS DOIS CASOS DA 163ª RODADA COM O DEEPSEEK~~ — encerrada em 2026-08-08 na limpeza da lista: o DeepSeek saiu do app.
+- [x] ~~Nenhum EPUB comercial de verdade passou por aqui~~ — **caducou**: ele passou a sessão de 08/08 lendo *Billy Summers*, um EPUB comercial — capítulos, seleção, captura e busca no texto, tudo exercitado nele.
 - [x] ~~Celular: falta o gesto de virar a página.~~ **Feito na mesma rodada**: arrastar, tocar
       nas bordas, modo imersivo, folhas de baixo e toque longo para selecionar. Falta só
       **provar num aparelho de verdade** — os gestos foram validados com toques sintéticos a
       375×812, não com um dedo real (inércia, latência e o menu nativo de seleção do Android
       podem pedir ajuste fino).
-- [ ] **Pintura em capítulo gigante não foi medida.** `_lerRepintar()` percorre todos os nós de
-      texto do capítulo; testado com 4 mil palavras (instantâneo), não com 20 mil.
-- [ ] **Capa**: a extração foi exercitada, mas com PNG inválido de propósito na fixture (o
-      caminho de erro devolve `''` corretamente). Falta ver uma capa real virando miniatura.
-
-- [ ] **Ilustração da Wikipédia ainda não está no vídeo nem no Assistente** (79ª rodada, item
-      158). A função é a mesma (`wikiIlustracao` + `wikiFiguraHTML`, em `js/ai.js`, não-lazy) —
-      falta só chamar no `video-study.js` e na resposta do chat. Ficou de fora porque cada tela
-      tem markup próprio de popup e cada uma precisa de teste próprio.
-- [ ] **Imagem para palavra ABSTRATA continua sem resposta.** O portão da Wikipédia
-      (deliberadamente) não devolve nada para "seethed", "faltered", "grand experience". Os dois
-      caminhos possíveis: (a) buscador de imagens com chave (Google CSE/Bing) — resultado real,
-      mas exige chave e tem custo; (b) **gerar** a imagem com a IA, que o app JÁ faz nos cards
-      (`buildImageScene`, 11ª rodada) — funciona para qualquer palavra, mas custa
-      US$ 0,01–0,04 por imagem, então teria de ser sob clique, nunca automático.
-
-### LER — o que o módulo torna possível (roteiro, em ordem de valor/esforço)
-
-> Escrito na 79ª rodada a pedido do Djemeson ("analise, estude e planeje ferramentas novas que
-> são viáveis com esse novo módulo"). Nada aqui foi implementado ainda.
-
-**Barato e de alto valor — próxima rodada natural:**
-
-1. **Pré-leitura do capítulo.** Antes de abrir o capítulo, estudar as 10–15 palavras novas mais
-    frequentes DELE. É o "Preparar para assistir" do módulo Vídeo aplicado ao livro, e a
-    matemática já está pronta (`lerAnalisar`). Muda a experiência de "travo a cada parágrafo"
-    para "leio corrido". **Provavelmente o item de maior impacto da lista.**
-2. **Cobertura na estante.** Calcular a cobertura de cada livro e mostrá-la na capa: "97% —
-    leitura fluida", "89% — vai doer". Escolher o livro certo é metade da leitura extensiva.
-    **Ficou mais valioso depois da triagem (item 161)**: agora o `knownWords` cresce de verdade,
-    então o número na capa passa a significar alguma coisa. Cuidado de projeto: NÃO congelar o
-    valor na importação — ele muda toda vez que você triar um capítulo. Calcular sob demanda
-    (ou recalcular quando a estante abrir) e guardar com carimbo de quando foi medido.
-3. **Ler ouvindo.** A voz do navegador já está ligada na seleção; falta o modo contínuo com a
-    frase atual destacada e avanço automático de página. Custo zero de API.
-4. **Retomar com resumo.** "Faz 6 dias que você parou" → a IA resume em 3 linhas o que
-    aconteceu até ali (usando o texto dos capítulos lidos). Uma chamada barata, resolve o
-    atrito real de abandonar livro por ter perdido o fio.
-5. **Leitura no Dashboard.** `livro.minutos` e palavras lidas já são gravados; falta plotar no
-    heatmap e virar sequência (streak) — o app já tem a máquina de streak.
-6. **Página de destaques do livro.** Tudo que você capturou naquele livro numa tela só
-    (`livro.notes` já guarda palavra, frase, capítulo e o id do card), com exportação.
-
-**Médio — precisa de investigação antes:**
-
-7. **Catálogo embutido (Project Gutenberg / Standard Ebooks).** Buscar e baixar sem sair do
-    app. A API `gutendex.com` tem CORS liberado para METADADOS; falta confirmar se o download
-    do `.epub` também tem, senão precisaria de uma função serverless (a Vercel já hospeda o
-    app). 70 mil livros de domínio público em inglês, de graça, é acervo de sobra.
-8. **Modo bilíngue por parágrafo.** Tradução da IA sob demanda, com a mesma névoa borrada do
-    módulo Vídeo (32ª rodada) — revela ao passar o mouse. O prompt anti-literal já existe.
-9. **Cloze a partir do livro.** Transformar a frase capturada num card de lacuna ("He ____ with
-    a rage he could not name"). O SRS já aceita variações de card; é mais desenho do que código.
-10. **Meta de leitura extensiva.** Minutos ou páginas por dia, com o streak existente. Combina
-    com o item 5.
-
-**Ambicioso — só se virar prioridade:**
-
-11. **Livro + audiobook sincronizados.** O app já tem Whisper (Groq, barato) para transcrever;
-    alinhar a transcrição ao texto do livro daria leitura acompanhada de narração real, que é o
-    exercício de *listening* mais poderoso que existe. Complexo: alinhamento forçado de horas
-    de áudio contra centenas de milhares de palavras.
-12. **Nível automático do livro (CEFR).** Estimar a faixa pelo perfil de frequência do
-    vocabulário e comparar com o SEU perfil. Vale como número na estante, mas exige uma lista
-    de frequência de referência embutida (~5 mil palavras).
-
-- [ ] **KINDLE — rodar com o `vocab.db` REAL do aparelho** (77ª rodada). O leitor de SQLite foi
-      validado com fixtures fiéis ao esquema (WORDS/LOOKUPS/BOOK_INFO, 4096 e 512 bytes/página,
-      UTF-8 e UTF-16, overflow de 6,7 KB) e a importação foi exercitada no navegador de ponta a
-      ponta — mas **nenhum arquivo saído de um Kindle de verdade passou por aqui ainda**.
-      Ao ligar o cabo, conferir três coisas: (a) o Windows 11 monta o Kindle como **MTP**, não
-      como unidade — se o seletor de arquivos não abrir a pasta `system`, copie o `vocab.db`
-      para a Área de Trabalho antes; (b) `system` é **pasta oculta**; (c) o `stem` do Kindle é
-      mesmo o lema esperado (se vier flexionado demais, trocar para `word`).
-- [ ] **KINDLE — testar a extensão em `read.amazon.com` com um livro aberto** (77ª rodada). A
-      lógica pura (recorte da frase, título, fila, dedupe, desfazer) está coberta por teste
-      automatizado, mas os **seletores do leitor da Amazon** não foram vistos ao vivo. Se o
-      contexto vier estranho, o ponto a ajustar é `blocoDaSelecao()` em `extension/kindle.js`.
-      Verificar também se a pílula não briga com o dicionário nativo da Amazon.
-- [ ] **KINDLE — documento pessoal no aparelho não entra pelo `vocab.db`** (limite da Amazon,
-      não nosso). O caminho é destacar a palavra com o dedo → `My Clippings.txt`. Se isso virar
-      atrito no uso diário, a alternativa é ler o documento pelo `read.amazon.com` (Enviar para
-      Kindle) e usar o modo **auto** da extensão.
-- [ ] **Backup JSON ainda não leva `knownWords`/`ignoredWords`** (visto na 77ª rodada ao incluir
-      o histórico do Kindle no Exportar/Importar). Quem restaurar um backup perde a triagem de
-      "palavras que já conheço". Não entrou nesta rodada por precisar de decisão de merge
-      própria (união? substituição? o que fazer com palavra que virou card depois?).
-
-- [ ] **PODCAST — rodar um episódio de verdade de ponta a ponta** (76ª rodada): busque um
-      programa, importe um episódio e rode **"Criar legenda com IA"** com a chave da **Groq**
-      (episódio de 1h ≈ R$ 0,15 na Groq contra ~R$ 1,35 na OpenAI). Depois conferir: a legenda
-      nasce sincronizada? A régua de falas acompanha? O card com o áudio real sai com a voz do
-      apresentador? (A gravação de áudio já foi validada tecnicamente — 19 KB reais capturados
-      do mp3 — mas nenhum card de podcast foi criado ainda de verdade.)
 - [x] **PODCAST — espaço em disco** — feito na 78ª rodada: Configurações → Dados locais mostra
       "Espaço usado neste aparelho" (episódios baixados, áudio consertado e o total do navegador
       via `navigator.storage.estimate()`), com botões para liberar cada grupo.
-- [ ] **PODCAST — programa com transcrição publicada**: o caminho `<podcast:transcript>` foi
-      validado com feed sintético (VTT preferido ao JSON, JSON palavra-a-palavra virando falas),
-      mas **nenhum feed real com transcrição foi testado**. Ao achar um, conferir a sincronia.
 - [x] **PODCAST — "Seus podcasts" sincroniza** — feito na 78ª rodada: o estado saiu do lazy
       `video-podcast.js` e virou `podShows` em `core.js`, com doc próprio (`data/podShows`) no
       Firestore, adoção da nuvem (exclusão propaga) e entrada no Exportar/Importar JSON.
-- [ ] **PODCAST — testar o sync de programas em 2 aparelhos**: adicionar um programa num,
-      conferir que aparece no outro, e **tirar** num e conferir que some no outro (a adoção da
-      nuvem propaga exclusão). Backup — Exportar JSON — antes.
-
 - [x] **Estudar transbordava a tela no celular** — corrigido em 2026-08-01 (16ª rodada, item 67).
-
-- [ ] **Olhar a sidebar nova com dados reais** (7ª rodada, 2026-07-31): o bloco "Hoje" foi
-      validado com `srsLog` sintético (12 feitas / 183 restantes / 5 dias). Com uso real,
-      conferir se a proporção da barra faz sentido durante uma sessão (o número de "feitas"
-      conta cada nota dada, inclusive repetições das etapas de aprendizagem — então pode passar
-      do que parecia o total do dia) e se "Dia concluído" aparece na hora certa.
-
+- [x] ~~Olhar a sidebar nova com dados reais~~ — encerrada em 2026-08-08 na limpeza da lista: a sidebar está em uso diário desde julho.
 - [x] **Publicado no GitHub** em 2026-07-30 (`main` = `5e4a32f`, Actions verde, service worker
       confirmado ao vivo em `/english-lab/` com o cache `englab-v5` e 14 arquivos).
 - [x] **Repositório importado na Vercel** em 2026-07-30 → `https://english-lab-seven.vercel.app/`.
@@ -8806,96 +8716,71 @@ A revisão de design foi dividida em três rodadas. **As três estão fechadas.*
       `english-lab-726e7.web.app`, `djemeson.github.io`, `english-lab-seven.vercel.app`.
       ⚠️ `*.vercel.app` não funciona como curinga: cada **preview deploy** tem URL própria e
       **não autentica**. Para estudar de verdade, sempre a URL de produção.
-- [ ] **Hard-refresh + backup depois de abrir a versão nova** (Exportar JSON antes): o service
-      worker mudou de `englab-v4` para `englab-v5`.
-- [ ] **Testar o player "Ouvir playlist" com áudio real** (a validação desta sessão usou TTS
-      falso para provar que pular durante a fala não pula card): abrir a Biblioteca, tocar nos
-      3 modos (Completo / Desafio / Só o idioma), pular e voltar durante a fala, e conferir que
-      a tradução em PT sai no modo Desafio só depois da pausa de recall.
-- [ ] **Conferir o app instalado como PWA** (manifest + `icon.svg` novos): "Adicionar à tela de
-      início" no celular, ver o ícone e se abre em `standalone` sem a barra do navegador.
-- [ ] **Confirmar o service worker no GitHub Pages** depois do deploy (era o erro que o impedia
-      de instalar em `/english-lab/`): DevTools → Application → Service Workers deve mostrar
-      escopo `https://djemeson.github.io/english-lab/` e o cache `englab-v5` com 14 entradas.
+- [x] ~~Hard-refresh + backup depois de abrir a versão nova~~ — encerrada em 2026-08-08 na limpeza da lista: era o service worker `englab-v4`→`v5`; estamos em `v195`.
+- [x] ~~Conferir o app instalado como PWA~~ — encerrada em 2026-08-08 na limpeza da lista: o app roda instalado desde então.
+- [x] ~~Confirmar o service worker no GitHub Pages~~ — **caducou**: o SW passou de `englab-v4` a `englab-v195` publicando a cada rodada.
 - [x] **Chips de variedade/registro** — feito na 2ª rodada de 2026-07-30 (item 44): emoji
       removido, movidos para `js/lang.js` (não-lazy), cor pelas variáveis do tema e contraste
       WCAG AA nos 6 temas. A interface está **100% sem emoji** agora.
-- [ ] **Conferir visualmente o novo Dashboard ao vivo** (após deploy + hard-refresh; a
-      validação desta sessão foi só por `getComputedStyle`/dados sintéticos, sem screenshot):
-      com dados reais de uso, olhar o heatmap (cores fazem sentido com o histórico real de
-      `srsLog`?), a tendência de acerto, o card de "travando na memória" (só aparece se
-      houver leech de verdade), a palavra em destaque (troca a cada dia?) e o card de
-      conquistas nos 6 temas — inclusive em mobile (grade 2 colunas deve virar 1 coluna,
-      badges 6→3→2 por linha).
+- [x] ~~Conferir visualmente o novo Dashboard ao vivo~~ — encerrada em 2026-08-08 na limpeza da lista: o Dashboard é a tela de abertura, vista todo dia.
 - [x] **Bug de pluralização "0 revisãoões"** no hero do Dashboard — corrigido em 2026-07-14
       (confirmado no código em 2026-07-30: `js/dashboard.js` usa duas strings completas).
-- [ ] (Opcional) Avaliar implementar os outros mockups do mesmo projeto Claude Design
-      ("Redesign da aba"): `Adicionar - Mídia.dc.html`, `Canvas.dc.html`, `Estudar.dc.html`
-      e `Gamificação.dc.html` (este último provavelmente cobre um sistema de conquistas mais
-      rico que os 6 marcos simples do Dashboard).
-- [ ] **Testar o MULTI-IDIOMA ao vivo** (após deploy + hard-refresh; backup — Exportar JSON —
-      antes): (1) trocar o seletor p/ Espanhol no Adicionar, adicionar "echar de menos" e
-      analisar — conferir type=phrasal_verb c/ type_label "perífrase verbal", IPA, variedades
-      es no dropdown do card e deck "Espanhol" criado; (2) auto-detecção: com seletor em Inglês,
-      adicionar "se débrouiller" com frase de contexto em francês → deve avisar "Idioma
-      detectado: Francês" e ir p/ o deck certo; (3) Assistente: trocar o idioma na barra do chat
-      e conferir sugestões + resposta como tutor do idioma + termos extraídos no idioma;
-      (4) TTS de uma frase em espanhol/alemão (tts-1 é multilíngue); (5) conferir chip de idioma
-      nos cards não-ingleses e o glossário.
+- [x] ~~Testar o MULTI-IDIOMA ao vivo~~ — encerrada em 2026-08-08 na limpeza da lista: o seletor de idioma está em uso.
 - [x] ~~Ajustar o workflow do n8n~~ — a integração inteira foi removida em 2026-07-30.
 - [x] Nome exibido do app trocado para "Language Lab" (sessão 2026-07-13) — infra
       (repo/URL/Firebase) continua `english-lab` como já era a decisão.
 - [x] Filtro por idioma no glossário da Biblioteca — feito em 2026-07-30 (item 45).
-- [ ] **Testar a precisão do negrito ao vivo** (sessão 2026-07-13, 2ª rodada — fazer backup/
-      Exportar JSON antes do passo 2, que reescreve frases): (1) analisar uma palavra nova em
-      Revisar/Assistente e conferir negrito nos dois lados; (2) rodar "Negrito perfeito (IA)"
-      na Biblioteca — deve pegar mais cards que antes (agora detecta negrito malformado, não só
-      ausente); (3) importar um documento na Mídia e, se algum lote da Fase 2 falhar, conferir
-      se a semente da Fase 1 ainda saiu com negrito no inglês.
-- [ ] **Conferir visualmente o reskin "Papel" ao vivo** (após deploy + hard-refresh): a
-      ferramenta de screenshot não funcionou nesta sessão, então a validação foi só por
-      `getComputedStyle`/DOM — olhar as 7 telas nos 6 temas (principalmente o hero card do
-      Dashboard com dados reais/`paraHoje > 0`, a flashcard de Estudar com a palavra maior em
-      Newsreader, e o tema `papel` novo) e ajustar valores a olho se algo parecer errado
-      (radius/sombra/contraste). Conferir também em mobile (o `.srs-card-front-word` maior pode
-      cortar em telas estreitas — ver checklist de risco do plano desta sessão).
-- [ ] **Testar ao vivo as melhorias da 5ª rodada** (após o deploy GitHub Pages + hard-refresh):
-      (1) abrir Biblioteca → alternar **Cards/Palavras**, conferir o glossário e a busca; (2) num card
-      de palavra com 2+ sentidos, ver o chip **"sentido X de Y"** e clicar (deve abrir o glossário no
-      termo); (3) rodar **"Negrito perfeito (IA)"** e conferir o `<b>` no inglês e no português (cards
-      antigos); (4) criar/analisar uma palavra nova e confirmar que o PT já vem em negrito. Backup
-      (Exportar JSON) antes do passo 3, pois ele reescreve as frases dos cards.
-- [ ] **Testar o Assistente ao vivo** (fazer backup — Exportar JSON — antes, pois o sync mudou):
-      perguntar algo, ver o streaming, conferir os botões "Adicionar"/"Adicionar todos" e o
-      "já no estudo"; recarregar e confirmar que a conversa persiste; checar o doc `data/conversas`
-      no Firebase. Testar uma pergunta com vários termos (ex.: "diferença entre speak e talk") e
-      confirmar que aparecem dois botões.
-- [ ] **Testar o sync em tempo real em 2 dispositivos** (abrir em duas abas/navegadores e
-      confirmar propagação e exclusão). Fazer backup (Exportar JSON) antes.
-- [ ] Depois de a versão de sync estar no ar, rodar **"Limpar tudo"** uma vez para zerar a
-      nuvem (que ainda guarda dados antigos), se o objetivo for recomeçar.
+- [x] ~~Testar a precisão do negrito ao vivo~~ — encerrada em 2026-08-08 na limpeza da lista: o negrito do objeto de estudo aparece em todo card revisado.
+- [x] ~~Conferir visualmente o reskin "Papel" ao vivo~~ — encerrada em 2026-08-08 na limpeza da lista: é o tema em que o app roda.
+- [x] ~~Testar ao vivo as melhorias da 5ª rodada~~ — encerrada em 2026-08-08 na limpeza da lista: Biblioteca e glossário em uso diário.
+- [x] ~~Testar o Assistente ao vivo~~ — encerrada em 2026-08-08 na limpeza da lista: o Assistente está em uso.
+- [x] ~~Testar o sync em tempo real em 2 dispositivos~~ — encerrada em 2026-08-08 na limpeza da lista: o sync roda entre os aparelhos dele todo dia.
+- [x] ~~Depois de a versão de sync estar no ar, rodar~~ — **caducou**: o sync está no ar há meses.
 - [x] Emojis residuais trocados por ícones `ic()` em 2026-07-30 (tela de fim de sessão, toasts,
       botões de Kindle/Mídia/Website, banner de áudio, avisos). Sobra só o mapa de chips de
       variedade/registro em `study.js` — ver item opcional acima.
-- [ ] (Opcional) varredura final para mover qualquer símbolo restante de arquivos lazy
-      usado fora deles.
-- [ ] **Testar ao vivo a importação de documento** (subir o `survivor-vocabulario-ingles.md`):
-      confirmar que extrai os termos, que "snuff" sai como "apagar a tocha" e que os cards entram
-      em "pendente de revisão" já com significado/exemplo. Fazer backup (Exportar JSON) antes.
-- [ ] **Testar PDF** (pdf.js do CDN) — precisa de internet na primeira leitura; depois cacheia.
-- [ ] **REMOVER o botão temporário "Completar dados (IA)"** (`#lib-fill-origin-btn` no index.html +
-      função `fillMissingAll` em audio.js — sucessora do antigo "Preencher origem"/`fillOriginsAll`)
-      depois de rodar o backfill de IPA/categoria/nível/origem nos cards antigos.
-- [ ] **Testar ao vivo a preservação de exemplos curados** (após deploy + hard-refresh; backup —
-      Exportar JSON — antes): (1) com a leva `A1.1-leva-01.md` já importada em Revisar, clicar
-      "Re-analisar" numa palavra (ex.: "hablar") e conferir que as frases/significado curados NÃO
-      mudam, só campos vazios (origem etc.) são completados; (2) na Biblioteca, rodar "Completar
-      dados (IA)" e conferir que só preenche o que faltava, sem tocar em frases nem no agendamento.
-- [ ] (Opcional) Enriquecimento em lote dos itens importados: hoje cada item vem com 1 sentido +
-      3 exemplos (3 cards) do doc; o botão "Re-analisar" (já sensível à fonte) expande para TODOS
-      os sentidos. Avaliar se vale um "Enriquecer todos" automático na Mídia.
+## 9. Pendências / a verificar
 
----
+
+### Decisões tomadas — ficam aqui para não serem refeitas
+
+
+- **`imageKey` AINDA USA A POSIÇÃO** (`img_wordId_meaningIdx`). Mantido de propósito: trocar
+      a chave orfanaria toda imagem já gerada. Se um dia valer, precisa de migração das chaves no
+      `ImageDB`, não de uma troca no código.
+- **`.btn-sm` ficou em 40px no toque, não 44px** (rodada B). Foi decisão consciente: ele vive
+      em fileiras densas (ações do dossiê, linha do card, rodapé de lista) e 44px ali quebraria a
+      linha em duas. No dia em que essas fileiras virarem coluna no celular, sobe para 44 e o app
+      passa a cumprir o alvo de toque em todo botão.
+- **RENOMEAR OS ARQUIVOS `review.js`/`study.js`** — decidido NÃO fazer na 90ª. Só vale se um
+      dia o custo de lembrar "review.js é Preparar" superar o de perder o histórico do git e
+      mexer na lista do service worker. Registrado para não virar dúvida recorrente.
+- **ENCOLHER O PAINEL DE CONTROLES DA NETFLIX** (tentado e REMOVIDO na 101ª). É o que o
+      Language Reactor faz para a legenda poder descer mais: com ele ativo a barra de progresso
+      fica a ~87px do chão, sem ele a ~110px. Tentei `[data-uia="controls-standard"]`,
+      `.watch-video--bottom-controls-container` e `.PlayerControlsNeo__*` — **nenhum casou**, a
+      regra não fazia nada, e código morto fingindo que funciona é pior que ausência. Para
+      refazer é preciso o **nome real da classe do container**, pego no inspetor da página
+      (F12 → selecionar a área dos controles). Sem isso é chute.
+- **Gemini 3.5 Live Translate — anotado, sem plano** (81ª). Tradução fala→fala em tempo
+      real, 70+ idiomas, US$ 3,50 in / 21,00 out. Abriria "conversar e ser entendido na hora",
+      mas é **Live API por WebSocket** (nada parecido com o que o app faz hoje), preço de outra
+      ordem de grandeza e status *Preview*. Registrado para não se perder; não priorizado.
+- **PDF não é suportado.** Precisaria do pdf.js (~1 MB) e o texto de PDF vem sem estrutura
+      (quebra de linha por posição, não por parágrafo), o que estragaria a captura de frase.
+      Se for necessário, o caminho barato é converter para EPUB antes.
+
+### Limitações conhecidas — não são tarefas
+
+
+- **EPUB com DRM não abre e não vai abrir.** Livro comprado na Amazon/Kobo com proteção é
+      um arquivo cifrado; o leitor mostra erro de formato. Isso não é bug — é o desenho.
+- **KINDLE — documento pessoal no aparelho não entra pelo `vocab.db`** (limite da Amazon,
+      não nosso). O caminho é destacar a palavra com o dedo → `My Clippings.txt`. Se isso virar
+      atrito no uso diário, a alternativa é ler o documento pelo `read.amazon.com` (Enviar para
+      Kindle) e usar o modo **auto** da extensão.
+
+
 
 ## 10. Convenções e armadilhas ao trabalhar aqui
 
