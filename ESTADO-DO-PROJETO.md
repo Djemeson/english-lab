@@ -7,7 +7,14 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (10ª) — **O LIVRO PASSOU A ACOMPANHAR O USUÁRIO**. A
+> Última atualização: 2026-08-11 (11ª) — **MENU DO CELULAR E PODCAST NA NUVEM**. Quatro
+> seções (Palavras, Ler, Vídeo, Configurações) **não tinham porta no celular** — 11 seções para
+> 7 lugares; entrou a gaveta do **"Mais"**. E o podcast passou a subir, com a **legenda junto**,
+> que é o que realmente dói perder (custou Whisper). Limite por arquivo: 50 MB → **500 MB**.
+> ⚠️ Caí na armadilha nº 1 escrevendo isto (shell citando `VideoDB`, que é lazy).
+> **Detalhes em §8.14.**
+>
+> Última atualização anterior: 2026-08-11 (10ª) — **O LIVRO PASSOU A ACOMPANHAR O USUÁRIO**. A
 > pendência que começou esta conversa, fechada: o EPUB sobe ao ser importado e **é buscado na
 > nuvem antes de o app desistir**. Testado ida e volta com o livro real — 3,92 MB, subiu em
 > 11 s pelo localhost e **baixou em 3 s na Vercel, que nunca teve o arquivo**, com a memória da
@@ -9292,6 +9299,75 @@ autorizados do Firebase Auth), e eu não ia mexer nisso só para testar. **Ele f
 mão** e destravou o caminho — foi assim que o arquivo subiu.
 
 `sw.js` → `englab-v211`.
+
+## 8.14 Menu do celular e o podcast na nuvem (2026-08-11)
+
+### O menu: quatro seções não tinham porta
+
+Ele reportou que **Palavras, Livros e Ler não aparecem no celular**. A conta não fechava
+mesmo: **11 seções, 7 lugares na barra**. Palavras, Ler, Vídeo e Configurações não eram
+alcançáveis — não era aperto visual, era ausência de caminho.
+
+Espremer um oitavo item deixaria todos os rótulos ilegíveis. A saída é a gaveta: **6 fixos**
+no fluxo diário (Início, Adicionar, Preparar, Estudar, Revisar, **Mais**) e os outros 6 numa
+folha que sobe, em três colunas, onde o rótulo cabe inteiro — "Configurações" por extenso,
+coisa que a barra nunca permitiria.
+
+`showSection` **acende o "Mais"** quando a seção ativa mora na gaveta: sem isso, abrir
+Palavras apagaria a barra inteira e ele ficaria sem saber onde está. E fecha a gaveta sozinha,
+para quem chamar `showSection` de outro lugar não deixar a folha aberta por cima.
+
+**Medido em 375px:** 6 itens de 61px, nenhum rótulo cortado, alvo de toque de 76px na gaveta,
+sem transbordo. Os seis destinos abrem a seção certa; fecha por toque fora e por Esc.
+
+⚠️ **Um bug fantasma que não era bug:** com o painel do navegador oculto, `visibilityState`
+fica `hidden` e o Chrome **congela transições CSS** — a gaveta media como se estivesse fora da
+tela e parecia que a regra `.aberta` não aplicava. Forçando `getAnimations().finish()`, o
+estado final é exato: a base da gaveta bate **744 = 744** com o topo da barra. **Medição de
+transição em aba oculta não vale.**
+
+### O podcast: o arquivo e, principalmente, a legenda
+
+O uso dele é *"um por vez: baixa, estuda, apaga"*, e a dor é começar num aparelho e não poder
+continuar em outro. Então **não há varredura nem migração em massa** — sobe o que está em uso.
+
+⚠️ **A LEGENDA IMPORTA MAIS QUE O ÁUDIO, e isso não é óbvio.** O mp3 se baixa de novo do feed;
+a transcrição **custou Whisper — dinheiro dele**. Sem subir, continuar num segundo aparelho
+significaria pagar a mesma transcrição outra vez. São poucos KB e ela sobe a cada gravação.
+A **posição** de onde parou já viajava: mora em `videos`, que sincroniza pelo banco.
+
+**A nuvem entra ANTES do feed** na hora de abrir: é mais rápido e não depende de o episódio
+ainda estar no ar — episódio sai do feed com o tempo, e aí a cópia dele é a única que existe.
+
+⚠️ **Duas remoções que parecem iguais e são opostas**, e o código agora diz isso:
+
+| botão | o que faz | por quê |
+|---|---|---|
+| **Liberar espaço** | apaga só deste aparelho, **cópia da nuvem fica** | é ela que faz o episódio voltar na hora |
+| **Remover da lista** | apaga dos dois | é a decisão de não estudar mais aquilo |
+
+O texto do modal de "liberar espaço" foi reescrito para prometer o que agora é verdade.
+
+**Limite da regra: 50 MB → 500 MB.** Episódio de três horas passa folgado dos 50, e ele pediu
+para aumentar.
+
+⚠️ **E eu caí na armadilha nº 1 escrevendo isto:** `midiaGarantirNaNuvem` e `midiaGarantirLocal`
+moram no **shell** e referenciavam `VideoDB`, que vive em `video.js` (**lazy**). O teste morreu
+com *"VideoDB is not defined"* antes de qualquer coisa subir. As chamadas reais vêm de dentro
+do módulo de vídeo e já trazem o blob na mão, então o caminho feliz nunca teria quebrado — mas
+a referência solta é justamente o que a regra do projeto proíbe.
+
+**Ciclo completo testado no app real:**
+
+| etapa | resultado |
+|---|---|
+| episódio de 6 MB sobe | ✓ 10 s |
+| legenda sobe | ✓ |
+| zerar o aparelho e recuperar o episódio | **6,0 MB em 3 s** |
+| legenda de volta | **idêntica, 2 falas** |
+| limpeza | nuvem vazia ✓ |
+
+`sw.js` → `englab-v214`.
 
 ## 9. Pendências / a verificar
 
