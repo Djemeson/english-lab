@@ -121,9 +121,15 @@ class Acervo {
 
   // Descobre o uid sozinho: a coleção `users` tem um documento por conta, e
   // esta base é de um usuário só. Com mais de um, ele escolhe.
+  //
+  // ⚠️ `showMissing=true` NÃO É OPCIONAL. O app nunca escreve campo nenhum em
+  // `users/{uid}` — só pendura a subcoleção `data` embaixo. Para o Firestore
+  // isso é um "documento ausente": o caminho existe, o documento não, e a
+  // listagem normal o esconde. Sem esta flag a resposta vem vazia e parece
+  // credencial errada, que foi exatamente o susto da primeira execução.
   async acharUid() {
     if (this.uid) return this.uid
-    const j = await this._get('users?pageSize=20')
+    const j = await this._get('users?pageSize=20&showMissing=true')
     const docs = (j && j.documents) || []
     if (!docs.length) { console.error('nenhum usuário na base — credencial do projeto certo?'); process.exit(1) }
     const uids = docs.map(d => d.name.split('/').pop())

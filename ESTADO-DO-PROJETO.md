@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (2ª) — **A MIGRAÇÃO PASSOU A ABRIR O LIVRO**. O que eu tinha
+> Última atualização: 2026-08-11 (3ª) — **O ACERVO PASSOU A RESPONDER SOZINHO**, e o
+> `CLAUDE.md` ganhou a **REGRA Nº 3: testar ao vivo, sempre**. `tools/acervo.mjs` lê o
+> Firestore direto do terminal, sem navegador e sem login, com credencial **só-leitura**
+> (papel Leitor do Cloud Datastore — escrever é o IAM do Google recusando, não promessa
+> minha). O primeiro uso já fechou uma pendência: os sentidos de `tuck` **estavam**
+> corretamente marcados com `moved_to`, e o defeito que eu tinha registrado **não existia** —
+> eu havia concluído duplicação a partir de um dump cru, sem checar a marca. **Detalhes em
+> §8.6.**
+>
+> Última atualização anterior: 2026-08-11 (2ª) — **A MIGRAÇÃO PASSOU A ABRIR O LIVRO**. O que eu tinha
 > deixado como pendência na mesma rodada: em vez de julgar pela frase, ela procura a expressão
 > dentro do EPUB. O conferidor **vem injetado** (a migração é shell, `ler.js` é lazy), item sem
 > o arquivo aqui é **pulado e nunca julgado**, e a busca vai ao livro inteiro porque o Kindle
@@ -8861,6 +8870,47 @@ que ele já tinha no código.
 
 `sw.js` → `englab-v204`.
 
+## 8.6 O acervo passou a responder sozinho (2026-08-11)
+
+**A REGRA Nº 3 do `CLAUDE.md` nasceu aqui**, e nasceu de uma recusa dele: *"quero automação
+real, sem interferência minha"*. Antes disso, todo diagnóstico com dado real terminava em
+pedido — *"me manda o print"*, *"exporta o JSON"*. Ele estava certo em recusar.
+
+**O bloqueio nunca foi o acervo: era o login.** O app usa `signInWithPopup`, e o painel de
+navegador não alcança a janela do popup — o clique acontece, a janela nasce fora do alcance,
+`_fbUser` continua `false`. O caminho por `signInWithRedirect` é **barrado pelo classificador
+de segurança**, e o Chrome real dele não estava conectado na hora.
+
+**A saída tira o navegador da conta.** `tools/acervo.mjs` fala com o Firestore por REST, com
+o token OAuth montado à mão (JWT RS256 com o `crypto` do Node). Zero dependências — o projeto
+é vanilla e continua. Conta de serviço **`leitor-acervo`** com o papel **Leitor do Cloud
+Datastore** e nada além: escrever é impossível pelo IAM do Google, não por bom comportamento
+de quem escreveu o script. A conta `firebase-adminsdk` original ficou intacta — criar uma
+conta nova foi escolha dele quando mostrei que rebaixar a padrão (que tem Editor) mexeria no
+projeto inteiro.
+
+⚠️ **Duas armadilhas já pagas, para não morderem de novo:**
+
+1. **`showMissing=true` na listagem de `users` não é opcional.** O app nunca grava campo em
+   `users/{uid}` — só pendura a subcoleção `data` embaixo. Para o Firestore isso é um
+   "documento ausente", que a listagem normal esconde. Sem a flag a resposta vem vazia e
+   **parece credencial errada**, que foi o susto da primeira execução.
+2. **No Console do Google a conta certa se alcança por `?authuser=1`, não por `/u/1`.** No
+   Firebase o `/u/1` funciona; no Cloud Console dá "URL não encontrado" e cai numa conta sem
+   o projeto. O link *"Gerenciar permissões da conta de serviço"*, dentro do Firebase, já
+   abre com o parâmetro certo. A conta padrão do Chrome dele (`djemesongentedigital`) **não**
+   enxerga o projeto; a do Firebase é a `djemeson16`.
+
+**O primeiro uso já fechou uma pendência** — ver §9: os sentidos de `tuck` estavam
+corretamente marcados, e o defeito que eu tinha registrado não existia.
+
+E fica registrado um erro meu da rodada anterior: ao cortar o fio da sincronização na aba
+dele, bloqueei `fbPushAll`, que **não existe**, e deixei soltos `fbPush`, `fbWipeMedia` e
+`fbWipeCloud` — as duas últimas apagam dados na nuvem. Nenhuma escrita chegou a ser tentada,
+mas a proteção era mais fina do que eu descrevi na hora. O corte agora vai pelos nomes reais
+e com uma rede no `fetch` por cima, bloqueando qualquer método diferente de GET para o
+Firestore.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -8886,12 +8936,12 @@ que ele já tinha no código.
       (§8.5): conferidor injetado, `BookDB.keys()` antes de julgar, livro inteiro, e achar no
       livro **protege sem reatribuir**. No teste, o modo livro marcou 1 item onde o textual
       marcava 3 — os outros 2 estavam mesmo na obra.
-- [ ] **CONFIRMAR SE O SENTIDO DESDOBRADO REALMENTE FICA NO PAI** — diagnóstico, não conserto.
-      ⚠️ Eu registrei isso como defeito em 2026-08-10 e **diagnostiquei mal**: o código já marca
-      `m.moved_to = alvo.id` e alimenta `w.spun_off` (`review.js` ~2181). No acervo dele, `tuck`
-      aparecia com os dois sentidos em `pronto` — ou eles não nasceram por esse caminho, ou a
-      marca existe e a tela a ignora. **Responder na próxima vez que a bancada com dado real
-      subir**, olhando o `moved_to` dos `meanings` de `tuck` antes de qualquer conclusão.
+- [x] ~~Confirmar se o sentido desdobrado fica no pai~~ — **RESPONDIDO em 2026-08-11 com o
+      acervo real, e NÃO ERA DEFEITO.** `node tools/acervo.mjs familia` mostrou os dois
+      sentidos de `tuck` corretamente marcados, e o `spun_off` batendo:
+      *"pôr na cama" → tuck in [alvo existe]* e *"comer com vontade" → tuck into [alvo existe]*.
+      O mecanismo funcionou inteiro. ⚠️ **O erro foi meu**: concluí duplicação a partir de um
+      dump cru, sem checar a marca — e a tela nem desenha sentido movido (`review.js` ~1756).
 - [ ] **`## 9. Pendências` APARECE DUAS VEZES** no arquivo (duas seções com o mesmo título).
       Higiene: fundir numa só, senão item novo entra na cópia errada e some.
 - [ ] **OS OUTROS 20 `aiJSON` AINDA NÃO TÊM ESQUEMA** (2026-08-08). Sete dos 27 ganharam contrato de
