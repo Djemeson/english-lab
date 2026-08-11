@@ -564,6 +564,56 @@ async function arrumarProcedencia(conferir) {
       ic('check','ic-sm')} Arrumar ${pl(r.mexeu, 'item', 'itens')}</button>`
 }
 
+// A MÍDIA SAINDO DO BANCO. Mesma família das outras: conferência antes, e a
+// contagem vem do servidor, não de estimativa — o que ele vê é o que existe.
+async function migrarMidia(conferir) {
+  const saida = el('midia-saida'); if (!saida) return
+  if (typeof migrarMidiaParaStorage !== 'function' || typeof _fbUser === 'undefined' || !_fbUser) {
+    saida.innerHTML = `<p class="dz-nota" style="color:var(--error)">Entre na sua conta para migrar — os arquivos são seus e vão para a sua pasta.</p>`
+    return
+  }
+  const kb = n => n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`
+
+  if (conferir) {
+    saida.innerHTML = `<p class="dz-nota"><span class="spinner"></span> contando o que está no banco…</p>`
+    let a = 0, i = 0, bytes = 0
+    try {
+      const base = _fbDb.collection('users').doc(_fbUser.uid)
+      const [da, di] = await Promise.all([base.collection('audio').get(), base.collection('images').get()])
+      a = da.size; i = di.size
+      da.forEach(d => bytes += String((d.data() || {}).data || '').length)
+      di.forEach(d => bytes += String((d.data() || {}).data || '').length)
+    } catch (e) {
+      saida.innerHTML = `<p class="dz-nota" style="color:var(--error)">Não consegui ler: ${esc(e.message)}</p>`
+      return
+    }
+    if (!a && !i) {
+      saida.innerHTML = `<p class="dz-nota">${ic('checkCircle','ic-sm')} O banco já está limpo — nada de mídia guardada nele.</p>`
+      return
+    }
+    const pl = (n, s, p) => `${n} ${n === 1 ? s : p}`
+    saida.innerHTML = `
+      <ul class="cost-bullets">
+        ${a ? `<li><b>${pl(a, 'áudio', 'áudios')}</b> saem do banco</li>` : ''}
+        ${i ? `<li><b>${pl(i, 'imagem', 'imagens')}</b> saem do banco</li>` : ''}
+        <li><b>${kb(bytes)}</b> de peso que o banco para de carregar</li>
+      </ul>
+      <button class="btn btn-primary btn-sm" onclick="migrarMidia(false)">${ic('check','ic-sm')} Mover ${pl(a + i, 'arquivo', 'arquivos')}</button>`
+    return
+  }
+
+  saida.innerHTML = `<p class="dz-nota"><span class="spinner"></span> movendo… <span id="midia-passo"></span></p>`
+  const passo = el('midia-passo')
+  const r = await migrarMidiaParaStorage((tipo, n, total) => {
+    if (passo) passo.textContent = `${tipo === 'audio' ? 'áudios' : 'imagens'} ${n}/${total}`
+  })
+  if (r.erro) { saida.innerHTML = `<p class="dz-nota" style="color:var(--error)">${esc(r.erro)}</p>`; return }
+  saida.innerHTML = `<p class="dz-nota">${ic('checkCircle','ic-sm')}
+    <b>${r.audio}</b> áudio${r.audio === 1 ? '' : 's'} e <b>${r.images}</b> imagem${r.images === 1 ? '' : 's'} movidos
+    (${kb(r.bytes)}).${r.falhas ? ` <b>${r.falhas}</b> não foram e continuam no banco — rode de novo.` : ''}</p>`
+  toast('Mídia movida para o espaço de arquivos', 'success')
+}
+
 // ================================================================
 // REPARAR O CONTEXTO DOS ITENS DO LEITOR
 // ================================================================

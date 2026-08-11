@@ -21,6 +21,10 @@
 <script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<!-- Arquivos (áudio e imagem). Entrou em 2026-08-11: eles moravam DENTRO do
+     Firestore, que tem teto de 1 MB por documento e cobra por operação — porta-
+     luvas fazendo as vezes de porta-malas. Ver ESTADO §8.12. -->
+<script crossorigin="anonymous" src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -772,6 +776,26 @@
              conferir, chutar seria pior que não mexer. Sem IA, sem custo.</p>
           <div id="proc-saida"></div>
           <button class="btn btn-secondary btn-sm" onclick="arrumarProcedencia(true)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Conferir sem mexer</button>
+        </div>
+      </details>
+
+      <!-- MÍDIA PARA O STORAGE — manutenção do acervo, mesma família das de cima. -->
+      <details class="danger-zone dz-suave" id="dz-midia">
+        <summary>
+          <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15V9a2 2 0 0 1 2-2h3l2-2h4l2 2h3a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          Tirar áudios e imagens de dentro do banco
+        </summary>
+        <div class="dz-corpo">
+          <p>Os áudios das palavras e as imagens estavam guardados <b>dentro do banco de
+             dados</b>, que existe para guardar texto. É como carregar mala no porta-luvas:
+             cabe pouco e atrapalha o resto.</p>
+          <p>Agora existe um <b>espaço de arquivos</b> próprio. Esta migração leva o que já está
+             gravado para lá — <b>primeiro copia, depois apaga</b>, nessa ordem, para que uma
+             falha no meio deixe cópia sobrando em vez de buraco.</p>
+          <p class="dz-nota">Nada seu se perde: enquanto a migração não roda, o app continua
+             lendo dos <b>dois</b> lugares. Sem IA, sem custo.</p>
+          <div id="midia-saida"></div>
+          <button class="btn btn-secondary btn-sm" onclick="migrarMidia(true)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Conferir sem mexer</button>
         </div>
       </details>
 

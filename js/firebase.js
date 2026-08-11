@@ -39,8 +39,73 @@ const FB_CONFIG = {
 }
 
 let _fbApp = null, _fbDb = null, _fbAuth = null, _fbUser = null
+let _fbStore = null
 let _fbSyncTimer = null
 let _fbAudioSyncTimer = null
+
+// ================================================================
+// MÍDIA NO STORAGE — áudio e imagem saíram de dentro do banco
+// ================================================================
+// Eles moravam em `collection('audio')` e `collection('images')`, com o base64
+// no campo `data`. O Firestore tem teto de 1 MB POR DOCUMENTO e cobra por
+// operação: um áudio um pouco maior simplesmente não subia, e cada sincronização
+// relia tudo. O Storage é o lugar de arquivo — e a cota gratuita cobre folgado
+// o acervo dele.
+//
+// ⚠️ O CAMINHO PRECISA CASAR COM A REGRA DE SEGURANÇA, que é
+// `users/{uid}/{resto}` e compara `uid` com quem está logado. Fugir daí é
+// levar "permission denied" sem explicação.
+//
+// A chave é o nome do arquivo, e ela vem de texto livre (o áudio é indexado
+// pela frase). `encodeURIComponent` evita que uma barra no meio da frase vire
+// pasta e que caractere estranho quebre o caminho.
+function _mediaRef(tipo, key) {
+  if (!_fbStore || !_fbUser) return null
+  return _fbStore.ref(`users/${_fbUser.uid}/${tipo}/${encodeURIComponent(key)}`)
+}
+
+async function mediaSubir(tipo, key, dataUrl) {
+  const r = _mediaRef(tipo, key)
+  if (!r || !dataUrl) return false
+  await r.putString(String(dataUrl), 'data_url')
+  return true
+}
+
+// Devolve `{ chave: dataUrl }`. Baixa em paralelo com teto, porque o acervo
+// dele já tem centenas de áudios e disparar tudo de uma vez trava o navegador.
+async function mediaBaixarTodos(tipo, aoAndar) {
+  if (!_fbStore || !_fbUser) return {}
+  const pasta = _fbStore.ref(`users/${_fbUser.uid}/${tipo}`)
+  let itens = []
+  try { itens = (await pasta.listAll()).items } catch (e) { return {} }
+  const saida = {}
+  let feitos = 0
+  const fila = [...itens]
+  const trabalhador = async () => {
+    while (fila.length) {
+      const it = fila.shift()
+      try {
+        const url = await it.getDownloadURL()
+        const blob = await (await fetch(url)).blob()
+        saida[decodeURIComponent(it.name)] = await new Promise(res => {
+          const fr = new FileReader(); fr.onloadend = () => res(fr.result); fr.readAsDataURL(blob)
+        })
+      } catch (e) { /* um arquivo perdido não derruba o resto */ }
+      if (aoAndar) aoAndar(++feitos, itens.length)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(6, itens.length) }, trabalhador))
+  return saida
+}
+
+// Só os NOMES, para saber o que já está lá sem baixar nada.
+async function mediaChavesNaNuvem(tipo) {
+  if (!_fbStore || !_fbUser) return new Set()
+  try {
+    const r = await _fbStore.ref(`users/${_fbUser.uid}/${tipo}`).listAll()
+    return new Set(r.items.map(i => decodeURIComponent(i.name)))
+  } catch (e) { return new Set() }
+}
 
 // Sincroniza APENAS áudios novos — roda após um delay longo para acumular mudanças
 async function autoSyncAudioAfterChange() {
@@ -48,16 +113,13 @@ async function autoSyncAudioAfterChange() {
   clearTimeout(_fbAudioSyncTimer)
   _fbAudioSyncTimer = setTimeout(async () => {
     try {
-      const base = _fbDb.collection('users').doc(_fbUser.uid)
+      if (!_fbStore) return                    // sem arquivos, não força pelo banco
       const audioData = await AudioDB.getAll()
-      const existing = await base.collection('audio').get()
-      const existingKeys = new Set(existing.docs.map(d => d.id))
-      const newEntries = Object.entries(audioData).filter(([k]) => !existingKeys.has(k))
-      if (!newEntries.length) return
-      for (const [key, val] of newEntries) {
-        await base.collection('audio').doc(key).set({ data: val, updatedAt: Date.now() })
-      }
-      console.log(`[Firebase] Audio sync: ${newEntries.length} novos áudios enviados`)
+      const jaNaNuvem = await mediaChavesNaNuvem('audio')
+      const novos = Object.entries(audioData).filter(([k]) => !jaNaNuvem.has(k))
+      if (!novos.length) return
+      for (const [key, val] of novos) await mediaSubir('audio', key, val)
+      console.log(`[Firebase] Audio sync: ${novos.length} novos áudios enviados`)
     } catch(e) {
       console.warn('[Firebase] audio sync error:', e.code || e.message)
     }
@@ -70,6 +132,11 @@ function initFirebase() {
     _fbApp  = firebase.initializeApp(FB_CONFIG)
     _fbAuth = firebase.auth()
     _fbDb   = firebase.firestore()
+    // Tolerante de propósito: se o script de arquivos não carregar (rede ruim,
+    // versão velha em cache), o app continua inteiro — só a mídia deixa de
+    // sincronizar, e o caminho antigo pelo banco continua sendo lido.
+    try { _fbStore = firebase.storage ? firebase.storage() : null }
+    catch (e) { _fbStore = null; console.warn('[Firebase] storage indisponível:', e.message) }
     // Garante que a sessão de login sobreviva a refresh / fechar e reabrir a aba
     _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e =>
       console.warn('[Firebase] setPersistence falhou:', e.message))
@@ -254,24 +321,15 @@ async function fbPush() {
   if (!dataOk) return false
   updateSyncNav('syncing')
   try {
-    const base = _fbDb.collection('users').doc(_fbUser.uid)
-
-    // Áudios — só escreve os que ainda não existem no Firestore
-    const audioData = await AudioDB.getAll()
-    const existingAudio = await base.collection('audio').get()
-    const existingAudioKeys = new Set(existingAudio.docs.map(d => d.id))
-    const newAudioEntries = Object.entries(audioData).filter(([k]) => !existingAudioKeys.has(k))
-    for (const [key, val] of newAudioEntries) {
-      await base.collection('audio').doc(key).set({ data: val, updatedAt: Date.now() })
-    }
-
-    // Imagens — idem
-    const imageData = await ImageDB.getAll()
-    const existingImages = await base.collection('images').get()
-    const existingImageKeys = new Set(existingImages.docs.map(d => d.id))
-    const newImageEntries = Object.entries(imageData).filter(([k]) => !existingImageKeys.has(k))
-    for (const [key, val] of newImageEntries) {
-      await base.collection('images').doc(key).set({ data: val, updatedAt: Date.now() })
+    if (!_fbStore) { updateSyncNav('ok'); return true }
+    // Áudio e imagem: sobe só o que ainda não está lá, comparando pelos NOMES
+    // dos arquivos — barato, não baixa conteúdo nenhum para decidir.
+    for (const [tipo, db] of [['audio', AudioDB], ['images', ImageDB]]) {
+      const local = await db.getAll()
+      const naNuvem = await mediaChavesNaNuvem(tipo)
+      for (const [key, val] of Object.entries(local)) {
+        if (!naNuvem.has(key)) await mediaSubir(tipo, key, val)
+      }
     }
 
     updateSyncNav('ok')
@@ -415,22 +473,23 @@ async function fbPull() {
       saveConversas()
     }
 
-    // Áudios — restaurar no IndexedDB
-    const audioDocs = await base.collection('audio').get()
-    const audioMap = {}
-    audioDocs.forEach(d => { audioMap[d.id] = d.data().data })
-    if (Object.keys(audioMap).length > 0) {
-      await AudioDB.setAll(audioMap)
-      _audioKeyCache = new Set(Object.keys(audioMap))
-    }
-
-    // Imagens
-    const imageDocs = await base.collection('images').get()
-    const imageMap = {}
-    imageDocs.forEach(d => { imageMap[d.id] = d.data().data })
-    if (Object.keys(imageMap).length > 0) {
-      await ImageDB.setAll(imageMap)
-      _imageKeyCache = new Set(Object.keys(imageMap))
+    // ⚠️ MÍDIA VEM DOS DOIS LUGARES, e essa é a trava de segurança da mudança.
+    // O que já estava gravado continua DENTRO do banco até a migração rodar; se
+    // o pull passasse a ler só o Storage, ele trocaria de aparelho e chegaria
+    // sem nenhum áudio antigo. O legado entra primeiro e o Storage sobrescreve,
+    // porque é ele que tem a versão nova quando os dois têm a mesma chave.
+    for (const [tipo, db, cache] of [['audio', AudioDB, 'audio'], ['images', ImageDB, 'images']]) {
+      const mapa = {}
+      try {
+        const docs = await base.collection(tipo).get()      // legado, ainda no banco
+        docs.forEach(d => { const v = d.data().data; if (v) mapa[d.id] = v })
+      } catch (e) {}
+      Object.assign(mapa, await mediaBaixarTodos(tipo))     // Storage manda
+      if (Object.keys(mapa).length) {
+        await db.setAll(mapa)
+        if (cache === 'audio') _audioKeyCache = new Set(Object.keys(mapa))
+        else _imageKeyCache = new Set(Object.keys(mapa))
+      }
     }
 
     updateSyncNav('ok')
@@ -626,7 +685,48 @@ async function fbWipeMedia() {
       refs.slice(k, k + 450).forEach(r => batch.delete(r))
       await batch.commit()
     }
+    // E o Storage junto: "apagar a mídia da nuvem" que deixasse metade para
+    // trás seria pior que não existir — ele apagaria achando que limpou.
+    for (const tipo of ['audio', 'images']) {
+      if (!_fbStore) break
+      try {
+        const r = await _fbStore.ref(`users/${_fbUser.uid}/${tipo}`).listAll()
+        for (const it of r.items) { try { await it.delete() } catch (e) {} }
+      } catch (e) {}
+    }
   } catch(e) { console.warn('[Firebase] fbWipeMedia erro:', e.code || e.message) }
+}
+
+// ================================================================
+// MIGRAÇÃO: tira a mídia de dentro do banco
+// ================================================================
+// Conserto de código não move dado já gravado (a lição de sempre). Sobe cada
+// item para o Storage e SÓ ENTÃO apaga do banco — nessa ordem, um erro no meio
+// deixa cópia sobrando, nunca buraco. Como o pull lê dos dois lugares, a cópia
+// sobrando é inofensiva.
+async function migrarMidiaParaStorage(aoAndar) {
+  if (!_fbDb || !_fbUser) return { erro: 'entre na sua conta primeiro' }
+  if (!_fbStore) return { erro: 'o módulo de arquivos não carregou — recarregue a página' }
+  const base = _fbDb.collection('users').doc(_fbUser.uid)
+  const r = { audio: 0, images: 0, bytes: 0, falhas: 0 }
+  for (const tipo of ['audio', 'images']) {
+    let docs
+    try { docs = await base.collection(tipo).get() } catch (e) { continue }
+    const total = docs.size
+    let n = 0
+    for (const d of docs.docs) {
+      const val = d.data().data
+      if (!val) { try { await d.ref.delete() } catch (e) {} ; continue }
+      try {
+        await mediaSubir(tipo, d.id, val)
+        await d.ref.delete()
+        r[tipo]++
+        r.bytes += String(val).length
+      } catch (e) { r.falhas++ }
+      if (aoAndar) aoAndar(tipo, ++n, total)
+    }
+  }
+  return r
 }
 
 // ---- Auto-sync com debounce ----
@@ -695,7 +795,18 @@ async function fbWipeCloud() {
       refs.slice(i, i + 450).forEach(ref => batch.delete(ref))
       await batch.commit()
     }
-    console.log(`[Firebase] nuvem apagada: ${refs.length} documentos`)
+    // A mídia agora vive FORA do banco: apagar só os documentos deixaria os
+    // arquivos na nuvem depois de ele mandar apagar tudo — a pior forma de
+    // errar, porque ele sai achando que limpou.
+    let arquivos = 0
+    for (const tipo of ['audio', 'images']) {
+      if (!_fbStore) break
+      try {
+        const r = await _fbStore.ref(`users/${_fbUser.uid}/${tipo}`).listAll()
+        for (const it of r.items) { try { await it.delete(); arquivos++ } catch (e) {} }
+      } catch (e) {}
+    }
+    console.log(`[Firebase] nuvem apagada: ${refs.length} documentos, ${arquivos} arquivos`)
     updateSyncNav('off')
     return true
   } catch (e) {
