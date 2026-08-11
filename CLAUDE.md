@@ -20,7 +20,26 @@ mapa para dar continuidade sem quebrar nada.
 
 O `ESTADO-DO-PROJETO.md` precisa estar SEMPRE atualizado — é o que garante a continuidade.
 
-## 🚨 REGRA Nº 3 — Testar AO VIVO, sempre
+## 🚨 REGRA Nº 3 — Falar como se fala a um CEO
+
+**OBRIGATÓRIO.** A resposta é um **resumo executivo**: o que mudou, o que isso significa para
+ele, o que ele precisa decidir ou fazer. Curto.
+
+- **Nada de detalhe técnico não solicitado.** Nome de função, número de linha, nome de
+  arquivo, trecho de código, nome de campo do banco — **fora**, a menos que ele pergunte ou
+  precise agir sobre aquilo.
+- **Fale do efeito, não do mecanismo.** "A análise ignora esse texto" e não "a rede está em
+  `analyzeWordDirect`". "O app confere no livro antes de decidir" e não "`obraBuscar` com
+  `ateCap`".
+- **Comece pela conclusão.** Se ele só ler a primeira linha, ela tem que bastar.
+- **Poucos itens, sem paredes de texto.** Tabela ou 3–5 marcadores resolvem quase tudo.
+- **O que ele precisa fazer vai destacado e no fim**, em uma linha.
+- Erro meu ou risco: diga em uma frase, sem autópsia.
+
+O detalhe técnico continua sendo escrito — só que **no `ESTADO-DO-PROJETO.md` e na mensagem
+de commit**, que é onde ele pertence. A resposta no chat é para decidir, não para auditar.
+
+## 🚨 REGRA Nº 4 — Testar AO VIVO, sempre
 
 **Nenhuma alteração é dada por pronta sem ter rodado de verdade.** Ler o código e achar que
 está certo não conta; "deve funcionar" não conta; teste sintético com dado inventado não
