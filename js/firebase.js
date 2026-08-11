@@ -180,11 +180,15 @@ async function midiaNaNuvem(id) {
   try { await r.getMetadata(); return true } catch (e) { return false }
 }
 
+// ⚠️ `VideoDB` mora em `video.js`, que é LAZY — este arquivo é do shell. As
+// chamadas reais vêm de dentro do módulo de vídeo e já trazem o blob na mão;
+// o `typeof` cobre quem chamar de fora dele. Armadilha nº 1, e eu caí nela
+// escrevendo isto: o teste morreu com "VideoDB is not defined".
 async function midiaGarantirNaNuvem(id, blob, aoAndar) {
   try {
     const r = _midiaRef('midia', id); if (!r) return false
     if (await midiaNaNuvem(id)) return true
-    const b = blob || await VideoDB.get('files', id)
+    const b = blob || (typeof VideoDB !== 'undefined' ? await VideoDB.get('files', id) : null)
     if (!b) return false
     if (aoAndar) aoAndar('enviando o episódio')
     await r.put(b)
@@ -193,7 +197,10 @@ async function midiaGarantirNaNuvem(id, blob, aoAndar) {
   } catch (e) { console.warn('[Firebase] episódio não subiu:', e.code || e.message); return false }
 }
 
+// Mesma nota da de cima: `VideoDB` é lazy. Aqui a guarda é dupla — sem o
+// módulo, nem faz sentido baixar, porque não haveria onde guardar.
 async function midiaGarantirLocal(id, aoAndar) {
+  if (typeof VideoDB === 'undefined') return null
   try {
     const jaTem = await VideoDB.get('files', id)
     if (jaTem) return jaTem
