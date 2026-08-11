@@ -449,7 +449,16 @@ async function podcastImport(i) {
     saveVideos()
   }
 
-  const jaBaixado = await VideoDB.get('files', v.id)
+  // ⚠️ A NUVEM ENTRA ANTES DO FEED. Ele começa num aparelho e continua em
+  // outro: se o episódio já está guardado na conta dele, puxar de lá é mais
+  // rápido e não depende do feed ainda ter aquele episódio no ar — episódio
+  // sai do feed com o tempo, e aí a cópia dele é a única que existe.
+  let jaBaixado = await VideoDB.get('files', v.id)
+  if (!jaBaixado && typeof midiaGarantirLocal === 'function') {
+    const t = toast('Procurando o episódio na sua nuvem…', 'info')
+    jaBaixado = await midiaGarantirLocal(v.id)
+    if (jaBaixado) toast('Episódio recuperado da sua nuvem', 'success')
+  }
   if (jaBaixado) {
     _vidFile = new File([jaBaixado], v.fileName || nomeArq, { type: jaBaixado.type || 'audio/mpeg' })
   } else {
@@ -511,6 +520,10 @@ async function podcastBaixarEpisodio(v, titulo) {
     v.fileSize = blob.size
     if (!v.podcast.sizeBytes) v.podcast.sizeBytes = blob.size
     saveVideos()
+    // Sobe em segundo plano, sem segurar a tela: episódio tem dezenas de MB e
+    // ele quer ouvir agora. Se falhar, o arquivo continua aqui e a próxima
+    // abertura tenta de novo.
+    if (typeof midiaGarantirNaNuvem === 'function') midiaGarantirNaNuvem(v.id, blob)
     if (st) st.baixando = null
     return blob
   } catch (e) {
@@ -607,10 +620,13 @@ async function podcastFreeSpace() {
   const v = _vidCur; if (!v || !v.podcast) return
   if (!(await confirmModal({ title: 'Liberar espaço', icon: 'trash', confirmText: 'Apagar o áudio baixado',
     html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Apaga só o <b>arquivo de áudio</b>
-      guardado no aparelho (${_podMB(v.fileSize || 0)}).
+      guardado neste aparelho (${_podMB(v.fileSize || 0)}).
       <b>Nada do estudo é perdido</b>: legenda, marcadores, cortes e cards continuam —
-      e o episódio pode ser baixado de novo a qualquer momento.</p>` }))) return
+      e a <b>cópia na sua nuvem fica</b>, então o episódio volta na hora, sem depender do feed.</p>` }))) return
+  // ⚠️ A NUVEM NÃO É TOCADA AQUI, de propósito. Este botão é "liberar espaço
+  // neste aparelho" — apagar a cópia da conta transformaria uma faxina em
+  // perda, e é justamente ela que faz o episódio voltar depois.
   await VideoDB.del('files', v.id)
-  toast('Áudio apagado do aparelho — o estudo continua todo aqui', 'success')
+  toast('Áudio apagado deste aparelho — a cópia na nuvem continua', 'success')
   videoBackToLib()
 }

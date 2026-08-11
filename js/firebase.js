@@ -156,6 +156,79 @@ async function livroApagarDaNuvem(id) {
   try { const r = _livroRef(id); if (r) await r.delete() } catch (e) {}
 }
 
+// ================================================================
+// O EPISÓDIO E A LEGENDA NA NUVEM
+// ================================================================
+// ⚠️ A LEGENDA IMPORTA MAIS QUE O ÁUDIO, e não é óbvio. O mp3 dá para baixar
+// de novo do feed; a transcrição **custou Whisper** — dinheiro dele. Sem ela,
+// continuar num segundo aparelho significaria pagar a mesma transcrição outra
+// vez. Por isso as duas sobem, e a legenda sobe primeiro por ser leve.
+//
+// A POSIÇÃO de onde ele parou já viajava: mora em `videos`, que sincroniza
+// pelo banco. Era o arquivo e a legenda que ficavam presos.
+//
+// O uso dele é "um episódio por vez: baixa, estuda, apaga" — então não há
+// varredura nem migração em massa. Sobe o que ele está usando, e sai da nuvem
+// quando ele apaga daqui.
+function _midiaRef(tipo, id) {
+  if (!_fbStore || !_fbUser) return null
+  return _fbStore.ref(`users/${_fbUser.uid}/${tipo}/${encodeURIComponent(id)}`)
+}
+
+async function midiaNaNuvem(id) {
+  const r = _midiaRef('midia', id); if (!r) return false
+  try { await r.getMetadata(); return true } catch (e) { return false }
+}
+
+async function midiaGarantirNaNuvem(id, blob, aoAndar) {
+  try {
+    const r = _midiaRef('midia', id); if (!r) return false
+    if (await midiaNaNuvem(id)) return true
+    const b = blob || await VideoDB.get('files', id)
+    if (!b) return false
+    if (aoAndar) aoAndar('enviando o episódio')
+    await r.put(b)
+    console.log(`[Firebase] episódio ${id} na nuvem (${Math.round(b.size / 1048576)} MB)`)
+    return true
+  } catch (e) { console.warn('[Firebase] episódio não subiu:', e.code || e.message); return false }
+}
+
+async function midiaGarantirLocal(id, aoAndar) {
+  try {
+    const jaTem = await VideoDB.get('files', id)
+    if (jaTem) return jaTem
+    const r = _midiaRef('midia', id); if (!r) return null
+    if (aoAndar) aoAndar('baixando o episódio da sua nuvem')
+    const url = await r.getDownloadURL()
+    const blob = await (await fetch(url)).blob()
+    await VideoDB.set('files', id, blob)
+    return blob
+  } catch (e) { return null }
+}
+
+// A legenda é JSON de alguns KB — sobe sempre que muda, sem checar antes.
+async function legendaSubir(id, dados) {
+  try {
+    const r = _midiaRef('subs', id); if (!r || !dados) return false
+    await r.putString(JSON.stringify(dados), 'raw', { contentType: 'application/json' })
+    return true
+  } catch (e) { return false }
+}
+
+async function legendaBaixar(id) {
+  try {
+    const r = _midiaRef('subs', id); if (!r) return null
+    const url = await r.getDownloadURL()
+    return await (await fetch(url)).json()
+  } catch (e) { return null }
+}
+
+async function midiaApagarDaNuvem(id) {
+  for (const tipo of ['midia', 'subs']) {
+    try { const r = _midiaRef(tipo, id); if (r) await r.delete() } catch (e) {}
+  }
+}
+
 // Só os NOMES, para saber o que já está lá sem baixar nada.
 async function mediaChavesNaNuvem(tipo) {
   if (!_fbStore || !_fbUser) return new Set()

@@ -495,12 +495,17 @@ function _vidSaveSubsNow() {
   clearTimeout(_vidSubsSaveTimer); _vidSubsSaveTimer = null
   if (!_vidCur) return
   const limpa = c => { const o = { s: c.s, e: c.e, t: c.t }; if (c.pt) o.pt = c.pt; if (c.pts) o.pts = c.pts; return o }
-  VideoDB.set('subs', _vidCur.id, {
+  const dados = {
     cues: _vidCues.map(limpa),
     cuesPT: _vidCuesPT.map(c => ({ s: c.s, e: c.e, t: c.t })),
     candidates: _vidSubCandidates,
     appliedUrl: _vidAppliedSubUrl
-  })
+  }
+  VideoDB.set('subs', _vidCur.id, dados)
+  // ⚠️ A LEGENDA VALE MAIS QUE O ÁUDIO. O mp3 se baixa de novo do feed; a
+  // transcrição custou Whisper — dinheiro dele. Sem subir, continuar em outro
+  // aparelho significaria pagar a mesma transcrição outra vez. São poucos KB.
+  if (typeof legendaSubir === 'function') legendaSubir(_vidCur.id, dados)
 }
 
 // Garante tradução IA das falas [i .. i+n). `sinc` espera terminar.

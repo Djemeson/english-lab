@@ -159,6 +159,11 @@ async function videoDelete(id) {
   VideoDB.del('handles', id); VideoDB.del('subs', id)
   // podcast baixado ocupa dezenas de MB: sai junto (nada de órfão no disco)
   VideoDB.del('files', id); VideoDB.del('media', id)
+  // ⚠️ E DA NUVEM TAMBÉM — aqui, e SÓ aqui. "Remover da lista" é a decisão de
+  // não estudar mais isto; deixar a cópia lá comeria a cota e o episódio
+  // reapareceria sozinho. Diferente de "liberar espaço", que é o oposto: lá o
+  // arquivo sai só deste aparelho, de propósito, para poder voltar depois.
+  if (typeof midiaApagarDaNuvem === 'function') midiaApagarDaNuvem(id)
   autoSyncAfterChange()
   renderVideoLib()
 }
@@ -269,7 +274,17 @@ async function videoOpenPlayer(v) {
   _videoView = 'player'
   _vidSel = null; _vidSelWords = new Set(); _vidLoop = false; _vidPlayStop = null; _vidCueIdx = -1
 
-  const stored = await VideoDB.get('subs', v.id)
+  // A legenda vem da nuvem quando não está aqui — é o que evita pagar Whisper
+  // de novo só porque ele trocou de aparelho.
+  let stored = await VideoDB.get('subs', v.id)
+  if ((!stored || !(stored.cues || []).length) && typeof legendaBaixar === 'function') {
+    const daNuvem = await legendaBaixar(v.id)
+    if (daNuvem && (daNuvem.cues || []).length) {
+      stored = daNuvem
+      try { await VideoDB.set('subs', v.id, daNuvem) } catch (e) {}
+      toast('Legenda recuperada da sua nuvem', 'success')
+    }
+  }
   _vidCues = (stored && stored.cues) || []
   _vidCuesPT = (stored && stored.cuesPT) || []
   _vidSubCandidates = (stored && stored.candidates) || []
