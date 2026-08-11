@@ -11,8 +11,16 @@ dist/
 .env.*.local
 
 # Backups exportados pelo app (Configurações → Exportar JSON)
+# ⚠️ O NOME REAL DO ARQUIVO É `english-lab-AAAA-MM-DD.json` (settings.js), e os
+# dois padrões abaixo NÃO o cobriam — um backup largado aqui entraria no commit
+# com as CHAVES DE API dentro, porque o export leva o `cfg` inteiro.
+english-lab-*.json
+language-lab-*.json
 english-lab-backup*.json
 language-lab-backup*.json
+
+# Material de teste que ele me empresta (livro, legenda, vocab.db do Kindle)
+_dados-de-teste/
 
 # Sistema operacional / editores
 Thumbs.db
