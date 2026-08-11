@@ -969,6 +969,28 @@ function _loadScript(src, tentativa = 0) {
   })
 }
 
+// ================================================================
+// A GAVETA DO "MAIS" (só no celular)
+// ================================================================
+// São 11 seções e a barra de baixo comporta ~6 legíveis. Palavras, Ler, Vídeo
+// e Configurações ficaram sem porta nenhuma no celular — foi o que ele
+// reportou. Espremer um sétimo item deixaria todos os rótulos ilegíveis.
+function navMaisAbrir() {
+  const g = document.getElementById('nav-mais'), f = document.getElementById('nav-mais-fundo')
+  if (!g || !f) return
+  g.classList.add('aberta'); f.classList.add('aberto')
+  document.addEventListener('keydown', _navMaisTeclas)
+}
+function navMaisFechar() {
+  const g = document.getElementById('nav-mais'), f = document.getElementById('nav-mais-fundo')
+  if (g) g.classList.remove('aberta')
+  if (f) f.classList.remove('aberto')
+  document.removeEventListener('keydown', _navMaisTeclas)
+}
+function _navMaisTeclas(e) { if (e.key === 'Escape') navMaisFechar() }
+// `showSection` já fecha a gaveta; esta existe só para o clique ser direto.
+function navMaisIr(secao) { navMaisFechar(); showSection(secao) }
+
 function showSection(name) {
   const lazy = _LAZY[name]
   const files = Array.isArray(lazy) ? lazy : (lazy ? [lazy] : [])
@@ -995,6 +1017,13 @@ function _activateSection(name) {
   if (navEl) navEl.classList.add('active')
   const navMobEl = document.getElementById(`nav-${name}-mob`)
   if (navMobEl) navMobEl.classList.add('active')
+  // A seção pode morar DENTRO da gaveta: sem isto, abrir "Palavras" no celular
+  // apagaria a barra inteira e ele ficaria sem saber onde está.
+  if (navMobEl && navMobEl.classList.contains('nmg-item')) {
+    const mais = document.getElementById('nav-mais-mob')
+    if (mais) mais.classList.add('active')
+  }
+  if (typeof navMaisFechar === 'function') navMaisFechar()
   document.getElementById(`section-${name}`).classList.add('active')
   if (name === 'dashboard') renderDashboard()
   if (name === 'assistente') { if (typeof renderAssistente === 'function') renderAssistente() }

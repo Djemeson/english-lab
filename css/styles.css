@@ -2448,6 +2448,9 @@ body.sb-collapsed #fb-user-photo{margin:0}
   display: none; /* Hidden on desktop */
 }
 
+/* A gaveta do "Mais" — só existe no celular, junto com a barra de baixo. */
+.nav-mais, .nav-mais-fundo { display: none; }
+
 @media (max-width:768px){
   /* Layout adjustments & Ambient Canvas styling */
   .app-layout {
@@ -2625,6 +2628,52 @@ body.sb-collapsed #fb-user-photo{margin:0}
     display: inline-flex;
     box-shadow: 0 0 10px color-mix(in srgb, var(--error) 50%, transparent);
   }
+
+  /* ---- A GAVETA DO "MAIS" -------------------------------------- */
+  /* Sobe de baixo, como folha. Fica ACIMA da barra (que é `--z-nav`) e
+     ABAIXO de modal — é navegação, não diálogo de decisão. */
+  .nav-mais-fundo {
+    display: block; position: fixed; inset: 0;
+    background: rgba(0,0,0,.5);
+    opacity: 0; pointer-events: none; transition: opacity .18s ease;
+    z-index: calc(var(--z-nav) + 1);
+  }
+  .nav-mais-fundo.aberto { opacity: 1; pointer-events: auto; }
+
+  .nav-mais {
+    display: block; position: fixed; left: 0; right: 0;
+    bottom: 68px;                       /* encosta na barra, não a cobre */
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    z-index: calc(var(--z-nav) + 2);
+    transform: translateY(110%);
+    transition: transform .22s cubic-bezier(.32,.72,0,1);
+    box-shadow: var(--shadow-up);
+  }
+  .nav-mais.aberta { transform: translateY(0); }
+
+  /* Alça: diz "isto sobe de baixo e dá para fechar" sem precisar de texto. */
+  .nav-mais-alca {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: var(--border); margin: 4px auto 12px;
+  }
+
+  /* Três colunas: rótulo inteiro cabe sem abreviar, que era o problema da
+     barra. "Configurações" aparece por extenso aqui. */
+  .nav-mais-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .nmg-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; padding: 14px 4px; min-height: 76px;
+    background: none; border: none; border-radius: var(--radius-sm);
+    color: var(--text2); font-size: var(--fs-xs); font-family: inherit;
+    cursor: pointer; text-align: center; line-height: 1.2;
+  }
+  .nmg-item svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .nmg-item:active { background: var(--bg-hover); }
+  .nmg-item.active { color: var(--primary); background: rgba(var(--primary-rgb), .1); }
 
   /* Page Header Mobile Refinements */
   .page-header {
