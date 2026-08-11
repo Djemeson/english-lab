@@ -145,6 +145,21 @@ async function videoCreateCard(alvoOverride) {
   // última fonte que ainda duplicava.
   // `prepAcharItem` acha inclusive flexionado ("fell" acha "fall"), então o
   // reencontro é reconhecido mesmo quando a legenda traz outra forma.
+  // ⚠️ O AVISO DA UNIDADE VEM ANTES DE TUDO — antes de gravar o áudio e antes
+  // da chamada de IA. Perguntando depois, ele já teria pago a chamada e a cena
+  // já estaria gravada para um item que não deveria nascer.
+  // A peça é a MESMA do leitor (`unidadeNaCaptura`, em review.js): a pergunta
+  // não muda porque a fonte é uma legenda em vez de uma página.
+  if (typeof unidadeNaCaptura === 'function') {
+    const expr = await unidadeNaCaptura(alvo, frase)
+    if (expr && typeof prepararNovoSentido === 'function') {
+      prepararNovoSentido(expr.id, { contexto: frase, glosa: '',
+        source_type: _vidCur.source_type || 'series', source_title: _vidCur.title })
+      toast(`Esta cena entrou em "${expr.word}"`, 'success')
+      return
+    }
+  }
+
   const jaExiste = (typeof prepAcharItem === 'function')
     ? prepAcharItem(alvo, _vidCur.lang || 'en')
     : words.find(w => (w.word || '').toLowerCase() === alvo.toLowerCase())

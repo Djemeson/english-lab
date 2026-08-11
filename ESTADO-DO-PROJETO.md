@@ -7,7 +7,18 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **O PARENTESCO APARECE NAS TRÊS TELAS**. O Preparar dizia de
+> Última atualização: 2026-08-08 — **A UNIDADE AVISA NA HORA DA CAPTURA**. Capturando `fall` de uma
+> frase que traz `fall in love`, que ele já estuda, nascia um item competindo com a expressão no
+> verbete — o mesmo sentido em dois tetos. O app já percebia, mas **só avisava quando ele abrisse o
+> item no Preparar**: tarde demais, porque a essa altura ele já passou da cena e perdeu o motivo de
+> ter capturado aquilo. Agora a pergunta é no leitor e no vídeo, com a frase ainda na tela.
+> ⚠️ **É pergunta de duas vias, não alerta**: o app não sabe se ele quis a palavra sozinha, e quem
+> decide é ele. O botão principal é o que evita o item duplicado — o único desfecho que ele não
+> teria como consertar depois sem antes descobrir que existe um problema. ⚠️ E no vídeo o aviso vem
+> **antes de gravar o áudio e antes da chamada de IA**: perguntar depois seria cobrar por um item
+> que não deveria nascer. `sw.js` → `englab-v199`.
+>
+> Anterior: 2026-08-08 — **O PARENTESCO APARECE NAS TRÊS TELAS**. O Preparar dizia de
 > onde o item veio — que `booklet` nasceu da família de `digest-sized`, que `fall in love` saiu de
 > `fall` —, e o Estudar e a Biblioteca mostravam o mesmo item **mudo**. A peça já era genérica e
 > mora no shell (`_familiaHtml`, `familiaDoItem`, `irParaItem`): as duas telas passaram a chamá-la,
@@ -8272,6 +8283,35 @@ sem resultado no caso mais comum — nome próprio famoso, que o modelo já conh
 
 `sw.js` → `englab-v191`.
 
+### A unidade avisa na hora da captura (2026-08-08)
+
+`unidadeJaEstudada` já existia e já detectava o caso: ele captura `fall` de uma frase que traz
+`fall in love`, expressão que ele já estuda. O problema era **quando** o app falava — só ao abrir o
+item no Preparar, minutos ou dias depois. Aviso que chega tarde não é aviso: a essa altura ele já
+passou da cena, já perdeu o motivo de ter capturado aquilo, e corrigir virou arqueologia.
+
+Agora a pergunta acontece **no instante da captura**, no leitor e no vídeo, com a frase ainda na
+frente dele — e a correção custa um clique.
+
+⚠️ **É pergunta de DUAS VIAS, não alerta.** O app não sabe o que ele quis: pode ser que queira
+`fall` sozinho mesmo. O botão principal é *"Guardar a cena em fall in love"* porque é o desfecho que
+ele quase sempre quer **e** o único que ele não teria como consertar depois sem antes descobrir que
+existe um problema. O secundário é *"Capturar fall mesmo assim"*, com todas as letras. Fechar no Esc
+ou clicando fora vale como a palavra: é o que teria acontecido sem o aviso, então não se perde nada.
+
+⚠️ **No vídeo ele vem antes de gravar o áudio e antes da chamada de IA.** Perguntando depois, ele já
+teria pago a análise e a cena já estaria gravada para um item que não deveria nascer.
+
+A peça é **a mesma nas duas telas** (`unidadeNaCaptura`, em `review.js`, que é shell): a pergunta
+não muda porque a fonte é uma legenda em vez de uma página. Escolhendo a expressão, a cena entra
+nela por `prepararNovoSentido` — o mesmo caminho do reencontro.
+
+**Provado no navegador** nos quatro cenários: pergunta quando deve (com os rótulos certos), devolve
+a expressão no botão principal, segue com a palavra no secundário, e **não pergunta** quando a
+frase não traz a unidade nem quando o alvo já É a expressão.
+
+**Arquivos**: `js/review.js`, `js/ler.js`, `js/video-study.js`. `sw.js` → `englab-v199`.
+
 ### O parentesco aparece nas três telas (2026-08-08)
 
 Um item guarda em `from` de qual outro nasceu — o sentido separado (`fall in love` de `fall`), a
@@ -8588,10 +8628,9 @@ lugar só.
 - [x] ~~A família só aparece no Preparar~~ — **feito em 2026-08-08**: Estudar e Biblioteca
       passaram a chamar a mesma peça, com rótulo dinâmico para não colidir com a "família do
       item" que a IA gera. Ver 8.2.
-- [ ] **A CAPTURA AVISA NO PREPARAR, NÃO NA HORA DO CLIQUE.** O aviso ("a frase contém *fall in
-      love*") aparece quando ele abre o item no Preparar — não no balão do leitor/vídeo, onde a
-      captura de fato acontece. `unidadeJaEstudada(w)` é de graça e serve igual lá; falta só o
-      lugar na UI daquelas telas.
+- [x] ~~A captura avisa no Preparar, não na hora do clique~~ — **feito em 2026-08-08**: a
+      pergunta é no leitor e no vídeo, de duas vias, e no vídeo antes de gastar áudio e IA.
+      Ver 8.2.
 - [ ] **O DOSSIÊ AINDA NÃO MOSTRA ÁUDIO NEM IMAGEM** (90ª rodada). O material tem os dois
       (`AudioDB`, `ImageDB`) e a tela só mostra texto. É a diferença entre ler o material e
       *estudar* o material. Ficou de fora por ser decisão de layout própria — um botão de ouvir

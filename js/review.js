@@ -2964,6 +2964,37 @@ function revBreakStudy(wordId) {
 // traz o verbo flexionado ("fell", "falling") e comparar forma com forma
 // erraria em todo verbo irregular — o mesmo motivo pelo qual o negrito da IA
 // é a âncora do detector.
+// ⚠️ O AVISO NA HORA DA CAPTURA, não minutos depois.
+// `unidadeJaEstudada` já existia, mas só era consultada quando ele ABRIA o
+// item no Preparar — e aí o aviso chega tarde: ele já passou da cena, já
+// perdeu o motivo de ter capturado aquilo, e corrigir virou trabalho de
+// arqueologia. Aqui a frase ainda está na frente dele e a correção é um clique.
+//
+// A pergunta é de DUAS VIAS de propósito, não um alerta. O app não sabe o que
+// ele quis: pode ser que ele queira mesmo `fall` sozinho. Quem decide é ele —
+// e o botão principal é o que evita o item duplicado, porque é o desfecho que
+// ele quase sempre quer e o único que ele não teria como consertar sozinho
+// depois sem descobrir que existe um problema.
+// Fechar no Esc ou no clique fora vale como "a palavra mesmo": é o que teria
+// acontecido sem o aviso, então não perde nada.
+async function unidadeNaCaptura(palavra, frase) {
+  if (typeof unidadeJaEstudada !== 'function' || typeof confirmModal !== 'function') return null
+  const expr = unidadeJaEstudada({ word: palavra, context: frase })
+  if (!expr) return null
+  const ok = await confirmModal({
+    title: `Isto parece ser "${expr.word}"`,
+    icon: 'layers',
+    confirmText: `Guardar a cena em "${expr.word}"`,
+    cancelText: `Capturar "${palavra}" mesmo assim`,
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Você já estuda
+        <b>${esc(expr.word)}</b>, e esta frase traz a expressão inteira.</p>
+      <p style="font-size:var(--fs-sm);color:var(--text2);margin-top:8px">Capturar
+        <b>${esc(palavra)}</b> sozinho cria um item que compete com ela no verbete —
+        o mesmo sentido dividido em dois tetos.</p>`
+  })
+  return ok ? expr : null
+}
+
 function unidadeJaEstudada(w) {
   const palavra = (w.word || '').trim()
   if (!palavra || palavra.split(/\s+/).length > 1) return null

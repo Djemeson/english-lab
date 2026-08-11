@@ -1051,7 +1051,9 @@ function _lerFraseEmVolta(sel, alvo) {
 // de card, e quem quebra em itens é o Raio-X da triagem, no Preparar.
 const LER_MAX_ALVO = 4
 
-function _lerCapturar(selecao, frase, alvoDOM, achado) {
+// `async` por causa do aviso da unidade, que pergunta antes de criar. Quem
+// chama nao usa o retorno, entao virar Promise nao muda nada la fora.
+async function _lerCapturar(selecao, frase, alvoDOM, achado) {
   const bruto = String(selecao || '').replace(/\s+/g, ' ').trim()
   if (!bruto) return
   const nPalavras = bruto.split(' ').filter(Boolean).length
@@ -1087,6 +1089,24 @@ function _lerCapturar(selecao, frase, alvoDOM, achado) {
     source_type: 'kindle',
     source_title: _lerLivro.title,
     source_context: _lerLivro.chapters[_lerCap]?.titulo || ''
+  }
+
+  // ⚠️ A EXPRESSÃO INTEIRA TEM PREFERÊNCIA, e a pergunta é AQUI — com a frase
+  // ainda na tela. Capturando "fall" de uma frase que traz "fall in love", que
+  // ele já estuda, nasceria um item competindo com a expressão no verbete.
+  // Antes o app percebia isso, mas só avisava quando ele abrisse o item no
+  // Preparar: tarde demais para lembrar por que capturou.
+  if (typeof unidadeNaCaptura === 'function') {
+    const expr = await unidadeNaCaptura(limpa, frase)
+    if (expr && typeof prepararNovoSentido === 'function') {
+      prepararNovoSentido(expr.id, { contexto: frase, glosa, ...fonte })
+      ;(_lerLivro.notes = _lerLivro.notes || []).push({
+        id: uid(), cap: _lerCap, word: expr.word, text: frase, wordId: expr.id, created_at: Date.now()
+      })
+      _lerPersistirCaptura()
+      toast(`Esta cena entrou em "${expr.word}"`, 'success')
+      return
+    }
   }
 
   // REENCONTRO: a palavra já existe (inclusive flexionada — "fell" acha
