@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (11ª) — **MENU DO CELULAR E PODCAST NA NUVEM**. Quatro
+> Última atualização: 2026-08-11 (12ª) — **"TINTA": O DESIGN SYSTEM NASCEU NO CLAUDE DESIGN**.
+> Diagnóstico com número: a paleta **não** é apagada (acentos com 83–91% de saturação) — o que
+> está fraco é o que separa as coisas (card vs. fundo **1,08**, borda **1,23**, secundário vs.
+> terciário **1,27**). Direção "Tinta" sobre o tema Papel, com **eixo de movimento** (que o
+> projeto nunca teve) e uma **superfície de IA viva** onde o arrasto do cursor empurra a tinta.
+> 7 previews publicados no projeto `English Lab — Tinta`; fonte em `design-system/`.
+> ⚠️ **Nada foi aplicado ao app** — `styles.css` intacto, `sw.js` ainda em `englab-v214`.
+> ⚠️ O movimento contínuo **não foi visto com os olhos** (painel do navegador oculto: sem
+> quadros compostos); o mecanismo está provado por interpolação. **Detalhes em §8.15.**
+>
+> Última atualização anterior: 2026-08-11 (11ª) — **MENU DO CELULAR E PODCAST NA NUVEM**. Quatro
 > seções (Palavras, Ler, Vídeo, Configurações) **não tinham porta no celular** — 11 seções para
 > 7 lugares; entrou a gaveta do **"Mais"**. E o podcast passou a subir, com a **legenda junto**,
 > que é o que realmente dói perder (custou Whisper). Limite por arquivo: 50 MB → **500 MB**.
@@ -9381,6 +9391,98 @@ a referência solta é justamente o que a regra do projeto proíbe.
 
 `sw.js` → `englab-v214`.
 
+## 8.15 "Tinta" — o design system nasceu no Claude Design (2026-08-11)
+
+**O pedido**: *"existe algum serviço que analisa o meu projeto e passa uma análise de estilo
+mais bonito? acho esse projeto tão apagado, sem chamar atenção."* Depois, o brief completo:
+não é só cor estática — é **arranjo da informação, movimento, cores vivas, e ícones/botões de
+IA com movimento de cor próprio que se atiça no hover e obedece ao arrasto do cursor, como
+baldes de tinta derramados**. Quer personalidade, personalização, autenticidade. Gosta de
+preto e laranja (informação, não limite). Usa o tema **Papel** no dia a dia.
+
+### O diagnóstico: a paleta não é apagada, o uso dela é
+
+Medido com script (`scratchpad/c.mjs`) direto sobre os tokens do CSS, não no olho:
+
+| par | contraste | leitura |
+|---|---|---|
+| `--surface` vs `--bg` (midnight) | **1,08** | o card não se separa do fundo |
+| `--surface2` vs `--surface` | 1,10 | as três camadas são a mesma camada |
+| borda (8% branco sobre `#0D1425`) | **1,23** | borda decorativa, não delimitadora |
+| `--text2` vs `--text3` | **1,27** | dois níveis de texto que são um só |
+| saturação dos acentos (6 temas) | **83–91%** | cor de sobra — o problema não é aqui |
+
+Conclusão registrada: **a interface está desenhada em volume de sussurro.** O acento existe e
+é sempre aplicado a 6–16% de alpha, então nunca aparece. Somado à ausência total de escada de
+tempo (transições soltas de `.12s`/`.3s`/`.35s`, a maioria dos elementos sem nenhuma), dá a
+sensação de imagem parada.
+
+### A direção: "Tinta"
+
+Base no tema Papel, que é o que ele usa. Valores **validados antes de escrever CSS**
+(`scratchpad/p.mjs`, `q.mjs`) — nada entrou sem passar em AA:
+
+| token | valor | contraste |
+|---|---|---|
+| `--ink` / `--ink2` / `--ink3` | `#16130E` / `#4A4337` / `#7D7364` | 18,52 / 9,77 / 4,66 — e **2,10 entre ink2 e ink3** (era 1,27) |
+| `--primary` | `#C2410C` | **5,18 nos dois sentidos**: como texto E como fundo com texto branco. `#D9480F` foi descartado por dar 4,30 |
+| `--line` / `--line-strong` | alpha .18 / .34 | 1,47 / 2,19 (era 1,23) |
+| `--surface3` | `#E6DDCB` | 1,35 vs surface (era 1,13) |
+| cores da IA | `#FF6B1A` `#E8177B` `#6D28D9` `#0D9488` | **paleta própria, separada do acento do app** — sempre preenchimento, nunca tipografia |
+
+Eixo novo que o projeto não tinha: **movimento**. `--dur-1` 120ms · `--dur-2` 220ms ·
+`--dur-3` 420ms · `--dur-live` 9s, com `--ease-out`, `--ease-spring`, `--ease-live`.
+
+### A superfície de IA viva (o carro-chefe)
+
+Três camadas empilhadas em `componentes/ia-viva.html`: o giro contínuo (`@property --spin`
+animado em 9 s), o farol que segue o ponteiro com atraso, e as gotas depositadas ao arrastar
+(`pointerdown` + `pointermove`, uma gota a cada 90 ms, cor sorteada das quatro, `mix-blend-mode:
+screen`, morre em 1500 ms). A velocidade do gesto vira `--vx`/`--vy` (multiplicador 2,6× com o
+botão pressionado, 0,9× só passando), limitada a ±26% — **é o arrasto que empurra a tinta**.
+Estados: repouso, hover (`--wake:1` → menos desfoque, mais saturação), arrasto, e `.pensando`
+(giro em 2,6 s + pulso). Variante **discreta** (`.ia-quieta`, orbe de 15 px) é a regra dentro
+de listas; a superfície grande é no máximo uma por tela.
+
+### O que subiu
+
+Projeto **`English Lab — Tinta`** no Claude Design, id `70386d3a-03ba-457e-b7e5-3839105b2e3a`.
+Fonte local versionada em `design-system/` (`_base.css` + 7 previews com marcador `@dsCard`):
+
+| grupo | arquivo | o que mostra |
+|---|---|---|
+| Fundamentos | `cores.html` | paleta atual vs. Tinta, com os contrastes medidos na tabela |
+| Fundamentos | `movimento.html` | a escada de tempo, as 3 curvas em pista clicável, onde o movimento entra |
+| Fundamentos | `arranjo.html` | o Painel de hoje (tema Papel, fiel) ao lado da proposta — 4 cartões iguais → 1 herói + faixa de 3 |
+| Fundamentos | `tipografia.html` | a regra única: **serifada = inglês e resultado; sem serifa = o app** |
+| Componentes | `ia-viva.html` | a tinta derramada, em 3 formatos + as 5 regras anti-caricatura |
+| Componentes | `botoes-e-chips.html` | hoje vs. Tinta lado a lado; o `.btn-srs` roxo órfão sai |
+| Componentes | `flashcard.html` | trilha da sessão, giro 3D de 520 ms, grifo de tinta, intervalo no botão |
+
+### O que foi testado ao vivo
+
+- **A lógica do ponteiro**, simulando `pointerdown` + dois `pointermove` no preview servido em
+  `localhost:8765`: `--px` foi para `90%`, `--vx` saturou no teto de `26%`, e **2 gotas** foram
+  criadas com cor e tamanho sorteados. Sem erro de console.
+- **A interpolação do `@property`**: `getAnimations()[0]` existe, `playState: running`,
+  duração 9000 ms; forçando `currentTime = 2250`, o `--spin` computado deu **exatamente
+  `90deg`** e o `background-image` recebeu `conic-gradient(from 90deg, …)`.
+- **As 7 páginas**, carregadas em iframe a partir da própria origem: todas **HTTP 200**, com o
+  marcador `@dsCard` na primeira linha, **zero erro de script** e **sem estouro horizontal**
+  a 1000 px de largura.
+
+⚠️ **O que NÃO foi verificado com os olhos:** o painel do navegador embutido está oculto nesta
+sessão, então a página não compõe quadros — `requestAnimationFrame` nunca dispara (uma tentativa
+de contar quadros travou em timeout de 30 s) e `screenshot` recusa. O **mecanismo** do giro está
+provado pelo teste de interpolação acima, mas **ninguém olhou o movimento rodando**. Confirmar
+no Chrome real ou com o painel visível antes de dar a estética por aprovada.
+
+### Nada foi aplicado ao app
+
+`css/styles.css` e `index.html` **não foram tocados** — o `sw.js` continua em `englab-v214`.
+`design-system/` é material de decisão, não código de produção. A aplicação é rodada própria,
+e é onde mora o risco (6357 linhas de CSS e 6 temas que precisam continuar de pé).
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -9392,6 +9494,25 @@ a referência solta é justamente o que a regra do projeto proíbe.
 
 ### Decisões em aberto (com o levantamento já feito)
 
+- [ ] **APLICAR A DIREÇÃO "TINTA" NO APP** (aberto em 2026-08-11, §8.15). O design system está
+      publicado e nada foi aplicado. Depende **primeiro da aprovação dele** no Claude Design —
+      não comece pela camada de tokens antes de ele dizer o que fica.
+      **A ordem que reduz risco**, se aprovar:
+      1. **Tokens de movimento** (`--dur-*`, `--ease-*`) — aditivo puro, não muda nenhum pixel
+         até alguém usar. Zero risco.
+      2. **Tema novo `tinta`** entrando em `THEMES` (core.js) **ao lado dos 6**, não no lugar de
+         nenhum. Ele testa trocando em Configurações → Aparência e volta atrás com um clique.
+      3. **Contraste de borda/camada nos 6 temas existentes** — é o conserto que vale mesmo sem
+         reskin (borda 1,23 é ruim em todos eles, não só no Papel).
+      4. **Componentes**, um por vez, começando pelo flashcard (maior tempo de tela).
+      ⚠️ **Armadilhas conhecidas desta mudança:** `sw.js` é cache-first — bumpar o `CACHE` a
+      cada mexida em `css/styles.css`, senão o aparelho serve o CSS velho; e para conferir tema
+      por script é preciso **desligar a `transition` antes de medir** (várias superfícies têm
+      0,3 s e `getComputedStyle` no meio devolve o valor antigo). Ver §6.
+- [ ] **VER O MOVIMENTO RODANDO** (§8.15). O mecanismo do giro está provado por interpolação
+      (`--spin` deu 90deg exatos em 2250 ms), mas o painel do navegador estava oculto nesta
+      sessão — sem quadros compostos, `requestAnimationFrame` não dispara e `screenshot` recusa.
+      **Confirmar no Chrome real** antes de tratar a estética como aprovada.
 - [x] ~~Onde guardar o arquivo do livro~~ — **decidido e a infraestrutura está de pé**
       (2026-08-11): plano **Blaze** ativo, bucket criado, regras publicadas e testadas. Falta
       só o código. Ver §8.11. O histórico do levantamento fica abaixo, riscado, porque a
