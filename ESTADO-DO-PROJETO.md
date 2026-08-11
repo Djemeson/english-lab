@@ -9135,6 +9135,32 @@ outros três projetos da pasta mãe.
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Decisões em aberto (com o levantamento já feito)
+
+- [ ] **ONDE GUARDAR O ARQUIVO DO LIVRO** (levantado em 2026-08-11, a pedido dele). Hoje o EPUB
+      mora só no IndexedDB do aparelho onde foi aberto: **não acompanha o usuário**. Foi o que
+      travou o teste na Vercel (`arquivoDoLivroNesteAparelho: false`), e é o que acontece se ele
+      trocar de máquina ou limpar o navegador — a memória da obra simplesmente para, sem
+      explicar por quê.
+      **Levantamento fechado, com evidência:**
+      - O projeto está no plano **Spark (sem custos)** — visto no console.
+      - O **bucket do Storage NÃO existe**. ⚠️ O `storageBucket` que aparece no `firebase.js`
+        é **texto de modelo**, não prova de provisionamento: a API do Google responde
+        *"The specified bucket does not exist"*. Eu inferi errado disso na primeira leitura.
+      - O console diz, com todas as letras: *"Para usar Storage, faça upgrade do plano de
+        preços do seu projeto"*.
+      **As três saídas:** (a) **Blaze + Storage** — exige cartão, custo irrisório para poucos
+      livros, e o app não toca em arquivo pessoal nenhum; (b) **Google Drive** — grátis (15 GB),
+      mas pede escopo novo no login e passa a mexer no Drive pessoal dele; (c) **deixar local e
+      consertar a experiência** — quando o livro não está no aparelho, o app avisa e oferece
+      arrastar o arquivo, em vez de falhar em silêncio. **Recomendação: (c) primeiro** — custo
+      zero, sem permissão nova, e resolve o sintoma que realmente dói. A nuvem entra depois, se
+      o vaivém incomodar.
+- [ ] **ÁUDIO E IMAGEM MORAM DENTRO DO FIRESTORE** (`collection('audio')`, `collection('images')`,
+      com o conteúdo no campo `data`). O Firestore tem teto de 1 MB por documento e cobra por
+      operação — não é lugar de blob. Independe da decisão acima, mas o mesmo conserto resolveria
+      os dois.
+
 ### Dívida — código que a gente sabe que está torto
 
 - [x] ~~Dois botões "Analisar com IA" na mesma tela~~ — **resolvido em 2026-08-11**: ficou o do
