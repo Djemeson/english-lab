@@ -424,6 +424,46 @@ async function generateMissingAudio() {
 // `saber` não é tocado: o sentido que ele marcou como "conheço, não quero
 // drilar" nunca esteve na fila, então não há de onde devolvê-lo.
 // ================================================================
+// ARRUMAR O LEMA DOS ITENS
+// ================================================================
+// O motor mora em `core.js` (shell), então aqui não há carregamento sob
+// demanda — diferente do reparo do contexto, cujo motor é lazy.
+// `conferir: true` simula e mostra as trocas; mexer no lema reagrupa o
+// verbete, e reagrupar o acervo dele sem mostrar antes seria abuso.
+function arrumarLemas(conferir) {
+  const saida = el('lema-saida'); if (!saida) return
+  if (typeof migrarLemas !== 'function') {
+    saida.innerHTML = `<p class="dz-nota" style="color:var(--error)">Recarregue a página e tente de novo.</p>`
+    return
+  }
+  const r = migrarLemas()
+  if (!r.mexeu) {
+    saida.innerHTML = `<p class="dz-nota">${ic('checkCircle','ic-sm')} Nenhum item com o lema torto — não há o que arrumar.</p>`
+    return
+  }
+  if (!conferir) {
+    const n = r.aplicar()
+    saida.innerHTML = `<p class="dz-nota">${ic('checkCircle','ic-sm')} <b>${n}</b> ${n === 1 ? 'item arrumado' : 'itens arrumados'}.</p>`
+    toast(`${n} ${n === 1 ? 'lema corrigido' : 'lemas corrigidos'}`, 'success')
+    if (typeof renderReview === 'function') { try { renderReview() } catch (e) {} }
+    return
+  }
+  const pl = (n, s, p) => `${n} ${n === 1 ? s : p}`
+  saida.innerHTML = `
+    <ul class="cost-bullets"><li><b>${pl(r.mexeu, 'item vai mudar', 'itens vão mudar')}</b> de teto no verbete</li></ul>
+    <div class="reparo-amostras">
+      <p class="dz-nota">Como fica${r.exemplos.length < r.mexeu ? ` (${r.exemplos.length} de ${r.mexeu})` : ''}:</p>
+      ${r.exemplos.map(e => `<div class="reparo-amostra">
+        <b>${esc(e.palavra)}</b>
+        <div class="reparo-antes">${esc(e.de)}</div>
+        <div class="reparo-depois">${esc(e.para)}</div>
+      </div>`).join('')}
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="arrumarLemas(false)">${
+      ic('check','ic-sm')} Arrumar ${pl(r.mexeu, 'item', 'itens')}</button>`
+}
+
+// ================================================================
 // REPARAR O CONTEXTO DOS ITENS DO LEITOR
 // ================================================================
 // ⚠️ ARMADILHA Nº 1: o motor do reparo mora em `ler.js`, que é LAZY — este

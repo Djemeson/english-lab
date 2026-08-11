@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-08 — **A LEXA LEU O LIVRO**. Até aqui ela via UM parágrafo: não sabia
+> Última atualização: 2026-08-08 — **O LEMA PAROU DE INVENTAR PALAVRA**. Era a única dívida de
+> código da lista: `_lemaBase` pegava cegamente `glossLemas(...)[1]`, e para `-ed`/`-ing` esse
+> candidato é o RADICAL CRU — `running`→`runn`, `making`→`mak`, `stopping`→`stopp`. Não-palavras
+> virando o teto do verbete, e **"running" deixando de se juntar a "run"**, que é justamente o que
+> o lema existe para evitar. Entrou o **passo 1b do Porter**, cujos ramos exclusivos resolvem o par
+> que qualquer regra ingênua erra: `hopping`→`hop` (consoante dobrada) e `hoping`→`hope` (medida 1
+> + CVC). ⚠️ E veio com **migração**, porque `w.lemma` fica gravado: consertar a regra sem remigrar
+> deixaria o "running" de ontem sob `runn` e o de amanhã sob `run` — família rachada, o defeito em
+> dobro. A migração **só troca o que a regra da casa escreveu**; lema que veio da IA (validado por
+> `aplicarLemaDaIA`) fica intacto. Botão em Configurações, com conferência antes.
+> `sw.js` → `englab-v196`. Ver 8.2 ("O lema parou de inventar palavra").
+>
+> Anterior: 2026-08-08 — **A LEXA LEU O LIVRO**. Até aqui ela via UM parágrafo: não sabia
 > quem é um personagem, nem se a palavra já tinha aparecido antes. O material sempre foi nosso — o
 > EPUB inteiro está no `BookDB` —, e agora o app procura dentro dele. **Zero IA e zero API nova**:
 > a busca por lema que o reparo já usava (`_repCasa`, que acha "fell" procurando "fall" e aguenta o
@@ -8238,6 +8250,61 @@ sem resultado no caso mais comum — nome próprio famoso, que o modelo já conh
 
 `sw.js` → `englab-v191`.
 
+### O lema parou de inventar palavra (2026-08-08)
+
+Era a única dívida de código da lista de pendências, achada pela bateria de IA.
+
+**A raiz não era o gerador, era a escolha.** `glossLemas` produz os candidatos certos — para
+`running` devolve `[running, runn, runne, run]`, e a forma boa está lá. Só que ela empurra o
+RADICAL CRU primeiro no ramo `-ed`/`-ing`, e `_lemaBase` pegava `cands[1]` às cegas. Daí
+`running`→`runn`, `making`→`mak`, `stopping`→`stopp`, `beginning`→`beginn`.
+
+E não existia índice fixo que acertasse: `carried`→`carry` está no 1, `making`→`make` no 2,
+`running`→`run` no 3.
+
+**A regra: passo 1b do Porter**, aplicado ao radical que sobra depois de tirar o sufixo. Os três
+ramos são **exclusivos**, e é isso que faz o par difícil dar certo:
+
+| entrada | radical | ramo | saída |
+|---|---|---|---|
+| `hopping` | `hopp` | consoante dobrada | `hop` |
+| `hoping` | `hop` | medida 1 + CVC | `hope` |
+
+Qualquer regra que aplicasse os dois em sequência erraria um dos dois.
+
+⚠️ **`l`, `s` e `z` ficam de fora do desdobramento** — pego no banco de prova, na primeira versão.
+Deixá-los na lista consertava o `running` e **quebrava o `fall`**: `falling`→`fal`, `passing`→`pas`,
+`buzzing`→`buz`. `ll`, `ss` e `zz` são terminações legítimas do inglês.
+⚠️ E o `-ied`/`-ies` do `glossLemas` **vem antes**, porque já acerta sozinho: deixar o Porter pegar
+`carried` trocaria `carry` por `carri`.
+
+**40 casos no banco de prova**, todos passando — as duas famílias do defeito, os que já estavam
+certos (para não regredir), os irregulares, os plurais e os compostos com hífen.
+
+#### A migração é a metade difícil
+
+`w.lemma` fica **gravado** no item (com `lemma_de`), e `lemaDoItem` devolve o cache sem recalcular.
+Consertar a regra sem remigrar deixaria o "running" capturado ontem sob `runn` e o de amanhã sob
+`run`: **família rachada, o defeito em dobro**. As duas coisas andam juntas ou nenhuma anda.
+
+⚠️ **E ela só troca o que a REGRA DA CASA produziu.** O lema pode ter vindo da IA por
+`aplicarLemaDaIA`, que o valida contra a expressão — esse é melhor que qualquer regra minha, e
+remigrar por cima seria trocar um acerto por um palpite. O reconhecimento é direto: guardei
+`_lemaBaseAntigo`, e se o valor gravado bate com o que a regra velha daria, foi ela quem escreveu.
+
+Para não criar uma terceira regra de cabeça para manter em dia, `_lemaCabecaCom(expr, tipo, reduz)`
+recebe o redutor injetado — a migração roda a regra velha e a nova sobre a MESMA lógica (phrasal
+head-initial, o "to" que não conta, o último token de conteúdo).
+
+**Provado com seis cenários**: lema torto migra; lema que a IA acertou fica intacto; o que já
+estava certo não é tocado; cache velho (`lemma_de` de outra palavra) fica fora do alcance; e de
+brinde o `digest-siz` do conserto de hoje cedo também é migrado.
+
+Botão em Configurações, ao lado dos outros dois de manutenção, com **conferência antes** — mexer no
+lema reagrupa o verbete, e reagrupar o acervo dele sem mostrar seria abuso.
+
+**Arquivos**: `js/core.js`, `js/settings.js`, `index.html`. `sw.js` → `englab-v196`.
+
 ### A LEXA LEU O LIVRO — entregue em 2026-08-08 (a parte A da especificação)
 
 **O motor** (`js/ler.js`): `obraBuscar(livro, termo, { ateCap, maxTrechos })` devolve
@@ -8366,22 +8433,9 @@ lugar só.
       urgente: sem esquema o comportamento é exatamente o de antes. **O caminho é conhecido**:
       escrever o `ESQ.*`, passar `{ schema, schemaNome }` e rodar `_esqConfere` contra o trecho do
       prompt — ⚠️ **nunca passar esquema sem conferir**, porque campo esquecido vira campo proibido.
-- [ ] **O REDUTOR DE LEMA COROA NÃO-PALAVRAS** (2026-08-08) — achado pela bateria, **anterior a
-      esta rodada** e maior que ela. `_lemaBase` pega cegamente `glossLemas(...)[1]`, e para
-      consoante dobrada ou 'e' mudo isso é a resposta errada:
-      `running→runn`, `getting→gett`, `stopping→stopp`, `planned→plann`, `hugged→hugg`,
-      `making→mak`, `coming→com`, `writing→writ`, `hoping→hop`.
-      **O candidato certo já está na lista** (`running` → `[running, runn, runne, run]`), só não é o
-      escolhido — e não existe índice fixo que acerte sempre: `carried→carry` e `falling→fall` são o
-      índice 1, `making→make` é o 2, `running→run` é o 3.
-      **Efeito**: o item mora no verbete debaixo de um teto que não é palavra, e "running" não se
-      junta a "run" — exatamente o que o lema existe para evitar.
-      **Correção recomendada**: o passo 1b do Porter (desdobrar consoante final; repor o 'e' mudo
-      quando a medida do radical for 1 e ele terminar em CVC) — que acerta `hoping→hope` **e**
-      `hopping→hop`, o par que qualquer regra ingênua erra.
-      ⚠️ **EXIGE MIGRAÇÃO, e é por isso que não entrou de carona**: `w.lemma` fica gravado no item
-      (com `lemma_de`), então corrigir a regra sem remigrar o acervo deixaria o "running" antigo sob
-      `runn` e o novo sob `run` — família rachada, que é o defeito em dobro. Merece rodada própria.
+- [x] ~~O redutor de lema coroa não-palavras~~ — **corrigido em 2026-08-08**, com migração.
+      Passo 1b do Porter + botão em Configurações. Ver 8.2. ⚠️ **Falta rodar a migração no
+      acervo dele** — o botão está lá, mas quem aperta é ele.
 - [ ] **A COBERTURA DO DETECTOR À ESQUERDA É ESTREITA.** Exige 2+ palavras iguais e falha quando
       o possessivo varia ("make up **your/his** mind" a partir de "mind"). É deliberado — a
       alternativa é falso positivo em série —, mas significa que expressão com encaixe no meio

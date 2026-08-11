@@ -659,6 +659,41 @@ function _lemaEhVerbo(tok) {
 
 // Reduz a forma à base pela mesma escada do glossário: tabela de irregulares
 // primeiro (medida e específica), regras de sufixo depois.
+// ⚠️ A "MEDIDA" DO PORTER: quantas vezes o radical alterna vogal→consoante.
+// Serve a uma pergunta só: o radical é curto o bastante para que o 'e' mudo
+// tenha sido cortado? `mak` (medida 1) veio de `make`; `walk` (medida 1) veio
+// de `walk` mesmo — quem separa os dois é o teste CVC logo abaixo.
+function _lemaMedida(t) {
+  return ((String(t || '')
+    .replace(/[aeiou]+|(?!^)y/g, 'V')
+    .replace(/[^V]+/g, 'C')
+    .match(/VC/g)) || []).length
+}
+
+// O PASSO 1b DO PORTER, aplicado ao radical que sobra depois de tirar -ed/-ing.
+// É o conserto do defeito que a bateria achou: `glossLemas` gera os candidatos
+// certos, mas empurra o RADICAL CRU primeiro — e `_lemaBase` pegava o primeiro.
+// Daí `running`→`runn`, `making`→`mak`, `stopping`→`stopp`: não-palavras
+// virando o teto onde o item mora no verbete, e "running" deixando de se juntar
+// a "run", que é justamente o que o lema existe para evitar.
+// Os três ramos são EXCLUSIVOS, e é isso que faz o par difícil dar certo:
+//   hopping → hopp → (consoante dobrada) → hop
+//   hoping  → hop  → (medida 1 + CVC)    → hope
+// Qualquer regra que aplicasse os dois em sequência erraria um dos dois.
+function _lemaPorter1b(base) {
+  const b = String(base || '')
+  if (b.length < 3) return b
+  if (/(at|bl|iz)$/.test(b)) return b + 'e'                       // conflat → conflate
+  // ⚠️ `l`, `s` e `z` FICAM DE FORA, e é exatamente isso que o Porter manda.
+  // Deixá-los na lista (foi meu primeiro erro, pego no banco de prova) fazia
+  // `falling`→`fal`, `passing`→`pas`, `filled`→`fil`, `buzzing`→`buz`: eu
+  // consertava a consoante dobrada de "running" e quebrava a de "fall", que
+  // estava certa. `ll`, `ss` e `zz` são terminações legítimas em inglês.
+  if (/([bcdfgjkmnpqrtv])\1$/.test(b)) return b.slice(0, -1)      // runn → run
+  if (_lemaMedida(b) === 1 && /[^aeiou][aeiou][^aeiouwxy]$/.test(b)) return b + 'e'   // mak → make
+  return b
+}
+
 function _lemaBase(tok) {
   const t = String(tok || '').toLowerCase()
   if (!t) return ''
@@ -678,16 +713,95 @@ function _lemaBase(tok) {
   // então não há família para reunir. E chave estável, ainda que literal, é
   // melhor que chave inventada.
   if (t.includes('-')) return t
+  // ⚠️ ORDEM IMPORTA: o `-ied`/`-ies` do `glossLemas` já acerta sozinho
+  // (`carried`→`carry`) e vem ANTES na lista. Deixar o Porter pegar esses
+  // trocaria um acerto por `carri`.
+  if (!/(ies|ied|i(er|est))$/.test(t)) {
+    const m = t.match(/^(.+?)(ed|ing)$/)
+    if (m && m[1].length >= 3) {
+      const alvo = _lemaPorter1b(m[1])
+      if (alvo && alvo !== t) return alvo
+    }
+  }
   if (typeof glossLemas === 'function') {
     const cands = glossLemas(t, { estrito: true })
-    // O primeiro candidato é a própria palavra; o segundo, quando existe, é a
-    // redução mais provável ("running"→"run", "leaves"→"leave").
+    // Fora do -ed/-ing, o segundo candidato é a redução mais provável
+    // ("leaves"→"leave", "boxes"→"box").
+    if (cands.length > 1) return cands[1]
+  }
+  return t
+}
+
+// A REGRA VELHA, guardada de propósito: é o que a migração usa para saber se o
+// lema gravado veio DAQUI ou da IA. Sem ela, remigrar apagaria o lema que a
+// `aplicarLemaDaIA` validou — trocando um acerto por uma regra.
+function _lemaBaseAntigo(tok) {
+  const t = String(tok || '').toLowerCase()
+  if (!t) return ''
+  const irr = (typeof GLOSS_IRREG === 'object' && GLOSS_IRREG) ? GLOSS_IRREG[t] : null
+  if (irr) return irr
+  if (typeof glossLemas === 'function') {
+    const cands = glossLemas(t, { estrito: true })
     if (cands.length > 1) return cands[1]
   }
   return t
 }
 
 // A cabeça da expressão, já reduzida à base.
+// ⚠️ A MIGRAÇÃO DO LEMA — e ela é a metade difícil do conserto.
+// `w.lemma` fica GRAVADO no item (com `lemma_de`), e `lemaDoItem` devolve o
+// cache sem recalcular. Consertar a regra sem remigrar deixaria o "running"
+// capturado ontem sob `runn` e o de amanhã sob `run`: família rachada, o
+// defeito em DOBRO. Por isso as duas coisas andam juntas ou nenhuma anda.
+//
+// ⚠️ E ela só troca o que a REGRA DA CASA produziu. O lema pode ter vindo da
+// IA por `aplicarLemaDaIA`, que o valida contra a expressão — esse é melhor do
+// que qualquer regra minha, e remigrar por cima seria trocar um acerto por um
+// palpite. O reconhecimento é direto: se o valor gravado bate com o que a
+// regra VELHA daria, foi ela quem escreveu.
+function migrarLemas() {
+  if (typeof words === 'undefined' || !Array.isArray(words)) return { mexeu: 0, exemplos: [] }
+  const mudancas = []
+  for (const w of words) {
+    const bruto = String(w.word || '').trim().toLowerCase()
+    if (!bruto || !w.lemma || w.lemma_de !== bruto) continue
+    // O que a regra velha daria para este item, cabeça e tudo.
+    const velho = _lemaCabecaCom(bruto, w.type, _lemaBaseAntigo)
+    if (w.lemma !== velho) continue          // não foi a regra: não é meu para mexer
+    const novo = _lemaCabecaCom(bruto, w.type, _lemaBase)
+    if (!novo || novo === w.lemma) continue
+    mudancas.push({ w, de: w.lemma, para: novo })
+  }
+  return {
+    mexeu: mudancas.length,
+    exemplos: mudancas.slice(0, 12).map(m => ({ palavra: m.w.word, de: m.de, para: m.para })),
+    aplicar() {
+      for (const m of mudancas) { m.w.lemma = m.para; m.w.lemma_de = String(m.w.word || '').trim().toLowerCase() }
+      if (mudancas.length && typeof saveWords === 'function') saveWords()
+      if (mudancas.length && typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+      return mudancas.length
+    }
+  }
+}
+
+// `lemaCabeca` com o redutor injetado, para a migração poder rodar a regra
+// velha e a nova sobre a MESMA lógica de cabeça (phrasal head-initial, "to"
+// que não conta, último token de conteúdo). Duplicar essa lógica na migração
+// seria criar uma terceira regra para manter em dia.
+function _lemaCabecaCom(expr, tipo, reduz) {
+  const bruto = String(expr || '').toLowerCase().replace(/[^\p{L}\p{N}'\s-]/gu, ' ').trim()
+  if (!bruto) return ''
+  const toks = bruto.split(/\s+/).filter(Boolean)
+  if (toks.length === 1) return reduz(toks[0])
+  if (tipo === 'phrasal_verb') return reduz(toks[0])
+  const inicio = toks[0] === 'to' && toks.length > 1 ? 1 : 0
+  if (_lemaEhVerbo(toks[inicio])) return reduz(toks[inicio])
+  for (let i = toks.length - 1; i >= 0; i--) {
+    if (!_LEMA_FUNCIONAIS.has(toks[i])) return reduz(toks[i])
+  }
+  return reduz(toks[toks.length - 1])
+}
+
 function lemaCabeca(expr, tipo) {
   const bruto = String(expr || '').toLowerCase().replace(/[^\p{L}\p{N}'\s-]/gu, ' ').trim()
   if (!bruto) return ''

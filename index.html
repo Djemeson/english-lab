@@ -717,6 +717,28 @@
       <!-- Espaço em disco (renderizado por renderEspacoLocal() em settings.js) -->
       <div id="set-espaco"></div>
 
+      <!-- ARRUMAR O LEMA — mesma família das outras duas: manutenção do
+           acervo, recolhida, e com conferência antes. -->
+      <details class="danger-zone dz-suave" id="dz-lema">
+        <summary>
+          <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+          Arrumar o lema dos itens
+        </summary>
+        <div class="dz-corpo">
+          <p>O <b>lema</b> é a palavra sob a qual o item mora no verbete — o "teto" que junta a
+             família. Uma regra antiga cortava o fim das palavras sem cuidado e produzia
+             <b>não-palavras</b>: <i>running</i> virava <code>runn</code>, <i>making</i> virava
+             <code>mak</code>, <i>stopping</i> virava <code>stopp</code>.</p>
+          <p>O efeito é o oposto do que o lema existe para fazer: <b>"running" não se junta a
+             "run"</b> — a família racha em duas por causa da grafia.</p>
+          <p class="dz-nota">A regra já foi corrigida, mas o lema fica <b>gravado</b> em cada item:
+             sem esta migração, o que foi capturado antes continua sob o teto errado. Só toca no que
+             a regra da casa escreveu — <b>lema que veio da IA fica intacto</b>. Sem IA, sem custo.</p>
+          <div id="lema-saida"></div>
+          <button class="btn btn-secondary btn-sm" onclick="arrumarLemas(true)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Conferir sem mexer</button>
+        </div>
+      </details>
+
       <!-- REPARAR O CONTEXTO — manutenção do acervo, vizinha da de cima pelo
            mesmo motivo. Diferente dela em uma coisa importante: esta MOSTRA
            antes de fazer. O "conferir" é uma simulação que não grava nada,
