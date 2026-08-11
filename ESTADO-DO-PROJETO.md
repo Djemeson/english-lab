@@ -7,7 +7,12 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (6ª) — **DUAS ARESTAS DE TELA**. Sumiu o segundo botão
+> Última atualização: 2026-08-11 (7ª) — **O TOM DA LEXA VIROU O TOM DA CONVERSA**. A persona
+> foi lida de `lexaSistema` e transposta para o `CLAUDE.md` global, com o mesmo truque que a
+> faz funcionar no app: **mais linhas proibindo caricatura do que descrevendo o temperamento**.
+> ⚠️ Sem herdar nome, gênero nem biografia — é jeito, não identidade. **Detalhes em §8.10.**
+>
+> Última atualização anterior: 2026-08-11 (6ª) — **DUAS ARESTAS DE TELA**. Sumiu o segundo botão
 > "Analisar com IA" (era idêntico ao do card), e o achado único da varredura virou **faixa no
 > Preparar** em vez de modal de tela cheia. ⚠️ No caminho, uma porta quase ficou trancada: com
 > a faixa assumindo o caso de um item, dispensar o último achado zerava a fila e escondia o
@@ -9062,6 +9067,40 @@ botão volta com o número. No card, sobrou **um** "Analisar com IA", e o estado
 intacto. Zero erro de console, sem transbordo, sem emoji.
 
 `sw.js` → `englab-v208`.
+
+## 8.10 O tom da Lexa saiu do app e virou o tom da conversa (2026-08-11)
+
+Ele pediu a personalidade da Lexa aplicada ao Claude — no Code, no Cowork e no chat. A persona
+não foi reinventada: foi **lida de `lexaSistema`, no topo de `js/ai.js`**, e transposta. As
+duas precisam continuar dizendo a mesma coisa; se uma mudar, a outra muda junto.
+
+**O que foi transposto:** calorosa e direta ao mesmo tempo, falando como gente ("olha",
+"repara", "na prática"), resolvendo rápido sem cerimônia, com humor em dose homeopática — no
+máximo uma piscadela por resposta, e só quando cabe sozinha.
+
+⚠️ **E o que faz isso funcionar é a lista de proibições, não a descrição.** O comentário do
+próprio `ai.js` explica por quê: *"modelo barato, se você disser só 'paraense e bem-humorada',
+devolve 'égua, maninho!' em toda resposta"*. A regra nova gasta mais linhas barrando caricatura
+do que definindo o temperamento — sem "Claro!", sem "Ótima pergunta", sem emoji, sem marca
+regional escrita, sem falar de si mesmo, sem entusiasmo de vendedor.
+
+⚠️ **Uma adaptação deliberada:** a Lexa tem nome, gênero e biografia (paraense de Belém), e o
+Claude **não** herda nada disso. É temperamento, não identidade — ele pediu o jeito dela, não
+uma atriz. A regra diz isso com todas as letras, porque a leitura preguiçosa desse pedido seria
+justamente virar personagem.
+
+**Onde ficou:** `~/.claude/CLAUDE.md` cobre Code e Cowork automaticamente. O **chat do
+claude.ai não é configurável daqui** — o texto pronto ficou em
+`_dados-de-teste/tom-para-o-chat.md`, para ele colar nas preferências de perfil.
+
+**De quebra, uma correção de instrução:** o `CLAUDE.md` do projeto dizia *"não insista no
+login"*. Isso valia para o painel de navegador embutido, mas **o Chrome real dele entra
+normalmente** — foi assim que a conta foi aberta hoje para conferir as 21 análises. A regra
+agora separa os dois casos: `acervo.mjs` para ler, Chrome real quando a tarefa exige o app
+rodando.
+
+**Numeração das regras do projeto:** o tom entrou como nº 3, o resumo executivo virou nº 4 e
+testar ao vivo virou nº 5.
 
 ## 9. Pendências / a verificar
 

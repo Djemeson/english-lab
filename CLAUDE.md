@@ -20,7 +20,16 @@ mapa para dar continuidade sem quebrar nada.
 
 O `ESTADO-DO-PROJETO.md` precisa estar SEMPRE atualizado — é o que garante a continuidade.
 
-## 🚨 REGRA Nº 3 — Falar como se fala a um CEO
+## 🚨 REGRA Nº 3 — O tom é o da Lexa
+
+O mesmo temperamento que ele desenhou para a tutora do app, aplicado à conversa: **calorosa e
+direta ao mesmo tempo**, fala como gente ("olha", "repara", "na prática"), humor em dose
+homeopática. E o que mais importa é o que **não** se faz — sem "Claro!", sem "Ótima pergunta",
+sem emoji, sem marca regional escrita, sem falar de si mesmo, sem virar personagem. Regra
+completa em `~/.claude/CLAUDE.md`; a persona original está no topo de `js/ai.js`, e as duas
+precisam continuar dizendo a mesma coisa.
+
+## 🚨 REGRA Nº 4 — Falar como se fala a um CEO
 
 **OBRIGATÓRIO.** Didático, organizado, curto. A regra completa, com o esqueleto de resposta,
 está em `~/.claude/CLAUDE.md` e vale para todos os projetos. O essencial:
@@ -35,7 +44,7 @@ está em `~/.claude/CLAUDE.md` e vale para todos os projetos. O essencial:
 
 O detalhe técnico continua sendo escrito — no `ESTADO-DO-PROJETO.md` e na mensagem de commit.
 
-## 🚨 REGRA Nº 4 — Testar AO VIVO, sempre
+## 🚨 REGRA Nº 5 — Testar AO VIVO, sempre
 
 **Nenhuma alteração é dada por pronta sem ter rodado de verdade.** Ler o código e achar que
 está certo não conta; "deve funcionar" não conta; teste sintético com dado inventado não
@@ -76,9 +85,12 @@ segundos olhando o real teriam evitado o erro.
 - **O navegador serve JS em cache** mesmo depois de editar o arquivo. Antes de testar, force:
   `fetch(arquivo, {cache:'reload'})` nos `.js` tocados e só então `location.reload()` — senão
   você testa a versão velha e comemora errado.
-- **Login do app é `signInWithPopup`**, e o painel de navegador não alcança a janela do popup
-  (o caminho por `signInWithRedirect` é barrado pelo classificador). Para dado real, use o
-  `tools/acervo.mjs` — não insista no login.
+- **Login do app é `signInWithPopup`.** O painel de navegador embutido **não** alcança a janela
+  do popup (e `signInWithRedirect` é barrado pelo classificador), mas o **Chrome real dele
+  entra normalmente** — basta clicar em "Entrar com o Google" pelas ferramentas do
+  Claude in Chrome. Para só LER o acervo, prefira `tools/acervo.mjs`, que não precisa de
+  navegador; o Chrome é o caminho quando a tarefa exige o app rodando (ex.: disparar análise,
+  que usa a chave de IA dele).
 - **Mudanças de dados/sync são de alto risco** — recomende backup (Configurações → Exportar JSON)
   antes de testar.
 - **Responda ao Djemeson em português.**
