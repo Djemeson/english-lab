@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (3ª) — **O ACERVO PASSOU A RESPONDER SOZINHO**, e o
+> Última atualização: 2026-08-11 (4ª) — **A GLOSA QUE VIROU FRASE**. O primeiro uso do
+> `acervo.mjs lista` achou o que número nenhum mostrava: 7 dos 21 itens da fila têm uma
+> explicação em português no campo da frase, vinda da linha de família do Estudar. Corrigido
+> na origem e nos **quatro** consumidores que tratam `context` como frase do idioma — com a
+> rede principal em `analyzeWordDirect`, porque a ordem real de uso é "analisar tudo" e
+> chamada gasta não volta. Teste **estrutural**, não de idioma (quebraria em espanhol):
+> **24 acertos em 24 casos reais**. Provado ao vivo interceptando `aiJSON` sem gastar chamada.
+> **Detalhes em §8.7.**
+>
+> Última atualização anterior: 2026-08-11 (3ª) — **O ACERVO PASSOU A RESPONDER SOZINHO**, e o
 > `CLAUDE.md` ganhou a **REGRA Nº 3: testar ao vivo, sempre**. `tools/acervo.mjs` lê o
 > Firestore direto do terminal, sem navegador e sem login, com credencial **só-leitura**
 > (papel Leitor do Cloud Datastore — escrever é o IAM do Google recusando, não promessa
@@ -8911,6 +8920,61 @@ mas a proteção era mais fina do que eu descrevi na hora. O corte agora vai pel
 e com uma rede no `fetch` por cima, bloqueando qualquer método diferente de GET para o
 Firestore.
 
+## 8.7 A glosa que virou frase (2026-08-11)
+
+Achado do **primeiro uso do `acervo.mjs lista`** — e nenhum número mostrava: 7 dos 21 itens
+parados na fila carregam uma **explicação em português** no campo da frase. `busty` traz
+*"busty sinônimo mais comum e direto; bosomy soa mais literário"*. Também `buxom`, `stash`,
+`pageantry`, `westward`, `western` e `exploit`.
+
+**Causa raiz** em `_dosSelContexto` (`dossie.js`): fora dos exemplos, ele pega "a linha em
+volta", e a lista de seletores incluía `.dosf-fam-txt` — que é
+`<b>busty</b><span>sinônimo mais comum…</span>`, expressão colada à glosa. O comentário do
+próprio código já antecipava metade do problema (*"uma seção inteira não é frase"*), mas a
+linha da família também não é.
+
+⚠️ **Sai VAZIO, e o `return` vem ANTES da lista de seletores.** Só tirar `.dosf-fam-txt` de lá
+faria o `closest` subir para o `li`/`p` em volta e trazer um bloco ainda maior — o defeito
+piorava se resolvido pelo caminho óbvio. `.dosf-coloc` **ficou**: é a colocação sozinha
+("make a decision"), fragmento mas no idioma do item.
+
+**O teste é ESTRUTURAL, não de idioma** (`_glosaComoFrase`, em `review.js`). Procurar
+"palavras em português" quebraria no dia em que ele estudar espanhol, onde *para*, *con* e
+*no* são do próprio idioma. A linha da família tem forma estável: **abre com a expressão do
+verbete, em minúscula, e não fecha com pontuação** — é rótulo seguido de explicação, não
+oração. Rodado contra os **24 casos reais do acervo** (os 7 suspeitos e as 17 frases e
+contextos legítimos): **24 acertos, 0 erros**, sem falso positivo nem falso negativo.
+
+**A rede ficou nos QUATRO lugares que tratam `context` como frase do idioma**, não só onde o
+defeito apareceu:
+
+| onde | o que evita |
+|---|---|
+| `_dosSelContexto` | a origem: o item nasce sem frase em vez de com glosa |
+| `analyzeWordDirect` | a glosa não vai ao prompt; a IA recebe "não há frase de contexto" |
+| `sementesPendentes` | o item não entra no lote da semente, que pergunta "o que significa NESTA frase" |
+| `renderWordCard` | o raio-X não é oferecido para decompor uma explicação em português |
+
+⚠️ **A rede na análise não é redundante com o aviso da tela — é ela que importa.** A ordem
+real de uso é *"mandar analisar tudo"*: se a limpeza dependesse de ele clicar em sete cards
+antes, a chamada errada aconteceria primeiro, e **chamada gasta não volta**.
+
+**Conferido ao vivo, com os dados reais carregados** (regra nº 3): `_glosaComoFrase` acertou
+os 5 casos na tela; `sementesPendentes()` devolveu só os 2 legítimos; o aviso apareceu nos 3
+com glosa e em nenhum dos 2 com frase. E o teste que fecha o argumento — interceptando
+`aiJSON` antes da rede, sem gastar chamada:
+
+- `busty` → contexto **não** foi ao prompt, e o prompt diz *"THERE IS NO CONTEXT SENTENCE"* ✓
+- `carries himself` → frase legítima **passou intacta** ✓
+
+**Os 7 já gravados não foram apagados por conta própria** — o app avisa no card ("isto não é
+uma frase: é a explicação que apareceu na família de outro item") com o botão que já existia,
+`removerFraseAlheia`. Foi preciso soltar a exigência de `w.from` em `_fraseAlheiaHtml`, porque
+esses itens não têm pai, e pôr o teste da glosa **antes** do outro: a glosa contém a
+expressão, então passaria batido pelo `_fraseServeParaExpressao` e ficaria sem aviso nenhum.
+
+`sw.js` → `englab-v205`.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -8922,21 +8986,11 @@ Firestore.
 
 ### Dívida — código que a gente sabe que está torto
 
-- [ ] **A LINHA DE SINÔNIMO VIRA "FRASE" DO ITEM** (achado em 2026-08-11 com o acervo real,
-      `node tools/acervo.mjs lista`). **7 dos 21 itens parados na fila** têm, no lugar da
-      frase, uma **explicação em português**: `busty` → *"busty sinônimo mais comum e direto;
-      bosomy soa mais literário"*; também `buxom`, `stash`, `pageantry`, `westward`, `western`,
-      `exploit`. Todos nasceram de seleção feita na seção de família/sinônimos do Estudar.
-      **Causa raiz:** `_dosSelContexto` (`dossie.js` ~1517) — fora dos exemplos, ele pega "a
-      linha em volta" e a lista de seletores inclui `.dosf-fam-txt` e `.dosf-coloc`, que são
-      **glosas bilíngues**, não frases do idioma. O comentário ali já antecipa metade do
-      problema ("uma seção inteira não é frase"), mas a linha de sinônimo também não é.
-      **Consequência:** o `context` é o que a Lexa recebe como cena da palavra — ela vai
-      analisar `busty` com um texto em português como contexto, e o card nasce ilustrado por
-      uma explicação. Conserto provável: quando a linha escolhida não for do idioma do item
-      (ou vier desses dois seletores), nascer **sem frase**, como já acontece com
-      `tuck one's tail between one's legs` — vazio é melhor que errado. ⚠️ Os 7 já gravados
-      precisam de varredura à parte; `removerFraseAlheia` só aparece para item com `from`.
+- [x] ~~A linha de sinônimo vira "frase" do item~~ — **corrigido em 2026-08-11**, na origem e
+      nos quatro consumidores. Ver §8.7. ⚠️ Os 7 já gravados continuam com o texto: o app
+      **avisa no card** e deixa a tesoura na mão dele, e enquanto isso a análise já os trata
+      como sem contexto. **Falta ele apertar "Remover" nos sete** (ou simplesmente ignorar —
+      nada mais quebra).
 
 - [ ] **ITEM DERIVADO HERDA A FONTE DO PAI SEM TER ESTADO LÁ** (achado com dado real,
       2026-08-10). `tuck in` nasceu da análise da Lexa como parente de `tuck` e ficou com

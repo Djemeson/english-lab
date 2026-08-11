@@ -1510,11 +1510,30 @@ function _dosSelContexto(w, m, no) {
   // Num exemplo, a frase é a LINHA EM INGLÊS — mesmo que ele tenha selecionado
   // na tradução embaixo: é o inglês que dá o sentido da palavra ali.
   if (ex) frase = textoDe(ex.querySelector('.dosf-ex-en'))
+  // ⚠️ A LINHA DA FAMÍLIA NÃO É FRASE, É GLOSA BILÍNGUE. Ela é
+  // `<b>busty</b><span>sinônimo mais comum e direto; bosomy soa mais
+  // literário</span>` — expressão em inglês colada à explicação em português.
+  // Selecionar ali criava o item com ESSE texto como `context`, e `context` é
+  // o que a Lexa recebe como cena da palavra: a análise sairia com português
+  // no lugar do exemplo. Achado com o acervo real (2026-08-11): SETE itens
+  // nasceram assim — busty, buxom, stash, pageantry, westward, western,
+  // exploit —, todos ainda esperando análise.
+  //
+  // Sai VAZIO de propósito, e o `return` é antes de tudo: só remover o
+  // seletor da lista abaixo faria `closest` subir para o `li`/`p` em volta e
+  // trazer um bloco ainda maior. Item sem frase é caso previsto e tratado (o
+  // "tuck one's tail between one's legs" dele é assim) — frase errada, não.
+  if (!frase && perto('.dosf-fam-txt')) {
+    return { frase: '', lang, fonte: [OBRA_ESTUDO, w.word || ''].filter(Boolean).join(' · '),
+             origem: { source_type: 'manual', source_title: OBRA_ESTUDO, source_context: w.word || '' } }
+  }
   if (!frase) {
     // Fora dos exemplos: vale a LINHA em volta, não o bloco. Uma seção inteira
     // não é frase, e mandar um parágrafo como "contexto" recria o defeito de
     // origem por outro caminho — a Lexa procuraria a palavra no lugar errado.
-    const linha = perto('.dosf-coloc, .dosf-fam-txt, .dosf-forma, .dosf-conj, .dosf-sig, .dosf-def, .dosf-texto, .dosf-nota, .dosf-padrao, li, p')
+    // `.dosf-coloc` fica: é a colocação sozinha ("make a decision"), fragmento
+    // mas no idioma do item — diferente da linha da família, que é bilíngue.
+    const linha = perto('.dosf-coloc, .dosf-forma, .dosf-conj, .dosf-sig, .dosf-def, .dosf-texto, .dosf-nota, .dosf-padrao, li, p')
     const t = textoDe(linha)
     if (t && t.length <= 300) frase = t
   }

@@ -806,7 +806,17 @@ async function analyzeWordDirect(wordId) {
   renderSidebar()
 
   const target = w.word || w.context
-  const ctx    = w.context || ''
+  // ⚠️ GLOSA NÃO ENTRA COMO CONTEXTO. Sete itens do acervo carregam a linha da
+  // família no lugar da frase (`busty sinônimo mais comum e direto; …`), e o
+  // `ctx` vai para o prompt como "a cena onde ele viu a palavra": a IA
+  // receberia português como exemplo de inglês e devolveria análise pior.
+  //
+  // A rede está AQUI, e não só no aviso da tela, porque a ordem real de uso é
+  // "mandar analisar tudo" — se a limpeza dependesse de ele clicar em sete
+  // cards antes, a chamada errada aconteceria primeiro, e chamada gasta não
+  // volta. Sem contexto a análise é a genérica, que é o certo: é exatamente o
+  // que acontece com item sem frase nenhuma.
+  const ctx    = (typeof _glosaComoFrase === 'function' && _glosaComoFrase(w)) ? '' : (w.context || '')
 
   // Bloco de contexto da fonte — faz a IA desambiguar pelo gênero da mídia
   // (ex.: "snuff" no Survivor = "apagar a tocha", não "rapé").
@@ -1276,6 +1286,10 @@ function sementesPendentes() {
     w.status === 'pending_ai' &&
     String(w.word || '').trim() &&
     String(w.context || '').trim() &&
+    // A semente pergunta "o que a palavra significa NESTA frase". Com a glosa
+    // da família no lugar da frase, a pergunta não tem resposta boa — e ainda
+    // entraria no lote, gastando a chamada por um item que não podia responder.
+    !(typeof _glosaComoFrase === 'function' && _glosaComoFrase(w)) &&
     !String(w._seedMeaning || '').trim() &&
     !(w.meanings || []).some(m => m && m.meaning_pt))
 }
@@ -1689,7 +1703,11 @@ function renderWordCard(wordId) {
     // Uma palavra só, capturada de dentro de uma frase: é AQUI que nasce o
     // "fall" que devia ter sido "fall in love" — e nesse caso não há sentido
     // para separar depois, porque o item já nasceu errado.
+    // Terceira porta que trata `context` como frase do idioma: a glosa da
+    // família tem mais de três palavras e passaria por "frase em volta",
+    // oferecendo o raio-X para decompor uma explicação em português.
     const ehPalavraNaFrase = alvoBrk.split(/\s+/).length === 1 &&
+      !(typeof _glosaComoFrase === 'function' && _glosaComoFrase(w)) &&
       (w.context || '').trim().split(/\s+/).length >= 3
     const jaEstudada = ehPalavraNaFrase ? unidadeJaEstudada(w) : null
     // KonMari: cada estado mostra SÓ o que serve àquele momento.
@@ -1828,9 +1846,40 @@ function unidadeDoSentido(w, m) {
 // nasceram com a frase do pai colada nelas. Em vez de apagar por conta
 // própria — a frase pode ser a única pista de onde ele viu aquilo —, o app
 // mostra o que está errado e deixa a tesoura na mão dele.
+// ⚠️ A GLOSA GRAVADA COMO FRASE. Irmã do caso acima, descoberta com o acervo
+// real: sete itens carregam a linha da família — `busty sinônimo mais comum e
+// direto; bosomy soa mais literário` — no campo da frase. A origem está
+// tapada em `_dosSelContexto`, mas estes já existem.
+//
+// O TESTE É ESTRUTURAL, NÃO DE IDIOMA, e de propósito: procurar "palavras em
+// português" quebraria no dia em que ele estudar espanhol, onde "para", "con"
+// e "no" são do próprio idioma. A linha da família tem forma reconhecível e
+// estável — ela ABRE com a expressão do verbete, em minúscula, e NÃO fecha com
+// pontuação, porque é rótulo seguido de explicação, não oração. Frase de
+// verdade faz o contrário: começa com outra palavra, em maiúscula, e termina
+// em ponto. Confere nos sete e em nenhuma das treze frases legítimas do acervo.
+function _glosaComoFrase(w) {
+  const t = String((w && w.context) || '').trim()
+  const expr = String((w && w.word) || '').trim()
+  if (!t || !expr || t.length > 300) return false
+  if (/[.!?…"”]$/.test(t)) return false               // fecha como oração: é frase
+  if (!t.toLowerCase().startsWith(expr.toLowerCase() + ' ')) return false
+  return t[0] === t[0].toLowerCase()                  // rótulo, não início de frase
+}
+
 function _fraseAlheiaHtml(w) {
-  if (!w || !w.from || !(w.context || '').trim()) return ''
+  if (!w || !(w.context || '').trim()) return ''
   if (typeof _fraseServeParaExpressao !== 'function') return ''
+  // A glosa vem primeiro: ela CONTÉM a expressão, então passaria batido pelo
+  // teste de baixo e ficaria sem aviso nenhum.
+  if (_glosaComoFrase(w)) {
+    return `<div class="mi-unidade" style="margin-top:var(--sp-3)">
+      <div class="miu-txt">${ic('alert','ic-sm')}<span>Isto não é uma frase: é a <b>explicação</b> que apareceu na família de outro item. Como exemplo de <b>${esc(w.word)}</b> ela não serve, e a análise sairia pior com ela.</span></div>
+      <button class="btn btn-secondary btn-sm" onclick="removerFraseAlheia('${w.id}')"
+        data-tip="Tira o texto deste item. Melhor sem frase do que com a frase errada.">${ic('trash','ic-sm')}Remover</button>
+    </div>`
+  }
+  if (!w.from) return ''
   if (_fraseServeParaExpressao(w.context, w.word)) return ''
   return `<div class="mi-unidade" style="margin-top:var(--sp-3)">
     <div class="miu-txt">${ic('alert','ic-sm')}<span>Esta frase veio de <b>${esc(w.from.word || 'outro item')}</b> e não usa <b>${esc(w.word)}</b> — ela ilustra outro sentido.</span></div>
