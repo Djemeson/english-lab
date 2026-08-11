@@ -468,15 +468,72 @@ function arrumarLemas(conferir) {
 // vai para "Do seu estudo" —, então mostra antes e só mexe se ele mandar.
 // `migrarProcedenciaHerdada` mora em `review.js`, que é SHELL: pode chamar
 // direto, sem a dança do lazy que o reparo do contexto exige logo abaixo.
-function arrumarProcedencia(conferir) {
+// O CONFERIDOR QUE ABRE O LIVRO. Monta a função que a migração recebe injetada
+// — ela mora no shell e não pode citar `ler.js`. Devolve `null` quando não há
+// como montar; a migração então cai no julgamento textual, que é o de antes.
+//
+// ⚠️ TRÊS DECISÕES QUE MUDAM O RESULTADO, e nenhuma é óbvia:
+//
+// 1. `BookDB.keys()` ANTES de qualquer busca. `obraBuscar` engole o erro de
+//    "o arquivo não está neste aparelho" e devolve zero achados — indistinguível
+//    de "procurei e não está no livro". Confiar nisso apagaria a obra de itens
+//    corretos em qualquer aparelho onde o EPUB não foi aberto ainda. Só as
+//    CHAVES são lidas: nada de carregar 4 MB para saber se o arquivo existe.
+//
+// 2. O livro INTEIRO, não até onde ele leu. A regra do spoiler existe para não
+//    entregar página nova na cara dele; aqui ninguém está lendo nada — é
+//    verificação de procedência. E o teto seria falso: o `pos.cap` é a leitura
+//    NO APP, mas as capturas vêm do Kindle, que costuma estar bem à frente.
+//    Buscar só até o teto marcaria como forasteiro o item capturado adiante.
+//    Foi essa decisão que o teste validou na hora: "tuck in" existe no livro,
+//    no *Chapter 20* — o modo textual o teria expulsado da obra.
+//
+// 3. A resposta é SIM/NÃO, sem capítulo. Ver o porquê em
+//    `migrarProcedenciaHerdada`: achar no livro protege o dado, não autoriza
+//    reescrevê-lo.
+async function _procConferidor() {
+  if (typeof BookDB === 'undefined' || typeof obraDoItem !== 'function' ||
+      typeof obraBuscar !== 'function' || typeof obraAteOndeLeu !== 'function') return null
+  let comArquivo
+  try { comArquivo = new Set(await BookDB.keys()) } catch (e) { return null }
+  if (!comArquivo.size) return null
+  return async (w) => {
+    const livro = obraDoItem(w)
+    if (!livro || !comArquivo.has(livro.id)) return null
+    const ate = ((livro.chapters || []).length || 1) - 1
+    let r
+    try { r = await obraBuscar(livro, w.word, { ateCap: ate, maxTrechos: 1 }) } catch (e) { return null }
+    return { achou: !!(r && r.total) }
+  }
+}
+
+async function arrumarProcedencia(conferir) {
   const saida = el('proc-saida'); if (!saida) return
   if (typeof migrarProcedenciaHerdada !== 'function') {
     saida.innerHTML = `<p class="dz-nota" style="color:var(--error)">Recarregue a página e tente de novo.</p>`
     return
   }
-  const r = migrarProcedenciaHerdada()
+  saida.innerHTML = `<p class="dz-nota"><span class="spinner"></span> abrindo os livros e conferindo…</p>`
+  // Best-effort de propósito: se o leitor não carregar, a migração roda pelo
+  // julgamento textual em vez de não rodar. O rodapé diz em qual modo foi.
+  let olharNoLivro = null
+  try { if (await _reparoCarregar()) olharNoLivro = await _procConferidor() } catch (e) { olharNoLivro = null }
+
+  let r
+  try { r = await migrarProcedenciaHerdada({ olharNoLivro }) }
+  catch (e) { saida.innerHTML = `<p class="dz-nota" style="color:var(--error)">Falhou: ${esc(e.message)}</p>`; return }
+
+  const modo = r.olhouOLivro
+    ? `${ic('bookOpen','ic-sm')} conferido <b>dentro do livro</b>`
+    : `${ic('alert','ic-sm')} conferido só pela <b>frase</b> — o arquivo do livro não está neste aparelho`
+  const extras = [
+    r.protegidos ? `<li><b>${r.protegidos}</b> ${r.protegidos === 1 ? 'ficou' : 'ficaram'} como ${r.protegidos === 1 ? 'está' : 'estão'} — a frase não usa a expressão, mas ela <b>está no livro</b></li>` : '',
+    r.semLivro ? `<li><b>${r.semLivro}</b> ${r.semLivro === 1 ? 'item ficou de fora' : 'itens ficaram de fora'} — sem o livro aqui, não dá para conferir, e chutar seria pior</li>` : ''
+  ].filter(Boolean).join('')
+
   if (!r.mexeu) {
-    saida.innerHTML = `<p class="dz-nota">${ic('checkCircle','ic-sm')} Nenhum item com obra herdada indevidamente — não há o que arrumar.</p>`
+    saida.innerHTML = `<p class="dz-nota">${ic('checkCircle','ic-sm')} Nenhum item com a obra errada — não há o que arrumar.</p>
+      <ul class="cost-bullets"><li>${modo}</li>${extras}</ul>`
     return
   }
   if (!conferir) {
@@ -488,14 +545,19 @@ function arrumarProcedencia(conferir) {
     return
   }
   const pl = (n, s, p) => `${n} ${n === 1 ? s : p}`
+  const linhas = [
+    `<li>${modo}</li>`,
+    `<li><b>${pl(r.mexeu, 'item sai', 'itens saem')}</b> da obra — ${r.olhouOLivro ? 'a expressão não está no livro' : 'a frase não usa a expressão'}</li>`,
+    extras
+  ].filter(Boolean).join('')
   saida.innerHTML = `
-    <ul class="cost-bullets"><li><b>${pl(r.mexeu, 'item vai mudar', 'itens vão mudar')}</b> de obra</li></ul>
+    <ul class="cost-bullets">${linhas}</ul>
     <div class="reparo-amostras">
       <p class="dz-nota">Como fica${r.exemplos.length < r.mexeu ? ` (${r.exemplos.length} de ${r.mexeu})` : ''}:</p>
       ${r.exemplos.map(e => `<div class="reparo-amostra">
         <b>${esc(e.palavra)}</b>
         <div class="reparo-antes">${esc(e.de)}</div>
-        <div class="reparo-depois">${esc(OBRA_ESTUDO)}${e.pai ? ' · ' + esc(e.pai) : ''}</div>
+        <div class="reparo-depois">${esc(e.para)}</div>
       </div>`).join('')}
     </div>
     <button class="btn btn-primary btn-sm" onclick="arrumarProcedencia(false)">${

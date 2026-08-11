@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 — **A RODADA DO PARENTESCO**. Os três defeitos que o dado
+> Última atualização: 2026-08-11 (2ª) — **A MIGRAÇÃO PASSOU A ABRIR O LIVRO**. O que eu tinha
+> deixado como pendência na mesma rodada: em vez de julgar pela frase, ela procura a expressão
+> dentro do EPUB. O conferidor **vem injetado** (a migração é shell, `ler.js` é lazy), item sem
+> o arquivo aqui é **pulado e nunca julgado**, e a busca vai ao livro inteiro porque o Kindle
+> anda à frente da leitura no app. ⚠️ **O teste derrubou parte do meu desenho**: eu ia corrigir
+> o capítulo "de brinde" até ver que `tuck in` aparece no *Chapter 20* sem ter vindo de lá —
+> achar no livro passou a **proteger sem reatribuir**. Modo livro marcou 1 item onde o textual
+> marcava 3. **Detalhes em §8.5.**
+>
+> Última atualização anterior: 2026-08-11 — **A RODADA DO PARENTESCO**. Os três defeitos que o dado
 > real acusou eram a mesma causa raiz em três pontas: o elo entre item pai e item filho estava
 > frouxo. Agora `deleteWord` promove os filhos em vez de deixar ponteiro morto (o `id` sai,
 > `from.word` fica — é ele que sustenta o aviso da frase alheia), e a procedência **segue a
@@ -8792,6 +8801,51 @@ para conferir. **Continua em §9 como diagnóstico, não como conserto.**
 
 `sw.js` → `englab-v202`.
 
+## 8.5 A migração passou a abrir o livro (2026-08-11)
+
+Era a pendência que eu mesmo tinha aberto na §8.4: a migração de procedência decidia pela
+**frase**, e agora decide **procurando a expressão dentro do EPUB**.
+
+**Como a armadilha nº 1 foi resolvida:** quem sabe abrir livro é `ler.js`, que é LAZY; a
+migração mora em `review.js`, que é shell. Em vez de mover código, o **conferidor vem
+injetado** — `migrarProcedenciaHerdada({ olharNoLivro })`. `settings.js` carrega os módulos
+(reusando `_reparoCarregar()`, que já existia para o reparo do contexto), monta a função e
+passa. Mesma saída de `_lemaCabecaCom(expr, tipo, reduz)`, que já recebe o redutor injetado.
+Sem conferidor, a migração continua funcionando pelo julgamento textual — e o rodapé da tela
+diz em qual dos dois modos ela rodou.
+
+**Três decisões que mudam o resultado, e o teste com o livro derrubou uma delas:**
+
+1. **`BookDB.keys()` antes de qualquer busca.** `obraBuscar` **engole** o erro de "o arquivo
+   não está neste aparelho" (`catch (e) { break }`) e devolve zero achados — indistinguível de
+   "procurei e não está no livro". Confiar nisso apagaria a obra de itens corretos em qualquer
+   aparelho onde o EPUB ainda não foi aberto. Só as chaves são lidas: nada de carregar 4 MB
+   para saber se o arquivo existe. **Item sem livro aqui é PULADO, nunca julgado.**
+2. **O livro inteiro, não até onde ele leu.** A regra do spoiler existe para não entregar
+   página nova na cara dele; aqui ninguém está lendo — é verificação de procedência. E o teto
+   seria falso: `pos.cap` é a leitura **no app**, mas as capturas vêm do Kindle, que costuma
+   estar bem à frente.
+3. ⚠️ **Achar no livro SÓ PROTEGE — NUNCA REATRIBUI.** Eu tinha escrito isto corrigindo também
+   o **capítulo** ("de brinde"), e o primeiro teste com o livro de verdade derrubou a ideia:
+   **`tuck in` aparece no *Chapter 20* de Billy Summers**, embora tenha nascido da análise de
+   `tuck` e ele esteja lendo o capítulo 1. **Existir no livro não é o mesmo que ter vindo de
+   lá** — para expressão comum, existir é quase inevitável. A evidência é forte o bastante para
+   *não apagar* a obra (na dúvida, o dado dele fica) e fraca demais para *afirmar* um capítulo
+   onde ele nunca esteve. Corrigir capítulo exigiria casar a **cena** do item com o trecho do
+   livro — e candidato aqui é justamente quem não tem cena que sirva, então essa evidência não
+   existe neste conjunto **por definição**.
+
+**A diferença entre os dois modos, medida:** no acervo de teste, o modo textual marcava **3**
+itens e o modo livro marca **1**. Os dois que ele salvou (`tuck in`, `pompadour`) estão mesmo
+no livro — teriam sido expulsos da obra por engano. E o caminho mais importante foi exercitado
+à parte: item de um livro **na estante mas sem o arquivo aqui** → o conferidor devolve `null`,
+`semLivro: 1`, **nada muda** (o modo textual apagaria).
+
+Custo: ~1,7 s para varrer 3 candidatos num EPUB de 4 MB (a primeira abertura domina; o cache
+`_obrTexto`/`_obrLivro` cobre o resto). Roda só quando ele aperta.
+
+`sw.js` → `englab-v203`.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -8813,12 +8867,10 @@ para conferir. **Continua em §9 como diagnóstico, não como conserto.**
 - [x] ~~`to his face` aponta para um pai que não existe~~ — **corrigido em 2026-08-11**:
       `deleteWord` promove os filhos (o `id` sai, `word` e `rel` ficam) e
       `migrarParentescoOrfao()` roda no boot para o dado já gravado. Ver §8.4.
-- [ ] **A MIGRAÇÃO DE PROCEDÊNCIA DECIDE PELA FRASE, NÃO PELO LIVRO** (2026-08-11). Com
-      `obraBuscar` pronto e barato (4 ms com cache quente), dava para **conferir no EPUB** se a
-      expressão está mesmo na obra antes de tirar a procedência — mais preciso que o teste
-      textual, e resolveria o caso ambíguo do item de **uma palavra sem frase nenhuma**, que
-      hoje perde a obra por falta de evidência. Custo: `ler.js` é LAZY e a migração mora no
-      shell, então exige a mesma dança que o reparo do contexto já faz em `settings.js`.
+- [x] ~~A migração de procedência decide pela frase, não pelo livro~~ — **feito em 2026-08-11**
+      (§8.5): conferidor injetado, `BookDB.keys()` antes de julgar, livro inteiro, e achar no
+      livro **protege sem reatribuir**. No teste, o modo livro marcou 1 item onde o textual
+      marcava 3 — os outros 2 estavam mesmo na obra.
 - [ ] **CONFIRMAR SE O SENTIDO DESDOBRADO REALMENTE FICA NO PAI** — diagnóstico, não conserto.
       ⚠️ Eu registrei isso como defeito em 2026-08-10 e **diagnostiquei mal**: o código já marca
       `m.moved_to = alvo.id` e alimenta `w.spun_off` (`review.js` ~2181). No acervo dele, `tuck`

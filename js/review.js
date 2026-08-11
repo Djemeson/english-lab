@@ -3286,9 +3286,36 @@ function _origemDoDerivado(w, expr) {
 //   3. só se a frase não servir para a expressão — se serve, ele esteve lá.
 // E ninguém aplica nada sozinho: devolve `mexeu`/`exemplos` para a tela
 // mostrar antes, igual `migrarLemas`.
-function migrarProcedenciaHerdada() {
-  if (typeof words === 'undefined' || !Array.isArray(words)) return { mexeu: 0, exemplos: [] }
-  const mudancas = []
+// ⚠️ O CONFERIDOR VEM DE FORA, e por armadilha nº 1: quem sabe abrir o livro é
+// `ler.js`, que é LAZY, e este arquivo é do shell — citá-lo aqui quebraria o
+// app inteiro na primeira carga. Mesma saída de `_lemaCabecaCom(expr, tipo,
+// reduz)`, que já recebe o redutor injetado: `settings.js` carrega o módulo,
+// monta o conferidor e passa. Sem ele a migração continua funcionando pelo
+// julgamento textual, exatamente como antes.
+//
+// O conferidor devolve TRÊS respostas, e a diferença entre duas delas é o que
+// evita estrago:
+//   { achou: true }  → a expressão está mesmo nesta obra
+//   { achou: false } → procurei no livro inteiro e não está
+//   null             → NÃO DEU para olhar (livro não está neste aparelho, erro
+//                      ao abrir). Aqui o item é PULADO, nunca julgado: tirar a
+//                      obra por falta de evidência quando a evidência é que
+//                      está inacessível seria apagar dado bom.
+//
+// ⚠️ ACHAR NO LIVRO SÓ PROTEGE — NUNCA REATRIBUI. Eu tinha escrito isto
+// corrigindo também o CAPÍTULO ("de brinde"), e o teste com o livro de verdade
+// derrubou a ideia: "tuck in" aparece no *Chapter 20* de Billy Summers, embora
+// tenha nascido da análise de "tuck" e ele esteja lendo o capítulo 1. Existir
+// no livro NÃO é o mesmo que ter vindo de lá — para expressão comum, existir é
+// quase inevitável. A evidência é forte o bastante para **não apagar** a obra
+// (na dúvida, o dado dele fica), e fraca demais para **afirmar** um capítulo
+// onde ele nunca esteve. Corrigir o capítulo exigiria casar a CENA do item com
+// o trecho do livro — e candidato aqui é justamente quem não tem cena que
+// sirva, então essa evidência não existe neste conjunto por definição.
+async function migrarProcedenciaHerdada({ olharNoLivro = null } = {}) {
+  const vazio = { mexeu: 0, exemplos: [], semLivro: 0, protegidos: 0, olhouOLivro: !!olharNoLivro }
+  if (typeof words === 'undefined' || !Array.isArray(words)) return { ...vazio, aplicar: () => 0 }
+  const candidatos = []
   for (const w of words) {
     if (!w || !w.from) continue
     const titulo = String(w.source_title || '').trim()
@@ -3298,11 +3325,25 @@ function migrarProcedenciaHerdada() {
     // item nasceu de outro. A guarda 3 continua valendo e é ela que decide.
     if (pai && String(pai.source_title || '').trim() !== titulo) continue
     if (_fraseServeParaExpressao(w.context, w.word)) continue
-    mudancas.push({ w, de: titulo, pai: (pai && pai.word) || (w.from.word || '') })
+    candidatos.push({ w, de: titulo, pai: (pai && pai.word) || (w.from.word || '') })
+  }
+  const mudancas = []
+  let semLivro = 0, protegidos = 0
+  for (const c of candidatos) {
+    let achado = null
+    if (olharNoLivro) { try { achado = await olharNoLivro(c.w) } catch (e) { achado = null } }
+    if (olharNoLivro && !achado) { semLivro++; continue }      // não deu para olhar: não mexe
+    if (achado && achado.achou) { protegidos++; continue }     // está no livro: a obra fica
+    mudancas.push(c)
   }
   return {
     mexeu: mudancas.length,
-    exemplos: mudancas.slice(0, 12).map(m => ({ palavra: m.w.word, de: m.de, pai: m.pai })),
+    semLivro, protegidos,
+    olhouOLivro: !!olharNoLivro,
+    exemplos: mudancas.slice(0, 12).map(m => ({
+      palavra: m.w.word, de: m.de, pai: m.pai,
+      para: `${OBRA_ESTUDO}${m.pai ? ' · ' + m.pai : ''}`
+    })),
     aplicar() {
       for (const m of mudancas) {
         m.w.source_type = 'manual'
