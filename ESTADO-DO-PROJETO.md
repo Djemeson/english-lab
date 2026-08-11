@@ -7,7 +7,13 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (7ª) — **O TOM DA LEXA VIROU O TOM DA CONVERSA**. A persona
+> Última atualização: 2026-08-11 (8ª) — **O STORAGE ESTÁ DE PÉ**. Plano Blaze ativo, bucket
+> criado em **US-EAST1** e regras publicadas e testadas (caminho próprio permite, caminho de
+> outra pessoa nega). ⚠️ A região contrariou minha recomendação: a tela mostrou que a cota
+> gratuita de 5 GB só vale nos EUA, e São Paulo cobraria desde o primeiro byte. **Falta o
+> código** — deixado para uma fatia inteira porque mexe em sincronização. **Detalhes em §8.11.**
+>
+> Última atualização anterior: 2026-08-11 (7ª) — **O TOM DA LEXA VIROU O TOM DA CONVERSA**. A persona
 > foi lida de `lexaSistema` e transposta para o `CLAUDE.md` global, com o mesmo truque que a
 > faz funcionar no app: **mais linhas proibindo caricatura do que descrevendo o temperamento**.
 > ⚠️ Sem herdar nome, gênero nem biografia — é jeito, não identidade. **Detalhes em §8.10.**
@@ -9126,6 +9132,56 @@ temperamento não é **dizer ser** aquela pessoa —, o que agora está numa se�
 Os seis arquivos foram alinhados: o global, o do projeto, o texto do chat e os lembretes dos
 outros três projetos da pasta mãe.
 
+## 8.11 O Storage está de pé (2026-08-11)
+
+Ele decidiu pelo plano pago e mandou eu assumir o resto. A infraestrutura está pronta; o
+código é a próxima fatia.
+
+| Etapa | Estado |
+|---|---|
+| Plano **Blaze** | ativo (ele confirmou o upgrade; o clique que liga cobrança foi dele) |
+| Alerta de gasto | **R$ 25**, avisa por e-mail antes de chegar lá |
+| Bucket | `english-lab-726e7.firebasestorage.app`, criado |
+| Região | **US-EAST1** |
+| Regras | publicadas e **testadas nos dois sentidos** |
+
+⚠️ **A REGIÃO CONTRARIOU O QUE EU TINHA RECOMENDADO, e a tela é que estava certa.** Eu havia
+dito "São Paulo, a mesma do Firestore", por latência. Na hora de criar, a primeira opção
+apareceu nomeada **"Local sem custos financeiros"** apontando para US-EAST1 — ou seja, a cota
+gratuita de 5 GB **só vale em regiões dos EUA**. São Paulo custaria desde o primeiro byte.
+Para arquivo que se baixa uma vez e fica em cache no aparelho, latência não pesa; cota pesa.
+Ficou US-EAST1. **Não dá para trocar depois.**
+
+**As regras** dão a cada pessoa a própria pasta e nada além, com teto de 50 MB por arquivo:
+
+```
+match /users/{uid}/{allPaths=**} {
+  allow read:  if request.auth != null && request.auth.uid == uid;
+  allow write: if request.auth != null && request.auth.uid == uid
+               && request.resource.size < 50 * 1024 * 1024;
+}
+```
+
+**Testadas antes de publicar**, com o uid real dele: caminho próprio → *"Leitura permitida"*;
+caminho de outra pessoa → *"Leitura negada"*. O teste que importa é o segundo.
+
+**Prova independente de que o bucket existe:** a mesma chamada que antes devolvia
+**404 "The specified bucket does not exist"** passou a devolver **403 "leitor-acervo … does
+not have storage.buckets.get access"**. A mudança de 404 para 403 é a confirmação — e de
+quebra mostra que a credencial só-leitura continua restrita ao banco, sem enxergar arquivos.
+
+### O que falta, e por que não fiz na mesma rodada
+
+Falta o **código**: o app carrega apenas os módulos de autenticação e banco do Firebase — o
+de arquivos nem está incluído. Migrar áudio e imagem significa incluir esse módulo, trocar as
+gravações que hoje vão para `collection('audio')` e `collection('images')` por envio ao
+bucket, e migrar o que já está gravado.
+
+⚠️ Isso é mudança de **sincronização**, que as regras deste projeto classificam como **alto
+risco** e mandam preceder de backup. Fazer isso com pouco espaço para testar ao vivo seria
+furar a regra nº 5 — e sync pela metade quebra o app dele de verdade. Fica como a próxima
+fatia, inteira.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -9137,7 +9193,11 @@ outros três projetos da pasta mãe.
 
 ### Decisões em aberto (com o levantamento já feito)
 
-- [ ] **ONDE GUARDAR O ARQUIVO DO LIVRO** (levantado em 2026-08-11, a pedido dele). Hoje o EPUB
+- [x] ~~Onde guardar o arquivo do livro~~ — **decidido e a infraestrutura está de pé**
+      (2026-08-11): plano **Blaze** ativo, bucket criado, regras publicadas e testadas. Falta
+      só o código. Ver §8.11. O histórico do levantamento fica abaixo, riscado, porque a
+      conclusão sobre a REGIÃO mudou na hora da criação.
+- [ ] ~~ONDE GUARDAR O ARQUIVO DO LIVRO~~ (levantado em 2026-08-11, a pedido dele). Hoje o EPUB
       mora só no IndexedDB do aparelho onde foi aberto: **não acompanha o usuário**. Foi o que
       travou o teste na Vercel (`arquivoDoLivroNesteAparelho: false`), e é o que acontece se ele
       trocar de máquina ou limpar o navegador — a memória da obra simplesmente para, sem
