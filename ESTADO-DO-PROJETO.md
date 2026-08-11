@@ -7,7 +7,14 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (4ª) — **A GLOSA QUE VIROU FRASE**. O primeiro uso do
+> Última atualização: 2026-08-11 (5ª) — **A VARREDURA DE UNIDADES GANHOU O "NÃO"**. O modal só
+> tinha "Fechar": discordar de um achado não era possível, então ele voltaria para sempre — e
+> aviso que não some treina o usuário a ignorar a tela inteira. Agora cada item tem **"Não é
+> isso"**, com contador e **"Trazer de volta"**. Entrou também a **frase que motivou a
+> suspeita**, com a expressão em negrito e tolerando flexão, e o botão passou a dizer o que faz:
+> **`Criar “complete with”`**. **Detalhes em §8.8.**
+>
+> Última atualização anterior: 2026-08-11 (4ª) — **A GLOSA QUE VIROU FRASE**. O primeiro uso do
 > `acervo.mjs lista` achou o que número nenhum mostrava: 7 dos 21 itens da fila têm uma
 > explicação em português no campo da frase, vinda da linha de família do Estudar. Corrigido
 > na origem e nos **quatro** consumidores que tratam `context` como frase do idioma — com a
@@ -8984,6 +8991,40 @@ que a tela promete.
 
 `sw.js` → `englab-v206`.
 
+## 8.8 A varredura de unidades ganhou o "não" (2026-08-11)
+
+Ele olhou o modal de *"Sentidos que são de outra expressão"* e perguntou se dava para melhorar.
+Dava, em três pontos — e o mais importante não era estético.
+
+**1. Faltava o "não é isso", e essa era a falha grave.** O modal só tinha "Fechar": discordar
+de um achado não era possível, então ele voltaria a aparecer para sempre. Aviso que não some
+vira ruído, e ruído recorrente treina o usuário a ignorar a tela inteira — inclusive nos casos
+em que ela está certa. Agora cada item tem **"Não é isso"**, e o rodapé mostra quantos foram
+dispensados, com **"Trazer de volta"** para desfazer.
+
+⚠️ **O "não" mora no próprio sentido** (`m.un_dispensada`), não numa lista à parte: duas listas
+para a mesma verdade divergem — o projeto já apanhou disso — e aqui haveria o agravante de a
+lista não sincronizar junto com o item.
+
+**2. Faltava a cena.** Ele decidia no escuro. Agora a frase aparece embaixo, com a expressão
+**em negrito**, e o destaque tolera flexão e palavras no meio, como o reparo do contexto:
+no teste, `stand still` acendeu em *"how time **stands still** there"*. Item sem frase não
+ganha bloco vazio — some.
+
+**3. "Separar" não dizia o que ia acontecer.** Virou **`Criar "complete with"`** — o rótulo
+carrega a expressão que vai nascer, e não precisa do parágrafo acima para ser entendido.
+
+**Conferido ao vivo** (regra nº 4), com dois itens reais do acervo: os dois achados listados
+com frase destacada; dispensar tira da fila e grava no sentido; o rodapé passa a "1
+dispensado"; "Trazer de volta" devolve; a marca sobrevive à releitura do armazenamento. Casos
+de borda: item sem frase não mostra bloco vazio, frase de 190 caracteres é cortada em 160,
+zero transbordo, sem emoji, ações empilhadas para o botão longo não espremer o texto.
+
+**Ficou de fora, e virou pendência:** com **um** achado só, um modal de tela cheia é peso
+demais — caberia uma faixa discreta no Preparar, deixando o modal para 2+.
+
+`sw.js` → `englab-v207`.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -8994,6 +9035,16 @@ que a tela promete.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
 ### Dívida — código que a gente sabe que está torto
+
+- [ ] **DOIS BOTÕES "ANALISAR COM IA" NA MESMA TELA** (2026-08-11, visto num print dele).
+      No estado `pending_ai` o botão aparece na barra de ações E no corpo do card, os dois
+      chamando a mesma coisa para o mesmo item. Não é bug — é ruído, do tipo que ele já
+      reclamou antes. Decidir qual fica: o do card é mais visível e explica o contexto; o da
+      barra é consistente com os outros estados. **Não mexer no meio de um fluxo dele** —
+      recolher o botão errado tira a ação de onde a mão já está acostumada.
+- [ ] **MODAL DE TELA CHEIA PARA UM ACHADO SÓ** (2026-08-11). A varredura de unidades abre um
+      modal mesmo quando há **um** item — peso demais para a decisão. Uma faixa discreta no
+      topo do Preparar resolveria, deixando o modal para 2 ou mais.
 
 - [x] ~~A linha de sinônimo vira "frase" do item~~ — **corrigido em 2026-08-11**, na origem e
       nos quatro consumidores. Ver §8.7. ⚠️ Os 7 já gravados continuam com o texto: o app

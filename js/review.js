@@ -1156,17 +1156,58 @@ async function _separarCuidarDosCards(w, mi, nome) {
 // aconteceria nunca. A varredura é de graça: roda o detector local sobre
 // `words` inteiro, sem uma chamada de IA sequer. A IA só entra depois, na
 // expressão que ELE decidir separar.
-function varrerUnidades() {
+function varrerUnidades(incluirDispensados) {
   const achados = []
   for (const w of (words || [])) {
     if (!Array.isArray(w.meanings)) continue
     w.meanings.forEach((m, mi) => {
       if (!m || m.moved_to) return
+      if (m.un_dispensada && !incluirDispensados) return
       const un = unidadeDoSentido(w, m)
-      if (un) achados.push({ wordId: w.id, mi, palavra: w.word || '', status: w.status, meaning_pt: m.meaning_pt || '', un })
+      if (un) achados.push({ wordId: w.id, mi, palavra: w.word || '', status: w.status,
+        meaning_pt: m.meaning_pt || '', un, dispensada: !!m.un_dispensada,
+        // A CENA ENTRA NA DECISÃO. Sem ela ele julga no escuro: ver
+        // "…was pure pomp, complete with spotlights" responde a pergunta
+        // sozinho, e era essa frase que faltava na tela.
+        frase: String(m.context || w.context || '').trim() })
     })
   }
   return achados
+}
+
+// ⚠️ O "NÃO" MORA NO PRÓPRIO SENTIDO, não numa lista à parte. Duas listas para
+// a mesma verdade divergem — o projeto já apanhou disso — e aqui ainda haveria
+// o agravante de a lista não sincronizar junto com o item.
+function dispensarUnidade(wordId, mi, voltar) {
+  const w = (words || []).find(x => x.id === wordId)
+  const m = w && (w.meanings || [])[mi]
+  if (!m) return
+  if (voltar) delete m.un_dispensada
+  else m.un_dispensada = true
+  w.updated_at = new Date().toISOString()
+  saveWords()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  _varreduraRefresh()
+}
+
+// Destaca a expressão dentro da frase. Sem destaque, a frase é parede de texto
+// e ele teria que caçar as duas palavras no meio dela.
+function _vruFrase(frase, unidade) {
+  const f = String(frase || '').replace(/\s+/g, ' ').trim()
+  if (!f) return ''
+  const corte = f.length > 160 ? f.slice(0, 160) + '…' : f
+  const alvo = String(unidade || '').trim()
+  if (!alvo) return esc(corte)
+  const partes = alvo.split(/\s+/).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  // Tolera flexão e palavras no meio ("tucks his digest into"), do mesmo jeito
+  // que o reparo do contexto faz.
+  try {
+    const re = new RegExp('(' + partes.join('\\w*(?:\\s+\\w+){0,3}\\s+') + '\\w*)', 'i')
+    const achou = corte.match(re)
+    if (!achou) return esc(corte)
+    return esc(corte.slice(0, achou.index)) + '<b>' + esc(achou[1]) + '</b>' +
+           esc(corte.slice(achou.index + achou[1].length))
+  } catch (e) { return esc(corte) }
 }
 
 function _varreduraRefresh() {
@@ -1184,31 +1225,51 @@ function abrirVarreduraUnidades(reabrindo) {
   overlay.addEventListener('click', e => { if (e.target === overlay) fechar() })
   // Lista vazia depois de separar tudo é uma boa notícia e precisa dizer isso —
   // modal em branco parece defeito.
-  const corpo = achados.length ? `
+  const dispensados = varrerUnidades(true).filter(a => a.dispensada)
+  const verDispensados = !!window._vruVerDispensados
+  const lista = verDispensados ? dispensados : achados
+  const corpo = lista.length ? `
     <div class="vru-lista">
-      ${achados.map(a => `
-        <div class="vru-item">
+      ${lista.map(a => `
+        <div class="vru-item${a.dispensada ? ' vru-dispensada' : ''}">
           <div class="vru-txt">
             <div class="vru-top"><b>${esc(a.palavra)}</b><span class="vru-seta">${ic('arrowRight','ic-sm')}</span><b class="vru-alvo">${esc(a.un.unidade)}</b>
               ${a.status === 'in_srs' ? `<span class="chip" data-tip="Este item já está na repetição espaçada">na Revisão</span>` : ''}</div>
             <div class="vru-sub">${esc(a.meaning_pt)} — só existe com <b>${esc(a.un.extra)}</b>${a.un.fonte === 'ia' ? ' (apontado pela própria IA)' : ''}</div>
+            ${a.frase ? `<div class="vru-frase">“${_vruFrase(a.frase, a.un.unidade)}”</div>` : ''}
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="separarSentido('${a.wordId}',${a.mi})">${ic('layers','ic-sm')}Separar</button>
+          <div class="vru-acoes">
+            ${a.dispensada
+              ? `<button class="btn btn-ghost btn-sm" onclick="dispensarUnidade('${a.wordId}',${a.mi},true)"
+                   data-tip="Volta para a fila">${ic('undo','ic-sm')}Trazer de volta</button>`
+              : `<button class="btn btn-secondary btn-sm" onclick="separarSentido('${a.wordId}',${a.mi})"
+                   data-tip="Cria a expressão como item próprio e tira este sentido da palavra sozinha">${ic('layers','ic-sm')}Criar “${esc(a.un.unidade)}”</button>
+                 <button class="btn btn-ghost btn-sm" onclick="dispensarUnidade('${a.wordId}',${a.mi})"
+                   data-tip="Some da lista. Dá para trazer de volta depois.">${ic('x','ic-sm')}Não é isso</button>`}
+          </div>
         </div>`).join('')}
     </div>` : `
-    <p class="vru-vazio">${ic('checkCircle')} Nenhum sentido preso a uma expressão maior. ${reabrindo ? 'Acabou a fila.' : ''}</p>`
+    <p class="vru-vazio">${ic('checkCircle')} ${verDispensados
+      ? 'Nada dispensado.'
+      : `Nenhum sentido preso a uma expressão maior. ${reabrindo ? 'Acabou a fila.' : ''}`}</p>`
   overlay.innerHTML = `<div class="srs-modal-box vru-box" role="dialog" aria-labelledby="vru-title">
     <h4 id="vru-title" style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px">Sentidos que são de outra expressão</h4>
-    <p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">${achados.length
-      ? `${achados.length} sentido${achados.length !== 1 ? 's' : ''} da sua base parece${achados.length !== 1 ? 'm' : ''} pertencer a uma expressão inteira, não à palavra sozinha. Separar cria a expressão como item próprio.`
+    <p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">${verDispensados
+      ? 'O que você marcou como "não é isso". Nada aqui volta a aparecer sozinho.'
+      : achados.length
+      ? `${achados.length} sentido${achados.length !== 1 ? 's' : ''} da sua base parece${achados.length !== 1 ? 'm' : ''} pertencer a uma expressão inteira, não à palavra sozinha. Veja a frase de cada um antes de decidir.`
       : 'Varredura de toda a base — nada a fazer aqui.'}</p>
     ${corpo}
-    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:16px">
+      <span>${dispensados.length ? `<button class="btn btn-ghost btn-sm" id="vru-alternar">${
+        verDispensados ? `${ic('chevronLeft','ic-sm')}Voltar à fila` : `${dispensados.length} dispensado${dispensados.length !== 1 ? 's' : ''}`}</button>` : ''}</span>
       <button class="btn btn-ghost btn-sm" id="vru-fechar">Fechar</button>
     </div>
   </div>`
   document.body.appendChild(overlay)
-  document.getElementById('vru-fechar').onclick = fechar
+  document.getElementById('vru-fechar').onclick = () => { window._vruVerDispensados = false; fechar() }
+  const alt = document.getElementById('vru-alternar')
+  if (alt) alt.onclick = () => { window._vruVerDispensados = !window._vruVerDispensados; abrirVarreduraUnidades(true) }
   document.addEventListener('keydown', teclas)
 }
 
