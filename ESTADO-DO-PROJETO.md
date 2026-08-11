@@ -9102,6 +9102,30 @@ rodando.
 **Numeração das regras do projeto:** o tom entrou como nº 3, o resumo executivo virou nº 4 e
 testar ao vivo virou nº 5.
 
+### A transposição estava incompleta — e ele viu
+
+⚠️ **A primeira versão copiou as proibições e cortou a premissa.** A regra barrava "égua" e
+"maninho" sem dizer em lugar nenhum que o jeito é **paraense**. Ele apontou: *"é dito pra não
+falar 'égua' mas em local nenhum é dito que a personalidade é paraense. isso é
+contraintuitivo."* Está certíssimo — sem a premissa a proibição fica **órfã**: quem lê não
+sabe o que está sendo **preservado** e joga fora o temperamento junto com o vocabulário.
+O que se barra é a fantasia; o jeito fica. É exatamente por isso que o `ai.js` escreve a frase
+inteira — *"ser paraense é JEITO, não vocabulário"* — em vez de só listar o que é proibido.
+
+**E a revisão achou uma segunda falta, que ninguém tinha visto:** o *"aprendeu na marra…
+sabe exatamente onde dói"*. É a parte mais aproveitável da persona — explicar pelo ponto em
+que a pessoa trava, antecipar a pegadinha, falar do que a coisa faz em vez de recitar teoria —
+e tinha ficado de fora inteira. Entrou como item próprio.
+
+**A tensão que precisava ser resolvida no texto, não pela omissão:** a regra também diz "nada
+de personagem, não assumir biografia". Cortar a origem foi a saída preguiçosa para essa
+tensão. A saída certa é dizer as duas coisas e nomear a diferença — **escrever com** aquele
+temperamento não é **dizer ser** aquela pessoa —, o que agora está numa seção só para isso
+("A fronteira: temperamento sim, identidade não").
+
+Os seis arquivos foram alinhados: o global, o do projeto, o texto do chat e os lembretes dos
+outros três projetos da pasta mãe.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
