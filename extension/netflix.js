@@ -41,6 +41,7 @@ let ptPend = new Set()
 let barra = null, painel = null
 let cfgUI = { ligada: true, ocultaNativa: true, pausaHover: true, pt: false, fog: true, transcript: false, doca: true }
 let pausadoPorNos = false
+let mouseNaBarra = false     // ponteiro sobre a barra/legenda (ver `_irAteAFala`)
 let tituloId = null          // id do titulo aberto (/watch/NNNN)
 // Declarado AQUI, e nao junto da funcao que o preenche, porque
 // `resetarSessao()` mexe nele e roda cedo — `let` mais abaixo daria
@@ -251,29 +252,56 @@ function continua(i) {
 const grupoIni = i => { let g = 0; while (i > 0 && continua(i) && g++ < 12) i--; return Math.max(0, i) }
 const grupoFim = i => { let g = 0; while (i + 1 < cues.length && continua(i + 1) && g++ < 12) i++; return i }
 
+// ================================================================
+// VOLTAR PARA VER, NAO PARA OUVIR PASSAR DE NOVO
+// ================================================================
+// Pedido dele, e o motivo e o gesto inteiro: "se eu volto e porque quero VER a
+// palavra; se estiver sendo falado rapido acaba passando de novo e eu nao vejo".
+// Voltar e dar play imediatamente devolve o mesmo problema que o levou a
+// voltar.
+//
+// Entao: com o ponteiro sobre a barra — onde estao a legenda e estes botoes —
+// a fala fica PARADA ali, a espera. Afastar o mouse e o sinal de "pode seguir",
+// e o `mouseleave` acima ja cuida disso porque marcamos `pausadoPorNos`.
+//
+// ⚠️ Nao depende de `cfgUI.pausaHover`. Aquela opcao e sobre passar o mouse
+// por acaso; esta e uma acao deliberada dele — apertou o botao de voltar. Amarrar
+// as duas faria o botao mudar de comportamento por causa de uma preferencia que
+// nada tem a ver com ele.
+// ⚠️ NAO E "seek e depois pausa". `seek` avisa o player por `postMessage` e JA
+// MANDA TOCAR por padrao (`play = true`); pausar em seguida seria uma corrida —
+// as duas ordens viajam assincronas e o play costuma chegar por ultimo,
+// desfazendo a pausa. O proprio `seek` aceita `play = false`, entao a decisao
+// vai JUNTO com a ordem, numa mensagem so.
+function _irAteAFala(t) {
+  const pousar = mouseNaBarra
+  seek(t, !pousar)
+  if (pousar) pausadoPorNos = true   // o `mouseleave` da barra devolve o play
+}
+
 function falaAnterior() {
   const v = vid(); if (!v) return
   if (!cues.length) {   // modo DOM: usa o histórico
     const h = histórico[histórico.length - 2]
-    if (h) seek(h.t - 0.2)
+    if (h) _irAteAFala(h.t - 0.2)
     return
   }
   const i = cueEm(v.currentTime)
   let alvo = i < 0 ? cues.findIndex(c => c.s > v.currentTime) - 1 : grupoIni(i)
   if (alvo < 0) alvo = 0
   if (v.currentTime - cues[alvo].s <= 0.8) alvo = grupoIni(Math.max(0, alvo - 1))
-  seek(cues[alvo].s - 0.2)
+  _irAteAFala(cues[alvo].s - 0.2)
 }
 function repetirFala() {
   const v = vid(); if (!v) return
-  if (!cues.length) { const h = histórico[histórico.length - 1]; if (h) seek(h.t - 0.2); return }
+  if (!cues.length) { const h = histórico[histórico.length - 1]; if (h) _irAteAFala(h.t - 0.2); return }
   const i = cueEm(v.currentTime)
   if (i < 0) return
-  seek(cues[grupoIni(i)].s - 0.2)
+  _irAteAFala(cues[grupoIni(i)].s - 0.2)
 }
 function proximaFala() {
   const v = vid(); if (!v) return
-  if (!cues.length) { seek(v.currentTime + 5); return }
+  if (!cues.length) { _irAteAFala(v.currentTime + 5); return }
   const i = cueEm(v.currentTime)
   let alvo = i < 0 ? cues.findIndex(c => c.s > v.currentTime) : grupoFim(grupoIni(i)) + 1
   if (alvo < 0 || alvo >= cues.length) alvo = cues.length - 1
@@ -281,7 +309,7 @@ function proximaFala() {
     const seg = grupoFim(alvo) + 1
     if (seg < cues.length) alvo = seg
   }
-  seek(cues[alvo].s - 0.2)
+  _irAteAFala(cues[alvo].s - 0.2)
 }
 
 // ---- tradução (IA) com janela antecipada, como no app ----
@@ -414,10 +442,12 @@ function garantirBarra() {
     else if (a === 'hide') { cfgUI.ligada = false; salvarUI(); barra.style.display = 'none'; aplicarNativa(); aplicarDoca() }
   })
   barra.addEventListener('mouseenter', () => {
+    mouseNaBarra = true
     if (!cfgUI.pausaHover) return
     const v = vid(); if (v && !v.paused) { pausar(); pausadoPorNos = true }
   })
   barra.addEventListener('mouseleave', () => {
+    mouseNaBarra = false
     // com o popup aberto o aluno esta indo ate ele: manter pausado
     if (document.getElementById('englab-pop')) return
     if (pausadoPorNos) { tocar(); pausadoPorNos = false }
