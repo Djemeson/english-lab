@@ -567,8 +567,23 @@ function _engolirMovimento(e) {
   if (_pertoDoRodape(e.clientY)) return          // deixa a Netflix abrir
   // Nunca engolir o que é NOSSO: a barra, o popup e o transcript precisam dos
   // próprios eventos de mouse (seleção de palavra, hover, arrastar).
+  // ⚠️ SOBRE A NOSSA UI O MOVIMENTO TAMBEM NAO PODE VAZAR. Antes havia um
+  // `return` seco aqui: o evento seguia e a Netflix abria o painel de
+  // controles justamente quando ele ia ate a barra apertar Explicar/Preparar —
+  // a "tela de suspensao" que ele relatou.
+  //
+  // ⚠️ MAS ENGOLIR AQUI CALA OS NOSSOS TAMBEM. Este interceptador roda em
+  // CAPTURA no `document`; `stopPropagation` impede a descida E a subida,
+  // entao os nossos ouvintes de `mousemove` registrados na bolha do document
+  // (`controlesAmostra`, que mantem a barra a vista, e `_guardarTitulo`)
+  // nunca seriam alcancados. Por isso eles sao chamados A MAO antes de engolir.
   const t = e.target
-  if (t && t.closest && t.closest('#englab-bar, #englab-pop, #englab-transcript')) return
+  if (t && t.closest && t.closest('#englab-bar, #englab-pop, #englab-transcript')) {
+    try { _guardarTitulo() } catch (err) {}
+    try { if (typeof controlesAmostra === 'function') controlesAmostra() } catch (err) {}
+    e.stopPropagation()
+    return
+  }
   // ⚠️ O PONTEIRO SOME sem isto. A Netflix esconde o cursor junto com o
   // painel quando acha que você parou de mexer — e como estamos engolindo o
   // movimento, para ela você parou para sempre. Aqui devolvemos o cursor no
@@ -631,6 +646,37 @@ setInterval(() => {
 for (const tipo of ['mousemove', 'pointermove']) {
   document.addEventListener(tipo, _engolirMovimento, true)
 }
+
+// ================================================================
+// O PLAY/PAUSE PASSA A SER NOSSO
+// ================================================================
+// ⚠️ ESTA E A CAUSA RAIZ DO "CLICO E NAO PAUSA". A Netflix decide o que fazer
+// no clique conforme os controles estarem visiveis: escondidos, o primeiro
+// clique so os REVELA; visiveis, ele alterna play/pause. Como engolimos o
+// movimento do mouse para o painel nao tapar a cena, para ela o ponteiro nunca
+// se move — os controles vivem escondidos e **todo clique e gasto em
+// mostra-los**. Dai o pause/play erratico dele, "mesmo sem selecionar nada":
+// nao era a selecao, era o preco de esconder o painel.
+//
+// A saida e nao depender do humor dela: o clique na area do video vira
+// play/pause aqui, direto no elemento <video>. Previsivel sempre.
+//
+// FICA DE FORA, de proposito:
+//   - a zona do rodape, onde ela abre os controles de verdade (barra de
+//     progresso, botoes) e ele quer que funcione como sempre;
+//   - a nossa UI, que tem os proprios cliques;
+//   - o clique duplo, que e tela cheia — soltamos para ela tratar.
+document.addEventListener('click', e => {
+  if (!cfgUI.ligada || cfgUI.doca) return
+  if (e.detail >= 2) return                       // duplo clique: tela cheia é dela
+  if (_pertoDoRodape(e.clientY)) return           // controles de verdade
+  const t = e.target
+  if (t && t.closest && t.closest('#englab-bar, #englab-pop, #englab-transcript')) return
+  const v = vid(); if (!v) return
+  e.preventDefault()
+  e.stopPropagation()
+  if (v.paused) tocar(); else pausar()
+}, true)
 
 function aplicarDoca() {
   const on = !!(cfgUI.ligada && cfgUI.doca && idDoTitulo())
