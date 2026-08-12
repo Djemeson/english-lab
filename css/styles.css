@@ -3899,16 +3899,27 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   display:flex;flex-direction:column;align-items:center;gap:4px;
   padding:0 24px;pointer-events:none;z-index:3;
 }
+/* ⚠️ SEM CAIXA, como na extensão da Netflix — foi o pedido dele, e a razão é
+   visível: a tarja preta corta a cena em duas e o olho bate na borda dela
+   antes de bater no texto. Legenda boa flutua sobre a imagem; o que garante
+   leitura em fundo claro é a SOMBRA, não o retângulo.
+   Os números vieram de `.englab-line`/`.englab-pt` (extension/netflix.css) —
+   as duas precisam continuar iguais, senão o app e o player passam a ter
+   duas legendas diferentes para o mesmo estudo. */
 .vid-ov-en,.vid-ov-pt{
   display:inline-block;max-width:92%;
-  background:rgba(0,0,0,.68);color:#fff;
-  padding:4px 12px;border-radius:6px;
-  font-size:clamp(14px, 1.6vw, 21px);line-height:1.35;text-align:center;
-  text-shadow:0 1px 2px rgba(0,0,0,.8);
+  background:none;padding:0;border-radius:0;
+  color:#eef2f6;
+  font-size:clamp(15px, 1.45vw, 21px);line-height:1.34;font-weight:500;
+  letter-spacing:0;text-align:center;
+  text-shadow:0 2px 8px rgba(0,0,0,.6);
+  overflow-wrap:break-word;word-break:normal;
 }
 .vid-ov-pt{
-  font-size:clamp(12px, 1.25vw, 17px);
-  color:#ffd98a;background:rgba(0,0,0,.55);
+  /* Mais perto do inglês em tamanho e peso: acompanhar as duas ao mesmo tempo
+     deixa de ser um salto (mesma calibragem da extensão). */
+  font-size:clamp(13px, 1.28vw, 18px);font-weight:400;
+  color:#f3c96b;background:none;
 }
 
 /* Botao pt de cada fala do transcript (aparece no hover da linha) */
