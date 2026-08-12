@@ -157,6 +157,35 @@
 /* A ênfase da Lexa agora chega renderizada (antes vazavam os asteriscos).
    O negrito ganha a cor de destaque, como no app — é ele que carrega o
    termo explicado. */
+/* ---- a conversa ---- */
+/* Cresce até um teto e então rola: o painel flutua sobre a cena e não pode
+   virar uma parede em cima do episódio. */
+.englab-pop-body:not(:empty) { max-height: 260px; }
+.englab-fala { margin: 0 0 10px; }
+.englab-fala:last-child { margin-bottom: 0; }
+.englab-fala-aluno {
+  color: #eaf1f8; background: rgba(255,255,255,.07);
+  border-left: 2px solid var(--ll-acc);
+  padding: 6px 10px; border-radius: 0 6px 6px 0;
+}
+.englab-pend { opacity: .55; font-style: italic; }
+
+.englab-pop-chat { display: flex; gap: 6px; margin-top: 10px; }
+.englab-pop-chat input {
+  flex: 1; min-width: 0; background: rgba(255,255,255,.07);
+  border: 1px solid var(--ll-line); border-radius: 6px;
+  padding: 7px 10px; color: #eaf1f8; font-size: 13px; font-family: inherit;
+}
+.englab-pop-chat input:focus { outline: none; border-color: var(--ll-acc); }
+.englab-pop-chat input::placeholder { color: #7d8b99; }
+.englab-pop-chat button {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; background: rgba(255,255,255,.07);
+  border: 1px solid var(--ll-line); border-radius: 6px;
+  color: #eaf1f8; cursor: pointer;
+}
+.englab-pop-chat button:hover { background: rgba(255,255,255,.13); border-color: var(--ll-acc); }
+
 .englab-pop-body b { color: #fff; font-weight: 600; }
 .englab-pop-body i { color: #dbe4ec; }
 .englab-pop-body code {

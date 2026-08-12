@@ -797,6 +797,11 @@ function renderFala(texto) {
 // ---- popup de seleção: Explicar / Preparar ----
 let popCtx = ''          // fala de origem CONGELADA no instante da selecao
 let popPausou = false
+// Declarados AQUI, e nao junto de `_lexaFalar`: `fecharPopupSel()` os zera e
+// roda antes daquele trecho ser alcancado — `let` mais abaixo daria
+// ReferenceError por zona morta temporal (mesma pegadinha do `_tituloVisto`).
+let popHist = []          // [{quem:'lexa'|'aluno', texto}] — a conversa desta selecao
+let popOcupado = false
 function mostrarPopupSel() {
   const sel = String(window.getSelection() || '').trim()
   const antigo = document.getElementById('englab-pop')
@@ -814,27 +819,95 @@ function mostrarPopupSel() {
       <button data-p="exp">Explicar</button>
       <button data-p="rev">Preparar</button>
     </div>
-    <div class="englab-pop-body" id="englab-pop-body"></div>`
+    <div class="englab-pop-body" id="englab-pop-body"></div>
+    <div class="englab-pop-chat" id="englab-pop-chat" hidden>
+      <input id="englab-pop-q" type="text" placeholder="pergunte mais sobre isto…" autocomplete="off">
+      <button id="englab-pop-send" title="Perguntar (Enter)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></button>
+    </div>`
   if (!antigo) document.body.appendChild(pop)
   pop.onmousedown = e => e.preventDefault()   // não colapsa a seleção
   pop.querySelector('[data-p="rev"]').onclick = () => {
     salvarCaptura(sel.toLowerCase(), popCtx); avisar(`"${sel}" vai para o Preparar`); fecharPopupSel()
   }
-  pop.querySelector('[data-p="exp"]').onclick = () => {
-    const v2 = vid(); if (v2 && !v2.paused) { pausar(); popPausou = true }
-    const body = pop.querySelector('#englab-pop-body')
-    body.textContent = 'a IA está explicando…'
-    pedirExt(() => chrome.runtime.sendMessage({ type: 'ai-explicar', alvo: sel, contexto: popCtx, titulo: titulo() })).then(resp => {
-      if (resp && resp.ok) body.innerHTML = _marcacaoDaLexa(resp.texto)
-      else body.textContent = 'Não deu: ' + ((resp && resp.erro) || 'sem resposta')
-    }).catch(() => { body.textContent = 'Extensão atualizada — recarregue a página (F5).' })
+  pop.querySelector('[data-p="exp"]').onclick = () => _lexaFalar(pop, sel, null)
+
+  // ⚠️ O CAMPO PRECISA DOS PROPRIOS EVENTOS. O popup tem
+  // `onmousedown = preventDefault` para nao colapsar a selecao da legenda —
+  // e isso tambem impede o campo de receber o cursor. Aqui devolvemos o foco
+  // a mao, so para ele.
+  const q = pop.querySelector('#englab-pop-q')
+  q.onmousedown = e => { e.stopPropagation(); setTimeout(() => q.focus(), 0) }
+  // Teclas param aqui: a Netflix usa espaco para pausar e as setas para
+  // avancar — digitar "para que serve" faria o filme pular pela tela.
+  q.onkeydown = e => {
+    e.stopPropagation()
+    if (e.key === 'Enter') { e.preventDefault(); _lexaFalar(pop, sel, q.value) }
+    if (e.key === 'Escape') { e.preventDefault(); fecharPopupSel() }
   }
+  q.onkeyup = q.onkeypress = e => e.stopPropagation()
+  pop.querySelector('#englab-pop-send').onclick = () => _lexaFalar(pop, sel, q.value)
+}
+
+// ================================================================
+// A CONVERSA COM A LEXA, DENTRO DO PLAYER
+// ================================================================
+// No site ele CONTINUA perguntando; aqui vinha uma resposta seca e acabou.
+// O historico e por SELECAO: trocar de palavra comeca conversa nova, porque a
+// cena e outra e arrastar o papo anterior so confundiria.
+function _lexaBolha(quem, texto, pendente) {
+  return `<div class="englab-fala englab-fala-${quem}${pendente ? ' englab-pend' : ''}">${
+    quem === 'aluno' ? escapar(texto) : _marcacaoDaLexa(texto)}</div>`
+}
+
+function _lexaPintar(pop) {
+  const body = pop.querySelector('#englab-pop-body')
+  body.innerHTML = popHist.map(t => _lexaBolha(t.quem, t.texto, t.pendente)).join('')
+  body.scrollTop = body.scrollHeight
+}
+
+function _lexaFalar(pop, sel, pergunta) {
+  if (popOcupado) return
+  const v2 = vid(); if (v2 && !v2.paused) { pausar(); popPausou = true }
+  const q = pop.querySelector('#englab-pop-q')
+  const chat = pop.querySelector('#englab-pop-chat')
+
+  if (pergunta != null) {
+    const txt = String(pergunta).trim()
+    if (!txt) { q.focus(); return }
+    popHist.push({ quem: 'aluno', texto: txt })
+    q.value = ''
+  }
+  popHist.push({ quem: 'lexa', texto: 'pensando…', pendente: true })
+  popOcupado = true
+  _lexaPintar(pop)
+
+  pedirExt(() => chrome.runtime.sendMessage({
+    type: 'ai-explicar', alvo: sel, contexto: popCtx, titulo: titulo(),
+    // manda o historico SEM o balao de "pensando", que e so da tela
+    historico: popHist.filter(t => !t.pendente).map(t => ({ quem: t.quem, texto: t.texto }))
+  })).then(resp => {
+    popHist.pop()                                  // tira o "pensando"
+    popHist.push({ quem: 'lexa', texto: (resp && resp.ok) ? resp.texto
+      : 'Não deu: ' + ((resp && resp.erro) || 'sem resposta') })
+  }).catch(() => {
+    popHist.pop()
+    popHist.push({ quem: 'lexa', texto: 'Extensão atualizada — recarregue a página (F5).' })
+  }).finally(() => {
+    popOcupado = false
+    chat.hidden = false                            // só aparece depois da 1ª resposta
+    _lexaPintar(pop)
+    q.focus()
+  })
 }
 function fecharPopupSel() {
   const pop = document.getElementById('englab-pop')
   if (pop) pop.remove()
   if (popPausou) { tocar(); popPausou = false }
   popCtx = ''
+  // A conversa morre com o painel: ela pertence AQUELA selecao, naquela cena.
+  // Deixar viva faria a proxima palavra herdar o papo da anterior.
+  popHist = []
+  popOcupado = false
 }
 // ⚠️ O CLIQUE QUE FECHA O POPUP NAO PODE CHEGAR AO PLAYER. Era a causa do
 // "clico fora, o painel nao some e o video nao roda; clico de novo e ele liga

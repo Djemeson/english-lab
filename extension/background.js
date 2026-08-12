@@ -164,10 +164,26 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         }
         sendResponse({ ok: true, pt: msg.falas.map((_, i) => mapa[i + 1] || '') })
       } else if (msg.type === 'ai-explicar') {
-        const resp = await chamar([
-          { role: 'system', content: SIS_LEXA },
-          { role: 'user', content: `Na cena de "${msg.titulo || ''}", a fala é: "${msg.contexto}". O aluno selecionou: "${msg.alvo}".\nExplique o que "${msg.alvo}" significa AQUI. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real. Traduza o SENTIDO, nunca palavra por palavra.` }
-        ], 600)
+        // ⚠️ A CONVERSA CONTINUA NO MESMO CANAL. O `historico` chega do popup
+        // como [{quem:'lexa'|'aluno', texto}] e vira turnos de verdade — sem
+        // ele, a pergunta de acompanhamento ("e por que 'chips'?") chegaria
+        // solta e a IA responderia do zero, sem lembrar da cena nem do que ela
+        // mesma acabou de dizer. Um caminho novo so para isso duplicaria o
+        // prompt da cena, que e o que faz a resposta ser desta fala e nao do
+        // dicionario.
+        const hist = Array.isArray(msg.historico) ? msg.historico.slice(-8) : []
+        const cena = `Na cena de "${msg.titulo || ''}", a fala é: "${msg.contexto}". O aluno selecionou: "${msg.alvo}".`
+        const msgs = [{ role: 'system', content: SIS_LEXA }]
+        if (!hist.length) {
+          msgs.push({ role: 'user', content: `${cena}\nExplique o que "${msg.alvo}" significa AQUI. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real. Traduza o SENTIDO, nunca palavra por palavra.` })
+        } else {
+          // A cena entra UMA vez, como enquadramento, e depois so os turnos.
+          msgs.push({ role: 'user', content: `${cena}\nO aluno vai continuar perguntando sobre isto. Responda sempre curto, 2 a 4 frases, sem repetir o que ja disse.` })
+          for (const t of hist) {
+            msgs.push({ role: t.quem === 'aluno' ? 'user' : 'assistant', content: String(t.texto || '').slice(0, 1500) })
+          }
+        }
+        const resp = await chamar(msgs, 600)
         if (!resp) throw new Error('a IA devolveu uma resposta vazia')
         sendResponse({ ok: true, texto: resp })
       } else if (msg.type === 'ai-glosar') {
