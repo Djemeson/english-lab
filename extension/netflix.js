@@ -188,6 +188,21 @@ window.addEventListener('message', ev => {
       colisoes++
       if (chavePT(ex.t) === chavePT(c.t)) iguais++
     }
+    // ⚠️ PERTO DO FIM, "OUTRA TRILHA" E O PROXIMO EPISODIO. A Netflix
+    // pre-carrega o proximo nos ultimos minutos, e o TTML dele chega enquanto
+    // este ainda esta rodando — com tempos comecando do zero, que colidem com
+    // tudo o que ja temos. A regra abaixo interpretava isso como "trocou a
+    // legenda", zerava o episodio ATUAL e adotava o do proximo: foi o que ele
+    // viu, "mais de 1000 falas se sobrepondo faltando 3 minutos".
+    //
+    // Aqui a decisao correta e a INVERSA da de sempre: ignorar o que chega.
+    // Trocar de idioma a 3 minutos do fim praticamente nao acontece; receber o
+    // proximo episodio, sempre. E quando ele de fato trocar de episodio, a URL
+    // muda e `resetarSessao()` limpa tudo pelo caminho certo.
+    const _v = vid()
+    const pertoDoFim = _v && _v.duration && (_v.duration - _v.currentTime) < 240
+    if (colisoes >= 2 && iguais / colisoes < 0.5 && pertoDoFim) return
+
     // 2 colisões já bastam: no mesmo idioma, tempos iguais trazem texto igual —
     // divergir aí é sinal de outra trilha (e no começo do episódio há poucas falas).
     if (colisoes >= 2 && iguais / colisoes < 0.5) {
