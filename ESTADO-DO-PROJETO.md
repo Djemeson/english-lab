@@ -7,7 +7,14 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (12ª) — **"TINTA": O DESIGN SYSTEM NASCEU NO CLAUDE DESIGN**.
+> Última atualização: 2026-08-11 (13ª) — **A CAPTURA DA NETFLIX PASSOU A SABER A SÉRIE**.
+> A fonte vinha só "Netflix" porque o título **só existe no HTML enquanto os controles estão
+> visíveis** — e ao clicar na legenda eles estão escondidos. Agora um observador guarda o
+> título quando ele aparece, e a captura usa o último visto: *"Friends · T10:E15 · The One
+> Where Estelle Dies"*. ⚠️ Zerado ao trocar de episódio, senão carimbaria o anterior — pior
+> que "Netflix", porque parece certo. Extensão → 3.13.0. **Detalhes em §8.16.**
+>
+> Última atualização anterior: 2026-08-11 (12ª) — **"TINTA": O DESIGN SYSTEM NASCEU NO CLAUDE DESIGN**.
 > Diagnóstico com número: a paleta **não** é apagada (acentos com 83–91% de saturação) — o que
 > está fraco é o que separa as coisas (card vs. fundo **1,08**, borda **1,23**, secundário vs.
 > terciário **1,27**). Direção "Tinta" sobre o tema Papel, com **eixo de movimento** (que o
@@ -9482,6 +9489,42 @@ no Chrome real ou com o painel visível antes de dar a estética por aprovada.
 `css/styles.css` e `index.html` **não foram tocados** — o `sw.js` continua em `englab-v214`.
 `design-system/` é material de decisão, não código de produção. A aplicação é rodada própria,
 e é onde mora o risco (6357 linhas de CSS e 6 temas que precisam continuar de pé).
+
+## 8.16 A captura da Netflix passou a saber a série (2026-08-11)
+
+Ele capturou frases de uma série e a fonte veio só **"Netflix"**, em vez de *"Friends T10:E15"*.
+
+⚠️ **CAUSA: o título só existe no HTML enquanto os controles do player estão visíveis.** Ele
+clica numa palavra da legenda com o painel escondido — que é o normal assistindo — e nesse
+instante `[data-uia="video-title"]` **não está no DOM**. O código lia na hora da captura e caía
+no `document.title`, que durante a reprodução é só "Netflix".
+
+**A saída é não depender do instante:** um observador guarda o título toda vez que ele
+**aparece** (mover o mouse, pausar, trocar de episódio), e a captura usa o último visto.
+
+⚠️ **E ele morre no `resetarSessao`**, junto com a legenda. Sem isso, capturar no episódio novo
+antes de os controles aparecerem carimbaria a captura com o episódio **anterior** — pior que
+"Netflix", porque parece certo e está errado.
+
+**A Netflix quebra o título em pedaços** (`<h4>` com a série, spans com "T10:E15" e com o nome
+do episódio) e `textContent` cola tudo sem espaço — *"FriendsT10:E15A Festa"*. Os filhos entram
+separados por " · ".
+
+**Testado contra as formas que a Netflix usa:**
+
+| caso | resultado |
+|---|---|
+| série + temporada/episódio + nome | `Friends · T10:E15 · The One Where Estelle Dies` |
+| série + episódio | `Breaking Bad · E4 · Cancer Man` |
+| filme (só o nome) | `The Irishman` |
+| espaços sujos / pedaço vazio | limpos, sem separador duplo |
+| elemento ausente | vazio → cai no encadeamento de reserva |
+
+⚠️ **Detalhe de ordem que daria erro:** `_tituloVisto` é declarado **no topo**, junto de
+`tituloId`, e não ao lado da função que o preenche — `resetarSessao()` mexe nele e roda cedo;
+um `let` mais abaixo daria *ReferenceError* por zona morta temporal.
+
+Extensão → **3.13.0**. ⚠️ Ela **não se atualiza sozinha**: ele precisa recarregar a extensão.
 
 ## 9. Pendências / a verificar
 
