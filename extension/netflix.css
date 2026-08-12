@@ -154,6 +154,15 @@
   font-size: 13.5px; line-height: 1.6; color: #c6d0da;
   max-height: 210px; overflow-y: auto;
 }
+/* A ênfase da Lexa agora chega renderizada (antes vazavam os asteriscos).
+   O negrito ganha a cor de destaque, como no app — é ele que carrega o
+   termo explicado. */
+.englab-pop-body b { color: #fff; font-weight: 600; }
+.englab-pop-body i { color: #dbe4ec; }
+.englab-pop-body code {
+  background: rgba(255,255,255,.08); border-radius: 4px;
+  padding: 1px 5px; font-size: .92em;
+}
 
 /* ---------------- transcript ---------------- */
 #englab-transcript {

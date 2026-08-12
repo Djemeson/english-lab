@@ -825,7 +825,8 @@ function mostrarPopupSel() {
     const body = pop.querySelector('#englab-pop-body')
     body.textContent = 'a IA está explicando…'
     pedirExt(() => chrome.runtime.sendMessage({ type: 'ai-explicar', alvo: sel, contexto: popCtx, titulo: titulo() })).then(resp => {
-      body.textContent = (resp && resp.ok) ? resp.texto : ('Não deu: ' + ((resp && resp.erro) || 'sem resposta'))
+      if (resp && resp.ok) body.innerHTML = _marcacaoDaLexa(resp.texto)
+      else body.textContent = 'Não deu: ' + ((resp && resp.erro) || 'sem resposta')
     }).catch(() => { body.textContent = 'Extensão atualizada — recarregue a página (F5).' })
   }
 }
@@ -968,6 +969,30 @@ function renderTranscript() {
 }
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 const escapar = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+// ================================================================
+// A MARCACAO DA LEXA, TAMBEM AQUI
+// ================================================================
+// ⚠️ Ele viu `**"ice chips"**` com os asteriscos na cara. O modelo escreve em
+// markdown mesmo mandado nao escrever — o app ja aprendeu isso e RENDERIZA em
+// vez de proibir (ver `lexaInline`, em js/ai.js): a enfase que ele quis dar e
+// informacao, e jogar fora empobrece a explicacao. A extensao ficou de fora
+// daquela licao e mostrava cru.
+//
+// ORDEM OBRIGATORIA: escapar SEMPRE primeiro — o texto vem de fora e vai para
+// `innerHTML` —, e `**` antes de `*`, senao o negrito vira dois italicos
+// vazios. As quebras de linha viram <br> porque o popup e uma caixa so.
+function _marcacaoDaLexa(t) {
+  return escapar(String(t || '').trim())
+    .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
+    // ⚠️ `\S` nas pontas: sem isso, "2 * 3 * 4" virava "2 <i> 3 </i> 4" —
+    // asterisco de multiplicacao lido como enfase. Italico de verdade nunca
+    // tem espaco colado por dentro.
+    .replace(/(^|[^*])\*(\S(?:[^*\n]*\S)?)\*(?!\*)/g, '$1<i>$2</i>')
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/\n{2,}/g, '<br><br>')
+    .replace(/\n/g, '<br>')
+}
 
 // ---- o que mostrar AGORA -------------------------------------------
 // Regra de ouro: o DOM e a verdade do que esta na tela (nunca perde uma
