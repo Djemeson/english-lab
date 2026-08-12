@@ -390,7 +390,13 @@ function garantirBarra() {
     <div class="englab-rule" id="englab-rule" title="Régua de falas: cada bloco é uma fala, o vão é silêncio. Clique para ir até lá."></div>`
   document.body.appendChild(barra)
 
+  // ⚠️ NENHUM CLIQUE NOSSO PODE CHEGAR AO PLAYER. A Netflix alterna play/pause
+  // em clique na area do video, e a barra vive por cima dela: sem esta trava,
+  // apertar "proxima fala" ou "PT" tambem pausava o filme. Mesma causa do
+  // popup que ele relatou, so que espalhada pela barra inteira.
+  barra.addEventListener('mousedown', e => e.stopPropagation())
   barra.addEventListener('click', e => {
+    e.stopPropagation()
     const b = e.target.closest('button[data-a]'); if (!b) return
     const a = b.dataset.a
     if (a === 'prev') falaAnterior()
@@ -422,11 +428,22 @@ function garantirBarra() {
     if (b) { ev.stopPropagation(); seek(parseFloat(b.dataset.t) - 0.15) }
   })
   barra.querySelector('#englab-line').addEventListener('mouseup', () => setTimeout(mostrarPopupSel, 10))
-  // arraste que termina fora da linha (acontece muito) também conta
+  // Arraste que TERMINA fora da linha (acontece muito) também conta — mas
+  // ⚠️ o que vale e onde ele COMECOU. Antes bastava existir texto selecionado
+  // em qualquer canto da Netflix para o popup abrir E PAUSAR O VIDEO: marcar
+  // uma sinopse, um nome de episodio, qualquer coisa, e o filme parava sem
+  // motivo. Agora a ancora da selecao precisa estar na legenda.
   document.addEventListener('mouseup', ev => {
     if (!barra || barra.style.display === 'none') return
     if (ev.target.closest && ev.target.closest('#englab-pop')) return
-    setTimeout(() => { if (String(window.getSelection() || '').trim()) mostrarPopupSel() }, 10)
+    setTimeout(() => {
+      const s = window.getSelection()
+      if (!s || !String(s).trim()) return
+      const no = s.anchorNode
+      const el = no && (no.nodeType === 1 ? no : no.parentElement)
+      if (!el || !el.closest || !el.closest('#englab-line')) return
+      mostrarPopupSel()
+    }, 10)
   })
   sincronizarBotoes()
   aplicarDoca()
@@ -667,8 +684,11 @@ function renderFala(texto) {
         const arrastou = s._x != null &&
           (Math.abs(ev.clientX - s._x) > 4 || Math.abs(ev.clientY - s._y) > 4)
         s._x = s._y = null
-        if (arrastou || String(window.getSelection() || '').trim()) return   // seleção manda
+        // ⚠️ O `stopPropagation` VEM ANTES DA DESISTENCIA. Terminar uma
+        // selecao em cima de uma palavra caia neste `return` e o clique seguia
+        // para o player: o filme pausava no meio do gesto de selecionar.
         ev.stopPropagation()
+        if (arrastou || String(window.getSelection() || '').trim()) return   // seleção manda
         salvarCaptura(parte.toLowerCase(), texto); piscar(s)
       }
       linha.appendChild(s)
@@ -724,10 +744,40 @@ function fecharPopupSel() {
   if (popPausou) { tocar(); popPausou = false }
   popCtx = ''
 }
+// ⚠️ O CLIQUE QUE FECHA O POPUP NAO PODE CHEGAR AO PLAYER. Era a causa do
+// "clico fora, o painel nao some e o video nao roda; clico de novo e ele liga
+// e desliga sozinho". O mesmo clique fazia DUAS coisas:
+//   1. fechava o popup, e `fecharPopupSel` manda o video voltar a tocar;
+//   2. seguia ate o player da Netflix, que alterna play/pause em qualquer
+//      clique na tela — desfazendo (1) no mesmo instante.
+// O saldo era video parado. No clique seguinte, ja sem popup, so o toggle da
+// Netflix rodava: liga. E se o popup tivesse reaberto pela selecao ainda viva,
+// pausava de novo — o "liga e desliga" que ele viu.
+//
+// Fase de CAPTURA e propagacao cortada: este clique tem UM proposito, fechar
+// o painel. E a selecao e limpa junto, senao o `mouseup` logo abaixo veria
+// texto selecionado e reabriria o popup que acabou de fechar.
 document.addEventListener('mousedown', e => {
   const pop = document.getElementById('englab-pop')
-  if (pop && !pop.contains(e.target) && !e.target.closest('#englab-line')) fecharPopupSel()
-})
+  if (!pop) return
+  const alvo = e.target
+  const dentro = pop.contains(alvo) || (alvo.closest && alvo.closest('#englab-line, #englab-bar'))
+  if (dentro) return
+  e.preventDefault()
+  e.stopPropagation()
+  try { const s = window.getSelection(); if (s) s.removeAllRanges() } catch (err) {}
+  fecharPopupSel()
+}, true)
+
+// Esc fecha, como qualquer painel. Sem isto o unico jeito de sair era clicar
+// fora — e clicar fora era justamente o que estava quebrado.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return
+  if (!document.getElementById('englab-pop')) return
+  e.preventDefault(); e.stopPropagation()
+  try { const s = window.getSelection(); if (s) s.removeAllRanges() } catch (err) {}
+  fecharPopupSel()
+}, true)
 
 // ---- RÉGUA DE FALAS (deslizante) -----------------------------------
 // Cada bloco é uma fala: largura = duração, vão = silêncio. O trilho é
@@ -790,6 +840,10 @@ function renderTranscript() {
   if (!painel) {
     painel = document.createElement('div')
     painel.id = 'englab-transcript'
+    // Mesma trava da barra: ler o transcript, buscar dentro dele ou rolar não
+    // pode alternar o play do filme por baixo.
+    painel.addEventListener('mousedown', e => e.stopPropagation())
+    painel.addEventListener('click', e => e.stopPropagation())
     document.body.appendChild(painel)
   }
   const linhas = cues.length ? cues : histórico.map((h, i) => ({ s: h.t, e: h.t, t: h.texto, _h: i }))
@@ -808,6 +862,7 @@ function renderTranscript() {
         </div>`).join('')}
     </div>`
   painel.querySelector('#englab-tr-list').onclick = e => {
+    e.stopPropagation()          // idem: pular para uma fala não pode pausar o filme
     const l = e.target.closest('.englab-tr-line'); if (!l) return
     seek(parseFloat(l.dataset.t) - 0.2)
   }

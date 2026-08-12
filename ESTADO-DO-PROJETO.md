@@ -7,7 +7,14 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (13ª) — **A CAPTURA DA NETFLIX PASSOU A SABER A SÉRIE**.
+> Última atualização: 2026-08-11 (14ª) — **O CLIQUE QUE FAZIA DUAS COISAS**. O painel que não
+> sumia, o vídeo que não voltava e o "liga e desliga" eram **um defeito só**: o clique fechava
+> o popup **e** chegava ao player, que alterna play/pause — um desfazia o outro. Corrigido em
+> fase de captura, com a seleção limpa e **Esc para fechar**. ⚠️ A varredura achou o mesmo
+> padrão em **mais quatro lugares**: botões da barra, palavra da legenda, transcript e o painel
+> dele — tudo pausava o filme sem querer. Extensão → 3.14.0. **Detalhes em §8.17.**
+>
+> Última atualização anterior: 2026-08-11 (13ª) — **A CAPTURA DA NETFLIX PASSOU A SABER A SÉRIE**.
 > A fonte vinha só "Netflix" porque o título **só existe no HTML enquanto os controles estão
 > visíveis** — e ao clicar na legenda eles estão escondidos. Agora um observador guarda o
 > título quando ele aparece, e a captura usa o último visto: *"Friends · T10:E15 · The One
@@ -9525,6 +9532,50 @@ separados por " · ".
 um `let` mais abaixo daria *ReferenceError* por zona morta temporal.
 
 Extensão → **3.13.0**. ⚠️ Ela **não se atualiza sozinha**: ele precisa recarregar a extensão.
+
+## 8.17 O clique que fazia duas coisas (2026-08-11)
+
+Relato dele: *"aperto Explicar, o painel não some, tem que clicar fora, mas ainda não some e o
+vídeo não roda. Aí clico de novo e ele roda e para de novo."* Três sintomas, **uma causa**.
+
+⚠️ **O MESMO CLIQUE FAZIA DUAS COISAS.** A Netflix alterna play/pause em qualquer clique sobre
+a área do vídeo, e a barra da extensão vive por cima dela. Então o clique que fechava o popup:
+
+1. fechava o painel — e `fecharPopupSel` manda o vídeo **voltar a tocar**;
+2. **seguia até o player**, que alternava play/pause — desfazendo (1) no mesmo instante.
+
+Saldo: vídeo parado. E como a seleção continuava viva, o `mouseup` seguinte **reabria o popup
+e pausava de novo** — o "liga e desliga" que ele viu.
+
+**Conserto:** o clique de fechar roda em **fase de captura**, com `preventDefault` e
+`stopPropagation`, e **limpa a seleção**. Ele tem um propósito só. Entrou também **Esc para
+fechar** — antes o único jeito de sair era clicar fora, que era justamente o que estava
+quebrado.
+
+**Simulado antes e depois**, reproduzindo o relato: no "antes", dois cliques e o vídeo termina
+**parado**, com o popup reaberto nas duas vezes; no "depois", um clique fecha e o vídeo **volta
+a tocar**.
+
+### A varredura: o mesmo padrão em mais quatro lugares
+
+Ele pediu para procurar o resto. Era o mesmo defeito espalhado — **todo clique nosso vazava
+para o player**:
+
+| onde | o que acontecia |
+|---|---|
+| botões da barra (prev, próxima, PT, transcript…) | apertar qualquer um **pausava o filme** |
+| palavra da legenda, ao terminar uma seleção em cima dela | o `return` saía **antes** do `stopPropagation` → pausava no meio do gesto |
+| linha do transcript | pular para uma fala **pausava** junto |
+| painel do transcript (rolar, buscar) | idem |
+
+Todos travados na origem: `mousedown` + `click` com `stopPropagation` na barra e no painel.
+
+**E um atrito extra, achado na varredura:** qualquer seleção de texto **em qualquer canto da
+Netflix** abria o popup e **pausava o vídeo** — marcar uma sinopse parava o filme. Agora a
+**âncora** da seleção precisa estar dentro da legenda; o arraste que começa nela e termina
+fora continua valendo, que era o motivo do handler global existir.
+
+Extensão → **3.14.0**. ⚠️ Precisa recarregar a extensão.
 
 ## 9. Pendências / a verificar
 
