@@ -42,6 +42,10 @@ let barra = null, painel = null
 let cfgUI = { ligada: true, ocultaNativa: true, pausaHover: true, pt: false, fog: true, transcript: false, doca: true }
 let pausadoPorNos = false
 let tituloId = null          // id do titulo aberto (/watch/NNNN)
+// Declarado AQUI, e nao junto da funcao que o preenche, porque
+// `resetarSessao()` mexe nele e roda cedo — `let` mais abaixo daria
+// ReferenceError por zona morta temporal.
+let _tituloVisto = ''        // ultimo "Serie · T10:E15 · Episodio" que apareceu na tela
 
 // A Netflix e uma SPA: trocar de episodio nao recarrega a pagina. Sem
 // resetar aqui, a legenda do titulo ANTERIOR continua na memoria, se
@@ -52,6 +56,10 @@ function idDoTitulo() {
   return m ? m[1] : null
 }
 function resetarSessao() {
+  // ⚠️ O TITULO GUARDADO MORRE AQUI. Sem isto, capturar no episodio novo antes
+  // de os controles aparecerem carimbaria a captura com o episodio ANTERIOR —
+  // pior que "Netflix", porque parece certo e esta errado.
+  _tituloVisto = ''
   cues = []; idxAtual = -1; ultimoTexto = ''
   histórico = []; ptCache = new Map(); ptPend = new Set()
   ruleIni = null; ruleCur = null
@@ -72,11 +80,52 @@ pedirExt(() => chrome.storage.local.get({ llui: null })).then(r => {
 const salvarUI = () => pedirExt(() => chrome.storage.local.set({ llui: cfgUI }))
 
 const vid = () => document.querySelector('video')
-const titulo = () => {
+
+// ================================================================
+// O NOME DA SERIE, TEMPORADA E EPISODIO
+// ================================================================
+// ⚠️ O TITULO SO EXISTE NO HTML ENQUANTO OS CONTROLES ESTAO VISIVEIS. Ele
+// clica numa palavra da legenda com o painel escondido — que e o normal
+// assistindo — e nesse instante `[data-uia="video-title"]` NAO ESTA NO DOM.
+// O codigo antigo lia na hora da captura e caia no `document.title`, que
+// durante a reproducao e so "Netflix". Por isso ele viu "Netflix" no lugar de
+// "Friends T10:E15".
+//
+// A saida e nao depender do instante: um observador guarda o titulo toda vez
+// que ele APARECE (ao mover o mouse, ao pausar, ao trocar de episodio), e a
+// captura usa o ultimo visto (`_tituloVisto`, declarado no topo). Zerado no
+// `resetarSessao`, senao a serie anterior grudaria na proxima.
+//
+// A Netflix quebra o titulo em pedacos: <h4> com a serie, spans com "T10:E15"
+// e com o nome do episodio. `textContent` cola tudo sem espaco
+// ("FriendsT10:E15A Festa"), entao os filhos entram separados por " · ".
+function _lerTituloDoDom() {
   const t = document.querySelector('[data-uia="video-title"]')
-  return (t && t.textContent.trim().replace(/\s+/g, ' ')) ||
-    document.title.replace(/ - Netflix.*$/i, '').trim() || 'Netflix'
+  if (!t) return ''
+  const partes = [...t.childNodes]
+    .map(n => (n.textContent || '').trim().replace(/\s+/g, ' '))
+    .filter(Boolean)
+  const texto = (partes.length ? partes.join(' · ') : t.textContent.trim().replace(/\s+/g, ' '))
+  return texto.replace(/\s*·\s*·\s*/g, ' · ').trim()
 }
+
+function _guardarTitulo() {
+  const t = _lerTituloDoDom()
+  if (t && t !== _tituloVisto) _tituloVisto = t
+}
+
+// Barato: so olha quando algo muda na arvore, e o que ele faz e ler um texto.
+const _obsTitulo = new MutationObserver(_guardarTitulo)
+try {
+  _obsTitulo.observe(document.body, { childList: true, subtree: true })
+} catch (e) {}
+document.addEventListener('mousemove', _guardarTitulo, { passive: true })
+_guardarTitulo()
+
+const titulo = () => _tituloVisto ||
+  _lerTituloDoDom() ||
+  document.title.replace(/ - Netflix.*$/i, '').trim() ||
+  'Netflix'
 
 // ---- captura para o app ----
 function salvarCaptura(word, context) {
