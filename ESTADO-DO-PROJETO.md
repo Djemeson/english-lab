@@ -9661,6 +9661,57 @@ eu ia construir sobre uma suposição — aqui, a de que "falta o áudio" — qu
 trinta segundos lendo o fluxo mostravam o contrário. O `git status` limpo ao
 final é a prova de que nada precisava mudar.
 
+
+### 8.18 — Os seis acentos ganharam papel
+
+Seis cores sem papel viram decoração: a tela seguinte escolhe "a que ficou
+bonita" e em um mês a cor não informa mais nada. Cada acento agora responde por
+UMA pergunta, e as telas usam `--role-*`, nunca `--acc-N` direto — trocar a
+paleta não troca o significado.
+
+| Papel | Cor | Responde a |
+|---|---|---|
+| `--role-ia` | roxo | isto veio da Lexa / da análise |
+| `--role-urgente` | rosa | vence hoje, errou, atrasou |
+| `--role-energia` | laranja | a ação principal, o fogo |
+| `--role-fonte` | azul | de onde veio: obra, cena, site |
+| `--role-dominio` | verde-água | acertou, dominou, concluiu |
+| `--role-novo` | lima | inédito: item, sentido, descoberta |
+
+**Aplicado onde a cor passou a informar** (não repintei o app): painel do SRS
+(hoje/novos/sequência), contador de revisão vs. inédito no estudo, as fontes
+citadas pela Lexa e a etiqueta dos chips dela.
+
+⚠️ **O painel do SRS estava semanticamente torto**: "vence hoje" em verde de
+sucesso, "novos" em roxo de IA, "sequência" em laranja de alerta. Três cores
+sem relação com o que diziam.
+
+**Medido nos SEIS temas, no navegador, não de olho** — pior par de cada tema:
+
+| Tema | Pior contraste | Veredito |
+|---|---|---|
+| midnight | 5,03 | AA em qualquer texto |
+| light | 4,74 | AA em qualquer texto |
+| sepia | 4,66 | AA em qualquer texto |
+| emerald | 5,39 | AA em qualquer texto |
+| violet | 5,56 | AA em qualquer texto |
+| papel | 5,24 | AA em qualquer texto |
+
+Duas armadilhas que a medição pegou e o olho não pegaria:
+
+1. **O roxo puro reprova como texto no escuro (2,50:1).** Por isso `--role-ia`
+   aponta para `--accent-bright` nos temas escuros e para o roxo puro nos
+   claros — quem escreve `var(--role-ia)` acerta sem saber disto.
+2. **Sepia e papel herdariam os acentos vivos e reprovariam feio** — o lima
+   daria **1,17:1**, praticamente invisível. Ganharam valores próprios.
+   No `light`, `--role-energia` também é próprio (4,12 → 5,55), sem mexer em
+   `--acc-3`, que alimenta `--warning`.
+
+⚠️ **Cache mordeu de novo:** `fetch(css, {cache:'reload'})` NÃO bastou — a
+primeira medição voltou "VAZIO" em todos os temas com o arquivo novo já no
+disco. Só `?v=Date.now()` trouxe a versão nova. Para medir CSS ao vivo, use
+sempre a URL com parâmetro.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que

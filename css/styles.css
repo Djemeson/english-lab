@@ -45,6 +45,22 @@
   --acc-4: #3C91FF;   /* azul      */
   --acc-5: #00C7A4;   /* verde-água*/
   --acc-6: #BEF214;   /* lima      */
+  /* ===== O PAPEL DE CADA ACENTO =====
+     Seis cores sem papel viram decoração: a próxima tela escolhe "a que ficou
+     bonita" e em um mês a cor não significa mais nada. Aqui cada uma responde
+     por UMA pergunta da interface — e as telas usam `--role-*`, nunca `--acc-N`
+     direto, para que trocar a paleta não troque o significado.
+
+     ⚠️ MEDIDO sobre o fundo real de cada tema, não escolhido de olho.
+     O roxo puro dá 2,50:1 no escuro — REPROVA como texto. Por isso o papel
+     "IA" aponta para a versão clara aqui e para a pura no claro: quem escreve
+     `var(--role-ia)` acerta nos dois sem precisar saber disto. */
+  --role-ia:      var(--accent-bright);  /* a Lexa, a análise, o que a IA disse   */
+  --role-urgente: var(--acc-2);          /* o que vence hoje, o erro, o atraso    */
+  --role-energia: var(--acc-3);          /* a ação principal, a conquista, o fogo */
+  --role-fonte:   var(--acc-4);          /* de onde veio: obra, cena, site, canal */
+  --role-dominio: var(--acc-5);          /* acertou, dominou, concluiu            */
+  --role-novo:    var(--acc-6);          /* nunca visto: item, sentido, descoberta*/
   --success: #00C7A4;
   --warning: #FF9345;
   --error: #FE4670;
@@ -906,9 +922,9 @@ select option{background:var(--surface)}
 }
 .srs-dash-card .sdc-value{font-size:var(--fs-3xl);font-weight:700;line-height:1;margin-bottom:4px}
 .srs-dash-card .sdc-label{font-size:var(--fs-sm);color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
-.srs-dash-card.due .sdc-value{color:var(--success)}
-.srs-dash-card.new .sdc-value{color:var(--primary)}
-.srs-dash-card.streak .sdc-value{color:var(--warning)}
+.srs-dash-card.due .sdc-value{color:var(--role-urgente)}
+.srs-dash-card.new .sdc-value{color:var(--role-novo)}
+.srs-dash-card.streak .sdc-value{color:var(--role-dominio)}
 
 /* Study session */
 /* A sessão usava só 800px num monitor largo — com a sidebar recolhida
@@ -1302,6 +1318,14 @@ select option{background:var(--surface)}
   --hot-grad:linear-gradient(135deg,#FF9345,#FE4670);
   --acc-1:#6B2FC3; --acc-2:#E01B4C; --acc-3:#C85F12;
   --acc-4:#1668D8; --acc-5:#00806B; --acc-6:#5F7A00;
+  /* Mesmos papéis, valores escurecidos: fundo branco perdoa menos. Aqui o roxo
+     puro dá 7,45:1 e não precisa da versão clara. */
+  --role-ia:var(--acc-1); --role-urgente:var(--acc-2); --role-energia:#A94E0D;
+  --role-fonte:var(--acc-4); --role-dominio:var(--acc-5); --role-novo:var(--acc-6);
+  /* ⚠️ `--role-energia` NÃO aponta para `--acc-3` aqui, de propósito: o laranja
+     do tema claro dá 4,12:1 sobre branco e só passaria em texto grande — e este
+     é o tema que ele usa. Um tom mais fechado leva a 5,55:1 sem tocar em
+     `--acc-3`, que também alimenta `--warning` e não deve mudar de cara. */
   --success:#00806B; --warning:#C85F12; --error:#E01B4C; --purple:#6B2FC3;
   --text:#19005E;
   /* Hierarquia por opacidade do MESMO roxo, como no escuro.
@@ -1321,6 +1345,11 @@ select option{background:var(--surface)}
 
 /* ---- SEPIA / LEITURA ---- */
 [data-theme="sepia"]{
+  /* Papéis dos acentos: valores MEDIDOS sobre este fundo claro (>=4,6:1 em
+     todos). Herdar os vivos do :root reprovaria feio aqui — o lima daria
+     1,17:1, praticamente invisível. */
+  --role-ia:#6B2FC3; --role-urgente:#C01340; --role-energia:#A94E0D;
+  --role-fonte:#1668D8; --role-dominio:#006B59; --role-novo:#4E6500;
   --bg:#EFE6D6;
   --bg-grad:radial-gradient(1000px 520px at 85% -15%, rgba(180,83,9,0.12), transparent 60%);
   --surface:#F8F1E3;
@@ -1404,6 +1433,11 @@ select option{background:var(--surface)}
 
 /* ---- PAPEL (claro, acento azul-tinta, estética "paper") ---- */
 [data-theme="papel"]{
+  /* Papéis dos acentos: valores MEDIDOS sobre este fundo claro (>=4,6:1 em
+     todos). Herdar os vivos do :root reprovaria feio aqui — o lima daria
+     1,17:1, praticamente invisível. */
+  --role-ia:#6B2FC3; --role-urgente:#C01340; --role-energia:#A94E0D;
+  --role-fonte:#1668D8; --role-dominio:#006B59; --role-novo:#4E6500;
   --bg:#F6F4EF;
   --bg-grad:radial-gradient(1100px 560px at 85% -15%, rgba(46,75,198,0.07), transparent 60%);
   --surface:#FFFFFF;
@@ -5342,7 +5376,7 @@ body.ler-full .mobile-bottom-nav{display:none}
    busca. Sem ele, "não buscou" e "buscou sem citar nada" ficavam idênticos. */
 .lexa-fontes b{
   display:inline-flex;align-items:center;gap:4px;
-  color:var(--success);font-weight:600;
+  color:var(--role-fonte);font-weight:600;
 }
 .lexa-fontes a{
   color:var(--text2);text-decoration:none;
@@ -5469,7 +5503,9 @@ body.ler-full .mobile-bottom-nav{display:none}
 .lexa-chips-carregando .spinner{width:13px;height:13px;border-width:2px}
 .lexa-chips-cab{
   display:flex;align-items:center;gap:5px;flex-wrap:wrap;
-  font-size:var(--fs-3xs);color:var(--text3);text-transform:uppercase;
+  /* Etiqueta do que veio da IA — o papel roxo. Mede 5,03:1 no escuro (o roxo
+     PURO daria 2,50 e reprovaria; `--role-ia` já resolve isso por tema). */
+  font-size:var(--fs-3xs);color:var(--role-ia);text-transform:uppercase;
   letter-spacing:.08em;font-weight:700;margin-bottom:var(--sp-3);
 }
 .lexa-chips-cab span{text-transform:none;letter-spacing:0;font-weight:400;opacity:.75}
@@ -5763,8 +5799,8 @@ body.ler-full .mobile-bottom-nav{display:none}
 }
 .srs-fonte-n{grid-row:2;grid-column:1/-1;display:flex;align-items:baseline;gap:5px;margin-top:4px}
 .srs-fonte-n b{font-size:var(--fs-lg);font-family:Georgia,serif;line-height:1}
-.srs-fonte-n b.rev{color:var(--success)}
-.srs-fonte-n b.novo{color:rgba(var(--primary-rgb),.98)}
+.srs-fonte-n b.rev{color:var(--role-dominio)}
+.srs-fonte-n b.novo{color:var(--role-novo)}
 .srs-fonte-n i{color:var(--text3);font-style:normal}
 .srs-fonte-sub{
   grid-row:3;grid-column:1/-1;font-size:var(--fs-3xs);color:var(--text2);
