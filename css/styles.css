@@ -363,7 +363,16 @@ select option{background:var(--surface)}
 }
 .btn:active:not(:disabled){transform:translateY(1px)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
-.btn-primary{background:var(--primary-grad);color:#fff;box-shadow:0 4px 14px rgba(var(--primary-rgb),0.35)}
+/* ⚠️ O LARANJA→ROSA É O SEGUNDO GRADIENTE DO MIGAKU, e ele pediu por nome.
+   No site deles é `--primary-gradient-1: #FF9345` → `--primary-gradient-2:
+   #FE4670`, e o papel dele é claro: o roxo é a marca em repouso; o quente é o
+   que CHAMA — botão principal, conquista, energia.
+   Aqui vai no botão de ação primária, que é o que ele mais aperta. Sem isto o
+   gradiente quente ficava definido e sem uso, que é o mesmo que não existir. */
+.btn-primary{background:var(--hot-grad);color:#fff;box-shadow:0 6px 18px rgba(254,70,112,0.32)}
+/* O contorno do foco acompanha o quente, senão fica um anel roxo em volta de
+   um botão laranja. */
+.btn-primary:focus-visible{box-shadow:0 6px 18px rgba(254,70,112,0.32),0 0 0 3px rgba(255,147,69,0.45)}
 .btn-primary:hover:not(:disabled){box-shadow:0 6px 20px rgba(var(--primary-rgb),0.5);transform:translateY(-1px)}
 .btn-success{background:var(--success);color:#fff}
 .btn-success:hover:not(:disabled){background:color-mix(in srgb, var(--success) 84%, black)}
@@ -2261,7 +2270,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
 .chip,.src-chip,.midia-type-chip{border-radius:var(--radius-pill)}
 
 /* ---- Botão primário: sombra reforçada ---- */
-.btn-primary{box-shadow:0 6px 18px rgba(var(--primary-rgb),0.40)}
+.btn-primary{box-shadow:0 8px 22px rgba(254,70,112,0.38)}   /* acompanha o quente */
 .btn-primary:hover:not(:disabled){box-shadow:0 8px 24px rgba(var(--primary-rgb),0.55);transform:translateY(-1px)}
 
 /* ---- Tabs em pílula segmentada ---- */
@@ -3744,7 +3753,7 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 /* --- Botao principal: presenca sem peso ---
    Sombra de 18px a 40% de opacidade e brilho de template; o botao ja e
    o unico solido da tela. */
-.btn-primary{box-shadow:0 2px 8px rgba(var(--primary-rgb),0.22)}
+.btn-primary{box-shadow:0 2px 8px rgba(254,70,112,0.22)}     /* idem */
 .btn-primary:hover:not(:disabled){box-shadow:0 4px 14px rgba(var(--primary-rgb),0.32);transform:translateY(-1px)}
 .dash-action-card .btn-primary{padding:var(--sp-3) var(--sp-6)}
 
