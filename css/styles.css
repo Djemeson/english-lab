@@ -1248,26 +1248,42 @@ select option{background:var(--surface)}
    ================================================================ */
 
 /* ---- LIGHT / CLEAN ---- */
+/* ⚠️ ESTE TEMA TAMBEM PRECISA DA CARA NOVA — e eu esqueci na primeira volta.
+   Mexi só no `midnight` e disse a ele que o app tinha mudado; ele atualizou e
+   não viu nada, porque usa o CLARO. **São 6 temas**, e reskin que só troca um
+   não é reskin. O print do celular dele mostrava fundo branco desde cedo — a
+   informação estava na minha frente.
+   O claro do Migaku é `#D4DDF5` (azul-lavanda, não branco-cinza) com texto
+   `#19005E` — roxo escuríssimo em vez de preto-azulado. */
 [data-theme="light"]{
-  --bg:#F4F6FB;
-  --bg-grad:radial-gradient(1100px 560px at 85% -15%, rgba(37,99,235,0.08), transparent 60%);
+  --bg:#D4DDF5;
+  --bg-grad:radial-gradient(1100px 560px at 85% -15%, rgba(107,47,195,0.10), transparent 60%);
   --surface:#FFFFFF;
-  --surface2:#EEF2F8;
-  --surface3:#E2E8F2;
+  --surface2:#E7ECFA;
+  --surface3:#D9E1F4;
   --sidebar-bg:#FFFFFF;
-  --border:rgba(15,23,42,0.10);
-  --border-strong:rgba(15,23,42,0.18);
-  --primary:#2563EB;
-  --primary-d:#1D4ED8;
-  --accent-bright:#2563EB;
-  --primary-glow:rgba(37,99,235,0.08);
-  --primary-rgb:37,99,235;
-  --primary-grad:linear-gradient(135deg,#3B82F6,#2563EB);
-  --success:#059669; --warning:#D97706; --error:#DC2626; --purple:#7C3AED;
-  --text:#0F172A;
-  --text2:#475569;
-  --text3:#617084;
-  --scrollbar-track:#E5EAF2;
+  --border:rgba(25,0,94,0.10);
+  --border-strong:rgba(25,0,94,0.20);
+  --primary:#6B2FC3;
+  --primary-d:#55219E;
+  --accent-bright:#6B2FC3;
+  --primary-glow:rgba(107,47,195,0.10);
+  --primary-rgb:107,47,195;
+  --primary-grad:linear-gradient(160deg,#3C91FF,#6B2FC3);
+  --hot-grad:linear-gradient(135deg,#FF9345,#FE4670);
+  --acc-1:#6B2FC3; --acc-2:#E01B4C; --acc-3:#C85F12;
+  --acc-4:#1668D8; --acc-5:#00806B; --acc-6:#5F7A00;
+  --success:#00806B; --warning:#C85F12; --error:#E01B4C; --purple:#6B2FC3;
+  --text:#19005E;
+  /* Hierarquia por opacidade do MESMO roxo, como no escuro.
+     ⚠️ MEDIDO, e a segunda vez que erro isto na mesma rodada: escrevi "42%
+     passa AA" e pus 52%, que dá 3,56:1 — reprova. Sobre `#D4DDF5` o mínimo é
+     62%; fundo claro perdoa MENOS que o escuro, porque o texto escuro precisa
+     de mais tinta para se separar. 66% e 74% deixam os dois degraus folgados
+     (5,44 e 6,96) e ainda distintos entre si. */
+  --text2:rgba(25,0,94,0.74);
+  --text3:rgba(25,0,94,0.66);
+  --scrollbar-track:#C9D4EF;
   --shadow:0 18px 50px rgba(40,35,25,0.14);
   --shadow-sm:0 2px 10px rgba(40,35,25,0.08);
   --shadow-card:0 1px 2px rgba(40,35,25,0.04), 0 8px 24px rgba(40,35,25,0.06);
