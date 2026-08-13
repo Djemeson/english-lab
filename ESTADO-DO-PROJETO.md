@@ -9637,6 +9637,30 @@ um `#FF9345`. Ou seja, **capturou a imagem certa**, não um quadro em branco.
 revisar — em vez da imagem, o caminho de volta até ela. Vale discutir; não é o
 mesmo produto, mas resolve a mesma necessidade.
 
+
+### 8.17 — O áudio da cena: já existia (verificação, sem código novo)
+
+Ao ir implementar "o áudio da cena no card", a leitura do fluxo real mostrou que
+**ele já estava pronto desde a construção do estudo por vídeo**. O botão diz
+literalmente "Mandar para o Preparar com o áudio da cena", e a captura grava o
+trecho e o salva sob DUAS chaves — `audioKey(boldEn)` e `audioKey(frase)` —, que
+são exatamente as que o card do SRS consulta. Não há nada a fazer.
+
+O helper duplicado que eu havia começado a escrever foi removido; a árvore ficou
+idêntica ao commit `64b0946` (o do quadro da cena).
+
+**Verificado ao vivo, no código do fluxo, não por suposição:**
+
+| Peça | Sobe para a nuvem? | Por onde |
+|---|---|---|
+| Áudio da cena | sim | `autoSyncAudioAfterChange()` na hora da captura — sobe o que falta 30s depois |
+| Quadro da cena | sim | `autoSyncAfterChange()` → `fbPush()`, que compara nomes e sobe o que falta |
+
+⚠️ **A lição é a da REGRA Nº 5, de novo.** A quarta vez nesta colaboração em que
+eu ia construir sobre uma suposição — aqui, a de que "falta o áudio" — quando
+trinta segundos lendo o fluxo mostravam o contrário. O `git status` limpo ao
+final é a prova de que nada precisava mudar.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
