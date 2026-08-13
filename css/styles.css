@@ -1,32 +1,72 @@
 /* ===== VARIABLES — tema padrão: MIDNIGHT ===== */
+/* ================================================================
+   TOKENS — o tema escuro passou a ter ROXO dentro (2026-08-11)
+   ================================================================
+   Reskin pedido por ele, com o Migaku como referência (ver
+   ESTUDO-VISUAL-MIGAKU.md, levantado do site no ar). O que mudou aqui muda o
+   app INTEIRO de uma vez — é por isso que o reskin se faz nos tokens e não
+   tela por tela: pintar tela por tela faz a próxima nascer fora do padrão.
+
+   ⚠️ A DESCOBERTA QUE MAIS PESA: o escuro deles não é cinza. `#0A002A` é
+   azul-violeta, e é isso que tira o ar de "tema escuro genérico" que quase
+   todo app tem. O nosso era `#06091A` — cinza-azulado, correto e sem graça.
+
+   ⚠️ E SÃO SEIS ACENTOS, não um. O app era monocromático no azul; a paleta
+   nova dá cor própria a coisas que hoje se confundem (progresso, IA, alerta).
+   Os `--acc-*` entram como vocabulário disponível — quem usa cada um é
+   decisão de cada tela, e trocar tudo de uma vez seria carnaval.
+
+   NÃO veio junto: o H1 de 99px deles. Aquilo é página de venda; isto é
+   ferramenta de uso diário, e cartaz cansa quando se abre dez vezes por dia.
+   O que veio da tipografia foi o PESO (ver `--fw-display`). */
 :root, [data-theme="midnight"] {
-  --bg: #06091A;
-  --bg-grad: radial-gradient(1100px 560px at 82% -12%, rgba(var(--primary-rgb),0.12), transparent 58%),
-             radial-gradient(900px 500px at -10% 110%, color-mix(in srgb, var(--purple) 8%, transparent), transparent 60%);
-  --surface: #0D1425;
-  --surface2: #131E30;
-  --surface3: #1A2840;
-  --sidebar-bg: #03050E;
+  --bg: #0A002A;
+  --bg-grad: radial-gradient(1100px 560px at 82% -12%, rgba(var(--primary-rgb),0.14), transparent 58%),
+             radial-gradient(900px 500px at -10% 110%, color-mix(in srgb, var(--purple) 12%, transparent), transparent 60%);
+  --surface: #12093A;
+  --surface2: #1A1049;
+  --surface3: #241858;
+  --sidebar-bg: #06001C;
   --border: rgba(255,255,255,0.08);
   --border-strong: rgba(255,255,255,0.15);
-  --primary: #3B82F6;
-  --primary-d: #2563EB;
-  --accent-bright: #60A5FA;
-  --primary-glow: rgba(var(--primary-rgb),0.10);
-  --primary-rgb: 59,130,246;
-  --primary-grad: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-  --success: #4CC39A;
-  --warning: #E7BA53;
-  --error: #ED7A74;
-  --purple: #A896E4;
-  --text: #E2E8F0;
-  --text2: #7C93B0;
+  --primary: #6B2FC3;
+  --primary-d: #55219E;
+  --accent-bright: #9B6BE8;
+  --primary-glow: rgba(var(--primary-rgb),0.14);
+  --primary-rgb: 107,47,195;
+  /* O gradiente de assinatura deles: azul → roxo. */
+  --primary-grad: linear-gradient(160deg, #3C91FF 0%, #6B2FC3 85%);
+  /* Gradiente quente, o segundo deles — para o que é conquista e energia. */
+  --hot-grad: linear-gradient(135deg, #FF9345 0%, #FE4670 100%);
+  /* Os seis acentos, na ordem do Migaku. */
+  --acc-1: #6B2FC3;   /* roxo      */
+  --acc-2: #FE4670;   /* rosa      */
+  --acc-3: #FF9345;   /* laranja   */
+  --acc-4: #3C91FF;   /* azul      */
+  --acc-5: #00C7A4;   /* verde-água*/
+  --acc-6: #BEF214;   /* lima      */
+  --success: #00C7A4;
+  --warning: #FF9345;
+  --error: #FE4670;
+  --purple: #9B6BE8;
+  --text: #FFFFFF;
+  /* ⚠️ Hierarquia por OPACIDADE da mesma cor (100/60/35), como eles fazem, e
+     não por três cinzas diferentes: nunca desafina com o fundo, e some um
+     valor para manter. */
+  --text2: rgba(255,255,255,0.60);
   /* --text3 e usado nos rotulos pequenos de TODA a interface (eyebrows,
      labels de metrica, dicas). Nos valores antigos ele reprovava contraste
      em todos os 6 temas (2.36 a 3.11:1). Estes passam AA (>=4.6:1) sem
      perder o papel de "terciario", que continua mais leve que --text2. */
-  --text3: #6A819E;
-  --scrollbar-track: #03050E;
+  /* ⚠️ 35% É O DEGRAU DELES E REPROVA AQUI — medido, não estimado: sobre
+     `#0A002A` dá 3,96:1, abaixo dos 4,5 que o texto pequeno exige. E `--text3`
+     é justamente o dos rótulos miúdos de toda a interface. O valor antigo
+     tinha sido calibrado à mão por esse mesmo motivo, e eu quase repeti o erro
+     que aquele comentário existia para evitar.
+     0,50 dá 5,24:1 — mantém o papel de terciário (mais leve que `--text2`) e
+     passa AA. Copiar a proporção não vale copiar a falha de contraste. */
+  --text3: rgba(255,255,255,0.50);
+  --scrollbar-track: #06001C;
   /* Raios: o CSS tinha 36 valores distintos. Estes cobrem tudo
      (2-4px seguem literais em detalhes micro, e 50% em circulos). */
   --radius-xs: 8px;
@@ -51,6 +91,13 @@
   --fs-2xl: 1.9rem;
   --fs-3xl: 2.5rem;
   --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+  /* ⚠️ O PESO É METADE DA IDENTIDADE DO MIGAKU, e não o tamanho. Os títulos
+     deles são **900** (black), não 700 "negrito forte" — com entrelinha
+     apertada (~1,16) isso dá ar de cartaz em vez de documento. Como token
+     porque o peso é o que muda; o tamanho da nossa escala fica como está,
+     que é o de ferramenta e não o de página de venda. */
+  --fw-display: 900;
+  --lh-display: 1.16;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace;
   --shadow: 0 18px 50px rgba(20,14,8,0.55);
   --shadow-sm: 0 2px 10px rgba(20,14,8,0.35);
@@ -190,7 +237,7 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 #section-revisar.active{display:block}
 #section-revisar .srs-library-wrap{margin:0 -28px;width:calc(100% + 56px)}
 .page-header{margin-bottom:var(--sp-8)}
-.page-header h1{font-size:var(--fs-xl);font-weight:700;letter-spacing:-.3px}
+.page-header h1{font-size:var(--fs-xl);font-weight:var(--fw-display);line-height:var(--lh-display);letter-spacing:-.3px}
 .page-header p{color:var(--text2);margin-top:var(--sp-1);font-size:var(--fs-md)}
 
 /* ===== STATS ===== */
@@ -1415,7 +1462,7 @@ select option{background:var(--surface)}
    ================================================================ */
 
 /* ---- Tipografia de cabeçalho ---- */
-.page-header h1{font-size:var(--fs-xl);letter-spacing:-.5px;font-weight:700}
+.page-header h1{font-size:var(--fs-xl);letter-spacing:-.5px;font-weight:var(--fw-display);line-height:var(--lh-display)}
 .page-header{position:relative}
 
 /* ---- Sidebar: marca com brilho ---- */
@@ -1578,7 +1625,7 @@ select option{background:var(--surface)}
   margin-bottom:var(--sp-8);padding-bottom:var(--sp-6);border-bottom:1px solid var(--border);
 }
 .ph-left{min-width:0}
-.page-header h1{display:flex;align-items:center;gap:var(--sp-4);font-size:var(--fs-xl);font-weight:700;letter-spacing:-.5px}
+.page-header h1{display:flex;align-items:center;gap:var(--sp-4);font-size:var(--fs-xl);font-weight:var(--fw-display);line-height:var(--lh-display);letter-spacing:-.5px}
 .page-header h1 .ic{width:24px;height:24px;color:var(--primary)}
 .ph-left p,.page-header > p{color:var(--text2);margin-top:var(--sp-1);font-size:var(--fs-md)}
 .ph-actions{display:flex;gap:var(--sp-3);align-items:center;flex-wrap:wrap}
