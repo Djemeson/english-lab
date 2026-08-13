@@ -248,7 +248,22 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
    exatamente para isto e já vira escuro nos temas claros. */
 .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:var(--sp-7)}
 .stat-label{font-size:var(--fs-sm);color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
-.stat-value{font-size:var(--fs-2xl);font-weight:700;margin-top:var(--sp-1);line-height:1}
+/* ⚠️ O GRADIENTE ENTRA NO TEXTO — é a assinatura do Migaku, e o que mais
+   distingue a marca deles de "mais um app escuro". Aqui ele vai no NÚMERO, que
+   é a primeira coisa que o olho pega ao abrir o app, e não em títulos: texto
+   corrido em degradê cansa e atrapalha a leitura.
+   ⚠️ A `color` vem ANTES de propósito. `background-clip:text` com
+   `color:transparent` some com o texto se o recorte não pegar — em impressão,
+   em leitor de tela mal comportado, em navegador antigo. Declarando a cor
+   sólida primeiro, o pior caso é ficar sem o degradê, nunca sem o número. */
+.stat-value{
+  font-size:var(--fs-2xl);font-weight:var(--fw-display);
+  margin-top:var(--sp-1);line-height:1;
+  color:var(--text);
+  background:var(--primary-grad);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
 .stat-sub{font-size:var(--fs-sm);color:var(--text2);margin-top:var(--sp-2)}
 .stat-card.blue .stat-value{color:var(--primary)}
 .stat-card.green .stat-value{color:var(--success)}
@@ -337,7 +352,12 @@ select option{background:var(--surface)}
      visíveis ao mesmo tempo (26,28,35,36,38px) — o tipo de ruído que não
      se nota de propósito, mas tira a sensação de sofisticação. */
   min-height:38px;
-  padding:var(--sp-3) var(--sp-6);border:none;border-radius:var(--radius-sm);
+  /* ⚠️ PÍLULA, como no Migaku (o botão deles é 32px de raio numa altura
+     parecida — na prática, redondo nas pontas). É a mudança de forma que mais
+     se nota depois da cor: canto arredondado "médio" é o padrão de todo mundo;
+     pílula tem intenção. Um token novo seria um valor a mais para manter,
+     e `--radius-pill` já existia sem uso aqui. */
+  padding:var(--sp-3) var(--sp-6);border:none;border-radius:var(--radius-pill);
   font-weight:600;font-size:var(--fs-md);cursor:pointer;white-space:nowrap;
   transition:transform .12s ease, box-shadow .15s ease, background .15s ease, color .15s ease, opacity .15s;
 }
