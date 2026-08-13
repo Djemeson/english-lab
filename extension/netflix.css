@@ -127,31 +127,50 @@
 }
 
 /* ---------------- popup de seleção ---------------- */
+/* ================================================================
+   O BALAO, NO ESTILO MIGAKU (2026-08-11)
+   ================================================================
+   Ele mandou o balao deles e pediu igual. O que muda tudo e a INVERSAO: era
+   um vidro escuro fundido na cena; virou um CARTAO BRANCO pousado por cima.
+   Cartao branco sobre imagem le melhor -- o texto nao disputa contraste com o
+   que estiver passando atras -- e e o que da o ar de objeto, nao de camada.
+
+   Os valores vieram do estudo do site deles (ESTUDO-VISUAL-MIGAKU.md): roxo
+   escurissimo #19005E no texto, raio generoso, pilula nos botoes.
+   ⚠️ A extensao NAO le o CSS do app -- folha propria, sem variaveis
+   compartilhadas. Estes valores sao copia, e as duas precisam mudar juntas.
+   Mesmo aviso que ficou na legenda. */
 #englab-pop {
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: calc(8.5% + 104px); z-index: 1000000;
-  width: min(640px, 84vw); padding: 14px 16px;
-  background: var(--ll-bg); border: 1px solid var(--ll-line-2); border-radius: 14px;
-  box-shadow: 0 18px 50px rgba(0,0,0,.55);
-  backdrop-filter: blur(18px) saturate(1.3);
-  color: var(--ll-txt); font-family: var(--ll-font); font-size: 14px;
+  width: min(640px, 84vw); padding: 18px 20px;
+  background: #fff; border: none; border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(10,0,42,.45);
+  color: #19005E; font-family: var(--ll-font); font-size: 14px;
   animation: englab-in .16s ease-out;
 }
 .englab-pop-row { display: flex; align-items: center; gap: 10px; }
+/* A palavra e o TITULO do cartao, como no deles: grande e em peso maximo. */
 .englab-pop-row b {
-  flex: 1; min-width: 0; color: var(--ll-acc); font-weight: 600;
+  flex: 1; min-width: 0; color: #19005E; font-weight: 900;
+  font-size: 21px; letter-spacing: -.2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Pilula, sem borda, em par: o roxo suave e a acao neutra e o quente e a que
+   chama -- exatamente a divisao TRACK / UNKNOWN do balao deles. */
 .englab-pop-row button {
-  flex-shrink: 0; padding: 7px 14px; border-radius: 9px; cursor: pointer;
-  font-size: 13px; font-weight: 600; font-family: var(--ll-font);
-  border: 1px solid var(--ll-line-2); background: rgba(255,255,255,.05); color: var(--ll-txt);
-  transition: background-color .12s, border-color .12s;
+  flex-shrink: 0; padding: 9px 18px; border-radius: 999px; cursor: pointer;
+  font-size: 13px; font-weight: 700; font-family: var(--ll-font);
+  border: none; background: rgba(107,47,195,.12); color: #6B2FC3;
+  transition: background-color .12s, color .12s;
 }
-.englab-pop-row button:hover { background: rgba(255,255,255,.13); border-color: var(--ll-acc); }
+.englab-pop-row button:hover { background: rgba(107,47,195,.20); }
+/* "Preparar" e o que leva o item para o estudo: e a acao que chama. */
+.englab-pop-row button[data-p="rev"] { background: rgba(254,70,112,.12); color: #D8104A; }
+.englab-pop-row button[data-p="rev"]:hover { background: rgba(254,70,112,.20); }
 .englab-pop-body:not(:empty) {
-  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--ll-line);
-  font-size: 13.5px; line-height: 1.6; color: #c6d0da;
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(25,0,94,.10);
+  font-size: 14px; line-height: 1.6; color: rgba(25,0,94,.78);
   max-height: 210px; overflow-y: auto;
 }
 /* A ênfase da Lexa agora chega renderizada (antes vazavam os asteriscos).
@@ -164,33 +183,35 @@
 .englab-fala { margin: 0 0 10px; }
 .englab-fala:last-child { margin-bottom: 0; }
 .englab-fala-aluno {
-  color: #eaf1f8; background: rgba(255,255,255,.07);
-  border-left: 2px solid var(--ll-acc);
-  padding: 6px 10px; border-radius: 0 6px 6px 0;
+  color: #19005E; background: rgba(107,47,195,.08);
+  border-left: 2px solid #6B2FC3;
+  padding: 7px 11px; border-radius: 0 10px 10px 0; font-weight: 500;
 }
 .englab-pend { opacity: .55; font-style: italic; }
 
 .englab-pop-chat { display: flex; gap: 6px; margin-top: 10px; }
 .englab-pop-chat input {
-  flex: 1; min-width: 0; background: rgba(255,255,255,.07);
-  border: 1px solid var(--ll-line); border-radius: 6px;
-  padding: 7px 10px; color: #eaf1f8; font-size: 13px; font-family: inherit;
+  flex: 1; min-width: 0; background: rgba(25,0,94,.05);
+  border: 1px solid rgba(25,0,94,.12); border-radius: 999px;
+  padding: 9px 15px; color: #19005E; font-size: 13.5px; font-family: inherit;
 }
-.englab-pop-chat input:focus { outline: none; border-color: var(--ll-acc); }
-.englab-pop-chat input::placeholder { color: #7d8b99; }
+.englab-pop-chat input:focus { outline: none; border-color: #6B2FC3; background: #fff; }
+.englab-pop-chat input::placeholder { color: rgba(25,0,94,.62); }  /* 0.42 dava 2,83:1 — ilegivel; 0.62 passa AA */
+/* Redondo e no gradiente quente: e o botao que age, como o laranja do canto
+   do balao deles. */
 .englab-pop-chat button {
   flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
-  width: 34px; background: rgba(255,255,255,.07);
-  border: 1px solid var(--ll-line); border-radius: 6px;
-  color: #eaf1f8; cursor: pointer;
+  width: 36px; height: 36px; background: linear-gradient(135deg,#FF9345,#FE4670);
+  border: none; border-radius: 999px;
+  color: #fff; cursor: pointer;
 }
-.englab-pop-chat button:hover { background: rgba(255,255,255,.13); border-color: var(--ll-acc); }
+.englab-pop-chat button:hover { filter: brightness(1.06); }
 
-.englab-pop-body b { color: #fff; font-weight: 600; }
-.englab-pop-body i { color: #dbe4ec; }
+.englab-pop-body b { color: #19005E; font-weight: 800; }
+.englab-pop-body i { color: rgba(25,0,94,.70); }
 .englab-pop-body code {
-  background: rgba(255,255,255,.08); border-radius: 4px;
-  padding: 1px 5px; font-size: .92em;
+  background: rgba(107,47,195,.10); color: #6B2FC3; border-radius: 5px;
+  padding: 1px 6px; font-size: .92em;
 }
 
 /* ---------------- transcript ---------------- */
