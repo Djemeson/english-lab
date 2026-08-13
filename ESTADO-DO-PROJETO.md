@@ -9608,6 +9608,30 @@ falta o quadro e a amarração dos dois ao card.
    irrelevante em cota, mas **precisa ir para o Storage e não para o banco** —
    é exatamente o erro que acabamos de desfazer com áudio e imagem (§8.12).
 
+### FEITO no módulo de Vídeo (2026-08-11)
+
+A captura de palavra no vídeo passa a guardar o **quadro da cena**.
+
+⚠️ **REUSA A CHAVE DAS IMAGENS QUE JÁ EXISTIA** (`img_<wordId>_<meaningIdx>`,
+de `audio.js`). Com isso o card do SRS mostra a cena **sem uma linha de mudança
+lá dentro**, o `ImageDB` já sincroniza pelo Storage (§8.12) e a imagem gerada
+por IA continua pelo mesmo caminho. Inventar campo novo daria trabalho nos dois
+lados para chegar ao mesmo lugar.
+
+`meaningIdx` 0 de propósito: no instante da captura o item nasce com um sentido
+só — o desta cena. Se ele desdobrar depois, a cena fica com o primeiro, que é
+de onde ela veio.
+
+⚠️ **E nada disto derruba a captura.** Tudo dentro de `try`: falhando, ele perde
+a imagem e mantém a palavra, nunca o contrário. Quadro preto ou vazio é
+descartado pelo tamanho (< 2 KB), que é a rede para o caso de DRM.
+
+**Medido, reproduzindo o caminho num vídeo de teste:** quadro 480×270, **3 KB**
+em JPEG a 72% (bem abaixo dos ~40 KB estimados, porque cena real comprime mais
+que cor chapada — mesmo assim, ordem de grandeza irrelevante para a cota), e a
+cor do centro do quadro capturado bate com a desenhada: `rgb(254,147,69)` para
+um `#FF9345`. Ou seja, **capturou a imagem certa**, não um quadro em branco.
+
 **A alternativa para a Netflix**, se ele quiser cena lá também: guardar a
 **fala** e o **tempo** (que já temos) e abrir o episódio no ponto certo ao
 revisar — em vez da imagem, o caminho de volta até ela. Vale discutir; não é o

@@ -3,6 +3,56 @@
 // com áudio real, "Preparar para assistir", ditado e shadowing.
 // Carregado LAZY depois de js/video-sync.js.
 // ================================================================
+// ================================================================
+// O QUADRO DA CENA NO CARD
+// ================================================================
+// O que o Migaku faz e ele pediu: o card não é palavra + tradução, é a CENA.
+// Aqui isso sai de graça — o quadro está na tela no segundo da captura, e
+// depois não volta.
+//
+// ⚠️ REUSA A CHAVE DAS IMAGENS QUE JÁ EXISTE (`img_<wordId>_<meaningIdx>`, em
+// `audio.js`). Com isso o card do SRS mostra a cena **sem uma linha de mudança
+// lá dentro**, o `ImageDB` já sincroniza pelo Storage, e a imagem gerada por
+// IA continua funcionando pelo mesmo caminho. Inventar um campo novo daria
+// trabalho nos dois lados para chegar ao mesmo lugar.
+//
+// ⚠️ `meaningIdx` 0 de propósito: no instante da captura o item nasce com um
+// sentido só — o desta cena. Se ele desdobrar depois, a cena fica com o
+// primeiro, que é de onde ela veio.
+//
+// ⚠️ E NADA DISTO PODE DERRUBAR A CAPTURA. Vídeo protegido por DRM faz o
+// `drawImage` lançar erro de segurança (é o caso da Netflix — por isso lá o
+// card com cena não existe). Aqui o arquivo é dele e funciona, mas o `try`
+// fica: falhando, ele perde a imagem e mantém a palavra, nunca o contrário.
+async function _vidGuardarQuadro(wordId) {
+  try {
+    if (typeof ImageDB === 'undefined' || !wordId) return false
+    const v = document.querySelector('#vid-player video, #vid-player')
+    const src = (v && v.videoWidth) ? v : document.querySelector('video')
+    if (!src || !src.videoWidth) return false
+    // 480px de largura: legível no card e ~40 KB em JPEG. O quadro é ilustração
+    // da cena, não material de leitura — resolução maior só engorda a cota.
+    const L = 480
+    const cv = document.createElement('canvas')
+    cv.width = L
+    cv.height = Math.round(L * (src.videoHeight / src.videoWidth)) || 270
+    cv.getContext('2d').drawImage(src, 0, 0, cv.width, cv.height)
+    const b64 = cv.toDataURL('image/jpeg', 0.72)
+    if (!b64 || b64.length < 2000) return false      // quadro preto/vazio: descarta
+    const chave = `img_${wordId}_0`
+    await ImageDB.set(chave, b64)
+    if (typeof _imageKeyCache !== 'undefined') {
+      if (!_imageKeyCache) _imageKeyCache = new Set()
+      _imageKeyCache.add(chave)
+    }
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+    return true
+  } catch (e) {
+    console.warn('[vídeo] não guardei o quadro da cena:', e.message)
+    return false
+  }
+}
+
 function _vidSelText() {
   if (!_vidSel) return ''
   return _vidCues.slice(_vidSel.ci, _vidSel.cj + 1).map(c => c.t).join(' ')
@@ -209,6 +259,9 @@ Responda:
       prepararNovoSentido(w.id, { contexto: frase, glosa: r.meaning_pt || '', ...fonte })
     } else {
       w = createWord({ word: alvo, context: frase, context_pt: (r.frase_pt || '').replace(/<\/?b>/gi, ''), ...fonte, lang: _vidCur.lang })
+      // A CENA VAI JUNTO. Ver `_vidGuardarQuadro`: é aqui, no segundo da
+      // captura, que o quadro certo está na tela — depois ele não volta.
+      _vidGuardarQuadro(w.id)
       w.ipa = r.ipa || ''
       w.type = r.type || 'word'
       w.type_label = r.type_label || ''
