@@ -9577,6 +9577,42 @@ fora continua valendo, que era o motivo do handler global existir.
 
 Extensão → **3.14.0**. ⚠️ Precisa recarregar a extensão.
 
+## 8.18 O card com cena — onde ele pode e onde NÃO pode existir (2026-08-11)
+
+Fatia aberta e **parada de propósito antes do código**, com um achado que muda
+o desenho inteiro. Ele avisou que o contexto estava no fim; escrever a captura
+sem resolver isto entregaria algo que falha calado.
+
+⚠️ **NA NETFLIX O FRAME NÃO PODE SER CAPTURADO.** O vídeo é protegido por DRM
+(Widevine): desenhar aquele `<video>` num canvas devolve preto ou lança erro de
+segurança. Não é limitação de código nossa — é o navegador cumprindo a
+proteção, e nenhuma extensão contorna isso por caminho legítimo. **O card com
+imagem da cena, do jeito que o Migaku mostra, não existe para conteúdo de
+streaming protegido.**
+
+**Onde ele FUNCIONA, e é onde vale fazer:** o módulo de Vídeo e o de Podcast do
+próprio app, porque ali o arquivo é dele — vídeo que ele abriu, episódio que
+ele baixou. Sem DRM, o frame sai. E o áudio da cena **já é capturado hoje**
+(`captureStream` em `video-study.js`), então metade do trabalho está pronta:
+falta o quadro e a amarração dos dois ao card.
+
+**A fatia, definida para a próxima rodada:**
+
+1. No módulo de Vídeo, no instante da captura: `drawImage` do `<video>` num
+   canvas (~480px de largura, JPEG), guardado junto do item.
+2. Aproveitar o áudio que já existe em vez de capturar de novo.
+3. O card do SRS passa a mostrar quadro + áudio quando houver — e cai no
+   formato de hoje quando não houver, que é o caso de tudo que vem da Netflix,
+   do Kindle e do livro.
+4. ⚠️ Peso: quadro de 480px em JPEG dá ~40 KB. Com o Storage de pé isso é
+   irrelevante em cota, mas **precisa ir para o Storage e não para o banco** —
+   é exatamente o erro que acabamos de desfazer com áudio e imagem (§8.12).
+
+**A alternativa para a Netflix**, se ele quiser cena lá também: guardar a
+**fala** e o **tempo** (que já temos) e abrir o episódio no ponto certo ao
+revisar — em vez da imagem, o caminho de volta até ela. Vale discutir; não é o
+mesmo produto, mas resolve a mesma necessidade.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
