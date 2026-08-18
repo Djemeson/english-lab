@@ -184,10 +184,15 @@ function mangaAjustarLinhas(raiz) {
       let tam = Math.max(9, Math.min(alturaCaixa * 0.9, 40))
       t.style.fontSize = tam.toFixed(1) + 'px'
       // Encolhe até caber: no máximo 12 passos, cada um 8% menor.
-      for (let k = 0; k < 12 && (t.scrollHeight > alturaCaixa + 1 || t.scrollWidth > largura + 1); k++) {
+      for (let k = 0; k < 20 && (t.scrollHeight > alturaCaixa + 1 || t.scrollWidth > largura + 1); k++) {
         tam *= 0.92
         if (tam < 8) break
         t.style.fontSize = tam.toFixed(1) + 'px'
+      }
+      // Se nem no menor tamanho coube, encolhe na horizontal — um bloco de
+      // resumo cortado pela metade é pior que um bloco um pouco estreito.
+      if (t.scrollWidth > largura + 1) {
+        t.style.transform = 'scaleX(' + Math.max(0.25, largura / t.scrollWidth).toFixed(4) + ')'
       }
       pai.dataset.ok = '1'
       n++
@@ -224,6 +229,17 @@ function mangaAjustarLinhas(raiz) {
       const chars = Math.max(1, (t.textContent || '').length)
       const espaco = Math.max(-1.5, Math.min(tamanho * 0.35, (largura - agora) / chars))
       t.style.letterSpacing = espaco.toFixed(2) + 'px'
+    }
+    // ⚠️ REDE FINAL CONTRA TRANSBORDO. A varredura achou texto passando da
+    // caixa em quase toda página: o tamanho da fonte é limitado pela ALTURA da
+    // faixa, e quando a fala é larga demais para essa altura ela sobra pelos
+    // lados. Sobrando, ela invade o realce do balão vizinho — e agora, com o
+    // texto aceso, também aparece por cima da arte ao lado.
+    // Aqui o encolhimento horizontal entra só no que sobrou: deformar um
+    // pouco é melhor que vazar.
+    const largoFinal = t.scrollWidth
+    if (largoFinal > largura + 1) {
+      t.style.transform = 'scaleX(' + Math.max(0.2, largura / largoFinal).toFixed(4) + ')'
     }
     pai.dataset.ok = '1'
     n++
