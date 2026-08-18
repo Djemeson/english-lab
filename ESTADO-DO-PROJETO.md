@@ -10526,6 +10526,48 @@ duas são a mesma coisa — o realce fica igual.
 menos linhas separadas: exatamente o efeito esperado da fusão, que junta o que
 antes era contado duas vezes.
 
+
+### 8.38 — O balão acende no hover (o jeito do mokuro)
+
+Ele mandou os prints do mokuro e o pedido: *"estuda as imagens, analisa,
+planeja e faz igual"*. E mandou também o print do defeito — arrastando para
+selecionar, a seleção **escapava do balão** e pegava a barra, o rodapé e o
+"35% · faltam ~4 min".
+
+⚠️ **O que o mokuro faz de diferente, e que eu não estava fazendo:** o texto
+não fica invisível o tempo todo. Ao passar o mouse, o balão **troca de
+estado** — ganha fundo opaco e o texto aparece em letra digital, por cima do
+desenhado. A partir daí você seleciona TEXTO DE VERDADE, e vem tudo de graça:
+o cursor sabe onde está, a seleção respeita as palavras, o duplo clique pega
+uma palavra inteira. Selecionar um fantasma era a causa de todo o resto.
+
+Fora do hover, nada disso existe: a arte fica intacta, sem marcador nenhum.
+
+**Três mudanças:**
+
+1. `.mg-balao:hover` ganha fundo do tema e texto na cor do texto.
+2. **Espaço entre letras no lugar de esticamento.** `scaleX` cobria a largura
+   certa mas DEFORMA a letra — e agora que o texto aparece, deformado ficaria
+   à vista. Distribuindo a diferença entre os caracteres, a linha ocupa a
+   largura exata e cada letra mantém a forma da fonte.
+3. **A interface saiu da seleção** (barra, rodapé, setas, selo, número da
+   página): texto de controle não é conteúdo, ninguém quer copiá-lo.
+
+#### Verificado, e o que ficou por confirmar
+
+| O quê | Resultado |
+|---|---|
+| Texto transparente em repouso | sim |
+| Texto acende ao aceso | sim — `rgb(43, 39, 33)` |
+| Encaixe da linha na fala | **100%** |
+| Interface fora da seleção | sim (`user-select: none`) |
+
+⚠️ **O FUNDO OPACO não pôde ser confirmado nesta sessão.** O estilo computado
+seguiu devolvendo transparente mesmo com a regra presente no arquivo e na
+ordem certa — o padrão do cache de folha de estilo que já mordeu antes neste
+projeto. **Sem o fundo, o texto acende POR CIMA do desenho e fica ilegível**,
+que seria pior que o estado anterior. É a primeira coisa a conferir.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
