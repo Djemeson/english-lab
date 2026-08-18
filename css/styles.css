@@ -6506,3 +6506,69 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   /* Botões só de ícone: sem texto para dar corpo, o alvo é o padding. */
   .mob-action-btn{min-width:44px;min-height:44px}
 }
+
+/* ================================================================
+   MANGÁ — a página é a imagem; o texto vai POR CIMA, invisível
+   ================================================================
+   ⚠️ O texto dos balões é transparente, e NÃO escondido. `display:none` e
+   `visibility:hidden` tirariam o elemento da seleção do navegador — e a
+   seleção é o módulo inteiro: é ela que leva a fala para a Lexa e para o
+   card, reaproveitando o caminho que o leitor de livros já tem.
+
+   Tudo posicionado em PORCENTAGEM sobre a imagem: acompanha zoom, giro de
+   celular e mudança de largura sem uma linha de JavaScript recalculando. */
+.mg-pagina{
+  position:relative;
+  max-width:100%;
+  margin:0 auto var(--sp-4);
+  line-height:0;                      /* mata o vão que o inline-block cria */
+}
+.mg-img{
+  display:block;width:100%;height:auto;
+  border-radius:var(--radius);
+  background:var(--surface2);         /* enquanto carrega, não pisca branco */
+}
+.mg-camada{position:absolute;inset:0;line-height:normal}
+
+/* Cada balão. O `color:transparent` deixa a arte original aparecer; o
+   ::selection pintado é o que dá o retorno visual de "selecionei isto". */
+.mg-balao{
+  position:absolute;
+  display:flex;align-items:center;justify-content:center;
+  margin:0;padding:0;
+  color:transparent;
+  font-size:min(2.6vw, 15px);
+  text-align:center;
+  overflow:hidden;
+  cursor:text;
+  /* Sem isto o texto invisível transborda a caixa em telas estreitas e a
+     seleção passa a pegar palavra de balão vizinho. */
+  word-break:break-word;hyphens:auto;
+  -webkit-user-select:text;user-select:text;
+}
+.mg-balao::selection{background:rgba(var(--primary-rgb),.45);color:transparent}
+.mg-balao::-moz-selection{background:rgba(var(--primary-rgb),.45);color:transparent}
+
+/* Segurar o dedo/mouse sobre a página mostra onde há texto para pegar. Sem
+   esta dica o balão lido e o não lido são idênticos, e não há como saber se
+   vale tentar selecionar. */
+.mg-pagina:hover .mg-balao,
+.mg-pagina:focus-within .mg-balao{
+  box-shadow:inset 0 0 0 1.5px rgba(var(--primary-rgb),.30);
+  border-radius:10px;
+}
+
+.mg-aviso{
+  display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
+  margin:0 auto var(--sp-5);padding:var(--sp-3) var(--sp-4);
+  background:var(--surface2);border-radius:var(--radius);
+  font-size:var(--fs-sm);color:var(--text2);
+}
+.mg-aviso svg{flex:0 0 auto;opacity:.7}
+.mg-aviso-vazio{opacity:.55}
+.mg-aviso-erro{color:var(--role-urgente)}
+
+/* O botão de ler o volume inteiro. Em leitura ele vira "parar" — o mesmo
+   botão, porque são a mesma decisão. */
+#mg-lote.mg-lendo{color:var(--role-ia)}
+#mg-lote .spinner{width:13px;height:13px;border-width:2px;margin-right:5px}

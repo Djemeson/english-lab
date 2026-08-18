@@ -74,7 +74,7 @@ function renderLerSection() {
            onclick="lerEscolherArquivo()">
         <div class="upload-icon">${ic('book','ic-xl')}</div>
         <p><strong>Clique</strong> ou arraste um livro aqui</p>
-        <p>.epub · .txt · .html — o arquivo fica neste aparelho, não sobe para a nuvem</p>
+        <p>.epub · .cbz (mangá) · .txt · .html — o arquivo fica neste aparelho, não sobe para a nuvem</p>
       </div>
       <div class="ler-vazio-dica">
         <b>De onde tirar livros em inglês, de graça e legalmente:</b>
@@ -110,7 +110,7 @@ function renderLerSection() {
 function lerEscolherArquivo() {
   const inp = document.createElement('input')
   inp.type = 'file'
-  inp.accept = '.epub,.txt,.html,.htm,application/epub+zip,text/plain,text/html'
+  inp.accept = '.epub,.cbz,.txt,.html,.htm,application/epub+zip,application/vnd.comicbook+zip,text/plain,text/html'
   inp.multiple = true
   inp.onchange = () => lerImportar(inp.files)
   inp.click()
@@ -140,6 +140,15 @@ async function _lerImportarUm(file) {
 
   let meta
   if (ehZip) {
+    // ⚠️ CBZ TAMBÉM COMEÇA COM "PK". Decidir só pelos 4 primeiros bytes
+    // mandaria todo mangá para o parser de EPUB, que morreria procurando um
+    // `container.xml` que não existe — com uma mensagem sobre EPUB que não
+    // ajudaria ninguém. Quem decide é o CONTEÚDO, não a extensão: renomear
+    // .cbz para .zip é comum e continuaria funcionando.
+    const zipCru = await zipAbrir(buf)
+    if (mangaEhCbz(zipCru)) {
+      meta = await mangaMeta(zipCru, file.name)
+    } else {
     const ep = await epubAbrir(buf)
     // Contagem por capítulo AGORA: é ela que dá progresso honesto depois
     // (capítulo não tem tamanho igual — 1/12 não é 8% do livro).
@@ -152,6 +161,7 @@ async function _lerImportarUm(file) {
     meta = {
       title: ep.titulo, author: ep.autor, lang: ep.idioma, format: 'epub',
       chapters: caps, cover: await _lerCapaMiniatura(ep)
+    }
     }
   } else {
     const txt = new TextDecoder('utf-8').decode(buf)
@@ -277,7 +287,10 @@ async function lerAbrir(id) {
   const buf = await blob.arrayBuffer()
   try {
     if (l.format === 'epub') {
-      _lerEpub = await epubAbrir(buf)
+      const zipCru = await zipAbrir(buf)
+      _lerEpub = (livro.format === 'manga' || mangaEhCbz(zipCru))
+        ? { manga: await mangaAbrir(buf) }
+        : await epubAbrir(buf)
     } else {
       const txt = new TextDecoder('utf-8').decode(buf)
       const ehHtml = /^\s*(<!doctype html|<html)/i.test(txt)
@@ -347,6 +360,12 @@ function renderLeitor() {
   document.body.classList.add('lendo')
   const c = lerCfg()
 
+  // O botão só existe onde faz sentido: num mangá com página por ler. Num
+  // livro comum ele seria um botão morto na barra, e a barra já está cheia.
+  const _mgF = (typeof mangaFaltam === 'function') ? mangaFaltam(_lerLivro) : 0
+  const c_manga = _mgF
+    ? `<button class="ler-btn" id="mg-lote" onclick="mangaLerVolume()" data-tip="Ler os balões das ${_mgF} páginas que faltam — dá para parar no meio, o que já foi lido fica guardado">${ic('sparkles','ic-sm')}</button>`
+    : ''
   area.innerHTML = `
     <div class="ler-leitor" data-tema="${c.tema}" data-modo="${c.modo}">
       <div class="ler-barra">
@@ -355,6 +374,7 @@ function renderLeitor() {
           <span id="ler-cap-nome"></span>${ic('chevronDown','ic-sm')}
         </button>
         <div class="ler-barra-dir">
+          ${c_manga}
           <button class="ler-btn" onclick="lerToggle('conversa')" data-tip="Conversar com a ${escA(lexaNome())} sobre este livro — quem é quem, onde se passa, o que está acontecendo">${ic('message','ic-sm')}</button>
           <button class="ler-btn" onclick="lerToggle('ferramentas')" data-tip="Palavras deste capítulo, cobertura e pré-estudo">${ic('sparkles','ic-sm')}</button>
           <button class="ler-btn" onclick="lerToggle('tipografia')" data-tip="Tamanho, fonte, tema e largura da coluna"><b style="font-size:15px">Aa</b></button>
@@ -636,6 +656,7 @@ function _lerAplicarTipografia() {
 // CAPÍTULOS
 // ================================================================
 async function _lerHtmlDoCapitulo(i) {
+  if (_lerEpub.manga) return mangaHtmlDaPagina(_lerEpub.manga, _lerLivro, i)
   if (_lerEpub.txtCaps) return _lerEpub.txtCaps[i] ? _lerEpub.txtCaps[i].html : ''
   const c = _lerLivro.chapters[i]
   if (!c || !c.href) return ''
@@ -791,7 +812,14 @@ function _lerRenderSumario() {
 // Paginado = colunas CSS da altura da tela; "virar a página" é rolar a
 // viewport na horizontal. Rolagem = scroll vertical de sempre. A posição é
 // guardada como FRAÇÃO do capítulo, então sobrevive a mudar fonte/tamanho.
-function _lerPaginado() { return lerCfg().modo === 'pag' }
+// ⚠️ MANGÁ NUNCA É PAGINADO. O modo "página" corta o capítulo em colunas da
+// altura da tela; uma imagem de 1600x2400 não se deixa cortar assim — ficaria
+// uma tira vertical por coluna e "virar a página" pularia meia arte. No mangá
+// a página JÁ é a unidade: cada uma é um capítulo, e rolar é o gesto certo.
+function _lerPaginado() {
+  if (_lerLivro && _lerLivro.format === 'manga') return false
+  return lerCfg().modo === 'pag'
+}
 
 function _lerMedirPaginas() {
   const vp = el('ler-viewport'); if (!vp) return
@@ -1678,6 +1706,7 @@ function lerAnalisar(txt) {
 }
 
 async function _lerTextoDoCapitulo(i) {
+  if (_lerEpub.manga) return mangaTextoDaPagina(_lerLivro, i)
   if (_lerEpub.txtCaps) return epubTextoLimpo(_lerEpub.txtCaps[i]?.html || '')
   const c = _lerLivro.chapters[i]
   if (!c || !c.href) return ''

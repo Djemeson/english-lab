@@ -940,8 +940,10 @@ const _LAZY = {
   // adicionar = PACOTE: o leitor de SQLite vem antes porque add.js usa
   // sqliteAbrir() para ler o vocab.db do Kindle.
   adicionar: ['js/kindle-db.js', 'js/add.js'],
-  // ler = PACOTE: epub.js (formato, sem DOM da página) antes de ler.js (tela)
-  ler: ['js/epub.js', 'js/ler.js'],
+  // ler = PACOTE, e a ORDEM importa: epub.js traz o leitor de ZIP; manga.js o
+  // usa e é chamado por ler.js, que monta a tela. CBZ entra por esta mesma
+  // porta — mangá é uma obra da estante, não uma seção à parte.
+  ler: ['js/epub.js', 'js/manga.js', 'js/ler.js'],
   // revisar = SRS (study.js); estudar = os dossiês (dossie.js). Ver o mapa
   // acima de SECTIONS antes de mexer: os nomes trocaram de lugar.
   revisar: 'js/study.js', biblioteca: 'js/study.js',

@@ -1558,6 +1558,26 @@ function _aiFormato(modo, schema, nome) {
   return {}
 }
 
+// ================================================================
+// VISÃO — mandar uma IMAGEM e receber JSON
+// ================================================================
+// Os três fornecedores falam o mesmo dialeto aqui (o formato da OpenAI), então
+// isto é só o invólucro que monta a mensagem multimodal — quem chama, tenta os
+// modos de JSON e cai para o reserva continua sendo `aiJSON`.
+//
+// ⚠️ `maxTokens` FOLGADO de propósito. A resposta útil são ~250 tokens, mas os
+// modelos que raciocinam gastam do MESMO orçamento antes de escrever: se o
+// teto acaba no meio do raciocínio, volta `finish_reason: length` com conteúdo
+// VAZIO — paga-se a imagem inteira e não vem nada. Foi assim que a leitura do
+// capítulo morreu uma vez (ver comentário em `_aiRaciocina`). O teto é LIMITE,
+// não reserva: a folga não custa nada a quem não usa.
+async function aiVisaoJSON(pedido, base64, { maxTokens = 8000, model, timeoutMs = 90000, retries = 1, mime = 'image/jpeg' } = {}) {
+  return aiJSON([{ role: 'user', content: [
+    { type: 'text', text: pedido },
+    { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
+  ]}], { maxTokens, model, timeoutMs, retries })
+}
+
 async function aiJSON(messages, { maxTokens, model, timeoutMs, retries, schema, schemaNome } = {}) {
   const chat = aiChatCfg()
   if (!chat.key) throw new Error('Chave da ' + chat.P.nome + ' não configurada (Configurações → IA)')
