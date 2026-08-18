@@ -9991,6 +9991,52 @@ Sempre `scrollTo({ top: x, behavior: 'instant' })`.
 Sem conflito com os gestos que o leitor já tem (borda vira página, arrasto
 vira página): eles só agem no modo paginado, e mangá nunca é paginado.
 
+
+### 8.25 — Leitura adiantada da próxima página
+
+Ler ao CHEGAR na página era tarde: ~6 s olhando um balão mudo. Agora as duas
+páginas seguintes são lidas enquanto você ainda está na atual, e ao virar o
+texto já está lá.
+
+**Duas à frente, não dez.** O adiantamento gasta de verdade — o que for lido
+além do seu olho é dinheiro no lixo se você fechar o volume. Duas páginas são
+meio centavo de risco e cobrem a virada mais rápida que um leitor faz; dez
+seriam 3 centavos por parada e, pior, disputariam o limite de requisições com
+a página que você está tentando ver AGORA. Pelo mesmo motivo a fila é
+**sequencial**, nunca paralela.
+
+A fila confere a cada volta se você ainda está por perto: virar 20 páginas de
+uma vez a torna obsoleta, e insistir seria pagar por páginas já passadas.
+
+#### Dois defeitos, os dois só visíveis medindo
+
+**1. O adiantamento estava pendurado na TROCA de página.** A chamada ficava
+dentro do `if (a página mudou)`. Parado na página 1, nada era pedido; ao virar
+para a 2, a leitura começava do zero — exatamente o que o adiantamento existia
+para evitar. **Medido:** 17 s na página 1, só ela lida, e a 2 em branco ao
+virar. A chamada saiu do `if`.
+
+**2. A mesma página podia ser paga duas vezes.** A leitura automática dispara
+ao chegar; o adiantamento já tinha disparado segundos antes; nenhuma das duas
+terminou, e a checagem de "já lida" só pega quem JÁ acabou. Resolvido com
+`_mgLendo`, um conjunto de páginas em voo.
+
+⚠️ `_mgLendo` é declarado **no topo do arquivo**, de propósito: `let`/`const`
+têm zona morta temporal e este projeto já perdeu duas rodadas para esse
+tropeço (`_tituloVisto` e `popHist`, na extensão).
+
+#### Verificado no volume real, com todas as páginas zeradas antes
+
+| Momento | Páginas lidas |
+|---|---|
+| 6 s após abrir | **2** (1 e 2) |
+| 20 s | **3** (1, 2 e 3) — e parou, como deve |
+| Ao virar para a página 2 | **já estava pronta** |
+
+E a cadeia inteira até a tela: a página 4 (o resumo do volume) devolveu 50
+caixas de texto e as **50** apareceram como spans selecionáveis. As páginas
+1 a 3 voltaram com zero balões — corretas, são capa e créditos.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
