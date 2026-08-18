@@ -10438,6 +10438,42 @@ some e não há faixa nenhuma. Agora o corte sai do histograma da própria janel
 digital ele cai perto de 110 e nada muda. Se as populações quase se tocam, não
 há texto ali — volta o corte fixo, que ao menos falha de forma previsível.
 
+
+### 8.35 — O último balão, e a glosa que só fala do desconhecido
+
+#### A perseguição ao balão teimoso
+
+Sobrou **1 de 178**, e persegui-lo ensinou mais que resolvê-lo. Cada ajuste de
+constante resolvia um caso e fazia outro aparecer:
+
+| Ajuste | Resolveu | Revelou |
+|---|---|---|
+| Altura mínima da faixa: 35% → 20% | `OOGH ...` — os três pontos são linha de verdade, mas baixa | `WHAT?!` |
+| Teto de distância: 2,0 → 2,6 alturas | os pontos ficavam a 40 px com teto de 37 | — |
+| Teto de sanidade na altura mínima | a caixa de `WHAT?!` vinha com **30% da altura da página** para UMA palavra, e a exigência virava "faixa de 95 px ou nada" | a projeção então devolvia uma faixa de 30% da página |
+| Teto de 6% na faixa aceita | mancha contínua de tinta (cabelo preto, fundo hachurado) não é linha | — |
+| Caixa implausível encolhida na origem | linha acima de 6% da folha é caixa errada, não letra grande | — |
+
+⚠️ **A lição:** afrouxar um limite para caber um caso empurra o problema para o
+vizinho. Os limites que sobraram não são números escolhidos a esmo — cada um
+corresponde a um fato da página impressa (**nenhuma linha de mangá passa de 6%
+da folha**; reticências e vírgulas soltas são linhas legítimas e baixas).
+
+**Cobertura: 177 de 178 (99%).** O último alterna entre dois balões conforme o
+ajuste, e ambos são casos-limite de pontuação isolada. Nele o realce continua
+sendo a caixa do balão — folgada, mas funcional.
+
+#### A glosa no hover
+
+*"deve aparecer somente pro que eu não conheço"*. Palavra marcada como
+conhecida abria balão para dizer justamente "você marcou como conhecida" —
+informação que ele não pediu, atravessando a leitura de uma palavra que ele lê
+sem ajuda.
+
+O caminho de resgate continua existindo: pelo toque ou pela seleção, o painel
+mostra a mesma coisa com o "não lembro". **O hover é passivo, e o que é passivo
+não pode interromper.**
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
