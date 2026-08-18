@@ -6605,16 +6605,41 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   word-break:break-word;hyphens:auto;
   -webkit-user-select:text;user-select:text;
 }
+/* Quando as linhas vêm separadas, o contêiner não desenha nada: ele é só o
+   alvo do toque e o dono da fala inteira. Quem carrega o texto — e o realce —
+   são as faixas de dentro. */
+.mg-balao.mg-linhado{display:block;overflow:visible}
+.mg-linha{
+  position:absolute;
+  display:flex;align-items:center;justify-content:center;
+  margin:0;padding:0;
+  color:transparent;
+  /* `1` porque a caixa da linha JÁ é a altura da linha: qualquer entrelinha
+     extra faria o realce transbordar para cima e para baixo das letras. */
+  line-height:1;
+  white-space:nowrap;
+  overflow:hidden;
+  -webkit-user-select:text;user-select:text;
+}
+.mg-linha::selection{background:rgba(var(--primary-rgb),.45);color:transparent}
+.mg-linha::-moz-selection{background:rgba(var(--primary-rgb),.45);color:transparent}
 .mg-balao::selection{background:rgba(var(--primary-rgb),.45);color:transparent}
 .mg-balao::-moz-selection{background:rgba(var(--primary-rgb),.45);color:transparent}
 
 /* Segurar o dedo/mouse sobre a página mostra onde há texto para pegar. Sem
    esta dica o balão lido e o não lido são idênticos, e não há como saber se
    vale tentar selecionar. */
-.mg-pagina:hover .mg-balao,
-.mg-pagina:focus-within .mg-balao{
+.mg-pagina:hover .mg-balao:not(.mg-linhado),
+.mg-pagina:focus-within .mg-balao:not(.mg-linhado){
   box-shadow:inset 0 0 0 1.5px rgba(var(--primary-rgb),.30);
   border-radius:10px;
+}
+/* Com linhas, a dica acompanha cada uma — mostrar a caixa do balão inteiro
+   voltaria a sujar a arte, que é justamente o que se está corrigindo. */
+.mg-pagina:hover .mg-linhado .mg-linha,
+.mg-pagina:focus-within .mg-linhado .mg-linha{
+  box-shadow:inset 0 0 0 1px rgba(var(--primary-rgb),.22);
+  border-radius:4px;
 }
 
 .mg-aviso{

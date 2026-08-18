@@ -424,6 +424,13 @@ function renderLeitor() {
   // aparece dentro do popup de seleção (nenhum gesto novo; ver _lerAoSelecionar).
   if (typeof glossAtivar === 'function') {
     glossAtivar(vp, {
+      // No mangá o balão da glosa não pode nascer em cima da fala: o alvo tem
+      // várias linhas e o "acima do ponteiro" é o meio do próprio balão que
+      // se está lendo. Entregando o retângulo, o glossário o contorna.
+      evitar: () => {
+        const b = document.querySelector('#ler-conteudo .mg-balao:hover')
+        return b ? b.getBoundingClientRect() : null
+      },
       // Não reimplementa Explicar: seleciona a palavra e deixa o popup normal
       // abrir. Assim o botão da Lexa no balão entrega TUDO que a seleção
       // entrega (Explicar, Estudar, Ouvir, Imagens, Wikipédia, Web).

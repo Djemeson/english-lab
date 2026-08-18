@@ -719,8 +719,21 @@ function _glossMostrar(achado, x, y, opts, pos) {
   // acabar. Vão grande transforma "ir até o botão" em prova de pontaria.
   const larg = b.offsetWidth, alt = b.offsetHeight
   let px = Math.max(8, Math.min(x - larg / 2, window.innerWidth - larg - 8))
-  let py = y - alt - 6
-  if (py < 8) py = y + 18
+  let py
+  // ⚠️ ALVO QUE NÃO É UMA PALAVRA PRECISA SER CONTORNADO INTEIRO. Num livro o
+  // alvo é uma palavra e o balão cabe acima dela sem esconder nada que
+  // importe. No mangá o alvo é uma FALA de várias linhas: acima do ponteiro
+  // é exatamente onde está o resto da frase que se está lendo, e o balão
+  // tapava a leitura. Quem chama pode entregar o retângulo a evitar, e aqui
+  // ele é contornado por baixo — ou por cima, se embaixo não couber.
+  const fugir = (opts && typeof opts.evitar === 'function') ? opts.evitar() : null
+  if (fugir && fugir.height) {
+    py = fugir.bottom + 8
+    if (py + alt > window.innerHeight - 8) py = Math.max(8, fugir.top - alt - 8)
+  } else {
+    py = y - alt - 6
+    if (py < 8) py = y + 18
+  }
   b.style.left = Math.round(px) + 'px'
   b.style.top = Math.round(py) + 'px'
   _glossBalao = b

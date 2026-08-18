@@ -170,7 +170,8 @@ function mangaTocarBalao(elemento) {
 const MG_PEDIDO = `You are reading ONE page of an English-language manga/comic.
 
 Return ONLY JSON, no prose:
-{"balloons":[{"text":"...","box_2d":[ymin,xmin,ymax,xmax]}],"sfx":["..."]}
+{"balloons":[{"text":"...","box_2d":[ymin,xmin,ymax,xmax],
+  "lines":[{"text":"...","box_2d":[ymin,xmin,ymax,xmax]}]}],"sfx":["..."]}
 
 Rules:
 - One entry per SPEECH BALLOON (also thought balloons and caption boxes).
@@ -178,6 +179,8 @@ Rules:
   with single spaces. Keep punctuation and apostrophes. NEVER translate.
 - "box_2d": bounding box of the balloon's TEXT as [ymin, xmin, ymax, xmax],
   normalized to 0-1000.
+- "lines": one entry per PRINTED LINE of that balloon, in reading order, each
+  with a TIGHT box around that line's glyphs only — no balloon padding.
 - Order: natural reading order for this page.
 - "sfx": sound effects drawn OUTSIDE balloons. Text only, no boxes.
 - If the page has no dialogue at all, return {"balloons":[],"sfx":[]}.`
@@ -267,7 +270,29 @@ function _mgAplicar(livro, i, brutos, sfx) {
     // Caixa degenerada: o texto ficaria espremido num ponto e impossível de
     // acertar com o dedo. 1,2% de cada lado é o menor alvo de toque decente.
     if (w < 0.012 || h < 0.012) continue
-    bons.push({ t, x: +x.toFixed(4), y: +y.toFixed(4), w: +w.toFixed(4), h: +h.toFixed(4) })
+    // As LINHAS são o que dá precisão ao realce: sem elas o texto invisível é
+    // um bloco só e a seleção pinta a caixa inteira do balão. Com uma faixa
+    // por linha, o realce cai onde estão as letras.
+    const linhas = []
+    for (const l of (Array.isArray(b.lines) ? b.lines : [])) {
+      const lt = String((l && l.text) || (l && l.t) || '').replace(/\s+/g, ' ').trim()
+      const lc = _mgCaixa(l, escala)
+      if (!lt || !lc) continue
+      const lx = preso(lc.x, 0, 1), ly = preso(lc.y, 0, 1)
+      const lw = Math.min(1 - lx, Math.max(0, lc.w)), lh = Math.min(1 - ly, Math.max(0, lc.h))
+      if (lw < 0.008 || lh < 0.004) continue
+      linhas.push({ t: lt, x: +lx.toFixed(4), y: +ly.toFixed(4), w: +lw.toFixed(4), h: +lh.toFixed(4) })
+    }
+    const item = { t, x: +x.toFixed(4), y: +y.toFixed(4), w: +w.toFixed(4), h: +h.toFixed(4) }
+    // Só aceita as linhas se elas cobrirem o balão de verdade: um punhado de
+    // linhas soltas seria pior que a caixa única, porque parte da fala ficaria
+    // sem alvo nenhum e o toque simplesmente não pegaria.
+    if (linhas.length) {
+      const juntas = linhas.map(l => l.t).join(' ').replace(/\s+/g, ' ').toUpperCase()
+      const inteiro = t.replace(/\s+/g, ' ').toUpperCase()
+      if (juntas.length >= inteiro.length * 0.7) item.ls = linhas
+    }
+    bons.push(item)
   }
   const c = livro.chapters[i]
   c.baloes = bons
@@ -293,8 +318,16 @@ function _mgAplicar(livro, i, brutos, sfx) {
 // A lição: não é o formato mais legível que ganha, é aquele que o modelo foi
 // treinado a produzir. `x/y/w/h` continua aceito porque outros fornecedores o
 // usam — mas é o caminho alternativo, não o principal.
+// ⚠️ A CAIXA VEM ÀS VEZES DENTRO DE OUTRO ARRAY. Medido: o mesmo modelo
+// devolveu `box_2d: [[264,796,375,934]]` — uma lista de uma caixa — em vez de
+// `[264,796,375,934]`. Sem achatar, a validação recusa tudo e a página fica
+// sem nenhum balão, calada. Um `.flat()` resolve os dois formatos.
+function _mgAchatar(v) {
+  return Array.isArray(v) ? v.flat(2) : null
+}
+
 function _mgCaixa(b, escala) {
-  const cx = Array.isArray(b && b.box_2d) ? b.box_2d : (Array.isArray(b && b.box) ? b.box : null)
+  const cx = _mgAchatar(b && b.box_2d) || _mgAchatar(b && b.box)
   if (cx && cx.length === 4 && cx.every(v => typeof v === 'number' && isFinite(v))) {
     const [y1, x1, y2, x2] = cx.map(v => v / escala)
     return { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) }
@@ -322,7 +355,7 @@ function _mgCaixa(b, escala) {
 function _mgEscala(brutos) {
   let maior = 0
   for (const b of brutos || []) {
-    const cx = Array.isArray(b && b.box_2d) ? b.box_2d : (Array.isArray(b && b.box) ? b.box : null)
+    const cx = _mgAchatar(b && b.box_2d) || _mgAchatar(b && b.box)
     const vals = cx ? cx : [b.x, b.y, b.w, b.h, (b.x || 0) + (b.w || 0), (b.y || 0) + (b.h || 0)]
     for (const v of vals) {
       if (typeof v === 'number' && isFinite(v) && v > maior) maior = v
@@ -526,13 +559,37 @@ async function mangaHtmlDoVolume(mg, livro) {
   return '<div class="mg-fluxo" data-modo="' + escA(mangaZoom().modo) + '">' + paginas.join('') + '</div>'
 }
 
+// ⚠️ UMA FAIXA POR LINHA IMPRESSA, NÃO UM BLOCO POR BALÃO — e é isto que dá
+// precisão ao realce. Com um bloco só, o texto invisível se espalha pela
+// caixa inteira e a seleção pinta um retângulo do tamanho do balão desenhado
+// (ou maior), cobrindo a arte. Com uma faixa por linha, o realce cai sobre as
+// letras, como num livro.
+//
+// As linhas são posicionadas RELATIVAS AO BALÃO, não à página, para que o
+// contêiner continue sendo um elemento só: é ele que o toque seleciona, e é
+// dele que sai a fala inteira para a Lexa.
 function _mgCamadaHtml(c) {
   const baloes = Array.isArray(c && c.baloes) ? c.baloes : []
   return baloes.map((b, n) => {
     const est = 'left:' + (b.x * 100).toFixed(3) + '%;top:' + (b.y * 100).toFixed(3) + '%;' +
                 'width:' + (b.w * 100).toFixed(3) + '%;height:' + (b.h * 100).toFixed(3) + '%'
-    return '<span class="mg-balao" style="' + est + '" data-b="' + n +
-           '" onclick="mangaTocarBalao(this)">' + esc(b.t || '') + '</span>'
+    const abre = '<span class="mg-balao' + (b.ls && b.ls.length ? ' mg-linhado' : '') +
+                 '" style="' + est + '" data-b="' + n + '" onclick="mangaTocarBalao(this)">'
+    if (!b.ls || !b.ls.length) return abre + esc(b.t || '') + '</span>'
+    const corpo = b.ls.map(l => {
+      const lx = b.w ? (l.x - b.x) / b.w : 0
+      const ly = b.h ? (l.y - b.y) / b.h : 0
+      const lw = b.w ? l.w / b.w : 1
+      const lh = b.h ? l.h / b.h : 1
+      // A fonte sai da ALTURA REAL da linha na folha: `--mg-alt` é a altura da
+      // página em px e `l.h` a fração que a linha ocupa. Assim a faixa de
+      // realce tem a espessura da linha impressa, em qualquer zoom.
+      const estL = 'left:' + (lx * 100).toFixed(3) + '%;top:' + (ly * 100).toFixed(3) + '%;' +
+                   'width:' + (lw * 100).toFixed(3) + '%;height:' + (lh * 100).toFixed(3) + '%;' +
+                   'font-size:calc(var(--mg-alt, 1600px) * ' + l.h.toFixed(4) + ')'
+      return '<span class="mg-linha" style="' + estL + '">' + esc(l.t) + '</span>'
+    }).join('')
+    return abre + corpo + '</span>'
   }).join('\n')
 }
 
@@ -803,6 +860,11 @@ function mangaAplicarZoom() {
     larg = larguraVp
   }
   fluxo.style.setProperty('--mg-larg', Math.round(larg) + 'px')
+  // A altura da folha — é ela que dimensiona a fonte de cada linha, para a
+  // faixa de realce ter a espessura do texto impresso em qualquer zoom.
+  const propA = String(_mgProporcao(typeof _lerLivro !== 'undefined' ? _lerLivro : null)).split('/').map(parseFloat)
+  const razaoA = (propA[0] && propA[1]) ? propA[0] / propA[1] : 2 / 3
+  fluxo.style.setProperty('--mg-alt', Math.round(larg / razaoA) + 'px')
   // ⚠️ AMPLIAR SEM ROLAGEM LATERAL SERIA CORTAR A PÁGINA. A viewport do
   // leitor esconde o transbordo horizontal (é o que faz o modo paginado
   // funcionar); no mangá ampliado ela precisa deixar arrastar para o lado,
