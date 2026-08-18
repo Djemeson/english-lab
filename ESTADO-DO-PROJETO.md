@@ -10127,6 +10127,52 @@ ela. `flex-shrink:0`, fundo próprio e `z-index`.
 | Botão "Ler o volume" | presente | ausente |
 | Barra de zoom | presente e sem sobrepor o rodapé | ausente |
 
+
+### 8.28 — Quatro defeitos que só o uso encontra
+
+**1. "CALL NICOROBIN!!!"** — a fala selecionada juntava duas linhas numa
+palavra que não existe, e era isso que chegava à Lexa para explicar. Custou
+**duas** tentativas, e a segunda ensina algo:
+
+| Tentativa | Por que falhou |
+|---|---|
+| Espaço ENTRE os spans | Fica no DOM mas não na seleção: nó de texto entre elementos posicionados não gera caixa de layout, e a seleção ignora o que não é renderizado |
+| Espaço no FIM do span, com `nowrap` | O navegador trata espaço final como colapsável e não o renderiza — mesmo problema |
+| Espaço no fim do span, com **`white-space: pre`** | ✅ |
+
+**Medido nas três:** `textContent` dava 25 caracteres e a seleção, 24. A
+diferença de um caractere era o defeito inteiro.
+
+**2. O botão "Largura" acendia e ficava inerte.** Apertar estando já em
+largura não fazia nada, e não havia volta para o ajuste anterior — botão aceso
+que não responde parece travado. Agora tocar no que já está ativo **desfaz**:
+volta ao zoom de antes (o 140% que a pinça deixou, por exemplo). Sem estado
+anterior, cai no outro ajuste. O toque nunca é em vão.
+
+**3. O botão "Auto" sumia ao ser desligado.** `_mgBarraZoom` fazia
+`outerHTML = …`, que **destrói o nó no meio do próprio clique que o
+disparou** — o botão deixava de existir enquanto o navegador ainda tratava o
+evento dele. Agora troca só o conteúdo interno.
+
+**4. O realce aparecia deslocado sobre a arte.** Não era defeito de código: as
+páginas lidas antes de a caixa passar a envolver as linhas ficaram com as duas
+medidas discordando, e as linhas são posicionadas em porcentagem do balão.
+
+⚠️ **A união é conta pura — não precisa da IA.** `mangaCorrigirCaixas()`
+endireita o acervo inteiro na abertura, **de graça**. Sem isso a única saída
+seria reler o volume: 15 centavos e alguns minutos por algo que o aparelho
+resolve sozinho. Verificado estragando uma caixa de propósito (−0,02 em y,
++0,04 em h) e conferindo que a abertura a devolveu ao lugar.
+
+#### Verificado
+
+| O quê | Resultado |
+|---|---|
+| Fala selecionada | **2/2** — "Chapter 1005: DEMON CHILD", com o espaço |
+| Ajuste reversível | largura → página → **volta para largura** |
+| Botão Auto após desligar | **sobrevive e continua visível** |
+| Caixa antiga estragada de propósito | realinhada na abertura |
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
