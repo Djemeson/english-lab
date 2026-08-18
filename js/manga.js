@@ -170,16 +170,28 @@ function mangaAjustarLinhas(raiz) {
     const largura = pai.clientWidth
     // Sem layout ainda (página fora da tela): fica para a próxima passada.
     if (!largura) continue
+    t.style.letterSpacing = ''
     t.style.transform = ''
     const propria = t.offsetWidth
     if (!propria) continue
-    // ⚠️ O PISO PRECISA SER BAIXO. Medido: uma linha longa ("THE DREADED BIG
-    // MOM PIRATES") batia no piso de 0,3 e ainda transbordava 39% da faixa —
-    // e texto que transborda invade o realce da linha vizinha, que é o defeito
-    // que se está corrigindo. Encolher muito só deixa o texto invisível mais
-    // apertado; ele continua invisível. Transbordar, não: aparece na seleção.
-    const fator = Math.max(0.08, Math.min(4, largura / propria))
-    t.style.transform = 'scaleX(' + fator.toFixed(4) + ')'
+    // ⚠️ ESPAÇO ENTRE LETRAS, NÃO ESTICAMENTO. `scaleX` cobria a largura certa
+    // mas DEFORMA a letra — e agora que o balão acende no hover, esse texto
+    // deformado aparece na tela. Distribuindo a diferença entre os caracteres,
+    // a linha ocupa exatamente a largura da fala impressa e cada letra
+    // continua com a forma que a fonte desenhou.
+    const chars = Math.max(1, (t.textContent || '').length)
+    const folga = (largura - propria) / chars
+    // Sobra por caractere fica em `em` implícito via px — teto para não virar
+    // texto espaçado a esmo quando a leitura veio muito mais curta.
+    const espaco = Math.max(-2, Math.min(24, folga))
+    t.style.letterSpacing = espaco.toFixed(2) + 'px'
+    // O que o espaçamento não cobre (linha longa demais para a caixa) fica
+    // com o encolhimento — ali deformar é melhor que transbordar para o
+    // realce da linha vizinha.
+    const depois = t.offsetWidth
+    if (depois > largura + 1) {
+      t.style.transform = 'scaleX(' + Math.max(0.08, largura / depois).toFixed(4) + ')'
+    }
     pai.dataset.ok = '1'
     n++
   }
