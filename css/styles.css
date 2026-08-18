@@ -6601,6 +6601,16 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 .mg-img{
   display:block;width:100%;height:auto;
   border-radius:var(--radius);
+  /* ⚠️ `margin:0` NÃO É REDUNDANTE. O leitor dá `margin:1.2em auto` a toda
+     imagem dentro do texto — o respiro certo para uma ilustração no meio de
+     um parágrafo. Com a fonte de 19px isso vira **23 px**, e era o que
+     empurrava a página do mangá para baixo enquanto a camada de texto ficava
+     no topo: o realce aparecia exatamente 23 px (1,41% da folha) ACIMA das
+     letras, em TODAS as linhas. Foi o desalinhamento que ele viu três vezes.
+     Nenhuma medida do texto ou da caixa apontava para isto, porque o erro não
+     estava nos dados — estava no desenho. */
+  margin:0;
+  max-width:none;
 }
 /* A camada inteira é transparente: entre um balão e outro há uma quebra de
    linha (para o contexto da Lexa não sair grudado), e sem isto essa quebra
