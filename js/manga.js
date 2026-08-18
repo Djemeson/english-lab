@@ -173,9 +173,12 @@ function mangaAjustarLinhas(raiz) {
     t.style.transform = ''
     const propria = t.offsetWidth
     if (!propria) continue
-    // Teto e piso para não virar caricatura quando a leitura do texto veio
-    // maior ou menor que o desenho: 0,3x a 4x cobre o real e barra o absurdo.
-    const fator = Math.max(0.3, Math.min(4, largura / propria))
+    // ⚠️ O PISO PRECISA SER BAIXO. Medido: uma linha longa ("THE DREADED BIG
+    // MOM PIRATES") batia no piso de 0,3 e ainda transbordava 39% da faixa —
+    // e texto que transborda invade o realce da linha vizinha, que é o defeito
+    // que se está corrigindo. Encolher muito só deixa o texto invisível mais
+    // apertado; ele continua invisível. Transbordar, não: aparece na seleção.
+    const fator = Math.max(0.08, Math.min(4, largura / propria))
     t.style.transform = 'scaleX(' + fator.toFixed(4) + ')'
     pai.dataset.ok = '1'
     n++
