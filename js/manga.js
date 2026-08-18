@@ -217,6 +217,8 @@ async function mangaLerPagina(i, silencioso) {
   const b64 = await _mgBase64(bytes)
 
   if (!silencioso) _mgAviso(i, 'lendo a página…')
+  const selo = document.querySelector('.mg-selo[data-selo="' + i + '"]')
+  if (selo) { selo.disabled = true; selo.innerHTML = '<span class="spinner"></span> lendo…' }
   try {
     const resp = await aiVisaoJSON(MG_PEDIDO, b64)
     const brutos = Array.isArray(resp && resp.balloons) ? resp.balloons : []
@@ -241,6 +243,15 @@ async function mangaLerPagina(i, silencioso) {
     return false
   } finally {
     _mgLendo.delete(i)
+    // Se a leitura falhou, o selo tem de voltar ao que era — senão fica um
+    // "lendo…" eterno numa página que ninguém está lendo.
+    const s2 = document.querySelector('.mg-selo[data-selo="' + i + '"]')
+    if (s2 && !Array.isArray(livro.chapters[i].baloes)) {
+      s2.disabled = false
+      s2.innerHTML = ic('sparkles', 'ic-sm') + ' ler os balões'
+    } else if (s2) {
+      s2.remove()
+    }
   }
 }
 
@@ -570,6 +581,7 @@ async function mangaHtmlDoVolume(mg, livro) {
     paginas.push(
       '<div class="mg-pagina" data-pg="' + i + '" style="aspect-ratio:' + _mgProporcao(livro) + '">' +
         '<div class="mg-camada">' + _mgCamadaHtml(livro.chapters[i]) + '</div>' +
+        _mgSeloHtml(livro.chapters[i], i) +
         '<div class="mg-num">' + (i + 1) + '</div>' +
       '</div>'
     )
@@ -620,6 +632,20 @@ function _mgCamadaHtml(c) {
   }).join('\n')
 }
 
+// ⚠️ PÁGINA NÃO LIDA PRECISA DIZER QUE NÃO FOI LIDA. No fluxo contínuo eu
+// perdi o aviso que a versão de página única tinha, e o resultado foi o pior
+// silêncio possível: ele rolou o volume, achou páginas onde nada selecionava
+// e não tinha como saber por quê nem como pedir a leitura daquela página.
+// Com a leitura automática desligada, então, o volume simplesmente parava de
+// ganhar texto sem avisar.
+//
+// O selo fica no canto e some assim que a página é lida.
+function _mgSeloHtml(c, i) {
+  if (Array.isArray(c.baloes)) return ''
+  return '<button class="mg-selo" data-selo="' + i + '" onclick="mangaLerPagina(' + i + ')">' +
+         ic('sparkles', 'ic-sm') + ' ler os balões</button>'
+}
+
 // Redesenha a camada de UMA página, sem tocar na imagem nem na rolagem.
 // Depois de ler os balões, remontar o fluxo inteiro jogaria você para o
 // começo do volume — e é exatamente o momento em que você está lendo ali.
@@ -631,6 +657,8 @@ function mangaRepintarPagina(livro, i) {
   camada.innerHTML = _mgCamadaHtml(livro.chapters[i])
   const av = div.querySelector('.mg-aviso')
   if (av) av.remove()
+  const selo = div.querySelector('.mg-selo')
+  if (selo && Array.isArray(livro.chapters[i].baloes)) selo.remove()
   return true
 }
 
