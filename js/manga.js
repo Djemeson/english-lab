@@ -155,6 +155,34 @@ async function mangaHtmlDaPagina(mg, livro, i) {
 // Tocando, basta o balão estar mais ou menos onde está. E é o gesto que a
 // pessoa já faria: no mangá se lê balão a balão, não palavra a palavra.
 // Arrastar continua funcionando para quem quer só uma expressão.
+// Menor tamanho em que o texto aceso ainda se lê. Abaixo disso, quem cede é
+// a caixa — ver `_mgCrescerCaixa`.
+const MG_FONTE_MIN = 12
+
+// ⚠️ A CAIXA CRESCE, O TEXTO NÃO ENCOLHE MAIS. A varredura mostrou 92 textos
+// transbordando e 40 blocos com fonte ilegível, e os dois eram o MESMO
+// problema: caixa pequena demais para o que a IA leu. Encolher a fonte tem
+// limite — passado ele, o texto acende e continua sem se ler.
+//
+// A caixa é um alvo INVISÍVEL sobre a arte: aumentá-la não estraga nada, só
+// dá mais área para o dedo. Cresce a partir do CENTRO, para o texto continuar
+// sobre a linha impressa, e no máximo 2,2x — acima disso a caixa começaria a
+// cobrir a fala vizinha e o toque pegaria a errada.
+function _mgCrescerCaixa(pai, t, largura) {
+  const alturaAtual = pai.clientHeight
+  if (!alturaAtual) return
+  const precisa = t.scrollHeight
+  if (precisa <= alturaAtual + 1) return
+  const nova = Math.min(precisa + 2, alturaAtual * 2.2)
+  const cresceu = nova - alturaAtual
+  if (cresceu < 1) return
+  // O pai está posicionado em % dentro da página; crescer em px e subir
+  // metade do que cresceu mantém o centro no lugar.
+  pai.style.height = nova.toFixed(1) + 'px'
+  const topoAtual = parseFloat(getComputedStyle(pai).top) || 0
+  pai.style.top = (topoAtual - cresceu / 2).toFixed(1) + 'px'
+}
+
 // ⚠️ O REALCE TEM DE TER A LARGURA DA LETRA DESENHADA, NÃO A DA FONTE.
 // A faixa recebe a largura medida no pixel, mas o texto invisível dentro dela
 // é escrito na fonte do navegador — e "IT GALLS" em Inter não mede o mesmo
@@ -181,16 +209,20 @@ function mangaAjustarLinhas(raiz) {
       const alturaCaixa = pai.clientHeight
       if (!largura || !alturaCaixa) continue
       t.style.fontSize = ''
-      let tam = Math.max(9, Math.min(alturaCaixa * 0.9, 40))
+      let tam = Math.max(MG_FONTE_MIN, Math.min(alturaCaixa * 0.9, 40))
       t.style.fontSize = tam.toFixed(1) + 'px'
-      // Encolhe até caber: no máximo 12 passos, cada um 8% menor.
+      // Encolhe até caber, mas NUNCA abaixo do legível.
       for (let k = 0; k < 20 && (t.scrollHeight > alturaCaixa + 1 || t.scrollWidth > largura + 1); k++) {
+        if (tam * 0.92 < MG_FONTE_MIN) break
         tam *= 0.92
-        if (tam < 8) break
         t.style.fontSize = tam.toFixed(1) + 'px'
       }
-      // Se nem no menor tamanho coube, encolhe na horizontal — um bloco de
-      // resumo cortado pela metade é pior que um bloco um pouco estreito.
+      // ⚠️ AQUI A CAIXA CEDE, NÃO O TEXTO. Espremer a fonte tem limite: na
+      // página de resumo do volume dava 40 blocos com menos de 10 px, e texto
+      // que acende ilegível é o mesmo que não acender. Como a caixa é só um
+      // ALVO invisível sobre a arte, ela pode crescer — e crescer para os dois
+      // lados a partir do centro mantém o texto sobre a linha impressa.
+      _mgCrescerCaixa(pai, t, largura)
       if (t.scrollWidth > largura + 1) {
         t.style.transform = 'scaleX(' + Math.max(0.25, largura / t.scrollWidth).toFixed(4) + ')'
       }
@@ -220,7 +252,7 @@ function mangaAjustarLinhas(raiz) {
     // Piso de 11px: abaixo disso o texto acende e continua ilegível, que é o
     // mesmo que não acender. Antes o piso era 6 e a varredura achou linhas
     // com menos de 7px em três páginas.
-    const tamanho = Math.max(11, Math.min(base * (largura / propria), Math.max(11, alturaFaixa * 1.05)))
+    const tamanho = Math.max(MG_FONTE_MIN, Math.min(base * (largura / propria), Math.max(MG_FONTE_MIN, alturaFaixa * 1.05)))
     t.style.fontSize = tamanho.toFixed(2) + 'px'
     // O resíduo — quando o teto de altura impediu chegar à largura — vai para
     // o espaçamento, com limite curto para não voltar ao "I N   T H E".
@@ -237,6 +269,8 @@ function mangaAjustarLinhas(raiz) {
     // texto aceso, também aparece por cima da arte ao lado.
     // Aqui o encolhimento horizontal entra só no que sobrou: deformar um
     // pouco é melhor que vazar.
+    // A caixa cede antes do texto: cresce em altura até a fala caber.
+    _mgCrescerCaixa(pai, t, largura)
     const largoFinal = t.scrollWidth
     if (largoFinal > largura + 1) {
       t.style.transform = 'scaleX(' + Math.max(0.2, largura / largoFinal).toFixed(4) + ')'
