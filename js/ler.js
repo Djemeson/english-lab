@@ -811,7 +811,12 @@ async function lerIrParaCapitulo(i, frac = 0) {
   _lerAtualizarProgresso()
   // Imagem preguiçosa que carrega depois ainda empurra o texto: por alguns
   // segundos, qualquer chegada dessas devolve o leitor ao ponto certo.
-  _lerAlvoAte = Date.now() + 4000
+  // ⚠️ NO MANGÁ ESTA REDE VIRA ARMADILHA. Ela existe para o livro: imagem que
+  // chega empurra o texto, então por 4s qualquer chegada devolve o leitor ao
+  // ponto. No mangá TUDO é imagem e elas chegam o tempo todo — o leitor era
+  // puxado de volta a cada página carregada, e o salto pelo sumário não
+  // colava. Aqui a posição já tem dono: o número da página.
+  _lerAlvoAte = (_lerLivro && _lerLivro.format === 'manga') ? 0 : Date.now() + 4000
   cont.querySelectorAll('img').forEach(im => {
     if (im.complete) return
     im.addEventListener('load', () => {

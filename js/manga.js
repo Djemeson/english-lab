@@ -422,8 +422,24 @@ function mangaTextoDaPagina(livro, i) {
 // o volume todo, a memória tem meia dúzia de páginas.
 
 let _mgObs = null        // observador que carrega/descarrega as imagens
-let _mgObsPos = null     // observador que diz em que página você está
+let _mgAoRolar = null    // ouvinte que diz em que página você está
+let _mgRaf = 0           // trava de quadro, para não recalcular 60x por segundo
 let _mgMontado = null    // id do livro cujo fluxo já está na tela
+
+// A página que ocupa o meio da tela. O meio, e não o topo: rolando devagar,
+// o topo pertence à página que está SAINDO, e a barra ficaria sempre uma
+// atrás do que os olhos estão lendo.
+function _mgPaginaNoCentro() {
+  const vp = el('ler-viewport'), cont = el('ler-conteudo')
+  if (!vp || !cont) return -1
+  const meio = vp.getBoundingClientRect().top + vp.clientHeight / 2
+  const pgs = cont.querySelectorAll('.mg-pagina')
+  for (const d of pgs) {
+    const r = d.getBoundingClientRect()
+    if (r.top <= meio && r.bottom >= meio) return +d.dataset.pg
+  }
+  return -1
+}
 
 // Quanto a página ocupa. Guardado no livro na primeira medição: sem isto,
 // cada imagem que chega muda a altura do fluxo e a rolagem "pula" debaixo do
@@ -485,25 +501,29 @@ function mangaLigarFluxo(mg, livro) {
     }
   }, { root: raiz, rootMargin: '600px 0px' })
 
-  // Qual página está mais no meio da tela — é ela que a barra deve nomear.
-  _mgObsPos = new IntersectionObserver(entradas => {
-    if (_lerRestaurando) return
-    let melhor = null
-    for (const e of entradas) {
-      if (!e.isIntersecting) continue
-      if (!melhor || e.intersectionRatio > melhor.intersectionRatio) melhor = e
-    }
-    if (!melhor) return
-    const i = +melhor.target.dataset.pg
-    if (i === _lerCap) return
-    _lerCap = i
-    const nome = el('ler-cap-nome')
-    if (nome) nome.textContent = (livro.chapters[i] && livro.chapters[i].titulo) || ('Página ' + (i + 1))
-    if (typeof _lerAtualizarProgresso === 'function') _lerAtualizarProgresso()
-    if (mangaAuto()) mangaLerPagina(i, true).catch(() => {})
-  }, { root: raiz, threshold: [0.25, 0.6] })
+  // ⚠️ A PÁGINA CORRENTE SAI DA ROLAGEM, NÃO DE OBSERVADOR. A primeira versão
+  // usava um IntersectionObserver com limiares e a barra dizia "Página 14"
+  // com a rolagem em ZERO: com 28 elementos observados de uma vez, os
+  // disparos chegam fora de ordem e o "melhor" de um lote parcial não é o
+  // melhor da tela. Uma conta sobre `scrollTop` não tem esse problema — ela
+  // sempre descreve o AGORA.
+  _mgAoRolar = () => {
+    if (_mgRaf) return
+    _mgRaf = requestAnimationFrame(() => {
+      _mgRaf = 0
+      if (_lerRestaurando) return
+      const i = _mgPaginaNoCentro()
+      if (i < 0 || i === _lerCap) return
+      _lerCap = i
+      const nome = el('ler-cap-nome')
+      if (nome) nome.textContent = (livro.chapters[i] && livro.chapters[i].titulo) || ('Página ' + (i + 1))
+      if (typeof _lerAtualizarProgresso === 'function') _lerAtualizarProgresso()
+      if (mangaAuto()) mangaLerPagina(i, true).catch(() => {})
+    })
+  }
+  if (raiz) raiz.addEventListener('scroll', _mgAoRolar, { passive: true })
 
-  cont.querySelectorAll('.mg-pagina').forEach(d => { _mgObs.observe(d); _mgObsPos.observe(d) })
+  cont.querySelectorAll('.mg-pagina').forEach(d => _mgObs.observe(d))
   mangaAplicarZoom()
   // Duas passadas: a primeira pega o que já está na tela; a segunda cobre o
   // caso de o layout ainda estar assentando (imagem que chega muda alturas).
@@ -514,7 +534,10 @@ function mangaLigarFluxo(mg, livro) {
 
 function mangaDesligarFluxo() {
   if (_mgObs) { _mgObs.disconnect(); _mgObs = null }
-  if (_mgObsPos) { _mgObsPos.disconnect(); _mgObsPos = null }
+  const raiz = el('ler-viewport')
+  if (_mgAoRolar && raiz) raiz.removeEventListener('scroll', _mgAoRolar)
+  _mgAoRolar = null
+  if (_mgRaf) { cancelAnimationFrame(_mgRaf); _mgRaf = 0 }
   // Os blobs das páginas que ficaram carregadas precisam voltar, senão fechar
   // o volume não devolve a memória.
   document.querySelectorAll('#ler-conteudo .mg-pagina').forEach(_mgSoltarPagina)
@@ -588,8 +611,15 @@ function mangaGarantirVisiveis(mg, livro) {
 function mangaIrParaPagina(i, suave) {
   const cont = el('ler-conteudo'); if (!cont) return false
   const alvo = cont.querySelector('.mg-pagina[data-pg="' + i + '"]')
-  if (!alvo) return false
-  alvo.scrollIntoView({ block: 'start', behavior: suave ? 'smooth' : 'auto' })
+  const vp = el('ler-viewport')
+  if (!alvo || !vp) return false
+  // ⚠️ `scrollIntoView` NÃO SERVE AQUI. Medido: o salto para a página 20
+  // deixava a rolagem em 0 — ele escolhe sozinho qual ancestral rolar e, com
+  // imagens chegando e mudando alturas no mesmo instante, o resultado é
+  // imprevisível. `scrollTop` diz exatamente qual caixa rola e para onde.
+  const y = alvo.offsetTop - (cont.offsetTop || 0)
+  if (suave && vp.scrollTo) vp.scrollTo({ top: y, behavior: 'smooth' })
+  else vp.scrollTop = y
   // Saltar 40 páginas de uma vez não dá tempo ao observador: sem isto, o
   // sumário levava a uma tela vazia que só se enchia ao mexer na rolagem.
   if (typeof _lerEpub !== 'undefined' && _lerEpub && _lerEpub.manga) {
