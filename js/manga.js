@@ -1416,7 +1416,12 @@ function _mgAfinarBalao(ctx, cv, b) {
     if ((!tem || y === H - 1) && ini >= 0) {
       const fim = tem ? y : y - 1
       // Faixa fina demais para ser uma linha de texto: descarta.
-      if (fim - ini >= Math.max(3, alturaMedia * cv.height * 0.35)) faixas.push([ini, fim])
+      // ⚠️ 0,20 E NÃO 0,35. O último balão que resistia era "OOGH ...": os três
+      // pontos são uma linha impressa de verdade, mas BAIXA — não chegavam a
+      // 35% da altura média e eram descartados como ruído. Reticências,
+      // vírgulas soltas e o coração do balão são linhas legítimas e todas
+      // pequenas. O piso absoluto de 3 px continua barrando sujeira real.
+      if (fim - ini >= Math.max(3, alturaMedia * cv.height * 0.20)) faixas.push([ini, fim])
       ini = -1
     }
   }
@@ -1450,7 +1455,10 @@ function _mgAfinarBalao(ctx, cv, b) {
     // Teto de 2 alturas de linha: com 1,2 os balões cuja caixa o modelo errou
     // por mais de uma linha eram descartados inteiros, e é justamente neles
     // que a medição por pixel mais vale.
-    if (melhor < 0 || dist > alturaMedia * cv.height * 2.0) return false
+    // 2,6 alturas: o mesmo "OOGH ..." tinha os pontos a 40 px com teto de 37 —
+    // perdia por três pixels. A fusão protege o excesso: linha que cai na
+    // faixa da vizinha vira uma só, em vez de apontar para o lugar errado.
+    if (melhor < 0 || dist > alturaMedia * cv.height * 2.6) return false
     escolhidas.push(melhor)
     ultima = melhor
   }
