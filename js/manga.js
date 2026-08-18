@@ -604,7 +604,14 @@ function _mgCamadaHtml(c) {
                    'width:' + (lw * 100).toFixed(3) + '%;height:' + (lh * 100).toFixed(3) + '%;' +
                    'font-size:calc(var(--mg-alt, 1600px) * ' + l.h.toFixed(4) + ')'
       return '<span class="mg-linha" style="' + estL + '">' + esc(l.t) + '</span>'
-    }).join('')
+  // ⚠️ O ESPAÇO ENTRE AS LINHAS NÃO É ENFEITE — é o mesmo defeito que já
+  // apareceu ENTRE balões, agora DENTRO de um. Sem ele os spans são irmãos
+  // colados e a fala selecionada sai "CALL NICOROBIN!!!": duas linhas viram
+  // uma palavra que não existe, e é isso que a Lexa recebe para explicar.
+  //
+  // O espaço é um nó de texto solto na camada, e a camada inteira é
+  // transparente — ele não desenha nada.
+    }).join(' ')
     return abre + corpo + '</span>'
   }).join('\n')
 }
@@ -845,8 +852,26 @@ function mangaZoom() {
   return { modo: z.modo || 'largura', fator: +z.fator || 1 }
 }
 
+// ⚠️ BOTÃO QUE ACENDE PRECISA PODER APAGAR. Ele apertou "Largura" estando já
+// em largura e nada aconteceu: um botão aceso e inerte parece travado, e não
+// havia caminho de volta para o ajuste anterior. Agora tocar no que já está
+// ativo DESFAZ — volta ao zoom de antes (o de 140% que a pinça deixou, por
+// exemplo). Sem estado anterior, cai no outro ajuste, para o toque nunca ser
+// em vão.
+let _mgZoomAnterior = null
+
 function mangaDefinirZoom(modo, fator) {
-  cfg.mgZoom = { modo, fator: Math.max(0.4, Math.min(4, +fator || 1)) }
+  const atual = mangaZoom()
+  if (atual.modo === modo && modo !== 'livre') {
+    const volta = _mgZoomAnterior && _mgZoomAnterior.modo !== modo
+      ? _mgZoomAnterior
+      : { modo: modo === 'largura' ? 'altura' : 'largura', fator: 1 }
+    _mgZoomAnterior = atual
+    cfg.mgZoom = { modo: volta.modo, fator: Math.max(0.4, Math.min(4, +volta.fator || 1)) }
+  } else {
+    _mgZoomAnterior = atual
+    cfg.mgZoom = { modo, fator: Math.max(0.4, Math.min(4, +fator || 1)) }
+  }
   saveCfg()
   mangaAplicarZoom()
   _mgBarraZoom()
@@ -920,9 +945,18 @@ function mangaBarraHtml() {
   '</div>'
 }
 
+// ⚠️ NÃO TROCAR O ELEMENTO. `outerHTML = …` destrói o nó no meio do próprio
+// clique que o disparou — o botão que você acabou de apertar deixa de existir
+// enquanto o navegador ainda está tratando o evento dele. Foi o que fez o
+// "Auto" sumir da tela ao ser desligado. Trocando só o CONTEÚDO, o elemento
+// (e o clique em andamento) sobrevivem.
 function _mgBarraZoom() {
   const b = el('mg-barra')
-  if (b) b.outerHTML = mangaBarraHtml()
+  if (!b) return
+  const molde = document.createElement('div')
+  molde.innerHTML = mangaBarraHtml()
+  const nova = molde.firstElementChild
+  if (nova) b.innerHTML = nova.innerHTML
 }
 
 // ---------------------------------------------------------------
