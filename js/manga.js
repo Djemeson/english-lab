@@ -1196,8 +1196,12 @@ function _mgAfinarBalao(ctx, cv, b) {
   // A busca começa na região que o modelo apontou, ESTICADA: ele erra por
   // menos de uma linha, e sem folga a linha certa ficaria de fora justamente
   // no caso que se quer consertar. Uma linha inteira de margem, dos dois lados.
-  const y0 = Math.max(0, b.y - alturaMedia * 1.1)
-  const y1 = Math.min(1, b.y + b.h + alturaMedia * 1.1)
+  // ⚠️ FOLGA CURTA. Com uma linha inteira de margem dos dois lados, a janela
+  // quase DOBRAVA e engolia as falas de cima e de baixo: onde havia 2 linhas,
+  // a projeção achava 4. Meia linha basta para cobrir o desvio do modelo (que
+  // erra por menos de uma linha) sem convidar a vizinhança.
+  const y0 = Math.max(0, b.y - alturaMedia * 0.55)
+  const y1 = Math.min(1, b.y + b.h + alturaMedia * 0.55)
   const x0 = Math.max(0, b.x - b.w * 0.10)
   const x1 = Math.min(1, b.x + b.w + b.w * 0.10)
 
@@ -1237,14 +1241,33 @@ function _mgAfinarBalao(ctx, cv, b) {
     }
   }
 
-  // ⚠️ SÓ TROCA SE O NÚMERO BATER. Se a projeção achou 3 faixas onde a IA leu
-  // 2 linhas, alguma coisa não é o que se pensa — um balão vizinho entrou na
-  // janela, ou uma linha se partiu. Casar na marra embaralharia o texto entre
-  // posições erradas, que é pior do que a imprecisão que se está corrigindo.
-  if (faixas.length !== b.ls.length) return false
+  if (!faixas.length) return false
 
-  for (let k = 0; k < faixas.length; k++) {
-    const [fy0, fy1] = faixas[k]
+  // ⚠️ CASAR POR PROXIMIDADE, NÃO POR CONTAGEM. Exigir que o número de faixas
+  // batesse com o de linhas fazia o conserto desistir sempre que uma sobra da
+  // vizinhança entrava na janela — e era o caso comum. Aqui cada linha lida
+  // procura a faixa cujo CENTRO está mais perto do seu, sem repetir faixa e
+  // sem voltar atrás na ordem: a leitura é de cima para baixo, e uma linha
+  // nunca cai acima da anterior.
+  const centros = faixas.map(([a, z]) => (a + z) / 2)
+  const escolhidas = []
+  let ultima = -1
+  for (const l of b.ls) {
+    const alvo = ((l.y + l.h / 2) - y0) * cv.height
+    let melhor = -1, dist = Infinity
+    for (let k = ultima + 1; k < faixas.length; k++) {
+      const d = Math.abs(centros[k] - alvo)
+      if (d < dist) { dist = d; melhor = k }
+    }
+    // Longe demais para ser a mesma linha: melhor não mexer do que apontar
+    // para o texto errado.
+    if (melhor < 0 || dist > alturaMedia * cv.height * 1.2) return false
+    escolhidas.push(melhor)
+    ultima = melhor
+  }
+
+  for (let k = 0; k < escolhidas.length; k++) {
+    const [fy0, fy1] = faixas[escolhidas[k]]
     // Onde a linha começa e termina na horizontal — a largura real das letras.
     let cx0 = W, cx1 = -1
     for (let y = fy0; y <= fy1; y++) {
