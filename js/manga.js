@@ -499,6 +499,11 @@ function mangaLigarFluxo(mg, livro) {
       if (e.isIntersecting) _mgCarregarPagina(mg, livro, e.target)
       else _mgSoltarPagina(e.target)
     }
+    // A barra também sai daqui. ⚠️ MEDIDO: o evento `scroll` da viewport do
+    // leitor NÃO chega — zero disparos com a rolagem mudando de posição na
+    // mesma medição. Este observador, por outro lado, dispara sempre, e com
+    // a granularidade certa: uma vez por página que entra ou sai.
+    _mgAtualizarBarra(livro)
   }, { root: raiz, rootMargin: '600px 0px' })
 
   // ⚠️ A PÁGINA CORRENTE SAI DA ROLAGEM, NÃO DE OBSERVADOR. A primeira versão
@@ -507,21 +512,14 @@ function mangaLigarFluxo(mg, livro) {
   // disparos chegam fora de ordem e o "melhor" de um lote parcial não é o
   // melhor da tela. Uma conta sobre `scrollTop` não tem esse problema — ela
   // sempre descreve o AGORA.
+  // O ouvinte de rolagem entra como REFORÇO, no `document` em fase de captura
+  // — rolagem de elemento não borbulha, e no elemento ela não chegava. Se
+  // funcionar, a barra fica mais fluida; se não, o observador acima cobre.
   _mgAoRolar = () => {
     if (_mgRaf) return
-    _mgRaf = requestAnimationFrame(() => {
-      _mgRaf = 0
-      if (_lerRestaurando) return
-      const i = _mgPaginaNoCentro()
-      if (i < 0 || i === _lerCap) return
-      _lerCap = i
-      const nome = el('ler-cap-nome')
-      if (nome) nome.textContent = (livro.chapters[i] && livro.chapters[i].titulo) || ('Página ' + (i + 1))
-      if (typeof _lerAtualizarProgresso === 'function') _lerAtualizarProgresso()
-      if (mangaAuto()) mangaLerPagina(i, true).catch(() => {})
-    })
+    _mgRaf = requestAnimationFrame(() => { _mgRaf = 0; _mgAtualizarBarra(livro) })
   }
-  if (raiz) raiz.addEventListener('scroll', _mgAoRolar, { passive: true })
+  document.addEventListener('scroll', _mgAoRolar, { passive: true, capture: true })
 
   cont.querySelectorAll('.mg-pagina').forEach(d => _mgObs.observe(d))
   mangaAplicarZoom()
@@ -534,8 +532,7 @@ function mangaLigarFluxo(mg, livro) {
 
 function mangaDesligarFluxo() {
   if (_mgObs) { _mgObs.disconnect(); _mgObs = null }
-  const raiz = el('ler-viewport')
-  if (_mgAoRolar && raiz) raiz.removeEventListener('scroll', _mgAoRolar)
+  if (_mgAoRolar) document.removeEventListener('scroll', _mgAoRolar, { capture: true })
   _mgAoRolar = null
   if (_mgRaf) { cancelAnimationFrame(_mgRaf); _mgRaf = 0 }
   // Os blobs das páginas que ficaram carregadas precisam voltar, senão fechar
@@ -605,6 +602,20 @@ function mangaGarantirVisiveis(mg, livro) {
     if (perto && !div.querySelector('img')) { _mgCarregarPagina(mg, livro, div); n++ }
   }
   return n
+}
+
+// A barra de cima, o progresso e a leitura automática — tudo o que depende de
+// "em que página estou". Sai de uma conta sobre a geometria, nunca de estado
+// acumulado: assim nenhum disparo perdido deixa a barra mentindo.
+function _mgAtualizarBarra(livro) {
+  if (typeof _lerRestaurando !== 'undefined' && _lerRestaurando) return
+  const i = _mgPaginaNoCentro()
+  if (i < 0 || i === _lerCap) return
+  _lerCap = i
+  const nome = el('ler-cap-nome')
+  if (nome) nome.textContent = (livro.chapters[i] && livro.chapters[i].titulo) || ('Página ' + (i + 1))
+  if (typeof _lerAtualizarProgresso === 'function') _lerAtualizarProgresso()
+  if (mangaAuto()) mangaLerPagina(i, true).catch(() => {})
 }
 
 // Rola até uma página — o que "ir para o capítulo" virou no mangá.
