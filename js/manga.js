@@ -290,7 +290,23 @@ function _mgAplicar(livro, i, brutos, sfx) {
     if (linhas.length) {
       const juntas = linhas.map(l => l.t).join(' ').replace(/\s+/g, ' ').toUpperCase()
       const inteiro = t.replace(/\s+/g, ' ').toUpperCase()
-      if (juntas.length >= inteiro.length * 0.7) item.ls = linhas
+      if (juntas.length >= inteiro.length * 0.7) {
+        item.ls = linhas
+        // ⚠️ A CAIXA DO BALÃO PASSA A SER A UNIÃO DAS LINHAS. O modelo não
+        // garante coerência entre as duas medidas: MEDIDO, um balão veio com
+        // caixa de 53 px de altura e DUAS linhas de 37 px cada dentro — 74 px
+        // em 53. Como as linhas são posicionadas em porcentagem do balão,
+        // elas transbordavam e o realce voltava a ser um bloco.
+        // Envolvendo, as duas medidas passam a contar a mesma história.
+        const x1 = Math.min(...linhas.map(l => l.x))
+        const y1 = Math.min(...linhas.map(l => l.y))
+        const x2 = Math.max(...linhas.map(l => l.x + l.w))
+        const y2 = Math.max(...linhas.map(l => l.y + l.h))
+        item.x = +x1.toFixed(4)
+        item.y = +y1.toFixed(4)
+        item.w = +(x2 - x1).toFixed(4)
+        item.h = +(y2 - y1).toFixed(4)
+      }
     }
     bons.push(item)
   }
