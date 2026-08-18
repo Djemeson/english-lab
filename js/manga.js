@@ -613,11 +613,22 @@ function mangaGarantirVisiveis(mg, livro) {
   const rv = vp.getBoundingClientRect()
   if (!rv.height) return 0                 // aba oculta: medir aqui daria 0
   const folga = 600
+  // ⚠️ SOLTAR TEM FOLGA MAIOR QUE CARREGAR, de propósito. Com o mesmo limite,
+  // uma página parada exatamente na borda entraria e sairia a cada varredura
+  // — carrega, solta, carrega — e o leitor piscaria sem parar. A margem de
+  // 1200 px cria a zona morta que impede esse vaivém.
+  const folgaSolta = 1200
   let n = 0
   for (const div of cont.querySelectorAll('.mg-pagina')) {
     const r = div.getBoundingClientRect()
-    const perto = r.bottom > rv.top - folga && r.top < rv.bottom + folga
-    if (perto && !div.querySelector('img')) { _mgCarregarPagina(mg, livro, div); n++ }
+    const temImg = !!div.querySelector('img')
+    if (r.bottom > rv.top - folga && r.top < rv.bottom + folga) {
+      if (!temImg) { _mgCarregarPagina(mg, livro, div); n++ }
+    } else if (temImg && (r.bottom < rv.top - folgaSolta || r.top > rv.bottom + folgaSolta)) {
+      // A memória volta aqui mesmo que o observador não tenha rodado — e ele
+      // não roda em aba de segundo plano.
+      _mgSoltarPagina(div)
+    }
   }
   return n
 }
