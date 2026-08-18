@@ -10355,6 +10355,45 @@ novo" e cada tentativa era uma chamada paga. Arquivo abaixo de 512 bytes agora
 teve confiança e preferiu manter a caixa do modelo a apontar para o texto
 errado. Nesses o realce continua sendo a caixa do balão.
 
+
+### 8.33 — Fora os contornos, e os 27 teimosos medidos
+
+#### O contorno era o problema, não o alinhamento
+
+Ele mandou prints do **mokuro** pedindo "exatamente assim": o texto do mangá
+aparece normal, e ao passar o mouse fica selecionável — **sem marcador na
+silhueta**.
+
+⚠️ **Os retângulos roxos que ele fotografou TRÊS VEZES eram a minha "dica de
+onde dá para selecionar"** — um `box-shadow` no hover —, não o realce da
+seleção. Passei três rodadas caçando desalinhamento nos dados por causa de um
+enfeite que eu mesmo desenhei. A dica valia muito menos que o incômodo.
+
+A arte é a página; o texto sobreposto é ferramenta invisível, e ferramenta
+invisível não desenha nada por cima do desenho. Quem mostra onde há texto é o
+cursor e o realce ao selecionar.
+
+#### Os 27 que a medição recusava
+
+Todos falhavam por "faixas esgotadas" ou "casamento longe", e as duas causas
+apareceram medindo:
+
+| Causa | O que era | Conserto |
+|---|---|---|
+| **Faixas esgotadas** (12 casos) | A IA separa `!!!`, `...` e `♡` como linha própria, mas na página isso é a MESMA linha impressa — 2 linhas lidas para 1 faixa | Uma faixa pode receber várias linhas; as que caem na mesma são fundidas, com os textos juntos |
+| **Casamento longe** (15 casos) | A projeção FUNDIA as linhas: medido, **cinco linhas viraram uma faixa só**. Corte fixo de 1,5% da largura funciona com vão branco e falha quando as linhas se tocam | Limiar relativo — a fileira precisa de 18% da tinta da fileira mais cheia DAQUELE balão. O vão volta a ser vale mesmo sem chegar a zero. E o teto de distância subiu de 1,2 para 2,0 alturas de linha |
+
+#### Resultado
+
+| Medida | Antes | Agora |
+|---|---|---|
+| Balões medidos no pixel | 151 de 178 | **177 de 178** |
+| Cobertura | 85% | **99%** |
+| Texto preservado na fusão | — | **intacto em todos** |
+
+Exemplos do que a fusão produziu, com o texto inteiro: `I SEE YOU | NEED MORE |
+DISCIPLINE | !!!` e `SEALED | STORE- | ROOM, | INSIDE THE | DOME`.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
