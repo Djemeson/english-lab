@@ -9798,6 +9798,61 @@ aparelho e entram na conta da nuvem.
 Custo já medido (§8.19): **R$ 0,96 por volume de 180 páginas**, com 7/7 de
 acerto no modelo mais barato.
 
+
+### 8.21 — Mangá: o CBZ virou obra da estante, com o balão selecionável
+
+**Mangá não é uma seção nova — é uma obra do leitor.** Cada página é um
+capítulo; o texto de cada balão vai POR CIMA da imagem, transparente,
+posicionado em porcentagem.
+
+⚠️ **A decisão que fez o recurso ser barato:** o leitor usa a seleção NATIVA do
+navegador. Texto de verdade sobre a imagem faz seleção → Lexa → card funcionar
+**sem uma linha a mais**, e traz destaque, progresso e procedência junto. Uma
+tela própria teria custado tudo isso de novo.
+
+#### Onde eu errei, e o que a medição mostrou
+
+| Tentativa | O que aconteceu |
+|---|---|
+| Pedir a caixa em fração (0 a 1) | O Gemini devolveu **0–1000** e o texto caiu fora do balão: **0% de sobreposição** com o texto 7/7 certo |
+| Pedir `x, y, w, h` em 0–1000 | A altura vinha de **2x a 5x** a real (0,424 onde o certo era 0,079); centro fora do balão em 4 de 7 |
+| Pedir `box_2d: [ymin,xmin,ymax,xmax]` | Centro dentro do balão em **7 de 7** |
+
+**A lição:** não ganha o formato mais legível, ganha **aquele que o modelo foi
+treinado a produzir**. `box_2d` em 0–1000 é a convenção nativa do Gemini.
+
+E ainda assim a caixa **OSCILA entre chamadas** — 7 centros certos numa, 5 na
+seguinte, mesmo código e mesma página. Por isso **um toque no balão seleciona a
+fala inteira**: basta o balão estar mais ou menos onde está. É também o gesto
+natural (em mangá se lê balão a balão), e arrastar continua valendo para pegar
+só uma expressão.
+
+#### Verificado ao vivo, com a chave dele
+
+| O quê | Resultado |
+|---|---|
+| Texto dos balões | **7/7**, em toda chamada |
+| Toque seleciona a fala daquele balão | **7/7** |
+| Caixa cai sobre texto (medido por PIXEL) | **7/7** — 68–75% branco de balão, 16–22% de letra; controle em área vazia deu 0% |
+| Nenhum texto fora da imagem | 0 de 7 vazando |
+| Regressão: EPUB com imagem dentro | **não** é confundido com mangá |
+
+#### Armadilhas resolvidas de propósito
+
+- **CBZ também começa com "PK"**: quem decide é o CONTEÚDO (`META-INF/container.xml`),
+  não a extensão — renomear .cbz para .zip continua funcionando.
+- **Ordenação numérica**: sem ela `pagina-10` vem antes de `pagina-2`.
+- **`__MACOSX` filtrado**: duplicaria cada página do volume.
+- **Mangá nunca é paginado**: a coluna do modo "página" cortaria a arte ao meio.
+- **Uma chamada por página**, retomável; o lote vai de 2 em 2 e pode parar no meio.
+- **Estudar e reparo de procedência**: mangá não decodifica o CBZ como texto —
+  o texto dele já são os balões guardados. Sem isso, o Estudar leria lixo binário.
+- **`temperature: 0`** na visão, e ela NÃO é enviada a modelo que raciocina
+  (esses recusam temperatura diferente de 1).
+
+**Peças novas:** `js/manga.js` (LAZY, no pacote de `ler`, entre epub.js e
+ler.js) e `aiVisaoJSON()` em ai.js.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que

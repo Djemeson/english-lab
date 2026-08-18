@@ -3129,9 +3129,14 @@ async function reparoExecutar({ simular = true, aoAndar = null } = {}) {
     // dizia "não achei" para um livro que estava ali inteiro.
     let ep = null, txtCaps = null
     try {
-      const buf = await blob.arrayBuffer()
-      if (livro.format === 'epub') ep = await epubAbrir(buf)
+      // Mangá: o texto de cada página são os balões já lidos, e eles já estão
+      // aqui — nada de decodificar o CBZ como se fosse texto.
+      if (livro.format === 'manga') {
+        txtCaps = (livro.chapters || []).map((c, n) => ({ html: esc(mangaTextoDaPagina(livro, n)) }))
+      }
+      else if (livro.format === 'epub') ep = await epubAbrir(await blob.arrayBuffer())
       else {
+        const buf = await blob.arrayBuffer()
         const txt = new TextDecoder('utf-8').decode(buf)
         const ehHtml = /^\s*(<!doctype html|<html)/i.test(txt)
         txtCaps = textoParaCapitulos(ehHtml ? epubTextoLimpo(txt) : txt)
@@ -3301,8 +3306,16 @@ async function _obrAbrir(livro) {
   let blob = await BookDB.get(livro.id)
   if (!blob && typeof livroGarantirLocal === 'function') blob = await livroGarantirLocal(livro.id)
   if (!blob) throw new Error('o arquivo do livro não está neste aparelho nem na sua nuvem')
-  const buf = await blob.arrayBuffer()
   let dados
+  // ⚠️ MANGÁ NÃO PASSA POR AQUI PARA LER O ARQUIVO. O texto dele já está
+  // guardado nos balões de cada página — abrir o CBZ não daria texto nenhum,
+  // e cair no ramo `else` decodificaria um ZIP binário como UTF-8: lixo puro,
+  // que o Estudar tomaria por "o que o livro diz".
+  if (livro.format === 'manga') {
+    _obrLivro.set(livro.id, { manga: true, nCaps: (livro.chapters || []).length })
+    return _obrLivro.get(livro.id)
+  }
+  const buf = await blob.arrayBuffer()
   if (livro.format === 'epub') {
     const ep = await epubAbrir(buf)
     dados = { ep, nCaps: (livro.chapters || []).length }
@@ -3322,7 +3335,8 @@ async function obraTextoCap(livro, i) {
   let t = ''
   try {
     const d = await _obrAbrir(livro)
-    if (d.txtCaps) t = _repEspacos(epubTextoLimpo((d.txtCaps[i] || {}).html || ''))
+    if (d.manga) t = _repEspacos(mangaTextoDaPagina(livro, i))
+    else if (d.txtCaps) t = _repEspacos(epubTextoLimpo((d.txtCaps[i] || {}).html || ''))
     else {
       const c = (livro.chapters || [])[i]
       const html = c && c.href ? await d.ep.zip.texto(c.href) : ''
