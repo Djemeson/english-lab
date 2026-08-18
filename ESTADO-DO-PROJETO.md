@@ -10037,6 +10037,60 @@ E a cadeia inteira até a tela: a página 4 (o resumo do volume) devolveu 50
 caixas de texto e as **50** apareceram como spans selecionáveis. As páginas
 1 a 3 voltaram com zero balões — corretas, são capa e créditos.
 
+
+### 8.26 — Realce na linha do texto, e a glosa que tapava a fala
+
+Duas queixas dele: *"o balão de seleção aparece imenso, do tamanho ou maior
+que o balão de texto, mas quero preciso, na silhueta do texto"* e *"o balão
+da Lexa que aparece quando passa o mouse já atrapalhou a visão do texto"*.
+
+#### 1. Uma faixa por LINHA IMPRESSA
+
+O texto invisível era um bloco único por balão: espalhado pela caixa inteira,
+a seleção pintava um retângulo do tamanho do balão desenhado — ou maior.
+Agora a IA devolve também as **linhas**, cada uma com caixa própria, e cada
+linha vira uma faixa selecionável.
+
+A fonte de cada faixa sai da **altura real da linha na folha**
+(`--mg-alt` × a fração da linha), então a espessura do realce acompanha o
+texto impresso em qualquer zoom. `line-height: 1` porque a caixa JÁ é a
+altura da linha — entrelinha extra faria o realce transbordar as letras.
+
+**Medido na página 7 do volume dele:**
+
+| Balão | Faixas | Realce antes | Realce agora | Ganho |
+|---|---|---|---|---|
+| "I JUST NEED YOU TO CALL HER HERE!!" | 5 | 148×171 px | 5 faixas de 26–31 px de altura | **35% menor** |
+| "CALL NICO ROBIN!!!" | 2 | 210×86 px | 2 faixas de 34–37 px | **22% menor** |
+
+E as larguras acompanham cada linha (110, 86, 148, 147, 114 px na primeira),
+em vez de um retângulo único. **Zero transbordo** nos dois.
+
+⚠️ **Duas armadilhas do modelo, ambas silenciosas:**
+
+1. **`box_2d` às vezes vem dentro de outro array** — `[[264,796,375,934]]`.
+   Sem achatar, a validação recusa tudo e a página fica calada, sem nenhum
+   balão e sem erro.
+2. **A caixa do balão e as das linhas não são coerentes entre si.** Medido:
+   caixa de 53 px de altura com DUAS linhas de 37 px dentro — 74 em 53. Como
+   as linhas são posicionadas em porcentagem do balão, elas transbordavam e o
+   realce voltava a ser um bloco. Agora, havendo linhas, **a caixa do balão
+   vira a união delas**: as duas medidas passam a contar a mesma história.
+
+As linhas só são aceitas se cobrirem ≥70% da fala. Um punhado de linhas
+soltas seria pior que a caixa única — parte do texto ficaria sem alvo e o
+toque simplesmente não pegaria.
+
+#### 2. A glosa deixou de nascer em cima da fala
+
+O balão do glossário nasce **sempre acima do ponteiro**. Num livro isso cobre
+a linha anterior e não incomoda; no mangá o alvo tem várias linhas, e "acima
+do ponteiro" é exatamente onde está o resto da frase que se está lendo.
+
+`glossAtivar` aceita agora um `evitar`, que devolve o retângulo do alvo; o
+balão o contorna por baixo, ou por cima se embaixo não couber. Verificado: com
+a fala ocupando 171 px, a glosa se posiciona fora dela — antes cairia no meio.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
