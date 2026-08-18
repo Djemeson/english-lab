@@ -163,7 +163,7 @@ async function mangaHtmlDaPagina(mg, livro, i) {
 function mangaAjustarLinhas(raiz) {
   const alvo = raiz || document.getElementById('ler-conteudo')
   if (!alvo) return 0
-  const linhas = alvo.querySelectorAll('.mg-linha:not([data-ok]) > .mg-t')
+  const linhas = alvo.querySelectorAll('.mg-linha:not([data-ok]) > .mg-t, .mg-balao:not([data-ok]) > .mg-t-solo')
   let n = 0
   for (const t of linhas) {
     const pai = t.parentElement
@@ -187,7 +187,10 @@ function mangaAjustarLinhas(raiz) {
     // Teto pela ALTURA da faixa: fonte maior que a linha impressa transbordaria
     // para cima e para baixo, invadindo a linha vizinha.
     const alturaFaixa = pai.clientHeight || base
-    const tamanho = Math.max(6, Math.min(base * (largura / propria), alturaFaixa * 1.05))
+    // Piso de 11px: abaixo disso o texto acende e continua ilegível, que é o
+    // mesmo que não acender. Antes o piso era 6 e a varredura achou linhas
+    // com menos de 7px em três páginas.
+    const tamanho = Math.max(11, Math.min(base * (largura / propria), Math.max(11, alturaFaixa * 1.05)))
     t.style.fontSize = tamanho.toFixed(2) + 'px'
     // O resíduo — quando o teto de altura impediu chegar à largura — vai para
     // o espaçamento, com limite curto para não voltar ao "I N   T H E".
@@ -729,7 +732,13 @@ function _mgCamadaHtml(c) {
                 'width:' + (b.w * 100).toFixed(3) + '%;height:' + (b.h * 100).toFixed(3) + '%'
     const abre = '<span class="mg-balao' + (b.ls && b.ls.length ? ' mg-linhado' : '') +
                  '" style="' + est + '" data-b="' + n + '" onclick="mangaTocarBalao(this, event)">'
-    if (!b.ls || !b.ls.length) return abre + esc(b.t || '') + '</span>'
+    // ⚠️ BALÃO SEM LINHAS TAMBÉM PRECISA DO FILHO AJUSTÁVEL. Sem ele o texto
+    // fica com a fonte fixa do CSS (min(2.6vw,15px)) — e ao acender no hover
+    // aparecia uma letrinha perdida no meio do balão, ou nada visível. Foi o
+    // "várias páginas não acontece nada ao passar o mouse".
+    if (!b.ls || !b.ls.length) {
+      return abre + '<i class="mg-t mg-t-solo">' + esc(b.t || '') + '</i></span>'
+    }
     const corpo = b.ls.map(l => {
       const lx = b.w ? (l.x - b.x) / b.w : 0
       const ly = b.h ? (l.y - b.y) / b.h : 0
