@@ -131,15 +131,14 @@ async function mangaHtmlDaPagina(mg, livro, i) {
 const MG_PEDIDO = `You are reading ONE page of an English-language manga/comic.
 
 Return ONLY JSON, no prose:
-{"balloons":[{"text":"...","x":0.0,"y":0.0,"w":0.0,"h":0.0}],"sfx":["..."]}
+{"balloons":[{"text":"...","box_2d":[ymin,xmin,ymax,xmax]}],"sfx":["..."]}
 
 Rules:
 - One entry per SPEECH BALLOON (also thought balloons and caption boxes).
 - "text": the dialogue exactly as printed. Join broken lines into one sentence
   with single spaces. Keep punctuation and apostrophes. NEVER translate.
-- x, y, w, h: the balloon's bounding box in the 0-1000 normalized scale,
-  where x,y is the TOP-LEFT corner and 1000 is the full page width/height.
-  Be tight around the TEXT, not around the drawing.
+- "box_2d": bounding box of the balloon's TEXT as [ymin, xmin, ymax, xmax],
+  normalized to 0-1000.
 - Order: natural reading order for this page.
 - "sfx": sound effects drawn OUTSIDE balloons. Text only, no boxes.
 - If the page has no dialogue at all, return {"balloons":[],"sfx":[]}.`
@@ -195,10 +194,16 @@ function _mgAplicar(livro, i, brutos, sfx) {
   for (const b of brutos) {
     const t = String((b && b.t) || (b && b.text) || '').replace(/\s+/g, ' ').trim()
     if (!t) continue
-    let x = preso(num(b.x, 0) / escala, 0, 1)
-    let y = preso(num(b.y, 0) / escala, 0, 1)
-    let w = preso(num(b.w, 0) / escala, 0, 1)
-    let h = preso(num(b.h, 0) / escala, 0, 1)
+    const cx = _mgCaixa(b, escala)
+    if (!cx) continue
+    let { x, y, w, h } = cx
+    x = preso(x, 0, 1); y = preso(y, 0, 1); w = preso(w, 0, 1); h = preso(h, 0, 1)
+    // Uma folga pequena em volta: a caixa do modelo é justa no TEXTO, e um
+    // alvo colado nas letras é difícil de pegar com o dedo. 1,5% de cada lado
+    // cobre a borda do balão sem chegar no vizinho.
+    const fx = Math.min(0.015, w * 0.12), fy = Math.min(0.015, h * 0.18)
+    x = Math.max(0, x - fx); y = Math.max(0, y - fy)
+    w = Math.min(1 - x, w + fx * 2); h = Math.min(1 - y, h + fy * 2)
     if (x + w > 1) w = 1 - x
     if (y + h > 1) h = 1 - y
     // Caixa degenerada: o texto ficaria espremido num ponto e impossível de
@@ -219,6 +224,29 @@ function _mgAplicar(livro, i, brutos, sfx) {
   livro.updatedAt = Date.now()
 }
 
+// A caixa, venha ela no formato que vier.
+//
+// ⚠️ PEDIR `x, y, w, h` FOI ERRO MEU. Medido: com esse formato a altura vinha
+// entre 2x e **5x** a real (h 0,424 onde o certo era 0,079) — o modelo mistura
+// largura/altura com as bordas e o resultado oscila balão a balão. Trocado por
+// `box_2d: [ymin, xmin, ymax, xmax]` em 0–1000, que é a convenção NATIVA do
+// Gemini para caixa, o centro passou a cair dentro do balão em **7 de 7**.
+//
+// A lição: não é o formato mais legível que ganha, é aquele que o modelo foi
+// treinado a produzir. `x/y/w/h` continua aceito porque outros fornecedores o
+// usam — mas é o caminho alternativo, não o principal.
+function _mgCaixa(b, escala) {
+  const cx = Array.isArray(b && b.box_2d) ? b.box_2d : (Array.isArray(b && b.box) ? b.box : null)
+  if (cx && cx.length === 4 && cx.every(v => typeof v === 'number' && isFinite(v))) {
+    const [y1, x1, y2, x2] = cx.map(v => v / escala)
+    return { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) }
+  }
+  if (typeof b.x === 'number' && typeof b.w === 'number') {
+    return { x: b.x / escala, y: (b.y || 0) / escala, w: b.w / escala, h: (b.h || 0) / escala }
+  }
+  return null
+}
+
 // ⚠️ O MODELO NÃO USA A ESCALA QUE VOCÊ PEDIR. Pedi caixa em fração (0 a 1) e
 // o Gemini devolveu `x:211, y:95, w:341, h:80` — a escala 0–1000, que é a
 // convenção interna dele para caixas. O texto vinha 7/7 CERTO e as caixas com
@@ -236,7 +264,9 @@ function _mgAplicar(livro, i, brutos, sfx) {
 function _mgEscala(brutos) {
   let maior = 0
   for (const b of brutos || []) {
-    for (const v of [b.x, b.y, b.w, b.h, (b.x || 0) + (b.w || 0), (b.y || 0) + (b.h || 0)]) {
+    const cx = Array.isArray(b && b.box_2d) ? b.box_2d : (Array.isArray(b && b.box) ? b.box : null)
+    const vals = cx ? cx : [b.x, b.y, b.w, b.h, (b.x || 0) + (b.w || 0), (b.y || 0) + (b.h || 0)]
+    for (const v of vals) {
       if (typeof v === 'number' && isFinite(v) && v > maior) maior = v
     }
   }
