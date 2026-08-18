@@ -834,8 +834,16 @@ function _mgPincaMove(ev) {
   // conteúdo cresce a partir do topo e a cena que você estava olhando
   // escapa da tela — a sensação é a de que o leitor "fugiu" do dedo.
   const k = larg1 / larg0
-  vp.scrollTop = (vp.scrollTop + _mgPinca.cy) * k - _mgPinca.cy
-  vp.scrollLeft = (vp.scrollLeft + _mgPinca.cx) * k - _mgPinca.cx
+  // ⚠️ `scrollTop = …` DE NOVO NÃO SERVE. A viewport tem `scroll-behavior:
+  // smooth`, e sob ele cada atribuição vira uma animação — durante a pinça
+  // são dezenas por segundo, cada uma cancelando a anterior, e a rolagem
+  // simplesmente não sai do lugar. MEDIDO: o conteúdo dobrava de tamanho e o
+  // `scrollTop` continuava exatamente em 4000, com o ponto sob os dedos
+  // escorregando 4,5% da página. `behavior:'instant'` é o que vence o CSS.
+  const alvoY = (vp.scrollTop + _mgPinca.cy) * k - _mgPinca.cy
+  const alvoX = (vp.scrollLeft + _mgPinca.cx) * k - _mgPinca.cx
+  if (vp.scrollTo) vp.scrollTo({ top: alvoY, left: alvoX, behavior: 'instant' })
+  else { vp.scrollTop = alvoY; vp.scrollLeft = alvoX }
 }
 
 function _mgPincaFim(ev) {
