@@ -168,6 +168,26 @@ function mangaAjustarLinhas(raiz) {
   for (const t of linhas) {
     const pai = t.parentElement
     const largura = pai.clientWidth
+    // ⚠️ BLOCO QUE QUEBRA SE AJUSTA PELA ALTURA, não pela largura. Num texto
+    // de várias linhas a largura natural é a da linha mais longa, e casar por
+    // ela deixaria o bloco transbordando por baixo. Aqui a fonte cresce até o
+    // bloco encher a caixa e para.
+    if (t.classList.contains('mg-t-solo')) {
+      const alturaCaixa = pai.clientHeight
+      if (!largura || !alturaCaixa) continue
+      t.style.fontSize = ''
+      let tam = Math.max(9, Math.min(alturaCaixa * 0.9, 40))
+      t.style.fontSize = tam.toFixed(1) + 'px'
+      // Encolhe até caber: no máximo 12 passos, cada um 8% menor.
+      for (let k = 0; k < 12 && (t.scrollHeight > alturaCaixa + 1 || t.scrollWidth > largura + 1); k++) {
+        tam *= 0.92
+        if (tam < 8) break
+        t.style.fontSize = tam.toFixed(1) + 'px'
+      }
+      pai.dataset.ok = '1'
+      n++
+      continue
+    }
     // Sem layout ainda (página fora da tela): fica para a próxima passada.
     if (!largura) continue
     t.style.letterSpacing = ''

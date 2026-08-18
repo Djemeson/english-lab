@@ -6672,9 +6672,17 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 /* O texto vive neste filho, que é esticado por JS até a largura da letra
    desenhada. `transform-origin:left` para o esticamento crescer para a
    direita a partir do começo da linha, e não para os dois lados. */
-/* Balão sem linhas separadas: o texto ocupa a caixa inteira e é ajustado
-   pelo mesmo caminho das linhas. */
-.mg-t-solo{max-width:100%}
+/* ⚠️ BALÃO SEM LINHAS SEPARADAS QUEBRA O TEXTO. São os blocos que a IA
+   devolveu inteiros — na página de resumo do volume, caixas de 7% a 21% da
+   folha com um parágrafo dentro. Forçados numa linha só, o texto saía da
+   caixa e a fonte tinha de encolher até ficar ilegível. Deixando quebrar,
+   ele preenche o bloco como o original faz. */
+.mg-t-solo{
+  max-width:100%;
+  white-space:normal;
+  text-align:center;
+  line-height:1.15;
+}
 .mg-t{
   display:inline-block;
   transform-origin:left center;
