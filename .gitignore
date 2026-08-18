@@ -1,31 +1,29 @@
-# Dependências
-node_modules/
 
-# Build local (o deploy do GitHub Pages publica a raiz, não o dist)
-dist/
-
-# Segredos — a chave da OpenAI vive no navegador (localStorage/IndexedDB),
-# nunca em arquivo. Estes existem só para quem rodar um servidor próprio.
-.env
-.env.local
-.env.*.local
 
 # Backups exportados pelo app (Configurações → Exportar JSON)
-# ⚠️ O NOME REAL DO ARQUIVO É `english-lab-AAAA-MM-DD.json` (settings.js), e os
-# dois padrões abaixo NÃO o cobriam — um backup largado aqui entraria no commit
-# com as CHAVES DE API dentro, porque o export leva o `cfg` inteiro.
-english-lab-*.json
-language-lab-*.json
-english-lab-backup*.json
-language-lab-backup*.json
-
+# Build local (o deploy do GitHub Pages publica a raiz, não o dist)
+# Dependências
 # Material de teste que ele me empresta (livro, legenda, vocab.db do Kindle)
-_dados-de-teste/
-
+# Segredos — a chave da OpenAI vive no navegador (localStorage/IndexedDB),
 # Sistema operacional / editores
-Thumbs.db
-Desktop.ini
-.DS_Store
+# com as CHAVES DE API dentro, porque o export leva o `cfg` inteiro.
+# dois padrões abaixo NÃO o cobriam — um backup largado aqui entraria no commit
+# nunca em arquivo. Estes existem só para quem rodar um servidor próprio.
+# ⚠️ O NOME REAL DO ARQUIVO É `english-lab-AAAA-MM-DD.json` (settings.js), e os
 *.swp
-.vscode/
+.DS_Store
+.env
+.env.*.local
+.env.local
 .idea/
+.vscode/
+Desktop.ini
+Thumbs.db
+_dados-de-teste/
+_dados-de-teste/
+dist/
+english-lab-*.json
+english-lab-backup*.json
+language-lab-*.json
+language-lab-backup*.json
+node_modules/

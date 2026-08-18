@@ -9712,6 +9712,45 @@ primeira medição voltou "VAZIO" em todos os temas com o arquivo novo já no
 disco. Só `?v=Date.now()` trouxe a versão nova. Para medir CSS ao vivo, use
 sempre a URL com parâmetro.
 
+
+### 8.19 — Mangá: custo e acerto MEDIDOS de verdade
+
+Antes de construir qualquer coisa, medimos numa página de mangá em inglês de
+tamanho real (1600x2400, 7 balões, gabarito conhecido, com onomatopeia fora de
+balão para tentar confundir). Rodado no Chrome dele, com a chave do próprio app.
+
+**Resultado com `gemini-3.5-flash-lite`:**
+
+| Medida | Valor |
+|---|---|
+| Balões lidos corretamente | **7 de 7** |
+| Onomatopeia | pegou (`KRAAASH!`), separada dos balões |
+| Tokens | 1163 entrada + 249 saída |
+| Tempo | 2,5 s por página |
+| Custo | **R$ 0,0053 por página** |
+
+Extrapolado: capítulo de 20 páginas **R$ 0,11**; volume de 180 páginas
+**R$ 0,96**; coleção de 20 volumes **R$ 19,23** (dólar a R$ 5,50).
+
+⚠️ **O modelo mais barato acertou 100%** — não foi preciso subir de faixa. O
+que fracassa em mangá é o OCR clássico (abaixo de 30% em página inteira), não
+o modelo de visão.
+
+**Descoberta paralela, e é um defeito real do app:** os TRÊS modelos Gemini que
+o app oferece (`gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro`)
+retornam **404** na conta dele — "no longer available to new users". Quem
+escolher Gemini nas configurações hoje não consegue analisar nada. Os que
+existem são a linha 3.x (`gemini-3.5-flash-lite`, `gemini-3.5-flash`,
+`gemini-3.6-flash`, `gemini-3.7-flash`, `gemini-3.1-pro-preview`) mais os
+apelidos que nunca envelhecem: `gemini-flash-latest` e `gemini-flash-lite-latest`.
+
+**Ferramentas novas:** `tools/ocr-custo.mjs` (mede pela API, pede chave no
+`.env`) e `tools/ocr-custo-calc.mjs` (calcula pela regra oficial de cobrança de
+imagem, sem gastar). A página de teste ficou em `_dados-de-teste/`.
+
+⚠️ A conta **OpenAI está sem créditos** — foi o primeiro caminho tentado e
+morreu em "no credits remaining". Por isso a medição saiu pelo Gemini.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
