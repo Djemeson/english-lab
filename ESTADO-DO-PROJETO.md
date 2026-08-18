@@ -10173,6 +10173,48 @@ resolve sozinho. Verificado estragando uma caixa de propósito (−0,02 em y,
 | Botão Auto após desligar | **sobrevive e continua visível** |
 | Caixa antiga estragada de propósito | realinhada na abertura |
 
+
+### 8.29 — A posição das linhas vem da IMAGEM, não do modelo
+
+O print dele mostrou o que nenhum dos meus testes pegava: as caixas vinham
+**meia linha acima** do texto, de forma consistente. Um teste de "tem tinta
+embaixo?" não flagra isso — uma caixa deslocada meia linha ainda acerta parte
+das letras e passa com 36%. Só o olho viu.
+
+⚠️ **Pedir precisão de pixel a um modelo de visão é pedir a coisa errada a
+quem faz outra.** Ele lê o que está escrito — isso a imagem não sabe fazer.
+Onde o texto está, porém, a tinta responde melhor que qualquer modelo.
+
+**Como funciona agora:** a página é lida como pixels e cada linha impressa é
+encontrada por **projeção horizontal** — somando os pixels escuros de cada
+fileira, as linhas viram picos e os vãos entre elas viram vales. Determinístico,
+sem custo de chamada, alinhado no pixel. O texto continua vindo da IA.
+
+#### Duas correções, ambas descobertas medindo
+
+| Erro | O que a medição mostrou |
+|---|---|
+| Janela de busca com uma linha de folga de cada lado | Ela quase **dobrava** e engolia as falas vizinhas: onde havia 2 linhas, a projeção achava **4** (faixas em 0-37, 44-83, 94-130, 140-172). Reduzida para meia linha. |
+| Exigir que o número de faixas batesse com o de linhas | O conserto **desistia sempre** que uma sobra da vizinhança entrava na janela — `afinou: 0`. Trocado por casamento pelo centro mais próximo, sem repetir faixa e sem voltar na ordem. |
+
+Se a faixa mais próxima estiver a mais de uma altura de linha, o balão inteiro
+é deixado como está: **melhor não mexer do que apontar para o texto errado**.
+
+#### Verificado em 3 páginas do volume dele
+
+| Medida | Resultado |
+|---|---|
+| Linhas medidas no pixel | **39 de 43** (as 4 restantes ficam com a caixa do modelo, por segurança) |
+| Tinta DENTRO da faixa | **34%** em média |
+| Tinta nas bordas (logo acima e logo abaixo) | **1%** em média |
+| Bordas limpas (≤8%) | **75 de 78** |
+
+Antes do conserto as bordas tinham **18% e 31%** — a faixa invadia o vão entre
+as linhas. Agora ela começa e termina onde as letras começam e terminam.
+
+As páginas lidas antes disto são medidas quando entram na tela: a imagem já
+foi decodificada ali, é a hora mais barata. Uma vez por página, com carimbo.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
