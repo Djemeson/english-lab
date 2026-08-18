@@ -9853,6 +9853,45 @@ só uma expressão.
 **Peças novas:** `js/manga.js` (LAZY, no pacote de `ler`, entre epub.js e
 ler.js) e `aiVisaoJSON()` em ai.js.
 
+
+### 8.22 — Mangá no volume REAL: dois defeitos que só o uso pegou
+
+Ele subiu *One Piece Vol 100* e a tela encheu de caracteres quebrados. Dois
+defeitos, e os dois passaram pelos meus testes.
+
+**1. A abertura só aceitava `epub`.** O CBZ, com formato `manga`, caía no ramo
+que decodifica o arquivo como UTF-8 — um ZIP lido como letra.
+
+⚠️ **Por que não apareceu antes:** eu tinha exercitado as FUNÇÕES soltas
+(detectar, montar metadados, desenhar a página) e nunca a **abertura pelo app**.
+**Testar a peça não é testar o caminho.** A importação funcionava — o livro
+estava na estante com formato `manga` e 28 páginas certas —, só abrir quebrava.
+
+**2. As falas iam grudadas para a Lexa.** O contexto saía
+`"CALL HER HERE!!CALL NICO ROBIN!!!"`: os balões são spans irmãos colados e o
+texto vizinho vinha sem separação. Resolvido com quebra de linha entre eles, e
+`color:transparent` na camada para a quebra não sujar a arte.
+
+#### Verificado no volume dele, no Chrome, com a chave dele
+
+| O quê | Resultado |
+|---|---|
+| Volume abre | 28 páginas, 1067x1600, ordem correta, 0,3 s |
+| Falas da página 7 | **as duas**, exatas: *"I JUST NEED YOU TO CALL HER HERE!!"* e *"CALL NICO ROBIN!!!"* |
+| Onomatopeias separadas das falas | `GRP..!!`, `SLIP...`, `CREAK..` — fora dos balões, como devem |
+| Toque no balão | seleciona a fala daquele balão, nos dois |
+| Painel da Lexa | abre com **Explicar** e **Estudar/Salvar frase**, a ~70 px do balão |
+| Texto dentro da imagem | 2 de 2, nada vazando |
+| Tempo de leitura | 6,6 s por página |
+
+⚠️ **A conta OpenAI está sem crédito** e era o provedor ativo — a primeira
+tentativa morreu em "no credits remaining". **O app foi trocado para Gemini**
+(`gemini-flash-lite-latest`), e é com ele que os números acima foram medidos.
+
+De brinde: o título saía `One Piece   Vol 100` com três espaços — o hífen
+cercado de espaços virava mais um espaço. Corrigido na origem e no livro que
+já estava na estante dele.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
