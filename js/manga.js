@@ -632,6 +632,42 @@ function mangaRepintarPagina(livro, i) {
   return true
 }
 
+// ⚠️ CONSERTA O QUE JÁ ESTÁ SALVO, SEM GASTAR UMA LEITURA. As páginas lidas
+// antes de a caixa passar a envolver as linhas ficaram com as duas medidas
+// discordando — e como as linhas são posicionadas em porcentagem do balão,
+// o realce aparecia DESLOCADO sobre a arte. Foi o que ele viu na tela.
+//
+// A união é conta pura, não precisa da IA: dá para arrumar o acervo inteiro
+// na abertura, de graça. Sem isto, a única saída seria reler o volume — 15
+// centavos e alguns minutos por algo que o aparelho resolve sozinho.
+function mangaCorrigirCaixas(livro) {
+  if (!livro || livro.format !== 'manga') return 0
+  let mexeu = 0
+  for (const c of livro.chapters || []) {
+    if (!Array.isArray(c.baloes)) continue
+    for (const b of c.baloes) {
+      if (!b.ls || !b.ls.length) continue
+      const x1 = Math.min(...b.ls.map(l => l.x))
+      const y1 = Math.min(...b.ls.map(l => l.y))
+      const x2 = Math.max(...b.ls.map(l => l.x + l.w))
+      const y2 = Math.max(...b.ls.map(l => l.y + l.h))
+      const nx = +x1.toFixed(4), ny = +y1.toFixed(4)
+      const nw = +(x2 - x1).toFixed(4), nh = +(y2 - y1).toFixed(4)
+      // 0,3% de tolerância: arredondamento não é motivo para reescrever tudo.
+      if (Math.abs(b.x - nx) > 0.003 || Math.abs(b.y - ny) > 0.003 ||
+          Math.abs(b.w - nw) > 0.003 || Math.abs(b.h - nh) > 0.003) {
+        b.x = nx; b.y = ny; b.w = nw; b.h = nh
+        mexeu++
+      }
+    }
+  }
+  if (mexeu) {
+    saveLivros()
+    console.info('[mangá] ' + mexeu + ' balões realinhados (caixa antiga, sem custo de releitura)')
+  }
+  return mexeu
+}
+
 // Liga o fluxo: imagens sob demanda e a página corrente na barra.
 function mangaLigarFluxo(mg, livro) {
   const cont = el('ler-conteudo'); if (!cont) return
@@ -686,6 +722,8 @@ function mangaLigarFluxo(mg, livro) {
   // observador de forma diferente: a página corrente nunca depende de UM
   // mecanismo só.
   mangaPincaLigar()
+  // Antes de qualquer coisa: endireita o que ficou torto de versões antigas.
+  mangaCorrigirCaixas(livro)
   // Sem isto, a primeira página só começaria a ser lida no primeiro rolar.
   mangaAdiantar(typeof _lerCap === 'number' ? _lerCap : 0).catch(() => {})
   clearInterval(_mgPulso)
