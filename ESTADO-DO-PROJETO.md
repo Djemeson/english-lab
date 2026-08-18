@@ -10474,6 +10474,34 @@ O caminho de resgate continua existindo: pelo toque ou pela seleção, o painel
 mostra a mesma coisa com o "não lembro". **O hover é passivo, e o que é passivo
 não pode interromper.**
 
+
+### 8.36 — Pontuação sozinha não é linha (a causa, enfim)
+
+Depois de cinco rodadas afrouxando constantes e vendo o defeito pular de um
+balão para o vizinho, ataquei a causa.
+
+⚠️ **A IA devolve `OOGH` + `...` e `ROBIN` + `!!!` como duas linhas** porque
+ela VÊ dois blocos separados — mas a página tem **uma** linha impressa. Era
+essa diferença que fazia a projeção encontrar menos faixas do que havia linhas,
+e o balão inteiro ser recusado. Cada constante que eu afrouxava para caber um
+caso empurrava o problema para o seguinte.
+
+Agora, **na entrada** — antes de qualquer medição —, uma linha que só tem
+sinais (`...`, `!!!`, `?!`, `♡`, `—`) é fundida na anterior: o texto se junta e
+a caixa se estende para englobar as duas. O número de linhas volta a bater com
+o que a projeção encontra, e **nenhuma constante precisa ceder**.
+
+A regra distingue certo, verificado isoladamente: `...` `!!!` `?!` `♡` fundem;
+`OOGH` e `A1` não.
+
+⚠️ **NÃO VERIFICADO no volume:** as duas páginas dos casos-limite precisam ser
+RELIDAS para a fusão valer (ela acontece na entrada, não sobre o que já está
+salvo), e a releitura ficou presa no limite de taxa do Gemini durante o teste.
+Falta confirmar a cobertura final — a esperada é 178 de 178.
+
+**Como confirmar:** abrir o mangá, apagar os balões das páginas 13 e 17 e
+mandar reler; ou simplesmente reler o volume pela varinha.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
