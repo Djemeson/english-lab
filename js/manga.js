@@ -28,6 +28,11 @@ const MG_IMG = /\.(jpe?g|png|webp|gif|avif|bmp)$/i
 // e `popHist`, na extensão). Perto do topo, não há como cair nele.
 const _mgLendo = new Set()
 
+// Quanto se espera por UMA página antes de desistir. Dois minutos é folgado
+// para uma leitura que normalmente leva 7 segundos, e curto o bastante para
+// não parecer que o app morreu.
+const MG_TETO_MS = 120000
+
 // ---------------------------------------------------------------
 // Detecção e abertura
 // ---------------------------------------------------------------
@@ -339,7 +344,22 @@ async function mangaLerPagina(i, silencioso) {
     // no meio — o app dizia "veio, mas não era JSON válido" e a página ficava
     // sem texto, sem que nada indicasse a causa. O teto é LIMITE, não reserva:
     // quem responde curto não paga a folga.
-    const resp = await aiVisaoJSON(MG_PEDIDO, b64, { maxTokens: 24000 })
+    // ⚠️ TETO PRÓPRIO, PORQUE O DE DENTRO NÃO BASTA. Aconteceu três vezes
+    // nesta série: a leitura de uma página ficava em voo indefinidamente, sem
+    // retorno E SEM ERRO — a trava nunca era solta, o selo ficava eterno em
+    // "lendo…" e a página nunca mais era tentada. Uma chamada que não volta é
+    // pior que uma que falha: a que falha o usuário reinicia.
+    //
+    // A cadeia de IA já tem tempo-limite, mas ela tenta vários modos de JSON e
+    // ainda cai para um fornecedor reserva — cada etapa com o seu prazo. O
+    // total pode passar de muitos minutos, e qualquer promessa que não resolva
+    // no meio disso trava tudo. Este teto é o único que conhece o tempo que a
+    // PESSOA está disposta a esperar por uma página.
+    const resp = await Promise.race([
+      aiVisaoJSON(MG_PEDIDO, b64, { maxTokens: 24000 }),
+      new Promise((_, falhar) => setTimeout(
+        () => falhar(new Error('demorou demais (mais de 2 min)')), MG_TETO_MS))
+    ])
     const brutos = Array.isArray(resp && resp.balloons) ? resp.balloons : []
     _mgAplicar(livro, i, brutos, resp && resp.sfx)
     // A posição vem da IMAGEM, não do modelo — ver `_mgAfinarPorPixel`.
@@ -633,7 +653,10 @@ async function mangaLerVolume() {
   const trabalhador = async () => {
     while (fila.length && !_mgLote.parar) {
       const i = fila.shift()
-      const ok = await mangaLerPagina(i, true)
+      // Cada página já tem teto próprio; aqui o `catch` garante que uma falha
+      // não derrube a fila inteira — o volume continua nas páginas seguintes.
+      let ok = false
+      try { ok = await mangaLerPagina(i, true) } catch (e) { ok = false }
       ok ? feitas++ : erros++
       _mgBotaoLote(feitas + erros, faltam.length)
     }
