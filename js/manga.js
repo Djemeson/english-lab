@@ -1335,7 +1335,13 @@ function _mgAfinarBalao(ctx, cv, b) {
   for (const l of b.ls) {
     const alvo = ((l.y + l.h / 2) - y0) * cv.height
     let melhor = -1, dist = Infinity
-    for (let k = ultima + 1; k < faixas.length; k++) {
+    // ⚠️ `ultima` E NÃO `ultima + 1`: uma faixa PODE receber mais de uma
+    // linha. Foi o que travou os 27 casos que sobravam — e eles falhavam
+    // todos pela mesma razão. A IA separa `!!!`, `...` e `♡` como linha
+    // própria ("ROBIN" + "!!!"), mas na página impressa isso é UMA linha só:
+    // havia 2 linhas lidas para 1 faixa, as faixas "acabavam" e o balão
+    // inteiro era descartado. Deixando repetir, cada linha acha a sua.
+    for (let k = Math.max(0, ultima); k < faixas.length; k++) {
       const d = Math.abs(centros[k] - alvo)
       if (d < dist) { dist = d; melhor = k }
     }
@@ -1346,8 +1352,24 @@ function _mgAfinarBalao(ctx, cv, b) {
     ultima = melhor
   }
 
+  // Linhas que caíram na MESMA faixa são a mesma linha impressa: viram uma só,
+  // com os textos juntos. Sem fundir, duas faixas idênticas se sobreporiam e
+  // o realce ficaria dobrado no mesmo lugar.
+  const fundidas = []
+  const mapa = []
   for (let k = 0; k < escolhidas.length; k++) {
-    const [fy0, fy1] = faixas[escolhidas[k]]
+    const anterior = fundidas.length - 1
+    if (anterior >= 0 && mapa[anterior] === escolhidas[k]) {
+      fundidas[anterior].t += ' ' + b.ls[k].t
+    } else {
+      fundidas.push({ t: b.ls[k].t })
+      mapa.push(escolhidas[k])
+    }
+  }
+  b.ls = fundidas
+
+  for (let k = 0; k < mapa.length; k++) {
+    const [fy0, fy1] = faixas[mapa[k]]
     // Onde a linha começa e termina na horizontal — a largura real das letras.
     let cx0 = W, cx1 = -1
     for (let y = fy0; y <= fy1; y++) {
