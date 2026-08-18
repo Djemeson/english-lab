@@ -758,6 +758,15 @@ function glossAtivar(container, opts = {}) {
   container.addEventListener('pointermove', ev => {
     if (ev.pointerType !== 'mouse') return
     if (ev.buttons) { glossFechar(); return }         // arrastando: está selecionando
+    // ⚠️ E DEPOIS DE SOLTAR TAMBÉM. `buttons` volta a zero no instante em que
+    // o dedo sai, mas a SELEÇÃO continua na tela — e é justo aí que a pessoa
+    // move o mouse para alcançar o painel. A glosa nascia por cima do trecho
+    // recém-marcado, tapando o que ela acabou de escolher. Enquanto houver
+    // seleção viva, o hover cala a boca.
+    try {
+      const sel = window.getSelection()
+      if (sel && !sel.isCollapsed && String(sel).trim()) { glossFechar(); return }
+    } catch (e) {}
 
     // Estrangulamento por TEMPO, não por requestAnimationFrame. O rAF parece
     // a escolha natural, mas ele é SUSPENSO em aba de fundo: uma chamada

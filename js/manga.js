@@ -1234,7 +1234,14 @@ function mangaPincaDesligar() {
 // O texto continua vindo da IA — ela lê o que está escrito, que é o que a
 // projeção não sabe fazer. Cada um no que é bom.
 
-const MG_ESCURO = 110      // ≤ isto conta como tinta (o texto é preto sólido)
+// Ponto de partida para "isto é tinta". ⚠️ NÃO É O VALOR FINAL: em página
+// digital o texto é preto puro sobre branco puro e qualquer corte serve, mas
+// mangá DIGITALIZADO DE PAPEL não tem nem preto nem branco — o fundo é
+// creme ou cinza, a tinta é cinza-escura, e o papel velho fecha ainda mais
+// essa distância. Com corte fixo, ou o fundo inteiro vira "tinta" (e a página
+// vira uma faixa só) ou a tinta clara some (e não há faixa nenhuma).
+// `_mgLimiarDaJanela` calcula o corte de cada balão a partir do que há ali.
+const MG_ESCURO = 110
 
 async function _mgAfinarPorPixel(bytes, baloes) {
   if (!Array.isArray(baloes) || !baloes.some(b => b.ls && b.ls.length)) return 0
@@ -1271,6 +1278,44 @@ function _mgCarregarImagem(bytes) {
   })
 }
 
+// ⚠️ O CORTE ENTRE TINTA E PAPEL SAI DA PRÓPRIA JANELA. Otsu: monta o
+// histograma dos tons e escolhe o valor que melhor SEPARA as duas populações
+// (papel e tinta), maximizando a distância entre as médias delas. Numa página
+// digital ele cai perto de 110 e nada muda; num escaneado de papel creme com
+// tinta cinza ele acompanha, e as linhas continuam sendo achadas.
+//
+// A trava do fim é o que impede o desastre silencioso: se as duas populações
+// quase se tocam (`separacao` baixa), não há texto ali — é fundo uniforme, e
+// insistir produziria faixas de ruído. Nesse caso volta o corte fixo, que ao
+// menos falha de forma previsível.
+function _mgLimiarDaJanela(dados) {
+  const hist = new Array(256).fill(0)
+  let n = 0
+  for (let i = 0; i < dados.length; i += 4) {
+    const v = (dados[i] + dados[i + 1] + dados[i + 2]) / 3 | 0
+    hist[v]++; n++
+  }
+  if (!n) return MG_ESCURO
+  let soma = 0
+  for (let t = 0; t < 256; t++) soma += t * hist[t]
+  let somaB = 0, pesoB = 0, melhor = -1, corte = MG_ESCURO
+  for (let t = 0; t < 256; t++) {
+    pesoB += hist[t]
+    if (!pesoB) continue
+    const pesoF = n - pesoB
+    if (!pesoF) break
+    somaB += t * hist[t]
+    const mediaB = somaB / pesoB
+    const mediaF = (soma - somaB) / pesoF
+    const entre = pesoB * pesoF * (mediaB - mediaF) * (mediaB - mediaF)
+    if (entre > melhor) { melhor = entre; corte = t }
+  }
+  // Fundo quase uniforme: o "melhor corte" seria arbitrário. Fica o fixo.
+  const media = soma / n
+  if (corte < 30 || corte > 225 || Math.abs(corte - media) < 8) return MG_ESCURO
+  return corte
+}
+
 function _mgAfinarBalao(ctx, cv, b) {
   const alturaMedia = b.ls.reduce((s, l) => s + l.h, 0) / b.ls.length
   // A busca começa na região que o modelo apontou, ESTICADA: ele erra por
@@ -1292,6 +1337,10 @@ function _mgAfinarBalao(ctx, cv, b) {
   let dados
   try { dados = ctx.getImageData(X, Y, W, H).data } catch (e) { return false }
 
+  // O corte entre tinta e papel, medido nesta janela — é o que faz página
+  // escaneada de papel funcionar como página digital.
+  const escuro = _mgLimiarDaJanela(dados)
+
   // Quanta tinta em cada fileira de pixels.
   const perfil = new Array(H).fill(0)
   for (let y = 0; y < H; y++) {
@@ -1299,7 +1348,7 @@ function _mgAfinarBalao(ctx, cv, b) {
     const base = y * W * 4
     for (let x = 0; x < W; x++) {
       const i = base + x * 4
-      if ((dados[i] + dados[i + 1] + dados[i + 2]) / 3 <= MG_ESCURO) n++
+      if ((dados[i] + dados[i + 1] + dados[i + 2]) / 3 <= escuro) n++
     }
     perfil[y] = n
   }
@@ -1386,7 +1435,7 @@ function _mgAfinarBalao(ctx, cv, b) {
       const base = y * W * 4
       for (let x = 0; x < W; x++) {
         const i = base + x * 4
-        if ((dados[i] + dados[i + 1] + dados[i + 2]) / 3 <= MG_ESCURO) {
+        if ((dados[i] + dados[i + 1] + dados[i + 2]) / 3 <= escuro) {
           if (x < cx0) cx0 = x
           if (x > cx1) cx1 = x
         }
