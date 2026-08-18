@@ -120,7 +120,7 @@ async function mangaHtmlDaPagina(mg, livro, i) {
   const camada = baloes.map((b, n) => {
     const est = `left:${(b.x * 100).toFixed(3)}%;top:${(b.y * 100).toFixed(3)}%;` +
                 `width:${(b.w * 100).toFixed(3)}%;height:${(b.h * 100).toFixed(3)}%`
-    return `<span class="mg-balao" style="${est}" data-b="${n}" onclick="mangaTocarBalao(this)">${esc(b.t || '')}</span>`
+    return `<span class="mg-balao" style="${est}" data-b="${n}" onclick="mangaTocarBalao(this, event)">${esc(b.t || '')}</span>`
   // ⚠️ A QUEBRA ENTRE OS BALÕES NÃO É ENFEITE. Sem ela os spans são irmãos
   // colados, e o contexto que vai para a Lexa sai grudado: "CALL HER
   // HERE!!CALL NICO ROBIN!!!" — duas falas viram uma palavra impossível.
@@ -150,7 +150,30 @@ async function mangaHtmlDaPagina(mg, livro, i) {
 // Tocando, basta o balão estar mais ou menos onde está. E é o gesto que a
 // pessoa já faria: no mangá se lê balão a balão, não palavra a palavra.
 // Arrastar continua funcionando para quem quer só uma expressão.
-function mangaTocarBalao(elemento) {
+// ⚠️ ARRASTOU? ENTÃO NÃO FOI TOQUE. O `click` dispara também no fim de um
+// arraste — e o toque, ao selecionar o balão inteiro, DESTRUÍA a seleção que
+// a pessoa acabara de fazer com o dedo. Ela marcava uma palavra e recebia a
+// fala toda, sem entender por quê.
+//
+// A distância entre onde o dedo desceu e onde subiu separa as duas intenções:
+// abaixo de 6 px é toque (pega a fala inteira), acima é arraste (é dele).
+let _mgDesceuEm = null
+
+function _mgPointerDown(ev) {
+  _mgDesceuEm = { x: ev.clientX, y: ev.clientY }
+}
+
+function _mgArrastou(ev) {
+  if (!_mgDesceuEm) return false
+  const dx = (ev.clientX || 0) - _mgDesceuEm.x
+  const dy = (ev.clientY || 0) - _mgDesceuEm.y
+  return Math.hypot(dx, dy) > 6
+}
+
+function mangaTocarBalao(elemento, ev) {
+  // Só o clique real traz evento; chamadas internas (e os testes) continuam
+  // pegando a fala inteira, que é o comportamento pedido.
+  if (ev && _mgArrastou(ev)) return
   try {
     const sel = window.getSelection()
     sel.removeAllRanges()
@@ -603,7 +626,7 @@ function _mgCamadaHtml(c) {
     const est = 'left:' + (b.x * 100).toFixed(3) + '%;top:' + (b.y * 100).toFixed(3) + '%;' +
                 'width:' + (b.w * 100).toFixed(3) + '%;height:' + (b.h * 100).toFixed(3) + '%'
     const abre = '<span class="mg-balao' + (b.ls && b.ls.length ? ' mg-linhado' : '') +
-                 '" style="' + est + '" data-b="' + n + '" onclick="mangaTocarBalao(this)">'
+                 '" style="' + est + '" data-b="' + n + '" onclick="mangaTocarBalao(this, event)">'
     if (!b.ls || !b.ls.length) return abre + esc(b.t || '') + '</span>'
     const corpo = b.ls.map(l => {
       const lx = b.w ? (l.x - b.x) / b.w : 0
@@ -1156,6 +1179,7 @@ function mangaPincaLigar() {
   if (!fluxo || _mgPincaLigada) return
   // `passive:false` é obrigatório: sem ele o `preventDefault` é ignorado e o
   // navegador amplia a página inteira por baixo do nosso gesto.
+  fluxo.addEventListener('pointerdown', _mgPointerDown, { passive: true })
   fluxo.addEventListener('touchstart', _mgPincaIni, { passive: false })
   fluxo.addEventListener('touchmove', _mgPincaMove, { passive: false })
   fluxo.addEventListener('touchend', _mgPincaFim, { passive: true })
@@ -1167,6 +1191,7 @@ function mangaPincaLigar() {
 function mangaPincaDesligar() {
   const fluxo = document.querySelector('#ler-conteudo .mg-fluxo')
   if (fluxo) {
+    fluxo.removeEventListener('pointerdown', _mgPointerDown)
     fluxo.removeEventListener('touchstart', _mgPincaIni)
     fluxo.removeEventListener('touchmove', _mgPincaMove)
     fluxo.removeEventListener('touchend', _mgPincaFim)
