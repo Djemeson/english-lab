@@ -9751,6 +9751,53 @@ imagem, sem gastar). A página de teste ficou em `_dados-de-teste/`.
 ⚠️ A conta **OpenAI está sem créditos** — foi o primeiro caminho tentado e
 morreu em "no credits remaining". Por isso a medição saiu pelo Gemini.
 
+
+### 8.20 — Gemini revivido, e o mangá com o caminho aberto
+
+**A lista de modelos Gemini estava inteira morta.** Os três que o app oferecia
+devolviam 404 ("no longer available to new users") — quem escolhesse Gemini nas
+Configurações não analisava nada, e a tela não dava pista do motivo. Trocada
+pela linha 3.x, com os **7 testados ao vivo na conta dele** (todos HTTP 200) e
+preços conferidos na tabela oficial.
+
+⚠️ Os dois primeiros da lista são de propósito os apelidos `gemini-flash-lite-latest`
+e `gemini-flash-latest`, que o Google mantém apontando para o modelo corrente:
+**não envelhecem**. Foi exatamente o envelhecimento silencioso que quebrou a
+versão anterior; repetir ids fixos no topo seria repetir o defeito.
+
+Quem tem um modelo morto salvo **se cura sozinho** — a resolução do modelo já
+valida o salvo contra a lista e cai no primeiro item quando não encontra. Não
+precisou de migração; verificado lendo o caminho, não suposto.
+
+**Mangá — a premissa técnica está provada.** CBZ é um ZIP de imagens, e o app
+já tem descompactador próprio (o mesmo do EPUB, sem biblioteca externa). Aberto
+um CBZ de teste: 3 páginas, ordenação natural correta, primeira imagem íntegra
+(assinatura JPEG e 1600x2400 conferidos). **Nenhuma dependência nova é
+necessária.**
+
+#### O plano da próxima rodada (fatia definida, não iniciada)
+
+O achado que define a arquitetura: **o leitor usa seleção nativa do navegador**.
+Se o texto do balão for texto de verdade, transparente, posicionado sobre a
+imagem, então seleção → Lexa → card **funciona sem tocar em nada** — e destaques,
+progresso e procedência vêm junto de graça.
+
+| Peça | Como |
+|---|---|
+| Abrir o CBZ | descompactador que já existe; guardar o arquivo como um livro |
+| Ler os balões | um pedido por página à IA, devolvendo texto **e a caixa** de cada balão em coordenadas de 0 a 1 |
+| Sobrepor | um elemento de texto transparente por balão, posicionado em porcentagem — acompanha o zoom sozinho |
+| Selecionar | nada a fazer: o fluxo da Lexa já é seleção nativa |
+
+⚠️ **Riscos já mapeados:** (1) a caixa que a IA devolve precisa ser conferida
+contra a imagem — se vier torta, o texto invisível fica fora do balão e a
+seleção parece quebrada; (2) um volume são ~180 chamadas, então a leitura
+precisa ser retomável, não tudo-ou-nada; (3) as páginas ocupam espaço no
+aparelho e entram na conta da nuvem.
+
+Custo já medido (§8.19): **R$ 0,96 por volume de 180 páginas**, com 7/7 de
+acerto no modelo mais barato.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
