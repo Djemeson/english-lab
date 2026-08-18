@@ -618,7 +618,14 @@ function mangaIrParaPagina(i, suave) {
   // imagens chegando e mudando alturas no mesmo instante, o resultado é
   // imprevisível. `scrollTop` diz exatamente qual caixa rola e para onde.
   const y = alvo.offsetTop - (cont.offsetTop || 0)
-  if (suave && vp.scrollTo) vp.scrollTo({ top: y, behavior: 'smooth' })
+  // ⚠️ `scrollTop = y` NÃO É INSTANTÂNEO AQUI. A viewport tem
+  // `scroll-behavior:smooth` no CSS (ótimo para virar página na mão), e sob
+  // ele a atribuição vira uma ANIMAÇÃO: ler `scrollTop` logo depois devolve o
+  // valor antigo, e um segundo salto no meio do caminho cancela o primeiro.
+  // Foi o que fez o salto para a página 20 "não colar". `behavior:'instant'`
+  // vence o CSS sem alterar o elemento — mesmo caminho que `_lerIrParaFrac`
+  // já usa para restaurar a posição de um livro.
+  if (vp.scrollTo) vp.scrollTo({ top: y, behavior: suave ? 'smooth' : 'instant' })
   else vp.scrollTop = y
   // Saltar 40 páginas de uma vez não dá tempo ao observador: sem isto, o
   // sumário levava a uma tela vazia que só se enchia ao mexer na rolagem.
