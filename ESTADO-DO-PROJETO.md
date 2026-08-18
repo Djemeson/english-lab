@@ -10091,6 +10091,42 @@ do ponteiro" é exatamente onde está o resto da frase que se está lendo.
 balão o contorna por baixo, ou por cima se embaixo não couber. Verificado: com
 a fala ocupando 171 px, a glosa se posiciona fora dela — antes cairia no meio.
 
+
+### 8.27 — A página cortada, e os dois botões de varinha
+
+Três defeitos na mesma tela, que ele mandou em print.
+
+**1. A folha aparecia cortada à direita.** `.ler-conteudo` tem
+`max-width: 646px` e 30 px de recuo — a medida que protege a vista num texto
+corrido. A página do mangá é uma IMAGEM da largura da tela e transbordava essa
+coluna: a arte sumia na borda. O leitor passou a carregar `data-obra`, e no
+mangá a coluna e o recuo saem; quem manda na largura é o zoom.
+
+⚠️ A causa raiz é a mesma de outros tropeços desta série: **o leitor foi
+desenhado para TEXTO, e o mangá herda tudo dele**. Já tinham aparecido o modo
+paginado (coluna cortando a arte), a rede de "devolver ao ponto quando a
+imagem chega" e a fração de posição. Vale desconfiar de qualquer regra do
+leitor que fale em coluna, medida ou linha.
+
+**2. Dois botões com a MESMA varinha, lado a lado.** Não são dois botões —
+são um enigma. Saiu o **Ferramentas**, e não por causa do ícone: ele mostra as
+palavras do CAPÍTULO, cobertura de vocabulário e pré-estudo, desenhado para um
+capítulo de livro com milhares de palavras. No mangá o "capítulo" é uma página
+de duas ou três falas, e cobertura sobre isso não informa nada. Ele volta
+sozinho em qualquer livro.
+
+**3. A barra de zoom sumia atrás do rodapé.** O palco é `flex:1` e espremia
+ela. `flex-shrink:0`, fundo próprio e `z-index`.
+
+#### Verificado nos dois formatos
+
+| | Mangá | Livro (EPUB) |
+|---|---|---|
+| Coluna de leitura | `none` — a folha cabe (sobra 8 px da rolagem) | `646px`, recuo de volta |
+| Botão Ferramentas | ausente | presente |
+| Botão "Ler o volume" | presente | ausente |
+| Barra de zoom | presente e sem sobrepor o rodapé | ausente |
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
