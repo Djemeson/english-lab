@@ -9943,6 +9943,54 @@ passada e o leitor piscaria sem parar).
 ao topo): barra correta em **7 de 7** paradas e **pico de 2 imagens vivas** —
 e isso com a aba oculta, ou seja, sem depender de composição de quadros.
 
+
+### 8.24 — Pinça no mangá
+
+Dois dedos ampliam a página no celular. Dois toques rápidos voltam ao ajuste
+— é o "desfazer" do gesto; sem ele a única saída da pinça seria caçar o botão
+certo no rodapé.
+
+⚠️ **Por que não deixar a pinça do navegador resolver:** ela amplia a PÁGINA
+inteira — barra, rodapé e menu junto —, e ao soltar você fica com a interface
+gigante e o texto do balão do mesmo tamanho relativo. Aqui os dois dedos mexem
+só na largura do fluxo, o mesmo controle dos botões: o resto da tela fica onde
+está, e a camada de texto acompanha a arte porque está em porcentagem.
+
+#### As peças que fazem o gesto existir
+
+| Peça | Sem ela |
+|---|---|
+| `touch-action: pan-x pan-y` no fluxo | o navegador trata os dois dedos como zoom da página e **nosso gesto nunca chega** |
+| `passive: false` nos dois primeiros ouvintes | `preventDefault` é ignorado e o zoom nativo acontece por baixo |
+| Correção do ponto focal | o conteúdo cresce a partir do topo e a cena **escapa da tela** |
+| Fator inicial vindo da largura ATUAL | salto no primeiro milímetro do gesto |
+| Gravar só ao soltar | dezenas de gravações por segundo, número piscando no rodapé |
+| `overflowX` liberado quando ampliado | as bordas do desenho ficam **inalcançáveis** |
+
+⚠️ **O `scroll-behavior:smooth` mordeu pela TERCEIRA vez.** Ele já tinha
+quebrado o salto de página; aqui, cada atribuição de `scrollTop` durante a
+pinça virava uma animação, e são dezenas por segundo — cada uma cancelando a
+anterior. **Medido:** o conteúdo dobrava de 1078 para 2156 px e o `scrollTop`
+continuava exatamente em 4000, com o ponto sob os dedos escorregando 4,5% da
+página. `behavior:'instant'` é o que vence o CSS.
+
+**Regra para a próxima vez:** nesta viewport, NUNCA escrever `scrollTop = x`.
+Sempre `scrollTo({ top: x, behavior: 'instant' })`.
+
+#### Verificado com toques sintéticos, no volume real
+
+| O quê | Resultado |
+|---|---|
+| Afastar os dedos | 100% → **200%**, página ampliou |
+| Ponto sob os dedos | **parado** — desvio de 0,02% (era 4,5% antes do conserto) |
+| Fechar os dedos | 200% → **60%**, página reduziu |
+| Rótulo no rodapé | acompanha |
+| Preferência gravada | sim, ao soltar |
+| Rolagem lateral | liberada ao ampliar, recolhida ao reduzir |
+
+Sem conflito com os gestos que o leitor já tem (borda vira página, arrasto
+vira página): eles só agem no modo paginado, e mangá nunca é paginado.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
