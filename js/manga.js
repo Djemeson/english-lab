@@ -220,7 +220,13 @@ async function mangaLerPagina(i, silencioso) {
   const selo = document.querySelector('.mg-selo[data-selo="' + i + '"]')
   if (selo) { selo.disabled = true; selo.innerHTML = '<span class="spinner"></span> lendo…' }
   try {
-    const resp = await aiVisaoJSON(MG_PEDIDO, b64)
+    // ⚠️ TETO DOBRADO PORQUE EU TRIPLIQUEI A RESPOSTA. Pedir as LINHAS de cada
+    // balão, cada uma com texto e caixa, faz o JSON crescer umas três vezes.
+    // Numa página densa isso estourava os 8.000 e a resposta chegava cortada
+    // no meio — o app dizia "veio, mas não era JSON válido" e a página ficava
+    // sem texto, sem que nada indicasse a causa. O teto é LIMITE, não reserva:
+    // quem responde curto não paga a folga.
+    const resp = await aiVisaoJSON(MG_PEDIDO, b64, { maxTokens: 24000 })
     const brutos = Array.isArray(resp && resp.balloons) ? resp.balloons : []
     _mgAplicar(livro, i, brutos, resp && resp.sfx)
     // A posição vem da IMAGEM, não do modelo — ver `_mgAfinarPorPixel`.
@@ -243,15 +249,8 @@ async function mangaLerPagina(i, silencioso) {
     return false
   } finally {
     _mgLendo.delete(i)
-    // Se a leitura falhou, o selo tem de voltar ao que era — senão fica um
-    // "lendo…" eterno numa página que ninguém está lendo.
-    const s2 = document.querySelector('.mg-selo[data-selo="' + i + '"]')
-    if (s2 && !Array.isArray(livro.chapters[i].baloes)) {
-      s2.disabled = false
-      s2.innerHTML = ic('sparkles', 'ic-sm') + ' ler os balões'
-    } else if (s2) {
-      s2.remove()
-    }
+    const lida = Array.isArray(livro.chapters[i].baloes)
+    _mgSeloEstado(i, lida, !lida)
   }
 }
 
@@ -644,6 +643,20 @@ function _mgSeloHtml(c, i) {
   if (Array.isArray(c.baloes)) return ''
   return '<button class="mg-selo" data-selo="' + i + '" onclick="mangaLerPagina(' + i + ')">' +
          ic('sparkles', 'ic-sm') + ' ler os balões</button>'
+}
+
+// O selo volta ao estado certo sozinho. Sem isto, uma leitura que falha deixa
+// "lendo…" para sempre numa página que ninguém está lendo — e o botão fica
+// desabilitado, tirando do usuário a única forma de tentar de novo.
+function _mgSeloEstado(i, lida, erro) {
+  const s = document.querySelector('.mg-selo[data-selo="' + i + '"]')
+  if (!s) return
+  if (lida) { s.remove(); return }
+  s.disabled = false
+  s.innerHTML = erro
+    ? ic('alert', 'ic-sm') + ' tentar de novo'
+    : ic('sparkles', 'ic-sm') + ' ler os balões'
+  s.classList.toggle('mg-selo-erro', !!erro)
 }
 
 // Redesenha a camada de UMA página, sem tocar na imagem nem na rolagem.

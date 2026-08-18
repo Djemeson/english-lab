@@ -6696,6 +6696,11 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 }
 .mg-selo:hover{opacity:1}
 .mg-selo[disabled]{cursor:default;opacity:.65}
+.mg-selo.mg-selo-erro{
+  background:var(--role-urgente);
+  border-color:var(--role-urgente);
+  opacity:1;
+}
 .mg-selo .spinner{width:11px;height:11px;border-width:2px}
 
 .mg-aviso{
