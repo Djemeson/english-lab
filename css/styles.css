@@ -6570,6 +6570,14 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   hyphens:none;
 }
 
+/* ⚠️ A INTERFACE NÃO ENTRA NA SELEÇÃO. Arrastando para marcar uma fala, a
+   seleção escapava do balão e pegava a barra, o rodapé e o progresso — ele
+   mandou o print com "Anterior", "Próximo" e "35% · faltam ~4 min" todos
+   realçados. Texto de controle não é conteúdo; ninguém quer copiá-lo. */
+.ler-barra, .ler-rodape, .mg-barra, .mg-selo, .mg-num, .ler-seta{
+  -webkit-user-select:none;user-select:none;
+}
+
 .mg-barra{
   display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;
   padding:var(--sp-2) var(--sp-3);
@@ -6681,13 +6689,37 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 /* Segurar o dedo/mouse sobre a página mostra onde há texto para pegar. Sem
    esta dica o balão lido e o não lido são idênticos, e não há como saber se
    vale tentar selecionar. */
-/* ⚠️ NENHUM CONTORNO. A arte é a página; o texto sobreposto é uma ferramenta
-   invisível, e ferramenta invisível não desenha nada por cima do desenho.
-   Os retângulos que existiam aqui eram uma "dica de onde dá para selecionar"
-   — e foram exatamente o que ele fotografou três vezes achando que era
-   desalinhamento. A dica valia menos que o incômodo.
-   Quem mostra onde há texto é o CURSOR (`cursor:text` no balão) e o realce
-   que aparece quando você seleciona — como no mokuro. */
+/* ================================================================
+   O BALÃO NO HOVER — o jeito do mokuro
+   ================================================================
+   ⚠️ ATÉ AQUI O TEXTO ERA UM FANTASMA: invisível o tempo todo, e selecionar
+   significava arrastar sobre algo que não se vê, mirando pela memória de onde
+   estavam as letras. Daí a seleção escapar do balão e pegar a página inteira.
+
+   O mokuro faz diferente, e é o que ele pediu: ao passar o mouse, o balão
+   TROCA de estado — ganha fundo opaco e o texto aparece em letra digital, por
+   cima do desenhado. A partir daí você está selecionando texto de verdade,
+   com tudo o que isso traz de graça: o cursor sabe onde está, a seleção
+   respeita as palavras, o duplo clique pega uma palavra inteira.
+
+   Fora do hover, nada disso existe: a arte fica intacta, sem marcador nenhum. */
+.mg-balao{
+  border-radius:6px;
+  transition:background-color .12s ease, color .12s ease;
+}
+.mg-balao:hover,
+.mg-balao:focus-within,
+.mg-balao.mg-aceso{
+  background:var(--ler-bg, #fff);
+  color:var(--ler-fg, #111);
+  box-shadow:0 0 0 3px var(--ler-bg, #fff);
+}
+.mg-balao:hover .mg-linha,
+.mg-balao:focus-within .mg-linha,
+.mg-balao.mg-aceso .mg-linha{ color:var(--ler-fg, #111) }
+.mg-balao:hover .mg-t,
+.mg-balao:focus-within .mg-t,
+.mg-balao.mg-aceso .mg-t{ color:inherit }
 
 /* O convite da página que ainda não foi lida. Canto de cima, discreto, e
    some assim que a leitura chega — não é um erro, é uma pendência. */
