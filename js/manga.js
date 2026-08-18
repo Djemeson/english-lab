@@ -707,12 +707,21 @@ function mangaGarantirVisiveis(mg, livro) {
 function _mgAtualizarBarra(livro) {
   if (typeof _lerRestaurando !== 'undefined' && _lerRestaurando) return
   const i = _mgPaginaNoCentro()
-  if (i < 0 || i === _lerCap) return
-  _lerCap = i
-  const nome = el('ler-cap-nome')
-  if (nome) nome.textContent = (livro.chapters[i] && livro.chapters[i].titulo) || ('Página ' + (i + 1))
-  if (typeof _lerAtualizarProgresso === 'function') _lerAtualizarProgresso()
-  // A página em que você está E as duas seguintes.
+  if (i < 0) return
+  if (i !== _lerCap) {
+    _lerCap = i
+    const nome = el('ler-cap-nome')
+    if (nome) nome.textContent = (livro.chapters[i] && livro.chapters[i].titulo) || ('Página ' + (i + 1))
+    if (typeof _lerAtualizarProgresso === 'function') _lerAtualizarProgresso()
+  }
+  // ⚠️ FORA DO `if`, e isto é o conserto. Com o adiantamento pendurado na
+  // TROCA de página ele nunca acontecia: parado na 1, nada era pedido, e ao
+  // virar para a 2 a leitura começava do zero — exatamente o que o
+  // adiantamento existia para evitar. MEDIDO: 17 s na página 1 e só ela
+  // lida; ao virar, a 2 ainda estava em branco.
+  //
+  // Chamar a cada passada do pulso não custa: `mangaAdiantar` sai na hora se
+  // já houver fila em voo ou se não faltar nada por perto.
   mangaAdiantar(i).catch(() => {})
 }
 
