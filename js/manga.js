@@ -1307,7 +1307,14 @@ function _mgAfinarBalao(ctx, cv, b) {
   // Uma fileira "tem texto" quando passa de 1,5% da largura examinada. Abaixo
   // disso é contorno de balão, sujeira de digitalização ou a perna de uma
   // letra isolada — e chamar isso de linha juntaria duas linhas numa só.
-  const limite = Math.max(2, Math.round(W * 0.015))
+  // ⚠️ LIMIAR RELATIVO AO PRÓPRIO BALÃO. Um corte fixo de 1,5% da largura
+  // funciona quando o vão entre as linhas é branco limpo — e falha quando
+  // elas se tocam: MEDIDO, cinco linhas viravam UMA faixa só, e aí nenhum
+  // casamento é possível. Exigindo que a fileira tenha pelo menos 18% da
+  // tinta da fileira MAIS CHEIA, o vão entre linhas coladas volta a ser vale,
+  // porque ali a tinta cai mesmo que não chegue a zero.
+  const pico = Math.max(...perfil)
+  const limite = Math.max(2, Math.round(W * 0.015), Math.round(pico * 0.18))
   const faixas = []
   let ini = -1
   for (let y = 0; y < H; y++) {
@@ -1347,7 +1354,10 @@ function _mgAfinarBalao(ctx, cv, b) {
     }
     // Longe demais para ser a mesma linha: melhor não mexer do que apontar
     // para o texto errado.
-    if (melhor < 0 || dist > alturaMedia * cv.height * 1.2) return false
+    // Teto de 2 alturas de linha: com 1,2 os balões cuja caixa o modelo errou
+    // por mais de uma linha eram descartados inteiros, e é justamente neles
+    // que a medição por pixel mais vale.
+    if (melhor < 0 || dist > alturaMedia * cv.height * 2.0) return false
     escolhidas.push(melhor)
     ultima = melhor
   }
