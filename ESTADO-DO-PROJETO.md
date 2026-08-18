@@ -10215,6 +10215,68 @@ as linhas. Agora ela começa e termina onde as letras começam e terminam.
 As páginas lidas antes disto são medidas quando entram na tela: a imagem já
 foi decodificada ali, é a hora mais barata. Uma vez por página, com carimbo.
 
+
+### 8.30 — O desalinhamento era CSS, não dado
+
+Três rodadas caçando o desalinhamento nos dados, e ele nunca esteve lá.
+
+⚠️ **A imagem da página descia 23 px e a camada de texto não.** O leitor dá
+`margin: 1.2em auto` a toda imagem dentro do texto — o respiro certo para uma
+ilustração no meio de um parágrafo. Com a fonte de 19 px isso vira **22,8 px**.
+A camada de balões é `absolute` na `.mg-pagina`, então ficava no topo enquanto
+a arte descia: **o realce aparecia 23 px acima das letras, em todas as linhas**.
+
+**Como foi encontrado, depois de três tentativas erradas:** comparando o DOM
+com os dados salvos. Os dados diziam `y = 0,0488`; o DOM desenhava em
+`0,0347`. A diferença — `0,0141` — era **idêntica em todos os 19 balões**. Erro
+constante não vem de medição; vem de deslocamento.
+
+⚠️ **Meus testes anteriores não podiam pegar isso.** Eu media se a faixa tinha
+tinta embaixo — e uma faixa deslocada meia linha ainda acerta parte das letras
+e passa com 36%. **Medir o dado não é medir a tela.**
+
+⚠️ **E a primeira correção não valeu:** escrevi `margin: 0` em `.mg-img` e o
+estilo computado continuou dizendo `22,8px`. `.mg-img` é uma classe;
+`.ler-conteudo img` é classe + elemento, e ganha. Só medindo o estilo
+COMPUTADO isso aparece — a regra existia e não valia.
+
+**Sexta vez que uma regra do leitor de TEXTO vaza para o mangá**: coluna de
+leitura, modo paginado, rede de reposicionamento, fração de posição, botão de
+ferramentas e agora margem de imagem.
+
+#### Páginas mudas
+
+Ele também relatou páginas onde nada selecionava. Medido: **10 das 28 sem
+leitura e ZERO avisos na tela** — no fluxo contínuo eu havia perdido o aviso
+que a versão de página única tinha. Com a leitura automática desligada (como
+estava na conta dele), o volume parava de ganhar texto **em silêncio**.
+
+Agora cada página não lida traz um selo no canto, que vira "lendo…" durante a
+chamada, some quando o texto chega e volta como **"tentar de novo"** se
+falhar — antes ficava desabilitado para sempre, tirando a única forma de
+insistir.
+
+#### E uma falha que eu mesmo causei
+
+`[Google Gemini] a resposta veio, mas não era JSON válido`. Pedir as LINHAS de
+cada balão triplicou o tamanho da resposta; numa página densa isso passava dos
+8.000 tokens e chegava **cortada no meio**. Teto para 24.000.
+
+#### Verificado
+
+| O quê | Resultado |
+|---|---|
+| DOM x dados, página 13 | **19 de 19** batendo (era 0 de 19) |
+| Margem da imagem | `0px` (era `22.8px 0px`) |
+| Faixas sobre a tinta | 60 de 63 |
+| Bordas limpas | 117 de 126 |
+| Selos nas páginas não lidas | **10 para 10**, exatamente as certas |
+
+⚠️ **NÃO verificado:** a leitura do volume inteiro travou no meio durante o
+teste, com a aba em segundo plano — onde o navegador estrangula temporizadores
+e o próprio limite de tempo das chamadas deixa de valer. Não dá para afirmar
+que o lote completa; falta rodar com a aba à vista.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
