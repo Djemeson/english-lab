@@ -1446,7 +1446,13 @@ function _mgAfinarBalao(ctx, cv, b) {
       // 35% da altura média e eram descartados como ruído. Reticências,
       // vírgulas soltas e o coração do balão são linhas legítimas e todas
       // pequenas. O piso absoluto de 3 px continua barrando sujeira real.
-      if (fim - ini >= minAltura) faixas.push([ini, fim])
+      // ⚠️ E UM TETO TAMBÉM. Sem ele a projeção aceita como "linha" uma
+      // mancha contínua de tinta — arte escura, cabelo preto, fundo hachurado
+      // — e devolve uma faixa de 30% da página. MEDIDO: foi o que aconteceu
+      // com o "WHAT?!" assim que ele passou a ser aceito: virou um alvo
+      // gigante de texto invisível por cima do desenho, pior que não medir.
+      const alt = fim - ini
+      if (alt >= minAltura && alt <= cv.height * 0.06) faixas.push([ini, fim])
       ini = -1
     }
   }
