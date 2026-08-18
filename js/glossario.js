@@ -795,6 +795,13 @@ function glossAtivar(container, opts = {}) {
     if (_glossBalao) { _glossBalao.remove(); _glossBalao = null }
     const achado = glossBuscar(p.palavra, p.seguinte, p.seguinte2)
     if (!achado) return
+    // ⚠️ NO HOVER, SÓ O QUE ELE NÃO CONHECE. Palavra marcada como conhecida
+    // (ou ignorada) abria um balão para dizer justamente "você marcou como
+    // conhecida" — informação que ele não pediu, atravessando a leitura de
+    // uma palavra que ele lê sem ajuda. O caminho de resgate continua: pelo
+    // toque ou pela seleção, o painel mostra a mesma coisa com o "não lembro".
+    // O hover é passivo, e o que é passivo não pode interromper.
+    if (achado.fonte === 'known' || achado.fonte === 'ignored') return
     const x = ev.clientX, y = ev.clientY
     _glossTimer = setTimeout(() => _glossMostrar(achado, x, y, opts, p), GLOSS_ESPERA)
   }, { passive: true })
