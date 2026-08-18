@@ -57,7 +57,11 @@ async function mangaAbrir(buf) {
 async function mangaMeta(zip, nomeArquivo) {
   const paginas = mangaPaginas(zip)
   return {
-    title: String(nomeArquivo || '').replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim() || 'Sem título',
+    // ⚠️ O `.replace(/\s+/g,' ')` no fim NÃO é enfeite: "One Piece - Vol 100"
+    // vira "One Piece   Vol 100" com três espaços quando o hífen cercado de
+    // espaços é trocado por mais um espaço. Foi o que apareceu no volume dele.
+    title: String(nomeArquivo || '').replace(/\.[^.]+$/, '')
+      .replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim() || 'Sem título',
     author: '', lang: 'en', format: 'manga',
     chapters: paginas.map((href, i) => ({
       id: 'p' + i, href, titulo: `Página ${i + 1}`,

@@ -286,9 +286,14 @@ async function lerAbrir(id) {
   if (typeof livroGarantirNaNuvem === 'function') livroGarantirNaNuvem(id)
   const buf = await blob.arrayBuffer()
   try {
-    if (l.format === 'epub') {
+    // ⚠️ `manga` PRECISA ESTAR AQUI. Sem ele o CBZ caía no ramo de baixo e o
+    // ZIP era decodificado como UTF-8: a tela enchia de caracteres quebrados.
+    // Foi o que aconteceu no primeiro volume de verdade — e não apareceu nos
+    // meus testes porque eu tinha exercitado as funções soltas, nunca a
+    // ABERTURA pelo app. Testar a peça não é testar o caminho.
+    if (l.format === 'epub' || l.format === 'manga') {
       const zipCru = await zipAbrir(buf)
-      _lerEpub = (livro.format === 'manga' || mangaEhCbz(zipCru))
+      _lerEpub = (l.format === 'manga' || mangaEhCbz(zipCru))
         ? { manga: await mangaAbrir(buf) }
         : await epubAbrir(buf)
     } else {
