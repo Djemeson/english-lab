@@ -10619,6 +10619,46 @@ diagnóstico próprio, porque agora atrapalha o teste tanto quanto o uso.
 **Fica pendente:** confirmar que os blocos da página 4 ficaram legíveis no
 hover, e ler a página 17.
 
+
+### 8.41 — O travamento, e a varredura geral
+
+#### Nenhuma leitura fica presa
+
+⚠️ **Aconteceu TRÊS vezes nesta série:** a leitura de uma página ficava em voo
+indefinidamente, **sem retorno e sem erro** — a trava nunca era solta, o selo
+ficava eterno em "lendo…" e a página nunca mais era tentada. Uma chamada que
+não volta é pior que uma que falha: a que falha, a pessoa reinicia.
+
+A cadeia de IA já tem tempo-limite, mas tenta vários modos de JSON e ainda cai
+para um fornecedor reserva, cada etapa com o seu prazo — o total passa de
+muitos minutos, e qualquer promessa que não resolva no meio trava tudo.
+
+**Teto próprio de 2 minutos por página**, e `catch` por página no lote para uma
+falha não derrubar a fila. Verificado: a página 17, que travava, **voltou em
+47,5 s** e a trava foi solta.
+
+#### A varredura geral (28 páginas, 215 balões, 532 textos)
+
+| | Antes | Agora |
+|---|---|---|
+| Páginas lidas | 27 de 28 | **28 de 28** |
+| Balões que não acendem | 53 | **0** |
+| Balões fora da imagem | — | **0** |
+| Textos transbordando | ~100 | **92** |
+| Fonte abaixo de 10 px | 3 páginas | 1 página (a 4) |
+
+⚠️ **O que sobrou, sem maquiagem:**
+- **92 textos (17%) ainda transbordam** a caixa — quase todos na vertical: a
+  fonte é limitada pela altura da faixa e o texto ocupa mais linhas do que
+  cabe. O `overflow:hidden` esconde, mas ao acender o texto fica cortado.
+- **40 blocos da página 4 com fonte abaixo de 10 px.** É a página de resumo do
+  volume, com parágrafos inteiros em caixas pequenas — para caber, encolhe até
+  ficar difícil de ler.
+
+Os dois são o mesmo problema de fundo: **caixa pequena para o texto que a IA
+leu**. Encolher a fonte tem limite; o caminho seguinte é deixar a caixa CRESCER
+um pouco quando o texto não cabe, em vez de espremer o texto.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
