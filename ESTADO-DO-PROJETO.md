@@ -10593,6 +10593,32 @@ que não acender. Piso subiu para 11 px.
   que a caixa do modelo veio errada e a projeção aceitou uma mancha de tinta.
 - **A página 17 nunca foi lida** — precisa de leitura.
 
+
+### 8.40 — As faixas altas eram blocos de texto, não faixas
+
+O diagnóstico mudou o conserto. As "9 faixas altas" (na verdade **25**, ao
+contar as linhas) estavam quase todas na **página 4** — o resumo do volume —, e
+todas em balões **sem linhas separadas**: caixas de 7% a 21% da folha com um
+parágrafo inteiro dentro, que a IA devolveu sem quebrar.
+
+⚠️ **Não era medição errada; era texto de bloco tratado como linha.** Forçado
+numa linha só (`white-space: pre`), o texto saía da caixa e a fonte encolhia
+até ficar ilegível — exatamente a "formatação ruim" que ele fotografou.
+
+Agora o bloco **quebra** e a fonte se ajusta **pela altura**: cresce até o
+bloco encher a caixa, depois encolhe em passos de 8% até caber. Casar pela
+largura deixaria o bloco transbordando por baixo, porque a largura natural de
+um texto de várias linhas é a da linha mais longa, não a do parágrafo.
+
+⚠️ **NÃO VERIFICADO ao vivo.** A correção está publicada, mas a leitura da
+página 17 — disparada na mesma sessão — ficou **presa** sem retornar nem erro,
+e não deu para completar a varredura de confirmação. É o mesmo travamento que
+já apareceu duas vezes com chamadas ao Gemini nesta série; ele merece
+diagnóstico próprio, porque agora atrapalha o teste tanto quanto o uso.
+
+**Fica pendente:** confirmar que os blocos da página 4 ficaram legíveis no
+hover, e ler a página 17.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
