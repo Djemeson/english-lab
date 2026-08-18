@@ -150,6 +150,39 @@ async function mangaHtmlDaPagina(mg, livro, i) {
 // Tocando, basta o balão estar mais ou menos onde está. E é o gesto que a
 // pessoa já faria: no mangá se lê balão a balão, não palavra a palavra.
 // Arrastar continua funcionando para quem quer só uma expressão.
+// ⚠️ O REALCE TEM DE TER A LARGURA DA LETRA DESENHADA, NÃO A DA FONTE.
+// A faixa recebe a largura medida no pixel, mas o texto invisível dentro dela
+// é escrito na fonte do navegador — e "IT GALLS" em Inter não mede o mesmo
+// que "IT GALLS" desenhado à mão pelo letrista. O realce ficava mais curto
+// que a linha e deslocado dentro dela: pegava "GALLS" onde a linha é "IT
+// GALLS", "ALONG-" onde é "WORK ALONG-".
+//
+// Esticar horizontalmente resolve sem tocar na altura: o texto continua
+// invisível, e o realce passa a cobrir exatamente as letras que estão ali.
+// Medido uma vez por linha, quando a página entra na tela.
+function mangaAjustarLinhas(raiz) {
+  const alvo = raiz || document.getElementById('ler-conteudo')
+  if (!alvo) return 0
+  const linhas = alvo.querySelectorAll('.mg-linha:not([data-ok]) > .mg-t')
+  let n = 0
+  for (const t of linhas) {
+    const pai = t.parentElement
+    const largura = pai.clientWidth
+    // Sem layout ainda (página fora da tela): fica para a próxima passada.
+    if (!largura) continue
+    t.style.transform = ''
+    const propria = t.offsetWidth
+    if (!propria) continue
+    // Teto e piso para não virar caricatura quando a leitura do texto veio
+    // maior ou menor que o desenho: 0,3x a 4x cobre o real e barra o absurdo.
+    const fator = Math.max(0.3, Math.min(4, largura / propria))
+    t.style.transform = 'scaleX(' + fator.toFixed(4) + ')'
+    pai.dataset.ok = '1'
+    n++
+  }
+  return n
+}
+
 // ⚠️ ARRASTOU? ENTÃO NÃO FOI TOQUE. O `click` dispara também no fim de um
 // arraste — e o toque, ao selecionar o balão inteiro, DESTRUÍA a seleção que
 // a pessoa acabara de fazer com o dedo. Ela marcava uma palavra e recebia a
@@ -662,7 +695,10 @@ function _mgCamadaHtml(c) {
       // e a serialização da seleção ignora o que não é renderizado.
       // Dentro do span, o espaço é texto de verdade e vem junto.
       const sep = (l === b.ls[b.ls.length - 1]) ? '' : ' '
-      return '<span class="mg-linha" style="' + estL + '">' + esc(l.t) + sep + '</span>'
+      // O texto vai num filho próprio para poder ser ESTICADO até a largura da
+      // linha impressa — ver `mangaAjustarLinhas`.
+      return '<span class="mg-linha" style="' + estL + '"><i class="mg-t">' +
+             esc(l.t) + sep + '</i></span>'
     }).join('')
     return abre + corpo + '</span>'
   }).join('\n')
@@ -709,6 +745,7 @@ function mangaRepintarPagina(livro, i) {
   if (av) av.remove()
   const selo = div.querySelector('.mg-selo')
   if (selo && Array.isArray(livro.chapters[i].baloes)) selo.remove()
+  mangaAjustarLinhas(div)
   return true
 }
 
@@ -811,6 +848,7 @@ function mangaLigarFluxo(mg, livro) {
     if (!_mgMontado) { clearInterval(_mgPulso); _mgPulso = 0; return }
     _mgAtualizarBarra(livro)
     mangaGarantirVisiveis(mg, livro)
+    mangaAjustarLinhas()
   }, 700)
 }
 
@@ -853,6 +891,9 @@ async function _mgCarregarPagina(mg, livro, div) {
     // A página acabou de ser decodificada de qualquer forma: é a hora mais
     // barata de medir os pixels das que foram lidas antes deste conserto.
     // Uma vez por página, marcada com o carimbo `px`.
+    // A largura só existe depois que a imagem define a altura da página.
+    img.addEventListener('load', () => mangaAjustarLinhas(div), { once: true })
+    mangaAjustarLinhas(div)
     const precisa = Array.isArray(c.baloes) && c.baloes.some(b => b.ls && b.ls.length && !b.px)
     if (precisa) {
       _mgAfinarPorPixel(bytes, c.baloes).then(n => {

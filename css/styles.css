@@ -6644,7 +6644,7 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 .mg-balao.mg-linhado{display:block;overflow:visible}
 .mg-linha{
   position:absolute;
-  display:flex;align-items:center;justify-content:center;
+  display:flex;align-items:center;justify-content:flex-start;
   margin:0;padding:0;
   color:transparent;
   /* `1` porque a caixa da linha JÁ é a altura da linha: qualquer entrelinha
@@ -6661,7 +6661,19 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   overflow:hidden;
   -webkit-user-select:text;user-select:text;
 }
+/* O texto vive neste filho, que é esticado por JS até a largura da letra
+   desenhada. `transform-origin:left` para o esticamento crescer para a
+   direita a partir do começo da linha, e não para os dois lados. */
+.mg-t{
+  display:inline-block;
+  transform-origin:left center;
+  white-space:pre;
+  color:inherit;
+  font-style:normal;
+}
 .mg-linha::selection{background:rgba(var(--primary-rgb),.45);color:transparent}
+.mg-t::selection{background:rgba(var(--primary-rgb),.45);color:transparent}
+.mg-t::-moz-selection{background:rgba(var(--primary-rgb),.45);color:transparent}
 .mg-linha::-moz-selection{background:rgba(var(--primary-rgb),.45);color:transparent}
 .mg-balao::selection{background:rgba(var(--primary-rgb),.45);color:transparent}
 .mg-balao::-moz-selection{background:rgba(var(--primary-rgb),.45);color:transparent}
