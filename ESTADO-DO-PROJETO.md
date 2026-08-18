@@ -10394,6 +10394,50 @@ apareceram medindo:
 Exemplos do que a fusão produziu, com o texto inteiro: `I SEE YOU | NEED MORE |
 DISCIPLINE | !!!` e `SEALED | STORE- | ROOM, | INSIDE THE | DOME`.
 
+
+### 8.34 — O realce com a largura da letra desenhada
+
+Ele mandou o print: o realce cobria **parte** de cada linha e deslocado —
+pegava "GALLS" onde a linha é "IT GALLS", "ALONG-" onde é "WORK ALONG-".
+
+⚠️ **A faixa tinha a largura certa; o TEXTO dentro dela, não.** A faixa recebe
+a largura medida no pixel, mas o texto invisível é escrito na fonte do
+navegador — e "IT GALLS" em Inter não mede o mesmo que "IT GALLS" desenhado à
+mão pelo letrista. **Medido: o esticamento necessário vai de 1,7x a 2,6x** —
+a fonte do navegador é quase metade da largura da letra do mangá.
+
+O texto foi para um filho próprio, esticado horizontalmente até casar com a
+faixa. A altura não muda, o texto continua invisível, e o realce passa a
+cobrir exatamente as letras que estão ali.
+
+| Medida | Resultado |
+|---|---|
+| Linhas ajustadas | **43 de 43** na página testada |
+| Cobertura da faixa | **100%** na maioria |
+| Começa junto com a linha | sim |
+
+⚠️ **O piso do fator precisou ser BAIXO.** Uma linha longa ("THE DREADED BIG
+MOM PIRATES") batia no piso de 0,3 e ainda cobria **139%** da faixa. Texto que
+transborda invade o realce da linha vizinha — o defeito que se estava
+corrigindo. Encolher demais só deixa o texto invisível mais apertado, e ele
+continua invisível; transbordar, não. Piso para 0,08.
+
+#### Duas outras coisas da mesma rodada
+
+**A glosa nascia por cima da seleção.** Havia guarda para o botão pressionado,
+mas `buttons` volta a zero no instante em que o dedo sai — e a seleção continua
+na tela, que é justo quando a pessoa move o mouse para alcançar o painel.
+Enquanto houver seleção viva, o hover cala.
+
+**Preparado para mangá digitalizado de papel.** O corte fixo entre tinta e
+papel (110) assume preto puro sobre branco puro — verdade no One Piece digital,
+falso num escaneado, onde o fundo é creme e a tinta é cinza. Com corte fixo, ou
+o fundo inteiro vira "tinta" e a página vira uma faixa só, ou a tinta clara
+some e não há faixa nenhuma. Agora o corte sai do histograma da própria janela
+(Otsu), escolhendo o valor que melhor separa as duas populações. Em página
+digital ele cai perto de 110 e nada muda. Se as populações quase se tocam, não
+há texto ali — volta o corte fixo, que ao menos falha de forma previsível.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
