@@ -10502,6 +10502,30 @@ Falta confirmar a cobertura final — a esperada é 178 de 178.
 **Como confirmar:** abrir o mangá, apagar os balões das páginas 13 e 17 e
 mandar reler; ou simplesmente reler o volume pela varinha.
 
+
+### 8.37 — 100% dos balões medidos
+
+As páginas 13 e 17 foram relidas e o resultado fechou o assunto:
+
+| Medida | Resultado |
+|---|---|
+| Balões com linhas | 162 |
+| Medidos no pixel | **162** |
+| Cobertura | **100%** |
+| Restantes | **nenhum** |
+
+O `OOGH...` voltou da IA como **uma linha só** — a fusão de pontuação agiu no
+próprio pedido, e o caso que resistia cinco rodadas deixou de existir em vez
+de ser contornado.
+
+⚠️ Ele apareceu na conta com `ls` vazio e sem carimbo: uma fala de uma linha
+só não precisa de faixa separada, e usa a caixa do balão. Para uma linha, as
+duas são a mesma coisa — o realce fica igual.
+
+**O total caiu de 178 para 162** porque as duas páginas relidas voltaram com
+menos linhas separadas: exatamente o efeito esperado da fusão, que junta o que
+antes era contado duas vezes.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
