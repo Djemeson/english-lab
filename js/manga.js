@@ -359,6 +359,15 @@ function _mgAplicar(livro, i, brutos, sfx) {
     // um bloco só e a seleção pinta a caixa inteira do balão. Com uma faixa
     // por linha, o realce cai onde estão as letras.
     const linhas = []
+    // ⚠️ PONTUAÇÃO SOZINHA NÃO É LINHA — é o fim da anterior. A IA devolve
+    // "OOGH" + "..." e "ROBIN" + "!!!" como duas linhas porque VÊ dois blocos,
+    // mas a página tem UMA linha impressa. Essa diferença foi a causa de quase
+    // todos os balões que a medição recusava, e afrouxar limites para caber
+    // esses casos só empurrava o defeito para o vizinho.
+    //
+    // Fundindo aqui, na entrada, o número de linhas volta a bater com o que a
+    // projeção encontra — e nenhuma constante precisa ceder.
+    const soSinais = t => /^[^\p{L}\p{N}]+$/u.test(t)
     for (const l of (Array.isArray(b.lines) ? b.lines : [])) {
       const lt = String((l && l.text) || (l && l.t) || '').replace(/\s+/g, ' ').trim()
       const lc = _mgCaixa(l, escala)
@@ -378,6 +387,19 @@ function _mgAplicar(livro, i, brutos, sfx) {
         const meio = linha.y + linha.h / 2
         linha.h = 0.04
         linha.y = +Math.max(0, meio - 0.02).toFixed(4)
+      }
+      // Só sinais e há uma linha antes: junta o texto e estende a caixa até
+      // englobar os dois — o realce continua cobrindo a linha impressa toda.
+      const ant = linhas[linhas.length - 1]
+      if (ant && soSinais(lt)) {
+        const x2b = Math.max(ant.x + ant.w, linha.x + linha.w)
+        const y2b = Math.max(ant.y + ant.h, linha.y + linha.h)
+        ant.x = +Math.min(ant.x, linha.x).toFixed(4)
+        ant.y = +Math.min(ant.y, linha.y).toFixed(4)
+        ant.w = +(x2b - ant.x).toFixed(4)
+        ant.h = +(y2b - ant.y).toFixed(4)
+        ant.t += ' ' + lt
+        continue
       }
       linhas.push(linha)
     }
