@@ -993,10 +993,26 @@ const AI_PROVIDERS = {
     // irregular conforme o modelo; ficar no que se sabe garantido é mais
     // barato que descobrir na fatura.
     json: 'objeto',
+    // ⚠️ A LINHA 2.5 INTEIRA MORREU. Em 2026-08-17 os três modelos que estavam
+    // aqui (`gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro`)
+    // devolviam **404** na conta dele — "no longer available to new users".
+    // Quem escolhesse Gemini nas Configurações não conseguia analisar NADA, e
+    // o app não dava pista do motivo. Medido no navegador, não suposto.
+    //
+    // Os dois primeiros são apelidos que o Google mantém apontando para o
+    // modelo corrente: eles NÃO envelhecem, e é de propósito que encabeçam a
+    // lista — foi exatamente o envelhecimento silencioso que quebrou a versão
+    // anterior. O preço deles acompanha o modelo para onde apontam, então a
+    // coluna aqui é a do alvo de hoje e pode ficar defasada; os ids fixos
+    // abaixo servem a quem quer preço previsível.
     modelos: [
-      { id: 'gemini-2.5-flash-lite', tier: 'baixo', nota: 'o mais barato da casa',  preco: { in: 0.10, out: 0.40 } },
-      { id: 'gemini-2.5-flash',      tier: 'baixo', nota: 'ótimo custo-benefício',  preco: { in: 0.30, out: 2.50 } },
-      { id: 'gemini-2.5-pro',        tier: 'alto',  nota: 'mais capaz',             preco: { in: 1.25, out: 10.00 } },
+      { id: 'gemini-flash-lite-latest', tier: 'baixo', nota: 'sempre o Flash-Lite atual — não envelhece (padrão)', preco: { in: 0.30, out: 2.50 } },
+      { id: 'gemini-flash-latest',      tier: 'médio', nota: 'sempre o Flash atual — não envelhece',              preco: { in: 0.75, out: 3.75 } },
+      { id: 'gemini-3.5-flash-lite',    tier: 'baixo', nota: 'o mais barato da casa; leu mangá 7/7 no teste',     preco: { in: 0.30, out: 2.50 } },
+      { id: 'gemini-3.1-flash-lite',    tier: 'baixo', nota: 'geração anterior, mais barata ainda',               preco: { in: 0.25, out: 1.50 } },
+      { id: 'gemini-3.7-flash',         tier: 'médio', nota: 'o Flash mais novo',                                 preco: { in: 0.75, out: 3.75 } },
+      { id: 'gemini-3.5-flash',         tier: 'médio', nota: 'raciocina mais, custa mais',                        preco: { in: 1.50, out: 9.00 } },
+      { id: 'gemini-3.1-pro-preview',   tier: 'alto',  nota: 'mais capaz da casa',                                preco: { in: 2.00, out: 12.00 } },
     ]
   },
   // ⚠️ O DEEPSEEK SAIU em 2026-08-08, por decisão dele: *"não vamos mais usar o
