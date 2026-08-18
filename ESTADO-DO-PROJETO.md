@@ -10568,6 +10568,31 @@ ordem certa — o padrão do cache de folha de estilo que já mordeu antes neste
 projeto. **Sem o fundo, o texto acende POR CIMA do desenho e fica ilegível**,
 que seria pior que o estado anterior. É a primeira coisa a conferir.
 
+
+### 8.39 — Os quatro ajustes, e a varredura por defeitos
+
+Ele aprovou o hover ("ficou bom") e listou quatro ajustes. Três tinham causa
+direta; o quarto só apareceu varrendo página a página, como ele pediu.
+
+| Ajuste | Causa | Conserto |
+|---|---|---|
+| Fundo não era branco | usava `--ler-bg`, que no tema é **creme** (`#f7f3ea`) — ótimo para página de texto, um remendo sobre o balão branco do mangá | `#fff` |
+| Ao selecionar, o texto sumia | `::selection` com `color:transparent` — fazia sentido quando o texto era invisível SEMPRE; agora ele acende, e selecionar apagava a fala justo quando ela devia estar mais legível | `color:inherit` |
+| `I N   T H E   H A L L ! ! !` | eu espaçava letra a letra para cobrir a largura; em linha curta numa faixa larga o espaço por letra fica enorme — e agora esse texto APARECE | a **fonte** cresce para preencher, com teto pela altura da faixa; só o resíduo vai para o espaçamento |
+| Páginas onde o hover não faz nada | balão **sem linhas separadas** ficava com a fonte fixa do CSS e sem o filho ajustável: ao acender, uma letrinha perdida ou nada | usa o mesmo filho ajustável das linhas |
+
+#### A varredura (28 páginas, no Chrome)
+
+Encontrou 13 defeitos em 10 páginas. Os dois padrões que explicam a queixa
+dele: **53 balões sem linhas em 3 páginas** (hover morto) e **linhas com fonte
+abaixo de 7 px em 3 páginas** — texto que acende e continua ilegível é o mesmo
+que não acender. Piso subiu para 11 px.
+
+⚠️ **Ainda em aberto, achados pela varredura e NÃO corrigidos:**
+- **9 faixas altas demais** (>9% da folha) em 6 páginas — resto dos casos em
+  que a caixa do modelo veio errada e a projeção aceitou uma mancha de tinta.
+- **A página 17 nunca foi lida** — precisa de leitura.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
