@@ -6635,7 +6635,14 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   /* `1` porque a caixa da linha JÁ é a altura da linha: qualquer entrelinha
      extra faria o realce transbordar para cima e para baixo das letras. */
   line-height:1;
-  white-space:nowrap;
+  /* ⚠️ `pre`, NÃO `nowrap` — e a diferença é o espaço no FIM da linha. Cada
+     faixa termina com um espaço, para a fala não sair "CALL NICOROBIN!!!"
+     quando as linhas são juntadas. Sob `nowrap` o navegador trata espaço
+     final como colapsável e NÃO O RENDERIZA; o que não é renderizado não
+     entra na seleção, e o espaço sumia de novo (medido: textContent 25
+     caracteres, seleção 24). `pre` preserva o espaço literalmente e mantém
+     a linha sem quebrar, que é o outro motivo de `nowrap` estar aqui. */
+  white-space:pre;
   overflow:hidden;
   -webkit-user-select:text;user-select:text;
 }
