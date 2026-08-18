@@ -318,6 +318,7 @@ function lerFechar() {
   _lerGravarPendente()
   _lerBlobs.forEach(u => { try { URL.revokeObjectURL(u) } catch (e) {} })
   _lerBlobs = []
+  if (typeof mangaDesligarFluxo === 'function') mangaDesligarFluxo()
   _lerLivro = null; _lerEpub = null
   _lerT = null
   // Fechar o livro derruba a leitura junto: sem isto, as glosas do romance
@@ -367,6 +368,9 @@ function renderLeitor() {
 
   // O botão só existe onde faz sentido: num mangá com página por ler. Num
   // livro comum ele seria um botão morto na barra, e a barra já está cheia.
+  // A barra de zoom só no mangá: num livro ela não teria o que ajustar.
+  const c_mgbarra = (_lerLivro && _lerLivro.format === 'manga' && typeof mangaBarraHtml === 'function')
+    ? mangaBarraHtml() : ''
   const _mgF = (typeof mangaFaltam === 'function') ? mangaFaltam(_lerLivro) : 0
   const c_manga = _mgF
     ? `<button class="ler-btn" id="mg-lote" onclick="mangaLerVolume()" data-tip="Ler os balões das ${_mgF} páginas que faltam — dá para parar no meio, o que já foi lido fica guardado">${ic('sparkles','ic-sm')}</button>`
@@ -399,6 +403,8 @@ function renderLeitor() {
         </div>
         <button class="ler-seta ler-seta-d" onclick="lerAvancarPagina()" aria-label="Próxima página">${ic('chevronRight','ic-sm')}</button>
       </div>
+
+      ${c_mgbarra}
 
       <div class="ler-rodape">
         <button class="ler-btn ler-btn-txt" onclick="lerCapituloAnterior()">Anterior</button>
@@ -661,7 +667,10 @@ function _lerAplicarTipografia() {
 // CAPÍTULOS
 // ================================================================
 async function _lerHtmlDoCapitulo(i) {
-  if (_lerEpub.manga) return mangaHtmlDaPagina(_lerEpub.manga, _lerLivro, i)
+  // ⚠️ NO MANGÁ O "CAPÍTULO" É O VOLUME INTEIRO. Cada página ser um capítulo
+  // isolado obrigava a um clique entre páginas — 180 interrupções por volume,
+  // e foi o que ele apontou. Aqui sai o fluxo completo, e navegar vira rolar.
+  if (_lerEpub.manga) return mangaHtmlDoVolume(_lerEpub.manga, _lerLivro)
   if (_lerEpub.txtCaps) return _lerEpub.txtCaps[i] ? _lerEpub.txtCaps[i].html : ''
   const c = _lerLivro.chapters[i]
   if (!c || !c.href) return ''
@@ -750,6 +759,18 @@ function _lerMostrarTexto(mostrar) {
 async function lerIrParaCapitulo(i, frac = 0) {
   if (!_lerLivro) return
   i = Math.max(0, Math.min(i, _lerLivro.chapters.length - 1))
+  // Mangá com o fluxo já na tela: "ir para a página 40" é ROLAR até ela, não
+  // remontar nada. Remontar perderia as imagens já carregadas e daria um
+  // salto branco a cada navegação pelo sumário.
+  if (_lerLivro.format === 'manga' && typeof mangaFluxoMontado === 'function'
+      && mangaFluxoMontado(_lerLivro)) {
+    _lerCap = i
+    mangaIrParaPagina(i, false)
+    const nm = el('ler-cap-nome')
+    if (nm) nm.textContent = _lerLivro.chapters[i].titulo || `Página ${i + 1}`
+    _lerAtualizarProgresso()
+    return
+  }
   _lerCap = i
   const cont = el('ler-conteudo'); if (!cont) return
   _lerRestaurando = true
@@ -764,6 +785,10 @@ async function lerIrParaCapitulo(i, frac = 0) {
   })
   const nome = el('ler-cap-nome')
   if (nome) nome.textContent = _lerLivro.chapters[i].titulo || `Parte ${i + 1}`
+  if (_lerEpub.manga) {
+    mangaLigarFluxo(_lerEpub.manga, _lerLivro)
+    if (i > 0) mangaIrParaPagina(i, false)
+  }
   _lerRepintar()
   _lerMedirPaginas()
   // A leitura do capítulo anterior NÃO pode sobrar: as glosas são presas ao

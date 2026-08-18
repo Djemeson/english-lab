@@ -6517,16 +6517,66 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 
    Tudo posicionado em PORCENTAGEM sobre a imagem: acompanha zoom, giro de
    celular e mudança de largura sem uma linha de JavaScript recalculando. */
+/* O FLUXO: o volume inteiro numa coluna, sem corte entre páginas.
+   A largura vem de `--mg-larg`, que o zoom escreve — é o único ponto que
+   muda, então trocar de ajuste não remonta nada e não perde a rolagem. */
+.mg-fluxo{
+  width:var(--mg-larg, 100%);
+  max-width:none;
+  margin:0 auto;
+  display:flex;flex-direction:column;
+  align-items:center;
+  gap:var(--sp-2);
+}
+/* No modo "página", a folha inteira cabe na tela: aí faz sentido dar um
+   respiro entre uma e outra, para não parecer uma tira só. */
+.mg-fluxo[data-modo="altura"]{gap:var(--sp-6)}
+
 .mg-pagina{
   position:relative;
-  max-width:100%;
-  margin:0 auto var(--sp-4);
+  width:100%;
   line-height:0;                      /* mata o vão que o inline-block cria */
+  background:var(--surface2);         /* o lugar da página antes da imagem */
+  border-radius:var(--radius);
+  overflow:hidden;
 }
+/* O número da página, discreto no canto. Num fluxo contínuo sem ele não há
+   como saber onde se está sem olhar a barra. */
+.mg-num{
+  position:absolute;right:8px;bottom:8px;
+  padding:2px 8px;border-radius:20px;
+  background:rgba(0,0,0,.55);color:#fff;
+  font-size:var(--fs-3xs);font-weight:600;line-height:1.6;
+  pointer-events:none;opacity:.55;
+}
+
+/* A barra do mangá: ajuste, zoom e leitura automática. */
+.mg-barra{
+  display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;
+  padding:var(--sp-2) var(--sp-3);
+  border-top:1px solid var(--border);
+}
+.mg-zb{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 11px;border-radius:var(--radius-pill);
+  border:1px solid var(--border);background:transparent;
+  color:var(--text2);font-size:var(--fs-xs);font-weight:600;
+  cursor:pointer;transition:background .15s,color .15s,border-color .15s;
+}
+.mg-zb:hover{color:var(--text);border-color:var(--border-strong)}
+.mg-zb.on{
+  color:var(--role-ia);
+  border-color:rgba(var(--primary-rgb),.45);
+  background:rgba(var(--primary-rgb),.10);
+}
+.mg-zval{
+  min-width:52px;text-align:center;
+  font-size:var(--fs-xs);color:var(--text3);font-variant-numeric:tabular-nums;
+}
+.mg-zsep{width:1px;height:18px;background:var(--border);margin:0 4px}
 .mg-img{
   display:block;width:100%;height:auto;
   border-radius:var(--radius);
-  background:var(--surface2);         /* enquanto carrega, não pisca branco */
 }
 /* A camada inteira é transparente: entre um balão e outro há uma quebra de
    linha (para o contexto da Lexa não sair grudado), e sem isto essa quebra

@@ -204,7 +204,12 @@ async function mangaLerPagina(i, silencioso) {
     // Só redesenha se ainda for esta a página aberta — numa leitura em lote o
     // usuário continua virando páginas, e repintar por baixo dele seria pior
     // que não mostrar nada.
-    if (!silencioso && _lerCap === i) await lerIrParaCapitulo(i, 0)
+    // ⚠️ NÃO remontar o leitor aqui. No fluxo contínuo, `lerIrParaCapitulo`
+    // reconstruiria o volume inteiro e jogaria você para o começo — justo no
+    // momento em que está lendo aquela página. Repinta só a camada dela.
+    if (!mangaRepintarPagina(livro, i) && !silencioso && _lerCap === i) {
+      await lerIrParaCapitulo(i, 0)
+    }
     return true
   } catch (e) {
     console.warn('[mangá] não li a página', i + 1, e && e.message)
@@ -398,4 +403,251 @@ function mangaTextoDaPagina(livro, i) {
   const c = livro && livro.chapters && livro.chapters[i]
   if (!c || !Array.isArray(c.baloes)) return ''
   return c.baloes.map(b => b.t).join('\n')
+}
+
+// ================================================================
+// O LEITOR DE MANGÁ — rolagem contínua e zoom
+// ================================================================
+// ⚠️ MANGÁ NÃO SE LÊ PÁGINA A PÁGINA COM UM CLIQUE ENTRE ELAS. A primeira
+// versão tratava cada página como um capítulo isolado: rolava DENTRO da
+// página e parava na borda, exigindo um clique para a seguinte. Ler um
+// volume assim são 180 interrupções — foi o que ele apontou.
+//
+// Aqui o volume inteiro é UM fluxo. O que era "trocar de capítulo" virou
+// "rolar até a página", e a barra de cima acompanha sozinha onde você está.
+//
+// O custo disso seria a memória: 180 páginas de 800 KB viram 140 MB se todas
+// forem imagem ao mesmo tempo. Por isso a imagem de cada página só nasce
+// quando ela se APROXIMA da tela e é devolvida quando fica longe — o DOM tem
+// o volume todo, a memória tem meia dúzia de páginas.
+
+let _mgObs = null        // observador que carrega/descarrega as imagens
+let _mgObsPos = null     // observador que diz em que página você está
+let _mgMontado = null    // id do livro cujo fluxo já está na tela
+
+// Quanto a página ocupa. Guardado no livro na primeira medição: sem isto,
+// cada imagem que chega muda a altura do fluxo e a rolagem "pula" debaixo do
+// dedo — o defeito mais irritante que um leitor de imagem pode ter.
+function _mgProporcao(livro) {
+  return (livro && livro.mgProp) || '2 / 3'
+}
+
+async function mangaHtmlDoVolume(mg, livro) {
+  const paginas = []
+  for (let i = 0; i < livro.chapters.length; i++) {
+    paginas.push(
+      '<div class="mg-pagina" data-pg="' + i + '" style="aspect-ratio:' + _mgProporcao(livro) + '">' +
+        '<div class="mg-camada">' + _mgCamadaHtml(livro.chapters[i]) + '</div>' +
+        '<div class="mg-num">' + (i + 1) + '</div>' +
+      '</div>'
+    )
+  }
+  return '<div class="mg-fluxo" data-modo="' + escA(mangaZoom().modo) + '">' + paginas.join('') + '</div>'
+}
+
+function _mgCamadaHtml(c) {
+  const baloes = Array.isArray(c && c.baloes) ? c.baloes : []
+  return baloes.map((b, n) => {
+    const est = 'left:' + (b.x * 100).toFixed(3) + '%;top:' + (b.y * 100).toFixed(3) + '%;' +
+                'width:' + (b.w * 100).toFixed(3) + '%;height:' + (b.h * 100).toFixed(3) + '%'
+    return '<span class="mg-balao" style="' + est + '" data-b="' + n +
+           '" onclick="mangaTocarBalao(this)">' + esc(b.t || '') + '</span>'
+  }).join('\n')
+}
+
+// Redesenha a camada de UMA página, sem tocar na imagem nem na rolagem.
+// Depois de ler os balões, remontar o fluxo inteiro jogaria você para o
+// começo do volume — e é exatamente o momento em que você está lendo ali.
+function mangaRepintarPagina(livro, i) {
+  const div = document.querySelector('#ler-conteudo .mg-pagina[data-pg="' + i + '"]')
+  if (!div) return false
+  const camada = div.querySelector('.mg-camada')
+  if (!camada) return false
+  camada.innerHTML = _mgCamadaHtml(livro.chapters[i])
+  const av = div.querySelector('.mg-aviso')
+  if (av) av.remove()
+  return true
+}
+
+// Liga o fluxo: imagens sob demanda e a página corrente na barra.
+function mangaLigarFluxo(mg, livro) {
+  const cont = el('ler-conteudo'); if (!cont) return
+  mangaDesligarFluxo()
+  _mgMontado = livro.id
+  const raiz = el('ler-viewport') || null
+
+  // 600px de folga dos dois lados: a imagem chega antes de aparecer e só some
+  // depois de sair de vista. Sem folga, rolar rápido mostra buraco branco.
+  _mgObs = new IntersectionObserver(entradas => {
+    for (const e of entradas) {
+      if (e.isIntersecting) _mgCarregarPagina(mg, livro, e.target)
+      else _mgSoltarPagina(e.target)
+    }
+  }, { root: raiz, rootMargin: '600px 0px' })
+
+  // Qual página está mais no meio da tela — é ela que a barra deve nomear.
+  _mgObsPos = new IntersectionObserver(entradas => {
+    if (_lerRestaurando) return
+    let melhor = null
+    for (const e of entradas) {
+      if (!e.isIntersecting) continue
+      if (!melhor || e.intersectionRatio > melhor.intersectionRatio) melhor = e
+    }
+    if (!melhor) return
+    const i = +melhor.target.dataset.pg
+    if (i === _lerCap) return
+    _lerCap = i
+    const nome = el('ler-cap-nome')
+    if (nome) nome.textContent = (livro.chapters[i] && livro.chapters[i].titulo) || ('Página ' + (i + 1))
+    if (typeof _lerAtualizarProgresso === 'function') _lerAtualizarProgresso()
+    if (mangaAuto()) mangaLerPagina(i, true).catch(() => {})
+  }, { root: raiz, threshold: [0.25, 0.6] })
+
+  cont.querySelectorAll('.mg-pagina').forEach(d => { _mgObs.observe(d); _mgObsPos.observe(d) })
+  mangaAplicarZoom()
+}
+
+function mangaDesligarFluxo() {
+  if (_mgObs) { _mgObs.disconnect(); _mgObs = null }
+  if (_mgObsPos) { _mgObsPos.disconnect(); _mgObsPos = null }
+  // Os blobs das páginas que ficaram carregadas precisam voltar, senão fechar
+  // o volume não devolve a memória.
+  document.querySelectorAll('#ler-conteudo .mg-pagina').forEach(_mgSoltarPagina)
+  _mgMontado = null
+}
+
+async function _mgCarregarPagina(mg, livro, div) {
+  if (div.dataset.carregando || div.querySelector('img')) return
+  div.dataset.carregando = '1'
+  try {
+    const i = +div.dataset.pg
+    const c = livro.chapters[i]
+    const bytes = await mg.zip.bytes(c.href)
+    if (!bytes) return
+    const url = URL.createObjectURL(new Blob([bytes]))
+    const img = new Image()
+    img.className = 'mg-img'
+    img.alt = 'Página ' + (i + 1)
+    img.onload = () => {
+      // A proporção REAL da primeira página vira a estimativa das demais.
+      if (!livro.mgProp && img.naturalWidth) {
+        livro.mgProp = img.naturalWidth + ' / ' + img.naturalHeight
+        saveLivros()
+      }
+      if (img.naturalWidth) div.style.aspectRatio = img.naturalWidth + ' / ' + img.naturalHeight
+    }
+    img.src = url
+    div.insertBefore(img, div.firstChild)
+    div._mgUrl = url
+  } catch (e) {
+    console.warn('[mangá] página não carregou:', e.message)
+  } finally {
+    delete div.dataset.carregando
+  }
+}
+
+// ⚠️ `revokeObjectURL` NÃO É OPCIONAL. Sem ele, cada página visitada deixa o
+// blob preso até a aba fechar: um volume de 180 páginas terminaria com mais
+// de 100 MB pendurados, e no celular o sistema mata a aba antes disso.
+function _mgSoltarPagina(div) {
+  const img = div.querySelector('img')
+  if (img) img.remove()
+  if (div._mgUrl) { URL.revokeObjectURL(div._mgUrl); div._mgUrl = null }
+}
+
+// Rola até uma página — o que "ir para o capítulo" virou no mangá.
+function mangaIrParaPagina(i, suave) {
+  const cont = el('ler-conteudo'); if (!cont) return false
+  const alvo = cont.querySelector('.mg-pagina[data-pg="' + i + '"]')
+  if (!alvo) return false
+  alvo.scrollIntoView({ block: 'start', behavior: suave ? 'smooth' : 'auto' })
+  return true
+}
+
+function mangaFluxoMontado(livro) {
+  return !!(livro && _mgMontado === livro.id &&
+            document.querySelector('#ler-conteudo .mg-fluxo'))
+}
+
+// ---------------------------------------------------------------
+// Zoom e ajuste
+// ---------------------------------------------------------------
+// Três modos, porque três são as intenções reais: **largura** para ler
+// rolando (o padrão), **página** para ver a folha inteira de uma vez (a
+// página dupla, o painel grande), e **livre** para chegar perto de um balão
+// pequeno. O fator só vale no modo livre — nos outros ele brigaria com o
+// ajuste e o resultado seria imprevisível.
+function mangaZoom() {
+  const z = (typeof cfg !== 'undefined' && cfg && cfg.mgZoom) || {}
+  return { modo: z.modo || 'largura', fator: +z.fator || 1 }
+}
+
+function mangaDefinirZoom(modo, fator) {
+  cfg.mgZoom = { modo, fator: Math.max(0.4, Math.min(4, +fator || 1)) }
+  saveCfg()
+  mangaAplicarZoom()
+  _mgBarraZoom()
+}
+
+function mangaZoomPasso(d) {
+  const z = mangaZoom()
+  mangaDefinirZoom('livre', (z.modo === 'livre' ? z.fator : 1) + d)
+}
+
+function mangaAplicarZoom() {
+  const fluxo = document.querySelector('#ler-conteudo .mg-fluxo')
+  const vp = el('ler-viewport')
+  if (!fluxo || !vp) return
+  const z = mangaZoom()
+  fluxo.dataset.modo = z.modo
+  const larguraVp = vp.clientWidth || 0
+  if (!larguraVp) return              // aba oculta: medir aqui daria 0
+  let larg
+  if (z.modo === 'altura') {
+    const prop = String(_mgProporcao(typeof _lerLivro !== 'undefined' ? _lerLivro : null)).split('/').map(parseFloat)
+    const razao = (prop[0] && prop[1]) ? prop[0] / prop[1] : 2 / 3
+    larg = Math.min(larguraVp, (vp.clientHeight || 800) * razao)
+  } else if (z.modo === 'livre') {
+    larg = larguraVp * z.fator
+  } else {
+    larg = larguraVp
+  }
+  fluxo.style.setProperty('--mg-larg', Math.round(larg) + 'px')
+}
+
+// Ler sozinho a página em que você chegou. Ligado por padrão: o contrário é
+// alcançar a página e ter de pedir a leitura toda vez. Como a leitura começa
+// quando a página se aproxima, ela costuma estar pronta quando você chega.
+function mangaAuto() { return !(typeof cfg !== 'undefined' && cfg && cfg.mgAuto === false) }
+
+function mangaAlternarAuto() {
+  cfg.mgAuto = !mangaAuto()
+  saveCfg()
+  _mgBarraZoom()
+  toast(mangaAuto() ? 'Vou lendo os balões conforme você avança' : 'Leitura automática desligada', 'info')
+  if (mangaAuto() && typeof _lerCap === 'number') mangaLerPagina(_lerCap, true).catch(() => {})
+}
+
+// A barra do mangá. Só existe quando há mangá aberto.
+function mangaBarraHtml() {
+  const z = mangaZoom()
+  const bt = (m, rot, dica) =>
+    '<button class="mg-zb' + (z.modo === m ? ' on' : '') + '" onclick="mangaDefinirZoom(\'' + m + '\', 1)"' +
+    ' data-tip="' + escA(dica) + '">' + rot + '</button>'
+  return '<div class="mg-barra" id="mg-barra">' +
+    bt('largura', ic('expand', 'ic-sm') + ' Largura', 'A página ocupa a largura da tela — o modo de rolar lendo') +
+    bt('altura', ic('image', 'ic-sm') + ' Página', 'A folha inteira cabe na tela — para a arte e a página dupla') +
+    '<span class="mg-zsep"></span>' +
+    '<button class="mg-zb" onclick="mangaZoomPasso(-0.2)" data-tip="Afastar">&minus;</button>' +
+    '<b class="mg-zval">' + (z.modo === 'livre' ? Math.round(z.fator * 100) + '%' : 'ajuste') + '</b>' +
+    '<button class="mg-zb" onclick="mangaZoomPasso(0.2)" data-tip="Aproximar">+</button>' +
+    '<span class="mg-zsep"></span>' +
+    '<button class="mg-zb' + (mangaAuto() ? ' on' : '') + '" onclick="mangaAlternarAuto()"' +
+    ' data-tip="Ler os balões sozinho conforme você avança">' + ic('sparkles', 'ic-sm') + ' Auto</button>' +
+  '</div>'
+}
+
+function _mgBarraZoom() {
+  const b = el('mg-barra')
+  if (b) b.outerHTML = mangaBarraHtml()
 }
