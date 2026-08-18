@@ -6669,18 +6669,13 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 /* Segurar o dedo/mouse sobre a página mostra onde há texto para pegar. Sem
    esta dica o balão lido e o não lido são idênticos, e não há como saber se
    vale tentar selecionar. */
-.mg-pagina:hover .mg-balao:not(.mg-linhado),
-.mg-pagina:focus-within .mg-balao:not(.mg-linhado){
-  box-shadow:inset 0 0 0 1.5px rgba(var(--primary-rgb),.30);
-  border-radius:10px;
-}
-/* Com linhas, a dica acompanha cada uma — mostrar a caixa do balão inteiro
-   voltaria a sujar a arte, que é justamente o que se está corrigindo. */
-.mg-pagina:hover .mg-linhado .mg-linha,
-.mg-pagina:focus-within .mg-linhado .mg-linha{
-  box-shadow:inset 0 0 0 1px rgba(var(--primary-rgb),.22);
-  border-radius:4px;
-}
+/* ⚠️ NENHUM CONTORNO. A arte é a página; o texto sobreposto é uma ferramenta
+   invisível, e ferramenta invisível não desenha nada por cima do desenho.
+   Os retângulos que existiam aqui eram uma "dica de onde dá para selecionar"
+   — e foram exatamente o que ele fotografou três vezes achando que era
+   desalinhamento. A dica valia menos que o incômodo.
+   Quem mostra onde há texto é o CURSOR (`cursor:text` no balão) e o realce
+   que aparece quando você seleciona — como no mokuro. */
 
 /* O convite da página que ainda não foi lida. Canto de cima, discreto, e
    some assim que a leitura chega — não é um erro, é uma pendência. */
