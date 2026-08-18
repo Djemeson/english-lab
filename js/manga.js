@@ -603,15 +603,17 @@ function _mgCamadaHtml(c) {
       const estL = 'left:' + (lx * 100).toFixed(3) + '%;top:' + (ly * 100).toFixed(3) + '%;' +
                    'width:' + (lw * 100).toFixed(3) + '%;height:' + (lh * 100).toFixed(3) + '%;' +
                    'font-size:calc(var(--mg-alt, 1600px) * ' + l.h.toFixed(4) + ')'
-      return '<span class="mg-linha" style="' + estL + '">' + esc(l.t) + '</span>'
-  // ⚠️ O ESPAÇO ENTRE AS LINHAS NÃO É ENFEITE — é o mesmo defeito que já
-  // apareceu ENTRE balões, agora DENTRO de um. Sem ele os spans são irmãos
-  // colados e a fala selecionada sai "CALL NICOROBIN!!!": duas linhas viram
-  // uma palavra que não existe, e é isso que a Lexa recebe para explicar.
-  //
-  // O espaço é um nó de texto solto na camada, e a camada inteira é
-  // transparente — ele não desenha nada.
-    }).join(' ')
+      // ⚠️ O ESPAÇO VAI DENTRO DA LINHA, e isto custou duas tentativas.
+      // Sem separador nenhum, a fala saía "CALL NICOROBIN!!!" — duas linhas
+      // viram uma palavra que não existe, e é isso que chegava à Lexa.
+      // Um espaço ENTRE os spans não resolve: ele fica no DOM (o
+      // `textContent` mostra 25 caracteres) mas some da SELEÇÃO (24), porque
+      // um nó de texto entre elementos posicionados não gera caixa de layout
+      // e a serialização da seleção ignora o que não é renderizado.
+      // Dentro do span, o espaço é texto de verdade e vem junto.
+      const sep = (l === b.ls[b.ls.length - 1]) ? '' : ' '
+      return '<span class="mg-linha" style="' + estL + '">' + esc(l.t) + sep + '</span>'
+    }).join('')
     return abre + corpo + '</span>'
   }).join('\n')
 }
