@@ -6521,6 +6521,12 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
    A largura vem de `--mg-larg`, que o zoom escreve — é o único ponto que
    muda, então trocar de ajuste não remonta nada e não perde a rolagem. */
 .mg-fluxo{
+  /* ⚠️ `touch-action` É O QUE ENTREGA A PINÇA PARA NÓS. Sem ele o navegador
+     trata os dois dedos como zoom DA PÁGINA e amplia barra, rodapé e menu
+     junto — e o nosso gesto nunca chega. Com `pan-x pan-y`, arrastar com um
+     dedo continua rolando (nos dois eixos, que a página ampliada precisa) e
+     o gesto de dois dedos vira nosso. */
+  touch-action:pan-x pan-y;
   width:var(--mg-larg, 100%);
   max-width:none;
   margin:0 auto;

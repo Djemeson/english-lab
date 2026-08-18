@@ -539,6 +539,7 @@ function mangaLigarFluxo(mg, livro) {
   // Ele também é o que garante o comportamento em navegador que trate o
   // observador de forma diferente: a página corrente nunca depende de UM
   // mecanismo só.
+  mangaPincaLigar()
   clearInterval(_mgPulso)
   _mgPulso = setInterval(() => {
     if (!_mgMontado) { clearInterval(_mgPulso); _mgPulso = 0; return }
@@ -548,6 +549,7 @@ function mangaLigarFluxo(mg, livro) {
 }
 
 function mangaDesligarFluxo() {
+  if (typeof mangaPincaDesligar === 'function') mangaPincaDesligar()
   if (_mgObs) { _mgObs.disconnect(); _mgObs = null }
   if (_mgAoRolar) document.removeEventListener('scroll', _mgAoRolar, { capture: true })
   _mgAoRolar = null
@@ -725,6 +727,11 @@ function mangaAplicarZoom() {
     larg = larguraVp
   }
   fluxo.style.setProperty('--mg-larg', Math.round(larg) + 'px')
+  // ⚠️ AMPLIAR SEM ROLAGEM LATERAL SERIA CORTAR A PÁGINA. A viewport do
+  // leitor esconde o transbordo horizontal (é o que faz o modo paginado
+  // funcionar); no mangá ampliado ela precisa deixar arrastar para o lado,
+  // senão as bordas do desenho ficam inalcançáveis.
+  vp.style.overflowX = (larg > larguraVp + 2) ? 'auto' : ''
 }
 
 // Ler sozinho a página em que você chegou. Ligado por padrão: o contrário é
@@ -762,4 +769,120 @@ function mangaBarraHtml() {
 function _mgBarraZoom() {
   const b = el('mg-barra')
   if (b) b.outerHTML = mangaBarraHtml()
+}
+
+// ---------------------------------------------------------------
+// PINÇA — dois dedos para aproximar, no celular
+// ---------------------------------------------------------------
+// ⚠️ POR QUE NÃO DEIXAR A PINÇA DO NAVEGADOR RESOLVER: ela amplia a PÁGINA
+// inteira — barra, rodapé e menu junto —, e ao soltar você fica com a
+// interface gigante e o texto do balão do mesmo tamanho relativo. Aqui a
+// pinça mexe só na LARGURA DO FLUXO, que é o mesmo controle dos botões: o
+// resto da tela fica onde está, e a camada de texto acompanha a arte porque
+// está posicionada em porcentagem.
+//
+// O gesto de um dedo continua sendo rolar — o leitor já tem gestos próprios,
+// mas eles só agem no modo paginado, e mangá nunca é paginado. Sem conflito.
+
+let _mgPinca = null      // estado enquanto os dois dedos estão na tela
+let _mgPincaLigada = false
+
+function _mgDistancia(t) {
+  const dx = t[0].clientX - t[1].clientX
+  const dy = t[0].clientY - t[1].clientY
+  return Math.hypot(dx, dy)
+}
+
+function _mgPincaIni(ev) {
+  if (ev.touches.length !== 2) { _mgPinca = null; return }
+  const vp = el('ler-viewport')
+  const fluxo = document.querySelector('#ler-conteudo .mg-fluxo')
+  if (!vp || !fluxo) return
+  const z = mangaZoom()
+  const rv = vp.getBoundingClientRect()
+  _mgPinca = {
+    d0: _mgDistancia(ev.touches),
+    // O fator de partida: nos modos de ajuste o zoom vale 1 por definição, e
+    // é a largura ATUAL que serve de base — assim a pinça começa exatamente
+    // de onde a página está, sem salto no primeiro milímetro de gesto.
+    f0: z.modo === 'livre' ? z.fator : (fluxo.getBoundingClientRect().width / (vp.clientWidth || 1)),
+    cx: (ev.touches[0].clientX + ev.touches[1].clientX) / 2 - rv.left,
+    cy: (ev.touches[0].clientY + ev.touches[1].clientY) / 2 - rv.top,
+  }
+  // Uma seleção viva atrapalha: o navegador tentaria arrastar as alças dela.
+  try { window.getSelection().removeAllRanges() } catch (e) {}
+  ev.preventDefault()
+}
+
+function _mgPincaMove(ev) {
+  if (!_mgPinca || ev.touches.length !== 2) return
+  ev.preventDefault()
+  const vp = el('ler-viewport')
+  const fluxo = document.querySelector('#ler-conteudo .mg-fluxo')
+  if (!vp || !fluxo) return
+  const d = _mgDistancia(ev.touches)
+  if (!_mgPinca.d0) return
+  const fator = Math.max(0.4, Math.min(4, _mgPinca.f0 * (d / _mgPinca.d0)))
+
+  const larg0 = fluxo.getBoundingClientRect().width
+  cfg.mgZoom = { modo: 'livre', fator }
+  mangaAplicarZoom()
+  const larg1 = fluxo.getBoundingClientRect().width
+  if (!larg0 || !larg1) return
+
+  // ⚠️ O PONTO ENTRE OS DEDOS PRECISA FICAR PARADO. Sem esta correção o
+  // conteúdo cresce a partir do topo e a cena que você estava olhando
+  // escapa da tela — a sensação é a de que o leitor "fugiu" do dedo.
+  const k = larg1 / larg0
+  vp.scrollTop = (vp.scrollTop + _mgPinca.cy) * k - _mgPinca.cy
+  vp.scrollLeft = (vp.scrollLeft + _mgPinca.cx) * k - _mgPinca.cx
+}
+
+function _mgPincaFim(ev) {
+  if (!_mgPinca) return
+  if (ev.touches && ev.touches.length >= 2) return
+  _mgPinca = null
+  // Só agora grava e redesenha o rótulo: durante o gesto seriam dezenas de
+  // gravações por segundo, e o número piscando no rodapé cansa a vista.
+  saveCfg()
+  _mgBarraZoom()
+}
+
+// Dois toques rápidos voltam ao ajuste — é o "desfazer" do gesto, e sem ele
+// a única saída da pinça seria caçar o botão certo no rodapé.
+let _mgUltimoToque = 0
+function _mgToqueDuplo(ev) {
+  if (ev.touches && ev.touches.length > 1) return
+  const agora = Date.now()
+  const rapido = agora - _mgUltimoToque < 300
+  _mgUltimoToque = agora
+  if (!rapido) return
+  ev.preventDefault()
+  mangaDefinirZoom(mangaZoom().modo === 'livre' ? 'largura' : 'altura', 1)
+}
+
+function mangaPincaLigar() {
+  const fluxo = document.querySelector('#ler-conteudo .mg-fluxo')
+  if (!fluxo || _mgPincaLigada) return
+  // `passive:false` é obrigatório: sem ele o `preventDefault` é ignorado e o
+  // navegador amplia a página inteira por baixo do nosso gesto.
+  fluxo.addEventListener('touchstart', _mgPincaIni, { passive: false })
+  fluxo.addEventListener('touchmove', _mgPincaMove, { passive: false })
+  fluxo.addEventListener('touchend', _mgPincaFim, { passive: true })
+  fluxo.addEventListener('touchcancel', _mgPincaFim, { passive: true })
+  fluxo.addEventListener('touchend', _mgToqueDuplo, { passive: false })
+  _mgPincaLigada = true
+}
+
+function mangaPincaDesligar() {
+  const fluxo = document.querySelector('#ler-conteudo .mg-fluxo')
+  if (fluxo) {
+    fluxo.removeEventListener('touchstart', _mgPincaIni)
+    fluxo.removeEventListener('touchmove', _mgPincaMove)
+    fluxo.removeEventListener('touchend', _mgPincaFim)
+    fluxo.removeEventListener('touchcancel', _mgPincaFim)
+    fluxo.removeEventListener('touchend', _mgToqueDuplo)
+  }
+  _mgPinca = null
+  _mgPincaLigada = false
 }
