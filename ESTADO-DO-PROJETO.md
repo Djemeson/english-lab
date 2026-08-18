@@ -10321,6 +10321,40 @@ carregar e a medição não tem o que medir.
 
 Nada disso se resolve por aqui com a aba oculta: precisa da janela à vista.
 
+
+### 8.32 — A varredura completa, com a janela à vista
+
+Ele deixou a janela do Chrome visível e a varredura que vinha travando rodou
+inteira. **O alinhamento está resolvido.**
+
+| Medida | Resultado |
+|---|---|
+| Páginas com fala varridas | **19 de 19** |
+| Balões alinhados (DOM x dados) | **todos** — pior desvio: **0** |
+| Páginas com problema | **nenhuma** |
+
+⚠️ **Isto só foi possível com a aba em primeiro plano.** Com ela oculta o
+navegador congela `requestAnimationFrame`, estrangula temporizadores e não roda
+o `IntersectionObserver` — as imagens não carregam e a medição não tem o que
+medir. Vale como regra: **medição de tela no mangá exige a janela à vista**,
+e dizer isso é melhor do que entregar número que não vale.
+
+#### Os dois pontos que sobraram, agora explicados
+
+**52 balões sem linhas — 50 deles na MESMA página.** É a página 4, o resumo do
+volume ("The story of ONE PIECE 1»100"), que não é página de história: são 50
+caixinhas de texto corrido. Nas 18 páginas de mangá de verdade sobram **dois**.
+
+**A página 21 falhava com HTTP 400 em toda tentativa.** Medido: o arquivo
+`022.jpg` tem **ZERO byte** — o empacotador falhou ali, dentro do CBZ dele. Não
+era defeito do app, mas o app insistia: o selo ficava eternamente em "tentar de
+novo" e cada tentativa era uma chamada paga. Arquivo abaixo de 512 bytes agora
+é marcado como lido-sem-fala.
+
+**Restam 27 balões (12%) com linhas mas sem medição no pixel** — a projeção não
+teve confiança e preferiu manter a caixa do modelo a apontar para o texto
+errado. Nesses o realce continua sendo a caixa do balão.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
