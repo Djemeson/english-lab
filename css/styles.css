@@ -6528,7 +6528,10 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   border-radius:var(--radius);
   background:var(--surface2);         /* enquanto carrega, não pisca branco */
 }
-.mg-camada{position:absolute;inset:0;line-height:normal}
+/* A camada inteira é transparente: entre um balão e outro há uma quebra de
+   linha (para o contexto da Lexa não sair grudado), e sem isto essa quebra
+   herdaria a cor do texto e sujaria a arte. */
+.mg-camada{position:absolute;inset:0;line-height:normal;color:transparent}
 
 /* Cada balão. O `color:transparent` deixa a arte original aparecer; o
    ::selection pintado é o que dá o retorno visual de "selecionei isto". */

@@ -114,7 +114,12 @@ async function mangaHtmlDaPagina(mg, livro, i) {
     const est = `left:${(b.x * 100).toFixed(3)}%;top:${(b.y * 100).toFixed(3)}%;` +
                 `width:${(b.w * 100).toFixed(3)}%;height:${(b.h * 100).toFixed(3)}%`
     return `<span class="mg-balao" style="${est}" data-b="${n}" onclick="mangaTocarBalao(this)">${esc(b.t || '')}</span>`
-  }).join('')
+  // ⚠️ A QUEBRA ENTRE OS BALÕES NÃO É ENFEITE. Sem ela os spans são irmãos
+  // colados, e o contexto que vai para a Lexa sai grudado: "CALL HER
+  // HERE!!CALL NICO ROBIN!!!" — duas falas viram uma palavra impossível.
+  // Com a quebra, o contexto continua sendo a PÁGINA inteira (que é o que
+  // ela precisa para entender a cena), só que legível.
+  }).join('\n')
 
   const aviso = baloes.length ? '' :
     (c.baloes === null
