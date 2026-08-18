@@ -6679,12 +6679,12 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   color:inherit;
   font-style:normal;
 }
-.mg-linha::selection{background:rgba(var(--primary-rgb),.45);color:transparent}
-.mg-t::selection{background:rgba(var(--primary-rgb),.45);color:transparent}
-.mg-t::-moz-selection{background:rgba(var(--primary-rgb),.45);color:transparent}
-.mg-linha::-moz-selection{background:rgba(var(--primary-rgb),.45);color:transparent}
-.mg-balao::selection{background:rgba(var(--primary-rgb),.45);color:transparent}
-.mg-balao::-moz-selection{background:rgba(var(--primary-rgb),.45);color:transparent}
+.mg-linha::selection{background:rgba(var(--primary-rgb),.35);color:inherit}
+.mg-t::selection{background:rgba(var(--primary-rgb),.35);color:inherit}
+.mg-t::-moz-selection{background:rgba(var(--primary-rgb),.35);color:inherit}
+.mg-linha::-moz-selection{background:rgba(var(--primary-rgb),.35);color:inherit}
+.mg-balao::selection{background:rgba(var(--primary-rgb),.35);color:inherit}
+.mg-balao::-moz-selection{background:rgba(var(--primary-rgb),.35);color:inherit}
 
 /* Segurar o dedo/mouse sobre a página mostra onde há texto para pegar. Sem
    esta dica o balão lido e o não lido são idênticos, e não há como saber se
@@ -6710,13 +6710,16 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 .mg-balao:hover,
 .mg-balao:focus-within,
 .mg-balao.mg-aceso{
-  background:var(--ler-bg, #fff);
-  color:var(--ler-fg, #111);
-  box-shadow:0 0 0 3px var(--ler-bg, #fff);
+  /* ⚠️ BRANCO, e não `--ler-bg`. O tema do leitor é creme (#f7f3ea) — ótimo
+     para página de texto, errado aqui: o balão do mangá é branco, e um
+     retângulo creme sobre ele aparece como remendo. */
+  background:#fff;
+  color:#111;
+  box-shadow:0 0 0 3px #fff;
 }
 .mg-balao:hover .mg-linha,
 .mg-balao:focus-within .mg-linha,
-.mg-balao.mg-aceso .mg-linha{ color:var(--ler-fg, #111) }
+.mg-balao.mg-aceso .mg-linha{ color:#111 }
 .mg-balao:hover .mg-t,
 .mg-balao:focus-within .mg-t,
 .mg-balao.mg-aceso .mg-t{ color:inherit }
