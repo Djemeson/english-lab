@@ -505,6 +505,11 @@ function mangaLigarFluxo(mg, livro) {
 
   cont.querySelectorAll('.mg-pagina').forEach(d => { _mgObs.observe(d); _mgObsPos.observe(d) })
   mangaAplicarZoom()
+  // Duas passadas: a primeira pega o que já está na tela; a segunda cobre o
+  // caso de o layout ainda estar assentando (imagem que chega muda alturas).
+  mangaGarantirVisiveis(mg, livro)
+  setTimeout(() => mangaGarantirVisiveis(mg, livro), 350)
+  setTimeout(() => mangaGarantirVisiveis(mg, livro), 1200)
 }
 
 function mangaDesligarFluxo() {
@@ -555,12 +560,42 @@ function _mgSoltarPagina(div) {
   if (div._mgUrl) { URL.revokeObjectURL(div._mgUrl); div._mgUrl = null }
 }
 
+// ⚠️ O OBSERVADOR NÃO ACORDA SOZINHO NO PRIMEIRO QUADRO. Medido: com o volume
+// recém-montado e a página 1 no topo, ele reportava ZERO interseções — a tela
+// ficava em branco até o primeiro toque de rolagem, e só então as imagens
+// apareciam. É o comportamento dele quando os elementos são observados no
+// mesmo quadro em que entram no DOM, antes do layout final existir.
+//
+// Esta varredura é a rede: percorre as páginas uma vez e carrega o que está
+// perto da tela, sem depender de evento nenhum. Roda ao montar e depois de
+// cada salto de página — barato, porque só olha retângulos.
+function mangaGarantirVisiveis(mg, livro) {
+  const cont = el('ler-conteudo'); const vp = el('ler-viewport')
+  if (!cont || !vp) return 0
+  const rv = vp.getBoundingClientRect()
+  if (!rv.height) return 0                 // aba oculta: medir aqui daria 0
+  const folga = 600
+  let n = 0
+  for (const div of cont.querySelectorAll('.mg-pagina')) {
+    const r = div.getBoundingClientRect()
+    const perto = r.bottom > rv.top - folga && r.top < rv.bottom + folga
+    if (perto && !div.querySelector('img')) { _mgCarregarPagina(mg, livro, div); n++ }
+  }
+  return n
+}
+
 // Rola até uma página — o que "ir para o capítulo" virou no mangá.
 function mangaIrParaPagina(i, suave) {
   const cont = el('ler-conteudo'); if (!cont) return false
   const alvo = cont.querySelector('.mg-pagina[data-pg="' + i + '"]')
   if (!alvo) return false
   alvo.scrollIntoView({ block: 'start', behavior: suave ? 'smooth' : 'auto' })
+  // Saltar 40 páginas de uma vez não dá tempo ao observador: sem isto, o
+  // sumário levava a uma tela vazia que só se enchia ao mexer na rolagem.
+  if (typeof _lerEpub !== 'undefined' && _lerEpub && _lerEpub.manga) {
+    mangaGarantirVisiveis(_lerEpub.manga, _lerLivro)
+    setTimeout(() => mangaGarantirVisiveis(_lerEpub.manga, _lerLivro), 300)
+  }
   return true
 }
 
