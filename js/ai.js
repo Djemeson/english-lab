@@ -1571,14 +1571,14 @@ function _aiFormato(modo, schema, nome) {
 // VAZIO — paga-se a imagem inteira e não vem nada. Foi assim que a leitura do
 // capítulo morreu uma vez (ver comentário em `_aiRaciocina`). O teto é LIMITE,
 // não reserva: a folga não custa nada a quem não usa.
-async function aiVisaoJSON(pedido, base64, { maxTokens = 8000, model, timeoutMs = 90000, retries = 1, mime = 'image/jpeg' } = {}) {
+async function aiVisaoJSON(pedido, base64, { maxTokens = 8000, model, timeoutMs = 90000, retries = 1, mime = 'image/jpeg', temperature = 0 } = {}) {
   return aiJSON([{ role: 'user', content: [
     { type: 'text', text: pedido },
     { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
-  ]}], { maxTokens, model, timeoutMs, retries })
+  ]}], { maxTokens, model, timeoutMs, retries, temperature })
 }
 
-async function aiJSON(messages, { maxTokens, model, timeoutMs, retries, schema, schemaNome } = {}) {
+async function aiJSON(messages, { maxTokens, model, timeoutMs, retries, schema, schemaNome, temperature } = {}) {
   const chat = aiChatCfg()
   if (!chat.key) throw new Error('Chave da ' + chat.P.nome + ' não configurada (Configurações → IA)')
   const m = model || chat.model
@@ -1587,6 +1587,9 @@ async function aiJSON(messages, { maxTokens, model, timeoutMs, retries, schema, 
     model: mod,
     ..._aiFormato(modo, schema, schemaNome),
     messages: msgs,
+    // Só entra quando pedida: os modelos que raciocinam RECUSAM temperatura
+    // diferente de 1, e mandá-la sempre quebraria as chamadas de análise.
+    ...(typeof temperature === 'number' && !_aiRaciocina(mod) ? { temperature } : {}),
     ..._aiTokenParam(mod, maxTokens)
   })
   // O modo estrito só entra quando HÁ esquema e o fornecedor o sustenta.

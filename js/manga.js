@@ -109,7 +109,7 @@ async function mangaHtmlDaPagina(mg, livro, i) {
   const camada = baloes.map((b, n) => {
     const est = `left:${(b.x * 100).toFixed(3)}%;top:${(b.y * 100).toFixed(3)}%;` +
                 `width:${(b.w * 100).toFixed(3)}%;height:${(b.h * 100).toFixed(3)}%`
-    return `<span class="mg-balao" style="${est}" data-b="${n}">${esc(b.t || '')}</span>`
+    return `<span class="mg-balao" style="${est}" data-b="${n}" onclick="mangaTocarBalao(this)">${esc(b.t || '')}</span>`
   }).join('')
 
   const aviso = baloes.length ? '' :
@@ -122,6 +122,29 @@ async function mangaHtmlDaPagina(mg, livro, i) {
     <img class="mg-img" src="${url}" alt="Página ${i + 1}">
     <div class="mg-camada">${camada}</div>
   </div>${aviso}`
+}
+
+// ⚠️ UM TOQUE PEGA A FALA INTEIRA — e isto é o que torna a imprecisão da
+// caixa irrelevante. MEDIDO: o texto sai 7/7 em toda chamada, mas a caixa
+// OSCILA entre chamadas (7 centros certos numa, 5 na seguinte, com o mesmo
+// código e a mesma página). Se a leitura dependesse de arrastar o dedo com
+// precisão sobre um texto que não se vê, esse tremor viraria "às vezes não
+// funciona" — o pior defeito que existe, porque não dá para reproduzir.
+//
+// Tocando, basta o balão estar mais ou menos onde está. E é o gesto que a
+// pessoa já faria: no mangá se lê balão a balão, não palavra a palavra.
+// Arrastar continua funcionando para quem quer só uma expressão.
+function mangaTocarBalao(elemento) {
+  try {
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    const r = document.createRange()
+    r.selectNodeContents(elemento)
+    sel.addRange(r)
+    // O leitor ouve `mouseup` e lê a seleção 10ms depois. O clique chega antes
+    // desse prazo, então a seleção que ele encontra já é esta — nada a
+    // disparar à mão, e o caminho continua sendo o mesmo do livro.
+  } catch (e) { console.warn('[mangá] não consegui selecionar o balão:', e.message) }
 }
 
 // ---------------------------------------------------------------
