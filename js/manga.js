@@ -172,25 +172,30 @@ function mangaAjustarLinhas(raiz) {
     if (!largura) continue
     t.style.letterSpacing = ''
     t.style.transform = ''
+    t.style.fontSize = ''
     const propria = t.offsetWidth
     if (!propria) continue
-    // ⚠️ ESPAÇO ENTRE LETRAS, NÃO ESTICAMENTO. `scaleX` cobria a largura certa
-    // mas DEFORMA a letra — e agora que o balão acende no hover, esse texto
-    // deformado aparece na tela. Distribuindo a diferença entre os caracteres,
-    // a linha ocupa exatamente a largura da fala impressa e cada letra
-    // continua com a forma que a fonte desenhou.
-    const chars = Math.max(1, (t.textContent || '').length)
-    const folga = (largura - propria) / chars
-    // Sobra por caractere fica em `em` implícito via px — teto para não virar
-    // texto espaçado a esmo quando a leitura veio muito mais curta.
-    const espaco = Math.max(-2, Math.min(24, folga))
-    t.style.letterSpacing = espaco.toFixed(2) + 'px'
-    // O que o espaçamento não cobre (linha longa demais para a caixa) fica
-    // com o encolhimento — ali deformar é melhor que transbordar para o
-    // realce da linha vizinha.
-    const depois = t.offsetWidth
-    if (depois > largura + 1) {
-      t.style.transform = 'scaleX(' + Math.max(0.08, largura / depois).toFixed(4) + ')'
+    // ⚠️ CRESCER A FONTE, NÃO AFASTAR AS LETRAS. Espaçar caractere a caractere
+    // cobre a largura certa, mas quando a linha é curta ("IN THE" numa faixa
+    // larga) o espaço por letra fica enorme e o resultado é "I N   T H E" —
+    // ilegível, e agora esse texto APARECE no hover. Ele mandou o print.
+    //
+    // Escalando o tamanho da fonte, a linha preenche a largura com a letra
+    // inteira, na proporção que a fonte desenhou. Só o que sobra depois do
+    // teto é acertado no espaçamento.
+    const base = parseFloat(getComputedStyle(t).fontSize) || 14
+    // Teto pela ALTURA da faixa: fonte maior que a linha impressa transbordaria
+    // para cima e para baixo, invadindo a linha vizinha.
+    const alturaFaixa = pai.clientHeight || base
+    const tamanho = Math.max(6, Math.min(base * (largura / propria), alturaFaixa * 1.05))
+    t.style.fontSize = tamanho.toFixed(2) + 'px'
+    // O resíduo — quando o teto de altura impediu chegar à largura — vai para
+    // o espaçamento, com limite curto para não voltar ao "I N   T H E".
+    const agora = t.offsetWidth
+    if (agora && Math.abs(agora - largura) > 2) {
+      const chars = Math.max(1, (t.textContent || '').length)
+      const espaco = Math.max(-1.5, Math.min(tamanho * 0.35, (largura - agora) / chars))
+      t.style.letterSpacing = espaco.toFixed(2) + 'px'
     }
     pai.dataset.ok = '1'
     n++
