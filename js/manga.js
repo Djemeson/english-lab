@@ -366,7 +366,20 @@ function _mgAplicar(livro, i, brutos, sfx) {
       const lx = preso(lc.x, 0, 1), ly = preso(lc.y, 0, 1)
       const lw = Math.min(1 - lx, Math.max(0, lc.w)), lh = Math.min(1 - ly, Math.max(0, lc.h))
       if (lw < 0.008 || lh < 0.004) continue
-      linhas.push({ t: lt, x: +lx.toFixed(4), y: +ly.toFixed(4), w: +lw.toFixed(4), h: +lh.toFixed(4) })
+      // ⚠️ LINHA ALTA DEMAIS É CAIXA ERRADA, NÃO LETRA GRANDE. Medido: o balão
+      // "WHAT?!" — uma palavra — veio com linha de **30% da altura da página**.
+      // Uma linha de mangá não passa de ~6% nem no grito mais berrado. Caixa
+      // assim vira um alvo gigante sobre a arte e envenena tudo o que se
+      // calcula a partir dela (a janela de busca, a altura mínima da faixa).
+      // Encolhida para 4% em torno do próprio centro: deixa de atrapalhar e
+      // continua cobrindo a palavra.
+      const linha = { t: lt, x: +lx.toFixed(4), y: +ly.toFixed(4), w: +lw.toFixed(4), h: +lh.toFixed(4) }
+      if (linha.h > 0.06) {
+        const meio = linha.y + linha.h / 2
+        linha.h = 0.04
+        linha.y = +Math.max(0, meio - 0.02).toFixed(4)
+      }
+      linhas.push(linha)
     }
     const item = { t, x: +x.toFixed(4), y: +y.toFixed(4), w: +w.toFixed(4), h: +h.toFixed(4) }
     // Só aceita as linhas se elas cobrirem o balão de verdade: um punhado de
