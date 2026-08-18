@@ -6598,7 +6598,12 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   font-size:var(--fs-xs);color:var(--text3);font-variant-numeric:tabular-nums;
 }
 .mg-zsep{width:1px;height:18px;background:var(--border);margin:0 4px}
-.mg-img{
+/* ⚠️ O SELETOR PRECISA DE DUAS CLASSES. `.mg-img` sozinho PERDE para
+   `.ler-conteudo img` — uma classe contra classe+elemento — e a margem do
+   leitor continuava valendo mesmo com `margin:0` escrito aqui. Medido: o CSS
+   dizia `margin: 22.8px 0px` depois do meu conserto. Especificidade não é
+   detalhe; é a diferença entre a regra existir e a regra valer. */
+.ler-conteudo .mg-img{
   display:block;width:100%;height:auto;
   border-radius:var(--radius);
   /* ⚠️ `margin:0` NÃO É REDUNDANTE. O leitor dá `margin:1.2em auto` a toda
