@@ -137,8 +137,9 @@ Rules:
 - One entry per SPEECH BALLOON (also thought balloons and caption boxes).
 - "text": the dialogue exactly as printed. Join broken lines into one sentence
   with single spaces. Keep punctuation and apostrophes. NEVER translate.
-- x, y, w, h: the balloon's bounding box as FRACTIONS of the page (0 to 1),
-  where x,y is the TOP-LEFT corner. Be tight around the TEXT, not the drawing.
+- x, y, w, h: the balloon's bounding box in the 0-1000 normalized scale,
+  where x,y is the TOP-LEFT corner and 1000 is the full page width/height.
+  Be tight around the TEXT, not around the drawing.
 - Order: natural reading order for this page.
 - "sfx": sound effects drawn OUTSIDE balloons. Text only, no boxes.
 - If the page has no dialogue at all, return {"balloons":[],"sfx":[]}.`
@@ -189,14 +190,15 @@ async function mangaLerPagina(i, silencioso) {
 function _mgAplicar(livro, i, brutos, sfx) {
   const num = (v, padrao) => (typeof v === 'number' && isFinite(v)) ? v : padrao
   const preso = (v, min, max) => Math.max(min, Math.min(max, v))
+  const escala = _mgEscala(brutos)
   const bons = []
   for (const b of brutos) {
     const t = String((b && b.t) || (b && b.text) || '').replace(/\s+/g, ' ').trim()
     if (!t) continue
-    let x = preso(num(b.x, 0), 0, 1)
-    let y = preso(num(b.y, 0), 0, 1)
-    let w = preso(num(b.w, 0), 0, 1)
-    let h = preso(num(b.h, 0), 0, 1)
+    let x = preso(num(b.x, 0) / escala, 0, 1)
+    let y = preso(num(b.y, 0) / escala, 0, 1)
+    let w = preso(num(b.w, 0) / escala, 0, 1)
+    let h = preso(num(b.h, 0) / escala, 0, 1)
     if (x + w > 1) w = 1 - x
     if (y + h > 1) h = 1 - y
     // Caixa degenerada: o texto ficaria espremido num ponto e impossível de
@@ -215,6 +217,32 @@ function _mgAplicar(livro, i, brutos, sfx) {
   livro.totalChars = livro.chapters.reduce((s, x) => s + (x.chars || 0), 0)
   livro.totalWords = livro.chapters.reduce((s, x) => s + (x.words || 0), 0)
   livro.updatedAt = Date.now()
+}
+
+// ⚠️ O MODELO NÃO USA A ESCALA QUE VOCÊ PEDIR. Pedi caixa em fração (0 a 1) e
+// o Gemini devolveu `x:211, y:95, w:341, h:80` — a escala 0–1000, que é a
+// convenção interna dele para caixas. O texto vinha 7/7 CERTO e as caixas com
+// **0% de sobreposição**: o texto invisível caía fora do balão e a seleção
+// parecia quebrada sem um único erro no console. O defeito mudo que eu tinha
+// mapeado como risco, acontecendo de verdade no primeiro teste.
+//
+// Por isso a escala é DEDUZIDA dos números, não combinada: o prompt pede
+// 0–1000 (o que o Gemini já faz sozinho), e isto aqui é a rede — se um dia
+// outro fornecedor devolver fração, funciona igual, sem tocar em nada.
+//
+// A dedução olha as BORDAS (x+w, y+h), não só os cantos: uma página com um
+// balão pequeno no alto à esquerda tem cantos pequenos em qualquer escala, e
+// só a borda distingue 0,3 de 300.
+function _mgEscala(brutos) {
+  let maior = 0
+  for (const b of brutos || []) {
+    for (const v of [b.x, b.y, b.w, b.h, (b.x || 0) + (b.w || 0), (b.y || 0) + (b.h || 0)]) {
+      if (typeof v === 'number' && isFinite(v) && v > maior) maior = v
+    }
+  }
+  if (maior <= 1.5) return 1        // fração (0 a 1)
+  if (maior <= 110) return 100      // porcentagem
+  return 1000                       // a convenção do Gemini
 }
 
 // Base64 sem passar por canvas: a imagem vai para a IA EXATAMENTE como está no
