@@ -889,6 +889,10 @@ function _lerPasso() {
 }
 
 function _lerFracAtual() {
+  // No mangá a posição inteira cabe em `cap` (a página). Gravar fração aqui
+  // seria gravar "onde estou dentro do volume", que na volta brigaria com a
+  // página — dois donos para a mesma informação.
+  if (_lerLivro && _lerLivro.format === 'manga') return 0
   const vp = el('ler-viewport'); if (!vp) return 0
   if (_lerPaginado()) {
     const max = vp.scrollWidth - vp.clientWidth
@@ -900,6 +904,15 @@ function _lerFracAtual() {
 
 function _lerIrParaFrac(frac) {
   const vp = el('ler-viewport'); if (!vp) return
+  // ⚠️ NO MANGÁ A POSIÇÃO É A PÁGINA, NÃO UMA FRAÇÃO. A fração salva vinha de
+  // quando cada página era um capítulo — aplicada ao volume inteiro, um
+  // `frac: 1` (fim daquela página) virava "fim do volume", e abrir o mangá
+  // jogava direto na última folha. Foi o que aconteceu no primeiro teste do
+  // fluxo contínuo: a página 1 estava 45.000 px acima da tela.
+  if (_lerLivro && _lerLivro.format === 'manga') {
+    if (typeof mangaIrParaPagina === 'function') mangaIrParaPagina(_lerCap, false)
+    return
+  }
   frac = Math.max(0, Math.min(1, frac || 0))
   // Restaurar tem de ser INSTANTÂNEO. No modo rolagem a viewport tem
   // `scroll-behavior:smooth` (bom para virar página na mão, péssimo aqui): a
