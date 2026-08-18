@@ -236,7 +236,21 @@ async function mangaLerPagina(i, silencioso) {
   }
 
   const bytes = await mg.zip.bytes(c.href)
-  if (!bytes) { _mgLendo.delete(i); return false }
+  // ⚠️ ARQUIVO VAZIO DENTRO DO CBZ. Medido no volume dele: `022.jpg` tem ZERO
+  // byte — o empacotador falhou naquela página. Mandar isso para a IA devolve
+  // HTTP 400 para sempre, e o selo ficava eternamente em "tentar de novo"
+  // numa página que nunca vai ler. Marcada como lida-sem-fala: some do
+  // caminho e não gasta mais chamada nenhuma.
+  if (!bytes || bytes.length < 512) {
+    _mgLendo.delete(i)
+    c.baloes = []
+    c.sfx = []
+    saveLivros()
+    _mgSeloEstado(i, true)
+    console.warn('[mangá] página ' + (i + 1) + ' está vazia no arquivo (' +
+                 (bytes ? bytes.length : 0) + ' bytes) — não há o que ler')
+    return true
+  }
   const b64 = await _mgBase64(bytes)
 
   if (!silencioso) _mgAviso(i, 'lendo a página…')
