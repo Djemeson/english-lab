@@ -9892,6 +9892,57 @@ De brinde: o título saía `One Piece   Vol 100` com três espaços — o hífen
 cercado de espaços virava mais um espaço. Corrigido na origem e no livro que
 já estava na estante dele.
 
+
+### 8.23 — Leitor de mangá: rolagem contínua, zoom e leitura automática
+
+O volume inteiro virou **um fluxo**. Antes cada página era um capítulo
+isolado: rolava dentro da página e parava na borda, exigindo um clique para a
+seguinte — 180 interrupções por volume. Agora navegar é rolar, e a barra de
+cima acompanha sozinha.
+
+**Zoom em três modos**, porque três são as intenções reais: **Largura** (rolar
+lendo), **Página** (a folha inteira na tela, para a arte e a página dupla) e
+**livre** com +/−. Tudo por uma variável CSS: trocar de ajuste não remonta
+nada e não perde a rolagem.
+
+**Leitura automática** ligada por padrão: ao alcançar a página, os balões são
+lidos sozinhos. Como começa quando a página se aproxima, costuma estar pronta
+na chegada.
+
+#### Cinco defeitos, todos encontrados medindo — nenhum por leitura de código
+
+| # | O que aconteceu | Causa |
+|---|---|---|
+| 1 | Abrir o mangá caía na **última** folha | A fração salva vinha de quando cada página era um capítulo; aplicada ao volume, `frac:1` virou "fim do volume" |
+| 2 | Tela **branca** até o primeiro toque de rolagem | O `IntersectionObserver` não reporta nada quando os elementos são observados no mesmo quadro em que entram no DOM |
+| 3 | Salto para a página 20 **não colava** | `scrollIntoView` escolhe sozinho qual ancestral rolar; e sob o `scroll-behavior:smooth` do CSS, `scrollTop = y` vira animação — ler logo depois devolve o valor antigo |
+| 4 | O leitor era **puxado de volta** a cada página | A rede do livro ("por 4s, imagem que chega devolve o leitor ao ponto") vira armadilha onde TUDO é imagem |
+| 5 | Barra dizia "Página 22" com a 4 na tela | A página corrente dependia de um mecanismo só |
+
+⚠️ **A descoberta que mudou o desenho:** ao investigar o nº 5, a medição
+mostrou `visibilityState: hidden` e `requestAnimationFrame` parado — **a aba
+estava em segundo plano**, e nela o observador e o evento de rolagem
+simplesmente não rodam. Não era defeito de lógica. Mas revelou uma
+fragilidade real: a página corrente estava pendurada num mecanismo único.
+
+Agora são três, e independentes: o observador, o evento de rolagem (no
+`document`, em captura — rolagem de elemento não borbulha) e um **pulso de
+700 ms** que varre retângulos. A página corrente sai sempre de uma conta sobre
+a **geometria**, nunca de estado acumulado — nenhum disparo perdido deixa a
+barra mentindo.
+
+#### Memória
+
+180 páginas de 800 KB seriam 140 MB se todas virassem imagem. A imagem só
+nasce quando a página se aproxima (600 px de folga) e o blob é devolvido com
+`revokeObjectURL` quando ela se afasta (1200 px — **folga maior de propósito**:
+com o mesmo limite, uma página parada na borda entraria e sairia a cada
+passada e o leitor piscaria sem parar).
+
+**Medido percorrendo o volume inteiro** (28 páginas, saltos de 7 em 7 e volta
+ao topo): barra correta em **7 de 7** paradas e **pico de 2 imagens vivas** —
+e isso com a aba oculta, ou seja, sem depender de composição de quadros.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
