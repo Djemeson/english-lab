@@ -10277,6 +10277,50 @@ teste, com a aba em segundo plano — onde o navegador estrangula temporizadores
 e o próprio limite de tempo das chamadas deixa de valer. Não dá para afirmar
 que o lote completa; falta rodar com a aba à vista.
 
+
+### 8.31 — O arraste, e o volume inteiro medido
+
+**Arrastar para marcar uma palavra devolvia a fala toda.** O `click` dispara
+também no FIM de um arraste, e o toque — que seleciona o balão inteiro —
+destruía a seleção que a pessoa acabara de fazer. Ela marcava uma palavra e
+recebia a fala inteira, sem entender por quê.
+
+A distância entre onde o ponteiro desceu e onde subiu separa as intenções:
+**abaixo de 6 px é toque** (pega a fala inteira), **acima é arraste** (é dele).
+
+#### O volume inteiro, pela varinha
+
+| Medida | Resultado |
+|---|---|
+| Páginas lidas | **27 de 28** |
+| Páginas com fala / sem fala | 19 / 8 |
+| Balões | **230** |
+| Com linhas separadas | 178 (77%) |
+| Medidos no pixel | 151 (85% dos que têm linhas) |
+| Alinhamento DOM x dados (pág. 13) | **19 de 19** |
+
+⚠️ **A cobrança dele é justa e fica registrada:** *"já era pra ti ter feito
+isso faz é tempo já que os mesmos erros se repetem"*. Eu vinha testando uma
+página por rodada e dando o conserto por bom; os mesmos defeitos voltavam
+porque **uma página não representa um volume**. A varredura completa é o teste
+mínimo daqui em diante.
+
+#### O que NÃO foi verificado, e por quê
+
+⚠️ A varredura de alinhamento página a página **travou no meio**, e a leitura
+em lote levou vários minutos: a aba do Chrome está em `visibilityState:
+hidden`. Nessa condição o navegador congela `requestAnimationFrame`, estrangula
+temporizadores e o `IntersectionObserver` não roda — as imagens não chegam a
+carregar e a medição não tem o que medir.
+
+**Fica em aberto:**
+1. O alinhamento nas outras 18 páginas com fala (só a 13 foi conferida).
+2. Uma página que falha sempre (1 de 28), com o selo em "tentar de novo".
+3. **52 balões sem linhas** e **27 com linhas mas não medidos** — nesses o
+   realce continua sendo a caixa do balão, não a faixa da linha.
+
+Nada disso se resolve por aqui com a aba oculta: precisa da janela à vista.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
