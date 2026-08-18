@@ -6557,10 +6557,28 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 }
 
 /* A barra do mangá: ajuste, zoom e leitura automática. */
+/* ⚠️ A COLUNA DE LEITURA NÃO VALE PARA MANGÁ. `.ler-conteudo` tem
+   `max-width: 646px` e 30 px de recuo — a medida que protege a vista num
+   texto corrido. A página do mangá é uma IMAGEM da largura da tela, e dentro
+   dessa coluna ela transbordava: a folha aparecia cortada à direita, com a
+   arte sumindo na borda. Aqui a coluna e o recuo saem, e quem manda na
+   largura é o zoom. */
+.ler-leitor[data-obra="manga"] .ler-conteudo{
+  max-width:none;
+  padding:0 0 var(--sp-3);
+  font-family:inherit;
+  hyphens:none;
+}
+
 .mg-barra{
   display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;
   padding:var(--sp-2) var(--sp-3);
   border-top:1px solid var(--border);
+  /* Sem isto o palco (que é `flex:1`) espreme a barra até ela desaparecer
+     por trás do rodapé — foi o que apareceu na tela dele. */
+  flex-shrink:0;
+  background:var(--ler-bg);
+  position:relative;z-index:2;
 }
 .mg-zb{
   display:inline-flex;align-items:center;gap:5px;

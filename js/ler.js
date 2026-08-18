@@ -368,6 +368,17 @@ function renderLeitor() {
 
   // O botão só existe onde faz sentido: num mangá com página por ler. Num
   // livro comum ele seria um botão morto na barra, e a barra já está cheia.
+  // ⚠️ DOIS BOTÕES COM O MESMO ÍCONE, LADO A LADO, NÃO SÃO DOIS BOTÕES — são
+  // um enigma. No mangá a barra tinha o "Ferramentas" e o "Ler o volume", os
+  // dois com a varinha, e nada na tela dizia qual era qual.
+  //
+  // Quem sai é o Ferramentas, e não por causa do ícone: ele mostra as
+  // palavras do CAPÍTULO, cobertura de vocabulário e pré-estudo — feito para
+  // um capítulo de livro, com milhares de palavras. No mangá o "capítulo" é
+  // uma página de duas ou três falas, e cobertura sobre isso não informa
+  // nada. Ele volta sozinho em qualquer livro.
+  const c_ferramentas = (_lerLivro && _lerLivro.format === 'manga') ? ''
+    : `<button class="ler-btn" onclick="lerToggle('ferramentas')" data-tip="Palavras deste capítulo, cobertura e pré-estudo">${ic('sparkles','ic-sm')}</button>`
   // A barra de zoom só no mangá: num livro ela não teria o que ajustar.
   const c_mgbarra = (_lerLivro && _lerLivro.format === 'manga' && typeof mangaBarraHtml === 'function')
     ? mangaBarraHtml() : ''
@@ -376,7 +387,7 @@ function renderLeitor() {
     ? `<button class="ler-btn" id="mg-lote" onclick="mangaLerVolume()" data-tip="Ler os balões das ${_mgF} páginas que faltam — dá para parar no meio, o que já foi lido fica guardado">${ic('sparkles','ic-sm')}</button>`
     : ''
   area.innerHTML = `
-    <div class="ler-leitor" data-tema="${c.tema}" data-modo="${c.modo}">
+    <div class="ler-leitor" data-tema="${c.tema}" data-modo="${c.modo}" data-obra="${escA((_lerLivro && _lerLivro.format) || '')}">
       <div class="ler-barra">
         <button class="ler-btn" onclick="lerFechar()" data-tip="Voltar para a estante">${ic('chevronLeft','ic-sm')}</button>
         <button class="ler-btn ler-titulo" onclick="lerToggle('sumario')" data-tip="Sumário">
@@ -385,7 +396,7 @@ function renderLeitor() {
         <div class="ler-barra-dir">
           ${c_manga}
           <button class="ler-btn" onclick="lerToggle('conversa')" data-tip="Conversar com a ${escA(lexaNome())} sobre este livro — quem é quem, onde se passa, o que está acontecendo">${ic('message','ic-sm')}</button>
-          <button class="ler-btn" onclick="lerToggle('ferramentas')" data-tip="Palavras deste capítulo, cobertura e pré-estudo">${ic('sparkles','ic-sm')}</button>
+          ${c_ferramentas}
           <button class="ler-btn" onclick="lerToggle('tipografia')" data-tip="Tamanho, fonte, tema e largura da coluna"><b style="font-size:15px">Aa</b></button>
           <button class="ler-btn" id="ler-btn-full" onclick="lerAlternarFull()" data-tip="Modo tela cheia (F) — só o texto">${ic('expand','ic-sm')}</button>
         </div>
