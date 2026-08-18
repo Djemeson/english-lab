@@ -21,6 +21,13 @@
 // Extensões de imagem que aparecem dentro de um CBZ no mundo real.
 const MG_IMG = /\.(jpe?g|png|webp|gif|avif|bmp)$/i
 
+// Páginas com leitura em voo. ⚠️ DECLARADO AQUI EM CIMA de propósito:
+// `mangaLerPagina` usa este conjunto e fica bem antes, no arquivo, de onde
+// ele naturalmente seria escrito. `let` tem zona morta temporal, e este
+// projeto já perdeu duas rodadas para exatamente esse tropeço (`_tituloVisto`
+// e `popHist`, na extensão). Perto do topo, não há como cair nele.
+const _mgLendo = new Set()
+
 // ---------------------------------------------------------------
 // Detecção e abertura
 // ---------------------------------------------------------------
@@ -187,11 +194,23 @@ async function mangaLerPagina(i, silencioso) {
   if (!c) return false
   if (Array.isArray(c.baloes)) return true          // já lida
 
+  // ⚠️ TRAVA POR PÁGINA. Sem ela a mesma página é pedida duas vezes: a
+  // leitura automática dispara ao chegar nela, o adiantamento já tinha
+  // disparado segundos antes, e nenhuma das duas terminou — a checagem
+  // acima só pega quem JÁ acabou. Seriam duas imagens pagas pelo mesmo
+  // resultado, e no volume inteiro isso dobra a conta.
+  if (_mgLendo.has(i)) return true
+  _mgLendo.add(i)
+
   const { key } = aiChatCfg()
-  if (!key) { toast('Configure a chave da IA para ler os balões', 'warning'); return false }
+  if (!key) {
+    _mgLendo.delete(i)
+    if (!silencioso) toast('Configure a chave da IA para ler os balões', 'warning')
+    return false
+  }
 
   const bytes = await mg.zip.bytes(c.href)
-  if (!bytes) return false
+  if (!bytes) { _mgLendo.delete(i); return false }
   const b64 = await _mgBase64(bytes)
 
   if (!silencioso) _mgAviso(i, 'lendo a página…')
@@ -215,6 +234,8 @@ async function mangaLerPagina(i, silencioso) {
     console.warn('[mangá] não li a página', i + 1, e && e.message)
     if (!silencioso) _mgAviso(i, 'não consegui ler: ' + (e.message || 'erro'), true)
     return false
+  } finally {
+    _mgLendo.delete(i)
   }
 }
 
@@ -331,6 +352,49 @@ function _mgAviso(i, texto, ehErro) {
     ? `${ic('alert')} <span>${esc(texto)}</span>
        <button class="btn btn-sm" onclick="mangaLerPagina(${i})">Tentar de novo</button>`
     : `<span class="spinner"></span> <span>${esc(texto)}</span>`
+}
+
+// ---------------------------------------------------------------
+// A leitura ADIANTADA
+// ---------------------------------------------------------------
+// Ler ao chegar na página é tarde: são ~6 s olhando um balão mudo. Aqui a
+// página seguinte é lida enquanto você ainda está na atual, e quando você
+// vira, o texto já está lá.
+//
+// ⚠️ DUAS PÁGINAS À FRENTE, NÃO DEZ. O adiantamento gasta de verdade: se
+// você fechar o volume, o que foi lido além do seu olho foi dinheiro no
+// lixo. Duas páginas é meio centavo de risco e cobre a virada mais rápida
+// que um leitor faz. Dez seriam 3 centavos jogados fora a cada parada — e,
+// pior, disputariam o limite de requisições com a página que você está
+// tentando ler AGORA.
+const MG_ADIANTE = 2
+
+let _mgFilaAdiante = null
+
+// Em SEQUÊNCIA, nunca em paralelo: o adiantamento é trabalho de fundo e não
+// pode roubar a vez da página aberta. Em paralelo, três pedidos simultâneos
+// batem no limite de taxa do fornecedor e TODOS ficam mais lentos — inclusive
+// aquele que você está esperando ver.
+async function mangaAdiantar(i) {
+  if (!mangaAuto() || _mgFilaAdiante) return
+  const livro = _lerLivro
+  if (!livro || livro.format !== 'manga') return
+  const alvos = []
+  for (let n = i; n <= i + MG_ADIANTE && n < livro.chapters.length; n++) {
+    if (!Array.isArray(livro.chapters[n].baloes) && !_mgLendo.has(n)) alvos.push(n)
+  }
+  if (!alvos.length) return
+  _mgFilaAdiante = (async () => {
+    for (const n of alvos) {
+      // A cada volta, confere se você ainda está por perto: virar 20 páginas
+      // de uma vez torna esta fila obsoleta, e insistir nela seria pagar por
+      // páginas que você já passou.
+      if (!_lerLivro || _lerLivro.id !== livro.id) break
+      if (Math.abs(n - _lerCap) > MG_ADIANTE + 1) break
+      await mangaLerPagina(n, true)
+    }
+  })()
+  try { await _mgFilaAdiante } finally { _mgFilaAdiante = null }
 }
 
 // ---------------------------------------------------------------
@@ -540,6 +604,8 @@ function mangaLigarFluxo(mg, livro) {
   // observador de forma diferente: a página corrente nunca depende de UM
   // mecanismo só.
   mangaPincaLigar()
+  // Sem isto, a primeira página só começaria a ser lida no primeiro rolar.
+  mangaAdiantar(typeof _lerCap === 'number' ? _lerCap : 0).catch(() => {})
   clearInterval(_mgPulso)
   _mgPulso = setInterval(() => {
     if (!_mgMontado) { clearInterval(_mgPulso); _mgPulso = 0; return }
@@ -646,7 +712,8 @@ function _mgAtualizarBarra(livro) {
   const nome = el('ler-cap-nome')
   if (nome) nome.textContent = (livro.chapters[i] && livro.chapters[i].titulo) || ('Página ' + (i + 1))
   if (typeof _lerAtualizarProgresso === 'function') _lerAtualizarProgresso()
-  if (mangaAuto()) mangaLerPagina(i, true).catch(() => {})
+  // A página em que você está E as duas seguintes.
+  mangaAdiantar(i).catch(() => {})
 }
 
 // Rola até uma página — o que "ir para o capítulo" virou no mangá.
@@ -744,7 +811,7 @@ function mangaAlternarAuto() {
   saveCfg()
   _mgBarraZoom()
   toast(mangaAuto() ? 'Vou lendo os balões conforme você avança' : 'Leitura automática desligada', 'info')
-  if (mangaAuto() && typeof _lerCap === 'number') mangaLerPagina(_lerCap, true).catch(() => {})
+  if (mangaAuto() && typeof _lerCap === 'number') mangaAdiantar(_lerCap).catch(() => {})
 }
 
 // A barra do mangá. Só existe quando há mangá aberto.
