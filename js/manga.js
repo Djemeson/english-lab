@@ -1408,6 +1408,18 @@ function _mgAfinarBalao(ctx, cv, b) {
   // porque ali a tinta cai mesmo que não chegue a zero.
   const pico = Math.max(...perfil)
   const limite = Math.max(2, Math.round(W * 0.015), Math.round(pico * 0.18))
+
+  // ⚠️ TETO DE SANIDADE NA ALTURA MÍNIMA. Ela é derivada da caixa que o
+  // MODELO deu, e o modelo às vezes erra feio: MEDIDO, o balão "WHAT?!" — uma
+  // palavra — veio com caixa de 30% da ALTURA DA PÁGINA. A exigência virava
+  // "faixa de 95 px ou nada", nenhuma linha real chegava lá e o balão ficava
+  // sem medição para sempre.
+  // Nenhuma linha de mangá passa de ~2,5% da folha; acima disso a caixa está
+  // errada, e a conta não pode herdar o erro dela.
+  const minAltura = Math.max(3, Math.min(
+    alturaMedia * cv.height * 0.20,
+    cv.height * 0.025
+  ))
   const faixas = []
   let ini = -1
   for (let y = 0; y < H; y++) {
@@ -1421,7 +1433,7 @@ function _mgAfinarBalao(ctx, cv, b) {
       // 35% da altura média e eram descartados como ruído. Reticências,
       // vírgulas soltas e o coração do balão são linhas legítimas e todas
       // pequenas. O piso absoluto de 3 px continua barrando sujeira real.
-      if (fim - ini >= Math.max(3, alturaMedia * cv.height * 0.20)) faixas.push([ini, fim])
+      if (fim - ini >= minAltura) faixas.push([ini, fim])
       ini = -1
     }
   }
