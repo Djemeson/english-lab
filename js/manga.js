@@ -424,6 +424,7 @@ function mangaTextoDaPagina(livro, i) {
 let _mgObs = null        // observador que carrega/descarrega as imagens
 let _mgAoRolar = null    // ouvinte que diz em que página você está
 let _mgRaf = 0           // trava de quadro, para não recalcular 60x por segundo
+let _mgPulso = 0         // rede de segurança: ver comentário em mangaLigarFluxo
 let _mgMontado = null    // id do livro cujo fluxo já está na tela
 
 // A página que ocupa o meio da tela. O meio, e não o topo: rolando devagar,
@@ -528,6 +529,22 @@ function mangaLigarFluxo(mg, livro) {
   mangaGarantirVisiveis(mg, livro)
   setTimeout(() => mangaGarantirVisiveis(mg, livro), 350)
   setTimeout(() => mangaGarantirVisiveis(mg, livro), 1200)
+
+  // ⚠️ A REDE DE ÚLTIMO RECURSO. Observador e evento de rolagem dependem de o
+  // navegador estar COMPONDO QUADROS: numa aba em segundo plano os dois
+  // param, e ao voltar a barra pode estar mentindo sobre a página. Este pulso
+  // é uma varredura de retângulos a cada 700 ms — custo desprezível perto de
+  // uma barra que diz "Página 21" com a 4 na tela.
+  //
+  // Ele também é o que garante o comportamento em navegador que trate o
+  // observador de forma diferente: a página corrente nunca depende de UM
+  // mecanismo só.
+  clearInterval(_mgPulso)
+  _mgPulso = setInterval(() => {
+    if (!_mgMontado) { clearInterval(_mgPulso); _mgPulso = 0; return }
+    _mgAtualizarBarra(livro)
+    mangaGarantirVisiveis(mg, livro)
+  }, 700)
 }
 
 function mangaDesligarFluxo() {
@@ -535,6 +552,7 @@ function mangaDesligarFluxo() {
   if (_mgAoRolar) document.removeEventListener('scroll', _mgAoRolar, { capture: true })
   _mgAoRolar = null
   if (_mgRaf) { cancelAnimationFrame(_mgRaf); _mgRaf = 0 }
+  if (_mgPulso) { clearInterval(_mgPulso); _mgPulso = 0 }
   // Os blobs das páginas que ficaram carregadas precisam voltar, senão fechar
   // o volume não devolve a memória.
   document.querySelectorAll('#ler-conteudo .mg-pagina').forEach(_mgSoltarPagina)
