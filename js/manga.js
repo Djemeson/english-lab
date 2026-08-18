@@ -221,6 +221,8 @@ async function mangaLerPagina(i, silencioso) {
     const resp = await aiVisaoJSON(MG_PEDIDO, b64)
     const brutos = Array.isArray(resp && resp.balloons) ? resp.balloons : []
     _mgAplicar(livro, i, brutos, resp && resp.sfx)
+    // A posição vem da IMAGEM, não do modelo — ver `_mgAfinarPorPixel`.
+    await _mgAfinarPorPixel(bytes, livro.chapters[i].baloes)
     saveLivros()
     if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
     // Só redesenha se ainda for esta a página aberta — numa leitura em lote o
@@ -770,6 +772,17 @@ async function _mgCarregarPagina(mg, livro, div) {
     img.src = url
     div.insertBefore(img, div.firstChild)
     div._mgUrl = url
+    // A página acabou de ser decodificada de qualquer forma: é a hora mais
+    // barata de medir os pixels das que foram lidas antes deste conserto.
+    // Uma vez por página, marcada com o carimbo `px`.
+    const precisa = Array.isArray(c.baloes) && c.baloes.some(b => b.ls && b.ls.length && !b.px)
+    if (precisa) {
+      _mgAfinarPorPixel(bytes, c.baloes).then(n => {
+        if (!n) return
+        saveLivros()
+        mangaRepintarPagina(livro, i)
+      }).catch(() => {})
+    }
   } catch (e) {
     console.warn('[mangá] página não carregou:', e.message)
   } finally {
@@ -1121,4 +1134,144 @@ function mangaPincaDesligar() {
   }
   _mgPinca = null
   _mgPincaLigada = false
+}
+
+// ---------------------------------------------------------------
+// AFINAR AS LINHAS PELO PIXEL
+// ---------------------------------------------------------------
+// ⚠️ O MODELO DÁ O TEXTO; A IMAGEM DÁ A POSIÇÃO. Pedir precisão de pixel a um
+// modelo de visão é pedir a coisa errada a quem faz outra: as caixas dele
+// vinham **meia linha acima** do texto, de forma consistente. Um teste de
+// "tem tinta embaixo?" não pega isso — uma caixa deslocada meia linha ainda
+// acerta parte das letras e passa. Só o olho pegou, no print dele.
+//
+// A tinta, porém, está ali para ser medida. Aqui a página é lida como pixels
+// e cada linha impressa é encontrada por PROJEÇÃO HORIZONTAL: somando os
+// pixels escuros de cada fileira, as linhas de texto viram picos e os vãos
+// entre elas viram vales. É determinístico, não custa chamada nenhuma e
+// acerta o alinhamento no pixel.
+//
+// O texto continua vindo da IA — ela lê o que está escrito, que é o que a
+// projeção não sabe fazer. Cada um no que é bom.
+
+const MG_ESCURO = 110      // ≤ isto conta como tinta (o texto é preto sólido)
+
+async function _mgAfinarPorPixel(bytes, baloes) {
+  if (!Array.isArray(baloes) || !baloes.some(b => b.ls && b.ls.length)) return 0
+  let img
+  try {
+    img = await _mgCarregarImagem(bytes)
+  } catch (e) {
+    console.warn('[mangá] não consegui medir os pixels:', e.message)
+    return 0
+  }
+  const cv = document.createElement('canvas')
+  cv.width = img.naturalWidth || img.width
+  cv.height = img.naturalHeight || img.height
+  if (!cv.width || !cv.height) return 0
+  const ctx = cv.getContext('2d', { willReadFrequently: true })
+  ctx.drawImage(img, 0, 0)
+  if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src)
+
+  let afinados = 0
+  for (const b of baloes) {
+    if (!b.ls || b.ls.length < 1) continue
+    if (_mgAfinarBalao(ctx, cv, b)) afinados++
+  }
+  return afinados
+}
+
+function _mgCarregarImagem(bytes) {
+  return new Promise((ok, erro) => {
+    const url = URL.createObjectURL(new Blob([bytes]))
+    const im = new Image()
+    im.onload = () => ok(im)
+    im.onerror = () => { URL.revokeObjectURL(url); erro(new Error('imagem inválida')) }
+    im.src = url
+  })
+}
+
+function _mgAfinarBalao(ctx, cv, b) {
+  const alturaMedia = b.ls.reduce((s, l) => s + l.h, 0) / b.ls.length
+  // A busca começa na região que o modelo apontou, ESTICADA: ele erra por
+  // menos de uma linha, e sem folga a linha certa ficaria de fora justamente
+  // no caso que se quer consertar. Uma linha inteira de margem, dos dois lados.
+  const y0 = Math.max(0, b.y - alturaMedia * 1.1)
+  const y1 = Math.min(1, b.y + b.h + alturaMedia * 1.1)
+  const x0 = Math.max(0, b.x - b.w * 0.10)
+  const x1 = Math.min(1, b.x + b.w + b.w * 0.10)
+
+  const X = Math.round(x0 * cv.width), Y = Math.round(y0 * cv.height)
+  const W = Math.round((x1 - x0) * cv.width), H = Math.round((y1 - y0) * cv.height)
+  if (W < 4 || H < 4 || X + W > cv.width || Y + H > cv.height) return false
+
+  let dados
+  try { dados = ctx.getImageData(X, Y, W, H).data } catch (e) { return false }
+
+  // Quanta tinta em cada fileira de pixels.
+  const perfil = new Array(H).fill(0)
+  for (let y = 0; y < H; y++) {
+    let n = 0
+    const base = y * W * 4
+    for (let x = 0; x < W; x++) {
+      const i = base + x * 4
+      if ((dados[i] + dados[i + 1] + dados[i + 2]) / 3 <= MG_ESCURO) n++
+    }
+    perfil[y] = n
+  }
+
+  // Uma fileira "tem texto" quando passa de 1,5% da largura examinada. Abaixo
+  // disso é contorno de balão, sujeira de digitalização ou a perna de uma
+  // letra isolada — e chamar isso de linha juntaria duas linhas numa só.
+  const limite = Math.max(2, Math.round(W * 0.015))
+  const faixas = []
+  let ini = -1
+  for (let y = 0; y < H; y++) {
+    const tem = perfil[y] >= limite
+    if (tem && ini < 0) ini = y
+    if ((!tem || y === H - 1) && ini >= 0) {
+      const fim = tem ? y : y - 1
+      // Faixa fina demais para ser uma linha de texto: descarta.
+      if (fim - ini >= Math.max(3, alturaMedia * cv.height * 0.35)) faixas.push([ini, fim])
+      ini = -1
+    }
+  }
+
+  // ⚠️ SÓ TROCA SE O NÚMERO BATER. Se a projeção achou 3 faixas onde a IA leu
+  // 2 linhas, alguma coisa não é o que se pensa — um balão vizinho entrou na
+  // janela, ou uma linha se partiu. Casar na marra embaralharia o texto entre
+  // posições erradas, que é pior do que a imprecisão que se está corrigindo.
+  if (faixas.length !== b.ls.length) return false
+
+  for (let k = 0; k < faixas.length; k++) {
+    const [fy0, fy1] = faixas[k]
+    // Onde a linha começa e termina na horizontal — a largura real das letras.
+    let cx0 = W, cx1 = -1
+    for (let y = fy0; y <= fy1; y++) {
+      const base = y * W * 4
+      for (let x = 0; x < W; x++) {
+        const i = base + x * 4
+        if ((dados[i] + dados[i + 1] + dados[i + 2]) / 3 <= MG_ESCURO) {
+          if (x < cx0) cx0 = x
+          if (x > cx1) cx1 = x
+        }
+      }
+    }
+    if (cx1 < cx0) continue
+    const l = b.ls[k]
+    l.y = +((Y + fy0) / cv.height).toFixed(4)
+    l.h = +((fy1 - fy0 + 1) / cv.height).toFixed(4)
+    l.x = +((X + cx0) / cv.width).toFixed(4)
+    l.w = +((cx1 - cx0 + 1) / cv.width).toFixed(4)
+  }
+
+  // A caixa do balão volta a ser a união — agora das linhas MEDIDAS.
+  const ux0 = Math.min(...b.ls.map(l => l.x))
+  const uy0 = Math.min(...b.ls.map(l => l.y))
+  const ux1 = Math.max(...b.ls.map(l => l.x + l.w))
+  const uy1 = Math.max(...b.ls.map(l => l.y + l.h))
+  b.x = +ux0.toFixed(4); b.y = +uy0.toFixed(4)
+  b.w = +(ux1 - ux0).toFixed(4); b.h = +(uy1 - uy0).toFixed(4)
+  b.px = 1     // carimbo: esta caixa já foi medida no pixel
+  return true
 }
