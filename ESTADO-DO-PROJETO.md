@@ -10881,6 +10881,46 @@ sem custo de releitura.
 ⚠️ Restam **10 caixas largas**, quase todas nas páginas 4 e 5 — o resumo do
 volume e a de créditos, onde as caixas de texto são mesmo largas no original.
 
+
+### 8.47 — A projeção só mexe na vertical (a lição de cinco rodadas)
+
+Ele: *"tá tudo pior que antes"* — e estava. O pedido ficou explícito: **uma
+caixa tão fiel ao original que ao passar o mouse quase não se perceba que algo
+abriu.**
+
+⚠️ **O erro não era um defeito; era a estratégia.** Eu vinha empilhando
+heurística sobre heurística para consertar a medição HORIZONTAL da projeção de
+pixels, e cada camada nova produzia um defeito diferente:
+
+| Tentativa | O que produziu |
+|---|---|
+| Medir de ponta a ponta da tinta | linha com **45% da largura da página** |
+| Rejeitar largura pequena demais | faixas de **3 px** viravam a caixa da IA, mas as grandes passavam |
+| Rejeitar largura grande demais | linhas coladas na margem esquerda (`x: 0`) |
+| Herdar do balão quando falta | herdava o lixo, porque o balão já estava envenenado |
+| Forçar quebra em N linhas | `NEA / R / DE / ENTWANCE` |
+
+**O motivo do erro é simples e devia ter sido visto antes:** numa **fileira**
+de pixels o texto e o desenho se misturam — a moldura do quadro, o contorno do
+balão e a arte estão na mesma altura das letras. Numa **coluna**, o texto se
+separa sozinho: linhas são picos, vãos são vales.
+
+**Agora a projeção faz só o que acerta** — a posição vertical de cada linha —
+e a largura vem da caixa que a IA deu ao balão, porque ela VÊ o balão. Três
+heurísticas de largura foram apagadas junto.
+
+#### Medido no volume inteiro, relido do zero
+
+| Medida | Resultado |
+|---|---|
+| Páginas lidas | 28 de 28 |
+| Balões | 207 |
+| **Caixa DENTRO do balão desenhado** | **190 (92%)** |
+
+⚠️ Os 17 restantes são **todos da página 4**, e não são defeito: aquela página
+tem **fundo preto com texto branco** (é o resumo do volume), e o teste procura
+o branco do miolo do balão. Nas páginas de mangá de verdade, a taxa é **100%**.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
