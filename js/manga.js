@@ -2522,19 +2522,27 @@ function _mgRepartir(texto, faixas) {
 // creme aparece como remendo, que é justamente o que se quer evitar.
 function _mgCoresDoBalao(det, caixa) {
   const { masc, buraco, dados, W } = det
-  let pr = 0, pg = 0, pb = 0, pn = 0, tr = 0, tg = 0, tb = 0, tn = 0
+  // ⚠️ A COR É A MAIS FREQUENTE, NÃO A MÉDIA — e a diferença aparece na tela.
+  // O serrilhado em volta de cada letra é cinza, e ele entra na média puxando
+  // o "branco" do balão para #f9f9f9. Como o fundo aceso é um retângulo, esse
+  // meio tom vira uma mancha visível sobre o branco do balão: o remendo que
+  // este trabalho inteiro existe para não deixar acontecer. MEDIDO na página
+  // 14, lado a lado com o original. A cor mais frequente é o papel limpo.
+  const hp = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)]
+  const ht = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)]
+  let pn = 0, tn = 0
   for (let y = caixa.y0; y <= caixa.y1; y++) {
     for (let x = caixa.x0; x <= caixa.x1; x++) {
       const p = y * W + x, i = p * 4
-      if (masc[p]) { pr += dados[i]; pg += dados[i + 1]; pb += dados[i + 2]; pn++ }
-      else if (buraco[p]) { tr += dados[i]; tg += dados[i + 1]; tb += dados[i + 2]; tn++ }
+      if (masc[p]) { hp[0][dados[i]]++; hp[1][dados[i + 1]]++; hp[2][dados[i + 2]]++; pn++ }
+      else if (buraco[p]) { ht[0][dados[i]]++; ht[1][dados[i + 1]]++; ht[2][dados[i + 2]]++; tn++ }
     }
   }
-  const hex = (a, b, c) => '#' + [a, b, c].map(v =>
-    Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')
+  const moda = h => { let m = 0, v = 0; for (let k = 0; k < 256; k++) if (h[k] > m) { m = h[k]; v = k } return v }
+  const hex = (a, b, c) => '#' + [a, b, c].map(v => v.toString(16).padStart(2, '0')).join('')
   return {
-    bg: pn ? hex(pr / pn, pg / pn, pb / pn) : (det.claro ? '#ffffff' : '#111111'),
-    fg: tn > 20 ? hex(tr / tn, tg / tn, tb / tn) : (det.claro ? '#111111' : '#ffffff')
+    bg: pn ? hex(moda(hp[0]), moda(hp[1]), moda(hp[2])) : (det.claro ? '#ffffff' : '#111111'),
+    fg: tn > 20 ? hex(moda(ht[0]), moda(ht[1]), moda(ht[2])) : (det.claro ? '#111111' : '#ffffff')
   }
 }
 
