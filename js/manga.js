@@ -2282,37 +2282,64 @@ function _mgDetectarBalao(ctx, cv, b) {
 }
 
 // As linhas impressas, medidas nos buracos — que são o texto e nada além.
+//
+// ⚠️ DUAS PASSADAS, E A SEGUNDA É QUE ACERTA. Medir a altura das linhas exige
+// saber QUAIS COLUNAS olhar; saber as colunas exige já ter as linhas. Na
+// primeira passada a janela horizontal é larga e as linhas saem grosseiras —
+// e num balão colado noutra fala o vale entre duas linhas vem preenchido pelo
+// texto do vizinho, que cai na mesma altura. MEDIDO na página 28: um balão de
+// quatro linhas impressas virou UMA faixa só, e a fala inteira foi para uma
+// linha de 30% da folha. A segunda passada refaz o perfil já dentro da coluna
+// da fala, e aí os vales aparecem.
 function _mgLinhasDoBalao(det, b, cv) {
   const buraco = det.buraco, W = det.W, H = det.H, X = det.X, Y = det.Y, hL = det.hL
   const ia = det.ia
+  const ancora = Math.round((det.ancoraFr || det.cx) * cv.width) - X
 
-  // A busca vertical fica em volta do que a IA leu: ela erra a caixa por
-  // menos de uma linha, e duas linhas de folga cobrem isso sem convidar a
-  // fala de cima e a de baixo.
+  // ⚠️ A JANELA VERTICAL COBRE A CAIXA DO MODELO INTEIRA, e não só as linhas
+  // que ele separou. Ele frequentemente lê cinco linhas impressas como duas —
+  // e mirando só nelas a busca cortava o balão pela metade: 5 linhas viravam
+  // 2, com a caixa na altura errada. A caixa dele é grosseira, mas cobre a
+  // fala toda, que é o que se precisa aqui.
   const ls = (b.ls || []).filter(l => typeof l.y === 'number' && isFinite(l.y))
-  let topo, base
+  let topo = ia.y * cv.height, base = (ia.y + ia.h) * cv.height
   if (ls.length) {
-    topo = Math.min(...ls.map(l => l.y)) * cv.height - Y - hL * 1.2
-    base = Math.max(...ls.map(l => l.y + l.h)) * cv.height - Y + hL * 1.2
-  } else {
-    topo = ia.y * cv.height - Y - hL
-    base = (ia.y + ia.h) * cv.height - Y + hL
+    topo = Math.min(topo, Math.min(...ls.map(l => l.y)) * cv.height)
+    base = Math.max(base, Math.max(...ls.map(l => l.y + l.h)) * cv.height)
   }
+  topo = topo - Y - hL * 1.2
+  base = base - Y + hL * 1.2
   const y0 = Math.max(0, Math.floor(topo)), y1 = Math.min(H - 1, Math.ceil(base))
   if (y1 - y0 < 3) return []
 
-  // Horizontalmente a busca começa larga: quem separa uma fala da vizinha é o
-  // VÃO entre elas, medido abaixo, e não um limite arbitrário aqui.
-  const ancora = Math.round((det.ancoraFr || det.cx) * cv.width) - X
-  const x0 = Math.max(0, Math.round(ia.x * cv.width) - X - Math.round(hL * 2))
-  const x1 = Math.min(W - 1, Math.round((ia.x + ia.w) * cv.width) - X + Math.round(hL * 2))
-  if (x1 - x0 < 3) return []
+  const jx0 = Math.max(0, Math.round(ia.x * cv.width) - X - Math.round(hL * 2))
+  const jx1 = Math.min(W - 1, Math.round((ia.x + ia.w) * cv.width) - X + Math.round(hL * 2))
+  if (jx1 - jx0 < 3) return []
 
+  // --- as três etapas, cada uma usando o resultado da anterior ------------
+  const faixasA = _mgFaixasEm(buraco, W, y0, y1, jx0, jx1)
+  if (!faixasA.length) return []
+  const larguraA = _mgLarguraDasFaixas(buraco, W, faixasA, jx0, jx1, ancora)
+  if (!larguraA.length) return []
+
+  // A coluna da fala: onde as linhas da primeira passada realmente estão.
+  const cx0 = Math.max(jx0, Math.min(...larguraA.map(f => f.x0)) - 2)
+  const cx1 = Math.min(jx1, Math.max(...larguraA.map(f => f.x1)) + 2)
+  const faixasB = _mgFaixasEm(buraco, W, y0, y1, cx0, cx1)
+  const usar = faixasB.length >= faixasA.length ? faixasB : faixasA
+  const finais = _mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora)
+  return _mgBlocoContinuo(finais, ia, cv, Y)
+}
+
+// Perfil por fileira dentro de uma janela: as linhas viram picos, os vãos
+// viram vales. Só conta buraco — letra cercada de papel —, então moldura de
+// quadro e arte não entram na conta.
+function _mgFaixasEm(buraco, W, y0, y1, x0, x1) {
   const perfil = new Int32Array(y1 - y0 + 1)
   for (let y = y0; y <= y1; y++) {
     let n = 0
-    const base2 = y * W
-    for (let x = x0; x <= x1; x++) if (buraco[base2 + x]) n++
+    const base = y * W
+    for (let x = x0; x <= x1; x++) if (buraco[base + x]) n++
     perfil[y - y0] = n
   }
   let pico = 0
@@ -2342,36 +2369,35 @@ function _mgLinhasDoBalao(det, b, cv) {
     if (ant && (f[0] - ant[1]) <= Math.max(1, tipica * 0.28)) ant[1] = f[1]
     else juntas.push([f[0], f[1]])
   }
-  faixas = juntas.filter(f => (f[1] - f[0] + 1) >= Math.max(2, tipica * 0.35))
-  if (!faixas.length) return []
+  return juntas.filter(f => (f[1] - f[0] + 1) >= Math.max(2, tipica * 0.35))
+}
 
-  // ⚠️ A LARGURA SAI DO GRUPO DE COLUNAS QUE CONTÉM A FALA, e não de todas as
-  // colunas com tinta. No balão aberto, a MESMA faixa de altura pega o
-  // "HUFF" do desenho ao lado — e a linha saía atravessando o quadro. Aqui as
-  // colunas são agrupadas com o espaço entre palavras como cola (um vão de
-  // até uma linha) e fica o grupo mais perto do centro da fala.
+// ⚠️ A LARGURA SAI DO GRUPO DE COLUNAS QUE CONTÉM A FALA, e não de todas as
+// colunas com tinta. No balão aberto, a MESMA faixa de altura pega o "HUFF"
+// desenhado ao lado — e a linha saía atravessando o quadro. As colunas são
+// agrupadas com o espaço entre palavras como cola e fica o grupo mais perto
+// do centro da fala.
+function _mgLarguraDasFaixas(buraco, W, faixas, x0, x1, ancora) {
   const saida = []
   for (const f of faixas) {
     const fy0 = f[0], fy1 = f[1]
     const altura = fy1 - fy0 + 1
     const minCol = Math.max(1, Math.round(altura * 0.05))
     const grupos = []
-    let gi = -1, vazias = 0
-    // ⚠️ A COLA VEM DA PRÓPRIA FAIXA, não da estimativa de linha. A altura
-    // medida aqui é a da linha impressa de verdade; a estimativa carrega o
-    // erro da caixa do modelo, e uma cola grande demais junta a fala do
-    // vizinho na mesma linha.
+    let aberto = false, vazias = 0
+    // A cola vem da PRÓPRIA faixa: a altura medida aqui é a da linha impressa
+    // de verdade, e uma cola grande demais junta a fala do vizinho.
     const cola = Math.max(3, Math.round(altura * 1.1))
     for (let x = x0; x <= x1; x++) {
       let n = 0
       for (let y = fy0; y <= fy1; y++) if (buraco[y * W + x]) n++
       if (n >= minCol) {
-        if (gi < 0) { gi = x; grupos.push([x, x]) }
+        if (!aberto) { grupos.push([x, x]); aberto = true }
         else grupos[grupos.length - 1][1] = x
         vazias = 0
-      } else if (gi >= 0) {
+      } else if (aberto) {
         vazias++
-        if (vazias > cola) gi = -1
+        if (vazias > cola) aberto = false
       }
     }
     if (!grupos.length) continue
@@ -2385,6 +2411,36 @@ function _mgLinhasDoBalao(det, b, cv) {
     saida.push({ y0: fy0, y1: fy1, x0: melhor[0], x1: melhor[1] })
   }
   return saida
+}
+
+// ⚠️ FALAS EMPILHADAS SÃO O CASO NORMAL, NÃO A EXCEÇÃO. Com a janela vertical
+// cobrindo a caixa inteira do modelo, a projeção também encontra as linhas da
+// fala de cima e da de baixo — e elas entrariam no mesmo balão, com o texto
+// repartido entre todas. O que separa duas falas é o VÃO: dentro de um
+// parágrafo o passo é regular; entre dois balões ele é muito maior.
+//
+// Fica o bloco de linhas seguidas que contém a altura do meio da caixa do
+// modelo, cortando onde o vão passa de 1,9 vez o passo típico.
+function _mgBlocoContinuo(faixas, ia, cv, Y) {
+  if (faixas.length < 2) return faixas
+  faixas.sort((a, b) => a.y0 - b.y0)
+  const passos = []
+  for (let k = 1; k < faixas.length; k++) passos.push(faixas[k].y0 - faixas[k - 1].y0)
+  const ord = [...passos].sort((a, b) => a - b)
+  const passo = ord[ord.length >> 1]
+  if (!(passo > 0)) return faixas
+
+  const meio = (ia.y + ia.h / 2) * cv.height - Y
+  let sem = 0, dist = Infinity
+  for (let k = 0; k < faixas.length; k++) {
+    const c = (faixas[k].y0 + faixas[k].y1) / 2
+    const d = Math.abs(c - meio)
+    if (d < dist) { dist = d; sem = k }
+  }
+  let a = sem, z = sem
+  while (a > 0 && (faixas[a].y0 - faixas[a - 1].y0) <= passo * 1.9) a--
+  while (z < faixas.length - 1 && (faixas[z + 1].y0 - faixas[z].y0) <= passo * 1.9) z++
+  return faixas.slice(a, z + 1)
 }
 
 // ⚠️ A CAIXA CRESCE ATÉ ENCOSTAR NA ARTE, E É ISSO QUE A TORNA INVISÍVEL. Ela
