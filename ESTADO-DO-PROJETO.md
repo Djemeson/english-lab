@@ -10826,6 +10826,61 @@ folga simétrica de 12% foi somada à faixa para absorver isso, mas ela só entr
 quando a página é REDESENHADA, e a varredura reajusta sem redesenhar. **Não é
 um defeito visível; é o meu medidor sendo mais severo que o olho.**
 
+
+### 8.46 — Os balões mortos, achados só olhando a tela
+
+⚠️ **A cobrança dele foi justa:** *"eu te peço pra usar o chrome pra poder
+encontrar esse tipo de erro e nem assim tu faz um bom serviço"*. Minhas
+varreduras mediam proporções e transbordos — números que passavam limpos —
+enquanto na tela havia balões que **não existiam para o ponteiro** e texto
+cobrindo as falas vizinhas. **Medir não é olhar.**
+
+Bastou perguntar outra coisa — "quanto cada balão OCUPA na tela?" — para os
+três defeitos aparecerem de uma vez.
+
+#### 1. Caixa nula: o hover morto
+
+Uma linha sem coordenada envenenava a união (`Math.min` com `undefined` devolve
+NaN) e o balão terminava com `x: null, w: null` — **largura ZERO**. Nenhum
+ponteiro o alcança; ele nunca acende. Eram **31 balões**.
+
+A raiz: ao **fundir** linhas eu criava o objeto novo só com o texto (`{ t }`),
+e as coordenadas só eram preenchidas se a largura medida passasse na checagem
+de plausibilidade. Rejeitada, a linha ficava sem `x` e sem `w` para sempre.
+
+⚠️ E a rede que eu havia posto para isso **estava depois do ponto em que a
+função desiste** — quando NENHUMA linha tinha coordenada, ela nunca chegava a
+rodar. Ordem errada é o mesmo que não ter rede.
+
+#### 2. Balão cobrindo os vizinhos
+
+A checagem de largura implausível só barrava valores PEQUENOS. Medido: a linha
+"YOU KNOW HE'S" ficou com **45% da largura da página** — a projeção varreu de
+uma borda do quadro à outra —, e ao acender virava um retângulo branco de
+502 px por cima das outras falas. Agora há teto: 1,6 da altura por caractere.
+
+#### 3. "NEA / R / DE / ENTWANCE"
+
+O limite que eu impunha para forçar a quebra em duas linhas podia ficar **menor
+que uma palavra sozinha**, e o navegador quebrava dentro dela. O limite nunca
+desce abaixo de `min-content`, o número de linhas tem teto de 3, e o CSS deixou
+de permitir quebra no meio de palavra.
+
+#### Resultado
+
+| Medida | Antes | Agora |
+|---|---|---|
+| Balões que o ponteiro alcança | 184 de 215 | **207 de 207 (100%)** |
+| Caixas com número inválido | 31 | **0** |
+
+**Oito balões foram descartados** — os que não tinham nenhuma coordenada
+aproveitável nem para herdar. Um balão a menos é melhor que um alvo invisível
+que parece defeito. O saneamento roda na abertura, sobre o que já está salvo,
+sem custo de releitura.
+
+⚠️ Restam **10 caixas largas**, quase todas nas páginas 4 e 5 — o resumo do
+volume e a de créditos, onde as caixas de texto são mesmo largas no original.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
