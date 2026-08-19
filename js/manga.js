@@ -336,12 +336,16 @@ function mangaAjustarLinhas(raiz) {
       t.style.transform = ''
       t.style.fontSize = REF + 'px'
       const naturalRef = t.offsetWidth || 1
-      // Faixa que vale por várias linhas: a largura natural é a do texto
-      // TODO numa linha só, mas ele vai quebrar — então a referência é a
-      // altura por linha, não a largura total.
+      // ⚠️ FAIXA QUE VALE POR VÁRIAS LINHAS PRECISA DE FONTE MAIOR, NÃO MENOR.
+      // Marcar a faixa como dupla não bastava: o texto continuava cabendo numa
+      // linha só e ficava boiando no meio de uma caixa de 59 px. Para ele
+      // quebrar em `n` linhas, a fonte tem de ser a que faria o texto ocupar
+      // `n` vezes a largura da faixa — aí a quebra acontece sozinha, onde o
+      // letrista quebrou.
       const multi = l.classList.contains('mg-multi')
-      const porLargura = multi ? Infinity : REF * (largura / naturalRef)
-      const porAltura = multi ? (altura / 2) * 1.02 : altura * 1.02
+      const vezes = multi ? Math.max(2, Math.round(altura / (altura / 2))) : 1
+      const porLargura = REF * ((largura * vezes) / naturalRef)
+      const porAltura = multi ? (altura / vezes) * 1.02 : altura * 1.02
       medidas.push({ l, t, largura, altura, multi })
       tamanho = Math.min(tamanho, porLargura, porAltura)
     }
