@@ -2244,7 +2244,14 @@ function _mgDetectarBalao(ctx, cv, b) {
   // a linha impressa tem 25 — e essa medida alimenta a janela de busca, a
   // cola entre palavras e o descarte do vizinho. Uma linha de mangá não passa
   // de ~3,5% da folha nem no grito.
-  let hL = alturas.length ? alturas[alturas.length >> 1] : 0.020
+  // ⚠️ E NÃO PODE VIR SÓ DAS LINHAS SALVAS: elas já podem ser o resultado de
+  // uma medição anterior que errou para menos. Medido no "OOGH...": a linha
+  // salva tinha 0,3% da folha, a estimativa caiu para o piso de 0,8% e a
+  // janela inteira nasceu apertada — o erro se realimentava a cada rodada.
+  // A caixa original do modelo, dividida pelo número de linhas lidas, é o
+  // contrapeso: grosseira, mas independente da medição anterior.
+  const porIA = ia.h / Math.max(1, (b.ls || []).length || 1)
+  let hL = alturas.length ? Math.max(alturas[alturas.length >> 1], porIA * 0.5) : porIA
   hL = Math.max(0.008, Math.min(0.035, hL)) * cv.height
 
   // A janela: em volta da fala, com folga de duas linhas para cada lado e
@@ -2621,6 +2628,18 @@ function _mgEscreverBalao(b, det, faixas, cv) {
   const X = det.X, Y = det.Y
   const fr = (v, total) => +(v / total).toFixed(4)
   const textosIA = (b.ls || []).map(l => l.t).filter(t => t && t.trim())
+  // ⚠️ MAIS FAIXAS QUE PALAVRAS É RUÍDO, NÃO LINHA. Um respingo de tinta
+  // cercado de papel também é "buraco", e vira faixa. Enquanto há texto para
+  // repartir isso não incomoda; quando as faixas passam do número de palavras
+  // da fala, as sobrando ficam VAZIAS e ainda assim esticam a caixa do balão.
+  // Medido: "OOGH..." saiu com três faixas e a caixa do tamanho das três.
+  // Ficam as mais cheias — respingo é estreito, linha é larga.
+  const palavras = String(b.t || '').split(/\s+/).filter(Boolean).length
+  const cabem = Math.max(1, textosIA.length, palavras)
+  if (faixas.length > cabem) {
+    const melhores = [...faixas].sort((a, c) => (c.x1 - c.x0) - (a.x1 - a.x0)).slice(0, cabem)
+    faixas = faixas.filter(f => melhores.indexOf(f) >= 0)
+  }
   const textos = (textosIA.length === faixas.length)
     ? textosIA
     : _mgRepartir(b.t || textosIA.join(' '), faixas)
