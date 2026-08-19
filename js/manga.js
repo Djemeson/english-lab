@@ -1841,7 +1841,7 @@ async function _mgAfinarPorPixel(bytes, baloes) {
   let afinados = 0
   for (const b of baloes) {
     if (!b || !b.t) continue
-    if (_mgMedirBalao(ctx, cv, b)) afinados++
+    if (_mgMedirBalao(ctx, cv, b, baloes)) afinados++
   }
   return afinados
 }
@@ -2536,7 +2536,25 @@ function _mgBlocoContinuo(faixas, ia, cv, Y) {
 //
 // A folga de 3% tolera o serrilhado da digitalização — sem ela, um único
 // pixel cinza de anti-serrilhado trava o crescimento na primeira fileira.
-function _mgCrescerNoPapel(det, caixa) {
+// As caixas das OUTRAS falas da página, em coordenadas desta janela. É o que
+// impede o fundo aceso de um grito grande cobrir a fala do vizinho.
+function _mgVizinhos(b, todos, det, cv) {
+  if (!Array.isArray(todos)) return []
+  const fora = []
+  for (const o of todos) {
+    if (o === b || !o) continue
+    const c = Array.isArray(o.ia) && o.ia.length === 4 && o.ia.every(v => isFinite(v))
+      ? { x: o.ia[0], y: o.ia[1], w: o.ia[2], h: o.ia[3] } : o
+    if (!isFinite(c.x) || !isFinite(c.y) || !isFinite(c.w) || !isFinite(c.h)) continue
+    fora.push({
+      x0: c.x * cv.width - det.X, x1: (c.x + c.w) * cv.width - det.X,
+      y0: c.y * cv.height - det.Y, y1: (c.y + c.h) * cv.height - det.Y
+    })
+  }
+  return fora
+}
+
+function _mgCrescerNoPapel(det, caixa, vizinhos) {
   const masc = det.masc, buraco = det.buraco, W = det.W, H = det.H, hL = det.hL
   const solido = p => masc[p] || buraco[p]
   const tetoV = Math.round(hL * 1.0), tetoH = Math.round(hL * 0.8)
@@ -2549,11 +2567,18 @@ function _mgCrescerNoPapel(det, caixa) {
     }
     return tot > 0 && bons >= tot * 0.97
   }
+  // ⚠️ PAPEL LIVRE NÃO É PAPEL DE NINGUÉM. Visto na tela (página 19): o grito
+  // "AAAAH!!" é escrito solto sobre o branco, sem balão em volta — então nada
+  // no PIXEL barrava o crescimento, e a caixa dele foi engolindo o branco até
+  // cobrir o balão vizinho inteiro, texto e tudo. Quem sabe que ali existe
+  // outra fala não é a imagem: é a lista de balões da página.
+  const vz = Array.isArray(vizinhos) ? vizinhos : []
+  const invade = (x0, y0, x1, y1) => vz.some(v => x0 <= v.x1 && x1 >= v.x0 && y0 <= v.y1 && y1 >= v.y0)
   let { x0, y0, x1, y1 } = caixa
-  for (let k = 0; k < tetoV && y0 > 0; k++) { if (!limpo(x0, x1, y0 - 1, true)) break; y0-- }
-  for (let k = 0; k < tetoV && y1 < H - 1; k++) { if (!limpo(x0, x1, y1 + 1, true)) break; y1++ }
-  for (let k = 0; k < tetoH && x0 > 0; k++) { if (!limpo(y0, y1, x0 - 1, false)) break; x0-- }
-  for (let k = 0; k < tetoH && x1 < W - 1; k++) { if (!limpo(y0, y1, x1 + 1, false)) break; x1++ }
+  for (let k = 0; k < tetoV && y0 > 0; k++) { if (!limpo(x0, x1, y0 - 1, true) || invade(x0, y0 - 1, x1, y0 - 1)) break; y0-- }
+  for (let k = 0; k < tetoV && y1 < H - 1; k++) { if (!limpo(x0, x1, y1 + 1, true) || invade(x0, y1 + 1, x1, y1 + 1)) break; y1++ }
+  for (let k = 0; k < tetoH && x0 > 0; k++) { if (!limpo(y0, y1, x0 - 1, false) || invade(x0 - 1, y0, x0 - 1, y1)) break; x0-- }
+  for (let k = 0; k < tetoH && x1 < W - 1; k++) { if (!limpo(y0, y1, x1 + 1, false) || invade(x1 + 1, y0, x1 + 1, y1)) break; x1++ }
   return { x0, y0, x1, y1 }
 }
 
@@ -2624,7 +2649,7 @@ function _mgCoresDoBalao(det, caixa) {
   }
 }
 
-function _mgEscreverBalao(b, det, faixas, cv) {
+function _mgEscreverBalao(b, det, faixas, cv, todos) {
   const X = det.X, Y = det.Y
   const fr = (v, total) => +(v / total).toFixed(4)
   const textosIA = (b.ls || []).map(l => l.t).filter(t => t && t.trim())
@@ -2657,7 +2682,7 @@ function _mgEscreverBalao(b, det, faixas, cv) {
     x0: Math.min(...faixas.map(f => f.x0)), x1: Math.max(...faixas.map(f => f.x1)),
     y0: Math.min(...faixas.map(f => f.y0)), y1: Math.max(...faixas.map(f => f.y1))
   }
-  const caixa = _mgCrescerNoPapel(det, uniao)
+  const caixa = _mgCrescerNoPapel(det, uniao, _mgVizinhos(b, todos, det, cv))
   const cores = _mgCoresDoBalao(det, caixa)
 
   b.ls = novas
@@ -2675,7 +2700,7 @@ function _mgEscreverBalao(b, det, faixas, cv) {
 
 // O caminho novo primeiro; o antigo continua de reserva para o que a imagem
 // não entrega (fala sobre arte escura, texto sem papel em volta).
-function _mgMedirBalao(ctx, cv, b) {
+function _mgMedirBalao(ctx, cv, b, todos) {
   // O palpite do modelo, guardado uma única vez. Daqui para a frente toda
   // medição parte DELE, e não do que a medição anterior deixou — é o que
   // impede o erro de se acumular a cada versão.
@@ -2684,7 +2709,7 @@ function _mgMedirBalao(ctx, cv, b) {
     const det = _mgDetectarBalao(ctx, cv, b)
     if (det) {
       const faixas = _mgLinhasDoBalao(det, b, cv)
-      if (faixas.length && _mgEscreverBalao(b, det, faixas, cv)) { _mgAlvoMinimo(b); return true }
+      if (faixas.length && _mgEscreverBalao(b, det, faixas, cv, todos)) { _mgAlvoMinimo(b); return true }
     }
   } catch (e) {
     console.warn('[mangá] detecção do balão falhou:', e && e.message)
