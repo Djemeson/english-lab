@@ -6667,6 +6667,25 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
    vazamento para fora do desenho, então a faixa pode deixar a letra respirar
    em vez de cortar o pé de um "Q" ou a vírgula. */
 .mg-balao.mg-forma .mg-linha{overflow:visible}
+
+/* ⚠️ A ÁREA QUE RESPONDE AO MOUSE É MAIOR QUE A QUE ACENDE — e essa separação
+   é o conserto de "passei o mouse e não aconteceu nada". Desde que a caixa
+   passou a ser medida no pixel, ela é JUSTA no texto: alguns pixels ao lado
+   da letra já estão fora dela, e o ponteiro caía no vazio. Inflar a caixa
+   resolveria o toque e estragaria o encaixe — o fundo aceso voltaria a ser
+   maior que a fala.
+   A borda transparente separa as duas coisas: ela ENTRA na conta do ponteiro
+   e sai da conta do fundo (`background-clip: padding-box`). Com
+   `box-sizing: content-box`, a largura e a altura em % continuam valendo para
+   a área pintada, e a margem negativa devolve o deslocamento que a borda
+   causaria. Resultado: acende com o mouse por perto, pintando exatamente onde
+   pintava antes. */
+.mg-balao.mg-forma{
+  box-sizing:content-box;
+  border:10px solid transparent;
+  margin:-10px;
+  background-clip:padding-box;
+}
 .mg-linha{
   position:absolute;
   /* ⚠️ CENTRALIZADO. Alinhado à esquerda só fazia sentido quando eu esticava
@@ -6769,7 +6788,12 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
      quando o mangá é digitalizado de papel, que é creme ou cinza. `--mg-bg` e
      `--mg-fg` são a média medida DENTRO daquele balão: o fundo que acende
      tem a cor exata do papel ali, e o texto a da tinta. */
-  background:var(--mg-bg, #fff);
+  /* ⚠️ `background-color`, NUNCA o atalho `background`. O atalho reescreve
+     TAMBÉM o `background-clip`, e com ele a cor voltava a pintar por baixo da
+     borda transparente — justo a borda que existe só para o ponteiro. Medido:
+     `background-clip` computava `border-box` mesmo com `padding-box` escrito
+     na regra da forma. */
+  background-color:var(--mg-bg, #fff);
   color:var(--mg-fg, #111);
   box-shadow:0 0 0 3px var(--mg-bg, #fff);
 }
