@@ -182,16 +182,25 @@ function _mgRegularizar(b) {
     return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2
   }
   const passo = mediana(passos)
-  const altura = mediana(ord.map(l => l.h))
-  if (!(passo > 0) || !(altura > 0)) return
-  // Passo menor que a altura da linha significaria linhas sobrepostas — aí a
-  // medição não é confiável e é melhor não mexer.
-  if (passo < altura * 0.7) return
-  const topo = ord[0].y
-  ord.forEach((l, k) => {
-    l.y = +(topo + k * passo).toFixed(4)
-    l.h = +altura.toFixed(4)
-  })
+  if (!(passo > 0)) return
+
+  // ⚠️ PASSO DOBRADO NÃO É ERRO DE MEDIÇÃO — É UMA LINHA QUE VALE POR DUAS.
+  // Medido no balão que ele fotografou: passos de 0,0356 / 0,0175 / 0,0175. A
+  // IA leu "YOU KNOW HE'S NOT THE KIND" como UMA linha, mas no desenho são
+  // duas, e a projeção mediu a faixa inteira — daí a primeira distância ser o
+  // dobro das outras.
+  //
+  // Forçar tudo ao passo mediano (o conserto óbvio) comprimiria o bloco e
+  // jogaria o texto para fora do balão. O certo é o contrário: reconhecer que
+  // aquela faixa comporta mais de uma linha e deixar o texto QUEBRAR dentro
+  // dela. Assim a posição continua sendo a medida — que é o que dá o encaixe
+  // — e a aparência fica a do original.
+  for (const l of ord) {
+    const quantas = Math.round(l.h / passo)
+    l.n = quantas > 1 ? quantas : 1
+  }
+
+  // A caixa do balão é a união do que ficou.
   const x0 = Math.min(...ls.map(l => l.x))
   const y0 = Math.min(...ls.map(l => l.y))
   const x1 = Math.max(...ls.map(l => l.x + l.w))
@@ -314,10 +323,13 @@ function mangaAjustarLinhas(raiz) {
       t.style.transform = ''
       t.style.fontSize = REF + 'px'
       const naturalRef = t.offsetWidth || 1
-      // O que cabe pela largura, e o que cabe pela altura da linha impressa.
-      const porLargura = REF * (largura / naturalRef)
-      const porAltura = altura * 1.02
-      medidas.push({ l, t, largura, altura })
+      // Faixa que vale por várias linhas: a largura natural é a do texto
+      // TODO numa linha só, mas ele vai quebrar — então a referência é a
+      // altura por linha, não a largura total.
+      const multi = l.classList.contains('mg-multi')
+      const porLargura = multi ? Infinity : REF * (largura / naturalRef)
+      const porAltura = multi ? (altura / 2) * 1.02 : altura * 1.02
+      medidas.push({ l, t, largura, altura, multi })
       tamanho = Math.min(tamanho, porLargura, porAltura)
     }
     if (semLayout || !medidas.length) continue
@@ -984,7 +996,10 @@ function _mgCamadaHtml(c) {
       const sep = (l === b.ls[b.ls.length - 1]) ? '' : ' '
       // O texto vai num filho próprio para poder ser ESTICADO até a largura da
       // linha impressa — ver `mangaAjustarLinhas`.
-      return '<span class="mg-linha" style="' + estL + '"><i class="mg-t">' +
+      // Faixa que comporta mais de uma linha impressa: o texto pode quebrar
+      // dentro dela — ver `_mgRegularizar`.
+      const cls = (l.n > 1) ? 'mg-linha mg-multi' : 'mg-linha'
+      return '<span class="' + cls + '" style="' + estL + '"><i class="mg-t">' +
              esc(l.t) + sep + '</i></span>'
     }).join('')
     return abre + corpo + '</span>'

@@ -6702,6 +6702,15 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   color:inherit;
   font-style:normal;
 }
+/* Faixa que comporta mais de uma linha impressa: o texto quebra dentro dela,
+   como quebra no balão desenhado. Sem isto ele sairia numa linha só, muito
+   mais larga que o balão. */
+.mg-linha.mg-multi > .mg-t{
+  white-space:normal;
+  text-align:center;
+  line-height:1.12;
+  max-width:100%;
+}
 .mg-linha::selection{background:rgba(var(--primary-rgb),.35);color:inherit}
 .mg-t::selection{background:rgba(var(--primary-rgb),.35);color:inherit}
 .mg-t::-moz-selection{background:rgba(var(--primary-rgb),.35);color:inherit}
