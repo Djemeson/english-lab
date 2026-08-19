@@ -2396,7 +2396,7 @@ function _mgLinhasDoBalao(det, b, cv) {
   // A primeira passada existe só para descobrir ONDE está a coluna da fala;
   // quem mede é a segunda.
   const usar = faixasB.length ? faixasB : faixasA
-  const finais = _mgNoPapel(_mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora), det.masc, W, H)
+  const finais = _mgNoPapel(_mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora), hL)
   const bloco = _mgTetoDeAltura(_mgBlocoContinuo(finais, ia, cv, Y), buraco, W, hL)
   return _mgPisoDeAltura(_mgSoTexto(bloco), hL, H)
 }
@@ -2518,41 +2518,34 @@ function _mgSoTexto(faixas) {
   return fica.length >= Math.ceil(faixas.length / 2) ? fica : faixas
 }
 
-// ⚠️ LINHA DE FALA TEM PAPEL LIMPO ACIMA OU ABAIXO DELA. Print dele: o balão
-// do "WE LOVE ONLY MISS BLACK MARIA" acendia com um fundo enorme, cobrindo os
+// ⚠️ AS LINHAS DE UM BALÃO DIVIDEM O MESMO EIXO. Print dele: o balão do "WE
+// LOVE ONLY MISS BLACK MARIA" acendia com um fundo enorme, cobrindo os
 // personagens de baixo. As quatro linhas estavam certas — mas duas faixas a
 // mais tinham entrado, tiradas de detalhes do DESENHO abaixo do balão, e a
 // caixa é a união de todas.
 //
 // Nada do que já existia denunciava: elas caíam com o mesmo passo das linhas
-// reais (o vão não acusa), eram pequenas (a altura não acusa), e havia papel
-// em volta delas — o balde tinha escapado por uma fresta na base do balão e
-// pintado uma tira fina ali embaixo, então "está no papel" também passava.
+// reais (o vão não acusa), eram pequenas (a altura não acusa), e o balde tinha
+// escapado por uma fresta e pintado papel ali embaixo (medido: vão limpo de
+// 100% em volta das duas — "está no papel" também passava).
 //
-// O que separa de verdade é o VÃO ENTRE LINHAS: dentro de um balão, logo
-// acima ou logo abaixo de cada linha existe papel limpo cobrindo a largura
-// dela inteira — é o entrelinha. Numa tira vazada de dois dedos de largura,
-// não existe.
-function _mgNoPapel(faixas, masc, W, H) {
-  return faixas.filter(f => {
-    const larg = f.x1 - f.x0 + 1
-    const cobre = y => {
-      if (y < 0 || y >= H) return 0
-      let n = 0
-      for (let x = f.x0; x <= f.x1; x++) if (masc[y * W + x]) n++
-      return n / larg
-    }
-    // ⚠️ PROCURAR O VÃO, NÃO APOSTAR NUMA FILEIRA. Olhando só a fileira 2 px
-    // acima e a 2 px abaixo, o teste reprovou TODAS as faixas do volume
-    // (medido: 0 de 19 balões numa página) — a faixa tem margem, e a duas
-    // fileiras dela ainda se está no meio das letras. O entrelinha pode estar
-    // a três, quatro, cinco pixels; basta encontrá-lo de um dos lados.
-    let melhor = 0
-    for (let d = 1; d <= 6 && melhor < 0.85; d++) {
-      melhor = Math.max(melhor, cobre(f.y0 - d), cobre(f.y1 + d))
-    }
-    return melhor >= 0.7
-  })
+// O que separa, MEDIDO: as quatro linhas reais têm o centro exatamente no
+// mesmo x (204 px, todas), porque letreiro de mangá é composto centralizado.
+// As duas intrusas estavam a 100 px do eixo e mediam um terço da largura.
+function _mgNoPapel(faixas, hL) {
+  if (faixas.length < 3) return faixas
+  const mediana = arr => { const a = [...arr].sort((x, y) => x - y); return a[a.length >> 1] }
+  const centro = f => (f.x0 + f.x1) / 2
+  const largura = f => f.x1 - f.x0 + 1
+  const cMed = mediana(faixas.map(centro))
+  const lMed = mediana(faixas.map(largura))
+  // ⚠️ AS DUAS CONDIÇÕES JUNTAS, E DE PROPÓSITO. Sozinho, "fora do eixo"
+  // reprovaria uma caixa de narração alinhada à esquerda; sozinho, "estreita"
+  // reprovaria o "ELSE..." que fecha a fala. Juntas, sobra o que de fato é
+  // respingo: pequeno E deslocado.
+  const fica = faixas.filter(f =>
+    Math.abs(centro(f) - cMed) <= hL * 2 || largura(f) >= lMed * 0.6)
+  return fica.length >= 2 ? fica : faixas
 }
 
 // ⚠️ A LARGURA SAI DO GRUPO DE COLUNAS QUE CONTÉM A FALA, e não de todas as
