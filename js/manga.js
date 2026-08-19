@@ -1698,10 +1698,26 @@ function _mgAfinarBalao(ctx, cv, b) {
     }
     if (cx1 < cx0) continue
     const l = b.ls[k]
+    const alturaPx = fy1 - fy0 + 1
+    const larguraPx = cx1 - cx0 + 1
+    // ⚠️ LARGURA IMPLAUSÍVEL É TINTA DO DESENHO, NÃO LINHA. Medido: a linha
+    // "THAT'S ONE OF" — treze caracteres — recebeu uma caixa de **3 px de
+    // largura**, e "MONSTERS" recebeu 13 px. A projeção tinha encontrado uma
+    // coluna fina de tinta (a borda de um quadro, um traço vertical) e a
+    // tomou pelos limites do texto. O resultado na tela é o pior possível: a
+    // fala inteira espremida num risco, ilegível ao acender.
+    //
+    // Nenhuma escrita cabe em menos de ~0,22 da altura da linha por
+    // caractere; abaixo disso a medida está errada e a caixa que a IA deu,
+    // ainda que folgada, é melhor. Só a POSIÇÃO VERTICAL é aproveitada, que é
+    // a parte em que a projeção acerta.
+    const minimoPlausivel = Math.max(4, (l.t || '').length * alturaPx * 0.22)
     l.y = +((Y + fy0) / cv.height).toFixed(4)
-    l.h = +((fy1 - fy0 + 1) / cv.height).toFixed(4)
-    l.x = +((X + cx0) / cv.width).toFixed(4)
-    l.w = +((cx1 - cx0 + 1) / cv.width).toFixed(4)
+    l.h = +(alturaPx / cv.height).toFixed(4)
+    if (larguraPx >= minimoPlausivel) {
+      l.x = +((X + cx0) / cv.width).toFixed(4)
+      l.w = +(larguraPx / cv.width).toFixed(4)
+    }
   }
 
   // A caixa do balão volta a ser a união — agora das linhas MEDIDAS.
