@@ -1935,32 +1935,18 @@ function _mgAfinarBalao(ctx, cv, b) {
     const [fy0, fy1] = faixas[mapa[k]]
     const l = b.ls[k]
     const alturaPx = fy1 - fy0 + 1
-    const larguraPx = cx1 - cx0 + 1
-    // ⚠️ LARGURA IMPLAUSÍVEL É TINTA DO DESENHO, NÃO LINHA. Medido: a linha
-    // "THAT'S ONE OF" — treze caracteres — recebeu uma caixa de **3 px de
-    // largura**, e "MONSTERS" recebeu 13 px. A projeção tinha encontrado uma
-    // coluna fina de tinta (a borda de um quadro, um traço vertical) e a
-    // tomou pelos limites do texto. O resultado na tela é o pior possível: a
-    // fala inteira espremida num risco, ilegível ao acender.
+    // ⚠️ A PROJEÇÃO SÓ MEXE NA VERTICAL. Lição de cinco rodadas de conserto:
+    // horizontalmente ela erra, e erra feio — pegou de uma borda do quadro à
+    // outra (45% da página), colou linhas na margem esquerda (x:0), devolveu
+    // faixas de 3 px. Cada erro pedia uma heurística nova, e a pilha delas
+    // produziu resultados piores que o começo.
     //
-    // Nenhuma escrita cabe em menos de ~0,22 da altura da linha por
-    // caractere; abaixo disso a medida está errada e a caixa que a IA deu,
-    // ainda que folgada, é melhor. Só a POSIÇÃO VERTICAL é aproveitada, que é
-    // a parte em que a projeção acerta.
-    // ⚠️ A PROJEÇÃO SÓ MEXE NA VERTICAL. Esta é a lição de cinco rodadas de
-    // conserto: horizontalmente ela erra, e erra feio — pegou de uma borda do
-    // quadro à outra (45% da página), colou linhas na margem esquerda
-    // (`x: 0`), devolveu faixas de 3 px. Cada erro exigiu uma heurística nova,
-    // e a pilha de heurísticas produziu resultados piores que o começo.
+    // O motivo: numa FILEIRA de pixels o texto e o desenho se misturam — a
+    // moldura do quadro, o contorno do balão e a arte estão na mesma altura
+    // das letras. Numa COLUNA o texto se separa sozinho: linhas são picos,
+    // vãos são vales. É onde ela acerta, e agora é só o que ela faz.
     //
-    // O motivo é simples: numa FILEIRA de pixels, o texto e o desenho se
-    // misturam — a moldura do quadro, o contorno do balão e a arte estão na
-    // mesma altura das letras. Já numa COLUNA de pixels o texto se separa
-    // sozinho: linhas são picos, vãos são vales. É onde a projeção acerta, e
-    // agora é só o que ela faz.
-    //
-    // A largura vem da caixa que a IA deu para o balão — ela VÊ o balão e
-    // acerta a extensão dele. Cada um no que é bom.
+    // A largura vem da caixa que a IA deu ao balão — ela VÊ o balão.
     l.y = +((Y + fy0) / cv.height).toFixed(4)
     l.h = +(alturaPx / cv.height).toFixed(4)
     l.x = b.x
