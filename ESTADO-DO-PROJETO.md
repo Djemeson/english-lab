@@ -10921,6 +10921,48 @@ heurísticas de largura foram apagadas junto.
 tem **fundo preto com texto branco** (é o resumo do volume), e o teste procura
 o branco do miolo do balão. Nas páginas de mangá de verdade, a taxa é **100%**.
 
+
+### 8.48 — A caixa de seleção do mangá: entregue sem resolver
+
+⚠️ **Não consegui resolver.** Depois de várias rodadas, a caixa de seleção
+continua sem encaixar no balão desenhado, e o usuário pediu um documento de
+transferência. Ele está em **`MANGA-CAIXA-DE-SELECAO.md`**, na raiz do projeto.
+
+**O que ele quer, textualmente:** *"uma caixa de seleção tão perfeita com o
+original que ao passar o mouse eu quase nem perceber que se abriu uma caixa"*.
+A referência é o mokuro.
+
+**Estado medido** (One Piece vol. 100, relido do zero): 28 páginas, 207
+balões, **42 mais largos que 25% da página** e **8 colados na margem
+esquerda**. Um balão de fala raramente passa de 20% da folha — esses 42 são o
+que ele vê transbordando por cima da arte.
+
+#### O diagnóstico
+
+As duas fontes de informação erram, cada uma à sua maneira:
+
+- **A IA lê o texto com precisão** (7 de 7, palavra por palavra) mas **a caixa
+  que devolve é aproximada** — junta duas linhas impressas numa, devolve 30%
+  da altura da página para uma palavra, começa em `x: 0`.
+- **A projeção de pixels acerta a vertical e erra a horizontal**: numa fileira,
+  texto e desenho se misturam (moldura do quadro, contorno do balão, arte ao
+  lado); numa coluna, o texto se separa sozinho.
+
+#### O caminho não tentado (a recomendação do documento)
+
+**Detectar o balão pela própria imagem, por preenchimento a partir de dentro.**
+O balão é uma região clara fechada por uma linha escura: um flood fill a partir
+do miolo para sozinho no contorno, e a caixa envolvente é o balão — com
+precisão de pixel e **sem heurística nenhuma**. É o que o mokuro faz (com um
+detector dedicado, o `comic-text-detector`).
+
+⚠️ **A lição de método, que vale além deste caso:** o maior erro da série não
+foi de código, foi de teste. Passei rodadas medindo proporções e contagens —
+números que passavam limpos — enquanto na tela havia balões cobrindo a arte e
+outros que sequer existiam para o ponteiro. **O usuário via em um segundo o que
+os meus testes não pegavam.** Medir não é olhar, e a pergunta que o teste faz
+importa mais que a precisão com que ele mede.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
