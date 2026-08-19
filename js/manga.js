@@ -196,89 +196,101 @@ function _mgCrescerCaixa(pai, t, largura) {
 function mangaAjustarLinhas(raiz) {
   const alvo = raiz || document.getElementById('ler-conteudo')
   if (!alvo) return 0
-  const linhas = alvo.querySelectorAll('.mg-linha:not([data-ok]) > .mg-t, .mg-balao:not([data-ok]) > .mg-t-solo')
   let n = 0
-  for (const t of linhas) {
-    const pai = t.parentElement
-    const largura = pai.clientWidth
-    // ⚠️ BLOCO QUE QUEBRA SE AJUSTA PELA ALTURA, não pela largura. Num texto
-    // de várias linhas a largura natural é a da linha mais longa, e casar por
-    // ela deixaria o bloco transbordando por baixo. Aqui a fonte cresce até o
-    // bloco encher a caixa e para.
-    if (t.classList.contains('mg-t-solo')) {
-      const alturaCaixa = pai.clientHeight
-      if (!largura || !alturaCaixa) continue
-      t.style.fontSize = ''
-      let tam = Math.max(MG_FONTE_MIN, Math.min(alturaCaixa * 0.9, 40))
-      t.style.fontSize = tam.toFixed(1) + 'px'
-      // Encolhe até caber, mas NUNCA abaixo do legível.
-      for (let k = 0; k < 20 && (t.scrollHeight > alturaCaixa + 1 || t.scrollWidth > largura + 1); k++) {
-        if (tam * 0.92 < MG_FONTE_MIN) break
-        tam *= 0.92
-        t.style.fontSize = tam.toFixed(1) + 'px'
-      }
-      // ⚠️ AQUI A CAIXA CEDE, NÃO O TEXTO. Espremer a fonte tem limite: na
-      // página de resumo do volume dava 40 blocos com menos de 10 px, e texto
-      // que acende ilegível é o mesmo que não acender. Como a caixa é só um
-      // ALVO invisível sobre a arte, ela pode crescer — e crescer para os dois
-      // lados a partir do centro mantém o texto sobre a linha impressa.
-      _mgCrescerCaixa(pai, t, largura)
-      if (t.scrollWidth > largura + 1) {
-        t.style.transform = 'scaleX(' + Math.max(0.25, largura / t.scrollWidth).toFixed(4) + ')'
-      }
-      pai.dataset.ok = '1'
+
+  // ⚠️ A FONTE É DO BALÃO, NÃO DA LINHA. Calculando linha por linha, cada uma
+  // recebia o tamanho que casava a SUA largura — e o balão saía com "IN THE"
+  // grande e "GREAT BANQUET" pequeno, cada linha com um espaçamento diferente.
+  // Era o que ele descreveu: sem organização, sem padronização, texto maior e
+  // outro menor.
+  //
+  // Um balão é um bloco de texto: as letras têm o mesmo corpo em todas as
+  // linhas. Aqui o tamanho é o MENOR que serve para todas — o que cabe na
+  // linha mais apertada manda no balão inteiro.
+  for (const cont of alvo.querySelectorAll('.mg-balao:not([data-ok])')) {
+    const linhas = [...cont.querySelectorAll('.mg-linha')]
+
+    // Balão sem linhas separadas: um bloco só, que quebra e se ajusta pela
+    // altura da caixa.
+    if (!linhas.length) {
+      const t = cont.querySelector('.mg-t-solo')
+      if (!t) continue
+      const larg = cont.clientWidth, alt = cont.clientHeight
+      if (!larg || !alt) continue
+      _mgAjustarBloco(cont, t, larg, alt)
+      cont.dataset.ok = '1'
       n++
       continue
     }
-    // Sem layout ainda (página fora da tela): fica para a próxima passada.
-    if (!largura) continue
-    t.style.letterSpacing = ''
-    t.style.transform = ''
-    t.style.fontSize = ''
-    const propria = t.offsetWidth
-    if (!propria) continue
-    // ⚠️ CRESCER A FONTE, NÃO AFASTAR AS LETRAS. Espaçar caractere a caractere
-    // cobre a largura certa, mas quando a linha é curta ("IN THE" numa faixa
-    // larga) o espaço por letra fica enorme e o resultado é "I N   T H E" —
-    // ilegível, e agora esse texto APARECE no hover. Ele mandou o print.
-    //
-    // Escalando o tamanho da fonte, a linha preenche a largura com a letra
-    // inteira, na proporção que a fonte desenhou. Só o que sobra depois do
-    // teto é acertado no espaçamento.
-    const base = parseFloat(getComputedStyle(t).fontSize) || 14
-    // Teto pela ALTURA da faixa: fonte maior que a linha impressa transbordaria
-    // para cima e para baixo, invadindo a linha vizinha.
-    const alturaFaixa = pai.clientHeight || base
-    // Piso de 11px: abaixo disso o texto acende e continua ilegível, que é o
-    // mesmo que não acender. Antes o piso era 6 e a varredura achou linhas
-    // com menos de 7px em três páginas.
-    const tamanho = Math.max(MG_FONTE_MIN, Math.min(base * (largura / propria), Math.max(MG_FONTE_MIN, alturaFaixa * 1.05)))
-    t.style.fontSize = tamanho.toFixed(2) + 'px'
-    // O resíduo — quando o teto de altura impediu chegar à largura — vai para
-    // o espaçamento, com limite curto para não voltar ao "I N   T H E".
-    const agora = t.offsetWidth
-    if (agora && Math.abs(agora - largura) > 2) {
-      const chars = Math.max(1, (t.textContent || '').length)
-      const espaco = Math.max(-1.5, Math.min(tamanho * 0.35, (largura - agora) / chars))
-      t.style.letterSpacing = espaco.toFixed(2) + 'px'
+
+    // Mede cada linha com uma fonte de referência para descobrir, sem
+    // tentativa e erro, qual tamanho ela suportaria.
+    const REF = 20
+    let tamanho = Infinity
+    const medidas = []
+    let semLayout = false
+    for (const l of linhas) {
+      const t = l.querySelector('.mg-t')
+      if (!t) continue
+      const largura = l.clientWidth
+      const altura = l.clientHeight
+      if (!largura || !altura) { semLayout = true; break }
+      t.style.letterSpacing = ''
+      t.style.transform = ''
+      t.style.fontSize = REF + 'px'
+      const naturalRef = t.offsetWidth || 1
+      // O que cabe pela largura, e o que cabe pela altura da linha impressa.
+      const porLargura = REF * (largura / naturalRef)
+      const porAltura = altura * 1.02
+      medidas.push({ l, t, largura, altura })
+      tamanho = Math.min(tamanho, porLargura, porAltura)
     }
-    // ⚠️ REDE FINAL CONTRA TRANSBORDO. A varredura achou texto passando da
-    // caixa em quase toda página: o tamanho da fonte é limitado pela ALTURA da
-    // faixa, e quando a fala é larga demais para essa altura ela sobra pelos
-    // lados. Sobrando, ela invade o realce do balão vizinho — e agora, com o
-    // texto aceso, também aparece por cima da arte ao lado.
-    // Aqui o encolhimento horizontal entra só no que sobrou: deformar um
-    // pouco é melhor que vazar.
-    // A caixa cede antes do texto: cresce em altura até a fala caber.
-    _mgCrescerCaixa(pai, t, largura)
-    const largoFinal = t.scrollWidth
-    if (largoFinal > largura + 1) {
-      t.style.transform = 'scaleX(' + Math.max(0.2, largura / largoFinal).toFixed(4) + ')'
+    if (semLayout || !medidas.length) continue
+
+    // Piso: abaixo disso o texto acende e continua sem se ler. Quando o piso
+    // manda, é a CAIXA que cede depois (ver `_mgCrescerCaixa`).
+    tamanho = Math.max(MG_FONTE_MIN, Math.min(tamanho, 44))
+
+    for (const m of medidas) {
+      m.t.style.fontSize = tamanho.toFixed(2) + 'px'
+      // ⚠️ SEM ESTICAR E SEM ESPAÇAR. Forçar cada linha a preencher a largura
+      // exata era o que produzia "I N   T H E". Centralizado na própria caixa,
+      // o bloco fica alinhado como o original — e o realce continua sobre as
+      // letras, porque a caixa é a da linha impressa.
+      m.t.style.letterSpacing = ''
+      m.t.style.transform = ''
+      // A caixa cede se o texto não couber: ela é um alvo invisível, e alargar
+      // não estraga a arte.
+      _mgCrescerCaixa(m.l, m.t, m.largura)
+      // Só o excesso que sobrar depois disso é encolhido — deformar um pouco
+      // é melhor que vazar para a fala vizinha.
+      const sobra = m.t.scrollWidth
+      if (sobra > m.l.clientWidth + 1) {
+        m.t.style.transform = 'scaleX(' + Math.max(0.35, m.l.clientWidth / sobra).toFixed(4) + ')'
+      }
     }
-    pai.dataset.ok = '1'
+    cont.dataset.ok = '1'
     n++
   }
   return n
+}
+
+// O bloco de texto corrido (páginas de resumo): quebra em várias linhas e
+// procura o maior tamanho que cabe na caixa.
+function _mgAjustarBloco(cont, t, largura, altura) {
+  t.style.letterSpacing = ''
+  t.style.transform = ''
+  let tam = Math.min(altura * 0.9, 34)
+  t.style.fontSize = tam.toFixed(1) + 'px'
+  for (let k = 0; k < 22 && (t.scrollHeight > altura + 1 || t.scrollWidth > largura + 1); k++) {
+    if (tam * 0.92 < MG_FONTE_MIN) break
+    tam *= 0.92
+    t.style.fontSize = tam.toFixed(1) + 'px'
+  }
+  _mgCrescerCaixa(cont, t, largura)
+  if (t.scrollWidth > largura + 1) {
+    t.style.transform = 'scaleX(' + Math.max(0.35, largura / t.scrollWidth).toFixed(4) + ')'
+  }
 }
 
 // ⚠️ ARRASTOU? ENTÃO NÃO FOI TOQUE. O `click` dispara também no fim de um

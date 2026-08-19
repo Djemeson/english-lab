@@ -6652,7 +6652,10 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 .mg-balao.mg-linhado{display:block;overflow:visible}
 .mg-linha{
   position:absolute;
-  display:flex;align-items:center;justify-content:flex-start;
+  /* ⚠️ CENTRALIZADO. Alinhado à esquerda só fazia sentido quando eu esticava
+     o texto para preencher a caixa; sem o esticamento, centralizar é o que
+     acompanha o balão de mangá — que é composto centralizado, sempre. */
+  display:flex;align-items:center;justify-content:center;
   margin:0;padding:0;
   color:transparent;
   /* `1` porque a caixa da linha JÁ é a altura da linha: qualquer entrelinha
@@ -6685,7 +6688,10 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 }
 .mg-t{
   display:inline-block;
-  transform-origin:left center;
+  /* Centro como origem: o pouco de encolhimento que ainda acontece parte do
+     meio da linha, e não da borda esquerda — assim o texto não "escorrega"
+     para um lado dentro do balão. */
+  transform-origin:center center;
   white-space:pre;
   color:inherit;
   font-style:normal;
