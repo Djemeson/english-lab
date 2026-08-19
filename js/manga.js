@@ -219,6 +219,15 @@ function mangaAjustarLinhas(raiz) {
   // linhas. Aqui o tamanho é o MENOR que serve para todas — o que cabe na
   // linha mais apertada manda no balão inteiro.
   for (const cont of alvo.querySelectorAll('.mg-balao:not([data-ok])')) {
+    // ⚠️ SÓ MEDE COM A IMAGEM PRONTA. A altura da página vem da imagem; antes
+    // de ela carregar, a caixa de cada linha ainda está no tamanho reservado
+    // pelo `aspect-ratio` e as contas saem de um layout que vai mudar. O
+    // resultado ficava carimbado como definitivo e nunca mais era revisto —
+    // eram os 6 balões com entrelinha irregular, que sumiam ao remedir à mão.
+    const pagina = cont.closest('.mg-pagina')
+    const imgPg = pagina && pagina.querySelector('.mg-img')
+    if (!imgPg || !imgPg.complete || !imgPg.naturalWidth) continue
+
     const linhas = [...cont.querySelectorAll('.mg-linha')]
 
     // Balão sem linhas separadas: um bloco só, que quebra e se ajusta pela
