@@ -17,19 +17,28 @@ desenhado, e a troca é quase imperceptível.
 
 ## 2. Como ficou, medido no volume real
 
-One Piece vol. 100, 28 páginas, 207 balões:
+One Piece vol. 100, 28 páginas, **relido do zero** depois dos consertos:
 
 | Medida | Antes | Depois |
 |---|---|---|
-| Balões com caixa vinda da imagem | 0 | **200 de 207** (154 de 155 nas páginas de mangá) |
-| Balões mais largos que 25% da folha | 42 | **13** — e 5 deles são as páginas de TEXTO do volume, onde caixa larga é correta |
+| Balões no volume | 207 | **318** |
+| Balões com caixa vinda da imagem | 0 | **318 de 318 (100%)** |
+| Balões mais largos que 25% da folha | 42 | **8** — metade nas páginas de TEXTO, onde é correto |
 | Balões sem área (invisíveis ao ponteiro) | 31 numa rodada anterior | **0** |
+| Páginas que a IA não conseguia ler | 10 | **0** (28 de 28, sem uma falha) |
 | Tempo de medição | — | ~250 ms por página, sem chamada de IA |
 
-Conferido com os olhos na página 28 (a que ele fotografou): os cinco balões
+⚠️ **Os 111 balões a mais são a resposta para "vários balões não acontece nada
+ao passar o mouse".** Não era a caixa: aquelas páginas **nunca tinham sido
+lidas**. O JSON quebrado derrubava a página inteira, e uma página sem balão
+nenhum é indistinguível de uma página sem fala — some calada. Uma delas tinha
+60 balões.
+
+Conferido com os olhos na página 28 (a que ele fotografou) e na 17: os balões
 acendem com as **mesmas quebras de linha impressas** — "YOU KNOW / HE'S NOT
-THE KIND / OF BOSS WHO / BESTOWS MERCY / ON CRYBABIES!!" — dentro do balão,
-sem remendo no fundo e sem cobrir o traço.
+THE KIND / OF BOSS WHO / BESTOWS MERCY / ON CRYBABIES!!", "I HEARD /
+SANGORO'S / VOICE COMING / FROM THIS / MOUSE!!" — dentro do balão, sem remendo
+no fundo e sem cobrir o traço.
 
 ---
 
@@ -67,6 +76,16 @@ traço do original**.
   isso o erro se acumula a cada versão.
 - **`b.px` é versão**: página já lida se remede sozinha ao entrar na tela, sem
   gastar IA.
+- **A área do mouse é maior que a área que acende**: a caixa medida é justa no
+  texto, e o ponteiro caía no vazio a poucos pixels da letra. Uma borda
+  transparente de 10 px entra na conta do ponteiro e sai da conta do fundo
+  (`background-clip: padding-box`) — acende de perto, pinta no lugar exato.
+  ⚠️ Nas regras de hover use `background-color`, nunca o atalho `background`:
+  o atalho reescreve o `background-clip` junto.
+- **Desenho dentro do balão não é linha**: um rostinho desenhado no rodapé do
+  balão é tão cercado de branco quanto as letras e virava uma faixa a mais,
+  espalhando o texto. Dentro de um balão o letrista usa uma letra só, então
+  faixa muito mais alta que a mediana das outras é descartada.
 
 ---
 
@@ -91,9 +110,10 @@ puro. O JSON encolheu umas três vezes e o aninhamento sumiu.
   volta, os respingos do impacto são tão cercados de papel quanto as letras, e
   a faixa sai maior que o texto. Há um corte por densidade, mas ele não
   resolve tudo. O fundo aceso cobre área branca a mais — não cobre traço.
-- **Páginas lidas antes desta rodada** têm a caixa do modelo já sobrescrita
-  por medições antigas, e a medição nova parte de um ponto de partida pior.
-  Relê-las custa ~R$ 0,005 por página e melhora o resultado.
+- **Volume relido em 2026-08-19** — as caixas antigas, sobrescritas por
+  medições de versões anteriores, saíram de cena. Um volume novo já nasce
+  certo; um volume lido por uma versão antiga do app se beneficia de uma
+  releitura (~R$ 0,005 por página).
 - **A fonte é Comic Sans** (com Comic Neue e a da interface como reserva). É a
   aproximação disponível sem baixar fonte nova; o lettering de mangá de
   verdade é outro desenho.

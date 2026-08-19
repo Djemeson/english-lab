@@ -1608,12 +1608,30 @@ encolheu umas três vezes e o aninhamento sumiu. O formato antigo continua aceit
 mesmas quebras impressas, dentro do balão, sem remendo de fundo e sem cobrir o traço. A seleção
 continua devolvendo a fala inteira e idêntica ao dado (o caminho para a Lexa está intacto).
 
+**A RELEITURA DO VOLUME REVELOU A CAUSA RAIZ DE "VÁRIOS BALÕES NÃO ACONTECE NADA AO PASSAR O
+MOUSE"** — e não era a caixa. Relidas as 28 páginas com o pedido novo (28 de 28, **zero falhas**),
+o volume passou de **207 para 318 balões**: dez páginas **nunca tinham sido lidas**, uma delas com
+60 balões. O JSON quebrado derrubava a página inteira, e página sem balão nenhum é indistinguível
+de página sem fala — some calada, sem erro na tela. Depois da releitura: **318 de 318 com caixa
+vinda da imagem (100%)**, 8 largos demais (metade nas páginas de texto), nenhum sem alvo.
+
+**Mais dois consertos vindos dessa rodada:**
+
+- **A área que responde ao mouse ficou maior que a que acende.** Com a caixa medida no pixel ela é
+  JUSTA no texto, e o ponteiro caía no vazio a poucos pixels da letra. Uma borda transparente de
+  10 px entra na conta do ponteiro e sai da conta do fundo (`background-clip: padding-box`,
+  `box-sizing: content-box`, margem negativa). ⚠️ Nas regras de hover use `background-color`,
+  nunca o atalho `background` — o atalho reescreve o `background-clip` junto, e a cor voltava a
+  pintar por baixo da borda.
+- **Desenho dentro do balão deixou de virar linha** (`_mgSoTexto`): o rostinho no rodapé do balão
+  da página 17 é tão cercado de branco quanto as letras, virava uma faixa a mais e espalhava o
+  texto ("MOUSE!!" boiando longe do resto). Dentro de um balão o letrista usa uma letra só — faixa
+  muito mais alta que a mediana das outras é descartada.
+
 **O que ficou aberto**: grito solto sobre o branco ("AAAAH!!" da página 19) ainda acende área maior
 que as letras — sem balão em volta, os respingos do impacto são tão cercados de papel quanto elas.
-E as páginas lidas antes desta rodada partem de uma caixa já sobrescrita por medições antigas;
-relê-las custa ~R$ 0,005 por página.
 
-`sw.js`: `englab-v299` → `englab-v311`.
+`sw.js`: `englab-v299` → `englab-v314`.
 
 
 ### Sessão 2026-08-07 (94ª rodada) — O ITEM AVISANDO CONTRA ELE MESMO
