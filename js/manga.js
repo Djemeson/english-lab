@@ -2360,9 +2360,24 @@ function _mgLinhasDoBalao(det, b, cv) {
   const larguraA = _mgLarguraDasFaixas(buraco, W, faixasA, jx0, jx1, ancora)
   if (!larguraA.length) return []
 
-  // A coluna da fala: onde as linhas da primeira passada realmente estão.
-  const cx0 = Math.max(jx0, Math.min(...larguraA.map(f => f.x0)) - 2)
-  const cx1 = Math.min(jx1, Math.max(...larguraA.map(f => f.x1)) + 2)
+  // ⚠️ A COLUNA DA SEGUNDA PASSADA VEM DA CAIXA DO MODELO, NÃO DAS FAIXAS DA
+  // PRIMEIRA. Elas já podem ter esticado até a fala vizinha — e foi o que
+  // aconteceu, visto no pixel: na altura de "WE CAN'T"/"LAST ANY" havia o
+  // "...BEHIND" do balão ao lado, a faixa da primeira passada engoliu os dois,
+  // e a coluna tirada dela continuava larga demais para o vale entre as duas
+  // linhas aparecer. Elas viravam UMA.
+  //
+  // A caixa do modelo é ruim para desenhar, mas boa para dizer "a fala está
+  // nesta coluna" — e é só isso que se pede a ela aqui. As larguras finais
+  // continuam saindo da janela larga, medidas no pixel.
+  const ax0 = Math.min(...larguraA.map(f => f.x0)), ax1 = Math.max(...larguraA.map(f => f.x1))
+  let cx0 = Math.max(jx0, Math.round(ia.x * cv.width) - X - Math.round(hL * 0.3))
+  let cx1 = Math.min(jx1, Math.round((ia.x + ia.w) * cv.width) - X + Math.round(hL * 0.3))
+  // Caixa do modelo estreita ou fora do lugar: volta o que a primeira passada
+  // achou — melhor uma coluna larga que uma coluna vazia.
+  if (cx1 - cx0 < hL * 2 || ancora < cx0 || ancora > cx1) {
+    cx0 = Math.max(jx0, ax0 - 2); cx1 = Math.min(jx1, ax1 + 2)
+  }
   const faixasB = _mgFaixasEm(buraco, W, y0, y1, cx0, cx1)
   const usar = faixasB.length >= faixasA.length ? faixasB : faixasA
   const finais = _mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora)
