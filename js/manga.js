@@ -2684,7 +2684,7 @@ function _mgMedirBalao(ctx, cv, b) {
     const det = _mgDetectarBalao(ctx, cv, b)
     if (det) {
       const faixas = _mgLinhasDoBalao(det, b, cv)
-      if (faixas.length && _mgEscreverBalao(b, det, faixas, cv)) return true
+      if (faixas.length && _mgEscreverBalao(b, det, faixas, cv)) { _mgAlvoMinimo(b); return true }
     }
   } catch (e) {
     console.warn('[mangá] detecção do balão falhou:', e && e.message)
@@ -2693,6 +2693,20 @@ function _mgMedirBalao(ctx, cv, b) {
   const ok = _mgAfinarBalao(ctx, cv, b)
   // Carimbo de versão mesmo no caminho antigo: sem ele a página seria
   // remedida a cada abertura, sem ganho nenhum.
-  if (ok) { b.px = MG_PX_V; delete b.fm }
+  if (ok) { b.px = MG_PX_V; delete b.fm; _mgAlvoMinimo(b) }
   return ok
+}
+
+// ⚠️ A REDE FINAL, E ELA É CONTRA UM DEFEITO ANTIGO E MUDO. Caixa de três
+// pixels não é alvo: o ponteiro não alcança, o balão nunca acende e não há
+// erro nenhum no console — foi assim que 31 balões sumiram numa rodada
+// anterior. O caminho de reserva ainda produz isso quando a única faixa que
+// ele acha são as reticências ("OOGH..." mede 0,3% da folha).
+//
+// O mínimo é o mesmo que a entrada já exige de qualquer balão: 1,2% de
+// largura, 1% de altura. Cresce pelo centro, para o texto não escorregar.
+function _mgAlvoMinimo(b) {
+  const min = (v, m) => Math.max(v, m)
+  if (b.w < 0.012) { const c = b.x + b.w / 2; b.w = 0.012; b.x = +Math.max(0, Math.min(1 - b.w, c - b.w / 2)).toFixed(4) }
+  if (b.h < 0.010) { const c = b.y + b.h / 2; b.h = 0.010; b.y = +Math.max(0, Math.min(1 - b.h, c - b.h / 2)).toFixed(4) }
 }
