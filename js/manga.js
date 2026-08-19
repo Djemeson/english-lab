@@ -543,20 +543,31 @@ function mangaTocarBalao(elemento, ev) {
 // A leitura dos balões
 // ---------------------------------------------------------------
 
+// ⚠️ NÃO PEÇA A CAIXA DE CADA LINHA. Pedia-se, e o modelo QUEBRAVA O JSON:
+// capturado na resposta crua da página 28, ele escreve o texto da primeira
+// linha e emenda as caixas das outras como chaves repetidas no mesmo objeto —
+// `{"text":"YOU KNOW","box_2d":[...],"box_2d":[...],"box_2d":]` —, o que não
+// é JSON e derruba a página inteira. Duas leituras seguidas falharam assim, e
+// o app só sabia dizer "a resposta veio, mas não era JSON válido".
+//
+// A causa é o formato: uma lista de objetos aninhados dentro de outra lista de
+// objetos é o que ele erra. E agora nem é preciso — a posição de cada linha
+// sai da IMAGEM. Do modelo só se quer o que ele faz bem: LER. As linhas viram
+// uma lista de textos, o JSON encolhe umas três vezes e o aninhamento some.
 const MG_PEDIDO = `You are reading ONE page of an English-language manga/comic.
 
 Return ONLY JSON, no prose:
 {"balloons":[{"text":"...","box_2d":[ymin,xmin,ymax,xmax],
-  "lines":[{"text":"...","box_2d":[ymin,xmin,ymax,xmax]}]}],"sfx":["..."]}
+  "lines":["first printed line","second printed line"]}],"sfx":["..."]}
 
 Rules:
 - One entry per SPEECH BALLOON (also thought balloons and caption boxes).
 - "text": the dialogue exactly as printed. Join broken lines into one sentence
   with single spaces. Keep punctuation and apostrophes. NEVER translate.
 - "box_2d": bounding box of the balloon's TEXT as [ymin, xmin, ymax, xmax],
-  normalized to 0-1000.
-- "lines": one entry per PRINTED LINE of that balloon, in reading order, each
-  with a TIGHT box around that line's glyphs only — no balloon padding.
+  normalized to 0-1000. Exactly four numbers, one box per balloon.
+- "lines": ONE STRING per printed line of that balloon, in reading order.
+  Plain strings only — no objects, no boxes, no extra keys.
 - Order: natural reading order for this page.
 - "sfx": sound effects drawn OUTSIDE balloons. Text only, no boxes.
 - If the page has no dialogue at all, return {"balloons":[],"sfx":[]}.`
@@ -700,28 +711,48 @@ function _mgAplicar(livro, i, brutos, sfx) {
     // Fundindo aqui, na entrada, o número de linhas volta a bater com o que a
     // projeção encontra — e nenhuma constante precisa ceder.
     const soSinais = t => /^[^\p{L}\p{N}]+$/u.test(t)
-    for (const l of (Array.isArray(b.lines) ? b.lines : [])) {
+    // ⚠️ A LINHA PODE CHEGAR COMO TEXTO PURO — é o formato pedido hoje, e o
+    // caminho normal. A caixa dela é ESTIMADA aqui, repartindo a do balão em
+    // fatias iguais: serve de ponto de partida para a medição no pixel, que é
+    // quem vai dizer onde a linha realmente está. O formato antigo (objeto com
+    // `box_2d`) continua aceito, para uma resposta antiga não virar página em
+    // branco.
+    const cruas = Array.isArray(b.lines) ? b.lines : []
+    const soTexto = cruas.length && cruas.every(l => typeof l === 'string')
+    if (soTexto) {
+      // Caminho normal: a fala já vem quebrada em textos. A caixa de cada
+      // linha é uma FATIA IGUAL da caixa do balão — palpite grosseiro, e é
+      // só o que precisa ser: quem diz onde a linha está é a medição no
+      // pixel, e este valor serve para ela saber por onde começar.
+      const textos = []
+      for (const l of cruas) {
+        const lt = String(l).replace(/\s+/g, ' ').trim()
+        if (!lt) continue
+        if (textos.length && soSinais(lt)) { textos[textos.length - 1] += ' ' + lt; continue }
+        textos.push(lt)
+      }
+      const n = textos.length || 1
+      textos.forEach((lt, k) => linhas.push({
+        t: lt,
+        x: +x.toFixed(4), y: +(y + h * k / n).toFixed(4),
+        w: +w.toFixed(4), h: +(h / n).toFixed(4)
+      }))
+    } else
+    for (const l of cruas) {
       const lt = String((l && l.text) || (l && l.t) || '').replace(/\s+/g, ' ').trim()
       const lc = _mgCaixa(l, escala)
       if (!lt || !lc) continue
       const lx = preso(lc.x, 0, 1), ly = preso(lc.y, 0, 1)
       const lw = Math.min(1 - lx, Math.max(0, lc.w)), lh = Math.min(1 - ly, Math.max(0, lc.h))
       if (lw < 0.008 || lh < 0.004) continue
-      // ⚠️ LINHA ALTA DEMAIS É CAIXA ERRADA, NÃO LETRA GRANDE. Medido: o balão
-      // "WHAT?!" — uma palavra — veio com linha de **30% da altura da página**.
-      // Uma linha de mangá não passa de ~6% nem no grito mais berrado. Caixa
-      // assim vira um alvo gigante sobre a arte e envenena tudo o que se
-      // calcula a partir dela (a janela de busca, a altura mínima da faixa).
-      // Encolhida para 4% em torno do próprio centro: deixa de atrapalhar e
-      // continua cobrindo a palavra.
+      // Linha alta demais é caixa errada, não letra grande: encolhida para 4%
+      // em torno do próprio centro.
       const linha = { t: lt, x: +lx.toFixed(4), y: +ly.toFixed(4), w: +lw.toFixed(4), h: +lh.toFixed(4) }
       if (linha.h > 0.06) {
         const meio = linha.y + linha.h / 2
         linha.h = 0.04
         linha.y = +Math.max(0, meio - 0.02).toFixed(4)
       }
-      // Só sinais e há uma linha antes: junta o texto e estende a caixa até
-      // englobar os dois — o realce continua cobrindo a linha impressa toda.
       const ant = linhas[linhas.length - 1]
       if (ant && soSinais(lt)) {
         const x2b = Math.max(ant.x + ant.w, linha.x + linha.w)
