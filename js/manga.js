@@ -195,9 +195,22 @@ function _mgRegularizar(b) {
   // aquela faixa comporta mais de uma linha e deixar o texto QUEBRAR dentro
   // dela. Assim a posição continua sendo a medida — que é o que dá o encaixe
   // — e a aparência fica a do original.
-  for (const l of ord) {
-    const quantas = Math.round(l.h / passo)
-    l.n = quantas > 1 ? quantas : 1
+  // ⚠️ O SINAL É O VÃO ATÉ A PRÓXIMA, NÃO A ALTURA DA FAIXA. Quando a IA
+  // junta duas linhas impressas numa leitura só, a projeção mede a faixa da
+  // PRIMEIRA — altura normal — e o que denuncia é a distância até a linha
+  // seguinte, que fica o dobro. Medido no balão dele: alturas 0,0112 / 0,0119
+  // / 0,0119, todas normais, mas o primeiro vão é 0,035 contra 0,0175 dos
+  // outros. O desenho tem CINCO linhas; a leitura trouxe quatro.
+  //
+  // Reconhecendo isso, a faixa é esticada para cobrir as duas linhas e o
+  // texto quebra dentro dela — fica onde está impresso, com a forma que está
+  // impressa.
+  for (let k = 0; k < ord.length; k++) {
+    const l = ord[k]
+    const vao = (k + 1 < ord.length) ? (ord[k + 1].y - l.y) : passo
+    const quantas = Math.max(1, Math.round(vao / passo))
+    l.n = quantas
+    if (quantas > 1) l.h = +Math.min(vao, quantas * passo).toFixed(4)
   }
 
   // A caixa do balão é a união do que ficou.
