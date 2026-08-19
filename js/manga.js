@@ -2381,7 +2381,32 @@ function _mgLinhasDoBalao(det, b, cv) {
   const faixasB = _mgFaixasEm(buraco, W, y0, y1, cx0, cx1)
   const usar = faixasB.length >= faixasA.length ? faixasB : faixasA
   const finais = _mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora)
-  return _mgBlocoContinuo(finais, ia, cv, Y)
+  return _mgPisoDeAltura(_mgBlocoContinuo(finais, ia, cv, Y), hL, H)
+}
+
+// ⚠️ RETICÊNCIAS SÃO LINHA, MAS MEDEM CINCO PIXELS. Medido: o balão "OOGH..."
+// da página 13 terminou com 0,3% da altura da folha — porque a única faixa
+// achada foi a dos três pontos, e a caixa do balão é a união das faixas. Um
+// balão de 5 px de altura não tem alvo para o ponteiro e não tem espaço para
+// letra nenhuma: some da tela sem avisar.
+//
+// O piso é meia linha, aberto em torno do CENTRO da faixa (para o texto não
+// escorregar) e limitado pela metade do vão até a vizinha (para não invadir a
+// linha de cima nem a de baixo).
+function _mgPisoDeAltura(faixas, hL, H) {
+  const piso = hL * 0.5
+  for (let k = 0; k < faixas.length; k++) {
+    const f = faixas[k]
+    const alt = f.y1 - f.y0 + 1
+    if (alt >= piso) continue
+    let folga = (piso - alt) / 2
+    if (k > 0) folga = Math.min(folga, (f.y0 - faixas[k - 1].y1) / 2)
+    if (k < faixas.length - 1) folga = Math.min(folga, (faixas[k + 1].y0 - f.y1) / 2)
+    if (folga < 1) continue
+    f.y0 = Math.max(0, Math.round(f.y0 - folga))
+    f.y1 = Math.min(H - 1, Math.round(f.y1 + folga))
+  }
+  return faixas
 }
 
 // Perfil por fileira dentro de uma janela: as linhas viram picos, os vãos
