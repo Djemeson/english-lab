@@ -6709,7 +6709,12 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   white-space:normal;
   text-align:center;
   line-height:1.12;
-  max-width:100%;
+  /* ⚠️ `normal`, e NÃO `break-word`. Com quebra dentro da palavra o navegador
+     produz "NEA / R / DE" quando o espaço aperta — o defeito que ele
+     fotografou. Preferindo transbordar a partir palavra, o erro fica visível
+     e corrigível, em vez de virar uma coluna de letras. */
+  word-break:normal;
+  overflow-wrap:normal;
 }
 .mg-linha::selection{background:rgba(var(--primary-rgb),.35);color:inherit}
 .mg-t::selection{background:rgba(var(--primary-rgb),.35);color:inherit}

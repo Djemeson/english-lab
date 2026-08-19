@@ -214,10 +214,18 @@ function _mgRegularizar(b) {
   }
 
   // A caixa do balão é a união do que ficou.
-  const x0 = Math.min(...ls.map(l => l.x))
-  const y0 = Math.min(...ls.map(l => l.y))
-  const x1 = Math.max(...ls.map(l => l.x + l.w))
-  const y1 = Math.max(...ls.map(l => l.y + l.h))
+  // ⚠️ UMA LINHA SEM COORDENADA ENVENENA A CAIXA INTEIRA. `Math.min` com um
+  // `undefined` devolve NaN, e o balão terminava com `x: null, w: null` — na
+  // tela, largura ZERO. É por isso que vários balões não acendiam ao passar o
+  // mouse: não havia área para o ponteiro alcançar. Só entram na conta as
+  // linhas com os quatro números.
+  const boas = ls.filter(l => [l.x, l.y, l.w, l.h].every(v => typeof v === 'number' && isFinite(v)))
+  if (!boas.length) return
+  const x0 = Math.min(...boas.map(l => l.x))
+  const y0 = Math.min(...boas.map(l => l.y))
+  const x1 = Math.max(...boas.map(l => l.x + l.w))
+  const y1 = Math.max(...boas.map(l => l.y + l.h))
+  if (![x0, y0, x1, y1].every(v => isFinite(v))) return
   b.x = +x0.toFixed(4); b.y = +y0.toFixed(4)
   b.w = +(x1 - x0).toFixed(4); b.h = +(y1 - y0).toFixed(4)
 }
@@ -359,7 +367,11 @@ function mangaAjustarLinhas(raiz) {
       // 1/n da largura natural, ela quebra exatamente em n linhas, com a
       // mesma letra das vizinhas.
       const multi = l.classList.contains('mg-multi')
-      const vezes = multi ? Math.max(2, Math.round(altura / Math.max(1, alturaLinhaTipica(linhas)))) : 1
+      // Teto de 3: acima disso a conta veio de uma medida torta, e estreitar
+      // tanto o texto produz aquela coluna de uma palavra por linha.
+      const vezes = multi
+        ? Math.min(3, Math.max(2, Math.round(altura / Math.max(1, alturaLinhaTipica(linhas)))))
+        : 1
       const porLargura = REF * (largura / naturalRef)
       const porAltura = multi ? (altura / vezes) * 1.02 : altura * 1.02
       medidas.push({ l, t, largura, altura, multi, vezes, naturalRef })
@@ -381,8 +393,14 @@ function mangaAjustarLinhas(raiz) {
       m.t.style.fontSize = tamanho.toFixed(2) + 'px'
       // Faixa dupla: estreita o espaço para o texto quebrar em `vezes` linhas.
       if (m.multi && m.vezes > 1) {
+        // ⚠️ NUNCA MAIS ESTREITO QUE A MAIOR PALAVRA. O limite calculado
+        // (largura ÷ nº de linhas) pode ficar menor que uma palavra sozinha, e
+        // aí o navegador quebra DENTRO dela: ele fotografou "NEA / R / DE /
+        // ENTWANCE...". `min-content` é exatamente a largura da maior palavra;
+        // com `max()`, o limite nunca desce abaixo dela.
         const natural = m.t.scrollWidth || m.largura
-        m.t.style.maxWidth = Math.max(24, Math.ceil(natural / m.vezes) + 2) + 'px'
+        const alvo = Math.max(24, Math.ceil(natural / m.vezes) + 2)
+        m.t.style.maxWidth = 'max(' + alvo + 'px, min-content)'
       } else {
         m.t.style.maxWidth = ''
       }
@@ -1900,20 +1918,32 @@ function _mgAfinarBalao(ctx, cv, b) {
     // caractere; abaixo disso a medida está errada e a caixa que a IA deu,
     // ainda que folgada, é melhor. Só a POSIÇÃO VERTICAL é aproveitada, que é
     // a parte em que a projeção acerta.
-    const minimoPlausivel = Math.max(4, (l.t || '').length * alturaPx * 0.22)
+    // ⚠️ IMPLAUSÍVEL DOS DOIS LADOS. A checagem só barrava largura PEQUENA
+    // demais; a grande passava — e passava muito: medido, a linha "YOU KNOW
+    // HE'S" ficou com 45% da LARGURA DA PÁGINA porque a projeção varreu de uma
+    // borda do quadro à outra. O balão inteiro virava um retângulo branco de
+    // 502 px cobrindo as falas vizinhas quando acendia. Foi o que ele viu.
+    //
+    // Uma letra não passa de ~1,1 da altura da linha em largura; com folga
+    // generosa, o teto é 1,6 por caractere. Fora da faixa, vale a caixa da IA.
+    const chars = Math.max(1, (l.t || '').length)
+    const minimoPlausivel = Math.max(4, chars * alturaPx * 0.22)
+    const maximoPlausivel = chars * alturaPx * 1.6
     l.y = +((Y + fy0) / cv.height).toFixed(4)
     l.h = +(alturaPx / cv.height).toFixed(4)
-    if (larguraPx >= minimoPlausivel) {
+    if (larguraPx >= minimoPlausivel && larguraPx <= maximoPlausivel) {
       l.x = +((X + cx0) / cv.width).toFixed(4)
       l.w = +(larguraPx / cv.width).toFixed(4)
     }
   }
 
   // A caixa do balão volta a ser a união — agora das linhas MEDIDAS.
-  const ux0 = Math.min(...b.ls.map(l => l.x))
-  const uy0 = Math.min(...b.ls.map(l => l.y))
-  const ux1 = Math.max(...b.ls.map(l => l.x + l.w))
-  const uy1 = Math.max(...b.ls.map(l => l.y + l.h))
+  const bons = b.ls.filter(l => [l.x, l.y, l.w, l.h].every(v => typeof v === 'number' && isFinite(v)))
+  if (!bons.length) return false
+  const ux0 = Math.min(...bons.map(l => l.x))
+  const uy0 = Math.min(...bons.map(l => l.y))
+  const ux1 = Math.max(...bons.map(l => l.x + l.w))
+  const uy1 = Math.max(...bons.map(l => l.y + l.h))
   b.x = +ux0.toFixed(4); b.y = +uy0.toFixed(4)
   b.w = +(ux1 - ux0).toFixed(4); b.h = +(uy1 - uy0).toFixed(4)
   // Espaçamento regular, com o passo do próprio balão desenhado.
