@@ -693,6 +693,9 @@ function _mgAplicar(livro, i, brutos, sfx) {
       linhas.push(linha)
     }
     const item = { t, x: +x.toFixed(4), y: +y.toFixed(4), w: +w.toFixed(4), h: +h.toFixed(4) }
+    // Nenhum balão entra no acervo com número inválido: um NaN aqui vira
+    // largura zero na tela e um balão que nunca acende.
+    if (![item.x, item.y, item.w, item.h].every(v => isFinite(v))) continue
     // Só aceita as linhas se elas cobrirem o balão de verdade: um punhado de
     // linhas soltas seria pior que a caixa única, porque parte da fala ficaria
     // sem alvo nenhum e o toque simplesmente não pegaria.
@@ -1943,6 +1946,21 @@ function _mgAfinarBalao(ctx, cv, b) {
     }
   }
 
+  // ⚠️ A REDE VEM ANTES DA UNIÃO, e essa ordem é o conserto. Ela estava depois
+  // — e quando NENHUMA linha tinha coordenada horizontal, a união desistia
+  // (`return false`) e a rede nunca chegava a rodar. O balão ficava com
+  // largura nula para sempre, sem área nenhuma para o ponteiro: era o
+  // "vários balões não acontece nada ao passar o mouse".
+  //
+  // Herdar a caixa da IA é impreciso, mas alvo impreciso ainda é alcançável;
+  // alvo nenhum não é.
+  for (const l of b.ls) {
+    if (typeof l.x !== 'number' || !isFinite(l.x)) l.x = b.x
+    if (typeof l.w !== 'number' || !isFinite(l.w)) l.w = b.w
+    if (typeof l.y !== 'number' || !isFinite(l.y)) l.y = b.y
+    if (typeof l.h !== 'number' || !isFinite(l.h)) l.h = b.h
+  }
+
   // A caixa do balão volta a ser a união — agora das linhas MEDIDAS.
   const bons = b.ls.filter(l => [l.x, l.y, l.w, l.h].every(v => typeof v === 'number' && isFinite(v)))
   if (!bons.length) return false
@@ -1952,13 +1970,6 @@ function _mgAfinarBalao(ctx, cv, b) {
   const uy1 = Math.max(...bons.map(l => l.y + l.h))
   b.x = +ux0.toFixed(4); b.y = +uy0.toFixed(4)
   b.w = +(ux1 - ux0).toFixed(4); b.h = +(uy1 - uy0).toFixed(4)
-  // Rede final: nenhuma linha pode ficar sem coordenada horizontal. Herdar a
-  // do balão é impreciso, mas um alvo impreciso ainda é alcançável — nenhum é
-  // o que faz o hover morrer.
-  for (const l of b.ls) {
-    if (typeof l.x !== 'number' || !isFinite(l.x)) l.x = b.x
-    if (typeof l.w !== 'number' || !isFinite(l.w)) l.w = b.w
-  }
   // Espaçamento regular, com o passo do próprio balão desenhado.
   _mgRegularizar(b)
   b.px = 1     // carimbo: esta caixa já foi medida no pixel
