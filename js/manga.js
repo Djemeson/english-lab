@@ -168,6 +168,20 @@ const MG_FONTE_MIN = 12
 // dá mais área para o dedo. Cresce a partir do CENTRO, para o texto continuar
 // sobre a linha impressa, e no máximo 2,2x — acima disso a caixa começaria a
 // cobrir a fala vizinha e o toque pegaria a errada.
+// Cresce o balão inteiro, mantendo o centro no lugar. As linhas, sendo
+// porcentagem dele, se esticam juntas e o entrelinha continua uniforme.
+function _mgCrescerBalao(cont, aumentoPx) {
+  const alturaAtual = cont.clientHeight
+  if (!alturaAtual || aumentoPx < 1) return
+  const nova = Math.min(alturaAtual + aumentoPx, alturaAtual * 2.4)
+  const cresceu = nova - alturaAtual
+  if (cresceu < 1) return
+  const ref = cont.offsetParent ? cont.offsetParent.clientHeight : 0
+  if (!ref) return
+  cont.style.height = ((nova / ref) * 100).toFixed(3) + '%'
+  cont.style.top = Math.max(0, (cont.offsetTop - cresceu / 2) / ref * 100).toFixed(3) + '%'
+}
+
 function _mgCrescerCaixa(pai, t, largura, aumentoImposto) {
   const alturaAtual = pai.clientHeight
   if (!alturaAtual) return
@@ -282,9 +296,15 @@ function mangaAjustarLinhas(raiz) {
       const falta = m.t.scrollHeight - m.l.clientHeight
       if (falta > precisaDeMais) precisaDeMais = falta
     }
-    if (precisaDeMais > 1) {
-      for (const m of medidas) _mgCrescerCaixa(m.l, m.t, m.largura, precisaDeMais)
-    }
+    // ⚠️ QUEM CRESCE É O BALÃO, NÃO CADA LINHA. Crescer linha a linha —
+    // mesmo com o mesmo aumento — desiguala: cada caixa tem altura levemente
+    // diferente por arredondamento de porcentagem, e `altura + aumento` gera
+    // valores diferentes, além de deslocar cada uma por metade de um número
+    // diferente. Era o entrelinha irregular que sobrava em 6 balões.
+    //
+    // As linhas são frações do balão (1/n cada). Crescendo o balão, elas
+    // acompanham juntas e o passo continua idêntico — de graça.
+    if (precisaDeMais > 1) _mgCrescerBalao(cont, precisaDeMais * medidas.length)
 
     for (const m of medidas) {
       m.t.style.fontSize = tamanho.toFixed(2) + 'px'
