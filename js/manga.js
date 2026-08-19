@@ -2388,7 +2388,42 @@ function _mgLinhasDoBalao(det, b, cv) {
   const faixasB = _mgFaixasEm(buraco, W, y0, y1, cx0, cx1)
   const usar = faixasB.length >= faixasA.length ? faixasB : faixasA
   const finais = _mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora)
-  return _mgPisoDeAltura(_mgBlocoContinuo(finais, ia, cv, Y), hL, H)
+  const bloco = _mgTetoDeAltura(_mgBlocoContinuo(finais, ia, cv, Y), buraco, W, hL)
+  return _mgPisoDeAltura(bloco, hL, H)
+}
+
+// ⚠️ ARTE CERCADA DE BRANCO TAMBÉM É "BURACO" — é o limite do método, e ele
+// aparece no grito solto sobre a página. Medido na página 19: o "AAAAH!!" é
+// escrito sem balão, no meio de um impacto desenhado, e os respingos pretos
+// em volta são tão cercados de papel quanto as letras. A faixa saiu com 189
+// px onde a letra tem pouco mais de cem.
+//
+// O corte é pela DENSIDADE: dentro de uma faixa alta demais, a linha de texto
+// é a parte onde a tinta se espalha por toda a largura; o respingo é ralo.
+// Fica só o miolo denso, e o grito legítimo — que é sólido de ponta a ponta —
+// sobrevive inteiro.
+function _mgTetoDeAltura(faixas, buraco, W, hL) {
+  const teto = hL * 2.6
+  for (const f of faixas) {
+    const alt = f.y1 - f.y0 + 1
+    if (alt <= teto) continue
+    const perfil = []
+    let pico = 0
+    for (let y = f.y0; y <= f.y1; y++) {
+      let n = 0
+      for (let x = f.x0; x <= f.x1; x++) if (buraco[y * W + x]) n++
+      perfil.push(n)
+      if (n > pico) pico = n
+    }
+    if (pico < 2) continue
+    const corte = pico * 0.35
+    let a = 0, z = perfil.length - 1
+    while (a < z && perfil[a] < corte) a++
+    while (z > a && perfil[z] < corte) z--
+    if (z - a + 1 < Math.max(2, hL * 0.4)) continue
+    f.y0 += a; f.y1 = f.y0 + (z - a)
+  }
+  return faixas
 }
 
 // ⚠️ RETICÊNCIAS SÃO LINHA, MAS MEDEM CINCO PIXELS. Medido: o balão "OOGH..."
