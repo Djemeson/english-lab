@@ -1883,7 +1883,13 @@ function _mgAfinarBalao(ctx, cv, b) {
     if (anterior >= 0 && mapa[anterior] === escolhidas[k]) {
       fundidas[anterior].t += ' ' + b.ls[k].t
     } else {
-      fundidas.push({ t: b.ls[k].t })
+      // ⚠️ COPIA A LINHA INTEIRA, não só o texto. Criando `{ t }` puro, a
+      // linha nascia SEM coordenadas — e se a largura medida logo abaixo
+      // fosse rejeitada por implausível, ela ficava sem `x` e sem `w` para
+      // sempre. Uma linha assim envenena a união e o balão termina com
+      // largura ZERO: nenhum ponteiro consegue alcançá-lo, e ele nunca
+      // acende. Eram 31 balões. As coordenadas da IA ficam de reserva.
+      fundidas.push(Object.assign({}, b.ls[k]))
       mapa.push(escolhidas[k])
     }
   }
@@ -1946,6 +1952,13 @@ function _mgAfinarBalao(ctx, cv, b) {
   const uy1 = Math.max(...bons.map(l => l.y + l.h))
   b.x = +ux0.toFixed(4); b.y = +uy0.toFixed(4)
   b.w = +(ux1 - ux0).toFixed(4); b.h = +(uy1 - uy0).toFixed(4)
+  // Rede final: nenhuma linha pode ficar sem coordenada horizontal. Herdar a
+  // do balão é impreciso, mas um alvo impreciso ainda é alcançável — nenhum é
+  // o que faz o hover morrer.
+  for (const l of b.ls) {
+    if (typeof l.x !== 'number' || !isFinite(l.x)) l.x = b.x
+    if (typeof l.w !== 'number' || !isFinite(l.w)) l.w = b.w
+  }
   // Espaçamento regular, com o passo do próprio balão desenhado.
   _mgRegularizar(b)
   b.px = 1     // carimbo: esta caixa já foi medida no pixel
