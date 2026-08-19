@@ -6680,7 +6680,13 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
    folha com um parágrafo dentro. Forçados numa linha só, o texto saía da
    caixa e a fonte tinha de encolher até ficar ilegível. Deixando quebrar,
    ele preenche o bloco como o original faz. */
-.mg-t-solo{
+/* ⚠️ `.mg-t.mg-t-solo`, com AS DUAS CLASSES. Escrito como `.mg-t-solo` ele
+   empata em especificidade com `.mg-t` — que vem depois e define
+   `white-space: pre`. Resultado medido: o bloco NÃO quebrava, e um texto de
+   509 px ficava numa linha só dentro de uma caixa de 158 px (44 casos na
+   página de resumo do volume). Mesmo tropeço da margem da imagem, algumas
+   rodadas atrás: a regra existia e não valia. */
+.mg-t.mg-t-solo{
   max-width:100%;
   white-space:normal;
   text-align:center;
