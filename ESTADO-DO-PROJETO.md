@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-11 (14ª) — **O CLIQUE QUE FAZIA DUAS COISAS**. O painel que não
+> Última atualização: 2026-08-19 — **A CAIXA DE SELEÇÃO DO MANGÁ SAI DA IMAGEM**. Onze tentativas
+> de consertar a caixa que o modelo de visão devolve tinham falhado; a informação exata estava na
+> página o tempo todo. O balde de tinta marca o papel, o que fica **cercado** por ele é texto, e a
+> caixa cresce até encostar na arte — por construção o fundo aceso **nunca cobre um traço** do
+> original. ⚠️ A primeira versão exigia balão fechado e pegou 3 de 11: metade do One Piece não tem
+> contorno. Medido no volume: **200 de 207** balões com caixa vinda da imagem, largos demais caíram
+> de **42 para 13**, nenhum sem alvo. E o pedido à IA parou de quebrar o JSON (ela repetia `box_2d`
+> no mesmo objeto). **Detalhes em §8, sessão 2026-08-19.**
+>
+> Última atualização anterior: 2026-08-11 (14ª) — **O CLIQUE QUE FAZIA DUAS COISAS**. O painel que não
 > sumia, o vídeo que não voltava e o "liga e desliga" eram **um defeito só**: o clique fechava
 > o popup **e** chegava ao player, que alterna play/pause — um desfazia o outro. Corrigido em
 > fase de captura, com a seleção limpa e **Esc para fechar**. ⚠️ A varredura achou o mesmo
@@ -1520,6 +1529,92 @@ maxInterval (36500), leechThreshold (50)
 ---
 
 ## 8. Histórico do que foi feito (sessão de junho/2026)
+
+### Sessão 2026-08-19 (rodada do mangá) — A CAIXA DE SELEÇÃO SAI DA IMAGEM, NÃO DO MODELO
+
+**O pedido, nas palavras dele**: *"quero uma caixa de seleção tão perfeita com o original que ao
+passar o mouse eu quase nem perceber que se abriu uma caixa de seleção, porque tá exatamente
+igual o original."* O registro completo está em `MANGA-CAIXA-DE-SELECAO.md`, que deixou de ser
+pedido de socorro e virou o mapa do que funcionou.
+
+**Onze tentativas anteriores tinham falhado**, todas pela mesma razão: tentavam consertar a caixa
+que o modelo de visão devolve. Ele **lê o texto muito bem** e mede mal — pedir precisão de pixel a
+ele é pedir a coisa errada a quem faz outra.
+
+**O caminho novo, em três passos** (seção "O BALÃO SAI DA IMAGEM", fim de `js/manga.js`):
+
+1. **O papel** — preenchimento por vizinhança (balde de tinta) a partir de um ponto dentro da
+   fala; marca o branco ligado àquele ponto e para na arte sozinho (`_mgPreencher`).
+2. **Os buracos são o texto** — pixel escuro **cercado** por esse branco, sem caminho até a borda,
+   é letra; com caminho, é desenho (`_mgBuracos`). Essa única distinção separa texto de arte sem
+   heurística: a arte se liga ao resto do quadro, a letra flutua no papel.
+3. **A caixa cresce até encostar na arte** — abre para os quatro lados enquanto a fileira (ou
+   coluna) inteira for papel (`_mgCrescerNoPapel`). Por construção, **o fundo aceso nunca cobre um
+   traço do original**.
+
+⚠️ **A primeira versão disto exigia balão FECHADO e detectou 3 de 11.** Metade dos balões do One
+Piece não tem contorno: o branco da fala é o mesmo branco do quadro. A suposição era minha, não do
+material — dez segundos olhando o pixel mostraram isso. Trocar "a caixa é o balão fechado" por "a
+caixa é o texto crescendo dentro do papel" atendeu os dois desenhos com o mesmo código.
+
+**O que mais entrou:**
+
+- **Duas passadas** para achar as linhas (`_mgLinhasDoBalao`): a primeira com janela larga, a
+  segunda dentro da coluna da fala — senão o texto do balão VIZINHO, que cai na mesma altura,
+  preenche o vale entre duas linhas e elas viram uma. A coluna da segunda passada vem da caixa do
+  modelo: ela é ruim para desenhar e boa para dizer "a fala está nesta coluna".
+- **Bloco contínuo** (`_mgBlocoContinuo`): fica só o bloco de linhas seguidas que contém o meio da
+  caixa, cortando onde o vão passa de 1,9 vez o passo típico. É o que separa falas empilhadas.
+- **Teto e piso de altura de faixa**: respingo cercado de branco também é "buraco" e virava linha
+  gigante (corte por densidade); reticências são linha legítima de 5 px e deixavam o balão sem
+  alvo (piso de meia linha).
+- **Reparte o texto pelas faixas** (`_mgRepartir`): quem manda no número de linhas é o DESENHO. Se
+  a contagem bate, cada texto vai para a sua; se não bate, o texto inteiro é repartido em proporção
+  à largura de cada faixa — o mesmo critério do letrista.
+- **As cores saem da página**: papel e tinta são a cor **mais frequente** dentro do balão. Com a
+  média, o serrilhado das letras puxava o branco para `#f9f9f9` e o fundo aceso virava mancha
+  visível — foi visto na tela, lado a lado com o original.
+- **`b.ia`**: a caixa original do modelo passa a ser guardada, e toda medição parte dela. Sem isso
+  o erro se acumula a cada versão (o balão 1 da página 28 já estava com 46% da largura da folha).
+- **`b.px` virou VERSÃO** (`MG_PX_V`): página já lida se remede sozinha ao entrar na tela, sem
+  gastar uma chamada de IA. É como o acervo inteiro se conserta de graça.
+- **`_mgAlvoMinimo`**: nenhum balão sai com caixa menor que 1,2% × 1% — abaixo disso não há alvo
+  para o ponteiro e o balão some sem erro nenhum no console (foi assim que 31 balões sumiram numa
+  rodada anterior).
+- **Tamanho da letra**: `font-size` não é a altura da letra (maiúscula ocupa ~72% do corpo, 83% em
+  Comic Sans). A razão passou a ser MEDIDA na fonte que vale (`_mgRazaoCaps`, via `measureText`).
+- **Fonte do mangá**: pilha `'Comic Sans MS', 'Comic Neue'` no lugar de Inter — grotesca de tela
+  denuncia a troca por mais certa que a caixa esteja.
+- **Saiu o `clip-path`/`b.fm`**: existia porque a caixa era o balão inteiro; com a caixa crescendo
+  dentro do papel ela já é toda branca, e o polígono virou dado a mais no banco.
+
+**O PEDIDO À IA MUDOU — e foi ele que derrubava páginas inteiras.** Capturado na resposta crua da
+página 28 (duas leituras seguidas falhando com "a resposta veio, mas não era JSON válido"): pedindo
+a caixa de cada linha, o modelo escreve o texto da primeira e emenda as caixas das outras como
+chaves REPETIDAS no mesmo objeto — `{"text":"YOU KNOW","box_2d":[...],"box_2d":[...],"box_2d":]` —
+o que não é JSON. Hoje se pede `"lines": ["primeira linha","segunda linha"]`, texto puro: o JSON
+encolheu umas três vezes e o aninhamento sumiu. O formato antigo continua aceito na entrada.
+
+**MEDIDO NO VOLUME REAL** (One Piece vol. 100, 28 páginas, 207 balões):
+
+| Medida | Antes | Depois |
+|---|---|---|
+| Caixa vinda da imagem | 0 | **200 de 207** (154 de 155 nas páginas de mangá) |
+| Mais largos que 25% da folha | 42 | **13** (5 deles nas páginas de TEXTO, onde é correto) |
+| Sem área para o ponteiro | 31 (rodada anterior) | **0** |
+| Tempo | — | ~250 ms por página, sem IA |
+
+**Conferido com os olhos** na página 28 (a que ele fotografou): os cinco balões acendem com as
+mesmas quebras impressas, dentro do balão, sem remendo de fundo e sem cobrir o traço. A seleção
+continua devolvendo a fala inteira e idêntica ao dado (o caminho para a Lexa está intacto).
+
+**O que ficou aberto**: grito solto sobre o branco ("AAAAH!!" da página 19) ainda acende área maior
+que as letras — sem balão em volta, os respingos do impacto são tão cercados de papel quanto elas.
+E as páginas lidas antes desta rodada partem de uma caixa já sobrescrita por medições antigas;
+relê-las custa ~R$ 0,005 por página.
+
+`sw.js`: `englab-v299` → `englab-v311`.
+
 
 ### Sessão 2026-08-07 (94ª rodada) — O ITEM AVISANDO CONTRA ELE MESMO
 

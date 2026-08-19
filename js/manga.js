@@ -2749,6 +2749,12 @@ function _mgMedirBalao(ctx, cv, b, todos) {
   } catch (e) {
     console.warn('[mangá] detecção do balão falhou:', e && e.message)
   }
+  // ⚠️ O ALVO MÍNIMO VALE ATÉ QUANDO NADA DEU CERTO. Medido: o item "Poker" da
+  // página de resumo tem caixa de 0,09% da folha — veio assim do modelo, e
+  // como nenhum dos dois caminhos consegue medi-lo, ele continuaria invisível
+  // ao ponteiro para sempre. Uma caixa pequena e aproximada ainda é
+  // alcançável; caixa nenhuma não é.
+  _mgAlvoMinimo(b)
   if (!b.ls || !b.ls.length) return false
   const ok = _mgAfinarBalao(ctx, cv, b)
   // Carimbo de versão mesmo no caminho antigo: sem ele a página seria
