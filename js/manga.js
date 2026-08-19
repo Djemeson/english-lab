@@ -852,17 +852,34 @@ function _mgCamadaHtml(c) {
     if (!b.ls || !b.ls.length) {
       return abre + '<i class="mg-t mg-t-solo">' + esc(b.t || '') + '</i></span>'
     }
-    const corpo = b.ls.map(l => {
+    // ⚠️ AS LINHAS SÃO DISTRIBUÍDAS POR IGUAL, não coladas onde a medição as
+    // achou. A projeção acerta ONDE está o bloco de texto, mas as faixas que
+    // ela devolve têm alturas e vãos irregulares — uma linha com 19 px, a
+    // seguinte com 49, um vão de 58 px onde os outros têm 28. Enquanto o texto
+    // era invisível isso não aparecia; agora que ele ACENDE, o balão sai com
+    // as falas espalhadas, exatamente o que ele fotografou.
+    //
+    // Um balão é um parágrafo: as linhas se empilham com o mesmo passo. Aqui
+    // o bloco ocupa a mesma faixa vertical que a medição encontrou (do topo da
+    // primeira ao fim da última), e as linhas se repartem por igual dentro
+    // dela. A posição do bloco continua vindo do pixel; só a arrumação
+    // interna passa a ser regular.
+    const totalLinhas = b.ls.length
+    const corpo = b.ls.map((l, k) => {
       const lx = b.w ? (l.x - b.x) / b.w : 0
-      const ly = b.h ? (l.y - b.y) / b.h : 0
       const lw = b.w ? l.w / b.w : 1
-      const lh = b.h ? l.h / b.h : 1
+      // Cada linha recebe a mesma fatia da altura do balão, na sua ordem.
+      const ly = k / totalLinhas
+      const lh = 1 / totalLinhas
       // A fonte sai da ALTURA REAL da linha na folha: `--mg-alt` é a altura da
       // página em px e `l.h` a fração que a linha ocupa. Assim a faixa de
       // realce tem a espessura da linha impressa, em qualquer zoom.
+      // A fonte de partida sai da fatia, não da faixa medida — quem manda no
+      // tamanho final é `mangaAjustarLinhas`, que mede todas e escolhe uma só
+      // para o balão inteiro.
       const estL = 'left:' + (lx * 100).toFixed(3) + '%;top:' + (ly * 100).toFixed(3) + '%;' +
                    'width:' + (lw * 100).toFixed(3) + '%;height:' + (lh * 100).toFixed(3) + '%;' +
-                   'font-size:calc(var(--mg-alt, 1600px) * ' + l.h.toFixed(4) + ')'
+                   'font-size:calc(var(--mg-alt, 1600px) * ' + (b.h / totalLinhas).toFixed(4) + ')'
       // ⚠️ O ESPAÇO VAI DENTRO DA LINHA, e isto custou duas tentativas.
       // Sem separador nenhum, a fala saía "CALL NICOROBIN!!!" — duas linhas
       // viram uma palavra que não existe, e é isso que chegava à Lexa.
@@ -1343,6 +1360,9 @@ function _mgDistancia(t) {
 
 function _mgPincaIni(ev) {
   if (ev.touches.length !== 2) { _mgPinca = null; return }
+  // Dois dedos na tela: o gesto é nosso. Sem isto o leitor ainda podia
+  // interpretar o movimento como arrasto de página.
+  if (typeof _lerT !== 'undefined') _lerT = null
   const vp = el('ler-viewport')
   const fluxo = document.querySelector('#ler-conteudo .mg-fluxo')
   if (!vp || !fluxo) return
@@ -1398,6 +1418,9 @@ function _mgPincaFim(ev) {
   if (!_mgPinca) return
   if (ev.touches && ev.touches.length >= 2) return
   _mgPinca = null
+  // Carimbo para o duplo toque se calar logo depois — ver `_mgToqueDuplo`.
+  _mgFimDaPinca = Date.now()
+  _mgUltimoToque = 0
   // Só agora grava e redesenha o rótulo: durante o gesto seriam dezenas de
   // gravações por segundo, e o número piscando no rodapé cansa a vista.
   saveCfg()
@@ -1407,9 +1430,21 @@ function _mgPincaFim(ev) {
 // Dois toques rápidos voltam ao ajuste — é o "desfazer" do gesto, e sem ele
 // a única saída da pinça seria caçar o botão certo no rodapé.
 let _mgUltimoToque = 0
+let _mgFimDaPinca = 0
+
+// ⚠️ SOLTAR A PINÇA GERA DOIS `touchend`, e eram lidos como duplo toque: o
+// gesto terminava desfazendo o próprio zoom que a pessoa acabara de dar — ou,
+// quando o segundo dedo saía antes, o toque solto virava virada de página.
+// Foi o que ele descreveu: "deu zoom, mas ao soltar volta pro tamanho normal,
+// ou pior, passava a página".
+//
+// Meio segundo de silêncio depois de uma pinça resolve: é mais do que a mão
+// leva para tirar o segundo dedo, e menos do que alguém leva para decidir dar
+// dois toques de propósito.
 function _mgToqueDuplo(ev) {
   if (ev.touches && ev.touches.length > 1) return
   const agora = Date.now()
+  if (agora - _mgFimDaPinca < 500) { _mgUltimoToque = 0; return }
   const rapido = agora - _mgUltimoToque < 300
   _mgUltimoToque = agora
   if (!rapido) return
