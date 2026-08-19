@@ -10699,6 +10699,40 @@ casos da página 14 eram falsos positivos. Medindo o retângulo real, eles
 somem. Vale a regra: para saber o que está na tela, meça o retângulo, não a
 métrica de layout.
 
+
+### 8.43 — Os dois últimos: caixa de 3 pixels
+
+Os dois casos que sobravam eram o mesmo defeito, e o número diz tudo:
+
+⚠️ **A linha "THAT'S ONE OF" — treze caracteres — recebeu uma caixa de 3 px de
+LARGURA.** "MONSTERS" recebeu 13 px. A projeção tinha encontrado uma coluna
+fina de tinta (a borda de um quadro, um traço vertical do desenho) e a tomou
+pelos limites do texto. Na tela, a fala inteira ficava espremida num risco —
+ilegível ao acender.
+
+**Nenhuma escrita cabe em menos de ~0,22 da altura da linha por caractere.**
+Abaixo disso a medida está errada, e a caixa que a IA deu — ainda que folgada
+— é melhor. Só a **posição vertical** da projeção é aproveitada, que é a parte
+em que ela acerta.
+
+#### Varredura final (28 páginas, 215 balões, 536 textos)
+
+| Medida | Resultado |
+|---|---|
+| Balões com fonte desigual | **0** |
+| Textos transbordando | **0** |
+| Balões fora da imagem | **0** |
+| Textos ilegíveis | **0** |
+
+Restam **7 caixas estreitas** na página 4 — o resumo do volume, com caixas
+pequenas para nomes curtos. Não transbordam nem ficam ilegíveis: é um alerta
+do critério de varredura, não um defeito visível.
+
+⚠️ **O ciclo que fechou esta série:** medir → achar o número absurdo (3 px,
+30% da folha, 509 px numa caixa de 158) → entender por que ele é absurdo →
+consertar a causa. Cada vez que tentei o contrário — afrouxar uma constante
+para caber o caso — o defeito reapareceu no vizinho.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
