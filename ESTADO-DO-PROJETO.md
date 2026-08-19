@@ -10659,6 +10659,46 @@ Os dois são o mesmo problema de fundo: **caixa pequena para o texto que a IA
 leu**. Encolher a fonte tem limite; o caminho seguinte é deixar a caixa CRESCER
 um pouco quando o texto não cabe, em vez de espremer o texto.
 
+
+### 8.42 — O texto aceso ficou um bloco só
+
+Ele apontou: *"sem organização, padronização, sem espaçamento padronizado,
+texto maior e outro menor, fora do balão"*. Eram quatro sintomas de **uma
+decisão errada de desenho**.
+
+⚠️ **A fonte era calculada LINHA POR LINHA.** Cada linha recebia o tamanho que
+casava a SUA largura — e o balão saía com "IN THE" grande e "GREAT BANQUET"
+pequeno, cada uma com um espaçamento diferente. Um balão é um bloco de texto:
+as letras têm o mesmo corpo em todas as linhas.
+
+Agora o tamanho é **do balão**: o menor que serve para todas as linhas, medido
+de uma vez com fonte de referência, sem tentativa e erro. E **sem esticar nem
+espaçar** — forçar cada linha a preencher a largura exata era o que produzia
+`I N   T H E`. Centralizado, como o balão de mangá é composto.
+
+#### Três defeitos que só a varredura acharia
+
+| Defeito | O que a medição mostrou |
+|---|---|
+| Bloco de texto não quebrava | `.mg-t-solo` empatava em especificidade com `.mg-t`, que vem depois e força linha única: um texto de **509 px numa caixa de 158 px**, 44 casos na página de resumo. Mesmo tropeço da margem da imagem — a regra existia e não valia |
+| A caixa não crescia | `_mgCrescerCaixa` escrevia altura em **px** sobre um elemento posicionado em **%**: o `style.height` continuava `18.308%` depois de mandar crescer |
+| Trocar o zoom não recalculava nada | o tamanho da fonte sai da caixa EM PIXELS, e a caixa muda com o zoom — ampliar deixava o texto miúdo numa página grande |
+
+#### Resultado da varredura (28 páginas, 215 balões, 532 textos)
+
+| Medida | Antes | Agora |
+|---|---|---|
+| Balões com fonte desigual | — | **0** |
+| Textos transbordando | 92 | **2** |
+| Balões fora da imagem | 9 | **0** |
+| Textos ilegíveis (<11 px) | 40 | **0** |
+
+⚠️ **Uma correção foi no TESTE, não no código:** eu media transbordo por
+`scrollWidth`, que **não enxerga o encolhimento** aplicado por transform — 20
+casos da página 14 eram falsos positivos. Medindo o retângulo real, eles
+somem. Vale a regra: para saber o que está na tela, meça o retângulo, não a
+métrica de layout.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
