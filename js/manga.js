@@ -332,7 +332,11 @@ function mangaAjustarLinhas(raiz) {
 function _mgAjustarBloco(cont, t, largura, altura) {
   t.style.letterSpacing = ''
   t.style.transform = ''
-  let tam = Math.min(altura * 0.9, 34)
+  // ⚠️ O PISO VALE JÁ NO PONTO DE PARTIDA. O laço abaixo respeitava
+  // `MG_FONTE_MIN` ao encolher, mas o valor INICIAL saía de `altura * 0.9` —
+  // numa caixa de 11 px isso já nascia com 9,9 px, abaixo do legível, e o
+  // laço nunca subia. Eram os 3 blocos que a varredura ainda pegava.
+  let tam = Math.max(MG_FONTE_MIN, Math.min(altura * 0.9, 34))
   t.style.fontSize = tam.toFixed(1) + 'px'
   for (let k = 0; k < 22 && (t.scrollHeight > altura + 1 || t.scrollWidth > largura + 1); k++) {
     if (tam * 0.92 < MG_FONTE_MIN) break
