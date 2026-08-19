@@ -159,6 +159,47 @@ async function mangaHtmlDaPagina(mg, livro, i) {
 // a caixa — ver `_mgCrescerCaixa`.
 const MG_FONTE_MIN = 12
 
+// ⚠️ O ENTRELINHA VEM DO ORIGINAL, NÃO DA CAIXA. Repartir as linhas por igual
+// dentro do balão parece certo e não é: a caixa é a UNIÃO das linhas medidas,
+// e basta uma medição folgada para ela inflar — aí as linhas se afastam e o
+// bloco fica espalhado, sem relação com o desenho. Ele mostrou os dois lado a
+// lado: num balão o encaixe é perfeito, no outro o texto está esparramado.
+//
+// O passo entre as linhas impressas já está nos dados: é a distância entre os
+// topos que a projeção mediu. Tomando a MEDIANA dessas distâncias, o
+// espaçamento fica regular E igual ao do balão desenhado — regularidade sem
+// perder o encaixe. Mediana, e não média, porque uma linha medida torta não
+// pode arrastar as outras.
+function _mgRegularizar(b) {
+  const ls = b.ls
+  if (!ls || ls.length < 2) return
+  const ord = [...ls].sort((a, c) => a.y - c.y)
+  const passos = []
+  for (let k = 1; k < ord.length; k++) passos.push(ord[k].y - ord[k - 1].y)
+  const mediana = arr => {
+    const a = [...arr].sort((x, y) => x - y)
+    const m = a.length >> 1
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2
+  }
+  const passo = mediana(passos)
+  const altura = mediana(ord.map(l => l.h))
+  if (!(passo > 0) || !(altura > 0)) return
+  // Passo menor que a altura da linha significaria linhas sobrepostas — aí a
+  // medição não é confiável e é melhor não mexer.
+  if (passo < altura * 0.7) return
+  const topo = ord[0].y
+  ord.forEach((l, k) => {
+    l.y = +(topo + k * passo).toFixed(4)
+    l.h = +altura.toFixed(4)
+  })
+  const x0 = Math.min(...ls.map(l => l.x))
+  const y0 = Math.min(...ls.map(l => l.y))
+  const x1 = Math.max(...ls.map(l => l.x + l.w))
+  const y1 = Math.max(...ls.map(l => l.y + l.h))
+  b.x = +x0.toFixed(4); b.y = +y0.toFixed(4)
+  b.w = +(x1 - x0).toFixed(4); b.h = +(y1 - y0).toFixed(4)
+}
+
 // ⚠️ A CAIXA CRESCE, O TEXTO NÃO ENCOLHE MAIS. A varredura mostrou 92 textos
 // transbordando e 40 blocos com fonte ilegível, e os dois eram o MESMO
 // problema: caixa pequena demais para o que a IA leu. Encolher a fonte tem
@@ -917,9 +958,12 @@ function _mgCamadaHtml(c) {
     const corpo = b.ls.map((l, k) => {
       const lx = b.w ? (l.x - b.x) / b.w : 0
       const lw = b.w ? l.w / b.w : 1
-      // Cada linha recebe a mesma fatia da altura do balão, na sua ordem.
-      const ly = k / totalLinhas
-      const lh = 1 / totalLinhas
+      // ⚠️ A POSIÇÃO É A MEDIDA, não uma fatia igual do balão. Fatiar por
+      // igual espalhava as linhas quando a caixa vinha folgada; a posição
+      // medida (já regularizada por `_mgRegularizar`) é o que faz o texto
+      // cair exatamente sobre a fala impressa.
+      const ly = b.h ? (l.y - b.y) / b.h : k / totalLinhas
+      const lh = b.h ? l.h / b.h : 1 / totalLinhas
       // A fonte sai da ALTURA REAL da linha na folha: `--mg-alt` é a altura da
       // página em px e `l.h` a fração que a linha ocupa. Assim a faixa de
       // realce tem a espessura da linha impressa, em qualquer zoom.
@@ -1811,6 +1855,8 @@ function _mgAfinarBalao(ctx, cv, b) {
   const uy1 = Math.max(...b.ls.map(l => l.y + l.h))
   b.x = +ux0.toFixed(4); b.y = +uy0.toFixed(4)
   b.w = +(ux1 - ux0).toFixed(4); b.h = +(uy1 - uy0).toFixed(4)
+  // Espaçamento regular, com o passo do próprio balão desenhado.
+  _mgRegularizar(b)
   b.px = 1     // carimbo: esta caixa já foi medida no pixel
   return true
 }
