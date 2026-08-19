@@ -168,10 +168,14 @@ const MG_FONTE_MIN = 12
 // dá mais área para o dedo. Cresce a partir do CENTRO, para o texto continuar
 // sobre a linha impressa, e no máximo 2,2x — acima disso a caixa começaria a
 // cobrir a fala vizinha e o toque pegaria a errada.
-function _mgCrescerCaixa(pai, t, largura) {
+function _mgCrescerCaixa(pai, t, largura, aumentoImposto) {
   const alturaAtual = pai.clientHeight
   if (!alturaAtual) return
-  const precisa = t.scrollHeight
+  // Quando vem imposto, TODAS as linhas do balão crescem o mesmo tanto — é o
+  // que mantém o entrelinha uniforme.
+  const precisa = (typeof aumentoImposto === 'number')
+    ? alturaAtual + aumentoImposto
+    : t.scrollHeight
   if (precisa <= alturaAtual + 1) return
   const nova = Math.min(precisa + 2, alturaAtual * 2.4)
   const cresceu = nova - alturaAtual
@@ -258,6 +262,21 @@ function mangaAjustarLinhas(raiz) {
     // manda, é a CAIXA que cede depois (ver `_mgCrescerCaixa`).
     tamanho = Math.max(MG_FONTE_MIN, Math.min(tamanho, 44))
 
+    // ⚠️ SE UMA LINHA CRESCE, TODAS CRESCEM. O crescimento por linha
+    // desigualava o parágrafo de novo: uma faixa ficava 41 px e a vizinha 58,
+    // e o passo voltava a ser irregular em 6 balões. Num bloco de texto, o
+    // entrelinha é o mesmo do começo ao fim — se uma linha precisa de mais
+    // espaço, é o bloco inteiro que abre.
+    let precisaDeMais = 0
+    for (const m of medidas) {
+      m.t.style.fontSize = tamanho.toFixed(2) + 'px'
+      const falta = m.t.scrollHeight - m.l.clientHeight
+      if (falta > precisaDeMais) precisaDeMais = falta
+    }
+    if (precisaDeMais > 1) {
+      for (const m of medidas) _mgCrescerCaixa(m.l, m.t, m.largura, precisaDeMais)
+    }
+
     for (const m of medidas) {
       m.t.style.fontSize = tamanho.toFixed(2) + 'px'
       // ⚠️ SEM ESTICAR E SEM ESPAÇAR. Forçar cada linha a preencher a largura
@@ -266,9 +285,6 @@ function mangaAjustarLinhas(raiz) {
       // letras, porque a caixa é a da linha impressa.
       m.t.style.letterSpacing = ''
       m.t.style.transform = ''
-      // A caixa cede se o texto não couber: ela é um alvo invisível, e alargar
-      // não estraga a arte.
-      _mgCrescerCaixa(m.l, m.t, m.largura)
       // Só o excesso que sobrar depois disso é encolhido — deformar um pouco
       // é melhor que vazar para a fala vizinha.
       const sobra = m.t.scrollWidth
