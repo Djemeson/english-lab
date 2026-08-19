@@ -173,14 +173,21 @@ function _mgCrescerCaixa(pai, t, largura) {
   if (!alturaAtual) return
   const precisa = t.scrollHeight
   if (precisa <= alturaAtual + 1) return
-  const nova = Math.min(precisa + 2, alturaAtual * 2.2)
+  const nova = Math.min(precisa + 2, alturaAtual * 2.4)
   const cresceu = nova - alturaAtual
   if (cresceu < 1) return
-  // O pai está posicionado em % dentro da página; crescer em px e subir
-  // metade do que cresceu mantém o centro no lugar.
-  pai.style.height = nova.toFixed(1) + 'px'
-  const topoAtual = parseFloat(getComputedStyle(pai).top) || 0
-  pai.style.top = (topoAtual - cresceu / 2).toFixed(1) + 'px'
+  // ⚠️ EM PORCENTAGEM, COMO A CAIXA NASCEU. Escrevendo `height` em px sobre um
+  // elemento cujo `top` e `height` estão em % da página, a caixa deixa de
+  // acompanhar o zoom: ao ampliar, o texto cresce e a caixa fica do mesmo
+  // tamanho. Medido: o `style.height` das linhas continuava "18.308%" mesmo
+  // depois de mandar crescer — o valor em px não vingava contra o layout
+  // percentual do pai.
+  const refAltura = pai.offsetParent ? pai.offsetParent.clientHeight : 0
+  if (!refAltura) return
+  const novaPct = (nova / refAltura) * 100
+  const topoPct = (pai.offsetTop - cresceu / 2) / refAltura * 100
+  pai.style.height = novaPct.toFixed(3) + '%'
+  pai.style.top = Math.max(0, topoPct).toFixed(3) + '%'
 }
 
 // ⚠️ O REALCE TEM DE TER A LARGURA DA LETRA DESENHADA, NÃO A DA FONTE.
@@ -783,6 +790,7 @@ let _mgObs = null        // observador que carrega/descarrega as imagens
 let _mgAoRolar = null    // ouvinte que diz em que página você está
 let _mgRaf = 0           // trava de quadro, para não recalcular 60x por segundo
 let _mgPulso = 0         // rede de segurança: ver comentário em mangaLigarFluxo
+let _mgReajuste = 0      // recálculo das fontes depois de mudar o zoom
 let _mgMontado = null    // id do livro cujo fluxo já está na tela
 
 // A página que ocupa o meio da tela. O meio, e não o topo: rolando devagar,
@@ -1247,6 +1255,17 @@ function mangaAplicarZoom() {
   const propA = String(_mgProporcao(typeof _lerLivro !== 'undefined' ? _lerLivro : null)).split('/').map(parseFloat)
   const razaoA = (propA[0] && propA[1]) ? propA[0] / propA[1] : 2 / 3
   fluxo.style.setProperty('--mg-alt', Math.round(larg / razaoA) + 'px')
+  // ⚠️ ZOOM NOVO, MEDIDAS NOVAS. O tamanho da fonte de cada balão é calculado
+  // a partir da caixa EM PIXELS, e a caixa muda de tamanho junto com o zoom.
+  // Sem refazer a conta, ampliar a página deixava o texto do mesmo tamanho de
+  // antes — miúdo numa página grande — e reduzir deixava o texto transbordando.
+  // A marca `data-ok` é o que impede recalcular à toa; aqui ela é limpa de
+  // propósito, porque a premissa dela mudou.
+  clearTimeout(_mgReajuste)
+  _mgReajuste = setTimeout(() => {
+    document.querySelectorAll('#ler-conteudo .mg-balao[data-ok]').forEach(b => { delete b.dataset.ok })
+    mangaAjustarLinhas()
+  }, 120)
   // ⚠️ AMPLIAR SEM ROLAGEM LATERAL SERIA CORTAR A PÁGINA. A viewport do
   // leitor esconde o transbordo horizontal (é o que faz o modo paginado
   // funcionar); no mangá ampliado ela precisa deixar arrastar para o lado,
