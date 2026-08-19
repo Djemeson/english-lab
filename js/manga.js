@@ -1797,8 +1797,10 @@ function _mgAfinarBalao(ctx, cv, b) {
   // erra por menos de uma linha) sem convidar a vizinhança.
   const y0 = Math.max(0, b.y - alturaMedia * 0.55)
   const y1 = Math.min(1, b.y + b.h + alturaMedia * 0.55)
-  const x0 = Math.max(0, b.x - b.w * 0.10)
-  const x1 = Math.min(1, b.x + b.w + b.w * 0.10)
+  // Sem folga horizontal: a janela é a do balão. Alargar convidava a moldura
+  // do quadro para dentro da conta, e era ela que esticava a medição.
+  const x0 = Math.max(0, b.x)
+  const x1 = Math.min(1, b.x + b.w)
 
   const X = Math.round(x0 * cv.width), Y = Math.round(y0 * cv.height)
   const W = Math.round((x1 - x0) * cv.width), H = Math.round((y1 - y0) * cv.height)
@@ -1931,19 +1933,6 @@ function _mgAfinarBalao(ctx, cv, b) {
 
   for (let k = 0; k < mapa.length; k++) {
     const [fy0, fy1] = faixas[mapa[k]]
-    // Onde a linha começa e termina na horizontal — a largura real das letras.
-    let cx0 = W, cx1 = -1
-    for (let y = fy0; y <= fy1; y++) {
-      const base = y * W * 4
-      for (let x = 0; x < W; x++) {
-        const i = base + x * 4
-        if ((dados[i] + dados[i + 1] + dados[i + 2]) / 3 <= escuro) {
-          if (x < cx0) cx0 = x
-          if (x > cx1) cx1 = x
-        }
-      }
-    }
-    if (cx1 < cx0) continue
     const l = b.ls[k]
     const alturaPx = fy1 - fy0 + 1
     const larguraPx = cx1 - cx0 + 1
@@ -1958,23 +1947,24 @@ function _mgAfinarBalao(ctx, cv, b) {
     // caractere; abaixo disso a medida está errada e a caixa que a IA deu,
     // ainda que folgada, é melhor. Só a POSIÇÃO VERTICAL é aproveitada, que é
     // a parte em que a projeção acerta.
-    // ⚠️ IMPLAUSÍVEL DOS DOIS LADOS. A checagem só barrava largura PEQUENA
-    // demais; a grande passava — e passava muito: medido, a linha "YOU KNOW
-    // HE'S" ficou com 45% da LARGURA DA PÁGINA porque a projeção varreu de uma
-    // borda do quadro à outra. O balão inteiro virava um retângulo branco de
-    // 502 px cobrindo as falas vizinhas quando acendia. Foi o que ele viu.
+    // ⚠️ A PROJEÇÃO SÓ MEXE NA VERTICAL. Esta é a lição de cinco rodadas de
+    // conserto: horizontalmente ela erra, e erra feio — pegou de uma borda do
+    // quadro à outra (45% da página), colou linhas na margem esquerda
+    // (`x: 0`), devolveu faixas de 3 px. Cada erro exigiu uma heurística nova,
+    // e a pilha de heurísticas produziu resultados piores que o começo.
     //
-    // Uma letra não passa de ~1,1 da altura da linha em largura; com folga
-    // generosa, o teto é 1,6 por caractere. Fora da faixa, vale a caixa da IA.
-    const chars = Math.max(1, (l.t || '').length)
-    const minimoPlausivel = Math.max(4, chars * alturaPx * 0.22)
-    const maximoPlausivel = chars * alturaPx * 1.6
+    // O motivo é simples: numa FILEIRA de pixels, o texto e o desenho se
+    // misturam — a moldura do quadro, o contorno do balão e a arte estão na
+    // mesma altura das letras. Já numa COLUNA de pixels o texto se separa
+    // sozinho: linhas são picos, vãos são vales. É onde a projeção acerta, e
+    // agora é só o que ela faz.
+    //
+    // A largura vem da caixa que a IA deu para o balão — ela VÊ o balão e
+    // acerta a extensão dele. Cada um no que é bom.
     l.y = +((Y + fy0) / cv.height).toFixed(4)
     l.h = +(alturaPx / cv.height).toFixed(4)
-    if (larguraPx >= minimoPlausivel && larguraPx <= maximoPlausivel) {
-      l.x = +((X + cx0) / cv.width).toFixed(4)
-      l.w = +(larguraPx / cv.width).toFixed(4)
-    }
+    l.x = b.x
+    l.w = b.w
   }
 
   // ⚠️ A REDE VEM ANTES DA UNIÃO, e essa ordem é o conserto. Ela estava depois
