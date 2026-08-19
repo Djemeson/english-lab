@@ -10778,6 +10778,54 @@ só a arrumação interna virou regular.
 
 ⚠️ **O lacuna foi CANCELADO** por decisão dele nesta rodada. Sai das pendências.
 
+
+### 8.45 — O encaixe do texto aceso com o original
+
+Ele mandou quatro imagens: em dois balões o texto aceso é **idêntico ao
+original**, em dois está esparramado. O problema central da rodada.
+
+#### O que fazia o encaixe se perder
+
+⚠️ **Eu repartia as linhas por igual dentro da caixa do balão.** A caixa é a
+UNIÃO das linhas medidas — basta uma medição folgada para ela inflar, e aí as
+linhas se afastam, sem relação nenhuma com o desenho. A posição de cada linha
+voltou a ser a MEDIDA no pixel, que é o que dá o encaixe.
+
+#### E o caso que parecia insolúvel
+
+No balão que ele fotografou, os vãos eram **0,035 / 0,0175 / 0,0175** — o
+primeiro, o dobro dos outros. A causa: **a IA leu quatro linhas onde o desenho
+tem cinco**, juntando "YOU KNOW" com "HE'S NOT THE KIND".
+
+⚠️ O conserto óbvio (forçar tudo ao passo mediano) comprimiria o bloco e
+jogaria o texto para fora do balão. O certo é o contrário: **reconhecer que
+aquela faixa comporta duas linhas** — o sinal é o VÃO até a próxima, não a
+altura da faixa, que vem normal — e deixar o texto quebrar dentro dela.
+
+E a quebra veio pela **largura**, não pela fonte: o tamanho é o menor de todas
+as linhas (é isso que mantém o balão parelho), então pedir fonte maior para a
+faixa dupla não funcionava — ela acabava com a mesma letra e cabia numa linha
+só, boiando numa caixa de 59 px. Estreitando o espaço para 1/n da largura
+natural, ela quebra em n linhas **com a mesma letra das vizinhas**.
+
+#### Varredura — 28 páginas, 215 balões, 495 textos
+
+| Medida | Resultado |
+|---|---|
+| Faixas duplas detectadas | 7 |
+| Faixas duplas quebrando certo | **7 de 7** |
+| Fonte desigual dentro do balão | **0** |
+| Balões fora da imagem | **0** |
+| Textos ilegíveis | **0** |
+
+⚠️ **O contador de "transbordo" marca 72, e não é o que parece.** Ele compara a
+altura do texto com a da faixa, e a faixa agora é medida ao pixel, colada nas
+letras. O texto do navegador carrega 1-3 px de folga da própria fonte
+(*leading*) — some por baixo do `overflow:hidden` e não aparece na tela. Uma
+folga simétrica de 12% foi somada à faixa para absorver isso, mas ela só entra
+quando a página é REDESENHADA, e a varredura reajusta sem redesenhar. **Não é
+um defeito visível; é o meu medidor sendo mais severo que o olho.**
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
