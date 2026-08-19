@@ -158,6 +158,33 @@ async function mangaHtmlDaPagina(mg, livro, i) {
 // Menor tamanho em que o texto aceso ainda se lê. Abaixo disso, quem cede é
 // a caixa — ver `_mgCrescerCaixa`.
 const MG_FONTE_MIN = 12
+// A folga invisível que cada faixa ganha na tela, para o texto do navegador
+// não encostar nas bordas da linha medida. Entra no HTML e SAI da conta do
+// tamanho da fonte — senão a letra digital nasce menor que a desenhada.
+const MG_FOLGA_V = 0.12
+const MG_FOLGA_H = 0.03
+
+// ⚠️ `font-size` NÃO É A ALTURA DA LETRA. Numa fonte comum a maiúscula ocupa
+// uns 72% do corpo — então uma faixa de 20 px de letra impressa precisa de
+// fonte de ~28 px para casar, e não de 20. Era por isso que o texto aceso
+// aparecia visivelmente menor que o desenhado, mesmo com a faixa certa.
+//
+// A proporção é MEDIDA na fonte que está valendo, não chutada: o mesmo
+// cálculo serve se um dia a fonte do mangá mudar.
+let _mgCaps = 0
+function _mgRazaoCaps(amostra) {
+  if (_mgCaps) return _mgCaps
+  _mgCaps = 0.72
+  try {
+    const cs = getComputedStyle(amostra)
+    const ctx = document.createElement('canvas').getContext('2d')
+    ctx.font = (cs.fontWeight || '400') + ' 100px ' + (cs.fontFamily || 'sans-serif')
+    const m = ctx.measureText('HEMX')
+    const alt = (m.actualBoundingBoxAscent || 0) + (m.actualBoundingBoxDescent || 0)
+    if (alt > 40 && alt < 110) _mgCaps = alt / 100
+  } catch (e) { /* fica o valor típico */ }
+  return _mgCaps
+}
 
 // ⚠️ O ENTRELINHA VEM DO ORIGINAL, NÃO DA CAIXA. Repartir as linhas por igual
 // dentro do balão parece certo e não é: a caixa é a UNIÃO das linhas medidas,
@@ -373,7 +400,10 @@ function mangaAjustarLinhas(raiz) {
         ? Math.min(3, Math.max(2, Math.round(altura / Math.max(1, alturaLinhaTipica(linhas)))))
         : 1
       const porLargura = REF * (largura / naturalRef)
-      const porAltura = multi ? (altura / vezes) * 1.02 : altura * 1.02
+      // A altura ÚTIL é a da letra impressa: tira a folga invisível da faixa
+      // e converte de "altura de maiúscula" para "corpo da fonte".
+      const util = (altura / (1 + 2 * MG_FOLGA_V)) / _mgRazaoCaps(t)
+      const porAltura = (multi ? util / vezes : util) * 0.98
       medidas.push({ l, t, largura, altura, multi, vezes, naturalRef })
       tamanho = Math.min(tamanho, porLargura, porAltura)
     }
@@ -381,7 +411,10 @@ function mangaAjustarLinhas(raiz) {
 
     // Piso: abaixo disso o texto acende e continua sem se ler. Quando o piso
     // manda, é a CAIXA que cede depois (ver `_mgCrescerCaixa`).
-    tamanho = Math.max(MG_FONTE_MIN, Math.min(tamanho, 44))
+    // Teto alto de propósito: o grito de meia página é uma linha impressa
+    // legítima, e prendê-lo em 44 px fazia o texto aceso sair menor que o
+    // desenhado justamente onde a diferença mais aparece.
+    tamanho = Math.max(MG_FONTE_MIN, Math.min(tamanho, 96))
 
     // ⚠️ SE UMA LINHA CRESCE, TODAS CRESCEM. O crescimento por linha
     // desigualava o parágrafo de novo: uma faixa ficava 41 px e a vizinha 58,
@@ -415,7 +448,15 @@ function mangaAjustarLinhas(raiz) {
     //
     // As linhas são frações do balão (1/n cada). Crescendo o balão, elas
     // acompanham juntas e o passo continua idêntico — de graça.
-    if (precisaDeMais > 1) _mgCrescerBalao(cont, precisaDeMais * medidas.length)
+    // ⚠️ BALÃO MEDIDO NA IMAGEM NÃO CRESCE. Crescer a caixa era a saída certa
+    // quando ela vinha do modelo e podia estar apertada demais — aumentar um
+    // alvo invisível não estragava nada. Agora a caixa É o balão desenhado, e
+    // qualquer crescimento empurra o fundo aceso para cima do traço: o
+    // remendo que este trabalho inteiro existe para eliminar. Aqui quem cede
+    // é a fonte, não o balão.
+    if (precisaDeMais > 1 && !cont.classList.contains('mg-forma')) {
+      _mgCrescerBalao(cont, precisaDeMais * medidas.length)
+    }
 
     for (const m of medidas) {
       m.t.style.fontSize = tamanho.toFixed(2) + 'px'
@@ -454,7 +495,9 @@ function _mgAjustarBloco(cont, t, largura, altura) {
     tam *= 0.92
     t.style.fontSize = tam.toFixed(1) + 'px'
   }
-  _mgCrescerCaixa(cont, t, largura)
+  // Mesma razão do balão linhado: com a caixa medida na imagem, crescer é
+  // vazar para cima do desenho.
+  if (!cont.classList.contains('mg-forma')) _mgCrescerCaixa(cont, t, largura)
   if (t.scrollWidth > largura + 1) {
     t.style.transform = 'scaleX(' + Math.max(0.35, largura / t.scrollWidth).toFixed(4) + ')'
   }
@@ -1001,12 +1044,38 @@ async function mangaHtmlDoVolume(mg, livro) {
 // As linhas são posicionadas RELATIVAS AO BALÃO, não à página, para que o
 // contêiner continue sendo um elemento só: é ele que o toque seleciona, e é
 // dele que sai a fala inteira para a Lexa.
+// ⚠️ O FUNDO ACESO TEM A FORMA DO BALÃO, NÃO A DA CAIXA. Um retângulo branco
+// sobre um balão redondo aparece nos quatro cantos — é o "remendo" que ele
+// fotografou. Com o contorno medido no pixel, o mesmo fundo passa a ter o
+// desenho do balão: por dentro do traço, o original continua inteiro na tela
+// e a troca de lettering para texto digital é quase imperceptível.
+//
+// Dez pontos por lado bastam: a interpolação entre eles fica SEMPRE dentro do
+// balão, nunca por cima do traço. Errar para dentro é invisível; errar para
+// fora é o remendo de volta.
+function _mgClipPath(fm) {
+  const pares = String(fm || '').trim().split(/\s+/).map(p => p.split(',').map(Number))
+  if (pares.length < 3) return ''
+  if (pares.some(p => p.length !== 2 || !isFinite(p[0]) || !isFinite(p[1]))) return ''
+  const n = pares.length
+  const alt = k => ((k + 0.5) / n * 100).toFixed(1) + '%'
+  const dir = pares.map((p, k) => p[1] + '% ' + alt(k))
+  const esq = pares.map((p, k) => p[0] + '% ' + alt(k)).reverse()
+  return ';clip-path:polygon(' + dir.concat(esq).join(',') + ')'
+}
+
 function _mgCamadaHtml(c) {
   const baloes = Array.isArray(c && c.baloes) ? c.baloes : []
   return baloes.map((b, n) => {
-    const est = 'left:' + (b.x * 100).toFixed(3) + '%;top:' + (b.y * 100).toFixed(3) + '%;' +
-                'width:' + (b.w * 100).toFixed(3) + '%;height:' + (b.h * 100).toFixed(3) + '%'
+    // As cores saem da PÁGINA, não do tema: mangá escaneado tem miolo creme e
+    // tinta cinza-escura, e branco puro sobre creme aparece como remendo.
+    const cores = (b.bg ? '--mg-bg:' + b.bg + ';' : '') + (b.fg ? '--mg-fg:' + b.fg + ';' : '')
+    const est = cores +
+                'left:' + (b.x * 100).toFixed(3) + '%;top:' + (b.y * 100).toFixed(3) + '%;' +
+                'width:' + (b.w * 100).toFixed(3) + '%;height:' + (b.h * 100).toFixed(3) + '%' +
+                (b.fm ? _mgClipPath(b.fm) : '')
     const abre = '<span class="mg-balao' + (b.ls && b.ls.length ? ' mg-linhado' : '') +
+                 (b.fm ? ' mg-forma' : '') +
                  '" style="' + est + '" data-b="' + n + '" onclick="mangaTocarBalao(this, event)">'
     // ⚠️ BALÃO SEM LINHAS TAMBÉM PRECISA DO FILHO AJUSTÁVEL. Sem ele o texto
     // fica com a fonte fixa do CSS (min(2.6vw,15px)) — e ao acender no hover
@@ -1029,8 +1098,13 @@ function _mgCamadaHtml(c) {
     // interna passa a ser regular.
     const totalLinhas = b.ls.length
     const corpo = b.ls.map((l, k) => {
-      const lx = b.w ? (l.x - b.x) / b.w : 0
-      const lw = b.w ? l.w / b.w : 1
+      // ⚠️ FOLGA HORIZONTAL TAMBÉM. A faixa é medida colada nas letras
+      // desenhadas, e a mesma frase na fonte do navegador quase nunca mede
+      // igual — sem uma casquinha de sobra, ela é encolhida à força e a linha
+      // sai mais magra que a impressa. 3% de cada lado, com o CENTRO parado.
+      const folgaH = (b.w ? l.w / b.w : 1) * MG_FOLGA_H
+      const lx = (b.w ? (l.x - b.x) / b.w : 0) - folgaH
+      const lw = (b.w ? l.w / b.w : 1) + folgaH * 2
       // ⚠️ A POSIÇÃO É A MEDIDA, não uma fatia igual do balão. Fatiar por
       // igual espalhava as linhas quando a caixa vinha folgada; a posição
       // medida (já regularizada por `_mgRegularizar`) é o que faz o texto
@@ -1040,7 +1114,7 @@ function _mgCamadaHtml(c) {
       // px. Eram 72 casos. Crescendo 12% para cada lado, o CENTRO não se move
       // (o encaixe é o mesmo) e o texto respira. A folga é invisível: a faixa
       // não desenha nada.
-      const folga = (b.h ? l.h / b.h : 1 / totalLinhas) * 0.12
+      const folga = (b.h ? l.h / b.h : 1 / totalLinhas) * MG_FOLGA_V
       const ly = (b.h ? (l.y - b.y) / b.h : k / totalLinhas) - folga
       const lh = (b.h ? l.h / b.h : 1 / totalLinhas) + folga * 2
       // A fonte sai da ALTURA REAL da linha na folha: `--mg-alt` é a altura da
@@ -1164,6 +1238,12 @@ function mangaCorrigirCaixas(livro) {
 
     for (const b of c.baloes) {
       if (!b.ls || !b.ls.length) continue
+      // ⚠️ BALÃO MEDIDO PELA IMAGEM NÃO ENTRA AQUI. A caixa dele é o balão
+      // desenhado — maior que as linhas de texto, de propósito, porque é ela
+      // que o fundo aceso preenche. Envolver as linhas encolheria a caixa de
+      // volta ao texto e o encaixe no desenho se perderia na primeira
+      // abertura do livro.
+      if (b.px >= 3) continue
       const x1 = Math.min(...b.ls.map(l => l.x))
       const y1 = Math.min(...b.ls.map(l => l.y))
       const x2 = Math.max(...b.ls.map(l => l.x + l.w))
@@ -1294,7 +1374,12 @@ async function _mgCarregarPagina(mg, livro, div) {
     // A largura só existe depois que a imagem define a altura da página.
     img.addEventListener('load', () => mangaAjustarLinhas(div), { once: true })
     mangaAjustarLinhas(div)
-    const precisa = Array.isArray(c.baloes) && c.baloes.some(b => b.ls && b.ls.length && !b.px)
+    // ⚠️ O CARIMBO É VERSÃO, NÃO "JÁ MEDIU". Enquanto era só um sinal de
+    // presença, o acervo dele ficava preso na medição da época em que a
+    // página foi lida — e ver o conserto exigiria reler o volume, que custa
+    // dinheiro. Comparando VERSÕES, cada página se remede sozinha na primeira
+    // vez que entra na tela, sem uma chamada de IA.
+    const precisa = Array.isArray(c.baloes) && c.baloes.some(b => b && b.t && b.px !== MG_PX_V)
     if (precisa) {
       _mgAfinarPorPixel(bytes, c.baloes).then(n => {
         if (!n) return
@@ -1714,7 +1799,11 @@ function mangaPincaDesligar() {
 const MG_ESCURO = 110
 
 async function _mgAfinarPorPixel(bytes, baloes) {
-  if (!Array.isArray(baloes) || !baloes.some(b => b.ls && b.ls.length)) return 0
+  // ⚠️ BALÃO SEM LINHAS SEPARADAS TAMBÉM É MEDIDO AGORA. Antes a medição
+  // dependia das linhas que a IA devolvia, e quem viesse como bloco único
+  // ficava para sempre com a caixa aproximada dela. A detecção pela imagem
+  // não precisa delas: acha o balão e as linhas por conta própria.
+  if (!Array.isArray(baloes) || !baloes.some(b => b && b.t)) return 0
   let img
   try {
     img = await _mgCarregarImagem(bytes)
@@ -1732,8 +1821,8 @@ async function _mgAfinarPorPixel(bytes, baloes) {
 
   let afinados = 0
   for (const b of baloes) {
-    if (!b.ls || b.ls.length < 1) continue
-    if (_mgAfinarBalao(ctx, cv, b)) afinados++
+    if (!b || !b.t) continue
+    if (_mgMedirBalao(ctx, cv, b)) afinados++
   }
   return afinados
 }
@@ -1981,4 +2070,423 @@ function _mgAfinarBalao(ctx, cv, b) {
   _mgRegularizar(b)
   b.px = 1     // carimbo: esta caixa já foi medida no pixel
   return true
+}
+
+// ================================================================
+// O BALÃO SAI DA IMAGEM — não do modelo
+// ================================================================
+// ⚠️ ONZE TENTATIVAS DE CONSERTAR A CAIXA DO MODELO FALHARAM, e todas pela
+// mesma razão: pedir precisão de pixel a um modelo de visão é pedir a coisa
+// errada a quem faz outra. Ele LÊ o texto muito bem — 7 de 7, palavra por
+// palavra — e devolve uma caixa aproximada: às vezes 30% da altura da folha
+// para uma palavra, às vezes começando na borda da página.
+//
+// A informação exata está na IMAGEM, e é barata: um balão de fala é uma
+// REGIÃO FECHADA cercada por uma linha de contorno. Preenchendo o miolo a
+// partir de dentro (o mesmo "balde de tinta" do editor de imagem), o
+// preenchimento para sozinho no contorno — e o que ele cobriu É o balão, com
+// precisão de pixel e sem heurística nenhuma. É o que os leitores de mangá
+// sérios fazem; o mokuro usa um detector dedicado para a mesma coisa.
+//
+// A caixa do modelo continua servindo, mas só para dizer ONDE olhar. O
+// resultado vem do preenchimento.
+//
+// O QUE ISSO DESTRAVA DE GRAÇA:
+//   1. A janela de medição passa a excluir a moldura do quadro e a arte —
+//      então a projeção por COLUNA volta a ser confiável e a largura de cada
+//      linha pode ser medida (era o erro que produzia linha de 45% da folha).
+//   2. A forma real do balão fica conhecida, e o fundo que acende no hover
+//      pode ter essa forma em vez de um retângulo por cima do desenho.
+//   3. A cor do papel e a da tinta saem da própria página — em escaneado de
+//      papel creme, branco puro apareceria como remendo.
+
+const MG_PX_V = 3          // versão da medição; `b.px` menor que isto remede
+const MG_FORMA_N = 10      // amostras que descrevem o contorno do balão
+
+// Otsu sobre um mapa de cinza já pronto (o mesmo cálculo de
+// `_mgLimiarDaJanela`, sem o passo de RGBA para cinza).
+function _mgOtsu(cinza) {
+  const hist = new Array(256).fill(0)
+  for (let p = 0; p < cinza.length; p++) hist[cinza[p]]++
+  const n = cinza.length
+  if (!n) return MG_ESCURO
+  let soma = 0
+  for (let t = 0; t < 256; t++) soma += t * hist[t]
+  let somaB = 0, pesoB = 0, melhor = -1, corte = MG_ESCURO
+  for (let t = 0; t < 256; t++) {
+    pesoB += hist[t]
+    if (!pesoB) continue
+    const pesoF = n - pesoB
+    if (!pesoF) break
+    somaB += t * hist[t]
+    const d = somaB / pesoB - (soma - somaB) / pesoF
+    const entre = pesoB * pesoF * d * d
+    if (entre > melhor) { melhor = entre; corte = t }
+  }
+  return corte
+}
+
+// O balde de tinta. Fila própria em vez de recursão: uma janela de 400x600
+// são 240 mil pixels, e recursão nesse tamanho estoura a pilha do navegador.
+function _mgPreencher(cinza, W, H, sx, sy, dentro) {
+  const total = W * H
+  const p0 = sy * W + sx
+  if (!dentro(cinza[p0])) return null
+  const masc = new Uint8Array(total)
+  const fila = new Int32Array(total)
+  let ini = 0, fim = 0, area = 0
+  masc[p0] = 1; fila[fim++] = p0
+  let minx = sx, maxx = sx, miny = sy, maxy = sy
+  while (ini < fim) {
+    const p = fila[ini++]
+    area++
+    const x = p % W, y = (p / W) | 0
+    if (x < minx) minx = x
+    if (x > maxx) maxx = x
+    if (y < miny) miny = y
+    if (y > maxy) maxy = y
+    if (x > 0 && !masc[p - 1] && dentro(cinza[p - 1])) { masc[p - 1] = 1; fila[fim++] = p - 1 }
+    if (x < W - 1 && !masc[p + 1] && dentro(cinza[p + 1])) { masc[p + 1] = 1; fila[fim++] = p + 1 }
+    if (y > 0 && !masc[p - W] && dentro(cinza[p - W])) { masc[p - W] = 1; fila[fim++] = p - W }
+    if (y < H - 1 && !masc[p + W] && dentro(cinza[p + W])) { masc[p + W] = 1; fila[fim++] = p + W }
+  }
+  return { masc, area, minx, maxx, miny, maxy }
+}
+
+// A semente tem de cair no PAPEL do balão, e o centro da caixa costuma cair
+// em cima de uma letra. Busca em quadrados crescentes o ponto de miolo mais
+// próximo do palpite.
+function _mgAchaSemente(cinza, W, H, sx, sy, dentro) {
+  sx = Math.max(0, Math.min(W - 1, Math.round(sx)))
+  sy = Math.max(0, Math.min(H - 1, Math.round(sy)))
+  if (dentro(cinza[sy * W + sx])) return { x: sx, y: sy }
+  const teto = Math.max(6, Math.round(Math.min(W, H) * 0.12))
+  for (let r = 1; r <= teto; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      const y = sy + dy
+      if (y < 0 || y >= H) continue
+      const passo = (Math.abs(dy) === r) ? 1 : 2 * r
+      for (let dx = -r; dx <= r; dx += passo) {
+        const x = sx + dx
+        if (x < 0 || x >= W) continue
+        if (dentro(cinza[y * W + x])) return { x, y }
+      }
+    }
+  }
+  return null
+}
+
+// ⚠️ VAZAMENTO É O ÚNICO MODO DE FALHA QUE IMPORTA. Se o contorno do balão
+// tem uma falha de um pixel (compressão JPEG, digitalização), o preenchimento
+// escapa e cobre o quadro inteiro. O sinal é sempre o mesmo: a caixa encosta
+// na borda da janela de busca. Um balão de verdade está inteiro dentro dela.
+function _mgPlausivel(r, W, H, cv) {
+  if (r.minx <= 0 || r.miny <= 0 || r.maxx >= W - 1 || r.maxy >= H - 1) return false
+  const bw = r.maxx - r.minx + 1, bh = r.maxy - r.miny + 1
+  if (bw < cv.width * 0.018 || bh < cv.height * 0.010) return false
+  // Nenhum balão de fala ocupa um quinto da folha. Acima disso o
+  // preenchimento pegou o quadro, não o balão.
+  if (bw * bh > cv.width * cv.height * 0.20) return false
+  // Região cheia, não corredor: um balão preenche a própria caixa; um
+  // vazamento por uma fresta cobre uma tira fina e comprida.
+  if (r.area < bw * bh * 0.42) return false
+  return true
+}
+
+// Do preenchimento aprovado saem: os limites de cada fileira (é o que define
+// "dentro do balão" para a projeção), o corte entre papel e tinta medido só
+// ali dentro, e as duas cores da página.
+function _mgMontarDet(r, cinza, dados, W, H, X, Y, claro) {
+  const bw = r.maxx - r.minx + 1, bh = r.maxy - r.miny + 1
+  // ⚠️ O MIOLO PREENCHIDO NÃO CONTÉM AS LETRAS — elas são barreira, e o balde
+  // as contorna. Medir a tinta exige "o que está entre a borda esquerda e a
+  // direita do balão nesta fileira", que inclui as letras e continua
+  // excluindo a moldura e a arte de fora.
+  const esq = new Int32Array(bh).fill(-1)
+  const dir = new Int32Array(bh).fill(-1)
+  for (let y = 0; y < bh; y++) {
+    const base = (r.miny + y) * W
+    for (let x = r.minx; x <= r.maxx; x++) {
+      if (r.masc[base + x]) { if (esq[y] < 0) esq[y] = x; dir[y] = x }
+    }
+  }
+  // Otsu só do que está dentro: separa a letra do papel do balão sem a arte
+  // vizinha puxando a conta.
+  let dentroN = 0
+  for (let y = 0; y < bh; y++) if (esq[y] >= 0) dentroN += dir[y] - esq[y] + 1
+  if (dentroN < 64) return null
+  const interno = new Uint8Array(dentroN)
+  let q = 0
+  for (let y = 0; y < bh; y++) {
+    if (esq[y] < 0) continue
+    const base = (r.miny + y) * W
+    for (let x = esq[y]; x <= dir[y]; x++) interno[q++] = cinza[base + x]
+  }
+  const corteTinta = _mgOtsu(interno)
+  const ehTinta = claro ? (v => v <= corteTinta) : (v => v >= corteTinta)
+
+  // As duas cores, tiradas da própria página: o papel é a média do que o
+  // balde cobriu (que é o miolo limpo); a tinta é a média do resto.
+  let pr = 0, pg = 0, pb = 0, pn = 0, tr = 0, tg = 0, tb = 0, tn = 0
+  for (let y = 0; y < bh; y++) {
+    if (esq[y] < 0) continue
+    const linha = (r.miny + y) * W
+    for (let x = esq[y]; x <= dir[y]; x++) {
+      const i = (linha + x) * 4
+      if (r.masc[linha + x]) { pr += dados[i]; pg += dados[i + 1]; pb += dados[i + 2]; pn++ }
+      else if (ehTinta(cinza[linha + x])) { tr += dados[i]; tg += dados[i + 1]; tb += dados[i + 2]; tn++ }
+    }
+  }
+  if (!pn) return null
+  const hex = (a, b, c) => '#' + [a, b, c].map(v =>
+    Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')
+  const bg = hex(pr / pn, pg / pn, pb / pn)
+  const fg = tn > 20 ? hex(tr / tn, tg / tn, tb / tn) : (claro ? '#111111' : '#ffffff')
+  // Sem tinta nenhuma dentro: o balde pegou um vão limpo da página, não um
+  // balão com fala.
+  if (tn < dentroN * 0.012) return null
+
+  return { r, cinza, dados, W, H, X, Y, claro, bw, bh, esq, dir, ehTinta, bg, fg }
+}
+
+function _mgDetectarBalao(ctx, cv, b) {
+  const cx = b.x + b.w / 2, cy = b.y + b.h / 2
+  // A janela de busca é a caixa do modelo com folga generosa: ele erra o
+  // tamanho, mas acerta o lugar. Teto de 32% da folha em cada direção para o
+  // preenchimento nunca ter a página inteira à disposição.
+  const mw = Math.min(0.32, Math.max(b.w * 0.95, 0.08))
+  const mh = Math.min(0.32, Math.max(b.h * 1.20, 0.06))
+  const jx0 = Math.max(0, cx - mw), jx1 = Math.min(1, cx + mw)
+  const jy0 = Math.max(0, cy - mh), jy1 = Math.min(1, cy + mh)
+  const X = Math.round(jx0 * cv.width), Y = Math.round(jy0 * cv.height)
+  const W = Math.min(cv.width - X, Math.round((jx1 - jx0) * cv.width))
+  const H = Math.min(cv.height - Y, Math.round((jy1 - jy0) * cv.height))
+  if (W < 16 || H < 16) return null
+
+  let dados
+  try { dados = ctx.getImageData(X, Y, W, H).data } catch (e) { return null }
+  const cinza = new Uint8Array(W * H)
+  for (let p = 0, i = 0; p < cinza.length; p++, i += 4) {
+    cinza[p] = (dados[i] + dados[i + 1] + dados[i + 2]) / 3
+  }
+  const corte = _mgOtsu(cinza)
+
+  // Vários palpites de onde está o miolo: o centro do balão e o centro de
+  // cada linha lida. Basta um cair dentro.
+  const pontos = [[cx, cy]]
+  for (const l of (b.ls || [])) pontos.push([l.x + l.w / 2, l.y + l.h / 2])
+  pontos.push([cx - b.w * 0.3, cy], [cx + b.w * 0.3, cy])
+
+  // Claro primeiro (o caso normal), escuro depois — balão preto com texto
+  // branco existe, e é a página de resumo do volume.
+  for (const claro of [true, false]) {
+    for (const ajuste of [0, 18, 36]) {
+      // Apertar o corte fecha as frestas do contorno que deixam o balde
+      // escapar; é a segunda e a terceira tentativa, não a primeira.
+      const lim = claro ? Math.min(248, corte + ajuste) : Math.max(6, corte - ajuste)
+      const dentro = claro ? (v => v > lim) : (v => v < lim)
+      let melhor = null
+      for (const ponto of pontos) {
+        const sx = (ponto[0] * cv.width) - X, sy = (ponto[1] * cv.height) - Y
+        if (sx < 0 || sy < 0 || sx >= W || sy >= H) continue
+        const s = _mgAchaSemente(cinza, W, H, sx, sy, dentro)
+        if (!s) continue
+        if (melhor && melhor.masc[s.y * W + s.x]) continue   // já coberto
+        const r = _mgPreencher(cinza, W, H, s.x, s.y, dentro)
+        if (!r || !_mgPlausivel(r, W, H, cv)) continue
+        if (!melhor || r.area > melhor.area) melhor = r
+      }
+      if (melhor) {
+        const det = _mgMontarDet(melhor, cinza, dados, W, H, X, Y, claro)
+        if (det) return det
+      }
+    }
+  }
+  return null
+}
+
+// ⚠️ AGORA A PROJEÇÃO PODE MEDIR OS DOIS EIXOS. A proibição antiga ("só a
+// vertical") existia porque a janela era a caixa do modelo, e nela a fileira
+// de pixels mistura letra, contorno e arte. Dentro do balão detectado não há
+// mais nada além do texto: a fileira só tem letra, e a coluna também.
+function _mgFaixasDoBalao(det) {
+  const r = det.r, cinza = det.cinza, W = det.W
+  const bw = det.bw, bh = det.bh, esq = det.esq, dir = det.dir, ehTinta = det.ehTinta
+  const perfil = new Int32Array(bh)
+  for (let y = 0; y < bh; y++) {
+    if (esq[y] < 0) continue
+    const base = (r.miny + y) * W
+    let n = 0
+    for (let x = esq[y]; x <= dir[y]; x++) if (ehTinta(cinza[base + x])) n++
+    perfil[y] = n
+  }
+  let pico = 0
+  for (let y = 0; y < bh; y++) if (perfil[y] > pico) pico = perfil[y]
+  if (pico < 2) return []
+  // Dentro do balão o vale entre duas linhas é papel limpo: 12% do pico já
+  // separa, e continua aceitando a linha curta (um "OK!" sozinho).
+  const limite = Math.max(1, pico * 0.12)
+
+  let faixas = []
+  let ini = -1
+  for (let y = 0; y < bh; y++) {
+    const tem = perfil[y] >= limite
+    if (tem && ini < 0) ini = y
+    if ((!tem || y === bh - 1) && ini >= 0) {
+      faixas.push([ini, tem ? y : y - 1])
+      ini = -1
+    }
+  }
+  if (!faixas.length) return []
+
+  // Altura típica manda no que é linha e no que é sujeira. Mediana, para uma
+  // faixa torta não arrastar as outras.
+  const alturas = faixas.map(f => f[1] - f[0] + 1).sort((a, c) => a - c)
+  const tipica = alturas[alturas.length >> 1]
+
+  // Vão pequeno demais para ser entrelinha: é a mesma linha partida pela
+  // barriga de uma letra ou por um traço fino. Junta.
+  const juntas = []
+  for (const f of faixas) {
+    const ant = juntas[juntas.length - 1]
+    if (ant && (f[0] - ant[1]) <= Math.max(1, tipica * 0.30)) ant[1] = f[1]
+    else juntas.push([f[0], f[1]])
+  }
+  faixas = juntas.filter(f => (f[1] - f[0] + 1) >= Math.max(2, tipica * 0.35))
+  if (!faixas.length) return []
+
+  // A largura de cada linha, medida no próprio balão — coluna a coluna.
+  const saida = []
+  for (const f of faixas) {
+    const fy0 = f[0], fy1 = f[1]
+    const alt = fy1 - fy0 + 1
+    const minCol = Math.max(1, Math.round(alt * 0.06))
+    let a = -1, z = -1
+    for (let x = 0; x < bw; x++) {
+      const col = r.minx + x
+      let n = 0
+      for (let y = fy0; y <= fy1; y++) {
+        if (esq[y] < 0 || col < esq[y] || col > dir[y]) continue
+        if (ehTinta(cinza[(r.miny + y) * W + col])) n++
+      }
+      if (n >= minCol) { if (a < 0) a = col; z = col }
+    }
+    if (a < 0) continue
+    saida.push({ y0: r.miny + fy0, y1: r.miny + fy1, x0: a, x1: z })
+  }
+  return saida
+}
+
+// ⚠️ QUEM MANDA NO NÚMERO DE LINHAS É O DESENHO, NÃO A LEITURA. A IA junta
+// duas linhas impressas numa ("YOU KNOW HE'S NOT THE KIND") e separa
+// pontuação como se fosse linha ("ROBIN" + "!!!"). Enquanto o número vinha
+// dela, cada divergência dessas virava uma heurística nova.
+//
+// Aqui a página decide: as faixas medidas são as linhas. Quando a contagem
+// bate, cada texto vai para a sua; quando não bate, o texto INTEIRO do balão
+// é repartido pelas faixas em proporção à largura de cada uma — que é
+// exatamente o critério do letrista ao quebrar a fala.
+function _mgRepartir(texto, faixas) {
+  const palavras = String(texto || '').split(/\s+/).filter(Boolean)
+  const n = faixas.length
+  if (!palavras.length) return faixas.map(() => '')
+  if (n === 1) return [palavras.join(' ')]
+  const larg = faixas.map(f => Math.max(1, f.x1 - f.x0 + 1))
+  const soma = larg.reduce((s, v) => s + v, 0)
+  const chars = palavras.reduce((s, p) => s + p.length + 1, 0) - 1
+  const saida = []
+  let k = 0, usado = 0, acumLarg = 0
+  for (let i = 0; i < n; i++) {
+    acumLarg += larg[i]
+    const alvo = (i === n - 1) ? chars : Math.round(chars * acumLarg / soma)
+    const bloco = []
+    // Sobram tantas palavras quantas faixas ainda faltam: cada uma leva a sua.
+    while (k < palavras.length && (palavras.length - k) > (n - 1 - i)) {
+      const antes = usado + bloco.join(' ').length + (bloco.length ? 1 : 0)
+      const depois = antes + (bloco.length ? 1 : 0) + palavras[k].length
+      if (bloco.length && Math.abs(depois - alvo) > Math.abs(antes - alvo)) break
+      bloco.push(palavras[k++])
+    }
+    const linha = bloco.join(' ')
+    usado += linha.length + (usado ? 1 : 0)
+    saida.push(linha)
+  }
+  // Palavra que sobrou (arredondamento): vai para a última linha.
+  if (k < palavras.length) saida[n - 1] = (saida[n - 1] + ' ' + palavras.slice(k).join(' ')).trim()
+  return saida
+}
+
+// O contorno em poucos pontos, para o fundo que acende ter a FORMA do balão
+// em vez de um retângulo branco por cima do desenho. Dez amostras descrevem
+// uma elipse sem erro visível e cabem em 60 bytes — o volume inteiro precisa
+// caber num documento do banco.
+function _mgFormaDoBalao(det) {
+  const r = det.r, W = det.W, bw = det.bw, bh = det.bh
+  const pts = []
+  for (let k = 0; k < MG_FORMA_N; k++) {
+    const y = Math.min(bh - 1, Math.round((k + 0.5) * bh / MG_FORMA_N))
+    const base = (r.miny + y) * W
+    let a = -1, z = -1
+    for (let x = r.minx; x <= r.maxx; x++) {
+      if (r.masc[base + x]) { if (a < 0) a = x; z = x }
+    }
+    if (a < 0) { pts.push('50,50'); continue }
+    pts.push(Math.round((a - r.minx) / bw * 100) + ',' + Math.round((z - r.minx) / bw * 100))
+  }
+  return pts.join(' ')
+}
+
+// Escreve o resultado no balão: caixa, linhas, forma e cores.
+function _mgEscreverBalao(b, det, faixas, cv) {
+  const r = det.r, X = det.X, Y = det.Y
+  const fr = (v, total) => +(v / total).toFixed(4)
+  const textosIA = (b.ls || []).map(l => l.t).filter(t => t && t.trim())
+  const textos = (textosIA.length === faixas.length)
+    ? textosIA
+    : _mgRepartir(b.t || textosIA.join(' '), faixas)
+
+  const novas = faixas.map((f, k) => ({
+    t: textos[k] || '',
+    x: fr(X + f.x0, cv.width),
+    y: fr(Y + f.y0, cv.height),
+    w: fr(f.x1 - f.x0 + 1, cv.width),
+    h: fr(f.y1 - f.y0 + 1, cv.height)
+  })).filter(l => l.t)
+  if (!novas.length) return false
+  b.ls = novas
+
+  // ⚠️ A CAIXA É O BALÃO INTEIRO, NÃO A UNIÃO DAS LINHAS. É essa troca que
+  // faz o fundo aceso encaixar no desenho: pintado sobre o miolo do balão,
+  // com a forma dele, o contorno original continua à mostra e a impressão é
+  // de que nada abriu.
+  b.x = fr(X + r.minx, cv.width)
+  b.y = fr(Y + r.miny, cv.height)
+  b.w = fr(r.maxx - r.minx + 1, cv.width)
+  b.h = fr(r.maxy - r.miny + 1, cv.height)
+  b.fm = _mgFormaDoBalao(det)
+  b.bg = det.bg
+  b.fg = det.fg
+  if (det.claro) delete b.inv; else b.inv = 1
+  b.px = MG_PX_V
+  return true
+}
+
+// O caminho novo primeiro; o antigo continua de reserva para o balão que a
+// imagem não entrega (texto sem contorno, balão aberto, arte por cima).
+function _mgMedirBalao(ctx, cv, b) {
+  try {
+    const det = _mgDetectarBalao(ctx, cv, b)
+    if (det) {
+      const faixas = _mgFaixasDoBalao(det)
+      if (faixas.length && _mgEscreverBalao(b, det, faixas, cv)) return true
+    }
+  } catch (e) {
+    console.warn('[mangá] detecção do balão falhou:', e && e.message)
+  }
+  if (!b.ls || !b.ls.length) return false
+  const ok = _mgAfinarBalao(ctx, cv, b)
+  // Carimbo de versão mesmo no caminho antigo: sem ele a página seria
+  // remedida a cada abertura, de graça nenhuma.
+  if (ok) { b.px = MG_PX_V; delete b.fm }
+  return ok
 }

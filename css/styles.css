@@ -6628,7 +6628,20 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 /* A camada inteira é transparente: entre um balão e outro há uma quebra de
    linha (para o contexto da Lexa não sair grudado), e sem isto essa quebra
    herdaria a cor do texto e sujaria a arte. */
-.mg-camada{position:absolute;inset:0;line-height:normal;color:transparent}
+.mg-camada{
+  position:absolute;inset:0;line-height:normal;color:transparent;
+  /* ⚠️ A LETRA DO BALÃO NÃO É A LETRA DA INTERFACE. O lettering de mangá é
+     desenhado à mão, em caixa alta e com traço grosso; Inter — uma grotesca
+     de tela — denuncia a troca no primeiro olhar, por mais certa que esteja a
+     caixa. A pilha começa pela fonte de quadrinhos que o sistema já tem e
+     desce até a da interface, então nada quebra onde ela não existe.
+     ⚠️ NÃO force maiúsculas aqui: a página de resumo do volume tem texto
+     corrido de verdade, e ele viraria um grito. O texto já chega como está
+     impresso. */
+  --mg-fonte:'Comic Sans MS','Comic Neue','Chalkboard SE',system-ui,sans-serif;
+  font-family:var(--mg-fonte);
+  font-weight:700;
+}
 
 /* Cada balão. O `color:transparent` deixa a arte original aparecer; o
    ::selection pintado é o que dá o retorno visual de "selecionei isto". */
@@ -6650,6 +6663,10 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
    alvo do toque e o dono da fala inteira. Quem carrega o texto — e o realce —
    são as faixas de dentro. */
 .mg-balao.mg-linhado{display:block;overflow:visible}
+/* Balão recortado no próprio contorno: o recorte do pai já impede qualquer
+   vazamento para fora do desenho, então a faixa pode deixar a letra respirar
+   em vez de cortar o pé de um "Q" ou a vírgula. */
+.mg-balao.mg-forma .mg-linha{overflow:visible}
 .mg-linha{
   position:absolute;
   /* ⚠️ CENTRALIZADO. Alinhado à esquerda só fazia sentido quando eu esticava
@@ -6747,16 +6764,25 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 .mg-balao:hover,
 .mg-balao:focus-within,
 .mg-balao.mg-aceso{
-  /* ⚠️ BRANCO, e não `--ler-bg`. O tema do leitor é creme (#f7f3ea) — ótimo
-     para página de texto, errado aqui: o balão do mangá é branco, e um
-     retângulo creme sobre ele aparece como remendo. */
-  background:#fff;
-  color:#111;
-  box-shadow:0 0 0 3px #fff;
+  /* ⚠️ A COR VEM DA PÁGINA, não do tema e nem de branco fixo. O tema do
+     leitor é creme (#f7f3ea) — errado aqui; mas branco puro também erra
+     quando o mangá é digitalizado de papel, que é creme ou cinza. `--mg-bg` e
+     `--mg-fg` são a média medida DENTRO daquele balão: o fundo que acende
+     tem a cor exata do papel ali, e o texto a da tinta. */
+  background:var(--mg-bg, #fff);
+  color:var(--mg-fg, #111);
+  box-shadow:0 0 0 3px var(--mg-bg, #fff);
 }
+/* ⚠️ COM A FORMA DO BALÃO, A AURA SAI DE CENA. Os 3 px de sombra existiam
+   para o retângulo não terminar rente ao texto; sobre um balão recortado no
+   contorno real, eles são justamente o que vazaria para cima do traço — e o
+   traço é o que faz o leitor não perceber que algo abriu. */
+.mg-balao.mg-forma:hover,
+.mg-balao.mg-forma:focus-within,
+.mg-balao.mg-forma.mg-aceso{ box-shadow:none }
 .mg-balao:hover .mg-linha,
 .mg-balao:focus-within .mg-linha,
-.mg-balao.mg-aceso .mg-linha{ color:#111 }
+.mg-balao.mg-aceso .mg-linha{ color:var(--mg-fg, #111) }
 .mg-balao:hover .mg-t,
 .mg-balao:focus-within .mg-t,
 .mg-balao.mg-aceso .mg-t{ color:inherit }
