@@ -2386,7 +2386,16 @@ function _mgLinhasDoBalao(det, b, cv) {
     cx0 = Math.max(jx0, ax0 - 2); cx1 = Math.min(jx1, ax1 + 2)
   }
   const faixasB = _mgFaixasEm(buraco, W, y0, y1, cx0, cx1)
-  const usar = faixasB.length >= faixasA.length ? faixasB : faixasA
+  // ⚠️ A SEGUNDA PASSADA GANHA SEMPRE — e "mais faixas" NÃO é sinal de melhor.
+  // Era assim que estava, e o efeito apareceu no balão "IF HE WEREN'T AN
+  // ENEMY": a primeira passada devolvia SETE faixas (as três do balão de cima,
+  // mais uma gorda com três linhas grudadas pelo texto do vizinho, mais as
+  // três de baixo) e a segunda devolvia SEIS — as seis linhas certas, com
+  // passo regular. Contando, a errada vencia; e como a faixa gorda destoava
+  // das outras, ela ainda era descartada depois, sumindo com metade da fala.
+  // A primeira passada existe só para descobrir ONDE está a coluna da fala;
+  // quem mede é a segunda.
+  const usar = faixasB.length ? faixasB : faixasA
   const finais = _mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora)
   const bloco = _mgTetoDeAltura(_mgBlocoContinuo(finais, ia, cv, Y), buraco, W, hL)
   return _mgPisoDeAltura(_mgSoTexto(bloco), hL, H)
