@@ -2396,9 +2396,29 @@ function _mgLinhasDoBalao(det, b, cv) {
   // A primeira passada existe só para descobrir ONDE está a coluna da fala;
   // quem mede é a segunda.
   const usar = faixasB.length ? faixasB : faixasA
-  const finais = _mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora)
+  const finais = _mgNoPapel(_mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora), det.masc, W)
   const bloco = _mgTetoDeAltura(_mgBlocoContinuo(finais, ia, cv, Y), buraco, W, hL)
   return _mgPisoDeAltura(_mgSoTexto(bloco), hL, H)
+}
+
+// ⚠️ LINHA DE FALA MORA DENTRO DO PAPEL DO BALÃO. Print dele: o balão do "WE
+// LOVE ONLY MISS BLACK MARIA" acendia com um fundo enorme, cobrindo os
+// personagens de baixo. As quatro linhas estavam certas — mas duas faixas a
+// mais tinham entrado, tiradas de detalhes do DESENHO abaixo do balão, e a
+// caixa é a união de todas.
+//
+// O vão não denunciava (elas caíam com o mesmo passo das linhas reais) e a
+// altura também não (eram pequenas). O que denuncia é a posição: estavam fora
+// da região que o balde preencheu. Dentro do balão, a faixa de uma linha tem
+// papel de sobra em volta das letras; sobre a arte, não tem nenhum.
+function _mgNoPapel(faixas, masc, W) {
+  return faixas.filter(f => {
+    let papel = 0, total = 0
+    for (let y = f.y0; y <= f.y1; y++) {
+      for (let x = f.x0; x <= f.x1; x++) { total++; if (masc[y * W + x]) papel++ }
+    }
+    return total > 0 && papel >= total * 0.15
+  })
 }
 
 // ⚠️ DESENHO DENTRO DO BALÃO TAMBÉM É "BURACO". Visto na tela (página 17): o
