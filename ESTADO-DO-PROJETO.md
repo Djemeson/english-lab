@@ -10733,6 +10733,51 @@ do critério de varredura, não um defeito visível.
 consertar a causa. Cada vez que tentei o contrário — afrouxar uma constante
 para caber o caso — o defeito reapareceu no vizinho.
 
+
+### 8.44 — O balão virou parágrafo, e a varredura zerou
+
+#### A pinça desfazia o próprio zoom
+
+⚠️ **Soltar dois dedos gera dois `touchend`**, e eles eram lidos como duplo
+toque — o gesto terminava desfazendo o zoom que a pessoa acabara de dar, ou,
+quando um dedo saía antes, virando a página. Meio segundo de silêncio depois
+de uma pinça resolve: mais do que a mão leva para tirar o segundo dedo, menos
+do que alguém leva para decidir tocar duas vezes. E dois dedos na tela agora
+cancelam o gesto de página do leitor.
+
+#### O texto aceso estava espalhado
+
+Medido no balão que ele fotografou: linhas de **19 px e 49 px** de altura, vão
+de **58 px** onde os outros tinham 28. A projeção acerta ONDE está o bloco,
+mas as faixas que devolve têm alturas e vãos irregulares. Enquanto o texto era
+invisível ninguém via; aceso, o balão sai desarrumado.
+
+**Um balão é um parágrafo.** As linhas passam a se repartir por igual dentro
+da faixa vertical que a medição encontrou — a POSIÇÃO continua vindo do pixel,
+só a arrumação interna virou regular.
+
+#### Três defeitos encadeados, cada um revelado pelo conserto do anterior
+
+| Conserto | O que ele revelou |
+|---|---|
+| Linhas repartidas por igual | o crescimento por linha desigualava de novo: cada caixa tem altura levemente diferente por arredondamento, e `altura + aumento` dá valores diferentes |
+| Crescer o BALÃO em vez da linha | as linhas são frações dele (1/n) e acompanham juntas — o passo fica idêntico de graça |
+| Piso de fonte no ponto de partida | o laço respeitava o mínimo ao encolher, mas o valor INICIAL saía de `altura × 0,9`: numa caixa de 11 px já nascia com 9,9 px e nunca subia |
+
+#### Varredura final — 28 páginas, 215 balões, 536 textos
+
+| Medida | Resultado |
+|---|---|
+| Fonte desigual dentro do balão | **0** |
+| Entrelinha irregular | **0** |
+| Textos transbordando | **0** |
+| Balões fora da imagem | **0** |
+| Textos ilegíveis | **0** |
+
+**Nenhum defeito em nenhuma página.**
+
+⚠️ **O lacuna foi CANCELADO** por decisão dele nesta rodada. Sai das pendências.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
