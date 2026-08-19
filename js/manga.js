@@ -2307,8 +2307,15 @@ function _mgLinhasDoBalao(det, b, cv) {
     topo = Math.min(topo, Math.min(...ls.map(l => l.y)) * cv.height)
     base = Math.max(base, Math.max(...ls.map(l => l.y + l.h)) * cv.height)
   }
-  topo = topo - Y - hL * 1.2
-  base = base - Y + hL * 1.2
+  // ⚠️ FOLGA DE TRÊS LINHAS, E NÃO DE UMA. A caixa de partida nem sempre é a
+  // do modelo: no acervo já medido por uma versão anterior, ela pode estar
+  // APERTADA no texto que aquela versão achou — e medido na página 28, um
+  // balão de quatro linhas impressas tinha ficado com a caixa de UMA. Com
+  // folga curta a busca nunca alcançaria as outras três. Folga generosa não
+  // custa nada aqui, porque quem separa uma fala da vizinha é o vão entre
+  // linhas (`_mgBlocoContinuo`), não o tamanho da janela.
+  topo = topo - Y - hL * 3
+  base = base - Y + hL * 3
   const y0 = Math.max(0, Math.floor(topo)), y1 = Math.min(H - 1, Math.ceil(base))
   if (y1 - y0 < 3) return []
 
