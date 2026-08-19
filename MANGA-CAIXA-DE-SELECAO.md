@@ -23,7 +23,7 @@ One Piece vol. 100, 28 páginas, **relido do zero** depois dos consertos:
 |---|---|---|
 | Balões no volume | 207 | **318** |
 | Balões com caixa vinda da imagem | 0 | **318 de 318 (100%)** |
-| Balões mais largos que 25% da folha | 42 | **8** — metade nas páginas de TEXTO, onde é correto |
+| Balões mais largos que 25% da folha | 42 | **2** |
 | Balões sem área (invisíveis ao ponteiro) | 31 numa rodada anterior | **0** |
 | Páginas que a IA não conseguia ler | 10 | **0** (28 de 28, sem uma falha) |
 | Tempo de medição | — | ~250 ms por página, sem chamada de IA |
@@ -86,6 +86,16 @@ traço do original**.
   balão é tão cercado de branco quanto as letras e virava uma faixa a mais,
   espalhando o texto. Dentro de um balão o letrista usa uma letra só, então
   faixa muito mais alta que a mediana das outras é descartada.
+- **As linhas de um balão dividem o mesmo eixo** — letreiro de mangá é
+  composto centralizado. Medido: as quatro linhas de um balão tinham o centro
+  no MESMO x (204 px, todas); as duas faixas intrusas, tiradas do desenho
+  abaixo, estavam a 100 px do eixo e mediam um terço da largura. Fora do eixo
+  **e** estreita = respingo. Um piso absoluto de largura (1/5 da mediana)
+  completa: faixa alinhada mas minúscula também é respingo.
+- **A segunda passada ganha sempre.** A regra era "fica a que achou mais
+  faixas", e isso favorecia a passada larga — que inclui as linhas do balão de
+  cima. A primeira passada existe só para achar a coluna; quem mede é a
+  segunda.
 
 ---
 

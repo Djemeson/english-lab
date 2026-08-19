@@ -1628,10 +1628,41 @@ vinda da imagem (100%)**, 8 largos demais (metade nas páginas de texto), nenhum
   texto ("MOUSE!!" boiando longe do resto). Dentro de um balão o letrista usa uma letra só — faixa
   muito mais alta que a mediana das outras é descartada.
 
+**MAIS TRÊS DEFEITOS FECHADOS, TODOS VINDOS DE PRINTS DELE** ("alguns balões ainda não estão
+perfeitos"), e todos com a mesma forma: uma faixa que não era linha entrava na conta e a caixa é a
+união das faixas.
+
+- **A segunda passada passou a ganhar sempre.** A regra era `B.length >= A.length ? B : A`, e a
+  passada larga vencia por ter MAIS faixas — só que as extras eram do balão de cima. Medido no "IF
+  HE WEREN'T AN ENEMY": A devolvia 7 (três do vizinho, uma gorda com três linhas grudadas, três
+  reais) e B devolvia as 6 certas. Pior: a faixa gorda destoava das outras e era descartada
+  adiante, sumindo com metade da fala.
+- **Faixa fora do eixo e estreita é respingo** (`_mgNoPapel`). No "WE LOVE ONLY MISS BLACK MARIA",
+  dois detalhes do desenho abaixo do balão entravam como linha e o fundo aceso cobria os
+  personagens. Nada denunciava — caíam com o passo certo, eram pequenas, e o balde tinha vazado
+  papel ali (vão limpo de 100%). O que denuncia, medido: as quatro linhas reais têm o centro no
+  MESMO x (204 px), porque letreiro de mangá é centralizado; as intrusas estavam a 100 px e mediam
+  um terço da largura. Mais um piso absoluto de 1/5 da largura mediana, que pegou o caso em que
+  "PERSONAL." foi espremido numa faixa de 20 px.
+- **Desenho dentro do balão não é linha** (`_mgSoTexto`): o rostinho no rodapé do balão da página
+  17 virava uma faixa a mais. Dentro de um balão a letra tem um corpo só — faixa muito mais alta
+  que a mediana cai fora.
+
+⚠️ **E UM ERRO MEU, DO PIOR TIPO.** Editando `js/manga.js` por substituição de trecho, apaguei
+QUATRO funções (`_mgFaixasEm`, `_mgTetoDeAltura`, `_mgPisoDeAltura`, `_mgSoTexto`). O arquivo
+continuou com sintaxe válida — `node --check` passou —, a chamada quebrada só estourava em
+execução, e o `try/catch` em volta engolia: todos os balões caíam calados no caminho de reserva.
+Medido: 0 de 19 numa página, e eu interpretei o sintoma como "critério rígido demais" por duas
+rodadas. Entrou **`tools/checa-js.mjs`**, que varre chamada de função interna sem definição em
+lugar nenhum e função definida duas vezes — rode antes de publicar.
+
+**Números finais do volume**: 318 balões, **318 com caixa vinda da imagem (100%)**, apenas **2**
+mais largos que 25% da folha (eram 42), nenhum sem alvo, 908 linhas medidas.
+
 **O que ficou aberto**: grito solto sobre o branco ("AAAAH!!" da página 19) ainda acende área maior
 que as letras — sem balão em volta, os respingos do impacto são tão cercados de papel quanto elas.
 
-`sw.js`: `englab-v299` → `englab-v314`.
+`sw.js`: `englab-v299` → `englab-v321`.
 
 
 ### Sessão 2026-08-07 (94ª rodada) — O ITEM AVISANDO CONTRA ELE MESMO
