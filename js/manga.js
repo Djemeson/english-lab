@@ -2544,7 +2544,13 @@ function _mgNoPapel(faixas, hL) {
   // reprovaria o "ELSE..." que fecha a fala. Juntas, sobra o que de fato é
   // respingo: pequeno E deslocado.
   const fica = faixas.filter(f =>
-    Math.abs(centro(f) - cMed) <= hL * 2 || largura(f) >= lMed * 0.6)
+    // ⚠️ E UM PISO ABSOLUTO DE LARGURA, que o par de condições acima não pega:
+    // a faixa alinhada no eixo mas com um quinto da largura das outras é
+    // respingo, não linha. Medido no balão "IT'S NOT FOR BUSINESS ANYMORE...":
+    // a última faixa tinha 20 px onde as vizinhas têm 160, e "PERSONAL." foi
+    // espremido nela — aparecia na tela em corpo miúdo no meio da fala.
+    largura(f) >= lMed * 0.2 &&
+    (Math.abs(centro(f) - cMed) <= hL * 2 || largura(f) >= lMed * 0.6))
   return fica.length >= 2 ? fica : faixas
 }
 
