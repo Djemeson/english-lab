@@ -1131,6 +1131,37 @@ function mangaCorrigirCaixas(livro) {
   let mexeu = 0
   for (const c of livro.chapters || []) {
     if (!Array.isArray(c.baloes)) continue
+
+    // ⚠️ CAIXA INVÁLIDA JÁ SALVA NO APARELHO. Versões anteriores gravaram
+    // balões com `x` e `w` nulos — na tela, largura ZERO: nenhum ponteiro os
+    // alcança e eles nunca acendem. Consertar só no código novo não bastaria,
+    // porque o dado ruim está no acervo dele e a releitura custaria dinheiro.
+    // Aqui a linha sem coordenada herda o que houver por perto; se nem isso,
+    // o balão é descartado — melhor um a menos que um alvo invisível que
+    // parece defeito.
+    for (let k = c.baloes.length - 1; k >= 0; k--) {
+      const b = c.baloes[k]
+      const ruim = v => typeof v !== 'number' || !isFinite(v)
+      if (Array.isArray(b.ls)) {
+        const refX = b.ls.find(l => !ruim(l.x))
+        const refW = b.ls.find(l => !ruim(l.w))
+        for (const l of b.ls) {
+          if (ruim(l.x)) { l.x = ruim(b.x) ? (refX ? refX.x : NaN) : b.x; mexeu++ }
+          if (ruim(l.w)) { l.w = ruim(b.w) ? (refW ? refW.w : NaN) : b.w; mexeu++ }
+        }
+        b.ls = b.ls.filter(l => ![l.x, l.y, l.w, l.h].some(ruim))
+      }
+      if ([b.x, b.y, b.w, b.h].some(ruim) || b.w < 0.004 || b.h < 0.004) {
+        const bons = (b.ls || []).filter(l => ![l.x, l.y, l.w, l.h].some(ruim))
+        if (!bons.length) { c.baloes.splice(k, 1); mexeu++; continue }
+        const x0 = Math.min(...bons.map(l => l.x)), y0 = Math.min(...bons.map(l => l.y))
+        const x1 = Math.max(...bons.map(l => l.x + l.w)), y1 = Math.max(...bons.map(l => l.y + l.h))
+        b.x = +x0.toFixed(4); b.y = +y0.toFixed(4)
+        b.w = +(x1 - x0).toFixed(4); b.h = +(y1 - y0).toFixed(4)
+        mexeu++
+      }
+    }
+
     for (const b of c.baloes) {
       if (!b.ls || !b.ls.length) continue
       const x1 = Math.min(...b.ls.map(l => l.x))
