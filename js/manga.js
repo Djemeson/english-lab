@@ -1014,8 +1014,14 @@ function _mgCamadaHtml(c) {
       // igual espalhava as linhas quando a caixa vinha folgada; a posição
       // medida (já regularizada por `_mgRegularizar`) é o que faz o texto
       // cair exatamente sobre a fala impressa.
-      const ly = b.h ? (l.y - b.y) / b.h : k / totalLinhas
-      const lh = b.h ? l.h / b.h : 1 / totalLinhas
+      // ⚠️ UMA FOLGA SIMÉTRICA NA FAIXA. Medida no pixel, ela fica colada nas
+      // letras — e o texto do navegador, com outra fonte, encosta ou passa 1-2
+      // px. Eram 72 casos. Crescendo 12% para cada lado, o CENTRO não se move
+      // (o encaixe é o mesmo) e o texto respira. A folga é invisível: a faixa
+      // não desenha nada.
+      const folga = (b.h ? l.h / b.h : 1 / totalLinhas) * 0.12
+      const ly = (b.h ? (l.y - b.y) / b.h : k / totalLinhas) - folga
+      const lh = (b.h ? l.h / b.h : 1 / totalLinhas) + folga * 2
       // A fonte sai da ALTURA REAL da linha na folha: `--mg-alt` é a altura da
       // página em px e `l.h` a fração que a linha ocupa. Assim a faixa de
       // realce tem a espessura da linha impressa, em qualquer zoom.
