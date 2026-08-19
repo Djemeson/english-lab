@@ -281,6 +281,15 @@ function _mgCrescerCaixa(pai, t, largura, aumentoImposto) {
 // Esticar horizontalmente resolve sem tocar na altura: o texto continua
 // invisível, e o realce passa a cobrir exatamente as letras que estão ali.
 // Medido uma vez por linha, quando a página entra na tela.
+// A altura de uma linha SIMPLES do balão — referência para saber quantas
+// linhas impressas cabem numa faixa marcada como dupla.
+function alturaLinhaTipica(linhas) {
+  const simples = [...linhas].filter(l => !l.classList.contains('mg-multi')).map(l => l.clientHeight).filter(Boolean)
+  if (!simples.length) return 0
+  simples.sort((a, b) => a - b)
+  return simples[simples.length >> 1]
+}
+
 function mangaAjustarLinhas(raiz) {
   const alvo = raiz || document.getElementById('ler-conteudo')
   if (!alvo) return 0
@@ -342,11 +351,18 @@ function mangaAjustarLinhas(raiz) {
       // quebrar em `n` linhas, a fonte tem de ser a que faria o texto ocupar
       // `n` vezes a largura da faixa — aí a quebra acontece sozinha, onde o
       // letrista quebrou.
+      // ⚠️ A FONTE CONTINUA UNIFORME; QUEM FORÇA A QUEBRA É A LARGURA. Pedir
+      // fonte maior para a faixa dupla não funciona: o tamanho final é o MENOR
+      // de todas as linhas (é isso que mantém o balão parelho), então a multi
+      // acabava com a mesma fonte das outras e cabia numa linha só — texto de
+      // 23 px boiando numa caixa de 59. Estreitando o espaço disponível para
+      // 1/n da largura natural, ela quebra exatamente em n linhas, com a
+      // mesma letra das vizinhas.
       const multi = l.classList.contains('mg-multi')
-      const vezes = multi ? Math.max(2, Math.round(altura / (altura / 2))) : 1
-      const porLargura = REF * ((largura * vezes) / naturalRef)
+      const vezes = multi ? Math.max(2, Math.round(altura / Math.max(1, alturaLinhaTipica(linhas)))) : 1
+      const porLargura = REF * (largura / naturalRef)
       const porAltura = multi ? (altura / vezes) * 1.02 : altura * 1.02
-      medidas.push({ l, t, largura, altura, multi })
+      medidas.push({ l, t, largura, altura, multi, vezes, naturalRef })
       tamanho = Math.min(tamanho, porLargura, porAltura)
     }
     if (semLayout || !medidas.length) continue
@@ -363,6 +379,13 @@ function mangaAjustarLinhas(raiz) {
     let precisaDeMais = 0
     for (const m of medidas) {
       m.t.style.fontSize = tamanho.toFixed(2) + 'px'
+      // Faixa dupla: estreita o espaço para o texto quebrar em `vezes` linhas.
+      if (m.multi && m.vezes > 1) {
+        const natural = m.t.scrollWidth || m.largura
+        m.t.style.maxWidth = Math.max(24, Math.ceil(natural / m.vezes) + 2) + 'px'
+      } else {
+        m.t.style.maxWidth = ''
+      }
       const falta = m.t.scrollHeight - m.l.clientHeight
       if (falta > precisaDeMais) precisaDeMais = falta
     }
