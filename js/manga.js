@@ -2389,7 +2389,24 @@ function _mgLinhasDoBalao(det, b, cv) {
   const usar = faixasB.length >= faixasA.length ? faixasB : faixasA
   const finais = _mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora)
   const bloco = _mgTetoDeAltura(_mgBlocoContinuo(finais, ia, cv, Y), buraco, W, hL)
-  return _mgPisoDeAltura(bloco, hL, H)
+  return _mgPisoDeAltura(_mgSoTexto(bloco), hL, H)
+}
+
+// ⚠️ DESENHO DENTRO DO BALÃO TAMBÉM É "BURACO". Visto na tela (página 17): o
+// balão do "I HEARD SANGORO'S VOICE..." tem um rostinho desenhado embaixo,
+// cercado de branco como as letras — virou uma sexta linha, e o texto se
+// espalhou para preenchê-la, com "MOUSE!!" boiando longe do resto.
+//
+// O que separa os dois é o CORPO: dentro de um mesmo balão o letrista usa uma
+// letra só, então as linhas têm altura parecida. Faixa muito mais alta que a
+// mediana das outras não é linha — é desenho. (A trava do fim evita jogar
+// tudo fora num balão de duas linhas, onde "mediana" não quer dizer nada.)
+function _mgSoTexto(faixas) {
+  if (faixas.length < 3) return faixas
+  const alt = faixas.map(f => f.y1 - f.y0 + 1).sort((a, b) => a - b)
+  const med = alt[alt.length >> 1]
+  const fica = faixas.filter(f => (f.y1 - f.y0 + 1) <= med * 1.9)
+  return fica.length >= Math.ceil(faixas.length / 2) ? fica : faixas
 }
 
 // ⚠️ ARTE CERCADA DE BRANCO TAMBÉM É "BURACO" — é o limite do método, e ele
