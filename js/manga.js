@@ -2396,146 +2396,37 @@ function _mgLinhasDoBalao(det, b, cv) {
   // A primeira passada existe só para descobrir ONDE está a coluna da fala;
   // quem mede é a segunda.
   const usar = faixasB.length ? faixasB : faixasA
-  const finais = _mgNoPapel(_mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora), det.masc, W)
+  const finais = _mgNoPapel(_mgLarguraDasFaixas(buraco, W, usar, jx0, jx1, ancora), det.masc, W, H)
   const bloco = _mgTetoDeAltura(_mgBlocoContinuo(finais, ia, cv, Y), buraco, W, hL)
   return _mgPisoDeAltura(_mgSoTexto(bloco), hL, H)
 }
 
-// ⚠️ LINHA DE FALA MORA DENTRO DO PAPEL DO BALÃO. Print dele: o balão do "WE
-// LOVE ONLY MISS BLACK MARIA" acendia com um fundo enorme, cobrindo os
+// ⚠️ LINHA DE FALA TEM PAPEL LIMPO ACIMA OU ABAIXO DELA. Print dele: o balão
+// do "WE LOVE ONLY MISS BLACK MARIA" acendia com um fundo enorme, cobrindo os
 // personagens de baixo. As quatro linhas estavam certas — mas duas faixas a
 // mais tinham entrado, tiradas de detalhes do DESENHO abaixo do balão, e a
 // caixa é a união de todas.
 //
-// O vão não denunciava (elas caíam com o mesmo passo das linhas reais) e a
-// altura também não (eram pequenas). O que denuncia é a posição: estavam fora
-// da região que o balde preencheu. Dentro do balão, a faixa de uma linha tem
-// papel de sobra em volta das letras; sobre a arte, não tem nenhum.
-function _mgNoPapel(faixas, masc, W) {
+// Nada do que já existia denunciava: elas caíam com o mesmo passo das linhas
+// reais (o vão não acusa), eram pequenas (a altura não acusa), e havia papel
+// em volta delas — o balde tinha escapado por uma fresta na base do balão e
+// pintado uma tira fina ali embaixo, então "está no papel" também passava.
+//
+// O que separa de verdade é o VÃO ENTRE LINHAS: dentro de um balão, logo
+// acima ou logo abaixo de cada linha existe papel limpo cobrindo a largura
+// dela inteira — é o entrelinha. Numa tira vazada de dois dedos de largura,
+// não existe.
+function _mgNoPapel(faixas, masc, W, H) {
   return faixas.filter(f => {
-    let papel = 0, total = 0
-    for (let y = f.y0; y <= f.y1; y++) {
-      for (let x = f.x0; x <= f.x1; x++) { total++; if (masc[y * W + x]) papel++ }
-    }
-    return total > 0 && papel >= total * 0.15
-  })
-}
-
-// ⚠️ DESENHO DENTRO DO BALÃO TAMBÉM É "BURACO". Visto na tela (página 17): o
-// balão do "I HEARD SANGORO'S VOICE..." tem um rostinho desenhado embaixo,
-// cercado de branco como as letras — virou uma sexta linha, e o texto se
-// espalhou para preenchê-la, com "MOUSE!!" boiando longe do resto.
-//
-// O que separa os dois é o CORPO: dentro de um mesmo balão o letrista usa uma
-// letra só, então as linhas têm altura parecida. Faixa muito mais alta que a
-// mediana das outras não é linha — é desenho. (A trava do fim evita jogar
-// tudo fora num balão de duas linhas, onde "mediana" não quer dizer nada.)
-function _mgSoTexto(faixas) {
-  if (faixas.length < 3) return faixas
-  const alt = faixas.map(f => f.y1 - f.y0 + 1).sort((a, b) => a - b)
-  const med = alt[alt.length >> 1]
-  const fica = faixas.filter(f => (f.y1 - f.y0 + 1) <= med * 1.9)
-  return fica.length >= Math.ceil(faixas.length / 2) ? fica : faixas
-}
-
-// ⚠️ ARTE CERCADA DE BRANCO TAMBÉM É "BURACO" — é o limite do método, e ele
-// aparece no grito solto sobre a página. Medido na página 19: o "AAAAH!!" é
-// escrito sem balão, no meio de um impacto desenhado, e os respingos pretos
-// em volta são tão cercados de papel quanto as letras. A faixa saiu com 189
-// px onde a letra tem pouco mais de cem.
-//
-// O corte é pela DENSIDADE: dentro de uma faixa alta demais, a linha de texto
-// é a parte onde a tinta se espalha por toda a largura; o respingo é ralo.
-// Fica só o miolo denso, e o grito legítimo — que é sólido de ponta a ponta —
-// sobrevive inteiro.
-function _mgTetoDeAltura(faixas, buraco, W, hL) {
-  const teto = hL * 2.6
-  for (const f of faixas) {
-    const alt = f.y1 - f.y0 + 1
-    if (alt <= teto) continue
-    const perfil = []
-    let pico = 0
-    for (let y = f.y0; y <= f.y1; y++) {
+    const larg = f.x1 - f.x0 + 1
+    const cobre = y => {
+      if (y < 0 || y >= H) return 0
       let n = 0
-      for (let x = f.x0; x <= f.x1; x++) if (buraco[y * W + x]) n++
-      perfil.push(n)
-      if (n > pico) pico = n
+      for (let x = f.x0; x <= f.x1; x++) if (masc[y * W + x]) n++
+      return n / larg
     }
-    if (pico < 2) continue
-    const corte = pico * 0.35
-    let a = 0, z = perfil.length - 1
-    while (a < z && perfil[a] < corte) a++
-    while (z > a && perfil[z] < corte) z--
-    if (z - a + 1 < Math.max(2, hL * 0.4)) continue
-    f.y0 += a; f.y1 = f.y0 + (z - a)
-  }
-  return faixas
-}
-
-// ⚠️ RETICÊNCIAS SÃO LINHA, MAS MEDEM CINCO PIXELS. Medido: o balão "OOGH..."
-// da página 13 terminou com 0,3% da altura da folha — porque a única faixa
-// achada foi a dos três pontos, e a caixa do balão é a união das faixas. Um
-// balão de 5 px de altura não tem alvo para o ponteiro e não tem espaço para
-// letra nenhuma: some da tela sem avisar.
-//
-// O piso é meia linha, aberto em torno do CENTRO da faixa (para o texto não
-// escorregar) e limitado pela metade do vão até a vizinha (para não invadir a
-// linha de cima nem a de baixo).
-function _mgPisoDeAltura(faixas, hL, H) {
-  const piso = hL * 0.5
-  for (let k = 0; k < faixas.length; k++) {
-    const f = faixas[k]
-    const alt = f.y1 - f.y0 + 1
-    if (alt >= piso) continue
-    let folga = (piso - alt) / 2
-    if (k > 0) folga = Math.min(folga, (f.y0 - faixas[k - 1].y1) / 2)
-    if (k < faixas.length - 1) folga = Math.min(folga, (faixas[k + 1].y0 - f.y1) / 2)
-    if (folga < 1) continue
-    f.y0 = Math.max(0, Math.round(f.y0 - folga))
-    f.y1 = Math.min(H - 1, Math.round(f.y1 + folga))
-  }
-  return faixas
-}
-
-// Perfil por fileira dentro de uma janela: as linhas viram picos, os vãos
-// viram vales. Só conta buraco — letra cercada de papel —, então moldura de
-// quadro e arte não entram na conta.
-function _mgFaixasEm(buraco, W, y0, y1, x0, x1) {
-  const perfil = new Int32Array(y1 - y0 + 1)
-  for (let y = y0; y <= y1; y++) {
-    let n = 0
-    const base = y * W
-    for (let x = x0; x <= x1; x++) if (buraco[base + x]) n++
-    perfil[y - y0] = n
-  }
-  let pico = 0
-  for (let k = 0; k < perfil.length; k++) if (perfil[k] > pico) pico = perfil[k]
-  if (pico < 2) return []
-  const limite = Math.max(1, pico * 0.10)
-
-  let faixas = []
-  let ini = -1
-  for (let k = 0; k < perfil.length; k++) {
-    const tem = perfil[k] >= limite
-    if (tem && ini < 0) ini = k
-    if ((!tem || k === perfil.length - 1) && ini >= 0) {
-      faixas.push([y0 + ini, y0 + (tem ? k : k - 1)])
-      ini = -1
-    }
-  }
-  if (!faixas.length) return []
-
-  // Vão pequeno demais para ser entrelinha: é a mesma linha partida pelo pé
-  // de uma letra. Junta. Depois, faixa fina demais é sujeira: descarta.
-  const alt = faixas.map(f => f[1] - f[0] + 1).sort((a, c) => a - c)
-  const tipica = alt[alt.length >> 1]
-  const juntas = []
-  for (const f of faixas) {
-    const ant = juntas[juntas.length - 1]
-    if (ant && (f[0] - ant[1]) <= Math.max(1, tipica * 0.28)) ant[1] = f[1]
-    else juntas.push([f[0], f[1]])
-  }
-  return juntas.filter(f => (f[1] - f[0] + 1) >= Math.max(2, tipica * 0.35))
+    return Math.max(cobre(f.y0 - 2), cobre(f.y1 + 2)) >= 0.7
+  })
 }
 
 // ⚠️ A LARGURA SAI DO GRUPO DE COLUNAS QUE CONTÉM A FALA, e não de todas as
