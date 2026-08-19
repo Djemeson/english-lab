@@ -2425,7 +2425,16 @@ function _mgNoPapel(faixas, masc, W, H) {
       for (let x = f.x0; x <= f.x1; x++) if (masc[y * W + x]) n++
       return n / larg
     }
-    return Math.max(cobre(f.y0 - 2), cobre(f.y1 + 2)) >= 0.7
+    // ⚠️ PROCURAR O VÃO, NÃO APOSTAR NUMA FILEIRA. Olhando só a fileira 2 px
+    // acima e a 2 px abaixo, o teste reprovou TODAS as faixas do volume
+    // (medido: 0 de 19 balões numa página) — a faixa tem margem, e a duas
+    // fileiras dela ainda se está no meio das letras. O entrelinha pode estar
+    // a três, quatro, cinco pixels; basta encontrá-lo de um dos lados.
+    let melhor = 0
+    for (let d = 1; d <= 6 && melhor < 0.85; d++) {
+      melhor = Math.max(melhor, cobre(f.y0 - d), cobre(f.y1 + d))
+    }
+    return melhor >= 0.7
   })
 }
 
