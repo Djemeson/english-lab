@@ -15,8 +15,10 @@
 > o que a leitura não cumpre. ⚠️ O mapa de conhecidas **continua vivo** (é ele que impede o Kindle
 > de resugerir o descartado) e a triagem por nível ficou como **código adormecido**, sem porta na
 > tela. Três freios de custo, porque a tradução dispara sem clique: cache por frase, teto de
-> tamanho e o interruptor em Ajustes. ⚠️ **A chamada de IA de verdade não foi exercitada aqui** —
-> o localhost não tem a chave dele. `sw.js` → **englab-v322**. **Detalhes em §8.49.**
+> tamanho e o interruptor em Ajustes. Provado no app publicado, com a chave dele: *"slick with
+> it"* voltou traduzido e destacado em **1,64 s**, e `barrel` virou **"cano"**, não "barril".
+> ⚠️ O livro real não abriu neste perfil do Chrome (`BookDB` vazio, sem login não busca na
+> nuvem). `sw.js` → **englab-v322**. **Detalhes em §8.49.**
 >
 > Última atualização anterior: 2026-08-19 — **A CAIXA DE SELEÇÃO DO MANGÁ SAI DA IMAGEM**. Onze tentativas
 > de consertar a caixa que o modelo de visão devolve tinham falhado; a informação exata estava na
@@ -11188,10 +11190,25 @@ daqui até o fim de `_lerNivBlocoHTML`.
 | Corte do trecho longo | 1203 → 699 caracteres, cortando em fim de frase |
 | Painel de ferramentas | sem `data-a="conheco"`, sem bloco de nível; por palavra sobraram `estudo` e `ignorar` |
 
-⚠️ **O que NÃO foi testado aqui:** a chamada de IA de verdade (a leitura do `.env` foi barrada
-pelo classificador, e o localhost não tem a chave dele). O caminho está provado com a IA
-simulada; a **qualidade da tradução e a posição do `<b>`** só se veem no Chrome dele, no app
-publicado. `sw.js` → `englab-v322`.
+#### E com a IA de verdade, no app publicado (Chrome dele, chave dele)
+
+Publicado (`sw.js` → `englab-v322`, Actions verde, Vercel já servindo o arquivo novo) e
+exercitado na Vercel com o **Gemini flash-lite** que está configurado lá:
+
+| Seleção | Tradução que voltou | Tempo |
+|---|---|---|
+| `tire of the mud` | "Ele começava a **cansar-se da lama**, e o cano do seu fuzil estava coberto dela." | ~6 s (não cronometrado) |
+| `slick with it` | "Ele estava começando a cansar-se da lama, e o cano do rifle dele **estava besuntado dela**." | **1,64 s** |
+
+Duas coisas que esse teste provou e o simulado não podia: o `<b>` cai no pedaço certo (não
+escorrega para a frase toda), e a **regra lexical do domínio pegou** — `barrel` virou "cano",
+não "barril". Print do popup real guardado na conversa.
+
+⚠️ **O livro real não abriu neste perfil do Chrome:** o `BookDB` está vazio (`BookDB.keys()`
+→ `[]`), e sem login o app não busca o arquivo na nuvem — a estante mostra os dois livros
+porque os METADADOS vivem no localStorage, mas o `.epub`/`.cbz` não está ali. O teste acima
+rodou com um parágrafo montado na própria página, dentro do app publicado, com a chave dele.
+Para exercitar o mangá com página real é preciso entrar com o Google primeiro.
 
 ## 9. Pendências / a verificar
 
