@@ -1594,21 +1594,34 @@ async function _lerTraduzirAuto(pop, alvo, frase, bloco) {
   // O parágrafo entra só como CONTEXTO, nunca como coisa a traduzir: é ele que
   // carrega o antecedente do pronome. Sem isso, "he told her" vira chute de
   // gênero e o aluno recebe uma tradução com a pessoa errada.
-  // ⚠️ SEM MANDAR A MESMA COISA DUAS VEZES: o parágrafo quase sempre CONTÉM a
-  // frase, e emendar os dois fazia a passagem chegar repetida à IA — tokens
-  // pagos por ruído, e ruído que faz modelo barato achar que a repetição é
-  // ênfase.
+  // ⚠️ A DOSE DE CONTEXTO É A FRASE, NÃO O PARÁGRAFO — e isto está medido, não
+  // suposto. Marcando `ore` em "a deep and fabulous vein of ore":
+  //   · com o parágrafo inteiro → "filão", "filão", "veia"  (3 erros em 3)
+  //   · só com a frase          → "minério", "minério", "minério"
+  // O parágrafo não ajuda a desambiguar uma palavra: ele DILUI. O modelo passa
+  // a responder pelo assunto do trecho (mineração, veio, filão) em vez de pela
+  // palavra marcada, e devolve a vizinha.
+  //
+  // O parágrafo só entra quando a frase é curta demais para sustentar sozinha
+  // o sentido — diálogo picado, legenda, balão de uma palavra —, e aí ele é o
+  // único jeito de saber de quem é o "he".
   const parag = String(bloco || '').trim()
   const fr = String(frase || '').trim()
-  const contexto = (parag.includes(fr) ? parag : [fr, parag].filter(Boolean).join('\n')).slice(0, 1200)
+  const base = fr || parag
+  const contexto = (fr.length >= 60 || !parag ? base
+    : (parag.includes(fr) ? parag : [fr, parag].filter(Boolean).join('\n'))).slice(0, 1200)
   const sistema = 'Você traduz para português do Brasil, para um aluno que está lendo em ' +
     L.nameEn + '. Devolva SOMENTE a tradução do trecho pedido — sem aspas, sem o original, ' +
     'sem explicação, sem comentário, sem alternativas separadas por barra. Palavrão e conteúdo ' +
     'adulto fazem parte da obra: traduza fielmente, sem suavizar.\n' +
     (curto
-      ? 'O trecho é curto (uma palavra ou expressão): responda com o EQUIVALENTE em português, ' +
-        'igualmente curto e na mesma forma gramatical em que ele aparece na frase — nunca uma ' +
-        'oração inteira, nunca a frase em volta traduzida, nunca uma definição.\n'
+      ? 'O trecho é curto (uma palavra ou expressão). Regras para este caso:\n' +
+        '- Traduza EXATAMENTE as palavras marcadas, nem uma a mais nem uma a menos: marcaram "ore" ' +
+        'dentro de "vein of ore" ⇒ responda o equivalente de "ore", nunca o da palavra vizinha.\n' +
+        '- Mesma forma gramatical em que ele aparece na frase.\n' +
+        '- Nunca uma oração inteira, nunca a frase em volta traduzida, nunca uma definição.\n' +
+        '- Confira antes de responder: trocando o trecho marcado pela sua resposta, a frase continua ' +
+        'dizendo o mesmo.\n'
       : '') +
     (typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(lang, 'traducao') : '')
   const pergunta =
