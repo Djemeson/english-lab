@@ -183,6 +183,9 @@
       <button class="nav-item" id="nav-ler" onclick="showSection('ler')" data-tip="Ler ebooks e mangá aqui dentro: clique numa palavra e ela vira card, com a frase do livro">
         <svg viewBox="0 0 24 24"><path d="M2 4h6a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2z"/><path d="M22 4h-6a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg><span>Ler</span>
       </button>
+      <button class="nav-item" id="nav-audiobook" onclick="showSection('audiobook')" data-tip="Ouvir audiolivros: capítulos, velocidade, marcadores e a posição guardada">
+        <svg viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M4 14h2.5a1.5 1.5 0 0 1 1.5 1.5v3A1.5 1.5 0 0 1 6.5 20H5a1 1 0 0 1-1-1z"/><path d="M20 14h-2.5a1.5 1.5 0 0 0-1.5 1.5v3a1.5 1.5 0 0 0 1.5 1.5H19a1 1 0 0 0 1-1z"/></svg><span>Audiobook</span>
+      </button>
       <button class="nav-item" id="nav-video" onclick="showSection('video')" data-tip="Estudar com séries, filmes e podcasts: legenda, cortes e cards com o áudio real da fala">
         <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><span>Vídeo</span>
       </button>
@@ -724,6 +727,14 @@
     </div>
 <!-- Manutenção de Áudio --><!-- Manutenção de Áudio -->
     <div class="settings-card">
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Dados dos livros</h3>
+      <p class="desc">Ao importar um livro ou audiolivro, o app procura no Google Books e na Open Library o que o arquivo não trouxe — ano, editora, páginas, gênero, sinopse e a capa quando não houver. <b>Nunca substitui o que já veio no arquivo</b> e nunca troca o título.</p>
+      <label class="cfg-linha">
+        <input type="checkbox" id="cfg-auto-meta" onchange="cfgAutoMeta(this.checked)">
+        <span>Completar automaticamente ao importar</span>
+      </label>
+    </div>
+    <div class="settings-card">
       <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>Manutenção de Áudio</h3>
       <p class="desc">Verifique a integridade da sua biblioteca e gere o áudio falado (TTS) para os cards que ainda não o possuem.</p>
       <div id="audio-maint-status" style="font-size:var(--fs-sm); color:var(--text2); margin-bottom:14px; min-height: 20px; display: flex; align-items: center;">
@@ -1039,6 +1050,24 @@
   <div id="ler-area"></div>
 </section>
 
+<!-- =========== AUDIOBOOK =========== -->
+<section id="section-audiobook" class="section">
+  <div class="page-header" id="ab-header">
+    <div class="ph-left">
+      <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M4 14h2.5a1.5 1.5 0 0 1 1.5 1.5v3A1.5 1.5 0 0 1 6.5 20H5a1 1 0 0 1-1-1z"/><path d="M20 14h-2.5a1.5 1.5 0 0 0-1.5 1.5v3a1.5 1.5 0 0 0 1.5 1.5H19a1 1 0 0 0 1-1z"/></svg>Audiobook</h1>
+      <p>Seus audiolivros com capítulos, velocidade e a posição guardada entre aparelhos</p>
+    </div>
+    <div class="ph-actions" id="ab-ph-actions"></div>
+  </div>
+  <!-- Estante e reprodutor são renderizados por js/audiobook.js -->
+  <div id="ab-area"></div>
+  <!-- ⚠️ O <audio> VIVE FORA DA ÁREA QUE É REDESENHADA. Trocar de tela dentro
+       da seção reescreve `#ab-area` inteiro, e um elemento de mídia recriado
+       perde a reprodução: o som pararia a cada clique em "capítulos". Aqui ele
+       nasce uma vez e nunca mais é tocado pelo render. -->
+  <audio id="ab-audio" preload="metadata"></audio>
+</section>
+
 <!-- SRS Config Modal -->
 <!-- O `z-index` era 500 escrito à mão. Coincidia com `--z-modal` hoje, mas era
      coincidência: no dia em que a escada de camadas mudar, este modal fica para
@@ -1145,6 +1174,10 @@
     <button class="nmg-item" id="nav-ler-mob" onclick="navMaisIr('ler')">
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 3 5v14c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5z"/><path d="M12 6.5V20"/></svg>
       <span>Ler</span>
+    </button>
+    <button class="nmg-item" id="nav-audiobook-mob" onclick="navMaisIr('audiobook')">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M4 14h2.5a1.5 1.5 0 0 1 1.5 1.5v3A1.5 1.5 0 0 1 6.5 20H5a1 1 0 0 1-1-1z"/><path d="M20 14h-2.5a1.5 1.5 0 0 0-1.5 1.5v3a1.5 1.5 0 0 0 1.5 1.5H19a1 1 0 0 0 1-1z"/></svg>
+      <span>Áudio</span>
     </button>
     <button class="nmg-item" id="nav-video-mob" onclick="navMaisIr('video')">
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>

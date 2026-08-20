@@ -5105,6 +5105,13 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .est-menu-nota{padding:4px 10px 8px}
 .est-linha-menu{padding-left:8px;padding-right:8px}
 
+.cfg-linha{
+  display:flex;align-items:center;gap:10px;cursor:pointer;
+  font-size:var(--fs-sm);color:var(--text2);
+}
+.cfg-linha input{width:16px;height:16px;accent-color:var(--primary);flex-shrink:0}
+.cfg-linha:hover{color:var(--text)}
+
 /* ---- editar vários (lote) ---- */
 .est-lote-sugestao{
   display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 12px;
@@ -5175,6 +5182,116 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   .est-campo.w2,.est-campo.w4{grid-column:span 1}
   .est-prog-campos{grid-template-columns:1fr}
   .est-lote-campos{grid-template-columns:1fr}
+}
+
+/* ================================================================
+   AUDIOBOOK — a estante e o reprodutor  (2026-08-20)
+   ================================================================
+   Reusa `.ler-estante`/`.ler-card` (mesma grade de capas da estante de
+   livros); o que é próprio daqui é o reprodutor.
+
+   ⚠️ A CAPA DE AUDIOLIVRO É QUADRADA, não 2:3. Vem da arte do álbum, e forçar
+   proporção de livro cortaria o título impresso nela. */
+.ab-estante .ab-capa{aspect-ratio:1}
+.ab-capa-play{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.35);color:#fff;opacity:0;transition:opacity .15s;
+}
+.ab-card:hover .ab-capa-play{opacity:1}
+.ab-sem-audio .ler-capa{border-style:dashed;opacity:.85}
+.ab-sem-audio:hover .ler-capa{opacity:1}
+.ab-selo-sem{
+  position:absolute;left:6px;top:6px;background:rgba(0,0,0,.72);color:#fff;
+  font-size:var(--fs-3xs);padding:2px 8px;border-radius:20px;
+}
+.ab-card-tempo{font-size:var(--fs-3xs);color:var(--text3);margin-top:2px}
+.ab-drop{min-height:220px}
+
+/* ---- reprodutor ---- */
+.ab-player{max-width:1000px}
+.ab-topo{display:grid;grid-template-columns:220px minmax(0,1fr);gap:32px;align-items:start;margin-bottom:30px}
+.ab-capa-grande{
+  aspect-ratio:1;border-radius:var(--radius);overflow:hidden;position:relative;
+  background:var(--surface2);border:1px solid var(--border);box-shadow:var(--shadow);
+}
+/* ⚠️ `contain`, NÃO `cover`. A moldura é quadrada (arte de álbum), mas
+   audiolivro vindo de catálogo de LIVRO traz capa 2:3 — e `cover` cortava o
+   nome do autor no pé e o título no topo, que é justamente o que identifica a
+   capa. O fundo escuro fecha o que sobra. */
+.ab-capa-grande img{width:100%;height:100%;object-fit:contain;display:block;background:var(--surface2)}
+.ab-estante .ab-capa .ler-capa-img{object-fit:contain;background:var(--surface2)}
+.ab-info h2{font-size:var(--fs-xl);font-weight:700;color:var(--text);line-height:1.25}
+.ab-autor{font-size:var(--fs-sm);color:var(--text2);margin-top:3px}
+.ab-cap-nome{font-size:var(--fs-base);color:var(--text);margin-top:16px;font-weight:600}
+.ab-cap-conta{font-size:var(--fs-xs);color:var(--text3);margin-top:2px}
+
+/* A barra tem 22px de altura e só 6 de traço: o alvo do clique é o dobro do
+   que se vê, porque acertar um segundo exato numa fita de doze horas com um
+   traço de 6px é sorte, não interface. */
+.ab-barra{margin-top:18px;height:22px;display:flex;align-items:center;cursor:pointer}
+.ab-barra-fundo{width:100%;height:6px;border-radius:3px;background:var(--surface2);overflow:hidden}
+.ab-barra-fundo i{display:block;height:100%;background:var(--role-energia);transition:width .2s linear}
+.ab-barra:hover .ab-barra-fundo{height:8px}
+.ab-tempos{display:flex;justify-content:space-between;font-size:var(--fs-3xs);color:var(--text3);margin-top:2px}
+.ab-t-resta{font-variant-numeric:tabular-nums}
+
+.ab-controles{display:flex;align-items:center;gap:10px;margin-top:22px}
+.ab-btn{
+  background:var(--surface);border:1px solid var(--border);color:var(--text2);cursor:pointer;
+  width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  position:relative;transition:border-color .15s,color .15s,transform .1s;
+}
+.ab-btn:hover{color:var(--text);border-color:var(--border-strong)}
+.ab-btn:active{transform:scale(.94)}
+/* O par voltar/avançar é o MESMO desenho espelhado — dois ícones diferentes
+   (uma seta e um "recarregar") liam como duas ações diferentes, e a segunda
+   parecia "recomeçar". Só a seta gira; o número continua legível. */
+.ab-espelho .ic{transform:scaleX(-1)}
+.ab-pulo i{
+  position:absolute;bottom:5px;font-size:8px;font-style:normal;color:var(--text3);
+  letter-spacing:-.02em;
+}
+.ab-play{
+  width:60px;height:60px;background:var(--primary-grad);border:0;color:#fff;
+  box-shadow:0 6px 20px rgba(var(--primary-rgb),.35);
+}
+.ab-play.tocando{background:var(--hot-grad)}
+.ab-secundarios{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap}
+
+.ab-abas{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.ab-caps{display:flex;flex-direction:column;max-height:420px;overflow-y:auto}
+.ab-cap{
+  display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:12px;align-items:center;
+  background:none;border:0;border-radius:var(--radius-xs);cursor:pointer;text-align:left;
+  padding:9px 10px;color:var(--text2);font-family:inherit;font-size:var(--fs-sm);
+}
+.ab-cap:hover{background:var(--surface)}
+.ab-cap.on{background:rgba(var(--primary-rgb),.14);color:var(--text)}
+.ab-cap-n{font-size:var(--fs-3xs);color:var(--text3);text-align:right}
+.ab-cap.on .ab-cap-n{color:var(--role-energia)}
+.ab-cap-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ab-cap-d{font-size:var(--fs-3xs);color:var(--text3);font-variant-numeric:tabular-nums}
+
+.ab-marcas{display:flex;flex-direction:column;gap:2px}
+.ab-marca{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:var(--radius-xs)}
+.ab-marca:hover{background:var(--surface)}
+.ab-marca-ir{
+  background:none;border:0;cursor:pointer;text-align:left;color:var(--text2);
+  font-family:inherit;display:flex;flex-direction:column;gap:1px;flex-shrink:0;width:170px;
+}
+.ab-marca-ir b{font-size:var(--fs-sm);color:var(--text);font-variant-numeric:tabular-nums}
+.ab-marca-ir span{font-size:var(--fs-3xs);color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ab-marca-nota{flex:1;font-size:var(--fs-sm);color:var(--text2);min-width:0}
+.ab-marca-x{background:none;border:0;color:var(--text3);cursor:pointer;opacity:0;display:flex;padding:3px}
+.ab-marca:hover .ab-marca-x{opacity:1}
+.ab-marca-x:hover{color:var(--error)}
+
+@media (max-width:760px){
+  .ab-topo{grid-template-columns:minmax(0,1fr);gap:20px}
+  .ab-capa-grande{width:170px;margin:0 auto}
+  .ab-controles{justify-content:center}
+  .ab-secundarios{justify-content:center}
+  .ab-marca-ir{width:120px}
 }
 
 /* ---- leitor: a moldura ocupa a tela toda ---- */

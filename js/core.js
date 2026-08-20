@@ -1,7 +1,7 @@
 // ================================================================
 // STATE & STORAGE
 // ================================================================
-const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue', deletedWords: 'el-deleted-words', conversas: 'el-consulta-conversas', videos: 'el-videos', clips: 'el-clips', podShows: 'el-podcasts', livros: 'el-livros' }
+const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-cards', srsCfg: 'el-srs-cfg', srsLog: 'el-srs-log', srsDecks: 'el-srs-decks', kindleSeen: 'el-kindle-seen', kindleQueue: 'el-kindle-queue', deletedWords: 'el-deleted-words', conversas: 'el-consulta-conversas', videos: 'el-videos', clips: 'el-clips', podShows: 'el-podcasts', livros: 'el-livros', audiolivros: 'el-audiolivros' }
 
 // ── VÍDEO (estado em core, como conversas): firebase.js sincroniza videos/
 //    clips e por isso eles NÃO podem morar no lazy video.js (armadilha nº 1).
@@ -76,6 +76,26 @@ const BookDB = {
     } catch { return [] }
   }
 }
+
+// ── AUDIOBOOKS: a estante da seção Audiobook (2026-08-20).
+//    Mesma divisão de sempre — e aqui ela pesa mais que em qualquer outro
+//    lugar: um audiobook tem de 100 MB a 1 GB. O ÁUDIO FICA NO APARELHO
+//    (IndexedDB, via BookDB com a chave `ab:<id>:<n>`); o que viaja para a
+//    nuvem é só o que é leve e dói perder: título, autor, capa reduzida,
+//    a lista de capítulos, ONDE VOCÊ PAROU e os marcadores.
+//    Mora no core porque firebase.js sincroniza (armadilha nº 1).
+let audiolivros = []
+function loadAudiolivros() {
+  try { audiolivros = JSON.parse(localStorage.getItem(SK.audiolivros) || '[]') } catch { audiolivros = [] }
+}
+function saveAudiolivros() {
+  try { localStorage.setItem(SK.audiolivros, JSON.stringify(audiolivros)) }
+  catch (e) { console.warn('[audiolivros] save falhou:', e.message) }
+}
+function audiolivroPorId(id) { return audiolivros.find(a => a.id === id) || null }
+// A chave do arquivo de UM trecho. Prefixo próprio para o `keys()` do BookDB
+// conseguir varrer e limpar o que é de um audiolivro só.
+function abChaveArquivo(id, n) { return `ab:${id}:${n}` }
 
 // ── PODCASTS: programas já visitados ("Seus podcasts" no buscador).
 //    Mora aqui pelo mesmo motivo de videos/clips: firebase.js sincroniza e
@@ -390,7 +410,7 @@ function toggleSidebar() {
 // aqui, mexeu no HTML.
 const NAV_GRUPOS = {
   inicio:  { secoes: ['dashboard'] },
-  captura: { secoes: ['ler', 'video', 'adicionar', 'assistente'] },
+  captura: { secoes: ['ler', 'audiobook', 'video', 'adicionar', 'assistente'] },
   estudo:  { secoes: ['preparar', 'estudar', 'revisar'], badges: ['badge-review', 'badge-dossie', 'badge-srs'] },
   acervo:  { secoes: ['palavras', 'biblioteca'] },
 }
@@ -1029,7 +1049,7 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 // Os ARQUIVOS mantiveram os nomes antigos de propósito: renomeá-los quebraria
 // o histórico do git e o cache do service worker sem ganhar nada. É aqui que
 // a tradução mora — não invente outra em nenhum outro arquivo.
-const SECTIONS = ['dashboard','assistente','adicionar','preparar','estudar','revisar','biblioteca','palavras','video','ler','configuracoes']
+const SECTIONS = ['dashboard','assistente','adicionar','preparar','estudar','revisar','biblioteca','palavras','video','ler','audiobook','configuracoes']
 // Lazy-load map: section → arquivo JS carregado só na 1ª visita
 // biblioteca usa funções de study.js (buildSrsFrente/Verso/MetaChips/fmtDays)
 // (assistente NÃO é lazy — js/consulta.js é carregado sempre, pois firebase.js
@@ -1051,7 +1071,10 @@ const _LAZY = {
   revisar: 'js/study.js', biblioteca: 'js/study.js',
   estudar: 'js/dossie.js',
   palavras: 'js/known.js',
-  video: ['js/video.js', 'js/video-subs.js', 'js/video-sync.js', 'js/video-study.js', 'js/video-podcast.js']
+  video: ['js/video.js', 'js/video-subs.js', 'js/video-sync.js', 'js/video-study.js', 'js/video-podcast.js'],
+  // Audiobook é uma ilha de propósito: não depende do pacote de vídeo (que
+  // carrega cinco arquivos e um player de legenda que aqui não serve).
+  audiobook: 'js/audiobook.js'
 }
 const _loadedModules = new Set()
 
@@ -1147,6 +1170,11 @@ function _activateSection(name) {
   if (name !== 'ler') document.body.classList.remove('lendo')
   if (name === 'ler') { if (typeof renderLerSection === 'function') renderLerSection() }
   if (name === 'palavras') { if (typeof renderKnownSection === 'function') renderKnownSection() }
+  if (name === 'audiobook') { if (typeof renderAudiobookSection === 'function') renderAudiobookSection() }
+  // ⚠️ SAIR DA SEÇÃO NÃO PARA O AUDIOLIVRO — ouvir enquanto se faz outra coisa
+  // é o uso normal dele. Mas a posição precisa ser gravada na hora, porque a
+  // aba pode ser fechada a qualquer momento e o debounce é de 4 segundos.
+  if (name !== 'audiobook' && typeof abAoSairDaSecao === 'function') abAoSairDaSecao()
 }
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))

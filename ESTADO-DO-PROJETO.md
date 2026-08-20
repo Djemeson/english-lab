@@ -7,7 +7,23 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-20 (7ª) — **EDITAR VÁRIOS, E O CATÁLOGO CHEGA A QUEM JÁ ESTÁ NA
+> Última atualização: 2026-08-20 (8ª) — **NASCEU A SEÇÃO AUDIOBOOK, E O ACERVO PASSOU A ACEITAR
+> "QUERO LER" SEM O ARQUIVO**. Três pedidos numa rodada. (1) **Reprodutor de audiolivro em seção
+> própria**: capítulos, velocidade, ±15/30s, marcadores, timer de sono, controles do fone
+> (Media Session) e a posição guardada — com um **parser de `.m4b` escrito aqui** (120 linhas,
+> sem biblioteca) que lê capítulos, duração, título, autor e capa de dentro do arquivo. Vários
+> `.mp3` também viram um audiolivro, um capítulo por faixa. (2) **Metadados automáticos**: ele
+> disse *"não vi essa opção"* — e tinha razão, era só um botão escondido; agora todo livro,
+> mangá e audiolivro que entra é completado pelo catálogo em segundo plano, com interruptor em
+> Configurações. (3) **Catálogo primeiro, arquivo depois**: dá para marcar o que **quer ler ou
+> ouvir** buscando pelo nome, e o EPUB/CBZ/áudio é **anexado ao item que já existe** — sem criar
+> repetido, preservando nota, notas, série e histórico. ⚠️ Quatro defeitos ao vivo: o capítulo
+> **pulava dois** na virada (dois eventos avisando a mesma coisa), o livro **emudecia** no fim
+> de cada faixa (o estado "pausado" chega antes do nosso código), o título do arquivo virava
+> nome do livro nas faixas soltas, e *"Billy Summers (US Edition)"* **não casava** com o
+> catálogo por causa de duas palavras de edição. `sw.js` → **englab-v332**. **Detalhes em §8.56.**
+>
+> Última atualização anterior: 2026-08-20 (7ª) — **EDITAR VÁRIOS, E O CATÁLOGO CHEGA A QUEM JÁ ESTÁ NA
 > ESTANTE**. Ele pediu autor em lote e *"puxar metadados de itens que eu adiciono tipo epub e
 > manga"*. O "Reunir em série" virou **"Editar vários"**: autor, série (com numeração
 > automática), gênero, status e busca de catálogo, aplicados a quantos livros ele marcar — com
@@ -1316,6 +1332,9 @@ js/estante.js     — GERENCIADOR DO ACERVO: estante (busca/filtros/ordem), fich
                     painel de leitura (calendário/metas/sequência)  (LAZY, antes de ler.js)
 js/ler.js         — seção LER: o LEITOR (tipografia, captura, cobertura). A estante saiu daqui
                     em 2026-08-20; `renderLerSection` delega a `estanteRender()`  (LAZY)
+js/audiobook.js   — seção AUDIOBOOK: estante, parser de `.m4b` (capítulos/duração/capa),
+                    reprodutor (velocidade, ±15/30s, marcadores, sono, Media Session) e o
+                    anexo de áudio a um item vindo do catálogo  (LAZY, sozinho)
 js/consulta.js    — seção Assistente (chat IA, histórico, streaming, SRS múltiplo)  (NÃO-lazy)
 js/study.js       — seção REVISAR: UI/sessão do SRS. Id: `revisar`   (CARREGADO LAZY)
 js/dossie.js      — seção ESTUDAR: os dossiês por obra+capítulo. Id: `estudar`  (LAZY)
@@ -1460,6 +1479,21 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
     exceção dentro da exceção**: ele se UNE por dia, nunca se escolhe. Ler no celular na segunda
     e no notebook na terça não pode apagar a segunda-feira do calendário.
 - **`cfg.estante`** — `{metaPag, metaLivros}`: a meta diária de páginas e a de livros no ano.
+- **`cfg.autoMeta`** — o interruptor do "completar sozinho ao importar" (Configurações → Dados
+  dos livros). **Ligado por padrão**: o campo só existe depois que ele DESLIGA.
+- **`audiolivros[]`** (core.js, localStorage `el-audiolivros`, **sincronizado** em
+  `data/audiolivros`) — a estante da seção Audiobook. ⚠️ **O ÁUDIO NUNCA SOBE**: um audiolivro
+  tem de 100 MB a 1 GB; o arquivo mora no `BookDB` sob a chave **`ab:<id>:<n>`** e o que viaja é
+  título, autor, capa reduzida, capítulos, **onde você parou**, marcadores e minutos ouvidos.
+  - `capitulos[]` — `{titulo, arq, ini, fim}`: `arq` é o índice do ARQUIVO e `ini/fim` são
+    segundos DENTRO dele. É o que faz `.m4b` (um arquivo, capítulos por instante) e faixas
+    soltas (um arquivo por capítulo) virarem a mesma coisa para o resto do código.
+  - `arquivos` — quantos arquivos o item tem. **`0` significa "quero ouvir"**: entrou pelo
+    catálogo e ainda não tem áudio; a estante mostra o selo e o clique leva ao anexo.
+  - `pos {cap, seg}` (seg é DENTRO do capítulo), `velocidade`, `marcadores[] {cap, seg, nota, at}`,
+    `minutos`, `duracao`, `formato`, `status` (`quero | ouvindo | ouvido`).
+  - **Merge na nuvem**: por item, pelo `updatedAt`, como os livros — e o aparelho que está
+    TOCANDO manda sobre o snapshot.
 
 ### Onde cada coisa é persistida
 - **localStorage:** `cfg` (`englab_cfg`), `words`, `srsCfg`, `srsLog`, `srsDecks`, filas Kindle.
@@ -1665,8 +1699,18 @@ maxInterval (36500), leechThreshold (50)
   - **Leitor** (`js/ler.js`) — tipografia de descanso, virar página ou rolar, seleção que já
     traz a tradução, captura, cobertura. Ao gravar a posição ele **anota o avanço do dia
     sozinho** (`estanteMarcarAvanco`): quem lê EPUB não digita nada.
+- **Audiobook** (id `audiobook`, `js/audiobook.js`, LAZY) — estante de audiolivros e o
+  reprodutor. Entra por três portas: **arquivo `.m4b`** (capítulos lidos de dentro dele),
+  **vários `.mp3`/`.m4a`** (um capítulo por faixa, em ordem natural) ou **"Quero ouvir"**
+  (busca no catálogo; entra só com capa e ficha, e o áudio é anexado depois).
+  - Reprodutor: play/pause, **−15s / +30s**, velocidade (0,8× a 2×), barra clicável, lista de
+    capítulos, **marcadores com nota**, **timer de sono** (minutos ou fim do capítulo) e
+    **Media Session** (fone, tela de bloqueio, botão do carro).
+  - ⚠️ **Sair da seção NÃO para o áudio** — ouvir enquanto se faz outra coisa é o uso normal —,
+    mas a posição é gravada na hora.
 - **Configurações** — Aparência (temas), IA (provider/modelo/chave/TTS), n8n, Firebase, Dados
-  locais (exportar/importar/limpar), Manutenção de áudio.
+  locais (exportar/importar/limpar), Manutenção de áudio, **Dados dos livros** (o interruptor
+  do completar-sozinho).
 
 ---
 
@@ -11782,6 +11826,102 @@ recebeu capa, ano, páginas e sinopse; livro com capa do arquivo manteve a dele.
 ("Um Livro Que Nao Existe Em Catalogo Nenhum 9977") não trouxe nem aceitou nada. Zero overflow a
 375px e a 1536px; console sem erro de JS.
 
+## 8.56 A seção Audiobook, e o acervo aceitando "quero ler" sem o arquivo (2026-08-20, 8ª)
+
+Três pedidos, na ordem em que chegaram.
+
+### 1. O reprodutor de audiolivro, em seção própria
+
+Audiolivro não é podcast nem vídeo: o que ele precisa não é legenda nem corte de cena, é
+**capítulo, velocidade e voltar exatamente onde parou** num arquivo de doze horas. Por isso
+seção própria, e não mais um modo dentro do player de vídeo.
+
+**Duas portas de entrada, uma estrutura só.** Todo capítulo é `{titulo, arq, ini, fim}` —
+`arq` é o índice do arquivo, `ini/fim` são segundos dentro dele. Assim o resto do código não
+sabe se veio de um `.m4b` (um arquivo, capítulos por instante) ou de trinta `.mp3` (um arquivo
+por capítulo).
+
+**O parser de `.m4b` é nosso, 120 linhas, sem biblioteca.** Um `.m4b` é um MP4, e MP4 é uma
+árvore de átomos `[tamanho][tipo][conteúdo]`; precisamos de três galhos — `mvhd` (duração),
+`chpl` (capítulos) e `ilst` (título, autor, capa). Vale mais isso do que 300 KB de dependência.
+- ⚠️ **A posição da contagem no `chpl` varia entre gravadores**: tentamos os dois deslocamentos
+  e ficamos com o que produzir capítulos plausíveis (instantes crescentes, dentro da duração).
+  Testado com os dois formatos, e com lixo puro — que devolve vazio, sem explodir.
+- ⚠️ **Não lê capítulo em trilha de texto** (QuickTime `tref/chap`), usado por parte dos
+  conversores. Nesse caso o livro entra como capítulo único: ouve-se igual e a posição continua
+  guardada.
+
+**O player:** ±15/30s, velocidade de 0,8× a 2×, barra clicável (alvo de 22px para um traço de
+6 — acertar um segundo numa fita de doze horas com 6px é sorte), lista de capítulos, marcadores
+com nota, **timer de sono** (minutos ou "ao fim do capítulo") e **Media Session**, que põe os
+controles no fone e na tela de bloqueio. Sair da seção **não para o áudio** — é audiolivro.
+
+### 2. "Os metadados quero que puxe automaticamente. Não vi essa opção."
+
+Ele tinha razão em não ver: existia dentro de "Editar vários" e num botão da ficha. **Coisa que
+deve acontecer sempre não pode depender de achar um botão.** Agora todo livro, mangá e
+audiolivro que entra é completado em segundo plano — com interruptor em **Configurações → Dados
+dos livros**, porque o que age sozinho precisa ter onde ser desligado.
+
+### 3. "Quero ler" sem o arquivo, e o arquivo entrando depois
+
+> *"...devem poder colocar livros que querem ler através da busca automática... mas ter uma
+> opção que sobe o áudio ou epub dentro do que já está carregado. ele só se encaixa nos
+> metadados."*
+
+| | Como entra | Como o arquivo chega depois |
+|---|---|---|
+| Livro / mangá | **Cadastrar livro** → busca por título ou ISBN | ficha → **Anexar arquivo para ler** |
+| Audiolivro | **Quero ouvir** → busca no catálogo | card com selo "quero ouvir" → clique anexa |
+
+⚠️ **O QUE NÃO PODE ACONTECER É NASCER UM SEGUNDO ITEM.** Importar pelo caminho normal criaria
+um livro novo, e o antigo ficaria com a nota, a série e o histórico apontando para lugar
+nenhum. O anexo **entra no item existente**: capítulos, formato e tipo mudam; título, autor,
+série, status, notas, marcadores e histórico ficam como estavam.
+
+E há um detalhe que faz diferença para quem organiza a estante antes de ter o arquivo: **a
+leitura registrada no papel vira a posição inicial do leitor**. No teste, um livro com 132 de
+528 páginas ganhou o EPUB e abriu no **capítulo 12, marcando 25%** — no lugar certo.
+
+### Os quatro defeitos que só o teste ao vivo pegou
+
+1. **O capítulo pulava dois na virada.** `timeupdate` percebia que passou do fim do capítulo e
+   `ended` percebia que o arquivo acabou — dois avisos da mesma coisa, cada um avançando por
+   conta própria. Uma trava (`_abVirando`) faz a virada acontecer uma vez só.
+2. **E aí o livro emudeceu no fim de cada faixa.** A trava consertou o pulo e revelou o
+   segundo defeito: eu decidia "estava tocando?" por `au.paused` **no instante do evento** — e
+   quando um arquivo termina, o elemento já se declara pausado. Passou a valer a **intenção**
+   (`_abQuerTocar`), que só a pausa dela desliga. De quebra, o `.catch(() => {})` que eu tinha
+   posto no `play()` escondia a falha: agora ele tenta de novo e, se falhar, aparece.
+3. **O título do livro virava o nome do capítulo** na importação por faixas: "Autor - Capitulo
+   01.mp3" entrava como livro chamado *"Capitulo 01"*. O nome passou a ser o **prefixo comum**
+   das faixas — o que elas têm em comum é a obra; o que as diferencia é o capítulo.
+4. **"Billy Summers (US Edition)" não casava com o catálogo.** O catálogo tem "Billy Summers";
+   a comparação por palavras dava 2 de 4, abaixo do corte. O carimbo da edição
+   (`(US Edition)`, `Unabridged`, `Deluxe`…) passou a ser removido antes de comparar.
+
+### De brinde, na mesma varredura
+
+- **"Gênero" da Open Library é assunto de fichário**: *Billy Summers* voltou com "New York Times
+  reviewed". Só entra o que parece gênero (até três palavras, sem números, sem cara de
+  catalogação) — campo com lixo é pior que campo vazio, porque some do radar.
+- **Parasita de catálogo**: "Summary of The Martian by Andy Weir — Conversation Starters" contém
+  todas as palavras da busca e ganhava do livro de verdade. Agora é penalizado e vai para o fim.
+- **A capa do reprodutor era cortada**: moldura quadrada com `cover` decepava o nome do autor
+  no pé. Virou `contain`.
+- **`_lerImportarUm` foi partido em dois** (`_lerMetaDoArquivo` + a criação do item), para o
+  anexo reusar o parser em vez de ter uma cópia que envelheceria.
+
+### Testado ao vivo
+
+Com **três `.mp3` reais**: importados, durações lidas pelo decodificador (65s, 294s, 354s),
+tocou, virou de capítulo sozinho **continuando a tocar**, guardou a posição, fechou, reabriu no
+mesmo ponto. Parser de `.m4b` conferido com arquivo montado átomo a átomo (título, autor,
+duração de 3600s, quatro capítulos com acento, capa) e nos **dois formatos de `chpl`**. Catálogo
+→ item "quero ouvir" → **anexo do áudio no mesmo item** (nenhum duplicado, capa e autor
+preservados). E, do lado dos livros, o **EPUB do Billy Summers anexado a uma ficha de papel**,
+com nota, tags, notas e histórico intactos. Zero overflow a 375px e a 1536px.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -11820,6 +11960,17 @@ recebeu capa, ano, páginas e sinopse; livro com capa do arquivo manteve a dele.
       áudio, guarda posição, faz legenda por IA e baixa episódio — um audiobook é um podcast com
       capítulos. ⚠️ Enquanto não existir, o cadastro da estante **não oferece "Audiobook"** de
       propósito.
+- [x] ~~**O AUDIOBOOK AINDA NÃO TEM CASA**~~ — **feito em 2026-08-20** (§8.56): seção própria,
+      parser de `.m4b`, reprodutor com capítulos, velocidade, marcadores, sono e Media Session.
+- [ ] **O AUDIOLIVRO AINDA NÃO VIRA VOCABULÁRIO** (aberto em 2026-08-20, §8.56). O reprodutor
+      toca, mas ouvir não gera card — falta transcrição. O caminho já existe montado no pacote
+      de vídeo (`video-subs.js` faz legenda por IA com Whisper); ligar os dois transformaria o
+      marcador num trecho com texto, e o trecho em item de estudo. É a fatia que falta para o
+      audiolivro ser do Language Lab, e não só um player.
+- [ ] **CAPÍTULO EM TRILHA DE TEXTO NO `.m4b` NÃO É LIDO** (2026-08-20, §8.56). Parte dos
+      conversores grava os capítulos como trilha QuickTime (`tref/chap`) em vez de `chpl`. Esses
+      arquivos entram como capítulo único — ouvem-se igual, com a posição guardada, mas sem a
+      lista. Só vale implementar se um arquivo real dele cair nesse caso.
 - [ ] **OS DADOS DO APP ANTIGO NUNCA FORAM ALCANÇADOS** (aberto em 2026-08-20, §8.53). O
       `gerenciador-de-livros` nunca foi publicado (sem Pages, sem Vercel), então o acervo dele —
       se existe — está no `localStorage` de algum `localhost:PORTA` no Chrome dele. Subir um

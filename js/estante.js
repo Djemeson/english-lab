@@ -1112,10 +1112,24 @@ function _estGoogleCaiu() { _estGoogleFora = Date.now() }
 // Consulta montada para o caso real: mangá busca pela SÉRIE + volume (o título
 // do arquivo, "One Piece v12", não existe em catálogo nenhum).
 function _estConsultaDe(l) {
-  const base = (l.serie || '').trim() || obraNome(l.title) || ''
+  const base = (l.serie || '').trim() || _estTituloLimpo(obraNome(l.title)) || ''
   const vol = l.serie && l.serieNum ? ` vol ${l.serieNum}` : ''
   const autor = (l.author || '').trim()
   return `${base}${vol}${autor ? ' ' + autor : ''}`.trim()
+}
+
+// ⚠️ O TÍTULO DO ARQUIVO VEM COM O CARIMBO DA EDIÇÃO, e o catálogo não tem
+// esse carimbo. Medido: o EPUB dele chama-se "Billy Summers (US Edition)"; o
+// catálogo devolve "Billy Summers", e a comparação por palavras dava 2 de 4 —
+// abaixo do corte de 0,6. O livro certo era recusado por causa de duas
+// palavras que não são do título.
+function _estTituloLimpo(t) {
+  return String(t || '')
+    .replace(/[\(\[\{][^)\]\}]*[\)\]\}]/g, ' ')              // (US Edition), [Unabridged]
+    .replace(/\b(unabridged|abridged|edition|ed|us|uk|deluxe|revised|reprint|anniversary|illustrated|boxed set|omnibus)\b/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/[\s\-–—:,.]+$/, '')
+    .trim()
 }
 
 // Semelhança por palavras: quantas palavras do nosso título aparecem no do
@@ -1183,7 +1197,7 @@ async function estMetaBuscar(l) {
   // 1,00 — "ONE PIECE 1", "ONE PIECE 2" e "ONE PIECE 13" — e o primeiro da
   // fila era o volume ERRADO. Numa série, gravar ano, páginas e capa de outro
   // volume é pior que não gravar nada, porque parece certo.
-  const alvo = (l.serie || '').trim() || obraNome(l.title)
+  const alvo = (l.serie || '').trim() || _estTituloLimpo(obraNome(l.title))
   const numAlvo = Number(l.serieNum) || 0
   return saida.map(r => {
     const semelhanca = _estParecido(alvo, r.title)
@@ -1191,9 +1205,14 @@ async function estMetaBuscar(l) {
     const num = _estNumDeTitulo(r.title)
     const bate = numAlvo && num === numAlvo
     const briga = numAlvo && num && num !== numAlvo
+    // ⚠️ PARASITA DE CATÁLOGO. "Summary of The Martian by Andy Weir —
+    // Conversation Starters" contém TODAS as palavras da busca e por isso
+    // ganhava de "The Martian" na ordenação. Livro sobre o livro não é o
+    // livro; a penalidade empurra esses para o fim sem escondê-los.
+    const parasita = /\b(summary|summaries|study guide|conversation starters|analysis|workbook|quiz|companion|unofficial|cliffsnotes|sparknotes)\b/i.test(r.title)
     return { ...r, semelhanca: incomparavel ? 0 : semelhanca, incomparavel, num,
-             volumeBate: !!bate, volumeBriga: !!briga,
-             peso: (incomparavel ? 0.35 : semelhanca) + (bate ? 0.6 : 0) - (briga ? 0.9 : 0) }
+             volumeBate: !!bate, volumeBriga: !!briga, parasita,
+             peso: (incomparavel ? 0.35 : semelhanca) + (bate ? 0.6 : 0) - (briga ? 0.9 : 0) - (parasita ? 1.2 : 0) }
   }).sort((a, b) => b.peso - a.peso)
 }
 
@@ -1204,6 +1223,19 @@ function _estNumDeTitulo(t) {
   return m ? Number(m[1]) : 0
 }
 
+// ⚠️ O "GÊNERO" DA OPEN LIBRARY É UM ASSUNTO QUALQUER, e o primeiro da lista
+// costuma ser catalogação, não gênero: no teste, Billy Summers voltou com
+// "New York Times reviewed". Gênero é uma palavra ou duas ("Suspense",
+// "Ficção científica"); frase comprida, com números ou com cara de fichário
+// não entra — campo com lixo é pior que campo vazio, porque some do radar.
+function _estGeneroServe(g) {
+  const t = String(g || '').trim()
+  if (t.length < 3 || t.length > 28) return false
+  if (/\d/.test(t)) return false
+  if (/(review|nyt|new york times|accessible|protected daisy|in library|overdrive|fiction in english|lending|award)/i.test(t)) return false
+  return t.split(/\s+/).length <= 3
+}
+
 // Aplica um resultado sobre o livro. `sobrescrever` só vem `true` do botão
 // explícito da ficha — em lote é sempre `false`.
 function estMetaAplicar(l, r, sobrescrever) {
@@ -1212,6 +1244,7 @@ function estMetaAplicar(l, r, sobrescrever) {
   for (const c of campos) {
     const novo = r[c]
     if (!novo) continue
+    if (c === 'genero' && !_estGeneroServe(novo)) continue
     const atual = l[c]
     const vazio = atual === undefined || atual === null || atual === '' || atual === 0
     if (vazio || sobrescrever) { l[c] = novo; n++ }
@@ -1241,7 +1274,8 @@ async function estMetaEmLote(ids, aoAndar) {
       // Título ilegível para nós (japonês, russo) só passa quando o NÚMERO do
       // volume bate — aí o sinal vem do número, não do nome. Sem número de
       // volume, título incomparável não entra: seria fé, não evidência.
-      const bom = res.find(r => (r.incomparavel ? (numAlvo && r.volumeBate) : r.semelhanca >= 0.6)
+      const bom = res.find(r => !r.parasita
+                              && (r.incomparavel ? (numAlvo && r.volumeBate) : r.semelhanca >= 0.6)
                               && (!numAlvo || r.volumeBate))
       if (bom) {
         if (bom.fonte === 'Open Library' && bom.key && !bom.resumo) {
@@ -1258,6 +1292,34 @@ async function estMetaEmLote(ids, aoAndar) {
   }
   estSalvar()
   return { achou, total: ids.length }
+}
+
+// ---- AUTOMÁTICO: o livro que acabou de entrar se completa sozinho ----
+// ⚠️ ELE PEDIU ASSIM, com todas as letras: *"os metadados quero que puxe
+// automaticamente. não vi essa opção."* — e tinha razão de não ver: existia só
+// dentro de "Editar vários" (uma tela de lote) e num botão da ficha. Coisa que
+// deve acontecer sempre não pode depender de o usuário achar um botão.
+//
+// Três freios, porque isto roda sem ninguém olhando:
+//   1. Só preenche campo VAZIO — nunca discute com o metadado do arquivo.
+//   2. Só aceita resultado que pareça ser o mesmo livro (e o mesmo volume).
+//   3. Roda em SEGUNDO PLANO: a estante já apareceu, e nada na tela espera.
+function estAutoMetaLigado() { return cfg.autoMeta !== false }
+
+function estAutoCompletar(ids, aoTerminar) {
+  if (!estAutoMetaLigado() || !ids || !ids.length) return
+  setTimeout(async () => {
+    try {
+      const r = await estMetaEmLote(ids, null)
+      if (r.achou) {
+        toast(r.achou === 1
+          ? 'Dados do catálogo preenchidos'
+          : `${r.achou} livros completados pelo catálogo`, 'info')
+        if (typeof estanteRender === 'function' && _estVista === 'estante') estanteRender()
+      }
+      if (aoTerminar) aoTerminar(r)
+    } catch (e) { console.warn('[estante] auto-metadados:', e && e.message) }
+  }, 400)
 }
 
 // ---- a tela individual: ele vê os candidatos e escolhe ----
@@ -1389,6 +1451,7 @@ function _estRenderFicha() {
         ${temArquivo
           ? `<button class="btn btn-primary" style="width:100%" onclick="lerAbrir('${l.id}')">${ic('bookOpen','ic-sm')} ${pct > 0 ? 'Continuar lendo' : 'Começar a ler'}</button>`
           : `<button class="btn btn-primary" style="width:100%" onclick="estProgressoModal('${l.id}')">${ic('pencil','ic-sm')} Registrar progresso</button>`}
+        ${l.kind === 'fisico' ? `<p class="est-dica" style="text-align:center">Sem arquivo aqui dentro — leitura no papel ou em outro aparelho.</p>` : ''}
         <div class="est-ficha-status">
           ${Object.entries(EST_STATUS).map(([k, v]) =>
             `<button class="est-chip${l.status === k ? ' on' : ''}" onclick="estSetLivroStatus('${l.id}','${k}')">${v.rotulo}</button>`).join('')}
@@ -1398,6 +1461,10 @@ function _estRenderFicha() {
           <button class="btn btn-ghost btn-sm" onclick="estEditar('${l.id}')">${ic('pencil','ic-sm')} Editar</button>
           <button class="btn btn-ghost btn-sm" onclick="lerExcluir('${l.id}')">${ic('trash','ic-sm')} Remover</button>
         </div>
+        ${l.kind === 'fisico' ? `
+        <button class="btn btn-ghost btn-sm" style="width:100%" onclick="lerAnexarArquivo('${l.id}')"
+                data-tip="O EPUB ou CBZ entra NESTE livro — sem criar um item repetido">
+          ${ic('upload','ic-sm')} Anexar arquivo para ler</button>` : ''}
         <button class="btn btn-ghost btn-sm" style="width:100%" onclick="estMetaModal('${l.id}')"
                 data-tip="Ano, editora, páginas, sinopse e capa — do Google Books ou da Open Library">
           ${ic('download','ic-sm')} Completar pelo catálogo</button>
@@ -1671,7 +1738,7 @@ function _estRenderForm() {
     <div class="est-form">
       <h2>${l ? 'Editar livro' : 'Cadastrar livro'}</h2>
       <p class="est-dica">${l ? 'O que estiver errado no arquivo se corrige aqui — a estante e as capturas passam a usar o nome certo.'
-        : 'Para o livro de papel, o e-book de fora ou o que você ainda quer ler. Sem arquivo, o progresso é você quem registra.'}</p>
+        : 'Busque pelo título e o livro entra na estante com capa e sinopse, mesmo sem você ter o arquivo. O EPUB ou o CBZ pode ser anexado depois, na ficha — sem criar item repetido.'}</p>
 
       ${!l ? `
       <div class="est-gb">
@@ -1852,6 +1919,8 @@ function estSalvarForm(id) {
   }
   estSalvar()
   toast(l ? 'Livro atualizado' : `"${titulo}" entrou na estante`, 'success')
+  // Cadastro à mão sem usar a busca: o catálogo completa o resto sozinho.
+  if (!l) estAutoCompletar([_estId], () => { if (_estVista === 'ficha') estanteRender() })
   estIr('ficha', _estId)
 }
 

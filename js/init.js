@@ -13,6 +13,7 @@ async function initApp() {
   loadVideos()       // metadados de vídeo (seção Vídeo — o módulo é lazy, o estado não)
   loadClips()        // cortes de cena
   loadLivros()       // estante de ebooks (o arquivo fica no IDB; aqui só metadados)
+  loadAudiolivros()  // audiobooks (o áudio fica no IDB — são centenas de MB)
   loadObrasNome()    // título limpo da obra (o da fonte traz lixo) — só exibição
   loadPodShows()     // programas de podcast já visitados (sincronizados)
   loadSrs()          // loads srsCfg, srsLog, decks

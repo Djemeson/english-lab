@@ -84,8 +84,9 @@ function lerEscolherArquivo() {
 async function lerImportar(files) {
   const lista = [...(files || [])]
   if (!lista.length) return
+  const novos = []
   for (const f of lista) {
-    try { await _lerImportarUm(f) }
+    try { const id = await _lerImportarUm(f); if (id) novos.push(id) }
     catch (e) {
       console.warn('[ler] importação falhou:', e)
       toast(`"${f.name}": ${e.message}`, 'error')
@@ -94,39 +95,44 @@ async function lerImportar(files) {
   saveLivros()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   renderLerSection()
+  // O CATÁLOGO COMPLETA O QUE O ARQUIVO NÃO TROUXE (ano, editora, páginas,
+  // gênero, sinopse e, quando não há capa, a capa). Em segundo plano: a
+  // estante já está na tela e ninguém espera pela rede.
+  if (typeof estAutoCompletar === 'function' && novos.length) estAutoCompletar(novos)
 }
 
-async function _lerImportarUm(file) {
+// A LEITURA DO ARQUIVO GANHOU FUNÇÃO PRÓPRIA (2026-08-20) porque agora ela
+// serve a dois donos: a IMPORTAÇÃO (que cria um livro novo) e o ANEXO (que
+// preenche um livro que já está na estante). Deixá-la dentro da importação
+// obrigaria o anexo a copiar o parser inteiro — duas cópias da mesma regra,
+// e uma delas envelheceria.
+async function _lerMetaDoArquivo(file) {
   const buf = await file.arrayBuffer()
   const u8 = new Uint8Array(buf.slice(0, 4))
   const ehZip = u8[0] === 0x50 && u8[1] === 0x4b   // "PK"
-  const id = uid()
-  toast(`Lendo "${file.name}"…`, 'info')
 
   let meta
   if (ehZip) {
     // ⚠️ CBZ TAMBÉM COMEÇA COM "PK". Decidir só pelos 4 primeiros bytes
     // mandaria todo mangá para o parser de EPUB, que morreria procurando um
-    // `container.xml` que não existe — com uma mensagem sobre EPUB que não
-    // ajudaria ninguém. Quem decide é o CONTEÚDO, não a extensão: renomear
-    // .cbz para .zip é comum e continuaria funcionando.
+    // `container.xml` que não existe. Quem decide é o CONTEÚDO, não a extensão.
     const zipCru = await zipAbrir(buf)
     if (mangaEhCbz(zipCru)) {
       meta = await mangaMeta(zipCru, file.name)
     } else {
-    const ep = await epubAbrir(buf)
-    // Contagem por capítulo AGORA: é ela que dá progresso honesto depois
-    // (capítulo não tem tamanho igual — 1/12 não é 8% do livro).
-    const caps = []
-    for (const c of ep.capitulos) {
-      const html = await ep.zip.texto(c.href)
-      const txt = html ? epubTextoLimpo(html) : ''
-      caps.push({ id: c.id, href: c.href, titulo: c.titulo, chars: txt.length, words: _lerContaPalavras(txt) })
-    }
-    meta = {
-      title: ep.titulo, author: ep.autor, lang: ep.idioma, format: 'epub',
-      chapters: caps, cover: await _lerCapaMiniatura(ep)
-    }
+      const ep = await epubAbrir(buf)
+      // Contagem por capítulo AGORA: é ela que dá progresso honesto depois
+      // (capítulo não tem tamanho igual — 1/12 não é 8% do livro).
+      const caps = []
+      for (const c of ep.capitulos) {
+        const html = await ep.zip.texto(c.href)
+        const txt = html ? epubTextoLimpo(html) : ''
+        caps.push({ id: c.id, href: c.href, titulo: c.titulo, chars: txt.length, words: _lerContaPalavras(txt) })
+      }
+      meta = {
+        title: ep.titulo, author: ep.autor, lang: ep.idioma, format: 'epub',
+        chapters: caps, cover: await _lerCapaMiniatura(ep)
+      }
     }
   } else {
     const txt = new TextDecoder('utf-8').decode(buf)
@@ -143,15 +149,22 @@ async function _lerImportarUm(file) {
       cover: ''
     }
   }
-
   if (!meta.chapters.length) throw new Error('não achei texto legível nesse arquivo')
+  return { ...meta, buf }
+}
 
-  await BookDB.set(id, new Blob([buf]))
+async function _lerImportarUm(file) {
+  const id = uid()
+  toast(`Lendo "${file.name}"…`, 'info')
+  const meta = await _lerMetaDoArquivo(file)
+
+  await BookDB.set(id, new Blob([meta.buf]))
   // Sobe em segundo plano: importar um livro não pode ficar esperando rede, e
   // se falhar ele continua com o arquivo aqui — a próxima abertura tenta de novo.
   if (typeof livroGarantirNaNuvem === 'function') livroGarantirNaNuvem(id)
   livros.push({
-    id, ...meta,
+    id, title: meta.title, author: meta.author, lang: meta.lang,
+    format: meta.format, chapters: meta.chapters, cover: meta.cover,
     totalWords: meta.chapters.reduce((s, c) => s + (c.words || 0), 0),
     totalChars: meta.chapters.reduce((s, c) => s + (c.chars || 0), 0),
     pos: { cap: 0, frac: 0 }, progress: 0, notes: [],
@@ -176,12 +189,78 @@ async function _lerImportarUm(file) {
   // O metadado do EPUB traz "(US Edition)", "Unabridged", o nome do arquivo —
   // e a captura carimba esse título em CADA item. Resolvendo aqui, tudo que
   // sair deste livro já nasce com o nome certo na tela, e a estante também.
-  // Uma chamada por LIVRO, não por item, e em segundo plano: a estante já
-  // apareceu, e nada na tela espera por isto.
   if (typeof resolverNomesDeObra === 'function' && aiChatCfg().key) {
     resolverNomesDeObra([meta.title])
       .then(n => { if (n) renderLerSection() })
       .catch(e => console.warn('[obra] não resolvi o título:', e && e.message))
+  }
+  return id
+}
+
+// ================================================================
+// ANEXAR O ARQUIVO A UM LIVRO QUE JÁ ESTÁ NA ESTANTE
+// ================================================================
+// Pedido dele: *"ter uma opção que sobe o áudio ou epub dentro do que já está
+// carregado. ele só se encaixa nos metadados."* É o fluxo de quem organiza a
+// estante antes de ter o arquivo: primeiro entra a ficha (pelo catálogo, com
+// capa e sinopse), o EPUB chega depois.
+//
+// ⚠️ O QUE NÃO PODE ACONTECER É NASCER UM SEGUNDO LIVRO. Importar pelo caminho
+// normal criaria um item novo, e o antigo ficaria com a nota, o histórico de
+// leitura e a série apontando para lugar nenhum. Aqui o arquivo ENTRA no item
+// existente: capítulos, formato e tipo mudam; título, autor, série, status,
+// notas e histórico ficam como estavam.
+function lerAnexarArquivo(id) {
+  const l = livroPorId(id); if (!l) return
+  const inp = document.createElement('input')
+  inp.type = 'file'
+  inp.accept = '.epub,.cbz,.txt,.html,.htm,application/epub+zip,application/vnd.comicbook+zip,text/plain,text/html'
+  inp.onchange = () => _lerAnexar(id, inp.files && inp.files[0])
+  inp.click()
+}
+
+async function _lerAnexar(id, file) {
+  const l = livroPorId(id)
+  if (!l || !file) return
+  toast(`Lendo "${file.name}"…`, 'info')
+  try {
+    const meta = await _lerMetaDoArquivo(file)
+    await BookDB.set(id, new Blob([meta.buf]))
+    if (typeof livroGarantirNaNuvem === 'function') livroGarantirNaNuvem(id)
+
+    l.kind = 'arquivo'
+    l.format = meta.format
+    l.chapters = meta.chapters
+    l.totalWords = meta.chapters.reduce((s, c) => s + (c.words || 0), 0)
+    l.totalChars = meta.chapters.reduce((s, c) => s + (c.chars || 0), 0)
+    if (!l.cover && meta.cover) l.cover = meta.cover
+    if (!l.author && meta.author) l.author = meta.author
+    if (meta.lang) l.lang = meta.lang
+
+    // A leitura que ele já registrou no papel vira o ponto de partida do
+    // leitor. Zerar aqui seria punir justamente quem organizou a estante
+    // antes de ter o arquivo.
+    if (!l.progress && l.paginas > 0 && l.pagAtual > 0) {
+      l.progress = Math.max(0, Math.min(1, l.pagAtual / l.paginas))
+      const caps = l.chapters, total = l.totalChars || 1
+      let acc = 0, i = 0
+      for (; i < caps.length; i++) {
+        const parte = (caps[i].chars || 0) / total
+        if (acc + parte >= l.progress) break
+        acc += parte
+      }
+      i = Math.min(i, caps.length - 1)
+      const parte = (caps[i].chars || 0) / total
+      l.pos = { cap: i, frac: parte ? Math.max(0, Math.min(1, (l.progress - acc) / parte)) : 0 }
+    }
+    l.updatedAt = Date.now()
+    saveLivros()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+    toast(`Arquivo anexado — ${meta.chapters.length} ${meta.chapters.length === 1 ? 'capítulo' : 'capítulos'}`, 'success')
+    renderLerSection()
+  } catch (e) {
+    console.warn('[ler] anexo falhou:', e)
+    toast('Não consegui ler esse arquivo: ' + e.message, 'error')
   }
 }
 

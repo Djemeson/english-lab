@@ -499,6 +499,9 @@ async function fbPushData() {
     // Ebooks: metadados, sumário, ONDE VOCÊ PAROU e os destaques. O arquivo
     // (MBs) fica no IndexedDB de cada aparelho — mesma regra do vídeo.
     batch.set(base.collection('data').doc('livros'), { list: livros, updatedAt: Date.now() })
+    // Audiolivros: SÓ METADADOS. O áudio (centenas de MB) fica no aparelho —
+    // aqui viaja título, capa reduzida, capítulos, posição e marcadores.
+    batch.set(base.collection('data').doc('audiolivros'), { list: audiolivros, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('known'), { map: knownWords || {}, ignored: ignoredWords || {}, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('clips'),  { list: clips,  updatedAt: Date.now() })
     // Podcasts: só a lista de programas visitados (ponteiros). O episódio em si
@@ -792,6 +795,29 @@ function applyCloudDocs(docs) {
       _lerLivro = livros.find(l => l.id === abertoId) || _lerLivro
     }
     saveLivros()
+  }
+  // Audiolivros: mesma exceção dos livros — merge POR ITEM, pelo `updatedAt`.
+  // O que está em jogo é ONDE VOCÊ PAROU num arquivo de doze horas, e um
+  // snapshot atrasado jogaria fora a escuta de hoje.
+  // ⚠️ Aparelho SEM o arquivo continua vendo o item na estante (é assim que a
+  // posição atravessa o computador e o celular); ele só avisa na hora de abrir.
+  if (docs.audiolivros) {
+    const nuvem = docs.audiolivros.list || []
+    const carimbo = docs.audiolivros.updatedAt || 0
+    const locais = new Map(audiolivros.map(a => [a.id, a]))
+    const abertoId = (typeof _abLivro !== 'undefined' && _abLivro) ? _abLivro.id : null
+    const juntos = nuvem.map(remoto => {
+      const local = locais.get(remoto.id)
+      if (!local) return remoto
+      if (local.id === abertoId) return local          // tocando aqui: manda quem toca
+      return (local.updatedAt || 0) > (remoto.updatedAt || 0) ? local : remoto
+    })
+    for (const a of audiolivros) {
+      if (nuvem.some(r => r.id === a.id)) continue
+      if ((a.addedAt || 0) > carimbo || a.id === abertoId) juntos.push(a)
+    }
+    audiolivros = juntos
+    saveAudiolivros()
   }
   if (docs.known)    { knownWords = { ...knownWords, ...(docs.known.map || {}) }; saveKnownLocal()
                        ignoredWords = { ...ignoredWords, ...(docs.known.ignored || {}) }; saveIgnoredLocal() }

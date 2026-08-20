@@ -122,6 +122,8 @@ function fillSettings() {
       `<option value="${c.id}"${c.id === cefrNivelAluno() ? ' selected' : ''}>${esc(c.nome)} — ${esc(c.dica)}</option>`).join('')
   }
   const stt = el('cfg-stt-provider'); if (stt) stt.value = cfg.sttProvider || 'auto'
+  // Ligado por padrão: `cfg.autoMeta` só existe depois que ele DESLIGA.
+  const am = el('cfg-auto-meta'); if (am) am.checked = cfg.autoMeta !== false
   setSettingsTab(_settingsTab)
   renderThemePicker()
   renderAccentPicker()
@@ -850,6 +852,16 @@ async function clearAllData() {
   // aberto no leitor, a pré-análise do capítulo, o handle do arquivo de vídeo.
   // Começar do zero de verdade é começar do boot.
   setTimeout(() => location.reload(), 1200)
+}
+
+// O interruptor do "completar sozinho" (2026-08-20). Ligado por padrão: foi
+// pedido assim. Fica em Configurações porque é comportamento que roda sem
+// pedir licença, e coisa que age sozinha precisa ter onde ser desligada.
+function cfgAutoMeta(ligado) {
+  cfg.autoMeta = !!ligado
+  saveCfg()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  toast(ligado ? 'Vou completar os dados ao importar' : 'Não vou mais buscar dados sozinho', 'info')
 }
 
 function togglePasswordVisibility(id) {
