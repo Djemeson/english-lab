@@ -3537,22 +3537,43 @@ body.sb-collapsed #fb-user-photo{margin:0}
    fechando no clique; quem identifica o grupo é o ícone. O único sinal de
    "está fechado" é o ícone apagar um pouco — e o número somado, que só
    aparece nessa situação. */
+/* A SILHUETA DO GRUPO É LARANJA (pedido dele). Vai por `--role-energia`, e
+   não pelo `#FF9345` cru, porque o papel do acento muda de cor conforme o
+   tema — escrever a cor à mão deixaria a silhueta gritando nos temas claros.
+   ⚠️ Atrito consciente com o mapa de papéis (topo do arquivo): o laranja
+   responde por "a ação principal, a conquista, o fogo", e um rótulo de menu
+   não é ação. Ele pediu assim; fica registrado que o significado esticou. */
 .sb-grupo-ic{
-  width:14px;height:14px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;
-  stroke-linecap:round;stroke-linejoin:round;opacity:.7;transition:opacity .16s ease;
+  width:15px;height:15px;flex-shrink:0;stroke:var(--role-energia);fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.9;transition:opacity .16s ease;
 }
 .sb-nav-label:hover .sb-grupo-ic{opacity:1}
-.sb-nav-label.fechado .sb-grupo-ic{opacity:.42}
+.sb-nav-label.fechado .sb-grupo-ic{opacity:.5}
 /* O número do cabeçalho não pode competir com o do item: menor e sem o
    vermelho, que fica reservado para "tem coisa parada no Preparar". */
 .sb-nav-label .badge{
   position:static;min-width:0;padding:1px 6px;font-size:var(--fs-3xs);
   background:var(--surface3);color:var(--text2);border-radius:99px;
 }
+/* ---- O RECUO DOS ITENS ----
+   Sem ele, título e item começam na mesma coluna e o grupo não lê como
+   grupo — foi o que ele viu no print. O recuo alinha o ÍCONE do item com
+   o TEXTO do título (12 de padding + 15 do ícone + 6 de gap = 33), e a
+   linha guia dá ao bloco uma borda por onde o olho desce. */
+.sb-grupo{position:relative}
+.sb-grupo::before{
+  content:'';position:absolute;left:19px;top:4px;bottom:4px;width:1px;
+  background:var(--border);opacity:.6;
+}
+.sb-grupo .nav-item{padding-left:33px}
 .sb-grupo.recolhido{display:none}
 /* No modo rail (só ícones) o cabeçalho está escondido: manter um grupo
    fechado trancaria a seção sem nenhum jeito de reabrir. Tudo aparece. */
 body.sb-collapsed .sb-grupo.recolhido{display:block}
+/* No rail o item é só o ícone, centrado: recuo e linha guia sairiam do
+   lugar e empurrariam o ícone para fora da coluna. */
+body.sb-collapsed .sb-grupo .nav-item{padding-left:0}
+body.sb-collapsed .sb-grupo::before{display:none}
 
 /* ---- Estado ativo: tinta chapada + marca no vinco da barra ----
    O gradiente + anel interno era o mesmo desenho de template que os

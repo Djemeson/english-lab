@@ -18,7 +18,7 @@
 > empurraram a barra para 740px e ela passava a rolar INTEIRA num notebook de 768px — a marca
 > quebrava em duas linhas e o rodapé saía da tela; agora **só a lista rola**. Sem seta de
 > colapso (pedido dele): quem identifica o grupo é um ícone, que apaga quando fechado.
-> `sw.js` → **englab-v326**. **Detalhes em §8.52.**
+> `sw.js` → **englab-v327**. **Detalhes em §8.52.**
 >
 > Última atualização anterior: 2026-08-20 (3ª) — **A TRADUÇÃO TRADUZ O TRECHO, E A DOSE DE CONTEXTO É A
 > FRASE**. Ele marcou `ore` e recebeu a frase inteira reescrita: *"isso não é tradução, é
@@ -11437,6 +11437,28 @@ sessão (`screenshot` recusou: *"not compositing frames"*), então **não há pr
 falsa leitura no meio do caminho: a opacidade do ícone media 0.42 nos dois estados, porque **sem
 quadros compostos a `transition` congela no valor inicial**. Medido de novo com
 `transition:none`, deu 0.7 aberto / 0.42 fechado — o esperado. É a armadilha da §6, de novo.
+
+#### Ajuste na mesma rodada: o recuo e o laranja da silhueta
+
+Ele mandou o print e o veredito: *"os itens da seção devem ter um recuo pra haver distinção e
+quem sabe o ícone da seção, na verdade a silhueta, receber aquele laranja q já tem em alguns
+botões."* Estava certo — título e item começavam na **mesma coluna**, então o grupo não lia como
+grupo, só como uma lista com palavras maiúsculas no meio.
+
+- **Recuo com alvo, não a olho:** o ícone do item passou a começar **exatamente onde começa o
+  texto do título** (x=45 nos dois, medido). Padrão: 12 de padding + 15 do ícone + 6 de gap = 33
+  de `padding-left`. Entrou também uma **linha guia** de 1px em `.sb-grupo::before`, para o olho
+  ter por onde descer o bloco.
+- **A silhueta em laranja** vai por `var(--role-energia)`, **nunca pelo `#FF9345` cru**: o papel
+  do acento troca de cor por tema, e a cor escrita à mão gritaria nos claros. Medido nos seis
+  temas — contraste do ícone contra o fundo da barra: midnight **9,28**, violet **9,10**,
+  emerald **9,00**, light/papel **5,55**, sepia **4,13**. O pior caso passa folgado no mínimo de
+  3:1 que vale para elemento gráfico. Nos temas claros a variável já entrega `#A94E0D`.
+  ⚠️ **Atrito consciente com o mapa de papéis** (topo do `styles.css`): o laranja responde por
+  *"a ação principal, a conquista, o fogo"*, e rótulo de menu não é ação. Foi pedido; fica
+  registrado que o significado esticou.
+- **No rail**, recuo e linha guia são desligados: o item vira só o ícone centrado, e o recuo o
+  empurraria para fora da coluna.
 
 ## 9. Pendências / a verificar
 
