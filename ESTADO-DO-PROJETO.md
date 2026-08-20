@@ -7,7 +7,20 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-20 (4ª) — **O MENU VIROU QUATRO GRUPOS, E ELES COLAPSAM**. Eram
+> Última atualização: 2026-08-20 (5ª) — **A ESTANTE VIROU UM GERENCIADOR DE LIVROS**. Era uma
+> grade de capas com barra de progresso; agora tem **busca, filtros por status e tipo,
+> ordenação, lista ou grade, ficha por livro, cadastro de livro SEM arquivo (papel, e-book de
+> fora) e um painel de leitura** com calendário, sequência, meta diária e meta anual. A base é o
+> `gerenciador-de-livros` que ele mesmo escreveu (GitHub, 2025), com uma diferença que só este
+> app pode ter: **quem tem EPUB não digita nada** — o avanço do dia é anotado pelo próprio
+> leitor. ⚠️ Três defeitos pegos no teste ao vivo, não na leitura do código: a grade de dados
+> **estourava 265px numa tela de 375** (`1fr` cresce até o min-content — virou `minmax(0,1fr)`),
+> marcar um livro como "lido" **creditava o livro inteiro como leitura de hoje**, e o Google
+> Books devolveu **HTTP 429** (cota do dia estourada), o que fez a busca de catálogo ganhar
+> **segunda fonte** (Open Library) em vez de mentir "sem internet". `sw.js` → **englab-v328**.
+> **Detalhes em §8.53.**
+>
+> Última atualização anterior: 2026-08-20 (4ª) — **O MENU VIROU QUATRO GRUPOS, E ELES COLAPSAM**. Eram
 > 2 grupos, e "Vocabulário" carregava 8 seções sem parentesco (ler um livro ao lado de revisar
 > um card). Agora o menu conta o ciclo do material: **Início · Captura · Estudo · Acervo**, com
 > o cabeçalho de cada grupo abrindo e fechando no clique e o estado **guardado no aparelho**
@@ -1271,7 +1284,11 @@ js/init.js        — bootstrap (initApp) + service worker
 js/add.js         — aba Adicionar (manual/Kindle/Mídia/Website)  (CARREGADO LAZY)
 js/kindle-db.js   — leitor SQLite só-leitura (vocab.db do Kindle), sem WASM  (LAZY, antes de add.js)
 js/epub.js        — leitor de ZIP (DecompressionStream nativo) + parser EPUB  (LAZY, antes de ler.js)
-js/ler.js         — seção LER: estante, leitor, tipografia, captura, cobertura  (LAZY)
+js/estante.js     — GERENCIADOR DO ACERVO: estante (busca/filtros/ordem), ficha do livro,
+                    cadastro sem arquivo (Google Books + Open Library), registro de progresso,
+                    painel de leitura (calendário/metas/sequência)  (LAZY, antes de ler.js)
+js/ler.js         — seção LER: o LEITOR (tipografia, captura, cobertura). A estante saiu daqui
+                    em 2026-08-20; `renderLerSection` delega a `estanteRender()`  (LAZY)
 js/consulta.js    — seção Assistente (chat IA, histórico, streaming, SRS múltiplo)  (NÃO-lazy)
 js/study.js       — seção REVISAR: UI/sessão do SRS. Id: `revisar`   (CARREGADO LAZY)
 js/dossie.js      — seção ESTUDAR: os dossiês por obra+capítulo. Id: `estudar`  (LAZY)
@@ -1382,6 +1399,33 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
   programas de podcast já visitados, para o atalho "Seus podcasts":
   `{title, artist, artwork, feedUrl, collectionId, addedAt}` (máx. 24). Só ponteiros — nenhum
   áudio. A nuvem é adotada como em `videos[]`, então **remover um programa propaga**.
+- **`livros[]`** (core.js, localStorage `el-livros`, **sincronizado** em `data/livros`) — a
+  ESTANTE. O arquivo do livro nunca entra aqui (fica no `BookDB`, no IndexedDB); só o que é
+  leve e precisa viajar. Campos do leitor: `{id, title, author, lang, format, cover, chapters[],
+  totalWords, totalChars, pos:{cap,frac}, progress, notes[], minutos, addedAt, updatedAt,
+  lastOpen}`.
+  - **Campos do gerenciador (2026-08-20, §8.53):**
+    - **`kind`** — `'arquivo'` (epub/cbz/txt, progresso medido pelo leitor) ou **`'fisico'`**
+      (papel ou e-book de fora, progresso digitado). ⚠️ **Nenhuma tela lê `progress` direto**:
+      tudo passa por `estPct()`/`estPaginas()`, que sabem a diferença.
+    - **`status`** — `quero | lendo | lido | parado`. Cuida-se sozinho (abrir vira "lendo",
+      100% vira "lido"), **menos `parado`**, que é decisão humana e nunca é sobrescrita.
+    - **`historico[]`** — `{d:'YYYY-MM-DD', pct, delta, pag, deltaPag, ts}`, **uma entrada por
+      dia por livro**, com o `delta` medido contra o fim do último dia anterior. É a base do
+      calendário, da sequência, da meta diária e da previsão de término. Teto de 400 dias e
+      frações arredondadas a 4 casas — o documento do Firestore tem teto de 1 MB (medido: 89
+      bytes por dia; 20 livros × 40 dias = 70 KB).
+    - `paginas` / `pagAtual` — total e página atual (livro físico). Sem `paginas`, o app estima
+      por `totalWords / 300` e **diz na tela que é estimativa** (aferido: *Billy Summers* tem
+      164.394 palavras e 528 páginas impressas = 311 por página).
+    - Catálogo e organização: `genero, editora, ano, isbn, serie, serieNum, tags[], resumo,
+      coverUrl, nota (0–5), inicio, fim, anoFim`.
+    - **`demo: true`** — item do acervo de exemplo, removível em um clique. Sem essa marca o
+      exemplo viraria lixo permanente num acervo que **sincroniza**.
+  - **Merge na nuvem (firebase.js):** por livro, pelo `updatedAt` — e o **`historico` é a
+    exceção dentro da exceção**: ele se UNE por dia, nunca se escolhe. Ler no celular na segunda
+    e no notebook na terça não pode apagar a segunda-feira do calendário.
+- **`cfg.estante`** — `{metaPag, metaLivros}`: a meta diária de páginas e a de livros no ano.
 
 ### Onde cada coisa é persistida
 - **localStorage:** `cfg` (`englab_cfg`), `words`, `srsCfg`, `srsLog`, `srsDecks`, filas Kindle.
@@ -1565,6 +1609,24 @@ maxInterval (36500), leechThreshold (50)
   régua de falas, PT legenda/PT IA com névoa, Explicar, marcadores, estudo focado, ditado,
   shadowing e card com o áudio real. Só o cabeçalho muda: podcast troca "Buscar legenda"
   (addons, que não indexam podcast) por **"Criar legenda com IA"** e ganha **"Liberar espaço"**.
+- **Ler** (id `ler`, `js/estante.js` + `js/ler.js`, LAZY) — **duas coisas numa seção só**:
+  o GERENCIADOR do acervo e o LEITOR.
+  - **Estante** (`estanteRender`) — busca por título/autor/série/etiqueta, abas de status
+    (Todos/Lendo/Quero ler/Lido/Parado) com contagem, filtro por tipo (EPUB/Mangá/Físico/Texto),
+    ordenação (aberto por último, título, autor, progresso, nota, adicionado) e vista em
+    **grade ou lista** — as duas últimas guardadas por aparelho, não no acervo.
+  - **Ficha do livro** — capa, metadados, nota em estrelas, status em um clique, e quatro abas:
+    *Sobre* (dados + previsão de término pelo ritmo real), *Progresso* (o histórico dia a dia,
+    com gráfico e apagar-dia), *Capturas* (o vocabulário que saiu DAQUELE livro, casado por
+    `obraNome`) e *Notas*.
+  - **Cadastrar livro sem arquivo** — o de papel, o e-book de fora, o que ainda quer ler.
+    Busca de catálogo por ISBN ou título preenchendo tudo: **Google Books e, quando ele estoura
+    a cota, Open Library** (ver §8.53). Progresso por página, registrado à mão.
+  - **Leitura em números** — páginas hoje/7/30 dias, sequência, calendário mensal em mapa de
+    calor, meta diária de páginas e meta de livros no ano, concluídos do ano.
+  - **Leitor** (`js/ler.js`) — tipografia de descanso, virar página ou rolar, seleção que já
+    traz a tradução, captura, cobertura. Ao gravar a posição ele **anota o avanço do dia
+    sozinho** (`estanteMarcarAvanco`): quem lê EPUB não digita nada.
 - **Configurações** — Aparência (temas), IA (provider/modelo/chave/TTS), n8n, Firebase, Dados
   locais (exportar/importar/limpar), Manutenção de áudio.
 
@@ -11460,6 +11522,80 @@ grupo, só como uma lista com palavras maiúsculas no meio.
 - **No rail**, recuo e linha guia são desligados: o item vira só o ícone centrado, e o recuo o
   empurraria para fora da coluna.
 
+## 8.53 A estante virou um gerenciador de livros (2026-08-20, 5ª)
+
+**O pedido:** *"que tal criarmos um gerenciador de livros completo aqui dentro? no github tem um
+projeto com tudo montado."* O projeto é o **`Djemeson/gerenciador-de-livros`** (público, 1 arquivo
+HTML de 1.148 linhas, 56 PRs, último push em 2025-08-20) — nunca publicado: **sem GitHub Pages e
+sem projeto na Vercel**, o que significa que os dados dele, se existirem, estão no `localStorage`
+de algum `localhost` no Chrome dele. Tentei alcançá-los subindo um servidor nas portas comuns; o
+modo automático barrou. Ficou como pendência, com **importador de colar-e-pronto** já feito.
+
+### O que veio de lá, o que já existia aqui
+
+| | O gerenciador dele | A estante daqui (antes) |
+|---|---|---|
+| Acervo | status quero/lendo/lido, gênero, tipo, ISBN | capa, título, autor |
+| Progresso | páginas digitadas, histórico por dia | fração medida pelo leitor |
+| Números | calendário, meta diária/semanal, meta anual | nenhum |
+| Catálogo | busca por ISBN no Google Books | nada |
+| Leitura | **não lê o livro** | leitor de EPUB completo |
+
+A síntese é o ponto: **quem tem EPUB não digita nada** — `_lerGravarPendente` chama
+`estanteMarcarAvanco()` e o dia é anotado sozinho. Livro de papel entra pelo cadastro manual e
+convive na mesma estante, com selo "Físico" (decisão dele: *"o físico pode ser em ler, mas com
+uma tag físico"*).
+
+### As três coisas que só o teste ao vivo pegou
+
+1. **A ficha estourava 265px numa tela de 375.** Causa: `1fr` é atalho de `minmax(auto,1fr)`, e o
+   `auto` faz a coluna crescer até o **min-content** do conteúdo — a grade de dados pedia
+   4×140px + gaps = **626px**, medidos. Virou `minmax(0,1fr)` na ficha e `min(140px,100%)` nas
+   grades internas. Depois: **0 de overflow** em estante, ficha (4 abas), painel e formulário,
+   a 375px e a 1536px.
+2. **Marcar "lido" creditava o livro inteiro como leitura de hoje.** Um livro de 352 páginas
+   marcado como concluído punha 352 páginas no calendário de um dia em que ninguém leu. Entrou
+   o `semCredito` em `estRegistrar`: a POSIÇÃO avança, o crédito do dia não. Vale também para o
+   cadastro que já nasce com página atual. Medido: páginas de hoje 39 → 39 (marcar lido) → 39
+   (cadastro com 150 páginas) → 239 (progresso real de +200).
+3. **O Google Books devolveu HTTP 429** — *"Quota exceeded ... per day"*. Sem chave, a cota é
+   compartilhada e estoura no meio do dia. Um app que dissesse "sem internet" ali mandaria o
+   usuário reiniciar o roteador. Agora o 429 é reconhecido pelo nome e a busca **cai sozinha na
+   Open Library**, que respondeu 200 com capa, páginas e ano; o resumo vem numa segunda
+   requisição **só depois de ele escolher o livro** — buscar a sinopse dos seis resultados seria
+   pagar por cinco que ele descarta.
+
+### Olhar para o horizonte — o que a varredura mudou além do pedido
+
+- **O documento da nuvem tem teto de 1 MB** e o histórico sincroniza junto. Frações cruas
+  (`0.5683333333333331`) e teto de 900 dias por livro chegariam lá. Arredondado a 4 casas e
+  cortado em 400 dias: **89 bytes por dia medidos**, projeção de **70 KB** para 20 livros com
+  40 dias cada.
+- **O merge entre aparelhos apagaria dias de leitura.** O merge de livros escolhe o objeto com
+  `updatedAt` maior — e o perdedor podia ter dias que o vencedor nunca viu. O `historico` passou
+  a ser **unido por dia** dentro do merge. Testado: 8 dias locais + 2 dias "da nuvem" com a nuvem
+  vencendo → **nenhum dia perdido**.
+- **Páginas estimadas foram aferidas, não chutadas.** 250 palavras/página (padrão de manuscrito)
+  dava 658 páginas para *Billy Summers*, 25% a mais que as 528 da edição impressa. Com 300, dá
+  548 — erro de 4%.
+- **`.ic-3xs` e `.ic-fill` não existiam** e eu já os estava usando; entraram junto dos ícones
+  novos (`star`, `grid`, `list`, `chart`, `calendar`, `tag`).
+
+### Testado ao vivo (regra nº 5)
+
+Com o **EPUB real do Billy Summers**: importado pelo app (35 capítulos, 164.394 palavras),
+aberto, avançado até o capítulo 7 — status virou "lendo" sozinho e o dia foi anotado com
+**26 páginas, 3,9%**. Acervo de exemplo (8 livros com histórico plausível) conferido item a
+item: `pct` do livro bate com o último registro do histórico em todos. Telas conferidas no
+Chrome dele a 1536px e no painel embutido a 375px. Console sem erro de JS.
+
+### Pendência que ficou de propósito
+
+**O audiobook não entrou.** Ele quer *"uma seção sua, e vamos construir um reprodutor"* — é uma
+fatia inteira (player, capítulos, velocidade, posição sincronizada), não um campo a mais no
+cadastro. Ficaria pela metade se entrasse aqui, então o formulário **não oferece "Audiobook"**:
+prometer na tela o que não existe é pior que a ausência.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -11489,6 +11625,27 @@ grupo, só como uma lista com palavras maiúsculas no meio.
 - [ ] **`badge-mais-mob` é código morto** — o badge da gaveta do celular existe no HTML e nunca
       é atualizado por ninguém. Hoje é inofensivo (nenhuma seção da gaveta tem contador), mas se
       alguma passar a ter, o número não vai aparecer. Remover ou ligar.
+
+- [ ] **O AUDIOBOOK AINDA NÃO TEM CASA** (aberto em 2026-08-20, §8.53). Ele pediu **seção
+      própria com reprodutor** — *"estamos criando uma suíte de aprendizado multimídia de
+      inglês"*. Não entrou nesta rodada porque é fatia inteira: player, capítulos, velocidade,
+      posição sincronizada entre aparelhos, e o arquivo (que é grande) no `BookDB`/Storage. O
+      caminho mais curto **já existe montado**: o pacote de Vídeo/Podcast (`video*.js`) já toca
+      áudio, guarda posição, faz legenda por IA e baixa episódio — um audiobook é um podcast com
+      capítulos. ⚠️ Enquanto não existir, o cadastro da estante **não oferece "Audiobook"** de
+      propósito.
+- [ ] **OS DADOS DO APP ANTIGO NUNCA FORAM ALCANÇADOS** (aberto em 2026-08-20, §8.53). O
+      `gerenciador-de-livros` nunca foi publicado (sem Pages, sem Vercel), então o acervo dele —
+      se existe — está no `localStorage` de algum `localhost:PORTA` no Chrome dele. Subir um
+      servidor nas portas comuns para alcançá-lo foi **barrado pelo classificador do modo
+      automático**. O importador já está pronto na estante ("Trazer acervo de outro app"): basta
+      ele abrir o app antigo e rodar `copy(localStorage.getItem('livros'))`. **Só falta saber se
+      há algo lá.**
+- [ ] **A CAPA VINDA DO CATÁLOGO É URL, não arquivo** (2026-08-20, §8.53). Livro cadastrado à
+      mão guarda `coverUrl` apontando para o Google/Open Library — **offline ela não aparece** e,
+      se o serviço tirar a imagem do ar, some. Baixar e converter para miniatura (como o EPUB
+      faz) esbarra em CORS: o canvas fica "tainted" e o `toDataURL` falha. Caminho, se incomodar:
+      buscar o binário e guardar o blob no `BookDB` sob `capa:<id>`.
 
 ### Decisões em aberto (com o levantamento já feito)
 

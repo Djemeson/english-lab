@@ -1658,9 +1658,13 @@ select option{background:var(--surface)}
 /* ---- Ícones SVG inline ---- */
 .ic{width:18px;height:18px;display:inline-block;vertical-align:-.18em;
   stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.ic-3xs{width:12px;height:12px;stroke-width:2.2}
 .ic-sm{width:15px;height:15px}
 .ic-lg{width:22px;height:22px}
 .ic-xl{width:40px;height:40px;stroke-width:1.6}
+/* Pinta o miolo do desenho. Serve à estrela cheia da nota: vazia e cheia
+   precisam ser o MESMO traçado, senão a fileira dança ao mudar a avaliação. */
+.ic-fill{fill:currentColor}
 .btn .ic{width:16px;height:16px}
 .tab .ic{width:16px;height:16px}
 
@@ -4725,6 +4729,338 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ler-vazio-dica{
   margin-top:18px;font-size:var(--fs-sm);color:var(--text2);line-height:1.65;
   border-left:2px solid rgba(var(--primary-rgb),.4);padding-left:14px;
+}
+
+/* ================================================================
+   ESTANTE 2.0 — O GERENCIADOR DO ACERVO  (2026-08-20)
+   ================================================================
+   A grade de capas continua sendo `.ler-estante`/`.ler-card` (o leitor
+   depende dela); o que entra aqui é a moldura em volta — barra de busca,
+   filtros, lista, ficha, formulário e o painel de números.
+
+   ⚠️ A COR DIZ O STATUS, e ela vem do JS por `--st`: a barra de progresso do
+   card, o selo da linha e o topo da ficha usam o MESMO valor. Escrever a cor
+   à mão em qualquer um dos três faria o dia em que "lendo" mudar de cor
+   deixar dois lugares para trás.
+   ================================================================ */
+
+/* ---- barra: busca + ordenação + vista ---- */
+.est-barra{display:flex;gap:12px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.est-busca{
+  flex:1;min-width:240px;display:flex;align-items:center;gap:8px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-pill);
+  padding:0 14px;height:40px;color:var(--text3);
+}
+.est-busca:focus-within{border-color:rgba(var(--primary-rgb),.55)}
+.est-busca input{
+  flex:1;background:none;border:0;outline:none;color:var(--text);
+  font-size:var(--fs-sm);font-family:inherit;height:100%;
+}
+.est-busca-x{background:none;border:0;color:var(--text3);cursor:pointer;display:flex;padding:2px}
+.est-busca-x:hover{color:var(--text)}
+.est-barra-dir{display:flex;gap:8px;align-items:center}
+.est-select{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-pill);
+  color:var(--text2);font-size:var(--fs-xs);font-family:inherit;height:40px;padding:0 12px;cursor:pointer;
+}
+.est-visual{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-pill);padding:3px}
+.est-visual button{
+  background:none;border:0;color:var(--text3);cursor:pointer;
+  width:34px;height:32px;border-radius:var(--radius-pill);display:flex;align-items:center;justify-content:center;
+}
+.est-visual button.on{background:var(--surface3);color:var(--text)}
+
+/* ---- filtros ---- */
+.est-filtros{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:22px}
+.est-abas{display:flex;gap:2px;flex-wrap:wrap}
+.est-aba{
+  background:none;border:0;border-bottom:2px solid transparent;cursor:pointer;
+  color:var(--text3);font-size:var(--fs-sm);font-family:inherit;padding:7px 12px;
+  display:flex;align-items:center;gap:6px;
+}
+.est-aba:hover{color:var(--text2)}
+.est-aba.on{color:var(--text);border-bottom-color:var(--primary);font-weight:600}
+.est-aba-n{
+  background:var(--surface2);color:var(--text3);font-size:var(--fs-3xs);
+  padding:1px 6px;border-radius:var(--radius-pill);
+}
+.est-aba.on .est-aba-n{background:rgba(var(--primary-rgb),.2);color:var(--text)}
+.est-chips{display:flex;gap:6px;flex-wrap:wrap}
+.est-chip{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-pill);
+  color:var(--text3);font-size:var(--fs-xs);font-family:inherit;padding:5px 12px;cursor:pointer;
+}
+.est-chip:hover{color:var(--text2);border-color:var(--border-strong)}
+.est-chip.on{background:rgba(var(--primary-rgb),.18);border-color:rgba(var(--primary-rgb),.5);color:var(--text)}
+
+/* ---- selos e estrelas ---- */
+.est-selo{
+  display:inline-flex;align-items:center;gap:4px;
+  background:var(--surface2);border-radius:var(--radius-pill);
+  font-size:var(--fs-3xs);color:var(--text2);padding:2px 8px;
+}
+.ler-capa .est-selo{position:absolute;left:6px;top:6px;background:rgba(0,0,0,.66);color:#fff}
+.est-selo.fisico{color:#fff}
+.est-selo.manga{background:rgba(0,0,0,.66);color:#fff}
+.est-selo.tag{color:var(--text3)}
+.est-status{
+  display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-3xs);
+  color:var(--st);background:color-mix(in srgb,var(--st) 15%,transparent);
+  border:1px solid color-mix(in srgb,var(--st) 35%,transparent);
+  border-radius:var(--radius-pill);padding:2px 9px;white-space:nowrap;
+}
+.est-estrelas{display:inline-flex;gap:2px;color:var(--text3);line-height:1}
+.est-estrelas i.on{color:var(--role-energia)}
+.est-estrelas.clic i{cursor:pointer;padding:2px}
+.est-estrelas.clic i:hover{color:var(--role-energia);transform:scale(1.15)}
+.est-card-nota{margin-top:4px}
+
+/* ---- lista ---- */
+.est-lista{display:flex;flex-direction:column;gap:2px}
+.est-linha{
+  display:flex;align-items:center;gap:14px;padding:10px 12px;cursor:pointer;
+  border-radius:var(--radius-sm);border:1px solid transparent;
+}
+.est-linha:hover{background:var(--surface);border-color:var(--border)}
+.est-linha-capa{
+  width:38px;height:56px;flex-shrink:0;border-radius:var(--radius-xs);overflow:hidden;
+  background:var(--surface2);border:1px solid var(--border);position:relative;
+}
+.est-linha-capa .ler-capa-fake{padding:3px}
+.est-linha-capa .ler-capa-fake span{font-size:8px;line-height:1.15}
+.est-linha-capa .est-selo{display:none}
+.est-linha-meio{flex:1;min-width:0}
+.est-linha-nome{
+  font-size:var(--fs-sm);font-weight:600;color:var(--text);
+  display:flex;align-items:center;gap:8px;
+}
+.est-linha-nome .est-selo{position:static;background:var(--surface2);color:var(--text3)}
+.est-linha-sub{font-size:var(--fs-xs);color:var(--text3);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.est-linha-barra{margin-top:7px;height:3px;border-radius:2px;background:var(--surface2);overflow:hidden;max-width:320px}
+.est-linha-barra i{display:block;height:100%}
+.est-linha-dir{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+.est-linha-pct{font-size:var(--fs-3xs);color:var(--text3)}
+.est-linha-acoes{flex-shrink:0}
+
+/* ---- estados vazios ---- */
+.est-nada{
+  text-align:center;padding:44px 20px;color:var(--text3);
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.est-nada p{font-size:var(--fs-sm)}
+.est-dica{font-size:var(--fs-xs);color:var(--text3);line-height:1.6}
+.est-erro{color:var(--error)}
+.est-vazio-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;justify-content:center}
+
+/* ---- ficha ---- */
+/* ⚠️ `minmax(0,1fr)` E NÃO `1fr`. `1fr` é atalho de `minmax(auto,1fr)`, e o
+   `auto` faz a coluna crescer até o min-content do que está dentro — foi assim
+   que a grade de dados da ficha (4 colunas de 140px) esticou a coluna para
+   626px e a tela de 375 passou a rolar de lado. Com o mínimo em zero, quem
+   manda é o container, e o conteúdo se vira. */
+.est-ficha{display:grid;grid-template-columns:210px minmax(0,1fr);gap:34px;align-items:start}
+.est-ficha-lado{display:flex;flex-direction:column;gap:12px;position:sticky;top:20px}
+.est-ficha-capa{
+  aspect-ratio:2/3;border-radius:var(--radius-sm);overflow:hidden;position:relative;
+  background:var(--surface2);border:1px solid var(--border);box-shadow:var(--shadow);
+}
+.est-ficha-capa .est-selo{display:none}
+.est-ficha-status{display:flex;gap:5px;flex-wrap:wrap}
+.est-ficha-nota{display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);color:var(--text3)}
+.est-ficha-mini{display:flex;gap:6px}
+.est-ficha-topo h2{font-size:var(--fs-xl);font-weight:700;color:var(--text);line-height:1.25}
+.est-ficha-autor{font-size:var(--fs-sm);color:var(--text2);margin-top:4px}
+.est-ficha-selos{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.est-ficha-prog{margin:22px 0}
+.est-ficha-prog-topo{display:flex;align-items:baseline;gap:10px;margin-bottom:7px}
+.est-ficha-prog-topo b{font-size:var(--fs-lg);color:var(--text)}
+.est-ficha-prog-topo span{font-size:var(--fs-xs);color:var(--text3)}
+.est-ficha-barra{height:6px;border-radius:3px;background:var(--surface2);overflow:hidden}
+.est-ficha-barra i{display:block;height:100%;transition:width .3s}
+.est-abas-ficha{border-bottom:1px solid var(--border);margin-bottom:20px}
+.est-resumo{font-size:var(--fs-sm);color:var(--text2);line-height:1.7;margin-bottom:20px}
+/* Duas correções na mesma linha:
+   1. `auto-fit` com teto — numa tela de 1536px o `auto-fill` abria seis colunas
+      e os dados nadavam em espaço vazio.
+   2. `min(140px,100%)` no lugar de `140px` — MEDIDO: com o mínimo fixo, o grid
+      exigia 4×140 + gaps = 626px de largura mínima, e a ficha inteira estourava
+      265px numa tela de 375. `1fr` respeita o min-content da coluna, então um
+      mínimo em pixels vira um piso que a tela pequena não consegue honrar. */
+.est-dados{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(140px,100%),1fr));gap:16px 22px;max-width:780px}
+.est-dado{display:flex;flex-direction:column;gap:2px}
+.est-dado span{font-size:var(--fs-3xs);color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+.est-dado b{font-size:var(--fs-sm);color:var(--text);font-weight:600}
+.est-previsao{
+  margin-top:22px;padding:12px 14px;border-radius:var(--radius-sm);
+  background:rgba(var(--primary-rgb),.09);border:1px solid rgba(var(--primary-rgb),.22);
+  font-size:var(--fs-sm);color:var(--text2);line-height:1.6;
+  display:flex;gap:9px;align-items:flex-start;
+}
+.est-previsao b{color:var(--text)}
+
+/* ---- histórico ---- */
+.est-hist-graf{
+  display:flex;align-items:flex-end;gap:3px;height:70px;margin-bottom:20px;
+  padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+}
+.est-hist-graf i{flex:1;min-width:3px;background:var(--primary);border-radius:2px 2px 0 0;opacity:.8}
+.est-hist-graf i:hover{opacity:1}
+.est-hist{display:flex;flex-direction:column}
+.est-hist-linha{
+  display:grid;grid-template-columns:70px 1fr 90px 24px;gap:10px;align-items:center;
+  padding:7px 4px;border-bottom:1px solid var(--border);font-size:var(--fs-xs);
+}
+.est-hist-d{color:var(--text2)}
+.est-hist-p{color:var(--text3)}
+.est-hist-delta{color:var(--role-dominio);text-align:right}
+.est-hist-x{background:none;border:0;color:var(--text3);cursor:pointer;opacity:0;display:flex;padding:2px}
+.est-hist-linha:hover .est-hist-x{opacity:1}
+.est-hist-x:hover{color:var(--error)}
+
+/* ---- capturas e notas ---- */
+.est-cap-resumo{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.est-cap-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr));gap:8px}
+.est-cap{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:9px 12px;display:flex;flex-direction:column;gap:2px;
+}
+.est-cap b{font-size:var(--fs-sm);color:var(--text)}
+.est-cap span{font-size:var(--fs-xs);color:var(--text3)}
+.est-notas-nova{display:flex;flex-direction:column;gap:8px;align-items:flex-start;margin-bottom:20px}
+.est-notas-nova textarea,.est-form textarea,.est-form input,.est-form select{
+  width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text);font-family:inherit;font-size:var(--fs-sm);padding:10px 12px;resize:vertical;
+}
+.est-notas-nova textarea:focus,.est-form input:focus,.est-form textarea:focus,.est-form select:focus{
+  outline:none;border-color:rgba(var(--primary-rgb),.55)
+}
+.est-notas{display:flex;flex-direction:column;gap:10px}
+.est-nota{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px}
+.est-nota p{font-size:var(--fs-sm);color:var(--text);line-height:1.6;white-space:pre-wrap}
+.est-nota-pe{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.est-nota-pe span{font-size:var(--fs-3xs);color:var(--text3)}
+.est-nota-pe button{background:none;border:0;color:var(--text3);cursor:pointer;display:flex;padding:2px}
+.est-nota-pe button:hover{color:var(--error)}
+
+/* ---- formulário ---- */
+.est-form{max-width:820px}
+.est-form h2{font-size:var(--fs-lg);font-weight:700;color:var(--text);margin-bottom:4px}
+.est-form>.est-dica{margin-bottom:22px}
+.est-gb{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:14px;margin-bottom:24px;
+}
+.est-gb-busca{display:flex;align-items:center;gap:10px;color:var(--text3)}
+.est-gb-busca input{
+  flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text);font-family:inherit;font-size:var(--fs-sm);padding:9px 12px;outline:none;
+}
+.est-gb-res{display:flex;flex-direction:column;gap:4px;margin-top:12px}
+.est-gb-item{
+  display:flex;align-items:center;gap:12px;text-align:left;cursor:pointer;
+  background:none;border:1px solid transparent;border-radius:var(--radius-sm);padding:8px;
+}
+.est-gb-item:hover{background:var(--surface2);border-color:var(--border)}
+.est-gb-item img{width:34px;height:50px;object-fit:cover;border-radius:var(--radius-xs);flex-shrink:0}
+.est-gb-sem{
+  width:34px;height:50px;display:flex;align-items:center;justify-content:center;
+  background:var(--surface2);border-radius:var(--radius-xs);color:var(--text3);flex-shrink:0;
+}
+.est-gb-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.est-gb-txt b{font-size:var(--fs-sm);color:var(--text)}
+.est-gb-txt i{font-size:var(--fs-xs);color:var(--text3);font-style:normal}
+.est-form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.est-campo{display:flex;flex-direction:column;gap:5px}
+.est-campo>span{font-size:var(--fs-3xs);color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+.est-campo.w2{grid-column:span 2}
+.est-campo.w4{grid-column:span 4}
+.est-form-acoes{display:flex;gap:10px;justify-content:flex-end;margin-top:26px}
+.est-prog-campos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.est-code{
+  display:block;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:10px 12px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:var(--fs-xs);
+  color:var(--role-novo);user-select:all;word-break:break-all;
+}
+
+/* ---- painel de números ---- */
+.est-metricas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:14px;margin-bottom:24px}
+.est-metrica{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:16px 18px;display:flex;flex-direction:column;gap:6px;
+}
+.est-metrica-rot{font-size:var(--fs-3xs);color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
+.est-metrica b{font-size:var(--fs-2xl);font-weight:700;color:var(--text);line-height:1;display:flex;align-items:baseline;gap:6px}
+.est-metrica b i{font-size:var(--fs-xs);font-weight:400;font-style:normal;color:var(--text3)}
+.est-metrica-barra{height:3px;border-radius:2px;background:var(--surface2);overflow:hidden}
+.est-metrica-barra i{display:block;height:100%;background:var(--role-energia)}
+.est-metrica-pe{font-size:var(--fs-3xs);color:var(--text3)}
+.est-painel-grade{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.est-bloco{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:18px 20px;
+}
+.est-bloco.w2{grid-column:span 2}
+.est-bloco-topo{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.est-bloco-topo h3{font-size:var(--fs-sm);font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
+.est-cal-nav{display:flex;gap:2px}
+.est-cal-nav button{
+  background:none;border:0;color:var(--text3);cursor:pointer;padding:4px 6px;
+  border-radius:var(--radius-xs);display:flex;
+}
+.est-cal-nav button:hover{background:var(--surface2);color:var(--text)}
+/* ⚠️ TETO DE LARGURA, senão o calendário vira cartaz: com `aspect-ratio:1`
+   numa coluna de 590px cada dia ficava com 80px de lado e o bloco vizinho
+   ficava com um vão vazio do mesmo tamanho. Ele é um mapa de calor, não a
+   agenda da parede. */
+.est-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;max-width:330px}
+.est-cal-cab{font-size:var(--fs-3xs);color:var(--text3);text-align:center;padding-bottom:4px}
+.est-cal-vazio{aspect-ratio:1}
+.est-cal-dia{
+  aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  border-radius:var(--radius-xs);font-size:var(--fs-3xs);color:var(--text3);
+  background:var(--surface2);cursor:default;
+}
+.est-cal-dia.n1{background:rgba(var(--primary-rgb),.28);color:var(--text2)}
+.est-cal-dia.n2{background:rgba(var(--primary-rgb),.48);color:#fff}
+.est-cal-dia.n3{background:rgba(var(--primary-rgb),.70);color:#fff}
+.est-cal-dia.n4{background:rgba(var(--primary-rgb),.95);color:#fff}
+.est-cal-dia.hoje{outline:1.5px solid var(--role-energia);outline-offset:1px}
+.est-meta{margin-bottom:20px}
+.est-meta:last-child{margin-bottom:0}
+.est-meta-lin{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.est-meta-lin span{font-size:var(--fs-sm);color:var(--text2)}
+.est-meta-lin input{
+  width:76px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-xs);
+  color:var(--text);font-family:inherit;font-size:var(--fs-sm);padding:5px 8px;text-align:right;
+}
+.est-meta .est-dica{margin-top:7px}
+.est-mini{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:14px}
+.est-mini .ler-card-nome{font-size:var(--fs-xs)}
+.est-mini .ler-card-x{display:none}
+.est-painel-pe{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;justify-content:center}
+
+/* ---- telas estreitas ---- */
+@media (max-width:900px){
+  .est-ficha{grid-template-columns:minmax(0,1fr);gap:22px}
+  /* ⚠️ NADA DE `flex-direction:row` AQUI. Tentei pôr capa e ações lado a lado
+     e a ficha passou a estourar 265px numa tela de 375: o botão principal tem
+     `width:100%`, que numa linha flex vira a largura INTEIRA da ficha, e a
+     capa de 120px é somada a isso. Empilhado, a capa só encolhe e centraliza. */
+  .est-ficha-lado{position:static;flex-direction:column;align-items:stretch}
+  .est-ficha-capa{width:150px;align-self:center}
+  .est-painel-grade{grid-template-columns:1fr}
+  .est-bloco.w2{grid-column:span 1}
+  .est-form-grid{grid-template-columns:repeat(2,1fr)}
+  .est-campo.w4{grid-column:span 2}
+}
+@media (max-width:640px){
+  .est-barra-dir{width:100%;justify-content:space-between}
+  .est-busca{min-width:100%}
+  .est-linha-acoes{display:none}
+  .est-linha-dir .est-estrelas{display:none}
+  .est-form-grid{grid-template-columns:1fr}
+  .est-campo.w2,.est-campo.w4{grid-column:span 1}
+  .est-prog-campos{grid-template-columns:1fr}
 }
 
 /* ---- leitor: a moldura ocupa a tela toda ---- */

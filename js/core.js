@@ -671,6 +671,15 @@ const ICONS = {
   chevronLeft:'<path d="m15 18-6-6 6-6"/>',
   chevronRight:'<path d="m9 18 6-6-6-6"/>',
   chevronDown:'<path d="m6 9 6 6 6-6"/>',
+  // ── Vocabulário da ESTANTE (2026-08-20). `star` é o único que se pinta por
+  //    dentro (`.ic-fill`): estrela vazada e estrela cheia precisam ser o
+  //    MESMO desenho, senão a fileira de notas dança ao passar o mouse.
+  star:'<polygon points="12 2.6 15.1 9 22 9.9 17 14.7 18.2 21.5 12 18.3 5.8 21.5 7 14.7 2 9.9 8.9 9"/>',
+  grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  list:'<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>',
+  chart:'<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="21" x2="21" y2="21"/>',
+  calendar:'<rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="16" y1="2.5" x2="16" y2="6.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  tag:'<path d="M20.6 13.4 12 22l-9-9V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.4" cy="7.4" r="1.3"/>',
 }
 function ic(name, extra) {
   const inner = ICONS[name]; if (!inner) return ''
@@ -1033,7 +1042,10 @@ const _LAZY = {
   // ler = PACOTE, e a ORDEM importa: epub.js traz o leitor de ZIP; manga.js o
   // usa e é chamado por ler.js, que monta a tela. CBZ entra por esta mesma
   // porta — mangá é uma obra da estante, não uma seção à parte.
-  ler: ['js/epub.js', 'js/manga.js', 'js/ler.js'],
+  // `estante.js` vem ANTES de ler.js de propósito: é ele que desenha a tela
+  // inicial da seção, e ler.js apenas o chama. Invertido, a primeira pintura
+  // da estante dependeria de um arquivo ainda em voo.
+  ler: ['js/epub.js', 'js/manga.js', 'js/estante.js', 'js/ler.js'],
   // revisar = SRS (study.js); estudar = os dossiês (dossie.js). Ver o mapa
   // acima de SECTIONS antes de mexer: os nomes trocaram de lugar.
   revisar: 'js/study.js', biblioteca: 'js/study.js',

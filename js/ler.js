@@ -61,54 +61,15 @@ function renderLerSection() {
   }
   document.body.classList.remove('lendo')
   const area = el('ler-area'); if (!area) return
-  const acoes = el('ler-ph-actions')
-  if (acoes) {
-    acoes.innerHTML = livros.length
-      ? `<button class="btn btn-primary btn-sm" onclick="lerEscolherArquivo()">${ic('plus','ic-sm')} Adicionar livro</button>`
-      : ''
-  }
   const hdr = el('ler-header'); if (hdr) hdr.style.display = ''
 
-  if (!livros.length) {
-    area.innerHTML = `
-      <div class="upload-area ler-drop" id="ler-drop"
-           ondragover="event.preventDefault();this.classList.add('drag')"
-           ondragleave="this.classList.remove('drag')"
-           ondrop="this.classList.remove('drag');lerImportar(event.dataTransfer.files)"
-           onclick="lerEscolherArquivo()">
-        <div class="upload-icon">${ic('book','ic-xl')}</div>
-        <p><strong>Clique</strong> ou arraste um livro aqui</p>
-        <p>.epub · .cbz (mangá) · .txt · .html — o arquivo fica neste aparelho, não sobe para a nuvem</p>
-      </div>
-      <div class="ler-vazio-dica">
-        <b>De onde tirar livros em inglês, de graça e legalmente:</b>
-        Project Gutenberg (domínio público, 70 mil títulos), Standard Ebooks (os mesmos
-        clássicos, bem diagramados) e qualquer <i>.epub</i> que você já tenha comprado sem DRM.
-      </div>`
-    return
-  }
-
-  const cards = livros
-    .slice().sort((a, b) => (b.lastOpen || b.addedAt || 0) - (a.lastOpen || a.addedAt || 0))
-    .map(l => {
-      const pct = Math.round((l.progress || 0) * 100)
-      const capa = l.cover
-        ? `<img class="ler-capa-img" src="${l.cover}" alt="">`
-        : `<div class="ler-capa-fake"><span>${esc((obraNome(l.title) || '?').slice(0, 28))}</span></div>`
-      return `
-      <div class="ler-card" onclick="lerAbrir('${l.id}')" data-tip="${escA(l.author || '')}">
-        <div class="ler-capa">${capa}
-          ${pct > 0 ? `<span class="ler-capa-pct">${pct}%</span>` : ''}
-        </div>
-        <div class="ler-card-nome">${esc(obraNome(l.title) || 'Sem título')}</div>
-        <div class="ler-card-autor">${esc(l.author || '')}</div>
-        <div class="ler-card-barra"><i style="width:${pct}%"></i></div>
-        <button class="ler-card-x" title="Remover da estante"
-                onclick="event.stopPropagation();lerExcluir('${l.id}')">${ic('trash','ic-sm')}</button>
-      </div>`
-    }).join('')
-
-  area.innerHTML = `<div class="ler-estante">${cards}</div>`
+  // A ESTANTE MUDOU DE CASA (2026-08-20). Deixou de ser uma grade de capas e
+  // virou o gerenciador do acervo — busca, filtros, ficha, cadastro de livro
+  // sem arquivo, calendário de leitura. Tudo isso mora em `js/estante.js`,
+  // que carrega no mesmo pacote lazy desta seção e ANTES deste arquivo.
+  if (typeof estanteRender === 'function') { estanteRender(); return }
+  area.innerHTML = `<div class="est-nada"><p>A estante não carregou.
+    Recarregue a página — se insistir, o arquivo <code>js/estante.js</code> não chegou.</p></div>`
 }
 
 function lerEscolherArquivo() {
@@ -194,7 +155,12 @@ async function _lerImportarUm(file) {
     totalWords: meta.chapters.reduce((s, c) => s + (c.words || 0), 0),
     totalChars: meta.chapters.reduce((s, c) => s + (c.chars || 0), 0),
     pos: { cap: 0, frac: 0 }, progress: 0, notes: [],
-    minutos: 0, addedAt: Date.now(), updatedAt: Date.now(), lastOpen: 0
+    minutos: 0, addedAt: Date.now(), updatedAt: Date.now(), lastOpen: 0,
+    // Campos do gerenciador (2026-08-20). Nascem preenchidos para o livro novo
+    // não depender da migração — que existe para o acervo que já estava aqui.
+    kind: 'arquivo', status: 'quero', historico: [], tags: [], nota: 0,
+    paginas: 0, pagAtual: 0, genero: '', editora: '', isbn: '', ano: '',
+    serie: '', serieNum: '', resumo: '', coverUrl: '', inicio: null, fim: null
   })
   toast(`"${meta.title}" entrou na estante`, 'success')
   // O NOME LIMPO SE RESOLVE NA ENTRADA, não num botão lá adiante.
@@ -242,7 +208,10 @@ async function lerExcluir(id) {
   const l = livroPorId(id); if (!l) return
   if (!(await confirmModal({
     title: 'Remover da estante', icon: 'trash', confirmText: 'Remover',
-    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Apagar <b>${esc(l.title)}</b> e o arquivo deste aparelho.
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Apagar <b>${esc(obraNome(l.title))}</b>${
+             l.kind === 'fisico'
+               ? ', com o histórico de leitura dele'
+               : ' e o arquivo deste aparelho'}.
            Os <b>cards que você já criou continuam</b> — eles vivem em Estudar/Revisar, não aqui.</p>`
   }))) return
   await BookDB.del(id)
@@ -322,6 +291,9 @@ async function lerAbrir(id) {
   _lerCap = Math.min(l.pos?.cap || 0, l.chapters.length - 1)
   _lerInicioLeitura = Date.now()
   l.lastOpen = Date.now()
+  // Abrir já é começar: sem isto o livro ficaria em "quero ler" para sempre
+  // em quem lê pouco por sessão (o status só mudaria ao virar página).
+  if (typeof estanteAoAbrir === 'function') estanteAoAbrir(l)
   renderLeitor()
   await lerIrParaCapitulo(_lerCap, l.pos?.frac || 0)
 }
@@ -1056,6 +1028,11 @@ function _lerGravarPendente() {
   _lerLivro.pos = _lerPosPendente
   _lerLivro.updatedAt = Date.now()
   _lerPosPendente = null
+  // O AVANÇO DO DIA SE ANOTA SOZINHO. É o que faz o calendário, a sequência e
+  // a meta diária existirem sem ninguém digitar nada — e é aqui, na gravação
+  // da posição, porque este é o único ponto por onde TODO avanço passa
+  // (página, rolagem, troca de capítulo, fechar o livro).
+  if (typeof estanteMarcarAvanco === 'function') estanteMarcarAvanco(_lerLivro)
   saveLivros()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
 }

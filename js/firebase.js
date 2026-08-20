@@ -759,12 +759,28 @@ function applyCloudDocs(docs) {
     const carimbo = docs.livros.updatedAt || 0
     const locais = new Map(livros.map(l => [l.id, l]))
     const abertoId = (typeof _lerLivro !== 'undefined' && _lerLivro) ? _lerLivro.id : null
+    // O HISTÓRICO DE LEITURA É A EXCEÇÃO DENTRO DA EXCEÇÃO: ele se soma, nunca
+    // se escolhe. Quem perde no `updatedAt` ainda pode ter dias que o outro
+    // aparelho nunca viu (leu no celular na segunda, no notebook na terça), e
+    // trocar o objeto inteiro apagaria a segunda-feira do calendário para
+    // sempre. União por DIA, ficando com a maior leitura de cada dia.
+    const unirHistorico = (a, b) => {
+      const mapa = new Map()
+      for (const h of [...(a || []), ...(b || [])]) {
+        if (!h || !h.d) continue
+        const ja = mapa.get(h.d)
+        if (!ja || (h.pct || 0) > (ja.pct || 0)) mapa.set(h.d, h)
+      }
+      return [...mapa.values()].sort((x, y) => (x.d < y.d ? -1 : 1))
+    }
     const juntos = nuvem.map(remoto => {
       const local = locais.get(remoto.id)
       if (!local) return remoto
+      const historico = unirHistorico(local.historico, remoto.historico)
       // Livro aberto agora: este aparelho é a fonte da verdade, ponto.
-      if (local.id === abertoId) return local
-      return (local.updatedAt || 0) > (remoto.updatedAt || 0) ? local : remoto
+      if (local.id === abertoId) return { ...local, historico }
+      const vence = (local.updatedAt || 0) > (remoto.updatedAt || 0) ? local : remoto
+      return { ...vence, historico }
     })
     // Livro importado aqui e ainda não empurrado não pode sumir da estante.
     for (const l of livros) {
