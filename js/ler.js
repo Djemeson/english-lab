@@ -33,7 +33,11 @@ const lexaPrompt = () => (typeof lexaExplicar === 'function' ? lexaExplicar()
 
 const LER_DEF = {
   tema: 'papel', fonte: 'serif', tamanho: 19, entrelinha: 1.7,
-  largura: 34, modo: 'pag', pintar: 'minhas'
+  largura: 34, modo: 'pag', pintar: 'minhas',
+  // `traduzir`: o que acontece no instante em que a seleção termina.
+  //   'auto' — a frase inteira já vem traduzida dentro do popup (padrão)
+  //   'menu' — só o menu de sempre, tradução nenhuma (para quem não quer gastar)
+  traduzir: 'auto'
 }
 function lerCfg() { return { ...LER_DEF, ...(cfg.ler || {}) } }
 function lerSetCfg(chave, valor) {
@@ -640,9 +644,14 @@ function _lerRenderTipografia() {
       `<button class="ler-btn ler-pill${m === c.modo ? ' on' : ''}" onclick="lerAjustar('modo','${m}')">${m === 'pag' ? 'Virar página' : 'Rolagem'}</button>`).join(''))}
     ${linha('Destacar', [['nada', 'Nada'], ['minhas', 'O que estou estudando']].map(([v, r]) =>
       `<button class="ler-btn ler-pill${v === c.pintar ? ' on' : ''}" onclick="lerAjustar('pintar','${v}')">${r}</button>`).join(''))}
+    ${linha('Ao selecionar', [['auto', 'Traduzir na hora'], ['menu', 'Só o menu']].map(([v, r]) =>
+      `<button class="ler-btn ler-pill${v === c.traduzir ? ' on' : ''}" onclick="lerAjustar('traduzir','${v}')"
+        data-tip="${v === 'auto'
+          ? 'Marcou com o mouse, a frase inteira já vem traduzida — com o que você marcou em destaque'
+          : 'Só o menu de sempre. Nenhuma chamada de IA sai sem você clicar'}">${r}</button>`).join(''))}
     <div class="ler-tip-nota">Dica: <b>duplo-clique</b> numa palavra manda ela para o Preparar com a frase.
-      Selecione um trecho para a ${lexaNome()} explicar, ouvir em voz alta, salvar para estudo
-      ou procurar na Wikipédia.</div>`
+      Selecione um trecho e a frase já aparece traduzida ali mesmo — o menu continua abrindo para
+      explicar, ouvir em voz alta, salvar para estudo ou procurar na Wikipédia.</div>`
 }
 
 function lerAjustar(chave, valor) {
@@ -1407,17 +1416,29 @@ function _lerAoSelecionar() {
         ? (glossBuscar(partes[0], partes[1]) || glossBuscar(txt))
         : glossBuscar(txt)
       // Entra mesmo SEM glosa: "já está no Preparar" evita que ele mande a
-      // mesma palavra de novo pelo botão Estudar logo abaixo, e "você marcou
-      // como conhecida" explica por que ela não aparece mais para estudar.
-      if (achado) {
+      // mesma palavra de novo pelo botão Estudar logo abaixo.
+      // ⚠️ MENOS UM CASO: `known`/`ignored` não entram mais. O balão dizia
+      // "você marcou como conhecida" — e conhecer a palavra deixou de fazer
+      // parte da leitura (ver o bloco "A LEITURA NÃO PERGUNTA MAIS SE VOCÊ
+      // CONHECE"). Dentro do popup isso era pior que no hover: ele acabou de
+      // marcar aquilo justamente porque NÃO entendeu, e a primeira linha da
+      // resposta era o app dizendo que ele já sabia.
+      if (achado && achado.fonte !== 'known' && achado.fonte !== 'ignored') {
         glosaHTML = `<div class="gloss-embutido">${glossLinhaHTML(achado, { curto: true })}</div>`
       }
     }
   }
 
+  // A TRADUÇÃO NASCE JUNTO COM O POPUP, antes de qualquer clique. É a primeira
+  // coisa que ele quer ver ao marcar um trecho, então é a primeira coisa que o
+  // popup mostra — o menu vem embaixo, para quem quiser ir além.
+  const tradHTML = (lerCfg().traduzir === 'auto')
+    ? `<div class="ler-pop-trad" id="ler-pop-trad"><i class="ler-pop-trad-esperando">traduzindo…</i></div>`
+    : ''
+
   const pop = document.createElement('div')
   pop.id = 'ler-pop'
-  pop.innerHTML = glosaHTML + `
+  pop.innerHTML = tradHTML + glosaHTML + `
     <div class="ler-pop-linha">
       <b>"${esc(txt.length > 34 ? txt.slice(0, 34) + '…' : txt)}"</b>
       <button data-p="exp">Explicar</button>
@@ -1434,12 +1455,11 @@ function _lerAoSelecionar() {
     <div class="ler-pop-corpo hidden" id="ler-pop-corpo"></div>`
   pop.onmousedown = e => e.preventDefault()
   document.body.appendChild(pop)
-  const larg = pop.offsetWidth, alt = pop.offsetHeight
-  let x = Math.max(8, Math.min(r.left + r.width / 2 - larg / 2, window.innerWidth - larg - 8))
-  let y = r.bottom + 8
-  if (y + alt > window.innerHeight - 8) y = Math.max(8, r.top - alt - 8)
-  pop.style.left = Math.round(x) + 'px'
-  pop.style.top = Math.round(y) + 'px'
+  // O retângulo da seleção fica GUARDADO: a tradução chega segundos depois e
+  // faz o popup crescer, e sem ele não haveria como recolocar a caixa sem
+  // tapar justamente a frase que ele acabou de marcar.
+  _lerPopRect = { top: r.top, bottom: r.bottom, left: r.left, width: r.width }
+  _lerPopPor(pop)
 
   pop.querySelector('[data-p="rev"]').onclick = () => {
     _lerCapturar(_lerPopAlvo, _lerPopCtx)
@@ -1450,6 +1470,153 @@ function _lerAoSelecionar() {
   pop.querySelector('[data-p="wiki"]').onclick = () => lerAbrirBusca('wiki')
   pop.querySelector('[data-p="web"]').onclick = () => lerAbrirBusca('web')
   pop.querySelector('[data-p="exp"]').onclick = () => lerExplicarSelecao(pop)
+
+  if (tradHTML) _lerTraduzirAuto(pop, txt, _lerPopCtx, _lerPopTrecho)
+}
+
+// Onde a caixa fica. Separado de quem a cria porque é chamado DUAS vezes: ao
+// nascer e quando a tradução entra — o popup muda de altura no meio do caminho.
+let _lerPopRect = null
+function _lerPopPor(pop) {
+  const r = _lerPopRect
+  if (!pop || !r) return
+  const larg = pop.offsetWidth, alt = pop.offsetHeight
+  const x = Math.max(8, Math.min(r.left + r.width / 2 - larg / 2, window.innerWidth - larg - 8))
+  let y = r.bottom + 8
+  if (y + alt > window.innerHeight - 8) y = Math.max(8, r.top - alt - 8)
+  pop.style.left = Math.round(x) + 'px'
+  pop.style.top = Math.round(y) + 'px'
+}
+
+// ================================================================
+// A TRADUÇÃO QUE VEM SOZINHA
+// ================================================================
+// O gesto passou a ser um só: marcou com o mouse, a frase aparece em
+// português. Antes era marcar → clicar em "Explicar" → esperar a Lexa escrever
+// quatro frases sobre o termo — bom para a dúvida grande, caro e lento para a
+// dúvida de sempre, que é "o que esta frase está dizendo aqui?".
+//
+// O que sai daqui é DIFERENTE do Explicar, de propósito:
+//   · Explicar  — a Lexa ensina o termo: sentido, nuance, exemplos, a obra.
+//   · Traduzir  — a frase INTEIRA em português, com o pedaço que ele marcou
+//                 em negrito. Nada de aula; é a leitura seguindo em frente.
+// Por isso o menu continua ali embaixo: uma coisa não substitui a outra.
+//
+// ⚠️ CUSTO. Isto dispara a cada seleção, sem clique nenhum — o oposto de todo
+// o resto do app, onde chamada de IA se pede. Três freios, nesta ordem:
+//   1. o mesmo par (frase + trecho) nunca é pago duas vezes na sessão
+//   2. teto de tamanho: parágrafo gigante não vira tradução automática
+//   3. o interruptor em Ajustes → "Ao selecionar: só o menu" desliga tudo
+const LER_TRAD_MAX = 700          // caracteres que a IA recebe, no máximo
+const LER_TRAD_CACHE_MAX = 400
+const _lerTradCache = new Map()   // "frase alvo" -> html já traduzido
+
+function _lerTradChave(alvo, frase) {
+  return String(frase || '').toLowerCase().trim() + ' ' + String(alvo || '').toLowerCase().trim()
+}
+
+function _lerTradGuardar(chave, html) {
+  // Mapa tem ordem de inserção: o mais velho é o primeiro, e sai primeiro.
+  if (_lerTradCache.size >= LER_TRAD_CACHE_MAX) {
+    const velho = _lerTradCache.keys().next().value
+    _lerTradCache.delete(velho)
+  }
+  _lerTradCache.set(chave, html)
+}
+
+// O QUE VAI PARA A IA. A frase em volta é o normal; mas quando ele marca um
+// parágrafo inteiro, o que ele marcou É maior que a frase — e traduzir só a
+// frase seria devolver menos do que ele pediu.
+function _lerTradTextoAlvo(alvo, frase) {
+  const a = String(alvo || '').trim(), f = String(frase || '').trim()
+  const base = (a.length > f.length) ? a : (f || a)
+  if (base.length <= LER_TRAD_MAX) return base
+  // Corta na última fronteira de frase que couber — nunca no meio de uma
+  // palavra, que faria a IA traduzir um pedaço sem sentido.
+  const pedaco = base.slice(0, LER_TRAD_MAX)
+  const corte = Math.max(pedaco.lastIndexOf('. '), pedaco.lastIndexOf('! '), pedaco.lastIndexOf('? '))
+  return (corte > 200 ? pedaco.slice(0, corte + 1) : pedaco.slice(0, pedaco.lastIndexOf(' '))).trim()
+}
+
+async function _lerTraduzirAuto(pop, alvo, frase, bloco) {
+  const caixa = pop && pop.querySelector('#ler-pop-trad')
+  if (!caixa) return
+  // `vivo`: ele pode ter fechado o popup (ou marcado outra coisa) enquanto a
+  // IA respondia. Escrever num popup que já morreu não dá erro nenhum — só
+  // some, e o silêncio é o que confunde.
+  const vivo = () => document.body.contains(caixa) && el('ler-pop') === pop
+
+  const texto = _lerTradTextoAlvo(alvo, frase)
+  if (!texto) { caixa.remove(); return }
+
+  const chave = _lerTradChave(alvo, texto)
+  const guardado = _lerTradCache.get(chave)
+  if (guardado) { caixa.innerHTML = guardado; _lerPopPor(pop); return }
+
+  if (typeof aiChatCfg !== 'function' || !aiChatCfg().key) {
+    // Sem chave, um aviso DISCRETO e uma vez só — nada de toast: ele viria a
+    // cada palavra marcada e transformaria a leitura num campo minado.
+    caixa.innerHTML = '<i class="ler-pop-trad-esperando">sem chave de IA — Configurações → IA</i>'
+    _lerPopPor(pop)
+    return
+  }
+
+  const lang = (_lerLivro && _lerLivro.lang) || 'en'
+  const L = (typeof getLangDef === 'function') ? getLangDef(lang) : { nameEn: 'English' }
+  // O parágrafo entra só como CONTEXTO, nunca como coisa a traduzir: é ele que
+  // carrega o antecedente do pronome. Sem isso, "he told her" vira chute de
+  // gênero e o aluno recebe uma tradução com a pessoa errada.
+  const emVolta = (bloco && bloco.length > texto.length) ? bloco.slice(0, 1200) : ''
+  const sistema = 'Você traduz para português do Brasil, para um aluno que está lendo. ' +
+    'Devolva SÓ a tradução da frase pedida, natural e do mesmo tamanho — sem aspas, sem explicação, ' +
+    'sem introdução, sem o texto original. Palavrão e conteúdo adulto fazem parte da obra: traduza ' +
+    'fielmente, sem suavizar.\n' +
+    (typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(lang, 'traducao') : '')
+  // O DESTAQUE SÓ FAZ SENTIDO SE HOUVER UM PEDAÇO. Quando ele marca a frase
+  // inteira — ou toca num balão do mangá, que seleciona a fala toda — pedir
+  // para negritar "o pedaço" é pedir para negritar tudo: um bloco inteiro em
+  // negrito não destaca nada e ainda faz o modelo torcer a tradução para
+  // encaixar o limite.
+  const semEspaco = s => String(s || '').toLowerCase().replace(/\s+/g, '')
+  const alvoEhTudo = semEspaco(alvo) === semEspaco(texto)
+  const pergunta =
+    (emVolta ? `Contexto em volta (NÃO traduza, use só para resolver pronomes e referências): "${emVolta}"\n` : '') +
+    `Frase em ${L.nameEn} para traduzir: "${texto}"` +
+    (alvoEhTudo ? '' :
+      `\nO aluno marcou este pedaço: "${alvo}". Na sua tradução, envolva em <b></b> o equivalente EXATO ` +
+      `desse pedaço — só ele, sem estender para o resto da frase.`)
+
+  try {
+    // Teto de saída proporcional à entrada: português rende ~30% mais que
+    // inglês, e ainda sobra folga para a marcação.
+    const maxTokens = Math.min(700, Math.max(120, Math.round(texto.length / 2) + 80))
+    const bruto = await aiTextSeguro([
+      { role: 'system', content: sistema },
+      { role: 'user', content: pergunta }
+    ], { maxTokens, timeoutMs: 30000 })
+    if (!vivo()) return
+    const html = _lerTradHTML(bruto)
+    if (!html) { caixa.innerHTML = '<i class="ler-pop-trad-esperando">a IA devolveu vazio</i>'; _lerPopPor(pop); return }
+    _lerTradGuardar(chave, html)
+    caixa.innerHTML = html
+    _lerPopPor(pop)
+  } catch (e) {
+    if (!vivo()) return
+    caixa.innerHTML = `<i class="ler-pop-trad-esperando">não deu para traduzir: ${esc(e.message || 'erro')}</i>`
+    _lerPopPor(pop)
+  }
+}
+
+// A resposta vem em texto puro, mas com <b> lá dentro — e é o ÚNICO HTML que
+// pode passar. Escapar tudo e devolver o <b> é mais seguro que confiar: a
+// resposta da IA é texto de fora, e texto de fora não vira marcação aqui.
+function _lerTradHTML(bruto) {
+  let t = String(bruto || '').trim()
+  if (!t) return ''
+  // Modelo teimoso às vezes devolve com aspas em volta, ou "Tradução: ...".
+  t = t.replace(/^\s*(tradução|traducao|translation)\s*:\s*/i, '').trim()
+  if (t.length > 1 && /^["“'].*["”']$/.test(t)) t = t.slice(1, -1).trim()
+  return esc(t).replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>')
 }
 
 // Wikipédia e web: o que a IA não resolve bem. Nome de lugar, batalha, arma,
@@ -1825,21 +1992,19 @@ function _lerFerCorpoHTML() {
       <button class="btn btn-primary btn-sm" onclick="lerMandarNovas(10)">${ic('plus','ic-sm')} As 10 mais frequentes para o Preparar</button>
       ${_lerDesfazer.length ? `<button class="btn btn-secondary btn-sm" onclick="lerDesfazerTriagem()">${ic('undo','ic-sm')} Desfazer (${_lerDesfazer.length})</button>` : ''}
     </div>
-    ${_lerNivBlocoHTML()}
     ${_lerPreBlocoHTML()}
     <div class="ler-fer-triagem" onclick="_lerCliqueTriagem(event)">
       ${topo.map(x => `
         <span class="ler-tri" data-w="${escA(x.w)}">
-          <button class="ler-tri-w" data-a="estudo" data-tip="Não conheço — mandar para o Preparar com a frase do livro">
+          <button class="ler-tri-w" data-a="estudo" data-tip="Mandar para o Preparar com a frase do livro">
             ${esc(x.w)}${x.n > 1 ? `<i>${x.n}×</i>` : ''}
           </button>
-          <button class="ler-tri-ok" data-a="conheco" data-tip="Já conheço — nunca mais sugerir, e a cobertura sobe">${ic('check','ic-sm')}</button>
           <button class="ler-tri-no" data-a="ignorar" data-tip="Nome próprio ou jargão que não interessa — sai da conta">${ic('x','ic-sm')}</button>
         </span>`).join('') || '<span class="ler-fer-nota">Nenhuma palavra nova por aqui.</span>'}
     </div>
-    <p class="ler-fer-nota"><b>Triagem:</b> clique na palavra para estudá-la, no <b>✓</b> se já
-      conhece, no <b>×</b> se for nome próprio. O que você marca aqui vale para o app inteiro —
-      é o mesmo vocabulário que mede série, podcast e os outros livros.</p>`
+    <p class="ler-fer-nota"><b>A lista de frequência:</b> clique na palavra para estudá-la, no
+      <b>×</b> se for nome próprio e não valer a conta. Nada aqui pergunta se você já conhece —
+      o sentido se aprende na frase, e a frase está a um arraste de mouse de distância.</p>`
 }
 
 // Quantas palavras faltam para chegar aos 95% — o patamar em que a leitura
@@ -1881,8 +2046,7 @@ function _lerCliqueTriagem(ev) {
   if (!b) return
   const palavra = b.closest('.ler-tri')?.dataset.w
   if (!palavra) return
-  if (b.dataset.a === 'conheco') lerConheco(palavra)
-  else if (b.dataset.a === 'ignorar') lerIgnorar(palavra)
+  if (b.dataset.a === 'ignorar') lerIgnorar(palavra)
   else lerMandarUma(palavra)
 }
 
@@ -1898,23 +2062,34 @@ function lerMandarNovas(n) {
 }
 
 // ================================================================
-// TRIAGEM — "eu já conheço" e "isso é nome próprio"
+// A LEITURA NÃO PERGUNTA MAIS SE VOCÊ CONHECE
 // ================================================================
-// Faltava a outra metade da conta. A cobertura era medida contra o mapa de
-// palavras conhecidas, mas não havia como ALIMENTAR esse mapa a partir daqui —
-// então o painel mostrava "bright", "cold", "day" como palavras novas e a
-// única saída era mandar lixo para o Preparar. Marcar o que você já sabe é o
-// que faz o número virar verdade, e vale para o app inteiro: a mesma medida
-// serve para série, podcast e para os outros livros da estante.
+// O QUE SAIU DAQUI (2026-08-20), e por quê. A leitura tinha dois lugares onde
+// se declarava conhecer uma palavra: o ✓ de cada palavra da lista de
+// frequência e a triagem por nível do QECR, que pré-marcava tudo abaixo do
+// nível do aluno para ele desmarcar as exceções.
+//
+// A objeção que os derrubou é sobre o que significa "conhecer": o sentido de
+// uma palavra se aprende DENTRO DA FRASE, e a mesma palavra que você conhece
+// numa cena não é a que aparece na outra ("barrel" do fuzil não é o do
+// depósito). Declarar "conheço" no nível da palavra nua promete uma coisa que
+// a leitura não cumpre — e o preço é caro: a marca vale para o app inteiro e
+// esconde a palavra da triagem, da cobertura e do glossário.
+//
+// O QUE FICOU NO LUGAR: marcar com o mouse e receber a frase traduzida na
+// hora (ver "A TRADUÇÃO QUE VEM SOZINHA"). É a mesma dúvida, respondida onde
+// ela nasce, sem pedir que ele classifique nada.
+//
+// ⚠️ O MAPA DE CONHECIDAS CONTINUA VIVO — só não se alimenta mais por aqui.
+// Ele é o que impede o Kindle de sugerir de novo o que já foi descartado, e
+// segue editável em Palavras. A cobertura no topo do painel também fica: ela
+// mede contra esse mapa e contra os cards maduros do SRS.
+//
+// ⚠️ CÓDIGO ADORMECIDO: a triagem por nível (`lerClassificar`, `lerNiv*`,
+// ~400 linhas mais abaixo) continua no arquivo, sem nenhum caminho na tela.
+// Foi deixada inteira de propósito — é cara de reescrever e a decisão de
+// aposentá-la é dele, não minha. Se for para valer, apagar o bloco todo.
 let _lerDesfazer = []      // últimas marcações, para voltar atrás sem medo
-
-function lerConheco(palavra) {
-  if (typeof markKnownWord !== 'function') return
-  markKnownWord(palavra, true)
-  _lerDesfazer.push({ w: palavra, tipo: 'conheco' })
-  _lerTirarDaLista(palavra, 'conheco')
-  _lerRepintar()
-}
 
 function lerIgnorar(palavra) {
   if (typeof markIgnoredWord !== 'function') return
@@ -2408,7 +2583,15 @@ function _lerRacPrevisto(model, nItens, tokensVisiveis) {
 // ================================================================
 // TRIAGEM POR NÍVEL — "marque o que está abaixo de mim, eu desmarco o resto"
 // ================================================================
-// O problema que isto resolve: um capítulo traz 647 palavras "novas", mas a
+// 🛑 ADORMECIDO DESDE 2026-08-20. Nada nesta seção é chamado pela tela: o
+// painel de ferramentas parou de renderizar `_lerNivBlocoHTML()` quando o
+// "conheço / não conheço" saiu do caminho da leitura (a explicação inteira
+// está no bloco "A LEITURA NÃO PERGUNTA MAIS SE VOCÊ CONHECE"). O código fica
+// intacto — inclusive o que já está gravado no BookDB — para o caso de ele
+// querer o recurso de volta. Se decidir que não, apague daqui até o fim de
+// `_lerNivBlocoHTML`.
+//
+// O problema que isto resolvia: um capítulo traz 647 palavras "novas", mas a
 // maioria só é nova para o APP — o aluno já as conhece; elas nunca passaram
 // pelo `knownWords` porque marcá-las uma a uma é trabalho de horas. O efeito
 // era duplo e ruim: a cobertura mentia para baixo (67% quando o real é ~90%) e

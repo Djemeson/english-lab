@@ -4827,6 +4827,22 @@ mark.ler-w{
   font-size:var(--fs-xs);line-height:1.6;color:var(--text2);white-space:pre-wrap;
 }
 
+/* A traducao automatica: a PRIMEIRA coisa do popup, e a maior.
+   Tamanho de leitura (nao de rodape) porque e ela que o gesto pede — o menu
+   embaixo e o que virou acessorio. O negrito marca o pedaco selecionado. */
+.ler-pop-trad{
+  margin:0 0 8px;padding:9px 11px;
+  background:rgba(var(--primary-rgb),.08);
+  border-left:2px solid rgba(var(--primary-rgb),.55);
+  border-radius:var(--radius-sm);
+  font-size:var(--fs-sm);line-height:1.55;color:var(--text);
+}
+.ler-pop-trad b{color:rgb(var(--primary-rgb));font-weight:600}
+.ler-pop-trad-esperando{color:var(--text3);font-size:var(--fs-xs);font-style:normal;opacity:.85}
+@media (max-width:768px){
+  .ler-pop-trad{padding:10px 12px;font-size:var(--fs-base)}
+}
+
 
 /* ================================================================
    LER no celular — o modo de leitura toma a tela inteira.

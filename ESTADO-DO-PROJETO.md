@@ -7,7 +7,18 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-19 — **A CAIXA DE SELEÇÃO DO MANGÁ SAI DA IMAGEM**. Onze tentativas
+> Última atualização: 2026-08-20 — **O GESTO VIROU TRADUÇÃO**. Marcar com o mouse no livro ou no
+> mangá devolve a **frase inteira em português na hora**, com o pedaço marcado em negrito, antes
+> de qualquer clique — o menu de sempre continua embaixo. Em troca, o **"conheço / não conheço"
+> saiu do caminho da leitura**: o ✓ da lista de frequência e a triagem por nível do QECR sumiram
+> da tela, porque sentido se aprende dentro da frase e declarar "conheço" na palavra nua promete
+> o que a leitura não cumpre. ⚠️ O mapa de conhecidas **continua vivo** (é ele que impede o Kindle
+> de resugerir o descartado) e a triagem por nível ficou como **código adormecido**, sem porta na
+> tela. Três freios de custo, porque a tradução dispara sem clique: cache por frase, teto de
+> tamanho e o interruptor em Ajustes. ⚠️ **A chamada de IA de verdade não foi exercitada aqui** —
+> o localhost não tem a chave dele. `sw.js` → **englab-v322**. **Detalhes em §8.49.**
+>
+> Última atualização anterior: 2026-08-19 — **A CAIXA DE SELEÇÃO DO MANGÁ SAI DA IMAGEM**. Onze tentativas
 > de consertar a caixa que o modelo de visão devolve tinham falhado; a informação exata estava na
 > página o tempo todo. O balde de tinta marca o papel, o que fica **cercado** por ele é texto, e a
 > caixa cresce até encostar na arte — por construção o fundo aceso **nunca cobre um traço** do
@@ -11107,6 +11118,81 @@ outros que sequer existiam para o ponteiro. **O usuário via em um segundo o que
 os meus testes não pegavam.** Medir não é olhar, e a pergunta que o teste faz
 importa mais que a precisão com que ele mede.
 
+### 8.49 — O gesto virou tradução: o "conheço/não conheço" saiu da leitura (2026-08-20)
+
+**O pedido dele, em uma frase:** *"uma vez que só estamos aprendendo o significado dentro do
+contexto não faz sentido que marque como conhecido — quero que sempre que arrastar o mouse pra
+selecionar uma palavra ou texto seja automaticamente traduzida a frase dentro do contexto."*
+
+**Escopo decidido com ele (duas perguntas, duas respostas):** o mapa de conhecidas **sai do
+caminho da leitura**, mas continua existindo (é ele que impede o Kindle de sugerir de novo o
+que já foi descartado); e a tradução automática vale em **livro e mangá** — não em vídeo,
+legenda nem extensão.
+
+#### O que entrou — `_lerTraduzirAuto` (js/ler.js)
+
+Soltou o mouse, a frase já vem em português dentro do popup de seleção, **antes de qualquer
+clique**, com o pedaço marcado em `<b>`. O menu de sempre (Explicar, Estudar, Ouvir, Imagens,
+Wikipédia, Web) continua embaixo: são coisas diferentes e uma não substitui a outra —
+**Explicar** é a Lexa ensinando o termo (sentido, nuance, exemplos, eco na obra, ~600 tokens);
+**traduzir** é a leitura seguindo em frente.
+
+Peças e decisões:
+
+- **O que vai à IA:** a frase em volta (`_lerFraseEmVolta`); se a seleção for MAIOR que a
+  frase (parágrafo inteiro), vale a seleção. O parágrafo entra separado, como contexto que
+  **não** deve ser traduzido — é ele que resolve o antecedente do pronome.
+- **Sem destaque quando o alvo é tudo.** Selecionar a frase inteira — ou tocar num balão do
+  mangá, que seleciona a fala toda — cai num caminho sem pedido de `<b>`: negritar o bloco
+  inteiro não destaca nada e ainda torce a tradução para caber no limite.
+- **Três freios de custo**, porque isto dispara sem clique: cache em memória por
+  (frase + alvo), 400 entradas com descarte do mais velho; teto de 700 caracteres com corte
+  na fronteira de frase; e o interruptor **Ajustes → "Ao selecionar: Traduzir na hora / Só o
+  menu"** (`cfg.ler.traduzir`, padrão `auto`).
+- **Só `<b>` passa.** A resposta da IA é texto de fora: escapa tudo e devolve só o `<b>`.
+  Também tira aspas em volta e o prefixo "Tradução:" que modelo barato insiste em pôr.
+- **O popup se recoloca** quando a tradução chega (ele cresce): o retângulo da seleção fica
+  guardado em `_lerPopRect` e `_lerPopPor()` roda duas vezes.
+- **Sem chave de IA**: uma linha discreta dentro do popup, nunca toast — o toast viria a cada
+  palavra marcada e transformaria a leitura num campo minado.
+
+#### O que saiu — o "conheço" na leitura
+
+- O **✓ de cada palavra** da lista de frequência (`data-a="conheco"` e `lerConheco`) e o ramo
+  correspondente em `_lerCliqueTriagem`. Sobraram **estudar** e **× ignorar** (nome próprio
+  não é "conheço": é ruído que sai da conta).
+- O **bloco inteiro da triagem por nível** (QECR) deixou de ser renderizado —
+  `_lerFerCorpoHTML` não chama mais `_lerNivBlocoHTML()`.
+- No popup de seleção, a glosa embutida não entra mais para `fonte === 'known' | 'ignored'`.
+  Era o pior lugar para esse aviso: ele marcou aquilo justamente porque **não** entendeu, e a
+  primeira linha da resposta era o app dizendo que ele já sabia. (No hover isso já estava
+  barrado desde a 82ª rodada.)
+- **Ficaram de pé:** o mapa `knownWords`, a seção Palavras, a barra de cobertura do painel
+  (mede contra o mapa + cards maduros do SRS) e o caminho de resgate "não lembro".
+
+⚠️ **CÓDIGO ADORMECIDO:** `lerClassificar` + todo o bloco `_lerNiv*` (~400 linhas) continua no
+arquivo **sem nenhum caminho na tela**, com aviso no topo da seção. Foi deixado inteiro de
+propósito — é caro de reescrever e a decisão de aposentá-lo é dele. Se for para valer, apagar
+daqui até o fim de `_lerNivBlocoHTML`.
+
+#### O que foi testado ao vivo (localhost:8765, `aiTextSeguro` interceptado — zero token gasto)
+
+| O que | Resultado |
+|---|---|
+| Pedaço dentro da frase do livro | pergunta com contexto + frase + pedido de `<b>`; popup mostra *"Começamos a **nos cansar** da lama."* |
+| Balão do mangá (fala inteira) | frase montada com o espaço certo entre as linhas, **sem** pedido de destaque |
+| Cache | segunda seleção idêntica: **1 chamada no total**, não 2 |
+| Interruptor em "Só o menu" | bloco não nasce e **0 chamadas** |
+| Sem chave de IA | aviso discreto no popup e **0 chamadas** |
+| Limpeza da resposta | aspas e "Tradução:" removidos; `<script>` escapado; só `<b>` sobrevive |
+| Corte do trecho longo | 1203 → 699 caracteres, cortando em fim de frase |
+| Painel de ferramentas | sem `data-a="conheco"`, sem bloco de nível; por palavra sobraram `estudo` e `ignorar` |
+
+⚠️ **O que NÃO foi testado aqui:** a chamada de IA de verdade (a leitura do `.env` foi barrada
+pelo classificador, e o localhost não tem a chave dele). O caminho está provado com a IA
+simulada; a **qualidade da tradução e a posição do `<b>`** só se veem no Chrome dele, no app
+publicado. `sw.js` → `englab-v322`.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -11118,6 +11204,19 @@ importa mais que a precisão com que ele mede.
 
 ### Decisões em aberto (com o levantamento já feito)
 
+- [ ] **A TRIAGEM POR NÍVEL: aposentar de vez ou trazer de volta?** (aberto em 2026-08-20,
+      §8.49). `lerClassificar` + `_lerNiv*` (~400 linhas em `js/ler.js`) ficaram **sem caminho
+      na tela** quando o "conheço" saiu da leitura. Código morto envelhece mal — mas apagá-lo é
+      decisão dele, não minha. Se mandar apagar: some do topo da seção "TRIAGEM POR NÍVEL" até
+      o fim de `_lerNivBlocoHTML`, e o que está gravado no `BookDB` (`niv:` e `nivmarca:`) vira
+      lixo a limpar.
+- [ ] **A TRADUÇÃO AO SELECIONAR EM VÍDEO / LEGENDA / EXTENSÃO** (aberto em 2026-08-20, §8.49).
+      Ele escolheu **livro e mangá** nesta rodada. O gesto existe igual no transcript do vídeo
+      (`video-study.js`) e no menu de seleção compartilhado (`selMenuAtivar`, usado no dossiê) —
+      quando quiser, é o mesmo mecanismo apontado para outro container.
+- [ ] **CACHE DA TRADUÇÃO SÓ VIVE NA SESSÃO** (aberto em 2026-08-20, §8.49). Recarregar a página
+      esvazia. Relendo a mesma página de mangá em outro dia, paga de novo. Se o custo incomodar,
+      o caminho é gravar no `BookDB` por livro — mesma chave (frase + alvo).
 - [ ] **APLICAR A DIREÇÃO "TINTA" NO APP** (aberto em 2026-08-11, §8.15). O design system está
       publicado e nada foi aplicado. Depende **primeiro da aprovação dele** no Claude Design —
       não comece pela camada de tokens antes de ele dizer o que fica.
