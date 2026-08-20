@@ -7,7 +7,15 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-20 (2ª) — **"NÃO ESTÁ NA SUA NUVEM" ERA UMA FRASE SEM APURAÇÃO**.
+> Última atualização: 2026-08-20 (3ª) — **A TRADUÇÃO TRADUZ O TRECHO, E A DOSE DE CONTEXTO É A
+> FRASE**. Ele marcou `ore` e recebeu a frase inteira reescrita: *"isso não é tradução, é
+> explicação, e já tem um botão de Explicar"*. Agora sai **"minério"** — e o erro que apareceu
+> no meio do caminho (`ore` → "veio") tinha causa medida: **parágrafo inteiro como contexto
+> erra 3 em 3; só a frase acerta 3 em 3**. Parágrafo não desambigua palavra, dilui. ✅ E ficou
+> provado que **os dois livros ESTÃO na nuvem** (3,9 MB e 13,1 MB) — o aviso da véspera era o
+> app acusando deslogado. `sw.js` → **englab-v325**. **Detalhes em §8.51.**
+>
+> Última atualização anterior: 2026-08-20 (2ª) — **"NÃO ESTÁ NA SUA NUVEM" ERA UMA FRASE SEM APURAÇÃO**.
 > Deslogado, o app não tem como olhar a nuvem — e ainda assim dizia que o arquivo não estava
 > lá e mandava reimportar o livro. Agora ele **pergunta ao Storage antes de acusar** e diz o
 > motivo certo: entre com o Google / não está lá / está lá (3,9 MB) mas o download falhou /
@@ -11269,6 +11277,63 @@ não enxerga o Storage (§8.11).
 **De brinde, achado no caminho:** dois bytes NUL literais que eu tinha escrito sem querer no
 separador do cache de traduções (`js/ler.js`, §8.49). Rodava igual — mas fazia o `grep` tratar
 o arquivo como binário e parar a busca no meio dele.
+
+### 8.51 — A tradução traduz o TRECHO, e a dose de contexto é a frase (2026-08-20)
+
+**Ele derrubou a primeira versão na primeira tela.** Marcou `ore` e recebeu *"Ele está pensando
+que Zola estava apenas começando a explorar o que viria a se revelar um veio profundo e fabuloso
+de minério"* — três linhas para responder uma palavra. O veredito: **"isso não é tradução, é
+explicação, e já tem um botão de Explicar"**. Estava certo: a frase inteira reescrita É o
+território do Explicar, e o bloco automático virou uma segunda versão dele, pior e no lugar
+errado.
+
+**Agora traduz-se a SELEÇÃO.** Marcou uma palavra, sai a palavra; marcou uma frase (ou tocou
+num balão do mangá, que seleciona a fala toda), sai a frase. Até 4 palavras o pedido muda:
+equivalente curto, mesma forma gramatical, com teste de substituição — e a resposta ganha
+corpo de título (`.ler-pop-trad.curta`), porque ela **é** a resposta.
+
+#### O erro que só o texto real pegou, e o número que o explicou
+
+No livro, `ore` voltou como **"veio"** — a palavra vizinha. A passagem que eu tinha usado nos
+testes era só a frase; a do app era o **parágrafo inteiro**. Medido com a chave dele
+(gemini-flash-lite), três voltas de cada:
+
+| contexto enviado | resposta para `ore` em *"a deep and fabulous vein of ore"* |
+|---|---|
+| parágrafo inteiro | filão · filão · veia — **3 erros em 3** |
+| só a frase | **minério · minério · minério** |
+
+⚠️ **Parágrafo não desambigua palavra: DILUI.** O modelo passa a responder pelo ASSUNTO do
+trecho (mineração, veio, filão) em vez de pela palavra marcada. E reforçar o prompt não
+salvava: a versão com *"traduza exatamente as palavras marcadas, nem uma a mais"* errou igual
+enquanto o parágrafo estava lá. **Quem consertou foi a dose, não a instrução.**
+
+O parágrafo continua entrando quando a frase tem **menos de 60 caracteres** — diálogo picado,
+legenda, balão de uma palavra —, que é quando ele vira o único jeito de saber de quem é o "he".
+
+#### Medido no livro dele, no app publicado
+
+| marcado | veio | tempo |
+|---|---|---|
+| `ore` (em "vein of ore") | **minério** | 0,85 s |
+| `digest-sized` | formato compacto | 1,8 s |
+| `breakthrough` | sucesso | 1,0 s |
+| a frase "He's thinking that Zola was—is—the nightmare version…" | "Ele está pensando que Zola foi — é — a versão pesadelo de Charles Dickens." | 1,9 s |
+
+**E o contexto pesa mesmo** — a mesma palavra, duas passagens: `bar` → **balcão** / **pé-de-cabra**;
+`stand` → **aguentar** / **barraquinha**. `sw.js` → `englab-v325`.
+
+#### ✅ Fechada a dúvida da §8.50: os arquivos ESTÃO na nuvem
+
+Com a sessão logada, `listAll` na pasta de livros devolveu os dois:
+
+| arquivo | tamanho | lá desde |
+|---|---|---|
+| Billy Summers | 3,9 MB | 2026-08-11 19:25 |
+| One Piece Vol 100 | 13,1 MB | 2026-08-18 15:08 |
+
+Ou seja: o print de "não está na sua nuvem" era **exatamente** o defeito da §8.50 — o app
+acusando sem ter olhado, porque estava deslogado. Logado, o livro baixou e abriu no capítulo 5.
 
 ## 9. Pendências / a verificar
 
