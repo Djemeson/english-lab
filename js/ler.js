@@ -277,13 +277,23 @@ async function lerAbrir(id) {
   // não acompanhar o usuário: em aparelho novo o arquivo não existe, e o app
   // mandava "importe o .epub de novo" mesmo tendo uma cópia guardada.
   let blob = await BookDB.get(id)
-  if (!blob && typeof livroGarantirLocal === 'function') {
+  // ⚠️ E QUANDO NÃO VEM, DIZER O MOTIVO CERTO. A frase antiga ("nem na sua
+  // nuvem") era dita até quando o app estava DESLOGADO e não tinha como olhar
+  // — foi o que aconteceu com o Billy Summers, cujo arquivo estava lá o tempo
+  // todo. Quem sabe o motivo é o shell (`nuvemDiagnostico`), e a frase vem de
+  // lá para leitor, vídeo e podcast dizerem a mesma coisa.
+  const logado = typeof _fbUser !== 'undefined' && !!_fbUser
+  if (!blob && typeof livroGarantirLocal === 'function' && logado) {
     toast('Buscando o arquivo na sua nuvem…', 'info')
     blob = await livroGarantirLocal(id)
     if (blob) toast(`"${l.title}" baixado para este aparelho`, 'success')
   }
   if (!blob) {
-    toast('O arquivo deste livro não está neste aparelho nem na sua nuvem. Importe o .epub de novo.', 'warning')
+    let frase = 'O arquivo deste livro não está neste aparelho. Importe-o de novo.'
+    if (typeof livroPorQueNaoVeio === 'function' && typeof nuvemFrase === 'function') {
+      frase = nuvemFrase(await livroPorQueNaoVeio(id), `o arquivo de "${l.title}"`)
+    }
+    toast(frase, 'warning')
     return
   }
   // Guarda a subida para o caso do livro ter entrado antes de existir nuvem.
@@ -1509,10 +1519,10 @@ function _lerPopPor(pop) {
 //   3. o interruptor em Ajustes → "Ao selecionar: só o menu" desliga tudo
 const LER_TRAD_MAX = 700          // caracteres que a IA recebe, no máximo
 const LER_TRAD_CACHE_MAX = 400
-const _lerTradCache = new Map()   // "frase alvo" -> html já traduzido
+const _lerTradCache = new Map()   // "frase + alvo" -> html já traduzido
 
 function _lerTradChave(alvo, frase) {
-  return String(frase || '').toLowerCase().trim() + ' ' + String(alvo || '').toLowerCase().trim()
+  return String(frase || '').toLowerCase().trim() + '\u0000' + String(alvo || '').toLowerCase().trim()
 }
 
 function _lerTradGuardar(chave, html) {

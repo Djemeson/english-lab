@@ -453,8 +453,11 @@ async function podcastImport(i) {
   // outro: se o episódio já está guardado na conta dele, puxar de lá é mais
   // rápido e não depende do feed ainda ter aquele episódio no ar — episódio
   // sai do feed com o tempo, e aí a cópia dele é a única que existe.
+  // Deslogado não há nuvem para procurar: `_midiaRef` devolve null e a busca
+  // termina antes de começar. Anunciar a procura assim mesmo é o defeito que o
+  // leitor tinha — dizer que olhou onde não dava para olhar.
   let jaBaixado = await VideoDB.get('files', v.id)
-  if (!jaBaixado && typeof midiaGarantirLocal === 'function') {
+  if (!jaBaixado && typeof midiaGarantirLocal === 'function' && typeof _fbUser !== 'undefined' && _fbUser) {
     const t = toast('Procurando o episódio na sua nuvem…', 'info')
     jaBaixado = await midiaGarantirLocal(v.id)
     if (jaBaixado) toast('Episódio recuperado da sua nuvem', 'success')

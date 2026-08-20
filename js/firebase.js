@@ -157,6 +157,67 @@ async function livroApagarDaNuvem(id) {
 }
 
 // ================================================================
+// POR QUE O ARQUIVO NÃO VEIO
+// ================================================================
+// ⚠️ A MENSAGEM AFIRMAVA UM FATO QUE O APP NUNCA VERIFICOU. "O arquivo deste
+// livro não está neste aparelho nem na sua nuvem" saía IGUAL quando não havia
+// login nenhum — e deslogado não existe nuvem para olhar: `_livroRef` devolve
+// null e a busca nem começa. Saía igual também quando o download falhava por
+// rede. Três situações completamente diferentes, uma frase só, e a pior delas
+// ("importe o .epub de novo") mandando o usuário refazer trabalho que talvez
+// não fosse preciso.
+//
+// Aconteceu de verdade em 2026-08-20, com o Billy Summers: o arquivo tinha
+// subido e voltado em 2026-08-11 (3,92 MB, medido nos dois sentidos) e ainda
+// assim a tela dizia que ele não existia na nuvem.
+//
+// `getMetadata` responde a pergunta sem baixar nada: existe / não existe /
+// não deu para perguntar. Devolve `{ estado, bytes?, code? }`.
+async function nuvemDiagnostico(ref) {
+  if (typeof firebase === 'undefined' || !_fbStore) return { estado: 'sem-storage' }
+  if (!_fbUser) return { estado: 'sem-login' }
+  if (!ref) return { estado: 'sem-storage' }
+  try {
+    const m = await ref.getMetadata()
+    return { estado: 'existe', bytes: Number(m && m.size) || 0 }
+  } catch (e) {
+    const c = String(e.code || e.message || '')
+    if (c.includes('object-not-found')) return { estado: 'ausente' }
+    if (c.includes('unauthorized') || c.includes('unauthenticated')) return { estado: 'sem-permissao', code: c }
+    return { estado: 'erro', code: c }
+  }
+}
+
+async function livroPorQueNaoVeio(id) {
+  return nuvemDiagnostico(_livroRef(id))
+}
+
+async function midiaPorQueNaoVeio(id) {
+  return nuvemDiagnostico(_midiaRef('midia', id))
+}
+
+// A frase que o usuário lê, montada do diagnóstico. Fica aqui, junto de quem
+// sabe o motivo, para leitor, vídeo e podcast dizerem a MESMA coisa.
+function nuvemFrase(d, oQue = 'o arquivo') {
+  // Vírgula, não ponto: o número é lido em português.
+  const mb = b => (b ? ` (${String(Math.round(b / 1048576 * 10) / 10).replace('.', ',')} MB)` : '')
+  switch (d && d.estado) {
+    case 'sem-login':
+      return `Você não está conectado — entre com o Google para procurar ${oQue} na sua nuvem. Deslogado, o app só enxerga este aparelho.`
+    case 'sem-storage':
+      return `A parte da nuvem que guarda arquivos não carregou agora. Recarregue a página e tente de novo.`
+    case 'ausente':
+      return `${oQue[0].toUpperCase() + oQue.slice(1)} não está na sua nuvem — ou nunca subiu, ou foi removido de lá. Importe o arquivo de novo neste aparelho.`
+    case 'existe':
+      return `${oQue[0].toUpperCase() + oQue.slice(1)} ESTÁ na sua nuvem${mb(d.bytes)}, mas o download falhou agora. Tente de novo em instantes.`
+    case 'sem-permissao':
+      return `${oQue[0].toUpperCase() + oQue.slice(1)}: sua nuvem recusou o acesso. Saia e entre de novo com o Google.`
+    default:
+      return `Não consegui falar com a sua nuvem agora${d && d.code ? ` (${d.code})` : ''}. Tente de novo em instantes.`
+  }
+}
+
+// ================================================================
 // O EPISÓDIO E A LEGENDA NA NUVEM
 // ================================================================
 // ⚠️ A LEGENDA IMPORTA MAIS QUE O ÁUDIO, e não é óbvio. O mp3 dá para baixar
