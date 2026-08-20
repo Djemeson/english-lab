@@ -7,7 +7,15 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-20 — **O GESTO VIROU TRADUÇÃO**. Marcar com o mouse no livro ou no
+> Última atualização: 2026-08-20 (2ª) — **"NÃO ESTÁ NA SUA NUVEM" ERA UMA FRASE SEM APURAÇÃO**.
+> Deslogado, o app não tem como olhar a nuvem — e ainda assim dizia que o arquivo não estava
+> lá e mandava reimportar o livro. Agora ele **pergunta ao Storage antes de acusar** e diz o
+> motivo certo: entre com o Google / não está lá / está lá (3,9 MB) mas o download falhou /
+> acesso recusado. ⚠️ **Ainda não se sabe se o Billy Summers está na nuvem** — só uma sessão
+> logada responde, e é a nova mensagem que vai dizer. `sw.js` → **englab-v323**.
+> **Detalhes em §8.50.**
+>
+> Última atualização anterior: 2026-08-20 — **O GESTO VIROU TRADUÇÃO**. Marcar com o mouse no livro ou no
 > mangá devolve a **frase inteira em português na hora**, com o pedaço marcado em negrito, antes
 > de qualquer clique — o menu de sempre continua embaixo. Em troca, o **"conheço / não conheço"
 > saiu do caminho da leitura**: o ✓ da lista de frequência e a triagem por nível do QECR sumiram
@@ -11209,6 +11217,58 @@ não "barril". Print do popup real guardado na conversa.
 porque os METADADOS vivem no localStorage, mas o `.epub`/`.cbz` não está ali. O teste acima
 rodou com um parágrafo montado na própria página, dentro do app publicado, com a chave dele.
 Para exercitar o mangá com página real é preciso entrar com o Google primeiro.
+
+### 8.50 — "Não está na sua nuvem": a frase que afirmava o que ninguém tinha olhado (2026-08-20)
+
+**O print dele:** *"Buscando o arquivo na sua nuvem…"* seguido de *"O arquivo deste livro não
+está neste aparelho nem na sua nuvem. Importe o .epub de novo."* — e a pergunta: **por que o
+arquivo não tá na nuvem?**
+
+**A resposta é que ninguém tinha olhado.** Deslogado, `_livroRef` devolve `null` e
+`livroGarantirLocal` cai no `catch` **antes de perguntar qualquer coisa** ao Storage; o mesmo
+`catch` engolia falha de rede e recusa de permissão. Três situações completamente diferentes,
+uma frase só — e a pior delas mandando reimportar um arquivo que talvez estivesse lá. O Billy
+Summers **subiu e voltou em 2026-08-11** (3,92 MB medidos nos dois sentidos, §8.13).
+
+**Reproduzido antes de mexer:** com o app deslogado, `lerAbrir` devolveu exatamente os dois
+toasts do print. E o perfil do Chrome onde isso rodou não tem sessão nenhuma
+(`firebaseLocalStorageDb` vazio) nem os arquivos (`BookDB.keys()` → `[]`) — os livros aparecem
+na estante porque os METADADOS vivem no Firestore/localStorage.
+
+**O conserto** (`js/firebase.js`, no shell): `nuvemDiagnostico(ref)` pergunta ao Storage sem
+baixar nada (`getMetadata`) e devolve `{ estado, bytes, code }` — `sem-login`, `sem-storage`,
+`ausente`, `existe`, `sem-permissao`, `erro`. `nuvemFrase(d, oQue)` monta o que o usuário lê,
+e mora junto de quem sabe o motivo para leitor, vídeo e podcast dizerem a mesma coisa.
+`livroPorQueNaoVeio` / `midiaPorQueNaoVeio` são os atalhos por tipo.
+
+No leitor, o toast "Buscando na sua nuvem…" **só sai com login** (antes anunciava uma busca
+que não ia acontecer).
+
+| estado | o que o usuário passa a ler |
+|---|---|
+| sem-login | "Você não está conectado — entre com o Google para procurar o arquivo de X na sua nuvem." |
+| ausente | "…não está na sua nuvem — ou nunca subiu, ou foi removido de lá." |
+| existe | "…**ESTÁ** na sua nuvem (3,9 MB), mas o download falhou agora." |
+| sem-permissao | "…sua nuvem recusou o acesso. Saia e entre de novo com o Google." |
+| erro | mostra o código do Storage. |
+
+**Varredura pelo mesmo padrão:** o podcast anunciava *"Procurando o episódio na sua nuvem…"*
+deslogado — mesmo defeito, mesma correção; e ele tem fallback para o feed, então nunca chegou
+a mentir no fim. A memória da obra também chama `livroGarantirLocal`, mas desiste **calada**,
+sem afirmar nada — ficou como está.
+
+**Testado ao vivo** nos cinco estados (localhost, com `_fbUser`/`_fbStore` simulados para os
+casos logados) e depois **no app publicado**: deslogado, clicar no Billy Summers agora devolve
+a frase do login em vez da acusação. `sw.js` → `englab-v323`.
+
+⚠️ **Ainda não sabemos se o arquivo está lá.** Só uma sessão logada responde isso, e a nova
+mensagem é quem vai dizer: se aparecer "ESTÁ na sua nuvem", o problema é download; se aparecer
+"não está", ele terá de reimportar. A credencial de serviço não serve — é `datastore.viewer` e
+não enxerga o Storage (§8.11).
+
+**De brinde, achado no caminho:** dois bytes NUL literais que eu tinha escrito sem querer no
+separador do cache de traduções (`js/ler.js`, §8.49). Rodava igual — mas fazia o `grep` tratar
+o arquivo como binário e parar a busca no meio dele.
 
 ## 9. Pendências / a verificar
 
