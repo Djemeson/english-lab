@@ -5105,6 +5105,34 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .est-menu-nota{padding:4px 10px 8px}
 .est-linha-menu{padding-left:8px;padding-right:8px}
 
+/* ---- editar vários (lote) ---- */
+.est-lote-sugestao{
+  display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 12px;
+  border-radius:var(--radius-sm);font-size:var(--fs-sm);color:var(--text2);
+  background:rgba(var(--primary-rgb),.09);border:1px solid rgba(var(--primary-rgb),.22);
+}
+.est-lote-sugestao span{flex:1}
+.est-lote-sugestao b{color:var(--text)}
+.est-lote-campos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.est-lote-check{
+  display:flex;align-items:flex-start;gap:9px;cursor:pointer;margin-bottom:14px;
+  font-size:var(--fs-xs);color:var(--text2);line-height:1.5;
+}
+.est-lote-check input{width:15px;height:15px;flex-shrink:0;margin-top:1px;accent-color:var(--primary)}
+.est-lote-topo{
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;
+  font-size:var(--fs-3xs);color:var(--text3);
+}
+.est-lote-botoes{display:flex;gap:6px}
+.est-lote-topo .est-chip{padding:3px 9px}
+#est-reunir .est-campo input,#est-reunir .est-campo select{
+  width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text);font-family:inherit;font-size:var(--fs-sm);padding:8px 10px;outline:none;
+}
+#est-reunir .est-campo input:focus,#est-reunir .est-campo select:focus{border-color:rgba(var(--primary-rgb),.55)}
+#est-meta .est-gb-item .est-selo{margin-left:auto;color:var(--role-dominio);flex-shrink:0}
+#est-meta .est-gb-item .est-selo-alerta{color:var(--role-urgente)}
+
 /* ---- reunir em série ---- */
 .est-reunir-lista{
   max-height:320px;overflow-y:auto;border:1px solid var(--border);
@@ -5146,6 +5174,7 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   .est-form-grid{grid-template-columns:1fr}
   .est-campo.w2,.est-campo.w4{grid-column:span 1}
   .est-prog-campos{grid-template-columns:1fr}
+  .est-lote-campos{grid-template-columns:1fr}
 }
 
 /* ---- leitor: a moldura ocupa a tela toda ---- */

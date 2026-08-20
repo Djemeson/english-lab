@@ -311,7 +311,7 @@ function _estRenderEstante() {
           ${[['serie','Agrupar: séries'],['autor','Agrupar: autor'],['nada','Sem agrupar']]
             .map(([v,r]) => `<option value="${v}"${agrupar === v ? ' selected' : ''}>${r}</option>`).join('')}
         </select>` : ''}
-      <button class="est-chip" onclick="estReunirModal()" data-tip="Marcar vários volumes como uma série">${ic('plus','ic-3xs')} Reunir em série</button>
+      <button class="est-chip" onclick="estReunirModal()" data-tip="Autor, série, gênero, status e busca de dados — em vários de uma vez">${ic('layers','ic-3xs')} Editar vários</button>
     </div>
     ${itens.length
       ? (visual === 'grade'
@@ -866,12 +866,17 @@ function estNota(id, n) {
 }
 
 // ================================================================
-// REUNIR EM SÉRIE — para o que já está na estante
+// EDITAR VÁRIOS — a tela do trabalho em lote
 // ================================================================
-// O caminho um-a-um existe (ficha → Editar → campo Série), mas ninguém edita
-// 40 volumes de One Piece à mão. Aqui ele marca os volumes, dá um nome e o
-// app NUMERA SOZINHO pelo número achado no título; quando não há número
-// nenhum, cai na ordem em que estão na lista.
+// O caminho um-a-um existe (ficha -> Editar), mas ninguém corrige o autor de
+// 40 volumes de One Piece à mão. Aqui ele marca os livros e diz o que muda:
+// CAMPO EM BRANCO NÃO MEXE EM NADA. Essa é a regra que faz a tela ser segura —
+// aplicar "tudo o que está no formulário" apagaria o autor certo de metade da
+// seleção só porque o campo ficou vazio.
+//
+// Nasceu como "Reunir em série" e cresceu quando ele pediu autor em lote e a
+// busca de metadados para EPUB e mangá: as três coisas são o mesmo gesto —
+// marcar vários e aplicar de uma vez.
 function estReunirModal(pre) {
   document.getElementById('est-reunir')?.remove()
   const cands = livros.slice().sort((a, b) =>
@@ -880,34 +885,114 @@ function estReunirModal(pre) {
   const ov = document.createElement('div')
   ov.id = 'est-reunir'; ov.className = 'srs-modal-overlay'
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
-  ov.innerHTML = `<div class="srs-modal-box" style="max-width:640px">
-    <h4 style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px">Reunir em série</h4>
+  ov.innerHTML = `<div class="srs-modal-box" style="width:100%;max-width:680px">
+    <h4 style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px">Editar vários</h4>
     <p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">
-      Marque os volumes da mesma obra. O número do volume é lido do título quando existe
-      (<i>One Piece v12</i>, <i>Naruto #3</i>) — e você pode corrigir depois na ficha de cada um.</p>
-    <label class="est-campo" style="margin-bottom:12px">
-      <span>Nome da série</span>
-      <input type="text" id="est-reunir-nome" value="${escA(sugestao.nome)}" placeholder="ex.: One Piece"
-             list="est-series-lista">
-      <datalist id="est-series-lista">${estSeriesExistentes().map(s => `<option value="${escA(s)}"></option>`).join('')}</datalist>
+      Marque os livros e preencha só o que quer mudar — <b>campo em branco não altera nada</b>.</p>
+
+    ${sugestao.ids.length >= 2 ? `
+    <div class="est-lote-sugestao">
+      ${ic('layers','ic-sm')}
+      <span>Achei <b>${sugestao.ids.length} volumes</b> que parecem ser
+        <b>${esc(sugestao.nome)}</b>.</span>
+      <button class="btn btn-ghost btn-sm" onclick="estLoteUsarSugestao(${_estArg(sugestao.nome)},${_estArg(sugestao.ids)})">Usar</button>
+    </div>` : ''}
+
+    <div class="est-lote-campos">
+      <label class="est-campo">
+        <span>Autor</span>
+        <input type="text" id="est-lote-autor" placeholder="ex.: Eiichiro Oda" list="est-lote-autores">
+        <datalist id="est-lote-autores">${estAutoresExistentes().map(a => `<option value="${escA(a)}"></option>`).join('')}</datalist>
+      </label>
+      <label class="est-campo">
+        <span>Série</span>
+        <input type="text" id="est-reunir-nome" placeholder="ex.: One Piece" list="est-series-lista">
+        <datalist id="est-series-lista">${estSeriesExistentes().map(x => `<option value="${escA(x)}"></option>`).join('')}</datalist>
+      </label>
+      <label class="est-campo">
+        <span>Gênero</span>
+        <input type="text" id="est-lote-genero" list="est-generos-lote">
+        <datalist id="est-generos-lote">${EST_GENEROS.map(g => `<option value="${g}"></option>`).join('')}</datalist>
+      </label>
+      <label class="est-campo">
+        <span>Status</span>
+        <select id="est-lote-status">
+          <option value="">— não mudar —</option>
+          ${Object.entries(EST_STATUS).map(([k, v]) => `<option value="${k}">${v.rotulo}</option>`).join('')}
+        </select>
+      </label>
+    </div>
+
+    <label class="est-lote-check">
+      <input type="checkbox" id="est-lote-meta">
+      <span>Buscar dados no catálogo (capa, ano, editora, páginas, resumo) —
+        <b>só preenche o que estiver vazio</b></span>
     </label>
-    <div class="est-reunir-lista">
+
+    <div class="est-lote-topo">
+      <span id="est-lote-conta">0 marcados</span>
+      <span class="est-lote-botoes">
+        <button class="est-chip" onclick="estLoteMarcar(true)">Marcar todos</button>
+        <button class="est-chip" onclick="estLoteMarcar(false)">Desmarcar</button>
+      </span>
+    </div>
+    <div class="est-reunir-lista" onchange="estLoteConta()">
       ${cands.map(l => `
         <label class="est-reunir-item">
-          <input type="checkbox" value="${l.id}" ${sugestao.ids.includes(l.id) ? 'checked' : ''}>
+          <input type="checkbox" value="${l.id}">
           <span class="est-reunir-nome">${esc(obraNome(l.title))}</span>
-          <span class="est-reunir-num">${_estNumDoTitulo(obraNome(l.title)) ? 'vol. ' + _estNumDoTitulo(obraNome(l.title)) : (l.serie ? esc(l.serie) : '—')}</span>
+          <span class="est-reunir-num">${_estResumoLinha(l)}</span>
         </label>`).join('')}
     </div>
+    <div id="est-lote-log" class="est-dica" style="margin-top:10px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('est-reunir').remove()">Cancelar</button>
-      <button class="btn btn-primary btn-sm" onclick="estReunirFazer()">${ic('layers','ic-sm')} Reunir</button>
+      <button class="btn btn-primary btn-sm" id="est-lote-ok" onclick="estReunirFazer()">${ic('check','ic-sm')} Aplicar</button>
     </div>
   </div>`
   document.body.appendChild(ov)
-  setTimeout(() => document.getElementById('est-reunir-nome')?.focus(), 30)
+  estLoteConta()
+  setTimeout(() => document.getElementById('est-lote-autor')?.focus(), 30)
 }
 
+// A coluna da direita diz o que aquele livro JÁ tem — é o que evita marcar o
+// volume errado numa lista de quarenta nomes quase idênticos.
+function _estResumoLinha(l) {
+  const p = []
+  if (l.serie) p.push(esc(l.serie) + (l.serieNum ? ` #${esc(String(l.serieNum))}` : ''))
+  else if (_estNumDoTitulo(obraNome(l.title))) p.push('vol. ' + _estNumDoTitulo(obraNome(l.title)))
+  if (l.author) p.push(esc(l.author))
+  return p.join(' · ') || '—'
+}
+
+// ⚠️ A SUGESTÃO PRECISA SER UM CLIQUE, NUNCA UM CAMPO JÁ PREENCHIDO.
+// Pego no teste: o campo Série vinha com "Berserk" (o palpite), eu marquei os
+// quatro volumes de One Piece para trocar o AUTOR — e os quatro foram parar na
+// série Berserk. Num modal que aplica tudo o que está preenchido, um campo que
+// o usuário não digitou é uma armadilha. Agora o palpite se apresenta, e só
+// entra em cena se ele mandar.
+function estLoteUsarSugestao(nome, ids) {
+  const campo = document.getElementById('est-reunir-nome')
+  if (campo) campo.value = nome
+  document.querySelectorAll('#est-reunir .est-reunir-lista input[type=checkbox]')
+    .forEach(i => { i.checked = ids.includes(i.value) })
+  estLoteConta()
+}
+
+function estLoteMarcar(todos) {
+  document.querySelectorAll('#est-reunir .est-reunir-lista input[type=checkbox]')
+    .forEach(i => { i.checked = todos })
+  estLoteConta()
+}
+function estLoteConta() {
+  const n = document.querySelectorAll('#est-reunir .est-reunir-lista input:checked').length
+  const e = document.getElementById('est-lote-conta')
+  if (e) e.textContent = `${n} ${n === 1 ? 'marcado' : 'marcados'}`
+}
+
+function estAutoresExistentes() {
+  return [...new Set(livros.map(l => (l.author || '').trim()).filter(Boolean))].sort()
+}
 function estSeriesExistentes() {
   return [...new Set(livros.map(l => (l.serie || '').trim()).filter(Boolean))].sort()
 }
@@ -933,22 +1018,324 @@ function _estSugereSerie(cands) {
   return melhor.ids.length >= 2 ? melhor : { nome: '', ids: [] }
 }
 
-function estReunirFazer() {
-  const nome = (document.getElementById('est-reunir-nome').value || '').trim()
-  const ids = [...document.querySelectorAll('#est-reunir input[type=checkbox]:checked')].map(i => i.value)
-  if (!nome) { toast('Dê um nome à série.', 'error'); return }
-  if (ids.length < 2) { toast('Marque pelo menos dois volumes.', 'warning'); return }
+async function estReunirFazer() {
+  const g = id => (document.getElementById(id).value || '').trim()
+  const autor = g('est-lote-autor'), serie = g('est-reunir-nome')
+  const genero = g('est-lote-genero'), status = g('est-lote-status')
+  const buscarMeta = document.getElementById('est-lote-meta').checked
+  const ids = [...document.querySelectorAll('#est-reunir .est-reunir-lista input:checked')].map(i => i.value)
+  if (!ids.length) { toast('Marque pelo menos um livro.', 'warning'); return }
+  if (!autor && !serie && !genero && !status && !buscarMeta) {
+    toast('Preencha algum campo — ou marque a busca no catálogo.', 'warning'); return
+  }
+
   ids.forEach((id, i) => {
     const l = livroPorId(id); if (!l) return
-    l.serie = nome
-    l.serieNum = _estNumDoTitulo(obraNome(l.title)) || Number(l.serieNum) || (i + 1)
+    if (autor) l.author = autor
+    if (genero) l.genero = genero
+    if (serie) {
+      l.serie = serie
+      l.serieNum = _estNumDoTitulo(obraNome(l.title)) || Number(l.serieNum) || (i + 1)
+    }
+    if (status) estStatusEmLote(l, status)
     l.updatedAt = Date.now()
   })
   estSalvar()
-  document.getElementById('est-reunir')?.remove()
-  toast(`${ids.length} volumes reunidos em "${nome}"`, 'success')
-  estSetPref('agrupar', true)
-  estAbrirSerie(nome)
+
+  if (buscarMeta) {
+    const ok = document.getElementById('est-lote-ok')
+    if (ok) { ok.disabled = true; ok.innerHTML = 'Buscando…' }
+    const r = await estMetaEmLote(ids, m => {
+      const log = document.getElementById('est-lote-log')
+      if (log) log.textContent = m
+    })
+    document.getElementById('est-reunir')?.remove()
+    toast(r.achou
+      ? `${r.achou} de ${ids.length} completados pelo catálogo`
+      : 'O catálogo não reconheceu nenhum destes títulos', r.achou ? 'success' : 'info')
+  } else {
+    document.getElementById('est-reunir')?.remove()
+    toast(`${ids.length} ${ids.length === 1 ? 'livro atualizado' : 'livros atualizados'}`, 'success')
+  }
+
+  if (serie && ids.length > 1) { estSetPref('agrupar', 'serie'); estAbrirSerie(serie) }
+  else estanteRender()
+}
+
+// Troca o status sem redesenhar a tela nem disparar um toast por livro —
+// dentro de um laço de quarenta, cada render seria um congelamento visível.
+function estStatusEmLote(l, s) {
+  const hoje = estData()
+  l.status = s
+  if (s === 'lido') {
+    l.fim = l.fim || hoje
+    l.anoFim = Number(String(l.fim).slice(0, 4))
+    if (!l.inicio) l.inicio = hoje
+    if (l.kind === 'fisico') { const p = estPaginas(l); if (p) l.pagAtual = p }
+    else if ((l.progress || 0) < 0.995) l.progress = 1
+    estRegistrar(l, 1, hoje, true)
+  } else {
+    if (s === 'lendo' && !l.inicio) l.inicio = hoje
+    l.fim = null; l.anoFim = null
+  }
+}
+
+// ================================================================
+// COMPLETAR PELO CATÁLOGO — para o que já entrou pelo arquivo
+// ================================================================
+// Pedido dele: *"que dê pra puxar metadados de itens que eu adiciono tipo epub
+// e manga."* O EPUB traz título, autor e capa e mais nada; o CBZ de mangá
+// muitas vezes não traz nem o autor. Ano, editora, gênero, sinopse e número de
+// páginas ficam vazios para sempre — e é isso que a estante usa para ordenar,
+// filtrar e mostrar.
+//
+// ⚠️ AS TRÊS REGRAS QUE FAZEM ISTO SER SEGURO:
+//   1. NUNCA sobrescreve o que já está preenchido (a não ser que ele mande,
+//      na tela individual). O metadado do arquivo é mais confiável que o
+//      palpite de um catálogo sobre um título parecido.
+//   2. O TÍTULO NUNCA é trocado automaticamente. É a chave que liga o livro às
+//      capturas de vocabulário (`obraNome`) — trocar em silêncio quebraria a
+//      aba "Capturas" de todo mundo.
+//   3. Em lote, só aplica quando o resultado PARECE ser o mesmo livro
+//      (semelhança de título), porque ali ninguém está olhando.
+
+// ⚠️ A COTA DO GOOGLE SE LEMBRA POR MEIA HORA. Sem isto, um lote de 40 volumes
+// dispara 40 requisições que já se sabe que vão voltar 429 — uma por livro,
+// cada uma com sua ida e volta e sua linha vermelha no console. Ao primeiro
+// 429, a fonte é dada como fora do ar e as buscas seguintes vão direto para a
+// Open Library. Meia hora depois ela é tentada de novo, porque a cota é diária
+// mas o relógio dela não é o nosso.
+let _estGoogleFora = 0
+function _estGooglePodeTentar() { return !_estGoogleFora || (Date.now() - _estGoogleFora) > 30 * 60 * 1000 }
+function _estGoogleCaiu() { _estGoogleFora = Date.now() }
+
+// Consulta montada para o caso real: mangá busca pela SÉRIE + volume (o título
+// do arquivo, "One Piece v12", não existe em catálogo nenhum).
+function _estConsultaDe(l) {
+  const base = (l.serie || '').trim() || obraNome(l.title) || ''
+  const vol = l.serie && l.serieNum ? ` vol ${l.serieNum}` : ''
+  const autor = (l.author || '').trim()
+  return `${base}${vol}${autor ? ' ' + autor : ''}`.trim()
+}
+
+// Semelhança por palavras: quantas palavras do nosso título aparecem no do
+// catálogo. Não é distância de edição — é o que distingue "One Piece, Vol. 12"
+// (bom) de "The Art of One Piece" (ruim) sem inventar sofisticação.
+// ⚠️ DEVOLVE `null` QUANDO NÃO DÁ PARA COMPARAR, e isso não é o mesmo que
+// zero. Visto no teste: o único resultado para "Berserk vol 1" foi
+// «ベルセルク 1» — o livro certo, com o volume certo, e semelhança 0 porque
+// não há uma palavra latina para casar. Zero diria "é outro livro"; `null` diz
+// "não sei", e aí quem decide é o número do volume. Mangá em catálogo grande
+// cai nisto o tempo todo.
+function _estParecido(a, b) {
+  const limpa = t => String(t || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1)
+  const A = limpa(a), B = new Set(limpa(b))
+  if (!A.length) return 0
+  if (!B.size) return null
+  return A.filter(w => B.has(w)).length / A.length
+}
+
+// Uma busca, as duas fontes, o melhor candidato. Devolve `null` quando nada
+// serve — o silêncio aqui é resposta, não falha.
+async function estMetaBuscar(l) {
+  const q = _estConsultaDe(l)
+  if (!q) return []
+  const saida = []
+  try {
+    if (!_estGooglePodeTentar()) throw new Error('cota')
+    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=5`)
+    if (r.status === 429) _estGoogleCaiu()
+    else {
+      const j = await r.json()
+      for (const it of (j.items || [])) {
+        const v = it.volumeInfo || {}
+        const img = (v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail)) || ''
+        saida.push({
+          fonte: 'Google Books', title: v.title || '', author: (v.authors || []).join(', '),
+          editora: v.publisher || '', ano: (v.publishedDate || '').slice(0, 4),
+          isbn: ((v.industryIdentifiers || []).find(x => /ISBN_13|ISBN_10/.test(x.type)) || {}).identifier || '',
+          paginas: v.pageCount || '', genero: (v.categories || [])[0] || '',
+          resumo: (v.description || '').slice(0, 1200), capa: img.replace(/^http:/, 'https:')
+        })
+      }
+    }
+  } catch (e) {}
+  if (!saida.length) {
+    try {
+      const campos = 'key,title,author_name,first_publish_year,number_of_pages_median,cover_i,publisher,isbn,subject'
+      const r2 = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=5&fields=${campos}`)
+      const j2 = await r2.json()
+      for (const d of (j2.docs || [])) {
+        saida.push({
+          fonte: 'Open Library', key: d.key || '', title: d.title || '',
+          author: (d.author_name || []).join(', '), editora: (d.publisher || [])[0] || '',
+          ano: d.first_publish_year || '', isbn: (d.isbn || [])[0] || '',
+          paginas: d.number_of_pages_median || '', genero: (d.subject || [])[0] || '', resumo: '',
+          capa: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : ''
+        })
+      }
+    } catch (e) {}
+  }
+  // ⚠️ O NÚMERO DO VOLUME DESEMPATA, E PESA MAIS QUE O TÍTULO. Medido: para o
+  // volume 2 de One Piece, os três primeiros resultados vieram com semelhança
+  // 1,00 — "ONE PIECE 1", "ONE PIECE 2" e "ONE PIECE 13" — e o primeiro da
+  // fila era o volume ERRADO. Numa série, gravar ano, páginas e capa de outro
+  // volume é pior que não gravar nada, porque parece certo.
+  const alvo = (l.serie || '').trim() || obraNome(l.title)
+  const numAlvo = Number(l.serieNum) || 0
+  return saida.map(r => {
+    const semelhanca = _estParecido(alvo, r.title)
+    const incomparavel = semelhanca === null
+    const num = _estNumDeTitulo(r.title)
+    const bate = numAlvo && num === numAlvo
+    const briga = numAlvo && num && num !== numAlvo
+    return { ...r, semelhanca: incomparavel ? 0 : semelhanca, incomparavel, num,
+             volumeBate: !!bate, volumeBriga: !!briga,
+             peso: (incomparavel ? 0.35 : semelhanca) + (bate ? 0.6 : 0) - (briga ? 0.9 : 0) }
+  }).sort((a, b) => b.peso - a.peso)
+}
+
+// Número solto num título de catálogo: "ONE PIECE 2", "One Piece, Vol. 12".
+function _estNumDeTitulo(t) {
+  const str = String(t || '')
+  const m = str.match(/\bvol\.?\s*(\d{1,3})\b/i) || str.match(/(\d{1,3})\s*$/)
+  return m ? Number(m[1]) : 0
+}
+
+// Aplica um resultado sobre o livro. `sobrescrever` só vem `true` do botão
+// explícito da ficha — em lote é sempre `false`.
+function estMetaAplicar(l, r, sobrescrever) {
+  const campos = ['author', 'editora', 'ano', 'isbn', 'paginas', 'genero', 'resumo']
+  let n = 0
+  for (const c of campos) {
+    const novo = r[c]
+    if (!novo) continue
+    const atual = l[c]
+    const vazio = atual === undefined || atual === null || atual === '' || atual === 0
+    if (vazio || sobrescrever) { l[c] = novo; n++ }
+  }
+  // A capa do arquivo (miniatura do EPUB) vence a do catálogo, sempre: é a
+  // capa DAQUELA edição, e não a de uma parecida.
+  if (r.capa && (!l.cover && (!l.coverUrl || sobrescrever))) { l.coverUrl = r.capa; n++ }
+  if (n) l.updatedAt = Date.now()
+  return n
+}
+
+// Em lote: um livro por vez, com respiro entre as chamadas. Duas razões — as
+// duas fontes são gratuitas e o Google já respondeu 429 uma vez nesta mesma
+// tela; e disparar quarenta requisições juntas é a receita para tomar bloqueio
+// justo quando ele mais precisa da tela.
+async function estMetaEmLote(ids, aoAndar) {
+  let achou = 0, i = 0
+  for (const id of ids) {
+    i++
+    const l = livroPorId(id); if (!l) continue
+    if (aoAndar) aoAndar(`Buscando ${i} de ${ids.length}: ${obraNome(l.title)}…`)
+    try {
+      const res = await estMetaBuscar(l)
+      // Em lote ninguém está olhando: além da semelhança de título, se o livro
+      // tem número de volume, o resultado PRECISA ser daquele volume.
+      const numAlvo = Number(l.serieNum) || 0
+      // Título ilegível para nós (japonês, russo) só passa quando o NÚMERO do
+      // volume bate — aí o sinal vem do número, não do nome. Sem número de
+      // volume, título incomparável não entra: seria fé, não evidência.
+      const bom = res.find(r => (r.incomparavel ? (numAlvo && r.volumeBate) : r.semelhanca >= 0.6)
+                              && (!numAlvo || r.volumeBate))
+      if (bom) {
+        if (bom.fonte === 'Open Library' && bom.key && !bom.resumo) {
+          try {
+            const w = await (await fetch(`https://openlibrary.org${bom.key}.json`)).json()
+            const d = typeof w.description === 'string' ? w.description : (w.description && w.description.value) || ''
+            if (d) bom.resumo = d.slice(0, 1200)
+          } catch (e) {}
+        }
+        if (estMetaAplicar(l, bom, false)) achou++
+      }
+    } catch (e) {}
+    if (i < ids.length) await new Promise(r => setTimeout(r, 220))
+  }
+  estSalvar()
+  return { achou, total: ids.length }
+}
+
+// ---- a tela individual: ele vê os candidatos e escolhe ----
+async function estMetaModal(id) {
+  const l = livroPorId(id); if (!l) return
+  document.getElementById('est-meta')?.remove()
+  const ov = document.createElement('div')
+  ov.id = 'est-meta'; ov.className = 'srs-modal-overlay'
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+  ov.innerHTML = `<div class="srs-modal-box" style="width:100%;max-width:620px">
+    <h4 style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px">Completar pelo catálogo</h4>
+    <p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:12px">
+      Procurando por <b id="est-meta-q">${esc(_estConsultaDe(l))}</b></p>
+    <div class="est-gb-busca" style="margin-bottom:12px">
+      ${ic('search','ic-sm')}
+      <input type="text" id="est-meta-termo" value="${escA(_estConsultaDe(l))}"
+             onkeydown="if(event.key==='Enter')estMetaRebuscar('${l.id}')">
+      <button class="btn btn-ghost btn-sm" onclick="estMetaRebuscar('${l.id}')">Buscar</button>
+    </div>
+    <label class="est-lote-check">
+      <input type="checkbox" id="est-meta-sobre">
+      <span>Substituir também o que já está preenchido (o título nunca muda)</span>
+    </label>
+    <div id="est-meta-res"><p class="est-dica">Buscando…</p></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('est-meta').remove()">Fechar</button>
+    </div>
+  </div>`
+  document.body.appendChild(ov)
+  _estMetaRes = await estMetaBuscar(l)
+  _estMetaPintar(l)
+}
+
+let _estMetaRes = []
+function _estMetaPintar(l) {
+  const box = document.getElementById('est-meta-res'); if (!box) return
+  if (!_estMetaRes.length) {
+    box.innerHTML = `<p class="est-dica est-erro">Nada encontrado. Tente o nome como está na capa,
+      sem o número do volume — ou preencha à mão em Editar.</p>`
+    return
+  }
+  box.innerHTML = `<div class="est-gb-res">${_estMetaRes.map((r, i) => `
+    <button class="est-gb-item" onclick="estMetaEscolher('${l.id}',${i})">
+      ${r.capa ? `<img src="${escA(r.capa)}" alt="" loading="lazy">` : `<span class="est-gb-sem">${ic('book','ic-sm')}</span>`}
+      <span class="est-gb-txt">
+        <b>${esc(r.title)}</b>
+        <i>${esc(r.author || 'autor desconhecido')}${r.ano ? ` · ${r.ano}` : ''}${r.paginas ? ` · ${r.paginas} pág` : ''} · ${r.fonte}</i>
+      </span>
+      ${r.volumeBate ? `<span class="est-selo">este volume</span>`
+        : r.volumeBriga ? `<span class="est-selo est-selo-alerta">vol. ${r.num}</span>`
+        : r.semelhanca >= 0.6 ? `<span class="est-selo">provável</span>` : ''}
+    </button>`).join('')}</div>`
+}
+
+async function estMetaRebuscar(id) {
+  const l = livroPorId(id); if (!l) return
+  const termo = (document.getElementById('est-meta-termo').value || '').trim()
+  const box = document.getElementById('est-meta-res'); if (box) box.innerHTML = `<p class="est-dica">Buscando…</p>`
+  _estMetaRes = await estMetaBuscar({ ...l, serie: '', serieNum: '', author: '', title: termo })
+  _estMetaPintar(l)
+}
+
+async function estMetaEscolher(id, i) {
+  const l = livroPorId(id), r = _estMetaRes[i]
+  if (!l || !r) return
+  const sobre = document.getElementById('est-meta-sobre')?.checked
+  if (r.fonte === 'Open Library' && r.key && !r.resumo) {
+    try {
+      const w = await (await fetch(`https://openlibrary.org${r.key}.json`)).json()
+      const d = typeof w.description === 'string' ? w.description : (w.description && w.description.value) || ''
+      if (d) r.resumo = d.slice(0, 1200)
+    } catch (e) {}
+  }
+  const n = estMetaAplicar(l, r, sobre)
+  estSalvar()
+  document.getElementById('est-meta')?.remove()
+  toast(n ? `${n} ${n === 1 ? 'campo preenchido' : 'campos preenchidos'}` : 'Nada a preencher — já estava tudo lá', n ? 'success' : 'info')
+  estanteRender()
 }
 
 // ================================================================
@@ -1011,6 +1398,9 @@ function _estRenderFicha() {
           <button class="btn btn-ghost btn-sm" onclick="estEditar('${l.id}')">${ic('pencil','ic-sm')} Editar</button>
           <button class="btn btn-ghost btn-sm" onclick="lerExcluir('${l.id}')">${ic('trash','ic-sm')} Remover</button>
         </div>
+        <button class="btn btn-ghost btn-sm" style="width:100%" onclick="estMetaModal('${l.id}')"
+                data-tip="Ano, editora, páginas, sinopse e capa — do Google Books ou da Open Library">
+          ${ic('download','ic-sm')} Completar pelo catálogo</button>
       </div>
       <div class="est-ficha-corpo">
         <div class="est-ficha-topo">
@@ -1366,8 +1756,9 @@ async function estGBBuscar() {
 
   let cota = false
   try {
+    if (!_estGooglePodeTentar()) throw new Error('cota')
     const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(ehIsbn ? `isbn:${soDigitos}` : q)}&maxResults=6`)
-    if (r.status === 429) cota = true
+    if (r.status === 429) { cota = true; _estGoogleCaiu() }
     else {
       const j = await r.json()
       _estGB = (j.items || []).map(it => {
@@ -1634,7 +2025,7 @@ function estImportarModal() {
   const ov = document.createElement('div')
   ov.id = 'est-imp-modal'; ov.className = 'srs-modal-overlay'
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
-  ov.innerHTML = `<div class="srs-modal-box" style="max-width:620px">
+  ov.innerHTML = `<div class="srs-modal-box" style="width:100%;max-width:620px">
     <h4 style="font-size:var(--fs-base);font-weight:700;margin-bottom:6px">Trazer acervo de outro app</h4>
     <p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.6;margin-bottom:12px">
       Abra o app antigo, aperte F12, cole isto no Console e dê Enter — o conteúdo vai para a

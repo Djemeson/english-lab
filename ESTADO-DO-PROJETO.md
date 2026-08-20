@@ -7,7 +7,20 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-20 (6ª) — **SÉRIES, PRATELEIRA DE AUTOR E O STATUS NO CARD**. Três
+> Última atualização: 2026-08-20 (7ª) — **EDITAR VÁRIOS, E O CATÁLOGO CHEGA A QUEM JÁ ESTÁ NA
+> ESTANTE**. Ele pediu autor em lote e *"puxar metadados de itens que eu adiciono tipo epub e
+> manga"*. O "Reunir em série" virou **"Editar vários"**: autor, série (com numeração
+> automática), gênero, status e busca de catálogo, aplicados a quantos livros ele marcar — com
+> a regra que faz a tela ser segura, **campo em branco não altera nada**. E qualquer livro tem
+> agora **"Completar pelo catálogo"** na ficha, que preenche ano, editora, páginas, sinopse e
+> capa **sem nunca tocar no título** (é ele que liga o livro às capturas). ⚠️ Quatro defeitos
+> pegos ao vivo, três deles graves: a sugestão de série vinha **pré-preenchida** e mandou quatro
+> volumes de One Piece para a série *Berserk*; para o volume 2 o catálogo devolvia o **volume 1**
+> em primeiro lugar; um `\b` virou **caractere de backspace** dentro de uma regex, que assim
+> nunca casaria; e mangá volta do catálogo com **título em japonês**, o que fazia a semelhança
+> dar zero e recusar o livro certo. `sw.js` → **englab-v330**. **Detalhes em §8.55.**
+>
+> Última atualização anterior: 2026-08-20 (6ª) — **SÉRIES, PRATELEIRA DE AUTOR E O STATUS NO CARD**. Três
 > pedidos numa rodada. (1) *"como um livro vai pra Quero ler e Parado?"* — ia pela ficha, e só
 > por ela; agora **cada card tem um menu** com os quatro status, nota e remover. Pergunta sobre
 > onde fica uma função é resposta sobre onde ela deveria estar. (2) **Mangá com muitos volumes
@@ -11699,6 +11712,76 @@ de 40 volumes seria perder o lugar.
 - A sugestão do "Reunir em série" **ignora quem já tem série** — sem isso ela apontava para o
   maior grupo do acervo, que costuma ser justamente o já organizado.
 
+## 8.55 Editar vários, e o catálogo chegando a quem já está na estante (2026-08-20, 7ª)
+
+Dois pedidos: *"faz a edição de autor em lote também"* e *"que dê pra puxar metadados de itens
+que eu adiciono tipo epub e manga"*. São o mesmo gesto — marcar vários e aplicar de uma vez —
+então viraram uma tela só.
+
+### "Editar vários" (era "Reunir em série")
+
+Campos: **autor, série** (com numeração automática), **gênero, status** e a opção de **buscar
+dados no catálogo**. A regra que sustenta tudo: **campo em branco não altera nada**. Sem ela,
+"aplicar o formulário" apagaria o autor certo de metade da seleção só porque o campo ficou
+vazio. Tem "marcar todos", contador e, na direita de cada linha, o que aquele livro **já tem**
+(série, volume, autor) — é o que evita marcar o volume errado numa lista de nomes quase iguais.
+
+### "Completar pelo catálogo" (ficha de qualquer livro)
+
+O EPUB traz título, autor e capa; o CBZ de mangá muitas vezes nem o autor. Ano, editora, gênero,
+sinopse e páginas ficavam vazios para sempre. Agora um botão busca nas duas fontes e mostra os
+candidatos para ele escolher. **Três regras de segurança:**
+
+1. **Nunca sobrescreve o que já existe** — salvo se ele marcar a caixa, na tela individual.
+2. **O título NUNCA muda sozinho.** É a chave que liga o livro às capturas de vocabulário
+   (`obraNome`); trocar em silêncio quebraria a aba "Capturas" de toda a estante.
+3. **A capa do arquivo vence a do catálogo** — é a capa daquela edição, não a de uma parecida.
+
+A consulta é montada para o caso real: mangá busca por **série + volume**, porque
+"One Piece v12" (o nome do arquivo) não existe em catálogo nenhum.
+
+### Os quatro defeitos que só o teste ao vivo pegou
+
+1. **A sugestão de série mandou One Piece para dentro de Berserk.** O campo vinha
+   pré-preenchido com o palpite; marquei os quatro volumes de One Piece para trocar só o
+   **autor** e os quatro saíram com série *Berserk*. Num modal que aplica tudo que está
+   preenchido, **campo que o usuário não digitou é armadilha**. Agora o palpite é uma faixa
+   ("Achei 3 volumes que parecem ser Berserk · **Usar**") e nada entra sem clique.
+2. **O catálogo devolvia o volume errado em primeiro lugar.** Para o volume 2 de One Piece, os
+   três primeiros resultados tinham semelhança 1,00 — *ONE PIECE 1*, *ONE PIECE 2*, *ONE PIECE
+   13*. Gravar ano, páginas e capa de outro volume é pior que não gravar nada, porque parece
+   certo. O **número do volume passou a desempatar** (+0,6 quando bate, −0,9 quando briga) e, em
+   lote, um livro com número de volume **só aceita** resultado daquele volume.
+3. **Um `\b` virou caractere de backspace (0x08) dentro de uma regex.** Ela nunca casaria, e o
+   arquivo passava no `node --check` do mesmo jeito. Achado ao comparar o que a ferramenta de
+   leitura mostrava com o que estava no disco. Varredura feita nos cinco arquivos tocados: dois
+   ocorrências, as duas corrigidas, zero restantes.
+4. **Mangá volta do catálogo em japonês.** O único resultado para "Berserk vol 1" foi
+   «ベルセルク 1» — o livro certo, com o volume certo, e semelhança **zero**, porque não há
+   palavra latina para casar. Zero diria "é outro livro"; agora a comparação devolve **`null`
+   ("não sei")** e, nesse caso, quem decide é o número do volume. Resultado: Berserk saiu de
+   **0 de 3** para **3 de 3** completados, cada um com o ano e as páginas do seu volume.
+
+### De brinde
+
+- **A cota do Google se lembra por meia hora.** Ele responde 429 desde ontem (cota diária
+  compartilhada de quem chama sem chave); sem memória, um lote de 40 volumes dispara 40
+  requisições que já se sabe que vão falhar. Ao primeiro 429 a fonte é dada como fora e as
+  buscas seguintes vão direto para a Open Library.
+- **Ritmo de 220ms entre livros no lote** — as duas fontes são gratuitas, e disparar quarenta
+  chamadas juntas é pedir bloqueio na hora em que ele mais precisa da tela.
+- Os modais estavam **nascendo estreitos** (`max-width` sem `width:100%`): 344px onde deviam ter
+  680. Corrigido nos três.
+
+### Testado ao vivo
+
+Autor em lote nos 4 volumes de One Piece: aplicou o autor e o gênero **sem tocar na série**, e
+os outros livros do acervo ficaram intactos. Metadados em lote: **4 de 4** volumes de One Piece
+e **3 de 3** de Berserk, cada um com ano e páginas do próprio volume. Livro sem capa nenhuma
+recebeu capa, ano, páginas e sinopse; livro com capa do arquivo manteve a dele. Título inventado
+("Um Livro Que Nao Existe Em Catalogo Nenhum 9977") não trouxe nem aceitou nada. Zero overflow a
+375px e a 1536px; console sem erro de JS.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -11744,6 +11827,8 @@ de 40 volumes seria perder o lugar.
       automático**. O importador já está pronto na estante ("Trazer acervo de outro app"): basta
       ele abrir o app antigo e rodar `copy(localStorage.getItem('livros'))`. **Só falta saber se
       há algo lá.**
+- [x] ~~**Edição de autor em lote**~~ — **feita em 2026-08-20** (§8.55), junto com série,
+      gênero, status e busca de catálogo, na tela "Editar vários".
 - [ ] **A CAPA VINDA DO CATÁLOGO É URL, não arquivo** (2026-08-20, §8.53). Livro cadastrado à
       mão guarda `coverUrl` apontando para o Google/Open Library — **offline ela não aparece** e,
       se o serviço tirar a imagem do ar, some. Baixar e converter para miniatura (como o EPUB
@@ -12246,6 +12331,10 @@ de 40 volumes seria perder o lugar.
 ### Limitações conhecidas — não são tarefas
 
 
+- **O CATÁLOGO ERRA, E ISSO NÃO É BUG NOSSO** (2026-08-20, §8.55). A Open Library tem registros
+      imprecisos: *Misery* voltou com **1978** (é de 1987). Como o app só preenche campo vazio e
+      mostra os candidatos com ano e páginas na tela individual, o erro é visível e corrigível em
+      Editar — mas ele existe, e o dado do catálogo nunca deve ser tratado como verdade.
 - **EPUB com DRM não abre e não vai abrir.** Livro comprado na Amazon/Kobo com proteção é
       um arquivo cifrado; o leitor mostra erro de formato. Isso não é bug — é o desenho.
 - **KINDLE — documento pessoal no aparelho não entra pelo `vocab.db`** (limite da Amazon,
