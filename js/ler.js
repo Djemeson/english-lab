@@ -1501,16 +1501,26 @@ function _lerPopPor(pop) {
 // ================================================================
 // A TRADUÇÃO QUE VEM SOZINHA
 // ================================================================
-// O gesto passou a ser um só: marcou com o mouse, a frase aparece em
-// português. Antes era marcar → clicar em "Explicar" → esperar a Lexa escrever
-// quatro frases sobre o termo — bom para a dúvida grande, caro e lento para a
-// dúvida de sempre, que é "o que esta frase está dizendo aqui?".
+// O gesto é um só: marcou com o mouse, aparece em português. Sem clique, sem
+// espera de aula — é a leitura seguindo em frente.
 //
-// O que sai daqui é DIFERENTE do Explicar, de propósito:
-//   · Explicar  — a Lexa ensina o termo: sentido, nuance, exemplos, a obra.
-//   · Traduzir  — a frase INTEIRA em português, com o pedaço que ele marcou
-//                 em negrito. Nada de aula; é a leitura seguindo em frente.
-// Por isso o menu continua ali embaixo: uma coisa não substitui a outra.
+// ⚠️ TRADUZ O QUE ELE MARCOU, E SÓ ISSO. A primeira versão traduzia a FRASE
+// INTEIRA em volta, com o pedaço marcado em negrito, e ele derrubou na
+// primeira tela: marcou `ore` e recebeu "Ele está pensando que Zola estava
+// apenas começando a explorar o que viria a se revelar um veio profundo e
+// fabuloso de minério" — três linhas para responder uma palavra. O veredito
+// dele foi certeiro: **"isso não é tradução, é explicação, e já tem um botão
+// de Explicar"**. Marcou uma palavra, quer a palavra; marcou uma frase (ou
+// tocou num balão do mangá, que seleciona a fala toda), quer a frase.
+//
+// A frase em volta não sumiu — mudou de papel: entra como CONTEXTO para
+// desambiguar e nunca é traduzida. É ela que faz `ore` virar "minério" num
+// livro de mineração e não "minério bruto" em outro sentido, e `barrel` virar
+// "cano" quando o dono é um fuzil.
+//
+// A divisão do trabalho, agora sem sobreposição:
+//   · Traduzir (aqui) — o equivalente do que ele marcou, naquela passagem.
+//   · Explicar (menu) — a Lexa ensinando: sentido, nuance, exemplos, a obra.
 //
 // ⚠️ CUSTO. Isto dispara a cada seleção, sem clique nenhum — o oposto de todo
 // o resto do app, onde chamada de IA se pede. Três freios, nesta ordem:
@@ -1534,12 +1544,10 @@ function _lerTradGuardar(chave, html) {
   _lerTradCache.set(chave, html)
 }
 
-// O QUE VAI PARA A IA. A frase em volta é o normal; mas quando ele marca um
-// parágrafo inteiro, o que ele marcou É maior que a frase — e traduzir só a
-// frase seria devolver menos do que ele pediu.
-function _lerTradTextoAlvo(alvo, frase) {
-  const a = String(alvo || '').trim(), f = String(frase || '').trim()
-  const base = (a.length > f.length) ? a : (f || a)
+// O QUE SE TRADUZ É A SELEÇÃO. Só o teto de tamanho mexe nela: marcar três
+// páginas com Ctrl+A não pode virar uma tradução de três páginas.
+function _lerTradTextoAlvo(alvo) {
+  const base = String(alvo || '').trim()
   if (base.length <= LER_TRAD_MAX) return base
   // Corta na última fronteira de frase que couber — nunca no meio de uma
   // palavra, que faria a IA traduzir um pedaço sem sentido.
@@ -1556,10 +1564,20 @@ async function _lerTraduzirAuto(pop, alvo, frase, bloco) {
   // some, e o silêncio é o que confunde.
   const vivo = () => document.body.contains(caixa) && el('ler-pop') === pop
 
-  const texto = _lerTradTextoAlvo(alvo, frase)
+  const texto = _lerTradTextoAlvo(alvo)
   if (!texto) { caixa.remove(); return }
 
-  const chave = _lerTradChave(alvo, texto)
+  // CURTO OU LONGO muda o que se pede — e o tamanho da letra na tela. Até
+  // quatro palavras é vocabulário: quer-se o equivalente, do tamanho de um
+  // equivalente ("minério", não uma oração explicando o que é minério). Daí em
+  // diante é texto, e texto se traduz inteiro.
+  const curto = texto.split(/\s+/).filter(Boolean).length <= LER_MAX_ALVO
+  if (curto) caixa.classList.add('curta')
+
+  // A chave leva a frase junto: a MESMA palavra em outra passagem pode ter
+  // outra tradução — é esse o ponto de traduzir dentro do contexto. Guardar só
+  // por palavra faria o cache devolver o sentido do capítulo anterior.
+  const chave = _lerTradChave(texto, frase)
   const guardado = _lerTradCache.get(chave)
   if (guardado) { caixa.innerHTML = guardado; _lerPopPor(pop); return }
 
@@ -1576,30 +1594,33 @@ async function _lerTraduzirAuto(pop, alvo, frase, bloco) {
   // O parágrafo entra só como CONTEXTO, nunca como coisa a traduzir: é ele que
   // carrega o antecedente do pronome. Sem isso, "he told her" vira chute de
   // gênero e o aluno recebe uma tradução com a pessoa errada.
-  const emVolta = (bloco && bloco.length > texto.length) ? bloco.slice(0, 1200) : ''
-  const sistema = 'Você traduz para português do Brasil, para um aluno que está lendo. ' +
-    'Devolva SÓ a tradução da frase pedida, natural e do mesmo tamanho — sem aspas, sem explicação, ' +
-    'sem introdução, sem o texto original. Palavrão e conteúdo adulto fazem parte da obra: traduza ' +
-    'fielmente, sem suavizar.\n' +
+  // ⚠️ SEM MANDAR A MESMA COISA DUAS VEZES: o parágrafo quase sempre CONTÉM a
+  // frase, e emendar os dois fazia a passagem chegar repetida à IA — tokens
+  // pagos por ruído, e ruído que faz modelo barato achar que a repetição é
+  // ênfase.
+  const parag = String(bloco || '').trim()
+  const fr = String(frase || '').trim()
+  const contexto = (parag.includes(fr) ? parag : [fr, parag].filter(Boolean).join('\n')).slice(0, 1200)
+  const sistema = 'Você traduz para português do Brasil, para um aluno que está lendo em ' +
+    L.nameEn + '. Devolva SOMENTE a tradução do trecho pedido — sem aspas, sem o original, ' +
+    'sem explicação, sem comentário, sem alternativas separadas por barra. Palavrão e conteúdo ' +
+    'adulto fazem parte da obra: traduza fielmente, sem suavizar.\n' +
+    (curto
+      ? 'O trecho é curto (uma palavra ou expressão): responda com o EQUIVALENTE em português, ' +
+        'igualmente curto e na mesma forma gramatical em que ele aparece na frase — nunca uma ' +
+        'oração inteira, nunca a frase em volta traduzida, nunca uma definição.\n'
+      : '') +
     (typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(lang, 'traducao') : '')
-  // O DESTAQUE SÓ FAZ SENTIDO SE HOUVER UM PEDAÇO. Quando ele marca a frase
-  // inteira — ou toca num balão do mangá, que seleciona a fala toda — pedir
-  // para negritar "o pedaço" é pedir para negritar tudo: um bloco inteiro em
-  // negrito não destaca nada e ainda faz o modelo torcer a tradução para
-  // encaixar o limite.
-  const semEspaco = s => String(s || '').toLowerCase().replace(/\s+/g, '')
-  const alvoEhTudo = semEspaco(alvo) === semEspaco(texto)
   const pergunta =
-    (emVolta ? `Contexto em volta (NÃO traduza, use só para resolver pronomes e referências): "${emVolta}"\n` : '') +
-    `Frase em ${L.nameEn} para traduzir: "${texto}"` +
-    (alvoEhTudo ? '' :
-      `\nO aluno marcou este pedaço: "${alvo}". Na sua tradução, envolva em <b></b> o equivalente EXATO ` +
-      `desse pedaço — só ele, sem estender para o resto da frase.`)
+    (contexto ? `A passagem, só para você entender o sentido — NÃO a traduza:\n"${contexto}"\n\n` : '') +
+    `Traduza este trecho, do jeito que ele significa AQUI nesta passagem:\n"${texto}"`
 
   try {
-    // Teto de saída proporcional à entrada: português rende ~30% mais que
-    // inglês, e ainda sobra folga para a marcação.
-    const maxTokens = Math.min(700, Math.max(120, Math.round(texto.length / 2) + 80))
+    // Teto de saída proporcional à entrada. Quem segura a explicação de brinde
+    // é o PROMPT, não este número: modelo que raciocina gasta orçamento antes
+    // de escrever, e teto apertado devolve resposta VAZIA — armadilha já
+    // documentada em `aiText`. Por isso 150, e não 40.
+    const maxTokens = curto ? 150 : Math.min(700, Math.max(120, Math.round(texto.length / 2) + 80))
     const bruto = await aiTextSeguro([
       { role: 'system', content: sistema },
       { role: 'user', content: pergunta }

@@ -4829,7 +4829,7 @@ mark.ler-w{
 
 /* A traducao automatica: a PRIMEIRA coisa do popup, e a maior.
    Tamanho de leitura (nao de rodape) porque e ela que o gesto pede — o menu
-   embaixo e o que virou acessorio. O negrito marca o pedaco selecionado. */
+   embaixo e o que virou acessorio. */
 .ler-pop-trad{
   margin:0 0 8px;padding:9px 11px;
   background:rgba(var(--primary-rgb),.08);
@@ -4837,10 +4837,20 @@ mark.ler-w{
   border-radius:var(--radius-sm);
   font-size:var(--fs-sm);line-height:1.55;color:var(--text);
 }
+/* Palavra ou expressao: a traducao E a resposta, entao tem corpo de titulo.
+   Trecho longo fica no corpo de leitura acima, senao viraria cartaz. */
+.ler-pop-trad.curta{
+  font-size:var(--fs-lg);line-height:1.35;font-weight:600;
+  color:rgb(var(--primary-rgb));padding:8px 11px;
+}
+.ler-pop-trad.curta .ler-pop-trad-esperando{
+  font-size:var(--fs-xs);font-weight:400;color:var(--text3);
+}
 .ler-pop-trad b{color:rgb(var(--primary-rgb));font-weight:600}
 .ler-pop-trad-esperando{color:var(--text3);font-size:var(--fs-xs);font-style:normal;opacity:.85}
 @media (max-width:768px){
   .ler-pop-trad{padding:10px 12px;font-size:var(--fs-base)}
+  .ler-pop-trad.curta{font-size:var(--fs-xl)}
 }
 
 
