@@ -5039,6 +5039,86 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .est-mini .ler-card-x{display:none}
 .est-painel-pe{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;justify-content:center}
 
+/* ---- séries: o volume 12 não é um livro solto ---- */
+.est-card-serie .ler-capa{
+  /* A pilha atrás da capa é o que diz "tem mais atrás deste" sem precisar de
+     texto. Duas camadas bastam: três já viram sujeira na grade.
+     ⚠️ AS CORES SÃO `surface3` + `border-strong`, NÃO `surface2` + `border`:
+     medido na tela, a primeira versão sumia — #1A1049 sobre o fundo #0A002A
+     com borda de 8% de branco é invisível a um metro do monitor. Pilha que
+     não se vê é o mesmo que não ter pilha. */
+  box-shadow:var(--shadow), 6px 6px 0 -1px var(--surface3), 6px 6px 0 0 var(--border-strong),
+             12px 12px 0 -2px var(--surface3), 12px 12px 0 -1px var(--border-strong);
+}
+.est-card-serie{margin-right:12px}
+.est-serie-n{
+  position:absolute;left:6px;top:6px;background:rgba(0,0,0,.72);color:#fff;
+  font-size:var(--fs-3xs);padding:2px 7px;border-radius:20px;
+}
+/* A prateleira do autor usa o acento da IA (roxo claro) e a da série usa o de
+   "de onde veio" (azul). Cor diferente porque a pergunta é diferente: uma
+   agrupa a MESMA obra, a outra agrupa a mesma PESSOA. */
+.est-card-autor .ler-capa{
+  box-shadow:var(--shadow), 6px 6px 0 -1px var(--surface3), 6px 6px 0 0 var(--border-strong);
+}
+.est-card-autor{margin-right:8px}
+.est-link{
+  background:none;border:0;padding:0;cursor:pointer;font:inherit;color:inherit;
+  border-bottom:1px dashed rgba(var(--primary-rgb),.5);
+}
+.est-link:hover{color:var(--text);border-bottom-color:var(--role-ia)}
+/* `width:auto` + `flex:0 0 auto`: dentro do `.est-filtros` (flex) o select
+   esticava para a linha inteira e empurrava o botão vizinho para baixo.
+   ⚠️ A regra vale SÓ PARA O SELECT. Aplicada a todos os filhos (`.est-filtros>*`)
+   ela travava também a fileira de abas, que deixava de quebrar linha e
+   estourava 71px numa tela estreita — medido. */
+.est-select-sm{height:30px;font-size:var(--fs-3xs);padding:0 8px;width:auto;flex:0 0 auto}
+.est-serie-topo{
+  display:flex;justify-content:space-between;align-items:flex-start;gap:20px;
+  flex-wrap:wrap;margin-bottom:26px;
+}
+.est-serie-topo h2{font-size:var(--fs-xl);font-weight:700;color:var(--text)}
+.est-serie-topo p{font-size:var(--fs-sm);color:var(--text2);margin-top:4px}
+.est-serie-acoes{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---- menu do livro (status sem abrir a ficha) ---- */
+.est-menu{
+  position:fixed;z-index:var(--z-modal);width:210px;padding:6px;
+  background:var(--surface);border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);box-shadow:0 14px 40px rgba(0,0,0,.45);
+  display:flex;flex-direction:column;gap:1px;
+}
+.est-menu button{
+  display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+  background:none;border:0;cursor:pointer;color:var(--text2);
+  font-family:inherit;font-size:var(--fs-sm);padding:8px 10px;border-radius:var(--radius-xs);
+}
+.est-menu button:hover{background:var(--surface2);color:var(--text)}
+.est-menu button.on{color:var(--text);font-weight:600}
+.est-menu button.perigo:hover{background:rgba(var(--primary-rgb),.08);color:var(--error)}
+.est-menu button i{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.est-menu-sep{
+  font-size:var(--fs-3xs);color:var(--text3);text-transform:uppercase;letter-spacing:.06em;
+  padding:9px 10px 4px;border-top:1px solid var(--border);margin-top:3px;
+}
+.est-menu-sep:empty{padding:0;margin-top:4px}
+.est-menu-nota{padding:4px 10px 8px}
+.est-linha-menu{padding-left:8px;padding-right:8px}
+
+/* ---- reunir em série ---- */
+.est-reunir-lista{
+  max-height:320px;overflow-y:auto;border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:4px;
+}
+.est-reunir-item{
+  display:flex;align-items:center;gap:10px;padding:7px 9px;cursor:pointer;
+  border-radius:var(--radius-xs);font-size:var(--fs-sm);color:var(--text2);
+}
+.est-reunir-item:hover{background:var(--surface2)}
+.est-reunir-item input{width:15px;height:15px;flex-shrink:0;accent-color:var(--primary)}
+.est-reunir-nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.est-reunir-num{font-size:var(--fs-3xs);color:var(--text3);flex-shrink:0}
+
 /* ---- telas estreitas ---- */
 @media (max-width:900px){
   .est-ficha{grid-template-columns:minmax(0,1fr);gap:22px}
@@ -5056,7 +5136,12 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 @media (max-width:640px){
   .est-barra-dir{width:100%;justify-content:space-between}
   .est-busca{min-width:100%}
-  .est-linha-acoes{display:none}
+  /* A pilha da série sai no celular: com colunas estreitas ela encostava no
+     card vizinho. O selo "N vols" continua dizendo a mesma coisa. */
+  .est-card-serie .ler-capa{box-shadow:var(--shadow)}
+  .est-card-serie{margin-right:0}
+  .est-linha-acoes{display:flex}
+  .est-linha-acoes .btn:not(.est-linha-menu){display:none}
   .est-linha-dir .est-estrelas{display:none}
   .est-form-grid{grid-template-columns:1fr}
   .est-campo.w2,.est-campo.w4{grid-column:span 1}

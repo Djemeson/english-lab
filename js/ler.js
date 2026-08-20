@@ -160,7 +160,16 @@ async function _lerImportarUm(file) {
     // não depender da migração — que existe para o acervo que já estava aqui.
     kind: 'arquivo', status: 'quero', historico: [], tags: [], nota: 0,
     paginas: 0, pagAtual: 0, genero: '', editora: '', isbn: '', ano: '',
-    serie: '', serieNum: '', resumo: '', coverUrl: '', inicio: null, fim: null
+    serie: '', serieNum: '', resumo: '', coverUrl: '', inicio: null, fim: null,
+    // A SÉRIE SE RESOLVE NA ENTRADA. Mangá chega em lote de dezenas de `.cbz`
+    // ("One Piece v12.cbz"), e pedir que ele digite série e número quarenta
+    // vezes seria transformar organização em trabalho braçal. O nome do
+    // ARQUIVO é a fonte — o metadado interno do CBZ raramente traz volume.
+    ...(function () {
+      if (typeof estSerieDoNome !== 'function') return {}
+      const d = estSerieDoNome(file.name, meta.format === 'manga')
+      return d ? { serie: d.serie, serieNum: d.num } : {}
+    })()
   })
   toast(`"${meta.title}" entrou na estante`, 'success')
   // O NOME LIMPO SE RESOLVE NA ENTRADA, não num botão lá adiante.

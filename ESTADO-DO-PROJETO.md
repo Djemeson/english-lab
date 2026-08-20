@@ -7,7 +7,21 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-20 (5ª) — **A ESTANTE VIROU UM GERENCIADOR DE LIVROS**. Era uma
+> Última atualização: 2026-08-20 (6ª) — **SÉRIES, PRATELEIRA DE AUTOR E O STATUS NO CARD**. Três
+> pedidos numa rodada. (1) *"como um livro vai pra Quero ler e Parado?"* — ia pela ficha, e só
+> por ela; agora **cada card tem um menu** com os quatro status, nota e remover. Pergunta sobre
+> onde fica uma função é resposta sobre onde ela deveria estar. (2) **Mangá com muitos volumes
+> vira UMA série**: a importação lê série e número **do nome do arquivo** (`One Piece v12.cbz`),
+> a estante mostra um card com pilha atrás, e quem já tem volumes soltos usa **"Reunir em
+> série"**, que adivinha o grupo e numera sozinho. (3) **Agrupar por AUTOR** — *"tem autores que
+> gosto muito de ler... tipo stephen king"*: a prateleira do autor conta **obras, não arquivos**
+> (40 volumes = 1 obra) e soma páginas e horas dele. ⚠️ Quatro defeitos vistos na tela, não no
+> código: a pilha da série era **invisível** (cor escura sobre fundo escuro), o card do autor
+> escolhia **capa vazia** tendo capa real no grupo, o seletor de agrupamento **comia a linha
+> inteira**, e o `flex` que consertou isso **estourou 71px no celular** ao travar a quebra das
+> abas. `sw.js` → **englab-v329**. **Detalhes em §8.54.**
+>
+> Última atualização anterior: 2026-08-20 (5ª) — **A ESTANTE VIROU UM GERENCIADOR DE LIVROS**. Era uma
 > grade de capas com barra de progresso; agora tem **busca, filtros por status e tipo,
 > ordenação, lista ou grade, ficha por livro, cadastro de livro SEM arquivo (papel, e-book de
 > fora) e um painel de leitura** com calendário, sequência, meta diária e meta anual. A base é o
@@ -1420,6 +1434,13 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
       164.394 palavras e 528 páginas impressas = 311 por página).
     - Catálogo e organização: `genero, editora, ano, isbn, serie, serieNum, tags[], resumo,
       coverUrl, nota (0–5), inicio, fim, anoFim`.
+    - **`serie` / `serieNum` são o que agrupa** (§8.54). Preenchidos na importação a partir do
+      NOME DO ARQUIVO (`One Piece v12.cbz`), por "Reunir em série" ou à mão. ⚠️ Série de um
+      volume só **não** vira grupo — o livro volta a aparecer solto. O agrupamento por **autor**
+      usa `author` cru (comparação por minúsculas, sem partir por vírgula) e conta **obras**:
+      uma série inteira vale 1.
+    - `cfg`/preferência local **`est_agrupar`** — `'serie' | 'autor' | 'nada'` (era booleano até
+      a 6ª rodada; o valor antigo continua sendo lido).
     - **`demo: true`** — item do acervo de exemplo, removível em um clique. Sem essa marca o
       exemplo viraria lixo permanente num acervo que **sincroniza**.
   - **Merge na nuvem (firebase.js):** por livro, pelo `updatedAt` — e o **`historico` é a
@@ -1615,6 +1636,10 @@ maxInterval (36500), leechThreshold (50)
     (Todos/Lendo/Quero ler/Lido/Parado) com contagem, filtro por tipo (EPUB/Mangá/Físico/Texto),
     ordenação (aberto por último, título, autor, progresso, nota, adicionado) e vista em
     **grade ou lista** — as duas últimas guardadas por aparelho, não no acervo.
+    - **Agrupamento** (§8.54): por **série** (os volumes viram um card com pilha atrás), por
+      **autor** (a prateleira de quem você lê sempre, contando obras e não arquivos) ou nenhum.
+    - **O menu do card** abre status, nota, ficha, ler/registrar e remover **sem sair da
+      estante** — é por ele que um livro vai para "Quero ler" ou "Parado".
   - **Ficha do livro** — capa, metadados, nota em estrelas, status em um clique, e quatro abas:
     *Sobre* (dados + previsão de término pelo ritmo real), *Progresso* (o histórico dia a dia,
     com gráfico e apagar-dia), *Capturas* (o vocabulário que saiu DAQUELE livro, casado por
@@ -11595,6 +11620,84 @@ Chrome dele a 1536px e no painel embutido a 375px. Console sem erro de JS.
 fatia inteira (player, capítulos, velocidade, posição sincronizada), não um campo a mais no
 cadastro. Ficaria pela metade se entrasse aqui, então o formulário **não oferece "Audiobook"**:
 prometer na tela o que não existe é pior que a ausência.
+
+## 8.54 Séries, prateleira de autor e o status no card (2026-08-20, 6ª)
+
+Três perguntas dele, na ordem em que chegaram — e cada uma virou uma decisão de desenho.
+
+### 1. "Como um livro vai pra Quero ler e Parado?"
+
+Ia pela ficha (card → botão de informação → quatro botões de status). Funcionava e ninguém
+achava. **Pergunta sobre onde fica uma função é resposta sobre onde ela deveria estar**: agora
+o botão do canto do card abre um **menu** com *Abrir a ficha*, *Ler agora* / *Registrar
+progresso*, os quatro status (com o atual marcado), a nota em estrelas e *Remover da estante*.
+Na lista, o mesmo menu ao lado do botão de ação.
+
+Detalhes que o teste cobrou:
+- O menu é `position:fixed` posicionado à mão, **não `absolute` dentro do card**: a capa tem
+  `overflow:hidden` e a grade rola — ficaria cortado. Ele também se vira para cima quando não
+  cabe embaixo (medido: cabe inteiro a 375px e a 1536px).
+- **As estrelas dentro do menu fecham o menu ao serem clicadas.** Sem isso ele ficava pairando
+  sobre uma estante já redesenhada, exibindo a nota antiga.
+- **"Parado" não mexe no progresso** — 35% continua 35%. É o único status que o app nunca
+  atribui sozinho: parar de ler é decisão humana.
+
+### 2. Mangá com muitos volumes
+
+Três caminhos, do mais automático ao manual:
+
+| Situação | O que acontece |
+|---|---|
+| Importar `One Piece v12.cbz` | série e número lidos **do nome do arquivo**, sem digitar nada |
+| Volumes já na estante | **"Reunir em série"** — sugere o grupo, marca os volumes e numera |
+| Um caso torto | ficha → Editar → campo Série, com autocompletar das séries que já existem |
+
+⚠️ **O padrão "título + número no fim" só vale para `.cbz`.** Em EPUB ele transformaria
+*Fahrenheit 451* na série "Fahrenheit", volume 451, e *Catch 22* na série "Catch" — para livro
+comum exige-se marca explícita (`v`, `vol`, `volume`, `#`). O teto de 300 no número derruba ano
+e código disfarçados de volume. Testado com 12 nomes: acertou os 6 de mangá
+(`v12`, `- Volume 08`, `#3`, ` 14`, `_012`, `vol.5`) e recusou os 6 que não são série,
+*Blade Runner 2049* incluído.
+
+Na tela: um card com **pilha de capas atrás**, selo "N vols", e o progresso **médio da série**.
+A capa é a do volume que importa — o que está sendo lido; senão o primeiro não lido. Dentro da
+série: cabeçalho com o quanto já foi, botão *Continuar o vol. N*, **Renomear** (vale para todos)
+e **Desfazer série** (nenhum livro é apagado, só a etiqueta sai).
+
+### 3. "Serializar por autor também — tipo Stephen King"
+
+Terceiro modo de agrupamento (`Agrupar: séries | autor | sem agrupar`), guardado por aparelho.
+
+⚠️ **A prateleira do autor conta OBRAS, não arquivos.** Dentro dela as séries continuam
+agrupadas: Oda aparece como *"2 obras · 1 série"* e não como *"5 livros"*, porque 40 volumes de
+um mangá são **uma** obra dele. O cabeçalho soma o que é do autor: obras, lidas, % do que você
+tem dele, páginas lidas e horas de leitura.
+
+Ligações: na ficha, **autor e série são links**; e o caminho de volta se encadeia —
+*ficha do volume → One Piece → Eiichiro Oda → Estante*. Voltar direto para a estante num mangá
+de 40 volumes seria perder o lugar.
+
+### As quatro coisas que só a tela mostrou
+
+1. **A pilha da série era invisível.** O `box-shadow` estava lá (confirmado no computed style),
+   mas em `--surface2` (#1A1049) sobre o fundo #0A002A, com borda de 8% de branco. Passou a
+   `--surface3` + `--border-strong`. Pilha que não se vê é o mesmo que não ter pilha.
+2. **O card do autor pegava capa vazia.** A regra era "o que está sendo lido"; *The Shining*
+   (sem capa) ganhava de *Billy Summers* (com capa real) na prateleira do King. Agora
+   "está sendo lido **e tem capa**" vem primeiro.
+3. **O seletor de agrupamento comia a linha inteira** e empurrava o botão vizinho para baixo.
+4. **E o conserto do item 3 estourou 71px no celular**: `flex:0 0 auto` aplicado a *todos* os
+   filhos da barra travou a quebra de linha das abas de status. Restrito ao select — medido de
+   novo: 0 de overflow em estante, série, autor, lista e ficha, a 375px e a 1536px.
+
+### Miudezas do mesmo lote
+
+- Dentro da prateleira do autor, o card **para de repetir o nome dele** e diz o que ali varia:
+  volume, ano, gênero — ou, em último caso, o **status** (nunca linha em branco, que
+  desalinhava a fileira).
+- Nome de série com **apóstrofo e aspas** (`Jojo's "Bizarre" Adventure`) foi testado: abre.
+- A sugestão do "Reunir em série" **ignora quem já tem série** — sem isso ela apontava para o
+  maior grupo do acervo, que costuma ser justamente o já organizado.
 
 ## 9. Pendências / a verificar
 

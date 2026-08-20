@@ -57,8 +57,14 @@ const EST_GENEROS = [
 ]
 
 // ---- estado só de tela (nada disto é persistido no acervo) ----
-let _estVista = 'estante'      // estante | ficha | form | painel
+let _estVista = 'estante'      // estante | serie | ficha | form | painel
 let _estId = null              // livro da ficha / edição
+let _estSerie = ''             // série aberta (nome)
+let _estAutor = ''             // autor aberto (nome)
+// Dentro da prateleira de um autor, repetir o nome dele embaixo de cada capa
+// é ruído: cinco cards dizendo "Stephen King" numa tela chamada Stephen King.
+// A linha passa a dizer o que ali VARIA — o volume, ou o ano.
+let _estOcultaAutor = false
 let _estAba = 'sobre'          // aba da ficha
 let _estBusca = ''
 let _estStatus = 'todos'
@@ -218,12 +224,24 @@ function estanteRender() {
   if (_estVista === 'ficha')  return _estRenderFicha()
   if (_estVista === 'form')   return _estRenderForm()
   if (_estVista === 'painel') return _estRenderPainel()
+  if (_estVista === 'serie')  return _estRenderSerie()
+  if (_estVista === 'autor')  return _estRenderAutor()
   _estRenderEstante()
 }
 
 function _estAcoesHTML() {
   if (_estVista !== 'estante') {
-    return `<button class="btn btn-ghost btn-sm" onclick="estIr('estante')">${ic('chevronLeft','ic-sm')} Estante</button>`
+    // Da ficha de um volume, voltar para a ESTANTE pularia a série de onde ele
+    // veio — e num mangá de 40 volumes isso é perder o lugar.
+    const l = _estVista === 'ficha' ? livroPorId(_estId) : null
+    const serie = l && (l.serie || '').trim()
+    const autor = _estVista === 'serie'
+      ? (livros.find(x => (x.serie || '').trim().toLowerCase() === String(_estSerie).toLowerCase()) || {}).author
+      : (l && l.author)
+    const voltaAutor = estModoAgrupar() === 'autor' && String(autor || '').trim()
+    return `${serie ? `<button class="btn btn-ghost btn-sm" onclick="estAbrirSerie(${_estArg(serie)})">${ic('chevronLeft','ic-sm')} ${esc(serie)}</button>` : ''}
+      ${voltaAutor ? `<button class="btn btn-ghost btn-sm" onclick="estAbrirAutor(${_estArg(autor.trim())})">${ic('chevronLeft','ic-sm')} ${esc(autor.trim())}</button>` : ''}
+      <button class="btn btn-ghost btn-sm" onclick="estIr('estante')">${ic('chevronLeft','ic-sm')} Estante</button>`
   }
   if (!livros.length) return ''
   return `
@@ -249,7 +267,8 @@ function _estRenderEstante() {
 
   const visual = estPref('visual', 'grade')
   const ordem = estPref('ordem', 'recentes')
-  const lista = _estFiltrar()
+  const agrupar = estModoAgrupar()
+  const itens = _estAgrupar(_estFiltrar())
   const contas = _estContagens()
 
   const abas = ['todos', 'lendo', 'quero', 'lido', 'parado'].map(s => {
@@ -286,13 +305,346 @@ function _estRenderEstante() {
     <div class="est-filtros">
       <div class="est-abas">${abas}</div>
       ${tipos ? `<div class="est-chips">${tipos}</div>` : ''}
+      ${(_estTemSerie() || _estTemAutorRepetido()) ? `
+        <select class="est-select est-select-sm" aria-label="Agrupar" onchange="estSetAgrupar(this.value)"
+                data-tip="Junta numa capa só o que é da mesma obra ou da mesma pessoa">
+          ${[['serie','Agrupar: séries'],['autor','Agrupar: autor'],['nada','Sem agrupar']]
+            .map(([v,r]) => `<option value="${v}"${agrupar === v ? ' selected' : ''}>${r}</option>`).join('')}
+        </select>` : ''}
+      <button class="est-chip" onclick="estReunirModal()" data-tip="Marcar vários volumes como uma série">${ic('plus','ic-3xs')} Reunir em série</button>
     </div>
-    ${lista.length
+    ${itens.length
       ? (visual === 'grade'
-          ? `<div class="ler-estante">${lista.map(_estCard).join('')}</div>`
-          : `<div class="est-lista">${lista.map(_estLinha).join('')}</div>`)
+          ? `<div class="ler-estante">${itens.map(_estItemCard).join('')}</div>`
+          : `<div class="est-lista">${itens.map(_estItemLinha).join('')}</div>`)
       : `<div class="est-nada">${ic('search','ic-lg')}<p>Nada aqui com esse filtro.</p>
          <button class="btn btn-ghost btn-sm" onclick="estLimparFiltros()">Limpar filtros</button></div>`}`
+}
+
+// ================================================================
+// SÉRIES — o volume 12 não é um livro solto
+// ================================================================
+// Mangá vem em dezenas de volumes, e uma estante que os trata como obras
+// independentes vira uma parede de capas iguais onde não se acha nada. Aqui
+// eles viram UM card, que abre na lista dos volumes.
+//
+// ⚠️ SÉRIE DE UM VOLUME SÓ NÃO É SÉRIE. O livro volta a aparecer sozinho —
+// senão marcar a série num livro avulso o esconderia atrás de uma capa que
+// promete uma coleção que não existe.
+function _estTemSerie() {
+  const c = {}
+  for (const l of livros) {
+    const s = (l.serie || '').trim().toLowerCase()
+    if (s) { c[s] = (c[s] || 0) + 1; if (c[s] > 1) return true }
+  }
+  return false
+}
+function _estTemAutorRepetido() {
+  const c = {}
+  for (const l of livros) {
+    const a = (l.author || '').trim().toLowerCase()
+    if (a) { c[a] = (c[a] || 0) + 1; if (c[a] > 1) return true }
+  }
+  return false
+}
+
+// O modo de agrupamento é `'serie' | 'autor' | 'nada'`.
+// ⚠️ Era um booleano ("agrupar séries, sim ou não") até ele pedir agrupamento
+// por autor: *"tem autores que gosto muito de ler e vão ter vários livros
+// deles. tipo stephen king."* Valor antigo `true`/`false` continua sendo lido.
+function estModoAgrupar() {
+  const v = estPref('agrupar', 'serie')
+  if (v === true) return 'serie'
+  if (v === false) return 'nada'
+  return v
+}
+
+function _estAgrupar(lista) {
+  const modo = estModoAgrupar()
+  if (modo === 'nada') return lista.map(l => ({ l }))
+
+  // AUTOR: as séries daquele autor continuam agrupadas DENTRO do grupo dele —
+  // senão Oda apareceria com "40 livros" quando na verdade tem uma obra em 40
+  // volumes, e o número diria a coisa errada.
+  if (modo === 'autor') {
+    const grupos = new Map(), itens = []
+    for (const l of lista) {
+      const a = (l.author || '').trim()
+      if (!a) { itens.push({ l }); continue }
+      const k = a.toLowerCase()
+      if (!grupos.has(k)) { const g = { autor: a, obras: [] }; grupos.set(k, g); itens.push(g) }
+      grupos.get(k).obras.push(l)
+    }
+    return itens.map(it => {
+      if (!it.autor) return it
+      if (it.obras.length < 2) return { l: it.obras[0] }
+      it.series = _estSeriesDe(it.obras)
+      return it
+    })
+  }
+
+  const grupos = new Map(), itens = []
+  for (const l of lista) {
+    const s = (l.serie || '').trim()
+    if (!s) { itens.push({ l }); continue }
+    const k = s.toLowerCase()
+    if (!grupos.has(k)) {
+      const g = { serie: s, vols: [] }
+      grupos.set(k, g); itens.push(g)
+    }
+    grupos.get(k).vols.push(l)
+  }
+  // Desfaz o grupo de um volume só e ordena os volumes pelo número.
+  return itens.map(it => {
+    if (!it.serie) return it
+    if (it.vols.length < 2) return { l: it.vols[0] }
+    it.vols.sort((a, b) => (Number(a.serieNum) || 9999) - (Number(b.serieNum) || 9999))
+    return it
+  })
+}
+
+// Quantas OBRAS há numa lista de livros: cada série conta como uma, os avulsos
+// contam um cada. É o número que a gente diz na tela do autor.
+function _estSeriesDe(lista) {
+  const s = new Set()
+  let avulsos = 0
+  for (const l of lista) {
+    const n = (l.serie || '').trim().toLowerCase()
+    if (n) s.add(n); else avulsos++
+  }
+  return { series: s.size, avulsos, obras: s.size + avulsos }
+}
+
+// O card do grupo mostra o volume que IMPORTA: o que está sendo lido; na falta
+// dele, o primeiro que ainda não foi lido; na falta dos dois, o último. Mostrar
+// sempre o volume 1 faria a capa de quem está no volume 40 nunca mudar.
+function _estVolAtual(vols) {
+  return vols.find(v => v.status === 'lendo')
+      || vols.find(v => v.status !== 'lido')
+      || vols[vols.length - 1]
+}
+
+function _estItemCard(it) {
+  if (it.serie) return _estCardSerie(it)
+  if (it.autor) return _estCardAutor(it)
+  return _estCard(it.l)
+}
+function _estItemLinha(it) {
+  if (it.serie) return _estLinhaSerie(it)
+  if (it.autor) return _estLinhaAutor(it)
+  return _estLinha(it.l)
+}
+
+// ================================================================
+// AUTOR — a prateleira de quem você lê sempre
+// ================================================================
+// Pedido dele: *"tem autores que gosto muito de ler e vão ter vários livros
+// deles. tipo stephen king."* Mesma mecânica da série, com uma diferença que
+// muda o número na tela: aqui se contam OBRAS, não arquivos — os 40 volumes
+// de um mangá são UMA obra do autor, não quarenta.
+// ⚠️ "O QUE ESTÁ SENDO LIDO" SÓ GANHA SE TIVER CAPA. Visto na tela: a
+// prateleira do Stephen King mostrou o retângulo vazio de *The Shining* (em
+// leitura, sem capa) tendo a capa real de *Billy Summers* no mesmo grupo. Um
+// card de autor sem imagem nenhuma é o pior resultado possível — a capa é o
+// que faz a prateleira ser reconhecida de longe.
+function _estAutorCapa(obras) {
+  const temCapa = o => !!(o.cover || o.coverUrl)
+  return obras.find(o => o.status === 'lendo' && temCapa(o))
+      || obras.find(temCapa)
+      || obras.find(o => o.status === 'lendo')
+      || obras[0]
+}
+function _estAutorResumo(obras) {
+  const c = _estSeriesDe(obras)
+  const lidos = obras.filter(o => o.status === 'lido').length
+  return { ...c, lidos,
+    txt: `${c.obras} ${c.obras === 1 ? 'obra' : 'obras'}${c.series ? ` · ${c.series} ${c.series === 1 ? 'série' : 'séries'}` : ''}` }
+}
+const _estArg = v => JSON.stringify(v).replace(/"/g, '&quot;')
+
+function _estCardAutor(g) {
+  const capa = _estAutorCapa(g.obras)
+  const r = _estAutorResumo(g.obras)
+  const pct = Math.round(g.obras.reduce((s, o) => s + estPct(o), 0) / g.obras.length * 100)
+  return `
+    <div class="ler-card est-card est-card-autor" onclick="estAbrirAutor(${_estArg(g.autor)})"
+         data-tip="${escA(`${r.txt} · ${r.lidos} ${r.lidos === 1 ? 'lida' : 'lidas'}`)}">
+      <div class="ler-capa">${_estCapaHTML(capa)}
+        <span class="est-serie-n">${g.obras.length} ${g.obras.length === 1 ? 'livro' : 'livros'}</span>
+        ${pct > 0 ? `<span class="ler-capa-pct">${pct}%</span>` : ''}
+      </div>
+      <div class="ler-card-nome">${esc(g.autor)}</div>
+      <div class="ler-card-autor">${esc(r.txt)}</div>
+      <div class="ler-card-barra"><i style="width:${pct}%;background:var(--role-ia)"></i></div>
+    </div>`
+}
+
+function _estLinhaAutor(g) {
+  const capa = _estAutorCapa(g.obras)
+  const r = _estAutorResumo(g.obras)
+  const pct = Math.round(g.obras.reduce((s, o) => s + estPct(o), 0) / g.obras.length * 100)
+  return `
+    <div class="est-linha" onclick="estAbrirAutor(${_estArg(g.autor)})">
+      <div class="est-linha-capa">${_estCapaHTML(capa)}</div>
+      <div class="est-linha-meio">
+        <div class="est-linha-nome">${esc(g.autor)}
+          <span class="est-selo">${ic('pencil','ic-3xs')} ${g.obras.length} ${g.obras.length === 1 ? 'livro' : 'livros'}</span></div>
+        <div class="est-linha-sub">${esc(r.txt)} · ${r.lidos} ${r.lidos === 1 ? 'lida' : 'lidas'}</div>
+        <div class="est-linha-barra"><i style="width:${pct}%;background:var(--role-ia)"></i></div>
+      </div>
+      <div class="est-linha-dir"><span class="est-linha-pct">${pct}%</span></div>
+      <div class="est-linha-acoes">
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();estAbrirAutor(${_estArg(g.autor)})">Abrir</button>
+      </div>
+    </div>`
+}
+
+function estAbrirAutor(nome) { _estAutor = nome; estIr('autor') }
+
+function _estRenderAutor() {
+  const alvo = String(_estAutor || '').toLowerCase()
+  const obras = livros.filter(l => (l.author || '').trim().toLowerCase() === alvo)
+  if (!obras.length) { estIr('estante'); return }
+  const r = _estAutorResumo(obras)
+  const pct = Math.round(obras.reduce((s, o) => s + estPct(o), 0) / obras.length * 100)
+  const visual = estPref('visual', 'grade')
+  const minutos = obras.reduce((s, o) => s + (o.minutos || 0), 0)
+  const paginas = obras.reduce((s, o) => s + Math.round(estPct(o) * estPaginas(o)), 0)
+  // Dentro do autor, a série continua sendo UM card — 40 volumes soltos aqui
+  // afogariam os outros livros dele.
+  const itens = _estAgruparEm('serie', obras)
+
+  _estOcultaAutor = true
+  el('ler-area').innerHTML = `
+    <div class="est-serie-topo">
+      <div>
+        <h2>${esc(_estAutor)}</h2>
+        <p>${esc(r.txt)} · <b>${r.lidos}</b> ${r.lidos === 1 ? 'lida' : 'lidas'} · ${pct}% do que você tem dele${
+          paginas ? ` · ${paginas.toLocaleString('pt-BR')} ${paginas === 1 ? 'página lida' : 'páginas lidas'}` : ''}${
+          minutos ? ` · ${_estDur(minutos)} de leitura` : ''}</p>
+        <div class="est-ficha-barra" style="max-width:420px;margin-top:10px"><i style="width:${pct}%;background:var(--role-ia)"></i></div>
+      </div>
+    </div>
+    ${visual === 'grade'
+      ? `<div class="ler-estante">${itens.map(_estItemCard).join('')}</div>`
+      : `<div class="est-lista">${itens.map(_estItemLinha).join('')}</div>`}`
+  // ⚠️ DESLIGAR AQUI, e não em outro lugar: o sinal vale só enquanto esta tela
+  // se desenha. Esquecido ligado, a estante inteira perderia o nome do autor.
+  _estOcultaAutor = false
+}
+
+// Agrupa numa modalidade específica, sem depender da preferência salva — é o
+// que deixa a tela do autor agrupar séries mesmo estando no modo "autor".
+function _estAgruparEm(modo, lista) {
+  const antes = estPref('agrupar', 'serie')
+  saveUiPref('est_agrupar', modo)
+  const r = _estAgrupar(lista)
+  saveUiPref('est_agrupar', antes)
+  return r
+}
+
+function _estCardSerie(g) {
+  const atual = _estVolAtual(g.vols)
+  const lidos = g.vols.filter(v => v.status === 'lido').length
+  const pct = Math.round(g.vols.reduce((s, v) => s + estPct(v), 0) / g.vols.length * 100)
+  const num = atual.serieNum ? `vol. ${esc(String(atual.serieNum))}` : ''
+  return `
+    <div class="ler-card est-card est-card-serie" onclick="estAbrirSerie(${JSON.stringify(g.serie).replace(/"/g, '&quot;')})"
+         data-tip="${escA(`${g.vols.length} volumes · ${lidos} lidos`)}">
+      <div class="ler-capa">${_estCapaHTML(atual)}
+        <span class="est-serie-n">${g.vols.length} vols</span>
+        ${pct > 0 ? `<span class="ler-capa-pct">${pct}%</span>` : ''}
+      </div>
+      <div class="ler-card-nome">${esc(g.serie)}</div>
+      <div class="ler-card-autor">${esc(atual.author || '')}${num ? ` · ${num}` : ''}</div>
+      <div class="ler-card-barra"><i style="width:${pct}%;background:var(--role-fonte)"></i></div>
+    </div>`
+}
+
+function _estLinhaSerie(g) {
+  const atual = _estVolAtual(g.vols)
+  const lidos = g.vols.filter(v => v.status === 'lido').length
+  const pct = Math.round(g.vols.reduce((s, v) => s + estPct(v), 0) / g.vols.length * 100)
+  return `
+    <div class="est-linha" onclick="estAbrirSerie(${JSON.stringify(g.serie).replace(/"/g, '&quot;')})">
+      <div class="est-linha-capa">${_estCapaHTML(atual)}</div>
+      <div class="est-linha-meio">
+        <div class="est-linha-nome">${esc(g.serie)}
+          <span class="est-selo">${ic('layers','ic-3xs')} ${g.vols.length} volumes</span></div>
+        <div class="est-linha-sub">${esc(atual.author || '')} · ${lidos} ${lidos === 1 ? 'lido' : 'lidos'}${
+          atual.status === 'lendo' && atual.serieNum ? ` · lendo o vol. ${esc(String(atual.serieNum))}` : ''}</div>
+        <div class="est-linha-barra"><i style="width:${pct}%;background:var(--role-fonte)"></i></div>
+      </div>
+      <div class="est-linha-dir"><span class="est-linha-pct">${pct}%</span></div>
+      <div class="est-linha-acoes">
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();estAbrirSerie(${JSON.stringify(g.serie).replace(/"/g, '&quot;')})">Abrir</button>
+      </div>
+    </div>`
+}
+
+function estAbrirSerie(nome) { _estSerie = nome; estIr('serie') }
+function estSetAgrupar(modo) { estSetPref('agrupar', modo); _estRenderEstante() }
+
+function _estRenderSerie() {
+  const nome = _estSerie
+  const vols = livros.filter(l => (l.serie || '').trim().toLowerCase() === String(nome || '').toLowerCase())
+    .sort((a, b) => (Number(a.serieNum) || 9999) - (Number(b.serieNum) || 9999))
+  if (!vols.length) { estIr('estante'); return }
+  const lidos = vols.filter(v => v.status === 'lido').length
+  const lendo = vols.find(v => v.status === 'lendo')
+  const proximo = vols.find(v => v.status !== 'lido')
+  const pct = Math.round(vols.reduce((s, v) => s + estPct(v), 0) / vols.length * 100)
+  const visual = estPref('visual', 'grade')
+
+  el('ler-area').innerHTML = `
+    <div class="est-serie-topo">
+      <div>
+        <h2>${esc(nome)}</h2>
+        <p>${vols.length} volumes · <b>${lidos}</b> ${lidos === 1 ? 'lido' : 'lidos'} · ${pct}% da série${
+          vols[0].author ? ` · ${esc(vols[0].author)}` : ''}</p>
+        <div class="est-ficha-barra" style="max-width:420px;margin-top:10px"><i style="width:${pct}%;background:var(--role-fonte)"></i></div>
+      </div>
+      <div class="est-serie-acoes">
+        ${proximo ? `<button class="btn btn-primary btn-sm" onclick="${proximo.kind === 'fisico'
+            ? `estProgressoModal('${proximo.id}')` : `lerAbrir('${proximo.id}')`}">
+          ${ic('bookOpen','ic-sm')} ${lendo ? 'Continuar' : 'Começar'} o vol. ${esc(String(proximo.serieNum || '?'))}</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="estRenomearSerie(${JSON.stringify(nome).replace(/"/g, '&quot;')})">${ic('pencil','ic-sm')} Renomear</button>
+        <button class="btn btn-ghost btn-sm" onclick="estDesfazerSerie(${JSON.stringify(nome).replace(/"/g, '&quot;')})">${ic('layers','ic-sm')} Desfazer série</button>
+      </div>
+    </div>
+    ${visual === 'grade'
+      ? `<div class="ler-estante">${vols.map(_estCard).join('')}</div>`
+      : `<div class="est-lista">${vols.map(_estLinha).join('')}</div>`}`
+}
+
+function estRenomearSerie(nome) {
+  inputModal({
+    title: 'Renomear a série', label: 'O nome novo vale para todos os volumes.',
+    value: nome, confirmText: 'Renomear',
+    onConfirm: novo => {
+      const alvo = String(nome || '').toLowerCase()
+      livros.forEach(l => {
+        if ((l.serie || '').trim().toLowerCase() === alvo) { l.serie = novo; l.updatedAt = Date.now() }
+      })
+      _estSerie = novo
+      estSalvar(); toast('Série renomeada', 'success'); estanteRender()
+    }
+  })
+}
+
+async function estDesfazerSerie(nome) {
+  const alvo = String(nome || '').toLowerCase()
+  const n = livros.filter(l => (l.serie || '').trim().toLowerCase() === alvo).length
+  const ok = await confirmModal({
+    title: 'Desfazer a série?', icon: 'layers', confirmText: 'Desfazer',
+    html: `<p>Os <b>${n} volumes</b> voltam a aparecer soltos na estante. Nenhum livro é apagado
+           e nenhuma leitura se perde — só a etiqueta de série sai.</p>`
+  })
+  if (!ok) return
+  livros.forEach(l => {
+    if ((l.serie || '').trim().toLowerCase() === alvo) { l.serie = ''; l.serieNum = ''; l.updatedAt = Date.now() }
+  })
+  estSalvar(); toast('Série desfeita', 'info'); estIr('estante')
 }
 
 function _estVazioHTML() {
@@ -379,12 +731,23 @@ function _estCard(l) {
         ${_estSeloTipo(l)}
       </div>
       <div class="ler-card-nome">${esc(obraNome(l.title) || 'Sem título')}</div>
-      <div class="ler-card-autor">${esc(l.author || '')}</div>
+      <div class="ler-card-autor">${esc(_estSubCard(l))}</div>
       ${l.nota ? `<div class="est-card-nota">${_estEstrelas(l.nota)}</div>` : ''}
       <div class="ler-card-barra"><i style="width:${pct}%;background:${EST_STATUS[l.status]?.cor || 'var(--primary)'}"></i></div>
-      <button class="ler-card-x" data-tip="Abrir a ficha"
-              onclick="event.stopPropagation();estIr('ficha','${l.id}')">${ic('info','ic-sm')}</button>
+      <button class="ler-card-x" data-tip="Ficha, status e mais"
+              onclick="estMenu(event,'${l.id}')">${ic('chevronDown','ic-sm')}</button>
     </div>`
+}
+
+// A segunda linha do card: normalmente o autor; na prateleira dele, o que
+// distingue um livro do outro ali dentro.
+function _estSubCard(l) {
+  if (!_estOcultaAutor) return l.author || ''
+  if (l.serie) return `${l.serie}${l.serieNum ? ` · vol. ${l.serieNum}` : ''}`
+  // Último recurso é o STATUS, e não string vazia: medido na tela, os livros
+  // sem ano nem gênero ficavam com uma linha em branco sob a capa, e a coluna
+  // de cards perdia o alinhamento. Status todo livro tem.
+  return l.ano ? String(l.ano) : (l.genero || (EST_STATUS[l.status] || {}).rotulo || '')
 }
 
 function _estCapaHTML(l) {
@@ -405,7 +768,9 @@ function _estLinha(l) {
       <div class="est-linha-meio">
         <div class="est-linha-nome">${esc(obraNome(l.title) || 'Sem título')}
           ${_estSeloTipo(l)}</div>
-        <div class="est-linha-sub">${esc(l.author || 'Autor não informado')}${l.serie ? ` · ${esc(l.serie)}${l.serieNum ? ` #${l.serieNum}` : ''}` : ''}</div>
+        <div class="est-linha-sub">${_estOcultaAutor
+          ? esc(_estSubCard(l) || '—')
+          : `${esc(l.author || 'Autor não informado')}${l.serie ? ` · ${esc(l.serie)}${l.serieNum ? ` #${esc(String(l.serieNum))}` : ''}` : ''}`}</div>
         <div class="est-linha-barra"><i style="width:${pct}%;background:${st.cor}"></i></div>
       </div>
       <div class="est-linha-dir">
@@ -417,9 +782,62 @@ function _estLinha(l) {
         ${temArquivo
           ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();lerAbrir('${l.id}')">${ic('bookOpen','ic-sm')} Ler</button>`
           : `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();estProgressoModal('${l.id}')">${ic('pencil','ic-sm')} Progresso</button>`}
+        <button class="btn btn-ghost btn-sm est-linha-menu" data-tip="Ficha, status e mais"
+                onclick="estMenu(event,'${l.id}')">${ic('chevronDown','ic-sm')}</button>
       </div>
     </div>`
 }
+
+// ================================================================
+// O MENU DO LIVRO — trocar de status sem abrir a ficha
+// ================================================================
+// ⚠️ ESTE MENU NASCEU DE UMA PERGUNTA DELE: *"como um livro vai pra Quero ler
+// e Parado?"* Ia pela ficha, e só por ela — dois cliques e uma tela de
+// distância para uma decisão que se toma olhando a capa. Pergunta sobre onde
+// fica uma função é resposta sobre onde ela DEVERIA estar.
+function estMenu(ev, id) {
+  ev.stopPropagation(); ev.preventDefault()
+  const antigo = document.getElementById('est-menu')
+  document.getElementById('est-menu')?.remove()
+  if (antigo && antigo.dataset.de === id) return      // clicar de novo fecha
+  const l = livroPorId(id); if (!l) return
+
+  const m = document.createElement('div')
+  m.id = 'est-menu'; m.className = 'est-menu'; m.dataset.de = id
+  m.innerHTML = `
+    <button onclick="estMenuFechar();estIr('ficha','${l.id}')">${ic('info','ic-sm')} Abrir a ficha</button>
+    ${l.kind !== 'fisico'
+      ? `<button onclick="estMenuFechar();lerAbrir('${l.id}')">${ic('bookOpen','ic-sm')} Ler agora</button>`
+      : `<button onclick="estMenuFechar();estProgressoModal('${l.id}')">${ic('pencil','ic-sm')} Registrar progresso</button>`}
+    <div class="est-menu-sep">Status</div>
+    ${Object.entries(EST_STATUS).map(([k, s]) => `
+      <button class="${l.status === k ? 'on' : ''}" onclick="estMenuFechar();estSetLivroStatus('${l.id}','${k}')">
+        <i style="background:${s.cor}"></i> ${s.rotulo}${l.status === k ? ` ${ic('check','ic-3xs')}` : ''}</button>`).join('')}
+    <div class="est-menu-sep">Nota</div>
+    <div class="est-menu-nota">${_estEstrelas(l.nota, l.id)}</div>
+    <div class="est-menu-sep"></div>
+    <button class="perigo" onclick="estMenuFechar();lerExcluir('${l.id}')">${ic('trash','ic-sm')} Remover da estante</button>`
+  document.body.appendChild(m)
+
+  // Posicionado à mão, e não em `position:absolute` dentro do card: o card tem
+  // `overflow:hidden` na capa e a grade rola — o menu ficaria cortado.
+  const r = ev.currentTarget.getBoundingClientRect()
+  const larg = 210, alt = m.offsetHeight || 300
+  let x = r.right - larg, y = r.bottom + 6
+  if (x < 8) x = 8
+  if (x + larg > innerWidth - 8) x = innerWidth - larg - 8
+  if (y + alt > innerHeight - 8) y = Math.max(8, r.top - alt - 6)
+  m.style.left = x + 'px'; m.style.top = y + 'px'
+  setTimeout(() => {
+    document.addEventListener('click', estMenuFechar, { once: true })
+    document.addEventListener('keydown', _estMenuTecla)
+  }, 0)
+}
+function estMenuFechar() {
+  document.getElementById('est-menu')?.remove()
+  document.removeEventListener('keydown', _estMenuTecla)
+}
+function _estMenuTecla(e) { if (e.key === 'Escape') estMenuFechar() }
 
 // ---- handlers da barra ----
 let _estBuscaTimer = null
@@ -441,7 +859,125 @@ function estNota(id, n) {
   const l = livroPorId(id); if (!l) return
   l.nota = n; l.updatedAt = Date.now()
   estSalvar()
+  // As estrelas também moram DENTRO do menu do card: sem fechar, ele ficaria
+  // pairando sobre uma estante já redesenhada, mostrando a nota antiga.
+  if (document.getElementById('est-menu')) estMenuFechar()
   estanteRender()
+}
+
+// ================================================================
+// REUNIR EM SÉRIE — para o que já está na estante
+// ================================================================
+// O caminho um-a-um existe (ficha → Editar → campo Série), mas ninguém edita
+// 40 volumes de One Piece à mão. Aqui ele marca os volumes, dá um nome e o
+// app NUMERA SOZINHO pelo número achado no título; quando não há número
+// nenhum, cai na ordem em que estão na lista.
+function estReunirModal(pre) {
+  document.getElementById('est-reunir')?.remove()
+  const cands = livros.slice().sort((a, b) =>
+    String(obraNome(a.title)).localeCompare(String(obraNome(b.title)), 'pt'))
+  const sugestao = pre || _estSugereSerie(cands)
+  const ov = document.createElement('div')
+  ov.id = 'est-reunir'; ov.className = 'srs-modal-overlay'
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+  ov.innerHTML = `<div class="srs-modal-box" style="max-width:640px">
+    <h4 style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px">Reunir em série</h4>
+    <p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">
+      Marque os volumes da mesma obra. O número do volume é lido do título quando existe
+      (<i>One Piece v12</i>, <i>Naruto #3</i>) — e você pode corrigir depois na ficha de cada um.</p>
+    <label class="est-campo" style="margin-bottom:12px">
+      <span>Nome da série</span>
+      <input type="text" id="est-reunir-nome" value="${escA(sugestao.nome)}" placeholder="ex.: One Piece"
+             list="est-series-lista">
+      <datalist id="est-series-lista">${estSeriesExistentes().map(s => `<option value="${escA(s)}"></option>`).join('')}</datalist>
+    </label>
+    <div class="est-reunir-lista">
+      ${cands.map(l => `
+        <label class="est-reunir-item">
+          <input type="checkbox" value="${l.id}" ${sugestao.ids.includes(l.id) ? 'checked' : ''}>
+          <span class="est-reunir-nome">${esc(obraNome(l.title))}</span>
+          <span class="est-reunir-num">${_estNumDoTitulo(obraNome(l.title)) ? 'vol. ' + _estNumDoTitulo(obraNome(l.title)) : (l.serie ? esc(l.serie) : '—')}</span>
+        </label>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('est-reunir').remove()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="estReunirFazer()">${ic('layers','ic-sm')} Reunir</button>
+    </div>
+  </div>`
+  document.body.appendChild(ov)
+  setTimeout(() => document.getElementById('est-reunir-nome')?.focus(), 30)
+}
+
+function estSeriesExistentes() {
+  return [...new Set(livros.map(l => (l.serie || '').trim()).filter(Boolean))].sort()
+}
+
+// Sugestão de partida: o maior conjunto de títulos que começam igual e têm
+// número. Adivinhar bem economiza vinte cliques; adivinhar mal não custa nada,
+// porque tudo continua editável antes de confirmar.
+function _estSugereSerie(cands) {
+  const grupos = new Map()
+  for (const l of cands) {
+    // ⚠️ SÓ O QUE AINDA NÃO TEM SÉRIE. Sem este filtro a sugestão apontava
+    // para o maior grupo do acervo — que costuma ser justamente o que já foi
+    // organizado, deixando de fora os volumes soltos que motivaram a tela.
+    if ((l.serie || '').trim()) continue
+    const d = estSerieDoNome(obraNome(l.title), true)
+    if (!d) continue
+    const k = d.serie.toLowerCase()
+    if (!grupos.has(k)) grupos.set(k, { nome: d.serie, ids: [] })
+    grupos.get(k).ids.push(l.id)
+  }
+  let melhor = { nome: '', ids: [] }
+  for (const g of grupos.values()) if (g.ids.length > melhor.ids.length) melhor = g
+  return melhor.ids.length >= 2 ? melhor : { nome: '', ids: [] }
+}
+
+function estReunirFazer() {
+  const nome = (document.getElementById('est-reunir-nome').value || '').trim()
+  const ids = [...document.querySelectorAll('#est-reunir input[type=checkbox]:checked')].map(i => i.value)
+  if (!nome) { toast('Dê um nome à série.', 'error'); return }
+  if (ids.length < 2) { toast('Marque pelo menos dois volumes.', 'warning'); return }
+  ids.forEach((id, i) => {
+    const l = livroPorId(id); if (!l) return
+    l.serie = nome
+    l.serieNum = _estNumDoTitulo(obraNome(l.title)) || Number(l.serieNum) || (i + 1)
+    l.updatedAt = Date.now()
+  })
+  estSalvar()
+  document.getElementById('est-reunir')?.remove()
+  toast(`${ids.length} volumes reunidos em "${nome}"`, 'success')
+  estSetPref('agrupar', true)
+  estAbrirSerie(nome)
+}
+
+// ================================================================
+// O NÚMERO DO VOLUME, LIDO DO NOME
+// ================================================================
+// ⚠️ O PADRÃO "TÍTULO + NÚMERO NO FIM" SÓ VALE PARA MANGÁ (`.cbz`). Em livro
+// comum ele transformaria *Fahrenheit 451* na série "Fahrenheit", volume 451,
+// e *Catch 22* na série "Catch". Para EPUB exige-se marca explícita — `v`,
+// `vol`, `volume`, `#`. O teto de 300 também é proposital: número maior que
+// isso é ano, código ou parte do título, não volume.
+function estSerieDoNome(nome, ehManga) {
+  const limpo = String(nome || '').replace(/\.[^.]{2,4}$/, '').replace(/_+/g, ' ').trim()
+  const padroes = [
+    /^(.{2,}?)[\s\-–—:]*\bv(?:ol(?:ume)?)?\.?\s*0*(\d{1,3})\b/i,
+    /^(.{2,}?)[\s\-–—:]*#\s*0*(\d{1,3})\b/i
+  ]
+  if (ehManga) padroes.push(/^(.{2,}?)[\s\-–—:]+0*(\d{1,3})\s*$/)
+  for (const p of padroes) {
+    const m = limpo.match(p)
+    if (!m) continue
+    const num = Number(m[2])
+    const serie = m[1].replace(/[\s\-–—:,.]+$/, '').trim()
+    if (num >= 1 && num <= 300 && serie.length >= 2) return { serie, num }
+  }
+  return null
+}
+function _estNumDoTitulo(nome) {
+  const d = estSerieDoNome(nome, true)
+  return d ? d.num : 0
 }
 
 // ================================================================
@@ -479,7 +1015,10 @@ function _estRenderFicha() {
       <div class="est-ficha-corpo">
         <div class="est-ficha-topo">
           <h2>${esc(obraNome(l.title) || 'Sem título')}</h2>
-          <p class="est-ficha-autor">${esc(l.author || 'Autor não informado')}${l.serie ? ` · <b>${esc(l.serie)}</b>${l.serieNum ? ` #${esc(String(l.serieNum))}` : ''}` : ''}</p>
+          <p class="est-ficha-autor">${l.author
+            ? `<button class="est-link" onclick="estAbrirAutor(${_estArg(l.author)})">${esc(l.author)}</button>`
+            : 'Autor não informado'}${l.serie
+            ? ` · <button class="est-link" onclick="estAbrirSerie(${_estArg(l.serie)})"><b>${esc(l.serie)}</b>${l.serieNum ? ` #${esc(String(l.serieNum))}` : ''}</button>` : ''}</p>
           <div class="est-ficha-selos">
             <span class="est-status" style="--st:${st.cor}">${st.rotulo}</span>
             ${_estSeloTipo(l)}
@@ -758,7 +1297,10 @@ function _estRenderForm() {
       <div class="est-form-grid">
         <label class="est-campo w2"><span>Título</span><input type="text" id="est-f-title" value="${v('title')}" placeholder="Obrigatório"></label>
         <label class="est-campo w2"><span>Autor</span><input type="text" id="est-f-author" value="${v('author')}"></label>
-        <label class="est-campo"><span>Série</span><input type="text" id="est-f-serie" value="${v('serie')}" placeholder="ex.: Discworld"></label>
+        <label class="est-campo"><span>Série</span>
+          <input type="text" id="est-f-serie" value="${v('serie')}" placeholder="ex.: One Piece" list="est-f-series">
+          <datalist id="est-f-series">${estSeriesExistentes().map(s => `<option value="${escA(s)}"></option>`).join('')}</datalist>
+        </label>
         <label class="est-campo"><span>Nº na série</span><input type="number" id="est-f-serieNum" value="${v('serieNum')}" min="0"></label>
         <label class="est-campo"><span>Editora</span><input type="text" id="est-f-editora" value="${v('editora')}"></label>
         <label class="est-campo"><span>Ano</span><input type="number" id="est-f-ano" value="${v('ano')}" min="0" max="2100"></label>
