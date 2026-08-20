@@ -2802,6 +2802,13 @@ body.sb-collapsed #fb-user-photo{margin:0}
   /* Três colunas: rótulo inteiro cabe sem abreviar, que era o problema da
      barra. "Configurações" aparece por extenso aqui. */
   .nav-mais-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  /* O rótulo do grupo, igual ao do menu grande — mas SEM colapsar: a gaveta
+     já é a coisa que abre e fecha. */
+  .nav-mais-secao {
+    font-size: var(--fs-3xs); font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--text3); padding: 4px 8px 6px;
+  }
+  .nav-mais-secao + .nav-mais-grade { margin-bottom: 10px; }
   .nmg-item {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 6px; padding: 14px 4px; min-height: 76px;
@@ -3502,8 +3509,50 @@ body.sb-collapsed #fb-user-photo{margin:0}
 
 /* O menu vira coluna para que o bloco "Hoje" possa ancorar no fim. */
 .sb-nav{display:flex;flex-direction:column}
+/* ⚠️ QUEM ROLA É A LISTA, NÃO A BARRA INTEIRA. Os quatro grupos somam ~740px
+   de altura; num notebook de 768px a barra passava a rolar POR INTEIRO — e aí
+   a barra de rolagem comia a largura da marca, que quebrava em duas linhas, e
+   a conta e o "Configurações" saíam da tela junto. Agora marca e rodapé ficam
+   ancorados e só o miolo desliza. `min-height:0` é obrigatório: sem ele um
+   filho flex se recusa a encolher e o overflow nunca acontece. */
+.sidebar{overflow:hidden}
+.sb-nav{overflow-y:auto;min-height:0;scrollbar-width:thin}
+.sb-brand-name{white-space:nowrap}
 .sb-nav-label{padding:4px 12px 7px;color:var(--text3)}
 .sb-nav-label-2{margin-top:16px}
+
+/* ---- GRUPOS COLAPSÁVEIS DO MENU (2026-08-20) ----
+   O cabeçalho virou <button>: mesma aparência de rótulo de antes, mas com
+   seta, alvo de toque de verdade e o número somado quando está fechado.
+   A caixa some com display:none — sem animação de altura de propósito: o
+   badge posicionado em absoluto vaza de qualquer container com overflow. */
+.sb-nav-label{
+  display:flex;align-items:center;gap:6px;width:100%;
+  background:none;border:0;cursor:pointer;text-align:left;
+  font-family:inherit;transition:color .14s;
+}
+.sb-nav-label:hover{color:var(--text2)}
+.sb-nav-label>span:first-of-type{flex:1}
+/* ⚠️ SEM SETA DE PROPÓSITO (pedido dele). O cabeçalho continua abrindo e
+   fechando no clique; quem identifica o grupo é o ícone. O único sinal de
+   "está fechado" é o ícone apagar um pouco — e o número somado, que só
+   aparece nessa situação. */
+.sb-grupo-ic{
+  width:14px;height:14px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.7;transition:opacity .16s ease;
+}
+.sb-nav-label:hover .sb-grupo-ic{opacity:1}
+.sb-nav-label.fechado .sb-grupo-ic{opacity:.42}
+/* O número do cabeçalho não pode competir com o do item: menor e sem o
+   vermelho, que fica reservado para "tem coisa parada no Preparar". */
+.sb-nav-label .badge{
+  position:static;min-width:0;padding:1px 6px;font-size:var(--fs-3xs);
+  background:var(--surface3);color:var(--text2);border-radius:99px;
+}
+.sb-grupo.recolhido{display:none}
+/* No modo rail (só ícones) o cabeçalho está escondido: manter um grupo
+   fechado trancaria a seção sem nenhum jeito de reabrir. Tudo aparece. */
+body.sb-collapsed .sb-grupo.recolhido{display:block}
 
 /* ---- Estado ativo: tinta chapada + marca no vinco da barra ----
    O gradiente + anel interno era o mesmo desenho de template que os

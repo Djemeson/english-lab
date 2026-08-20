@@ -368,13 +368,103 @@ function obraAutor(bruto) {
 const SK_UI = 'el-ui-prefs'
 function loadUiPrefs() { try { return JSON.parse(localStorage.getItem(SK_UI) || '{}') } catch { return {} } }
 function saveUiPref(key, val) { const p = loadUiPrefs(); p[key] = val; try { localStorage.setItem(SK_UI, JSON.stringify(p)) } catch {} }
-function applyUiPrefs() { document.body.classList.toggle('sb-collapsed', !!loadUiPrefs().sbCollapsed) }
+function applyUiPrefs() {
+  document.body.classList.toggle('sb-collapsed', !!loadUiPrefs().sbCollapsed)
+  navGruposAplicar()
+}
 // Recolhe/expande a sidebar global (vira rail só-ícones). Independente do histórico.
 function toggleSidebar() {
   const collapsed = document.body.classList.toggle('sb-collapsed')
   saveUiPref('sbCollapsed', collapsed)
   const btn = document.querySelector('.sb-collapse-btn')
   if (btn) btn.setAttribute('data-tip', collapsed ? 'Expandir menu' : 'Recolher menu')
+}
+
+// ── OS GRUPOS DO MENU (Início / Captura / Estudo / Acervo) ─────────
+// O menu conta o ciclo do material: entra pela CAPTURA (livro, vídeo/podcast,
+// Kindle, Assistente), atravessa o ESTUDO (Preparar → Estudar → Revisar) e
+// descansa no ACERVO. O markup está em index.html, logo abaixo de `.sb-nav`.
+//
+// ⚠️ ESTE MAPA É A FONTE ÚNICA. O id do grupo vira `grp-<id>` (a caixa),
+// `grp-btn-<id>` (o cabeçalho) e `badge-grp-<id>` (o número somado). Mexeu
+// aqui, mexeu no HTML.
+const NAV_GRUPOS = {
+  inicio:  { secoes: ['dashboard'] },
+  captura: { secoes: ['ler', 'video', 'adicionar', 'assistente'] },
+  estudo:  { secoes: ['preparar', 'estudar', 'revisar'], badges: ['badge-review', 'badge-dossie', 'badge-srs'] },
+  acervo:  { secoes: ['palavras', 'biblioteca'] },
+}
+function navGrupoDe(secao) {
+  for (const [id, g] of Object.entries(NAV_GRUPOS)) if (g.secoes.includes(secao)) return id
+  return null
+}
+// O que está recolhido MORA NO APARELHO e sobrevive a fechar o site — ele
+// pediu isso com todas as letras. Guardamos os RECOLHIDOS (não os abertos):
+// assim um grupo novo no futuro nasce aberto sem precisar de migração.
+function navGruposRecolhidos() {
+  const v = loadUiPrefs().navGrupos
+  return Array.isArray(v) ? v.filter(id => NAV_GRUPOS[id]) : []
+}
+function navGrupoToggle(id) {
+  if (!NAV_GRUPOS[id]) return
+  const atuais = navGruposRecolhidos()
+  const prox = atuais.includes(id) ? atuais.filter(x => x !== id) : atuais.concat(id)
+  saveUiPref('navGrupos', prox)
+  navGruposAplicar()
+}
+// Chamado ao trocar de seção: um grupo recolhido não pode engolir a tela em
+// que você acabou de entrar — sem isto, abrir "Revisar" por um botão do
+// Dashboard deixaria a sidebar sem nenhuma marca de onde você está.
+function navGrupoGarantirVisivel(secao) {
+  const id = navGrupoDe(secao)
+  if (!id || !navGruposRecolhidos().includes(id)) return
+  navGrupoToggle(id)
+}
+// O número no cabeçalho existe só quando o grupo está FECHADO: recolher
+// "Estudo" não pode esconder que há 12 cards vencendo hoje. Somamos os badges
+// reais dos filhos, então a conta nunca diverge do que a seção mostra.
+function navGruposBadges() {
+  const recolhidos = navGruposRecolhidos()
+  for (const [id, g] of Object.entries(NAV_GRUPOS)) {
+    const alvo = document.getElementById(`badge-grp-${id}`)
+    if (!alvo) continue
+    let n = 0
+    if (recolhidos.includes(id)) {
+      for (const bid of (g.badges || [])) {
+        const b = document.getElementById(bid)
+        if (b && !b.classList.contains('hidden')) n += parseInt(b.textContent, 10) || 0
+      }
+    }
+    alvo.textContent = n
+    alvo.classList.toggle('hidden', n === 0)
+  }
+}
+let _navBadgeObs = null
+function navGruposAplicar() {
+  const recolhidos = navGruposRecolhidos()
+  for (const id of Object.keys(NAV_GRUPOS)) {
+    const caixa = document.getElementById(`grp-${id}`)
+    const btn = document.getElementById(`grp-btn-${id}`)
+    const fechado = recolhidos.includes(id)
+    if (caixa) caixa.classList.toggle('recolhido', fechado)
+    if (btn) {
+      btn.setAttribute('aria-expanded', fechado ? 'false' : 'true')
+      btn.classList.toggle('fechado', fechado)
+    }
+  }
+  navGruposBadges()
+  // Quem atualiza os badges são meia dúzia de funções espalhadas (SRS, dossiê,
+  // Preparar) e cada uma tem seu próprio gatilho. Observar os elementos é o
+  // único jeito de a soma do cabeçalho nunca ficar velha — inclusive para um
+  // contador que ainda nem foi escrito.
+  if (!_navBadgeObs && typeof MutationObserver === 'function') {
+    const alvos = Object.values(NAV_GRUPOS).flatMap(g => (g.badges || []))
+      .map(id => document.getElementById(id)).filter(Boolean)
+    if (alvos.length) {
+      _navBadgeObs = new MutationObserver(() => navGruposBadges())
+      for (const el of alvos) _navBadgeObs.observe(el, { attributes: true, attributeFilter: ['class'], childList: true, characterData: true, subtree: true })
+    }
+  }
 }
 // Aplica o estado recolhido o quanto antes (core.js já roda após o markup) p/ evitar flash
 try { if (document.body) applyUiPrefs() } catch {}
@@ -1017,6 +1107,9 @@ function _activateSection(name) {
   document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'))
   const navEl = document.getElementById(`nav-${name}`)
   if (navEl) navEl.classList.add('active')
+  // Antes de marcar como ativo, o grupo precisa estar aberto — senão a marca
+  // fica dentro de uma caixa fechada e a sidebar não diz onde você está.
+  if (typeof navGrupoGarantirVisivel === 'function') navGrupoGarantirVisivel(name)
   const navMobEl = document.getElementById(`nav-${name}-mob`)
   if (navMobEl) navMobEl.classList.add('active')
   // A seção pode morar DENTRO da gaveta: sem isto, abrir "Palavras" no celular

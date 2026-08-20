@@ -7,7 +7,20 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-20 (3ª) — **A TRADUÇÃO TRADUZ O TRECHO, E A DOSE DE CONTEXTO É A
+> Última atualização: 2026-08-20 (4ª) — **O MENU VIROU QUATRO GRUPOS, E ELES COLAPSAM**. Eram
+> 2 grupos, e "Vocabulário" carregava 8 seções sem parentesco (ler um livro ao lado de revisar
+> um card). Agora o menu conta o ciclo do material: **Início · Captura · Estudo · Acervo**, com
+> o cabeçalho de cada grupo abrindo e fechando no clique e o estado **guardado no aparelho**
+> (sobrevive a fechar o site). ⚠️ Dois freios que o desenho exigiu: grupo fechado **mostra a
+> soma dos badges dos filhos** (recolher "Estudo" não pode esconder 15 cards vencendo), e entrar
+> numa seção **reabre** o grupo dela (senão a marca de "onde estou" fica dentro de uma caixa
+> fechada). No modo rail (só ícones) nada fica trancado. **Achado de brinde:** os rótulos a mais
+> empurraram a barra para 740px e ela passava a rolar INTEIRA num notebook de 768px — a marca
+> quebrava em duas linhas e o rodapé saía da tela; agora **só a lista rola**. Sem seta de
+> colapso (pedido dele): quem identifica o grupo é um ícone, que apaga quando fechado.
+> `sw.js` → **englab-v326**. **Detalhes em §8.52.**
+>
+> Última atualização anterior: 2026-08-20 (3ª) — **A TRADUÇÃO TRADUZ O TRECHO, E A DOSE DE CONTEXTO É A
 > FRASE**. Ele marcou `ore` e recebeu a frase inteira reescrita: *"isso não é tradução, é
 > explicação, e já tem um botão de Explicar"*. Agora sai **"minério"** — e o erro que apareceu
 > no meio do caminho (`ore` → "veio") tinha causa medida: **parágrafo inteiro como contexto
@@ -11335,6 +11348,96 @@ Com a sessão logada, `listAll` na pasta de livros devolveu os dois:
 Ou seja: o print de "não está na sua nuvem" era **exatamente** o defeito da §8.50 — o app
 acusando sem ter olhado, porque estava deslogado. Logado, o livro baixou e abriu no capítulo 5.
 
+### 8.52 — O menu virou quatro grupos, e eles colapsam (2026-08-20)
+
+**O pedido dele:** *"quero organizar o projeto em seções, e não tenho o panorama completo mas
+uma que quero e faz sentido é Captura, onde vão estar os livros, vídeos e podcasts. Uma seção
+de estudar creio que faz sentido também."* Depois, em duas mensagens no meio da execução:
+*"quero que as seções sejam colapsáveis"*, *"o jeito que eu deixar as seções colapsáveis ou não
+tem que ser lembrado entre sessões de entrada no site"* e *"coloca um ícone em cada título de
+seção e remove o ícone colapsável — ainda colapsa, só não terá o ícone"*.
+
+#### O diagnóstico
+
+O menu tinha **2 rótulos para 11 seções**: "Geral" (Dashboard, Assistente) e "Vocabulário" — que
+carregava as outras oito. Ler um livro, capturar do Kindle, revisar um card e consultar o
+glossário estavam todos sob a mesma palavra, que por isso não significava nada.
+
+#### O mapa (fonte única: `NAV_GRUPOS`, em `js/core.js`)
+
+| Grupo | Seções | O critério |
+|---|---|---|
+| **Início** | `dashboard` | onde o dia começa |
+| **Captura** | `ler`, `video`, `adicionar`, `assistente` | por onde o material **entra** |
+| **Estudo** | `preparar` → `estudar` → `revisar` | o fluxo das 4 etapas (§8.1), na ordem |
+| **Acervo** | `palavras`, `biblioteca` | o que já é seu |
+
+Duas decisões dele, perguntadas antes de escrever código:
+- **Assistente ficou em Captura** — ele gera item e manda para o estudo; pela função é uma fonte
+  como o livro e o vídeo.
+- **Grupo "Estudo" com a seção "Estudar" dentro** — a repetição foi aceita de propósito para
+  **não rebatizar seção pela terceira vez** (§8.1 já trocou os nomes de lugar uma vez). O
+  cabeçalho é rótulo; o item é ação.
+
+#### O colapso, e os dois freios que ele exigiu
+
+O cabeçalho virou `<button>` (`.sb-nav-label`), a caixa dos itens é `.sb-grupo`, e a lista dos
+**recolhidos** mora em `navGrupos`, dentro de `el-ui-prefs` — guardamos os fechados e não os
+abertos, para que um grupo novo no futuro nasça aberto sem migração. Sobrevive a fechar o site.
+
+1. **Grupo fechado mostra a soma dos badges dos filhos** (`badge-grp-<id>`). Recolher "Estudo"
+   não pode esconder que há 15 cards vencendo hoje. A soma lê os badges **reais**, então nunca
+   diverge do que a seção mostra — e é mantida por um `MutationObserver` sobre os elementos, não
+   por chamada em cada função que atualiza contador. Assim vale inclusive para um contador que
+   ainda não foi escrito.
+2. **Entrar numa seção reabre o grupo dela** (`navGrupoGarantirVisivel`, chamada em
+   `_activateSection`). Sem isso, ir para "Revisar" por um botão do Dashboard deixaria a marca
+   de "onde estou" dentro de uma caixa fechada — a sidebar ficaria sem dizer onde você está.
+3. **No modo rail** (`body.sb-collapsed`, só ícones) o cabeçalho está escondido; se um grupo
+   continuasse fechado, a seção ficaria trancada **sem nenhum jeito de reabrir**. O CSS força
+   `display:block` nos grupos recolhidos nesse modo.
+
+Sem seta de colapso, a pedido dele: cada grupo tem um **ícone próprio** (sol, seta-para-dentro,
+capelo, arquivo) e o único sinal de "está fechado" é o ícone apagar (opacidade .7 → .42) — mais
+o número somado, que só existe nessa situação.
+
+#### O achado de brinde: a barra inteira passou a rolar
+
+Dois rótulos a mais empurraram a sidebar para **740 px** de altura. Num notebook de 768 px ela
+passava a rolar **por inteiro** — e a barra de rolagem comia a largura da marca, que quebrava em
+duas linhas, enquanto o cartão de conta e o "Configurações" saíam da tela. Corrigido na origem:
+`.sidebar{overflow:hidden}` + `.sb-nav{overflow-y:auto;min-height:0}`, de modo que **marca e
+rodapé ficam ancorados e só o miolo desliza**. ⚠️ `min-height:0` é obrigatório: sem ele um filho
+flex se recusa a encolher e o overflow nunca acontece.
+
+#### O celular
+
+A gaveta do "Mais" (§8.14) era uma grade solta de seis ícones sem ordem; agora repete os mesmos
+rótulos — **Captura** (Ler, Vídeo, Chat) e **Acervo** (Palavras, Cards, Configurações) — para
+que o celular e o computador ensinem o mesmo mapa. ⚠️ **Ali não colapsa**: a gaveta já é a coisa
+que abre e fecha, e esconder item dentro do que já está escondido só afasta o destino.
+
+#### O que foi medido ao vivo (localhost:8765, painel em 1280×800)
+
+| Verificação | Resultado |
+|---|---|
+| Estrutura dos 4 grupos | `inicio:[dashboard]`, `captura:[ler,video,adicionar,assistente]`, `estudo:[preparar,estudar,revisar]`, `acervo:[palavras,biblioteca]` |
+| Colapso | altura da caixa 156 px → **0** → 156 px, `aria-expanded` acompanhando |
+| Soma no cabeçalho | Preparar 3 + Revisar 12 = **15**; mudou para 20 → virou **23**; escondi o do Preparar → caiu para **20** |
+| Persistência | fechado, `location.reload()`, **continuou fechado** (`navGrupos:["estudo"]` no `localStorage`) |
+| Auto-reabrir | grupo fechado + `showSection('revisar')` → **abriu**, item ativo visível |
+| Modo rail | grupo marcado como recolhido volta a medir **156 px**, cabeçalho em 0 — nada trancado |
+| Barra rolando | antes `scrollHeight 740 > clientHeight 655`; depois **a barra não rola**, só a lista, rodapé visível, marca em uma linha (17 px) |
+| Gaveta no celular (375×812) | topo 478, base 744 — encosta na barra sem cobri-la; rótulos "Captura" e "Acervo" presentes, 6 itens de 76 px |
+| Console | sem erros |
+
+⚠️ **O que NÃO foi visto com os olhos:** o painel do navegador não estava em exibição no fim da
+sessão (`screenshot` recusou: *"not compositing frames"*), então **não há print da versão com os
+ícones novos**. Os dois prints que existem são da versão com seta. Isso também produziu uma
+falsa leitura no meio do caminho: a opacidade do ícone media 0.42 nos dois estados, porque **sem
+quadros compostos a `transition` congela no valor inicial**. Medido de novo com
+`transition:none`, deu 0.7 aberto / 0.42 fechado — o esperado. É a armadilha da §6, de novo.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -11343,6 +11446,27 @@ acusando sem ter olhado, porque estava deslogado. Logado, o livro baixou e abriu
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada dos grupos do menu (§8.52, 2026-08-20)
+
+- [ ] **VER O MENU NOVO COM OS ÍCONES** — o painel do navegador estava oculto no fim da sessão e
+      `screenshot` recusou. Os quatro ícones estão medidos (14×14, presentes nos quatro
+      cabeçalhos) mas **não foram olhados**. Conferir no Chrome real: se algum ficar ilegível a
+      14 px, trocar por um traço mais simples.
+- [ ] **O estado dos grupos é POR APARELHO** — mora no `localStorage` (`el-ui-prefs`), como o
+      resto das preferências de interface, e **não sobe para a nuvem**. Fechar "Acervo" no
+      computador não fecha no celular. Ele pediu que fosse lembrado "entre sessões de entrada no
+      site", o que está atendido; sincronizar entre aparelhos é outra tarefa (mexe em
+      `firebase.js`) e não foi feita.
+- [ ] **"Biblioteca" continua com dois nomes** — no computador o menu diz "Biblioteca", no
+      celular diz "Cards". Deixado como está de propósito: a palavra "Biblioteca" aparece em
+      título de tela, em toast e em texto de aviso em `review.js`, `known.js` e `audio.js`;
+      trocar só o rótulo do menu criaria inconsistência pior. ⚠️ E sob o grupo **Acervo**, ao
+      lado de "Ler", "Biblioteca" ficou ambíguo (parece a estante de livros). Vale renomear
+      **tudo** para "Cards" numa fatia própria.
+- [ ] **`badge-mais-mob` é código morto** — o badge da gaveta do celular existe no HTML e nunca
+      é atualizado por ninguém. Hoje é inofensivo (nenhuma seção da gaveta tem contador), mas se
+      alguma passar a ter, o número não vai aparecer. Remover ou ligar.
 
 ### Decisões em aberto (com o levantamento já feito)
 
