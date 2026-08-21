@@ -7,7 +7,20 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (7ª) — **O RAIO-X PASSOU A FILTRAR PELO SENTIDO, NÃO PELA
+> Última atualização: 2026-08-21 (8ª) — **O RAIO-X DIZIA "NADA DIFÍCIL AQUI" NUMA PÁGINA CHEIA
+> DE PHRASAL VERBS**. Ele mandou analisar um capítulo de *Carrie* e recebeu *"nada acima do seu
+> B1"* — numa página com `back away`, `catch up`, `pull her leg`, `tagging along`,
+> `incontrovertible`. **Diagnóstico no site publicado**: a IA tinha achado tudo; a resposta veio
+> **cortada no teto de tokens** (4.591 caracteres terminando em `"tipo": "word`), o JSON ficou
+> inválido e o parse falhado virava **lista vazia**. Falha silenciosa que vira mentira na tela.
+> Agora o texto vai em **blocos**, JSON cortado é **resgatado item a item**, e o que não for
+> legível é **erro explícito, nunca "não achei"**. ⚠️ E, a pedido dele, o **modelo que raciocina
+> (Luna/gpt-5) ganhou orçamento próprio** — bloco menor e teto muito maior —, porque ali o
+> sintoma seria o mesmo: content vazio quando o orçamento acaba no raciocínio. **Medido no
+> capítulo real dele: de 0 para 71 achados em 7 segundos** (13 phrasal verbs, 6 idioms).
+> `sw.js` → **englab-v340**. **Detalhes em §8.64.**
+>
+> Última atualização anterior: 2026-08-21 (7ª) — **O RAIO-X PASSOU A FILTRAR PELO SENTIDO, NÃO PELA
 > FORMA**. Ele derrubou o critério da versão anterior com uma pergunta: *"já deixamos claro que
 > uma mesma palavra pode ter vários significados. Vai ser simplesmente apagado por eu conhecer
 > ela com um significado, ou vai buscar no significado que eu conheço e, se for igual ao que
@@ -12331,6 +12344,63 @@ momento. O risco do lado oposto é pequeno: *"minério"* e *"veio"* não têm pa
 | `petrichor` | cheiro de chuva | nada | **aparece** · novo |
 
 E o botão do painel passou a separar o que interessa: **"2 novos · 2 conhecidos"**.
+
+## 8.64 O raio-X mentia quando a resposta era cortada (2026-08-21, 8ª)
+
+**Ele não acreditou no resultado, e fez bem:**
+
+> *"Foi me dito que não tem nada acima do meu nível B1 aqui e que não tem phrasal, idioms,
+> collocations etc. Acho difícil de acreditar. Analisa usando o site publicado usando o Chrome."*
+
+O trecho era o começo de *Carrie* — `back away`, `catch up`, `trip her up`, `pull her leg`,
+`tagging along`, `incontrovertible`, `dispassionately`, `flailing`, `gobbling`.
+
+### O diagnóstico, feito no site publicado com a chave dele
+
+A IA **tinha achado tudo**. A resposta veio com 4.591 caracteres e terminava em
+`"tipo": "word` — **cortada no teto de tokens**. O `JSON.parse` falhava, o `catch` devolvia
+lista vazia, e a tela dizia "nada acima do seu nível".
+
+⚠️ **É o pior tipo de defeito: a falha silenciosa que vira afirmação.** Um erro visível manda
+tentar de novo; uma lista vazia convence o aluno de que a página é fácil e ele é que não presta
+atenção.
+
+### As três travas
+
+1. **Blocos.** O texto vai em pedaços de ~2.200 caracteres, cortados **por linha** (nunca no
+   meio de uma frase — o modelo precisa da frase inteira para julgar), com andamento no botão
+   ("Analisando 2 de 4…").
+2. **Resgate do JSON cortado.** Antes do corte havia dezenas de itens perfeitos, **já pagos**.
+   Uma varredura por objetos `{...}` completos recupera todos.
+3. **Erro é erro.** Se nenhum bloco voltar legível, a função **lança**; se parte falhar, o
+   resultado vem marcado como incompleto e a tela diz *"parte da análise não voltou legível"* em
+   vez de "nada encontrado".
+
+### O Luna, a pedido dele
+
+> *"Já analisa isso pro caso do Luna quando for rodar, pq ele tem suas particularidades."*
+
+A família gpt-5/o* **gasta tokens raciocinando dentro do mesmo teto** e devolve `content` vazio
+quando o orçamento acaba no meio do raciocínio — lição que este projeto já tinha pago em
+`aiText`. Seria exatamente o mesmo sintoma recém-corrigido. Então o orçamento agora é escolhido
+pelo modelo: **bloco de 1.500 e teto de 7.000 tokens** (contra 2.200/2.600), timeout de 3
+minutos, e o prompt pedindo explicitamente nenhum raciocínio escrito.
+
+### Medido no capítulo real dele, no site publicado
+
+| Antes | Depois |
+|---|---|
+| 0 achados | **71** (13 phrasal verbs, 6 idioms, 43 palavras), em **7 s** |
+
+Aplicado na tela do capítulo: **89 achados, 97 realces, 93 chips**, botão dizendo
+**"87 novos · 2 conhecidos"** — e os dois "conhecidos" vieram do filtro por sentido da §8.63.
+Console sem erro. `bloom`, `jagged`, `flailing`, `gobbling`, `fission`, `sanitary napkins`,
+`Plug it up`, `occurred to her` — tudo apontado.
+
+⚠️ **Fica uma observação de uso:** 89 achados numa página é muito para o olho. O texto é dos
+mais densos que existem e o nível é B1, então o número é honesto — mas se na prática cansar, o
+caminho é um filtro por tipo (só expressões / só acima do nível), não mexer no que a análise
+enxerga.
 
 ## 9. Pendências / a verificar
 
