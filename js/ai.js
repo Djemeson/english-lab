@@ -1310,6 +1310,127 @@ function _aiParseJSON(data) {
 }
 
 // ================================================================
+// O QUE ESTÁ DIFICULTANDO ESTA PASSAGEM — a análise por nível
+// ================================================================
+// A ideia é dele, e o diagnóstico também: *"vejo uma frase que não entendo, mas
+// não sei por que não entendi. Em vez de tentar traduzir e pedir pra Lexa
+// explicar, já vejo de cara que ali no meio tem um phrasal ou palavra
+// desconhecida."*
+//
+// É outra pergunta, e por isso outra ferramenta. Traduzir responde "o que isto
+// quer dizer"; explicar responde "por que isto quer dizer isso". Falta a
+// primeira de todas: **ONDE está o problema**. Quem responde isso é esta
+// varredura — ela não traduz nada, só APONTA.
+//
+// DOIS CRITÉRIOS, e eles são diferentes de propósito:
+//   1. Vocabulário ACIMA DO NÍVEL dele (o nível vive em Configurações).
+//   2. Phrasal verbs, idioms e collocations **em qualquer nível** — porque o
+//      que trava não é a raridade da palavra: "put up with" é feito de três
+//      palavras que um A1 conhece e significa uma quarta coisa.
+//
+// ⚠️ O QUE ELE JÁ SABE FICA DE FORA, e isso é metade do valor: sem filtrar,
+// a passagem inteira acenderia e o destaque deixaria de destacar. Saem as
+// palavras marcadas como conhecidas (`isKnownWord`) e as que já estão no
+// acervo — se já virou card, não é mais mistério.
+
+// O JSON de dentro de uma resposta de texto. Gêmeo de `_aiParseJSON`, que só
+// sabe ler o objeto cru da API — aqui a resposta já veio como string.
+function _aiJsonDeTexto(bruto) {
+  let raw = String(bruto || '').replace(/```(?:json)?\n?|\n?```/g, '').trim()
+  if (!raw) return null
+  try { return JSON.parse(raw) } catch {}
+  const i = raw.indexOf('{'), f = raw.lastIndexOf('}')
+  if (i >= 0 && f > i) { try { return JSON.parse(raw.slice(i, f + 1)) } catch {} }
+  return null
+}
+
+const AI_DIF_TIPOS = {
+  word:         { rotulo: 'palavra',    cor: 'var(--role-novo)' },
+  phrasal_verb: { rotulo: 'phrasal',    cor: 'var(--role-fonte)' },
+  idiom:        { rotulo: 'expressão',  cor: 'var(--role-urgente)' },
+  collocation:  { rotulo: 'combinação', cor: 'var(--role-ia)' }
+}
+
+async function aiAnalisarDificuldade({ texto, lang = 'en', nivel, maxItens = 40 }) {
+  const t = String(texto || '').trim()
+  if (!t) return []
+  const L = (typeof getLangDef === 'function') ? getLangDef(lang) : { nameEn: 'English' }
+  const nv = nivel || (typeof cefrNivelAluno === 'function' ? cefrNivelAluno() : 'B1')
+  const def = (typeof CEFR !== 'undefined' ? CEFR.find(x => x.id === nv) : null) || { nome: nv }
+
+  const sistema =
+`Você é professor de ${L.nameEn} e está preparando um aluno de nível ${nv} (${def.nome}).
+Receberá um trecho e deve apontar SÓ o que provavelmente o faria travar.
+
+Devolva JSON: {"itens":[{"t":"...","tipo":"word|phrasal_verb|idiom|collocation","nivel":"A1..C2","pt":"..."}]}
+
+REGRAS:
+- "t" é a forma EXATA como aparece no trecho (mesma flexão, mesma ordem), para poder ser
+  encontrada nele. Nunca o infinitivo, nunca a forma de dicionário.
+- "pt": o sentido AQUI, em português, no máximo 4 palavras. Sem definição, sem explicação.
+- Inclua vocabulário acima de ${nv} (nivel B2, C1 ou C2 para um aluno ${nv}).
+- Inclua TODO phrasal verb, idiom e collocation não literal, MESMO que as palavras sejam
+  fáceis — é justamente o caso de "put up with" ou "call it a day".
+- NÃO inclua: nome próprio, número, palavra transparente com o português (hotel, doctor),
+  nem vocabulário que um aluno ${nv} já domina.
+- Máximo ${maxItens} itens. Se não houver nada difícil, devolva {"itens":[]}.
+- Nada além do JSON.`
+
+  // `aiTextSeguro` devolve TEXTO (e tem a rede de segurança entre fornecedores);
+  // o JSON sai daí, tolerando cerca de ``` e conversa em volta.
+  const bruto = await aiTextSeguro([
+    { role: 'system', content: sistema },
+    { role: 'user', content: t.slice(0, 9000) }
+  ], { maxTokens: 1800, timeoutMs: 90000 })
+  const obj = _aiJsonDeTexto(bruto)
+  const itens = (obj && Array.isArray(obj.itens)) ? obj.itens : []
+
+  const vistos = new Set()
+  return itens
+    .map(x => ({
+      t: String(x.t || '').trim(),
+      tipo: AI_DIF_TIPOS[x.tipo] ? x.tipo : 'word',
+      nivel: String(x.nivel || '').toUpperCase(),
+      pt: String(x.pt || '').trim()
+    }))
+    .filter(x => {
+      if (!x.t || x.t.length > 60) return false
+      const k = x.t.toLowerCase()
+      if (vistos.has(k)) return false
+      vistos.add(k)
+      // Já conhecido ou já no acervo: não é mistério, e acender tudo é não
+      // acender nada.
+      if (typeof isKnownWord === 'function' && x.tipo === 'word' && isKnownWord(x.t)) return false
+      if (typeof words !== 'undefined' && Array.isArray(words)) {
+        if (words.some(w => String(w.word || '').toLowerCase() === k)) return false
+      }
+      return true
+    })
+}
+
+// Onde cada achado APARECE no texto. Casamento por posição, sem regex montada
+// com o termo — expressão com ponto, parêntese ou apóstrofo viraria um padrão
+// inválido, e é exatamente o formato de "call it a day." ou "don't".
+function aiAcharNoTexto(texto, termo) {
+  const alvo = String(texto || '').toLowerCase()
+  const t = String(termo || '').toLowerCase().trim()
+  if (!t) return []
+  const saida = []
+  let de = 0
+  while (saida.length < 8) {
+    const i = alvo.indexOf(t, de)
+    if (i < 0) break
+    // Fronteira de palavra nas duas pontas, para "on" não acender dentro de
+    // "only" e "at" dentro de "attention".
+    const antes = i === 0 || /[^a-z0-9']/i.test(alvo[i - 1])
+    const depois = i + t.length >= alvo.length || /[^a-z0-9']/i.test(alvo[i + t.length])
+    if (antes && depois) saida.push({ i, fim: i + t.length })
+    de = i + Math.max(1, t.length)
+  }
+  return saida
+}
+
+// ================================================================
 // A LEXA NA WEB — só quando ele pedir
 // ================================================================
 // A busca só existe na Responses API (`/v1/responses`), fora do dialeto

@@ -1076,20 +1076,142 @@ function _abListaTexto() {
   // igual é no livro."* Português impresso ao lado do inglês faz o olho pular
   // para o português e a escuta não treina nada — a tradução tem de ser um
   // gesto, e só quando ele pedir. Quem traduz é o menu de seleção (`ai.js`).
+  const achados = tr.achados || null
+  const nivel = cefrNivelAluno()
   return `
     <div class="ab-trans-topo">
       <span>${abTempo(tr.ini)} – ${abTempo(tr.fim)} · ${tr.segs.length} falas</span>
       <span class="est-dica">Marque uma palavra ou frase: a tradução aparece na hora, e o menu
         manda ao estudo.</span>
+      ${achados
+        ? `<button class="est-chip" id="ab-raiox-btn" onclick="abAnalisarPassagem()"
+             data-tip="Refazer com o nível de agora">${ic('refresh','ic-3xs')} ${achados.length} para o ${tr.achadosNivel || nivel}</button>`
+        : `<button class="est-chip" id="ab-raiox-btn" onclick="abAnalisarPassagem()"
+             data-tip="Acha o que está acima do seu nível, e todo phrasal verb e expressão">
+             ${ic('eye','ic-3xs')} O que é difícil aqui</button>`}
       <button class="est-chip" onclick="abTranscrever()">${ic('plus','ic-3xs')} Outro trecho</button>
     </div>
-    <div class="ab-trans" id="ab-trans">
+    <div class="ab-trans${achados ? ' com-raiox' : ''}" id="ab-trans">
       ${tr.segs.map((s, i) => `
         <p class="ab-fala" data-i="${i}" data-ini="${s.i}" data-fim="${s.f}">
           <button class="ab-fala-t" onclick="abIrPara(${s.i})" data-tip="Ouvir a partir daqui">${abTempo(s.i)}</button>
-          <span>${esc(s.t)}</span>
+          <span class="ab-fala-corpo">
+            <span class="ab-fala-en">${achados ? _abFalaPintada(s.t, achados) : esc(s.t)}</span>
+            ${achados ? _abChipsDaFala(s.t, achados, i) : ''}
+          </span>
         </p>`).join('')}
-    </div>`
+    </div>
+    ${achados && !achados.length ? `<p class="est-dica" style="margin-top:10px">
+      Nada acima do seu <b>${esc(tr.achadosNivel || nivel)}</b> neste trecho — e nenhum phrasal
+      verb ou expressão idiomática. Se ainda assim travou, marque a frase e peça o Explicar.</p>` : ''}`
+}
+
+// ---- O RAIO-X DA PASSAGEM: o que aqui está acima do meu nível ----
+// ⚠️ ELE MOSTRA ONDE DÓI, e essa é a diferença para o que já existia. Traduzir
+// diz o que a frase quer dizer; explicar diz por quê. Faltava a pergunta que
+// vem antes das duas — *"não entendi, mas não sei o que me travou"*.
+//
+// O achado aparece em DOIS lugares ao mesmo tempo, de propósito:
+//   · aceso DENTRO da fala, para o olho localizar sem procurar;
+//   · como chip ABAIXO da fala (a ideia dele), com o sentido em português e o
+//     clique que manda ao Preparar.
+// Só o realce deixaria "o que é isso?" sem resposta; só a lista embaixo faria
+// procurar a palavra no meio da linha. Juntos, um responde onde e o outro o quê.
+async function abAnalisarPassagem() {
+  const a = _abLivro; if (!a) return
+  const cap = a.capitulos[_abCap]
+  const au = _abAudio()
+  const atual = Math.max(0, (au ? au.currentTime : 0) - (cap.ini || 0))
+  const tr = abTransDoPonto(a, _abCap, atual) || (a.transcricoes || []).find(x => x.cap === _abCap)
+  if (!tr) return
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return
+  }
+  const btn = el('ab-raiox-btn')
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Analisando…' }
+  try {
+    const nivel = cefrNivelAluno()
+    const achados = await aiAnalisarDificuldade({
+      texto: tr.segs.map(x => x.t).join('\n'),
+      lang: (a.lang || 'en').slice(0, 2), nivel
+    })
+    tr.achados = achados
+    tr.achadosNivel = nivel
+    a.updatedAt = Date.now()
+    saveAudiolivros()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+    abAba('texto')
+    toast(achados.length
+      ? `${achados.length} ${achados.length === 1 ? 'ponto difícil' : 'pontos difíceis'} para o seu ${nivel}`
+      : `Nada acima do seu ${nivel} por aqui`, achados.length ? 'success' : 'info')
+  } catch (e) {
+    console.warn('[audiobook] raio-x:', e)
+    toast('Não consegui analisar: ' + e.message, 'error')
+    abAba('texto')
+  }
+}
+
+// Acende os achados dentro da fala. Trabalha por POSIÇÃO (nada de regex montada
+// com o termo, que quebraria em "don't" ou "call it a day.") e do fim para o
+// começo, para os índices do texto não mudarem embaixo do próximo recorte.
+function _abFalaPintada(txt, achados) {
+  if (!achados || !achados.length) return esc(txt)
+  const marcas = []
+  achados.forEach((x, idx) => {
+    for (const oc of aiAcharNoTexto(txt, x.t)) marcas.push({ ...oc, idx, tipo: x.tipo })
+  })
+  if (!marcas.length) return esc(txt)
+  marcas.sort((p, q) => p.i - q.i)
+  // Sobreposição acontece ("put up" dentro de "put up with"): fica a mais longa.
+  const limpas = []
+  for (const m of marcas) {
+    const ultima = limpas[limpas.length - 1]
+    if (ultima && m.i < ultima.fim) {
+      if (m.fim - m.i > ultima.fim - ultima.i) limpas[limpas.length - 1] = m
+      continue
+    }
+    limpas.push(m)
+  }
+  let saida = '', de = 0
+  for (const m of limpas) {
+    saida += esc(txt.slice(de, m.i))
+    saida += `<mark class="ab-dif ab-dif-${m.tipo}" data-idx="${m.idx}">${esc(txt.slice(m.i, m.fim))}</mark>`
+    de = m.fim
+  }
+  return saida + esc(txt.slice(de))
+}
+
+// Os chips daquela fala, com o sentido curto e a saída para o estudo.
+function _abChipsDaFala(txt, achados, iFala) {
+  if (!achados || !achados.length) return ''
+  const daFala = achados
+    .map((x, idx) => ({ ...x, idx }))
+    .filter(x => aiAcharNoTexto(txt, x.t).length)
+  if (!daFala.length) return ''
+  return `<span class="ab-chips">${daFala.map(x => `
+    <button class="ab-chip ab-dif-${x.tipo}" onclick="abChipPreparar(${iFala},${x.idx})"
+            data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + ' — clique para mandar ao Preparar')}">
+      <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}
+    </button>`).join('')}</span>`
+}
+
+// O chip vai ao Preparar com a FALA como contexto — é o mesmo caminho da
+// seleção, então o item nasce igual ao que ele criaria à mão.
+function abChipPreparar(iFala, idx) {
+  const a = _abLivro; if (!a) return
+  const cap = a.capitulos[_abCap] || {}
+  const au = _abAudio()
+  const atual = Math.max(0, (au ? au.currentTime : 0) - (cap.ini || 0))
+  const tr = abTransDoPonto(a, _abCap, atual) || (a.transcricoes || []).find(x => x.cap === _abCap)
+  const item = tr && (tr.achados || [])[idx]
+  const fala = tr && tr.segs[iFala]
+  if (!item || !fala) return
+  if (typeof lexaChipParaPreparar !== 'function') return
+  lexaChipParaPreparar(
+    { expr: item.t, gloss: item.pt || '', type: item.tipo === 'word' ? 'word' : item.tipo },
+    { contexto: fala.t, lang: (a.lang || 'en').slice(0, 2),
+      source_type: 'audiobook', source_title: a.title || '',
+      source_context: cap.titulo ? `audiolivro · ${cap.titulo}` : 'audiolivro' })
 }
 
 // Ligar o menu de seleção é o que faz "ouvir virar card": o mesmo gesto do

@@ -7,7 +7,20 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (5ª) — **A TRADUÇÃO VIROU GESTO, IGUAL À DO LIVRO**. Eu tinha
+> Última atualização: 2026-08-21 (6ª) — **O RAIO-X DA PASSAGEM: "o que aqui está acima do meu
+> nível"**. Ideia dele, com o diagnóstico junto: *"vejo uma frase que não entendo, mas não sei
+> por que não entendi."* Traduzir diz o que a frase quer dizer, Explicar diz por quê — **faltava
+> a pergunta que vem antes das duas: ONDE está o problema**. Um clique varre a passagem e acende
+> o que está **acima do nível dele** (o de Configurações) mais **todo phrasal verb, idiom e
+> collocation, em qualquer nível** — porque o que trava não é a raridade: *"put up with"* são
+> três palavras de A1 que significam uma quarta coisa. O achado aparece **sublinhado no texto**
+> (cor por tipo) **e como chip abaixo da fala**, com o sentido em PT; o chip manda ao Preparar
+> com a fala como contexto. ⚠️ O que ele **já conhece ou já tem no acervo fica de fora** — sem
+> esse filtro a passagem inteira acenderia, e destaque em tudo é destaque em nada. Medido:
+> 8 achados certos em 4 falas, incluindo `eleventh hour` (C1) e `call it a day`.
+> `sw.js` → **englab-v338**. **Detalhes em §8.62.**
+>
+> Última atualização anterior: 2026-08-21 (5ª) — **A TRADUÇÃO VIROU GESTO, IGUAL À DO LIVRO**. Eu tinha
 > entendido errado e feito **legenda em massa** por baixo de cada fala; ele corrigiu: *"a
 > tradução é só quando eu arrastar a palavra ou frase, igual é no livro."* A legenda saiu, e a
 > tradução ao arrastar entrou **no menu de seleção compartilhado** (`ai.js`, não-lazy) — então
@@ -12194,6 +12207,71 @@ a mesma palavra noutra passagem pode ter outra tradução.
 O menu mostra "traduzindo…" no mesmo instante em que abre, e o português entra no lugar — sem
 tela em branco e sem esperar para ver os botões.
 
+## 8.62 O raio-X da passagem (2026-08-21, 6ª)
+
+**O diagnóstico é dele e vale mais que a funcionalidade:** *"vejo uma frase que não entendo, mas
+não sei por que não entendi. Em vez de tentar traduzir e pedir pra Lexa explicar, já vejo de
+cara que ali no meio tem um phrasal ou palavra desconhecida."*
+
+São três perguntas diferentes, e o app só respondia duas:
+
+| Pergunta | Ferramenta |
+|---|---|
+| O que isto quer dizer? | tradução ao arrastar |
+| Por que quer dizer isso? | Explicar |
+| **Onde está o problema?** | **o raio-X (novo)** |
+
+### Os dois critérios, diferentes de propósito
+
+1. **Acima do nível dele** — o nível já existia em Configurações (`cefrNivelAluno`, padrão B1) e
+   nunca tinha sido usado para nada além de prompt.
+2. **Phrasal verbs, idioms e collocations em QUALQUER nível.** O que trava não é a raridade da
+   palavra: `put up with` são três palavras que um A1 conhece e que juntas significam uma quarta
+   coisa. Este critério é o que responde à queixa dele.
+
+### O filtro que faz o destaque funcionar
+
+Sai o que ele **marcou como conhecido** (`isKnownWord`) e o que **já está no acervo** — se
+virou card, não é mais mistério. Sem isso a passagem inteira acenderia, e **destaque em tudo é
+destaque em nada**.
+
+### Onde o achado aparece — e por que nos dois lugares
+
+Ele sugeriu uma linha abaixo do texto e perguntou se eu tinha ideia melhor. A resposta foi
+**manter a ideia dele e somar**: o termo fica **sublinhado dentro da fala** (cor por tipo:
+palavra, phrasal, expressão, combinação) **e** vira **chip abaixo da fala**, com o sentido em
+português. Só o realce deixaria "o que é isso?" sem resposta; só a lista embaixo obrigaria a
+procurar a palavra no meio da linha. Juntos, um diz **onde** e o outro diz **o quê**.
+
+O realce é **sublinhado, nunca fundo colorido**: cinco palavras pintadas numa frase viram mancha
+e o texto deixa de ser lido.
+
+⚠️ **Detalhe de implementação que evita um bug clássico:** o casamento do termo no texto é por
+POSIÇÃO (`aiAcharNoTexto`), nunca por regex montada com o termo — `call it a day.` e `don't`
+produziriam padrão inválido. E há fronteira de palavra nas duas pontas, para `on` não acender
+dentro de `only`.
+
+### Testado com o Gemini dele, em quatro falas construídas para o caso
+
+| Achou | Tipo | Nível | Sentido |
+|---|---|---|---|
+| put up with | phrasal | B2 | suportar, tolerar |
+| called off | phrasal | B2 | canceladas |
+| eleventh hour | idiom | C1 | última hora |
+| taciturn | palavra | C1 | taciturno, calado |
+| brooding | palavra | C1 | ruminação |
+| call it a day | idiom | B2 | parar por hoje |
+
+Oito achados, oito realces e oito chips, sem falso positivo. O clique no chip criou o item com
+`source_type: 'audiobook'`, a **fala inteira como contexto** e o tipo certo (`phrasal_verb`).
+Item de teste removido do acervo em seguida.
+
+### Onde isto ainda não está
+
+Só na aba **Texto do audiolivro**. A peça (`aiAnalisarDificuldade` + `aiAcharNoTexto`) mora em
+`js/ai.js`, que é **não-lazy**, justamente para o **leitor de EPUB** ganhar o mesmo botão sem
+duplicar regra — é a pendência natural desta rodada.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -12259,6 +12337,18 @@ tela em branco e sem esperar para ver os botões.
       se o serviço tirar a imagem do ar, some. Baixar e converter para miniatura (como o EPUB
       faz) esbarra em CORS: o canvas fica "tainted" e o `toDataURL` falha. Caminho, se incomodar:
       buscar o binário e guardar o blob no `BookDB` sob `capa:<id>`.
+
+- [ ] **O RAIO-X NO LEITOR DE EPUB** (aberto em 2026-08-21, §8.62). A varredura por nível existe
+      e é compartilhada (`aiAnalisarDificuldade`, em `js/ai.js`); falta o botão e a pintura no
+      leitor, que é onde ele mais lê. O leitor já tem paginação e realce próprios, então a
+      pintura precisa conviver com `_lerRepintar` — não é copiar e colar.
+- [ ] **O ÁUDIO DO AUDIOLIVRO AINDA NÃO SOBE PARA A NUVEM** (pedido dele em 2026-08-21). Hoje só
+      metadados, transcrições, marcadores e posição viajam; o arquivo fica no aparelho. Ele quer
+      **ouvir no desktop e no celular com todo o material gerado**. O Storage já está de pé
+      (§8.11) e o EPUB já sobe (§8.13) — o que muda é a ESCALA: 100 MB a 1 GB por livro, contra
+      4 MB de um EPUB. Precisa de: subida em segundo plano com barra, download sob demanda ao
+      abrir noutro aparelho, "liberar espaço" (apagar o local mantendo a nuvem) e um aviso de
+      custo, porque download de Storage é o que se paga.
 
 ### Decisões em aberto (com o levantamento já feito)
 

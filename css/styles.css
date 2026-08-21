@@ -5294,6 +5294,32 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ab-fala-t:hover{color:var(--role-energia)}
 .ab-fala.on .ab-fala-t{color:var(--role-energia)}
 .ab-fala span{flex:1;min-width:0}
+/* ---- raio-x da passagem: o que está acima do nível ---- */
+.ab-fala-corpo{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.ab-fala-en{line-height:1.65}
+/* O realce é SUBLINHADO, não fundo colorido: fundo em cinco palavras de uma
+   frase vira mancha e o texto deixa de ser lido. O sublinhado marca sem tirar
+   a frase do lugar, e a cor diz o tipo. */
+.ab-dif{
+  background:none;color:inherit;padding:0 1px;
+  border-bottom:2px solid var(--cor,var(--role-novo));border-radius:1px;
+}
+.ab-dif-word{--cor:var(--role-novo)}
+.ab-dif-phrasal_verb{--cor:var(--role-fonte)}
+.ab-dif-idiom{--cor:var(--role-urgente)}
+.ab-dif-collocation{--cor:var(--role-ia)}
+.ab-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ab-chip{
+  display:inline-flex;align-items:baseline;gap:6px;cursor:pointer;
+  background:var(--surface);border:1px solid var(--border);
+  border-left:3px solid var(--cor,var(--role-novo));
+  border-radius:var(--radius-xs);padding:3px 9px;font-family:inherit;
+}
+.ab-chip:hover{border-color:var(--border-strong);background:var(--surface2)}
+.ab-chip b{font-size:var(--fs-xs);color:var(--text);font-weight:600}
+.ab-chip i{font-size:var(--fs-3xs);color:var(--text3);font-style:normal}
+.ab-trans.com-raiox .ab-fala{padding-bottom:9px}
+
 .ab-novo{
   font-style:normal;font-size:8px;letter-spacing:.06em;vertical-align:super;
   color:var(--role-ia);
