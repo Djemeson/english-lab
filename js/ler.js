@@ -2690,32 +2690,97 @@ function _lerRaioXDespintar() {
   cont.normalize()
 }
 
-// ⚠️ O REALCE PRECISA DE UMA AÇÃO, e essa lição veio dele em uma frase: *"não
-// tá aparecendo chip. Como que faz pra mandar pro Preparar?"* Os chips estavam
-// no painel de ferramentas — longe do texto e atrás de um ícone. Marca que
-// acende e não faz nada obriga a procurar o que fazer com ela.
+// ⚠️ O REALCE PRECISA DE UMA AÇÃO, e a lição veio dele em duas frases. Primeiro
+// *"não tá aparecendo chip. Como que faz pra mandar pro Preparar?"* — os chips
+// estavam no painel de ferramentas, atrás de um ícone, longe do texto. Depois,
+// vendo a primeira tentativa: *"ao passar o mouse, em vez de só aparecer a
+// tradução, aparece o chip."*
 //
-// Agora clicar no destaque SELECIONA aquele trecho, e a seleção é o gesto que
-// o leitor já ensina: abre o popup de sempre, com a tradução, o Explicar e o
-// Preparar. Nenhum caminho novo para aprender.
+// É a solução certa e é melhor do que a minha: o chip **vai até onde o olho já
+// está**. A tradução sozinha responde "o que é", e para de aí; o chip responde
+// e ainda oferece as duas saídas — mandar ao estudo ou dizer que já sabe.
+//
+// Hover E clique abrem o mesmo chip: no celular não há hover, e no computador
+// quem clica também espera algo. Arrastar por cima continua selecionando
+// normalmente — a seleção é do leitor, não deste realce.
+let _lerDifPop = null
+let _lerDifSaiTimer = null
+
+function _lerDifFechar() {
+  clearTimeout(_lerDifSaiTimer)
+  if (_lerDifPop) { _lerDifPop.remove(); _lerDifPop = null }
+}
+
+function _lerDifAbrir(mk) {
+  const i = Number(mk.dataset.i)
+  const x = _lerRaioX && (_lerRaioX.itens || [])[i]
+  if (!x) return
+  if (_lerDifPop && _lerDifPop._i === i && document.body.contains(_lerDifPop)) return
+  _lerDifFechar()
+  const p = document.createElement('div')
+  p._i = i
+  p.className = 'ler-dif-pop ler-dif-' + (x.tipo || 'word')
+  p.innerHTML = `
+    <span class="ler-dif-pop-txt"><b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}</span>
+    <span class="ler-dif-pop-tipo">${esc(AI_DIF_TIPOS[x.tipo] ? AI_DIF_TIPOS[x.tipo].rotulo : '')}${x.nivel ? ' · ' + esc(x.nivel) : ''}</span>
+    <span class="ler-dif-pop-acoes">
+      <button onclick="lerRaioXPreparar(${i});_lerDifFechar()" data-tip="Mandar para o Preparar com a frase do livro">${ic('plus','ic-3xs')} Preparar</button>
+      <button onclick="lerRaioXJaSei(${i});_lerDifFechar()" data-tip="Já sei esta palavra COM ESTE sentido — não aparece mais">${ic('check','ic-3xs')} Já sei</button>
+    </span>`
+  // Fica vivo enquanto o mouse estiver nele: sem isto, tirar o mouse da palavra
+  // para clicar em "Preparar" fecharia o chip no meio do caminho.
+  p.addEventListener('mouseenter', () => clearTimeout(_lerDifSaiTimer))
+  p.addEventListener('mouseleave', () => { _lerDifSaiTimer = setTimeout(_lerDifFechar, 260) })
+  // ⚠️ AS CORES DO PAPEL PRECISAM VIAJAR JUNTO. `--ler-bg`/`--ler-fg` são
+  // declaradas em `.ler-leitor`; o chip vive no `body` (para ficar fora do
+  // texto paginado) e ali essas variáveis NÃO EXISTEM — `var(--ler-bg)` sem
+  // valor não dá erro, simplesmente some, e o chip nasceu transparente, com o
+  // texto do livro atravessando as letras dele. É a armadilha nº 2 do projeto,
+  // e a solução é copiar as quatro variáveis para o próprio elemento.
+  const leitor = document.querySelector('.ler-leitor')
+  if (leitor) {
+    const cs = getComputedStyle(leitor)
+    for (const v of ['--ler-bg', '--ler-fg', '--ler-fg2', '--ler-mark']) {
+      const valor = cs.getPropertyValue(v)
+      if (valor) p.style.setProperty(v, valor.trim())
+    }
+  }
+  document.body.appendChild(p)
+  _lerDifPop = p
+
+  const r = mk.getBoundingClientRect()
+  const larg = p.offsetWidth, alt = p.offsetHeight
+  let left = r.left + r.width / 2 - larg / 2
+  left = Math.max(8, Math.min(left, innerWidth - larg - 8))
+  // Acima da palavra por padrão; abaixo quando não couber — o chip nunca pode
+  // cobrir a linha que ele está lendo.
+  const top = (r.top - alt - 8 > 8) ? (r.top - alt - 8) : (r.bottom + 8)
+  p.style.left = Math.round(left) + 'px'
+  p.style.top = Math.round(top) + 'px'
+}
+
 function _lerRaioXLigarClique(cont) {
   if (!cont || cont._raioxClique) return
   cont._raioxClique = true
+  cont.addEventListener('mouseover', ev => {
+    const mk = ev.target.closest && ev.target.closest('mark.ler-dif')
+    if (mk) { clearTimeout(_lerDifSaiTimer); _lerDifAbrir(mk) }
+  })
+  cont.addEventListener('mouseout', ev => {
+    if (ev.target.closest && ev.target.closest('mark.ler-dif')) {
+      _lerDifSaiTimer = setTimeout(_lerDifFechar, 260)
+    }
+  })
   cont.addEventListener('click', ev => {
     const mk = ev.target.closest && ev.target.closest('mark.ler-dif')
-    if (!mk) return
+    if (!mk) { _lerDifFechar(); return }
     ev.preventDefault(); ev.stopPropagation()
-    try {
-      const rng = document.createRange()
-      rng.selectNodeContents(mk)
-      const sel = window.getSelection()
-      sel.removeAllRanges()
-      sel.addRange(rng)
-      // O leitor escuta `selectionchange` com um respiro; disparar na mão
-      // garante o popup mesmo quando o clique não moveu a seleção o bastante.
-      if (typeof _lerAoSelecionar === 'function') setTimeout(_lerAoSelecionar, 10)
-    } catch (e) {}
+    _lerDifAbrir(mk)
   })
+  // Virar página, rolar ou trocar de capítulo com o chip aberto o deixaria
+  // pendurado no meio da tela, apontando para uma palavra que já saiu de vista.
+  window.addEventListener('resize', _lerDifFechar)
+  cont.addEventListener('scroll', _lerDifFechar, { passive: true })
 }
 
 function _lerRaioXPintar() {
@@ -2751,7 +2816,9 @@ function _lerRaioXPintar() {
       const mk = document.createElement('mark')
       mk.className = 'ler-dif ler-dif-' + ((achado && achado.tipo) || 'word')
       mk.dataset.i = achado ? achado.i : ''
-      mk.title = achado && achado.pt ? achado.pt : ''
+      // Sem `title`: o tooltip nativo competia com o chip do hover e piscava por
+      // cima dele. Quem mostra a glosa (e as ações) agora é `_lerDifAbrir`.
+      mk.dataset.pt = achado && achado.pt ? achado.pt : ''
       mk.textContent = m[0]
       frag.appendChild(mk)
       ultimo = m.index + m[0].length
@@ -2781,12 +2848,34 @@ function _lerRaioXBlocoHTML() {
       ? `${novos} ${novos === 1 ? 'ponto difícil' : 'pontos difíceis'}${itens.length - novos ? ` · ${itens.length - novos} você já tem` : ''}`
       : `Nada acima do seu ${esc(nivel)} aqui`}</div>
     ${itens.length ? `<div class="ler-dif-lista">${itens.map((x, i) => `
-      <button class="ler-dif-chip ler-dif-${x.tipo}${x.ja ? ' ja' : ''}" onclick="lerRaioXPreparar(${i})"
-              data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + (x.ja === 'outro' ? ' — você tem esta palavra com OUTRO sentido' : x.ja === 'marcada' ? ' — você marcou como conhecida' : ' — clique para mandar ao Preparar'))}">
-        <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}
-      </button>`).join('')}</div>` : ''}
+      <span class="ler-dif-par">
+        <button class="ler-dif-chip ler-dif-${x.tipo}${x.ja ? ' ja' : ''}" onclick="lerRaioXPreparar(${i})"
+                data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + (x.ja === 'outro' ? ' — você tem esta palavra com OUTRO sentido' : x.ja === 'marcada' ? ' — você marcou como conhecida' : ' — clique para mandar ao Preparar'))}">
+          <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}
+        </button>
+        <button class="ler-dif-sei" onclick="lerRaioXJaSei(${i})"
+                data-tip="Já sei esta palavra COM ESTE sentido — não aparece mais">${ic('check','ic-3xs')}</button>
+      </span>`).join('')}</div>` : ''}
     <button class="btn btn-ghost btn-sm" onclick="lerRaioXApagar()">${ic('refresh','ic-sm')} Analisar de novo</button>
   </div>`
+}
+
+// "Já sei este sentido": tira do texto, tira da lista e ensina o filtro para as
+// próximas análises — em qualquer livro, porque a marca é do PAR termo+sentido.
+async function lerRaioXJaSei(i) {
+  const x = _lerRaioX && (_lerRaioX.itens || [])[i]
+  if (!x) return
+  if (typeof markKnownSense !== 'function' || !markKnownSense(x.t, x.pt)) {
+    toast('Não consegui marcar este sentido.', 'error'); return
+  }
+  _lerRaioX.itens = _lerRaioX.itens.filter((_, k) => k !== i)
+  try {
+    await BookDB.set(_lerChaveRaioX(_lerCap),
+      JSON.stringify({ itens: _lerRaioX.itens, nivel: cefrNivelAluno(), at: Date.now() }))
+  } catch (e) {}
+  _lerRaioXPintar()
+  _lerRenderFerramentas()
+  toast(`"${x.t}" (${x.pt}) marcado como conhecido`, 'success')
 }
 
 function lerRaioXPreparar(i) {

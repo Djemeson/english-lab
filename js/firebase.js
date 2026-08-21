@@ -502,7 +502,7 @@ async function fbPushData() {
     // Audiolivros: SÓ METADADOS. O áudio (centenas de MB) fica no aparelho —
     // aqui viaja título, capa reduzida, capítulos, posição e marcadores.
     batch.set(base.collection('data').doc('audiolivros'), { list: audiolivros, updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('known'), { map: knownWords || {}, ignored: ignoredWords || {}, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('known'), { map: knownWords || {}, ignored: ignoredWords || {}, senses: knownSenses || {}, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('clips'),  { list: clips,  updatedAt: Date.now() })
     // Podcasts: só a lista de programas visitados (ponteiros). O episódio em si
     // já viaja em `videos` e o mp3 nunca sobe.
@@ -820,7 +820,11 @@ function applyCloudDocs(docs) {
     saveAudiolivros()
   }
   if (docs.known)    { knownWords = { ...knownWords, ...(docs.known.map || {}) }; saveKnownLocal()
-                       ignoredWords = { ...ignoredWords, ...(docs.known.ignored || {}) }; saveIgnoredLocal() }
+                       ignoredWords = { ...ignoredWords, ...(docs.known.ignored || {}) }; saveIgnoredLocal()
+                       // Sentidos sabidos: UNIÃO, como o resto deste doc — marcar
+                       // no celular tem de valer no computador, e o que um
+                       // aparelho marcou nunca pode ser apagado pelo outro.
+                       knownSenses = { ...knownSenses, ...(docs.known.senses || {}) }; saveKnownSenses() }
   if (docs.clips)    { clips  = docs.clips.list  || []; saveClips() }
   // Programas de podcast: adota a nuvem (como videos/clips) para que tirar um
   // programa da lista num aparelho valha em todos. São só ponteiros (nome,

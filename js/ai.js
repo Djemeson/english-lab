@@ -1562,6 +1562,9 @@ function aiFraseDoTermo(texto, termo) {
 function aiJaConhecido(x) {
   const k = String(x.t || '').toLowerCase().trim()
   if (!k) return null
+  // "Eu já sei esta palavra NESTE sentido": a marca dele vale mais que
+  // qualquer inferência — foi ele que declarou, olhando a passagem.
+  if (typeof isKnownSense === 'function' && isKnownSense(x.t, x.pt)) return 'sentido'
   const item = (typeof words !== 'undefined' && Array.isArray(words))
     ? words.find(w => String(w.word || '').toLowerCase() === k)
     : null

@@ -197,6 +197,70 @@ function saveKnownLocal() {
   try { localStorage.setItem('el-known', JSON.stringify(knownWords)) } catch (e) {}
 }
 
+// ---- SENTIDOS QUE ELE JÁ SABE (2026-08-21) ----
+// Pedido dele, e ele explicou o porquê melhor do que eu explicaria: *"pode ser
+// acima do meu nível, mas eu posso já saber aquele objeto de estudo — assim ela
+// não aparece de novo futuramente."*
+//
+// ⚠️ POR QUE NÃO SERVIA O `knownWords`: aquele mapa guarda a PALAVRA, sem
+// significado. Marcar `ore` como conhecida esconderia a passagem em que ela é
+// "minério" só porque ele sabe "veio de mina" — o erro que o raio-X levou uma
+// rodada inteira para deixar de cometer (§8.63). Aqui a chave é o PAR
+// (termo + sentido): saber um sentido não apaga os outros.
+//
+// Mapa `termo\u0000glosa-normalizada` -> timestamp. Leve (dezenas de bytes por
+// item) e sincronizado por UNIÃO, como `knownWords`: marcar no celular vale no
+// computador, e nada se perde quando dois aparelhos marcam coisas diferentes.
+let knownSenses = {}
+try { knownSenses = JSON.parse(localStorage.getItem('el-known-senses') || '{}') } catch (e) {}
+
+// A glosa normalizada guarda só as palavras de peso, ordenadas: "suportar,
+// tolerar" e "tolerar suportar" viram a mesma chave. Sem isso, a mesma ideia
+// escrita de dois jeitos criaria duas marcas e o item voltaria a aparecer.
+function senseNorm(glosa) {
+  return String(glosa || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 4)
+    .sort()
+    .join(' ')
+    .trim()
+}
+function senseKey(termo, glosa) {
+  const t = knownNorm(termo)
+  const g = senseNorm(glosa)
+  return (t && g) ? (t + '\u0000' + g) : ''
+}
+function isKnownSense(termo, glosa) {
+  const k = senseKey(termo, glosa)
+  if (!k) return false
+  if (knownSenses[k]) return true
+  // Basta UMA palavra de peso em comum com algum sentido já marcado daquele
+  // termo — a glosa da IA muda de forma entre uma análise e outra ("suportar"
+  // hoje, "suportar, tolerar" amanhã), e exigir igualdade literal faria o item
+  // reaparecer para sempre. Mesma frouxidão de `aiSentidoParecido`.
+  const t = knownNorm(termo) + '\u0000'
+  const alvo = senseNorm(glosa).split(' ').filter(Boolean)
+  if (!alvo.length) return false
+  for (const chave of Object.keys(knownSenses)) {
+    if (!chave.startsWith(t)) continue
+    const partes = chave.slice(t.length).split(' ')
+    if (partes.some(x => alvo.some(y => x === y || (x.length >= 5 && y.startsWith(x.slice(0, 5)))))) return true
+  }
+  return false
+}
+function markKnownSense(termo, glosa, on = true) {
+  const k = senseKey(termo, glosa)
+  if (!k) return false
+  if (on) knownSenses[k] = Date.now(); else delete knownSenses[k]
+  try { localStorage.setItem('el-known-senses', JSON.stringify(knownSenses)) } catch (e) {}
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  return true
+}
+function saveKnownSenses() {
+  try { localStorage.setItem('el-known-senses', JSON.stringify(knownSenses)) } catch (e) {}
+}
+
 // "Nunca mais sugerir": nomes proprios, jargao que nao interessa, etc.
 let ignoredWords = {}
 try { ignoredWords = JSON.parse(localStorage.getItem('el-ignored') || '{}') } catch (e) {}

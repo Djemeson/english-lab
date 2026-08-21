@@ -5357,6 +5357,22 @@ body.ab-full .ab-chips{max-width:34em}
 .ab-chip i{font-size:var(--fs-3xs);color:var(--text3);font-style:normal}
 /* O chip do que ele já tem fica mais apagado: continua ali (o sentido pode ser
    outro), mas não disputa a atenção com o que é realmente novo. */
+/* O par chip + "já sei": o ✓ é discreto e só ganha cor no hover — ele é uma
+   saída, não uma ação principal. A principal continua sendo mandar ao estudo. */
+.ab-chip-par,.ler-dif-par{display:inline-flex;align-items:stretch}
+.ab-chip-par .ab-chip,.ler-dif-par .ler-dif-chip{border-top-right-radius:0;border-bottom-right-radius:0}
+.ab-chip-sei,.ler-dif-sei{
+  display:flex;align-items:center;padding:0 7px;cursor:pointer;
+  background:var(--surface);border:1px solid var(--border);border-left:0;
+  border-radius:0 var(--radius-xs) var(--radius-xs) 0;color:var(--text3);
+}
+.ab-chip-sei:hover,.ler-dif-sei:hover{color:var(--role-dominio);border-color:var(--role-dominio)}
+.ler-dif-sei{
+  background:color-mix(in srgb, var(--ler-fg) 6%, transparent);
+  border-color:color-mix(in srgb, var(--ler-fg) 16%, transparent);
+  color:color-mix(in srgb, var(--ler-fg) 45%, transparent);
+}
+.ler-dif-sei:hover{color:#1F7A4D;border-color:#1F7A4D}
 .ab-chip-ja{opacity:.72}
 .ab-chip-ja:hover{opacity:1}
 .ab-chip-selo{
@@ -5430,6 +5446,36 @@ body.ab-full .ab-chips{max-width:34em}
 .ler-dif-phrasal_verb{--cor:#2F72D0}
 .ler-dif-idiom{--cor:#C63B62}
 .ler-dif-collocation{--cor:#7B4BC9}
+/* O CHIP QUE VEM ATÉ O MOUSE. Vive no `body` (fora do texto paginado) para não
+   entrar na conta das colunas: qualquer elemento dentro do fluxo mudaria a
+   paginação e faria o livro pular de página. */
+.ler-dif-pop{
+  position:fixed;z-index:var(--z-modal);max-width:320px;
+  display:flex;flex-direction:column;gap:6px;padding:10px 12px;
+  background:var(--ler-bg);color:var(--ler-fg);
+  border:1px solid color-mix(in srgb, var(--ler-fg) 18%, transparent);
+  border-left:3px solid var(--cor,var(--ler-mark));
+  border-radius:var(--radius-sm);box-shadow:0 10px 30px rgba(0,0,0,.28);
+  font-family:var(--font);
+}
+.ler-dif-pop-txt{display:flex;flex-direction:column;gap:2px}
+.ler-dif-pop-txt b{font-size:var(--fs-sm);color:var(--ler-fg)}
+.ler-dif-pop-txt i{font-size:var(--fs-sm);color:var(--ler-fg2);font-style:normal}
+.ler-dif-pop-tipo{
+  font-size:var(--fs-3xs);letter-spacing:.04em;text-transform:uppercase;
+  color:color-mix(in srgb, var(--ler-fg) 45%, transparent);
+}
+.ler-dif-pop-acoes{display:flex;gap:6px;margin-top:2px}
+.ler-dif-pop-acoes button{
+  display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+  font-family:inherit;font-size:var(--fs-3xs);padding:5px 10px;
+  border-radius:var(--radius-pill);
+  background:color-mix(in srgb, var(--ler-fg) 8%, transparent);
+  border:1px solid color-mix(in srgb, var(--ler-fg) 18%, transparent);
+  color:var(--ler-fg);
+}
+.ler-dif-pop-acoes button:hover{background:color-mix(in srgb, var(--ler-fg) 16%, transparent)}
+
 .ler-dif-lista{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 /* ⚠️ O CHIP VIVE DENTRO DO PAPEL, e não na moldura do app. O painel de
    ferramentas herda o tema de LEITURA (`--ler-fg`/`--ler-bg`, que muda entre

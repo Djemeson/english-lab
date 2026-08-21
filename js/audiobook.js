@@ -1085,7 +1085,7 @@ function _abListaTexto() {
         manda ao estudo.</span>
       ${achados
         ? `<button class="est-chip" id="ab-raiox-btn" onclick="abAnalisarPassagem()"
-             data-tip="Refazer com o nível de agora">${ic('refresh','ic-3xs')} ${achados.filter(x => !x.ja).length} novos${
+             data-tip="Refazer com o nível de agora">${ic('refresh','ic-3xs')} ${achados.filter(x => !x.ja).length} ${achados.filter(x => !x.ja).length === 1 ? 'novo' : 'novos'}${
                achados.filter(x => x.ja).length ? ` · ${achados.filter(x => x.ja).length} conhecidos` : ''}</button>`
         : `<button class="est-chip" id="ab-raiox-btn" onclick="abAnalisarPassagem()"
              data-tip="Acha o que está acima do seu nível, e todo phrasal verb e expressão">
@@ -1213,11 +1213,38 @@ function _abChipsDaFala(txt, achados, iFala) {
     marcada: { txt: 'você marcou como conhecida', tip: 'Você declarou conhecer esta palavra; como não há significado registrado, não dá para saber se é este o sentido' }
   }
   return `<span class="ab-chips">${daFala.map(x => `
-    <button class="ab-chip ab-dif-${x.tipo}${x.ja ? ' ab-chip-ja' : ''}" onclick="abChipPreparar(${iFala},${x.idx})"
-            data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + (x.ja && selo[x.ja] ? ' — ' + selo[x.ja].tip : ' — clique para mandar ao Preparar'))}">
-      <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}${
-        x.ja && selo[x.ja] ? `<u class="ab-chip-selo ab-selo-${x.ja}">${selo[x.ja].txt}</u>` : ''}
-    </button>`).join('')}</span>`
+    <span class="ab-chip-par">
+      <button class="ab-chip ab-dif-${x.tipo}${x.ja ? ' ab-chip-ja' : ''}" onclick="abChipPreparar(${iFala},${x.idx})"
+              data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + (x.ja && selo[x.ja] ? ' — ' + selo[x.ja].tip : ' — clique para mandar ao Preparar'))}">
+        <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}${
+          x.ja && selo[x.ja] ? `<u class="ab-chip-selo ab-selo-${x.ja}">${selo[x.ja].txt}</u>` : ''}
+      </button>
+      <button class="ab-chip-sei" onclick="abJaSei(${x.idx})"
+              data-tip="Já sei esta palavra COM ESTE sentido — não aparece mais">${ic('check','ic-3xs')}</button>
+    </span>`).join('')}</span>`
+}
+
+// "JÁ SEI ESTE SENTIDO" — o item some daqui e das próximas análises.
+// ⚠️ Guarda o PAR (termo + sentido), nunca só a palavra: saber `ore` como "veio
+// de mina" não pode esconder a passagem em que ela é "minério".
+function abJaSei(idx) {
+  const a = _abLivro; if (!a) return
+  const cap = a.capitulos[_abCap] || {}
+  const au = _abAudio()
+  const atual = Math.max(0, (au ? au.currentTime : 0) - (cap.ini || 0))
+  const tr = abTransDoPonto(a, _abCap, atual) || (a.transcricoes || []).find(x => x.cap === _abCap)
+  const item = tr && (tr.achados || [])[idx]
+  if (!item) return
+  if (typeof markKnownSense !== 'function' || !markKnownSense(item.t, item.pt)) {
+    toast('Não consegui marcar este sentido.', 'error'); return
+  }
+  // Sai da lista guardada também: sem isto ele continuaria aceso nesta tela até
+  // a próxima análise, e o clique pareceria não ter feito nada.
+  tr.achados = (tr.achados || []).filter((_, i) => i !== idx)
+  a.updatedAt = Date.now()
+  saveAudiolivros()
+  toast(`"${item.t}" (${item.pt}) marcado como conhecido`, 'success')
+  abAba('texto')
 }
 
 // O chip vai ao Preparar com a FALA como contexto — é o mesmo caminho da
@@ -1303,7 +1330,6 @@ function abIrPara(seg) {
 // para os dois lados.
 const AB_VOLTA_AO_CENTRO_MS = 5000
 let _abRolouEm = 0        // quando ELE rolou por último
-let _abAutoRolando = false
 
 function _abAcompanharTexto() {
   const box = el('ab-trans'); if (!box || !_abLivro) return
@@ -1328,7 +1354,6 @@ function _abCentralizar(box, alvo) {
   const r = alvo.getBoundingClientRect(), c = box.getBoundingClientRect()
   const destino = box.scrollTop + (r.top - c.top) - (c.height / 2) + (r.height / 2)
   if (Math.abs(destino - box.scrollTop) < 4) return
-  _abAutoRolando = true
   // ⚠️ SUAVE SÓ COM A PÁGINA À VISTA. A rolagem animada depende de o navegador
   // estar compondo quadros: em aba de segundo plano (ou num painel embutido
   // que não compõe) ela simplesmente não anda, e a fala nunca chega ao centro.
@@ -1338,11 +1363,6 @@ function _abCentralizar(box, alvo) {
   const ate = Math.max(0, destino)
   if (suave) box.scrollTo({ top: ate, behavior: 'smooth' })
   else box.scrollTop = ate
-  // A rolagem suave dispara `scroll` por meio segundo; sem esta janela, o
-  // próprio ajuste seria lido como "ele rolou" e o auto-centro se desligaria
-  // sozinho para sempre.
-  clearTimeout(_abCentralizar._t)
-  _abCentralizar._t = setTimeout(() => { _abAutoRolando = false }, 700)
 }
 
 // Só o gesto DELE conta como rolagem manual. Escutar `scroll` puro não serve:
@@ -1350,7 +1370,13 @@ function _abCentralizar(box, alvo) {
 function _abLigarRolagemManual(box) {
   if (!box || box._abRolagem) return
   box._abRolagem = true
-  const marcar = () => { if (!_abAutoRolando) _abRolouEm = Date.now() }
+  // ⚠️ SEM GUARDA DE "ROLAGEM AUTOMÁTICA" AQUI, e isso foi medido: com ela, um
+  // gesto feito DURANTE a animação de centralização era descartado (o flag
+  // ficava ligado por 700 ms) e o texto voltava ao centro por cima da mão dele
+  // — exatamente o que estes 5 segundos existem para impedir. A guarda só faria
+  // sentido se eu escutasse `scroll`, que a rolagem programática também
+  // dispara; wheel, touch, pointer e teclas são SEMPRE gesto humano.
+  const marcar = () => { _abRolouEm = Date.now() }
   box.addEventListener('wheel', marcar, { passive: true })
   box.addEventListener('touchmove', marcar, { passive: true })
   box.addEventListener('pointerdown', marcar, { passive: true })

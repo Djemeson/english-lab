@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (9ª) — **O RAIO-X CHEGOU AO LEITOR DE EPUB**. Mesma peça do
+> Última atualização: 2026-08-21 (10ª) — **TELA CHEIA NO TEXTO DO AUDIOLIVRO, REALCE CLICÁVEL NO
+> LEITOR E "JÁ SEI ESTE SENTIDO"**. Quatro pedidos dele numa rodada. (1) O texto do audiolivro
+> ganhou **modo full com a fala do momento SEMPRE NO CENTRO**; rolar à mão manda por **5
+> segundos** e depois o áudio reassume. (2) O realce do leitor **virou clicável** — ele perguntou
+> *"não tá aparecendo chip, como que faz pra mandar pro Preparar?"*, e marca que acende sem fazer
+> nada obriga a procurar. (3) O prompt ganhou **conferência**: ele pegou `shakes it` traduzido
+> como *"treme de medo"* onde era **apertar a mão**. (4) **"Já sei este sentido"**: um ✓ no chip
+> marca o PAR termo+significado — saber `ore` como "veio de mina" **não** esconde a passagem em
+> que ela é "minério". ⚠️ Um defeito achado com espião de rolagem: gesto feito **durante** a
+> animação de centralização era descartado, e o texto voltava por cima da mão dele.
+> `sw.js` → **englab-v344**. **Detalhes em §8.66.**
+>
+> Última atualização anterior: 2026-08-21 (9ª) — **O RAIO-X CHEGOU AO LEITOR DE EPUB**. Mesma peça do
 > Audiobook (`aiAnalisarDificuldade`, em `js/ai.js`), tela diferente — e a diferença não é
 > cosmética: o texto do leitor é **paginado por colunas CSS**, então inserir chips no meio dele
 > mudaria a altura, a paginação seria remedida e o livro pularia de página sozinho. Aqui o texto
@@ -1582,6 +1594,10 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
     exceção dentro da exceção**: ele se UNE por dia, nunca se escolhe. Ler no celular na segunda
     e no notebook na terça não pode apagar a segunda-feira do calendário.
 - **`cfg.estante`** — `{metaPag, metaLivros}`: a meta diária de páginas e a de livros no ano.
+- **`knownSenses`** (core.js, localStorage `el-known-senses`, **sincronizado por união** dentro
+  de `data/known`) — os SENTIDOS que ele declarou saber, no formato
+  `termo\u0000glosa-normalizada` → timestamp. Diferente de `knownWords`, que guarda só a forma:
+  aqui saber um sentido **não apaga os outros** da mesma palavra (§8.66).
 - **`cfg.autoMeta`** — o interruptor do "completar sozinho ao importar" (Configurações → Dados
   dos livros). **Ligado por padrão**: o campo só existe depois que ele DESLIGA.
 - **`audiolivros[]`** (core.js, localStorage `el-audiolivros`, **sincronizado** em
@@ -12472,6 +12488,97 @@ no chip criou o item com tipo `phrasal_verb`, a frase do livro e o capítulo. Tr
 página creme. Chips e realce agora derivam de `--ler-fg`, e os quatro tons de tipo foram
 escolhidos com saturação média para se ver nos cinco temas.
 
+## 8.66 Tela cheia, realce clicável e "já sei este sentido" (2026-08-21, 10ª)
+
+Quatro pedidos dele, todos nascidos de uso real.
+
+### 1. O texto do audiolivro em tela cheia, com a fala no centro
+
+> *"O texto do audiobook deve ter um modo full e se comportar igual o livro. Quando o áudio
+> tiver rodando e a frase estiver acesa ela deve ficar no centro… eu posso subir ou descer o
+> mouse, mas depois de 5 segundos deve voltar pra centro do que está sendo dito."*
+
+A caixa de 420px dentro do player serve para consultar; para **ler enquanto ouve** — que é o que
+faz o audiolivro virar estudo — ela é pequena. Em tela cheia o texto ganha coluna de 34em,
+serifada, e o resto do app sai da frente. `Esc` sai.
+
+**O centro não é capricho.** Com o texto empurrado só até "caber na área visível", a linha ativa
+vive no rodapé da caixa e **o que vem a seguir fica fora da vista** — justamente o que o ouvido
+está prestes a receber. No centro, ele lê para os dois lados.
+
+⚠️ **Só gesto humano conta como "ele rolou"** (`wheel`, `touchmove`, `pointerdown`, teclas). O
+evento `scroll` puro serviria de armadilha: a própria centralização o dispara, e o ajuste seria
+lido como interrupção — o auto-centro se desligaria sozinho para sempre.
+
+⚠️ **E rolagem suave só com a página à vista:** animação depende de composição de quadros; em
+aba de segundo plano ela não anda, e a fala nunca chegaria ao centro. Escondida, o salto é
+direto — ninguém está vendo a animação mesmo.
+
+### 2. O chip vai até o mouse (no leitor)
+
+Duas frases dele, em sequência. Primeiro: *"não tá aparecendo chip. Como que faz pra mandar pro
+Preparar?"* — os chips existiam, mas no painel de ferramentas, atrás do ícone de faísca. **Marca
+que acende e não faz nada obriga a procurar o que fazer com ela.** Fiz o clique abrir a seleção,
+e ele corrigiu a solução: *"ao passar o mouse, em vez de só aparecer a tradução, aparece o
+chip."*
+
+Ele estava certo e é melhor: **o chip vai até onde o olho já está**. Passar o mouse (ou clicar,
+no celular) abre um chip flutuante com o termo, o sentido, o tipo e o nível — e **duas saídas**:
+*Preparar* e *Já sei*. A tradução sozinha responde "o que é" e para aí.
+
+⚠️ **O chip vive no `body`, fora do texto paginado** — dentro do fluxo, ele entraria na conta das
+colunas e faria o livro pular de página. E por viver fora, **as cores do papel precisaram viajar
+junto**: `--ler-bg`/`--ler-fg` são declaradas em `.ler-leitor` e ali não existem; sem valor, a
+variável não dá erro — simplesmente some, e o chip nasceu **transparente**, com o texto do livro
+atravessando as letras. É a armadilha nº 2 do projeto, e a correção é copiar as quatro variáveis
+para o próprio elemento.
+
+### 3. O prompt ganhou conferência
+
+Ele pegou `shakes it` glosado como **"treme de medo"** em *"Macintosh holds out his hand. Billy
+rises and shakes it"* — ali é **apertar a mão**. O prompt agora manda **substituir a tradução na
+frase e conferir se ela continua dizendo o mesmo** (técnica que já provou valor na tradução do
+leitor), usar as frases vizinhas, e só marcar idiom/phrasal quando o sentido **não for literal**.
+
+### 4. "Já sei este sentido" — o pedido que fecha o ciclo
+
+> *"Pode ser acima do meu nível, mas eu posso já saber aquele objeto de estudo — assim ela não
+> aparece de novo futuramente."*
+
+Um **✓** ao lado de cada chip (no audiolivro e no leitor) marca o **par termo + sentido** em
+`knownSenses` (`el-known-senses`, sincronizado por união como `knownWords`).
+
+⚠️ **Por que não serviu o `knownWords`:** aquele mapa guarda a PALAVRA, sem significado. Marcar
+`ore` esconderia a passagem em que ela é "minério" só porque ele sabe "veio de mina" — o erro que
+o raio-X levou uma rodada inteira para deixar de cometer (§8.63). Aqui saber um sentido **não
+apaga os outros**.
+
+A glosa é normalizada para as palavras de peso, ordenadas: *"suportar, tolerar"* e *"tolerar
+suportar"* viram a mesma chave, e a comparação aceita variação de escrita — senão a mesma ideia
+escrita de outro jeito criaria uma marca nova e o item voltaria a aparecer.
+
+**Medido:** marcando `ore` = "minério" → esse some, `ore` = "veio de mina" **continua aparecendo**,
+"minério bruto" é reconhecido como o mesmo sentido, e outro termo não é afetado. Na tela: o chip
+sumiu do texto e da lista no clique.
+
+### O defeito que só o espião de rolagem pegou
+
+Como aba de segundo plano não aplica scroll (nem no painel embutido nem no Chrome), a
+centralização não podia ser medida pelo resultado. Instrumentei o container para registrar **o
+alvo pedido** — e aí apareceu: um gesto feito **durante** a animação de centralização era
+descartado (havia uma guarda de "rolagem automática" ligada por 700 ms), e o texto voltava por
+cima da mão dele. A guarda saiu: ela só faria sentido para o evento `scroll`, e os eventos que
+eu escuto são todos gesto humano.
+
+| Situação | Antes | Depois |
+|---|---|---|
+| áudio andando | pede centralizar (727) | pede centralizar (727) |
+| gesto dele, dentro dos 5 s | **pedia centralizar (1172)** | **não mexe** |
+| passados os 5 s | pede centralizar | pede centralizar |
+
+⚠️ **O movimento em si continua sem prova automática** — aba oculta não rola. A lógica está
+medida; o deslizar é para o olho dele confirmar.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -12540,11 +12647,10 @@ escolhidos com saturação média para se ver nos cinco temas.
 
 - [x] ~~**O RAIO-X NO LEITOR DE EPUB**~~ — **feito em 2026-08-21** (§8.65): realce no texto,
       chips no painel de ferramentas, resultado guardado por capítulo no `BookDB`.
-- [ ] **O TEXTO DO AUDIOLIVRO PRECISA DE MODO FULL COM ROLAGEM AUTOMÁTICA** (pedido dele em
-      2026-08-21). Hoje a aba Texto vive dentro do player, numa caixa de 420px, e o
-      acompanhamento só empurra a fala para dentro da área visível. Ele quer o texto **em tela
-      cheia, como o livro**, com a fala que está tocando **centralizada**, podendo rolar à mão e
-      **voltando sozinho ao centro depois de 5 segundos**.
+- [x] ~~**O TEXTO DO AUDIOLIVRO PRECISA DE MODO FULL COM ROLAGEM AUTOMÁTICA**~~ — **feito em
+      2026-08-21** (§8.66). ⚠️ **Falta o olho dele:** aba em segundo plano não aplica rolagem,
+      então a lógica foi medida por espião (alvo pedido, regra dos 5 s) mas o deslizar no centro
+      nunca foi visto rodando.
 - [ ] **O ÁUDIO DO AUDIOLIVRO AINDA NÃO SOBE PARA A NUVEM** (pedido dele em 2026-08-21). Hoje só
       metadados, transcrições, marcadores e posição viajam; o arquivo fica no aparelho. Ele quer
       **ouvir no desktop e no celular com todo o material gerado**. O Storage já está de pé
