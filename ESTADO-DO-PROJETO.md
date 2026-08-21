@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (2ª) — **O MARCADOR MOSTRA A FRASE**. Ele guardava o instante;
+> Última atualização: 2026-08-21 (3ª) — **OS CAPÍTULOS DE VERDADE, ACHADOS PELO SILÊNCIO**. As
+> "Partes de 15 minutos" eram honestas e arbitrárias; agora o ffmpeg escuta o arquivo inteiro
+> atrás dos **vãos de 2 a 4 segundos** que separam capítulos, propõe os cortes e só aplica com o
+> aval dele. **Aqui no aparelho, sem IA e sem custo.** ⚠️ O que decidiu o desenho: aplicar um
+> corte novo **mexe em tudo que aponta para um capítulo** — posição de leitura, marcadores e
+> transcrições guardam `{cap, seg}` —, então há um remapeamento que converte cada referência
+> para tempo absoluto e a devolve ao capítulo certo. **Medido com áudio de silêncios
+> conhecidos**: os três cortes acertados com precisão de décimos, a pausa curta de 0,8 s
+> ignorada, e 10 minutos varridos em 1,4 s. `sw.js` → **englab-v335**. **Detalhes em §8.59.**
+>
+> Última atualização anterior: 2026-08-21 (2ª) — **O MARCADOR MOSTRA A FRASE**. Ele guardava o instante;
 > agora mostra **o que estava sendo dito ali**, cruzando o segundo marcado com a fala transcrita.
 > ⚠️ O detalhe que decidiu o desenho: a frase é **derivada na hora de mostrar**, não só gravada
 > quando o marcador nasce — porque a ordem real é o contrário da óbvia (ele marca ENQUANTO ouve
@@ -12042,6 +12052,49 @@ aviso honesto; marcador novo já nasceu com a frase; e a seleção na frase crio
 `source_type: 'audiobook'`, obra e capítulo certos, com a fala inteira como contexto. Item de
 teste removido do acervo em seguida.
 
+## 8.59 Os capítulos de verdade, achados pelo silêncio (2026-08-21, 3ª)
+
+As Partes de 15 minutos resolviam a navegação, mas cortavam no meio de uma frase. Um audiolivro
+real tem **2 a 4 segundos de silêncio entre capítulos** — muito mais que a pausa de um ponto
+final —, e é esse vão que o `silencedetect` do ffmpeg sabe achar.
+
+**Sob demanda, nunca na importação.** Medir silêncio exige DECODIFICAR o arquivo inteiro.
+Aceitável quando ele pediu e vê a barra andar; inaceitável como surpresa ao arrastar um arquivo.
+
+**O corte fica no FIM do silêncio**, não no começo nem no meio: é ali que o narrador diz
+"Chapter Two". Cortar na entrada do vão deixaria o título pendurado no capítulo anterior.
+
+**Três filtros contra falso positivo:** silêncio menor que 1,6 s é pausa, não capítulo; nada de
+capítulo com menos de 90 s; e o começo e o fim do arquivo são ignorados.
+
+### O que decidiu o desenho: aplicar o corte mexe em TUDO
+
+Posição de leitura, marcadores e transcrições guardam `{cap, seg}` — **relativo ao capítulo**.
+Trocar a lista de capítulos sem mais nada mandaria o livro para o lugar errado e faria cada
+marcador mentir. `_abRemapearParaNovosCapitulos` converte cada referência para tempo absoluto
+dentro do arquivo e a devolve ao capítulo que agora a contém. Por isso a proposta aparece
+**antes** de aplicar: recapitular não tem desfazer.
+
+### Testado com silêncio construído, onde a resposta certa é conhecida
+
+Gerei um WAV de 610 s com vãos deliberados — 3 s em 150, 2,5 s em 353, **0,8 s logo depois**
+(a armadilha) e 4 s em 476.
+
+| Esperado | Achado |
+|---|---|
+| corte em 153,0 | **152,8** |
+| corte em 355,5 | **356,1** |
+| corte em 480,3 | **480,1** |
+| pausa de 0,8 s | **ignorada**, como devia |
+
+E o remapeamento, conferido item a item: marcador em 200 s virou *capítulo 2, 0:47*; em 500 s,
+*capítulo 4, 0:20*; a posição de 400 s virou *capítulo 3, 0:44*; a transcrição que começava em
+190 s virou *capítulo 2, a partir de 0:37*, com os três segmentos deslocados junto.
+
+**Velocidade:** 10 minutos de áudio varridos em **1,4 s** — cerca de 400× o tempo real, o que
+põe um livro de doze horas em torno de dois minutos. Bem abaixo do que eu temia ao registrar
+esta pendência.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -12086,11 +12139,9 @@ teste removido do acervo em seguida.
       transcrição por capítulo, texto que acompanha o áudio e seleção que vira card.
 - [x] ~~**O MARCADOR AINDA NÃO CARREGA A FRASE**~~ — **feito em 2026-08-21** (§8.58): a fala
       daquele instante aparece no marcador, inclusive nos guardados antes da transcrição.
-- [ ] **DETECTAR OS CORTES REAIS DE UM ARQUIVO SEM CAPÍTULOS** (aberto em 2026-08-21, §8.57).
-      Hoje ele é fatiado em partes de 15 min, que é honesto mas arbitrário. Audiolivro costuma
-      ter 2–3 s de silêncio entre capítulos, e o ffmpeg tem `silencedetect` — daria os cortes de
-      verdade. Custa varrer o arquivo inteiro no wasm (minutos, para 12 h de áudio), então só
-      vale como ação sob demanda ("procurar capítulos"), nunca na importação.
+- [x] ~~**DETECTAR OS CORTES REAIS DE UM ARQUIVO SEM CAPÍTULOS**~~ — **feito em 2026-08-21**
+      (§8.59): "Procurar capítulos" varre o arquivo, propõe os cortes e remapeia tudo que
+      apontava para um capítulo. Mais rápido que o previsto: ~400× o tempo real.
 - [ ] **CAPÍTULO EM TRILHA DE TEXTO NO `.m4b` NÃO É LIDO** (2026-08-20, §8.56). Parte dos
       conversores grava os capítulos como trilha QuickTime (`tref/chap`) em vez de `chpl`. Esses
       arquivos entram como capítulo único — ouvem-se igual, com a posição guardada, mas sem a

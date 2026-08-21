@@ -644,6 +644,229 @@ function _abCapaIlst(dv, buf, ilst) {
 }
 
 // ================================================================
+// PROCURAR OS CAPÍTULOS DE VERDADE — pelo silêncio entre eles
+// ================================================================
+// As "Partes de 15 minutos" são honestas, mas arbitrárias: cortam no meio de
+// uma frase. Um audiolivro real tem 2 a 4 segundos de silêncio entre capítulos
+// — muito mais do que a pausa de uma vírgula ou de um ponto final. É esse vão
+// que o ffmpeg sabe achar (`silencedetect`), e é dele que saem os cortes
+// verdadeiros.
+//
+// ⚠️ POR QUE ISTO É SOB DEMANDA, E NUNCA NA IMPORTAÇÃO: para medir o silêncio é
+// preciso DECODIFICAR o arquivo inteiro. São minutos de trabalho num livro de
+// doze horas — aceitável quando ele pediu e está vendo a barra andar,
+// inaceitável como surpresa ao arrastar um arquivo para a tela.
+//
+// ⚠️ E O CORTE MEXE EM TUDO O QUE APONTA PARA UM CAPÍTULO: a posição de
+// leitura, os marcadores e as transcrições guardam `{cap, seg}`. Trocar a lista
+// de capítulos sem remapear essas referências mandaria o livro para o lugar
+// errado e faria cada marcador mentir. Ver `_abRemapearParaNovosCapitulos`.
+const AB_SIL_DB = -32           // abaixo disto é silêncio, para voz narrada
+const AB_SIL_SEG = 1.6          // silêncio menor que isto é pausa, não capítulo
+const AB_CAP_MIN_SEG = 90       // capítulo achado menor que isto é falso positivo
+
+function abPodeProcurarCapitulos(a) {
+  // Só faz sentido num arquivo único: várias faixas JÁ são a capitulação.
+  return !!a && (a.arquivos === 1) && (a.capitulos || []).length >= 1
+}
+
+async function abProcurarCapitulos() {
+  const a = _abLivro; if (!a || !abPodeProcurarCapitulos(a)) return
+  const dur = abDuracao(a)
+  const ok = await confirmModal({
+    title: 'Procurar os capítulos de verdade', icon: 'search', confirmText: 'Procurar',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Vou escutar o arquivo inteiro atrás dos <b>silêncios longos</b> — o vão de dois a quatro
+      segundos que separa um capítulo do outro — e trocar as partes por tempo pelos cortes
+      encontrados.<br><br>
+      É tudo feito <b>neste aparelho</b>, sem IA e sem custo algum. Em compensação <b>demora</b>:
+      o áudio precisa ser decodificado do começo ao fim${dur ? ` (${abTempoLongo(dur)} de livro)` : ''}.
+      Dá para continuar usando o app; só não feche esta aba.</p>`
+  })
+  if (!ok) return
+
+  const box = el('ab-aba')
+  const pintar = (m, pct) => {
+    if (!box) return
+    box.innerHTML = `<div class="est-nada">
+      <p>${esc(m)}</p>
+      ${pct != null ? `<div class="est-ficha-barra" style="width:280px"><i style="width:${Math.round(pct * 100)}%;background:var(--role-energia)"></i></div>` : ''}
+      <p class="est-dica">Pode deixar rodando e voltar depois.</p></div>`
+  }
+  try {
+    pintar('Preparando o conversor (na 1ª vez baixa ~31 MB)…')
+    const silencios = await _abDetectarSilencios(a, (m, pct) => pintar(m, pct))
+    const cortes = _abCortesDosSilencios(silencios, abDuracao(a))
+    if (cortes.length < 1) {
+      if (box) box.innerHTML = `<div class="est-nada">${ic('info','ic-lg')}
+        <p>Não achei silêncios longos o bastante para separar capítulos.</p>
+        <p class="est-dica" style="max-width:460px">Acontece com gravação sem pausa entre
+        capítulos, ou com música de fundo contínua — o vão existe para o ouvido, mas não para a
+        medida. As partes por tempo continuam valendo.</p>
+        <button class="btn btn-ghost btn-sm" onclick="abAba('capitulos')">Voltar</button></div>`
+      return
+    }
+    _abPropostaCapitulos(cortes)
+  } catch (e) {
+    console.warn('[audiobook] silêncios:', e)
+    if (box) box.innerHTML = `<div class="est-nada"><p class="est-erro">${esc(e.message)}</p>
+      <button class="btn btn-ghost btn-sm" onclick="abAba('capitulos')">Voltar</button></div>`
+  }
+}
+
+// O ffmpeg não devolve os silêncios como dado: ele os ESCREVE no log. A saída
+// vai para `-f null`, porque nada precisa ser gravado — só queremos o relatório
+// do filtro. Mono a 8 kHz para decodificar o mínimo possível: silêncio não tem
+// estéreo nem agudo.
+async function _abDetectarSilencios(a, aoAndar) {
+  const cap0 = (a.capitulos || [])[0] || { arq: 0 }
+  const blob = await BookDB.get(abChaveArquivo(a.id, cap0.arq))
+  if (!blob) throw new Error('o arquivo deste livro não está neste aparelho')
+  const ff = await _abFFmpeg()
+  const nome = 'entrada' + (a.formato === 'm4b' ? '.m4b' : '.mp3')
+  const arq = new File([blob], nome, { type: blob.type || 'audio/mpeg' })
+
+  const achados = []
+  const linha = ({ message }) => {
+    const m = String(message || '')
+    let r = m.match(/silence_start:\s*(-?[\d.]+)/)
+    if (r) { achados.push({ ini: parseFloat(r[1]) }); return }
+    r = m.match(/silence_end:\s*([\d.]+)[^|]*\|\s*silence_duration:\s*([\d.]+)/)
+    if (r && achados.length) {
+      const ultimo = achados[achados.length - 1]
+      ultimo.fim = parseFloat(r[1])
+      ultimo.dur = parseFloat(r[2])
+    }
+  }
+  ff.on('log', linha)
+  if (aoAndar) {
+    ff.on('progress', ({ progress }) => {
+      if (progress > 0 && progress <= 1) aoAndar(`Escutando o livro… ${Math.round(progress * 100)}%`, progress)
+    })
+  }
+  try {
+    try { await ff.unmount('/abs') } catch (e) {}
+    try { await ff.createDir('/abs') } catch (e) {}
+    await ff.mount('WORKERFS', { files: [arq] }, '/abs')
+    if (aoAndar) aoAndar('Escutando o livro…', 0)
+    const code = await ff.exec(['-i', '/abs/' + nome, '-ac', '1', '-ar', '8000',
+      '-af', `silencedetect=noise=${AB_SIL_DB}dB:d=${AB_SIL_SEG}`, '-f', 'null', '-'])
+    if (code !== 0) throw new Error('a varredura retornou código ' + code)
+  } finally {
+    try { ff.off('log', linha) } catch (e) {}
+    try { await ff.unmount('/abs') } catch (e) {}
+  }
+  return achados.filter(x => x.fim > x.ini)
+}
+
+// O CORTE FICA NO FIM DO SILÊNCIO, e não no começo nem no meio: é ali que o
+// narrador diz "Chapter Two". Cortar no início do vão deixaria o título do
+// capítulo pendurado no fim do capítulo anterior.
+// ⚠️ E silêncio longo não é sempre capítulo: pausa dramática, troca de cena e
+// respiro de fim de parágrafo também aparecem. Por isso o filtro por tamanho
+// mínimo de capítulo — melhor devolver dez capítulos certos que trinta cortes
+// no meio da narração.
+function _abCortesDosSilencios(silencios, duracao) {
+  const cortes = []
+  for (const s of silencios) {
+    const ponto = Math.max(0, s.fim - 0.25)
+    if (ponto < AB_CAP_MIN_SEG) continue                       // abertura do livro
+    if (duracao && ponto > duracao - AB_CAP_MIN_SEG) continue  // sobra do fim
+    if (cortes.length && ponto - cortes[cortes.length - 1] < AB_CAP_MIN_SEG) continue
+    cortes.push(ponto)
+  }
+  return cortes
+}
+
+// A PROPOSTA ANTES DE APLICAR. Trocar a capitulação de um livro é irreversível
+// na prática (não dá para "desfatiar"), então ele vê o que vai acontecer.
+let _abCortesPropostos = null
+function _abPropostaCapitulos(cortes) {
+  const a = _abLivro
+  const dur = abDuracao(a)
+  const novos = _abCapitulosDosCortes(cortes, dur, (a.capitulos[0] || {}).arq || 0)
+  _abCortesPropostos = novos
+  const menor = Math.min(...novos.map(abDurCap))
+  const maior = Math.max(...novos.map(abDurCap))
+  const box = el('ab-aba'); if (!box) return
+  box.innerHTML = `
+    <div class="ab-proposta">
+      <p><b>${novos.length} capítulos</b> encontrados pelo silêncio —
+        do menor (${abTempoLongo(menor)}) ao maior (${abTempoLongo(maior)}).</p>
+      <p class="est-dica">Confira a lista. Aplicando, suas <b>marcações e transcrições
+        acompanham</b> os novos cortes, e a posição de leitura também.</p>
+      <div class="ab-caps" style="margin:14px 0">
+        ${novos.map((c, i) => `<div class="ab-cap">
+          <span class="ab-cap-n">${i + 1}</span>
+          <span class="ab-cap-t">${esc(c.titulo)}</span>
+          <span class="ab-cap-d">${abTempo(abDurCap(c))}</span></div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="abAba('capitulos')">Manter como está</button>
+        <button class="btn btn-primary btn-sm" onclick="abAplicarCapitulos()">${ic('check','ic-sm')} Usar estes capítulos</button>
+      </div>
+    </div>`
+}
+
+function _abCapitulosDosCortes(cortes, duracao, arq) {
+  const pontos = [0, ...cortes, duracao]
+  const caps = []
+  for (let i = 0; i < pontos.length - 1; i++) {
+    caps.push({
+      titulo: `Capítulo ${i + 1} · ${abTempo(pontos[i])}`,
+      arq, ini: pontos[i], fim: pontos[i + 1]
+    })
+  }
+  return caps
+}
+
+function abAplicarCapitulos() {
+  const a = _abLivro, novos = _abCortesPropostos
+  if (!a || !novos || !novos.length) return
+  _abRemapearParaNovosCapitulos(a, novos)
+  a.capitulos = novos
+  a.updatedAt = Date.now()
+  saveAudiolivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  _abCortesPropostos = null
+  _abCap = Math.min(a.pos?.cap || 0, novos.length - 1)
+  toast(`${novos.length} capítulos aplicados`, 'success')
+  _abAbaAtual = 'capitulos'
+  _abRenderPlayer()
+}
+
+// TUDO QUE APONTAVA PARA UM CAPÍTULO PRECISA APONTAR PARA O NOVO.
+// A conta é a mesma para os três casos: o tempo dentro do ARQUIVO não muda —
+// muda só qual capítulo o contém. Sem isto, um marcador de "0:38 do capítulo 2"
+// viraria 0:38 de um capítulo 2 que agora começa noutro lugar do livro.
+function _abRemapearParaNovosCapitulos(a, novos) {
+  const antigos = a.capitulos || []
+  const absoluto = (cap, seg) => ((antigos[cap] || {}).ini || 0) + (seg || 0)
+  const achar = abs => {
+    let i = novos.findIndex(c => abs >= c.ini && abs < c.fim)
+    if (i < 0) i = abs >= (novos[novos.length - 1] || {}).fim ? novos.length - 1 : 0
+    return { cap: i, seg: Math.max(0, abs - novos[i].ini) }
+  }
+  if (a.pos) a.pos = achar(absoluto(a.pos.cap, a.pos.seg))
+  for (const m of (a.marcadores || [])) {
+    const novo = achar(absoluto(m.cap, m.seg))
+    m.cap = novo.cap; m.seg = novo.seg
+  }
+  // Na transcrição, `ini/fim` e cada `seg` guardam tempo DENTRO do capítulo.
+  // Todos se deslocam pela MESMA diferença — a distância entre o começo do
+  // capítulo antigo e o do novo —, então basta somar esse deslocamento a todos.
+  for (const t of (a.transcricoes || [])) {
+    const baseAntiga = (antigos[t.cap] || {}).ini || 0
+    const novoCap = achar(baseAntiga + t.ini).cap
+    const desloc = baseAntiga - novos[novoCap].ini
+    t.cap = novoCap
+    t.ini += desloc
+    t.fim += desloc
+    for (const seg of (t.segs || [])) { seg.i += desloc; seg.f += desloc }
+  }
+}
+
+// ================================================================
 // OUVIR VIRA CARD — a transcrição por capítulo
 // ================================================================
 // Era a pendência que separava o reprodutor do resto do app: ele tocava, e
@@ -1107,7 +1330,22 @@ function abAba(qual, ev) {
 
 function _abListaCapitulos() {
   const a = _abLivro
-  return `<div class="ab-caps">${(a.capitulos || []).map((c, i) => `
+  // O convite aparece só onde faz sentido: arquivo único cujas "partes" foram
+  // cortadas pelo relógio. Livro que já veio capitulado não precisa de nada.
+  // Vale para os dois casos de "arquivo que não veio capitulado": as Partes por
+  // relógio E o livro inteiro num capítulo só (arquivo curto demais para ser
+  // fatiado, ou um `.m4b` cujos capítulos não estavam em `chpl`).
+  const caps = a.capitulos || []
+  const porTempo = caps.length === 1 || caps.some(c => /^(Parte \d|Livro completo)/.test(c.titulo || ''))
+  const convite = abPodeProcurarCapitulos(a) && porTempo
+    ? `<div class="ab-conv">
+         ${ic('search','ic-sm')}
+         <span>Estes cortes são de <b>15 em 15 minutos</b>, não os capítulos do livro.
+           Dá para procurar os de verdade pelo <b>silêncio</b> entre eles — aqui no aparelho,
+           sem custo.</span>
+         <button class="btn btn-ghost btn-sm" onclick="abProcurarCapitulos()">Procurar capítulos</button>
+       </div>` : ''
+  return `${convite}<div class="ab-caps">${(a.capitulos || []).map((c, i) => `
     <button class="ab-cap${i === _abCap ? ' on' : ''}" onclick="abIrCapitulo(${i})">
       <span class="ab-cap-n">${i + 1}</span>
       <span class="ab-cap-t">${esc(c.titulo)}</span>

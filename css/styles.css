@@ -5299,6 +5299,16 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   color:var(--role-ia);
 }
 
+.ab-conv{
+  display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:11px 14px;
+  border-radius:var(--radius-sm);font-size:var(--fs-sm);color:var(--text2);line-height:1.55;
+  background:rgba(var(--primary-rgb),.09);border:1px solid rgba(var(--primary-rgb),.22);
+}
+.ab-conv span{flex:1}
+.ab-conv b{color:var(--text)}
+.ab-proposta p{font-size:var(--fs-sm);color:var(--text2);line-height:1.6}
+.ab-proposta .ab-cap{cursor:default}
+
 .ab-marcas{display:flex;flex-direction:column;gap:2px}
 .ab-marca{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:var(--radius-xs)}
 .ab-marca:hover{background:var(--surface)}
