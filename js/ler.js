@@ -2870,7 +2870,11 @@ function _lerRaioXBlocoHTML() {
     ${itens.length ? `<div class="ler-dif-lista">${itens.map((x, i) => `
       <span class="ler-dif-par">
         <button class="ler-dif-chip ler-dif-${x.tipo}${x.ja ? ' ja' : ''}" onclick="lerRaioXPreparar(${i})"
-                data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + (x.ja === 'outro' ? ' — você tem esta palavra com OUTRO sentido' : x.ja === 'marcada' ? ' — você marcou como conhecida' : ' — clique para mandar ao Preparar'))}">
+                data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + (
+                  x.ja === 'outro' ? ' — você tem esta palavra com OUTRO sentido'
+                  : x.ja === 'marcada' ? ' — você marcou como conhecida'
+                  : x.ja === 'fila' ? ' — já está no Preparar, esperando análise'
+                  : ' — clique para mandar ao Preparar'))}">
           <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}
         </button>
         <button class="ler-dif-sei" onclick="lerRaioXJaSei(${i})"

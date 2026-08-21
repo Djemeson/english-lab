@@ -7,7 +7,15 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (11ª) — **O CHIP VIROU PEÇA ÚNICA, E O RAIO-X GANHOU PORTA
+> Última atualização: 2026-08-21 (12ª) — **"VOCÊ TEM ESTA PALAVRA COM OUTRO SENTIDO" ERA MENTIRA
+> QUANDO NÃO HAVIA SENTIDO NENHUM**. Ele viu o chip dizer isso sobre `live large` — a mesma
+> expressão, do mesmo trecho, que ele tinha acabado de mandar ao Preparar. O item existia em
+> `words`, mas **ainda sem análise** (`pending_ai`, `meanings` vazio), e eu tratava "sem
+> significado registrado" como "significado diferente". Agora esse caso tem nome próprio —
+> **`fila`: "já está no Preparar, esperando análise"** — e a afirmação falsa saiu.
+> `sw.js` → **englab-v347**. **Detalhes em §8.68.**
+>
+> Última atualização anterior: 2026-08-21 (11ª) — **O CHIP VIROU PEÇA ÚNICA, E O RAIO-X GANHOU PORTA
 > PRÓPRIA**. Três pedidos: *"adorei 'o chip vai até o mouse'. Faça o mesmo pro texto do
 > audiobook"*, *"o modo de texto deve ter o mesmo botão Aa"* e *"quero que essa nova função fique
 > bem evidente em um botão seu, e que ao clicar apareçam os capítulos… com o spark nos já
@@ -12656,6 +12664,40 @@ analisados · nível B1"*. Chip do hover abrindo com *"put up with · suportar �
 duas ações. "Aa" mudando o tamanho para 22px: gravou em `cfg.ler` e aplicou no texto. No leitor,
 com o livro real: **"1 de 35 capítulos analisados"**, ✦ e **141** no Chapter 1, "analisar" nos
 demais.
+
+## 8.68 O item na fila não tem "outro sentido" — não tem sentido nenhum (2026-08-21, 12ª)
+
+> *"Eu tenho 'live large' em preparar, e no livro ao rodar a verificação ele me diz que tenho
+> essa palavra com outro sentido, apesar de ser a mesma palavra do mesmo trecho."*
+
+Ele mandou a expressão ao Preparar, a análise da IA **ainda não tinha rodado** (o item estava em
+`pending_ai`, com `meanings` vazio), e o raio-X anunciava *"você tem esta palavra com OUTRO
+sentido"* sobre a passagem de onde ela tinha acabado de sair.
+
+**A causa:** `aiJaConhecido` tratava "item existe, mas sem significado registrado" como o mesmo
+caso de "item existe com significado diferente". São coisas opostas — **não saber nada** não é
+**saber outra coisa**.
+
+⚠️ É o terceiro defeito desta família nesta semana (§8.64, o "nada difícil aqui"; §8.63, o filtro
+pela forma): **o app afirmando com convicção algo que ele não tem como saber**. A regra que sai
+disto: quando falta informação, o estado precisa de **nome próprio** — nunca ser encaixado no
+estado vizinho que "parece" servir.
+
+### O quarto estado
+
+| Situação | Estado | O que o chip diz |
+|---|---|---|
+| a glosa bate com um sentido estudado | `sentido` | (some da lista) |
+| tem a palavra, com sentido diferente | `outro` | você tem esta palavra com outro sentido |
+| marcada como conhecida (sem sentido) | `marcada` | você marcou como conhecida |
+| **no Preparar, ainda sem análise** | **`fila`** | **já está no Preparar, esperando análise** |
+
+Quando ele analisar o item no Preparar, os `meanings` passam a existir e o estado vira `sentido`
+(se a glosa bater) — e aí sim ele some do raio-X, com razão.
+
+**Medido:** `live large` em `pending_ai` → `fila`; `ore` com "veio de mina" estudado → `outro`
+para "minério" e `sentido` para "veio de mina"; termo desconhecido → novo. Na tela, o chip passou
+a dizer *"expressão · C1 · já está no Preparar, esperando análise"*.
 
 ## 9. Pendências / a verificar
 

@@ -1589,13 +1589,18 @@ function _difChipAbrir(mk, cfgChip) {
   if (_difPop && _difPop._id === id && document.body.contains(_difPop)) return
   difChipFechar()
   const tipo = x.tipo || 'word'
+  const situacao = {
+    outro:   'você tem esta palavra com outro sentido',
+    marcada: 'você marcou como conhecida',
+    fila:    'já está no Preparar, esperando análise'
+  }
   const p = document.createElement('div')
   p._id = id
   p.className = 'dif-pop ' + (cfgChip.classe || '') + ' dif-pop-' + tipo
   p.innerHTML = `
     <span class="dif-pop-txt"><b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}</span>
     <span class="dif-pop-tipo">${esc(AI_DIF_TIPOS[tipo] ? AI_DIF_TIPOS[tipo].rotulo : '')}${x.nivel ? ' · ' + esc(x.nivel) : ''}${
-      x.ja === 'outro' ? ' · você tem esta palavra com outro sentido' : x.ja === 'marcada' ? ' · você marcou como conhecida' : ''}</span>
+      situacao[x.ja] ? ' · ' + situacao[x.ja] : ''}</span>
     <span class="dif-pop-acoes">
       <button data-acao="preparar" data-tip="Mandar para o Preparar com a frase">${ic('plus','ic-3xs')} Preparar</button>
       <button data-acao="jasei" data-tip="Já sei esta palavra COM ESTE sentido — não aparece mais">${ic('check','ic-3xs')} Já sei</button>
@@ -1669,7 +1674,14 @@ function aiJaConhecido(x) {
     const sentidos = (item.meanings || [])
       .filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em)
       .map(m => m.meaning_pt)
-    if (!sentidos.length) return 'outro'
+    // ⚠️ SEM SIGNIFICADO REGISTRADO NÃO É "OUTRO SENTIDO" — é NENHUM sentido.
+    // Ele pegou o erro com todas as letras: mandou `live large` ao Preparar, a
+    // análise ainda não tinha rodado (o item estava em `pending_ai`, sem
+    // `meanings`), e o raio-X anunciava *"você tem esta palavra com outro
+    // sentido"* sobre o MESMO trecho de onde ela saiu. Afirmação falsa dita com
+    // convicção — o mesmo tipo de defeito do "nada difícil aqui" (§8.64).
+    // O estado certo é `fila`: já está no Preparar, o sentido ainda não existe.
+    if (!sentidos.length) return 'fila'
     return sentidos.some(m => aiSentidoParecido(m, x.pt)) ? 'sentido' : 'outro'
   }
   if (typeof isKnownWord === 'function' && x.tipo === 'word' && isKnownWord(x.t)) return 'marcada'
