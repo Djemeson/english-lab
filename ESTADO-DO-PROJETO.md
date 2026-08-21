@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (12ª) — **"VOCÊ TEM ESTA PALAVRA COM OUTRO SENTIDO" ERA MENTIRA
+> Última atualização: 2026-08-21 (13ª) — **O ÁUDIO DO AUDIOLIVRO VAI PARA A NUVEM**. Pedido
+> dele: *"atualmente o audiobook não é mandado pra nuvem, mas isso é necessário pq quero ter a
+> capacidade de ouvir tanto no desktop quanto no celular com todo material gerado."* Capítulos,
+> posição, marcadores, transcrição e raio-X já atravessavam; só o áudio não — e sem ele o resto
+> não servia de nada no outro aparelho. Agora cada arquivo tem lugar próprio no Storage, com
+> **painel que mostra o que está onde**, subida com barra e cancelamento, **download sob demanda
+> do capítulo que ele abrir**, e **"liberar espaço aqui"** que apaga a cópia local mantendo a da
+> nuvem. Nada é automático: audiolivro tem de 100 MB a 1 GB, e subir isso sem ele mandar seria
+> gastar a franquia do celular em segundo plano. ⚠️ **Pendente de um ajuste no console:** a regra
+> do Storage recusa arquivo acima de **50 MB** — ver §9. `sw.js` → **englab-v350**.
+> **Detalhes em §8.69.**
+>
+> Última atualização anterior: 2026-08-21 (12ª) — **"VOCÊ TEM ESTA PALAVRA COM OUTRO SENTIDO" ERA MENTIRA
 > QUANDO NÃO HAVIA SENTIDO NENHUM**. Ele viu o chip dizer isso sobre `live large` — a mesma
 > expressão, do mesmo trecho, que ele tinha acabado de mandar ao Preparar. O item existia em
 > `words`, mas **ainda sem análise** (`pending_ai`, `meanings` vazio), e eu tratava "sem
@@ -12712,6 +12724,78 @@ para "administrar, gerir"; item sem semente continua no `fila` genérico.
 para "minério" e `sentido` para "veio de mina"; termo desconhecido → novo. Na tela, o chip passou
 a dizer *"expressão · C1 · já está no Preparar, esperando análise"*.
 
+## 8.69 O áudio do audiolivro na nuvem (2026-08-21, 13ª)
+
+> *"Atualmente o audiobook não é mandado pra nuvem, mas isso é necessário pq quero ter a
+> capacidade de ouvir tanto no desktop quanto no celular com todo material gerado."*
+
+Tudo o que é leve já atravessava: os capítulos, onde ele parou, os marcadores, a transcrição, o
+raio-X. **Só o áudio não** — e sem o áudio nada daquilo serve no outro aparelho. Abrir o livro no
+celular mostrava a estante e um aviso mandando importar o arquivo de novo.
+
+### As três decisões que sustentam isto
+
+| Decisão | Por quê |
+|---|---|
+| **Nunca automático** | O EPUB sobe sozinho porque tem 4 MB. Um audiolivro tem de 100 MB a 1 GB — subir isso sem ele mandar seria gastar a franquia do celular em segundo plano. Sempre clique consciente, com o tamanho na tela **antes**. |
+| **Arquivo por arquivo, sob demanda** | Num livro em 40 faixas, chegar no capítulo 12 baixa a faixa 12 (uns 30 MB), não o livro inteiro. Quem quiser tudo de uma vez tem o botão. |
+| **Nuvem e aparelho são estados separados** | Estar na nuvem não obriga a ocupar disco aqui. Por isso a lista do que está no aparelho **nunca sincroniza**: é uma pergunta ao IndexedDB desta máquina, e a resposta é diferente em cada uma. |
+
+### O que apareceu na tela
+
+Um **selo de nuvem no card** (canto oposto ao "remover"), que fica aceso sem hover quando o áudio
+já está guardado — é a resposta de relance para *"dá para ouvir isso no celular?"*. O clique abre
+o painel:
+
+- **Neste aparelho** — 2 de 2 · *toca na hora*
+- **Na sua nuvem** — 0 de 2 · *ainda não subiu*
+- Ações conforme o estado: *Guardar na nuvem* · *Baixar tudo para cá* · *Liberar espaço aqui* ·
+  *Tirar da nuvem*
+
+E quando o arquivo não está aqui, `abAbrir` **baixa sozinho, com barra**, em vez de dar erro. O
+download não é tarefa dele.
+
+### As armadilhas tratadas
+
+⚠️ **O merge de audiolivros escolhia um vencedor inteiro por `updatedAt`.** O campo `nuvem`
+descreve o **Storage** — um fato do mundo, não uma preferência deste aparelho. Se o celular
+subisse o áudio e o computador salvasse a posição depois, o registro da subida sumiria junto e a
+subida seria refeita do zero. Agora `nuvem` é mesclado à parte (`_abNuvemMaisCompleta`).
+
+⚠️ **A barra de progresso repintava o painel inteiro** — que varre todas as chaves do IndexedDB
+e pergunta à nuvem o que já está lá. Numa subida de 700 MB isso dispara dezenas de vezes por
+segundo. Virou uma peça leve que só troca o texto e a largura.
+
+⚠️ **"Liberar espaço" só aparece com TUDO na nuvem.** Apagar o local com metade lá em cima
+destruiria a única cópia da outra metade.
+
+⚠️ **Remover o audiolivro apaga também a cópia da nuvem.** O item sai da estante em todos os
+aparelhos (a lista sincroniza) e, sem o item, ninguém mais chegaria naqueles arquivos para
+apagá-los — seria lixo pago para sempre.
+
+⚠️ **`unauthorized` do Storage não explica nada.** É a mesma palavra para "você não está logado"
+e "seu arquivo passou do teto". Com arquivo grande, o app agora explica o teto de 50 MB e onde
+trocá-lo.
+
+### O horizonte: quem mais dependia do arquivo local
+
+A varredura achou dois pontos que quebrariam **logo depois** de ele usar "liberar espaço": a
+**transcrição do capítulo** e a **procura de capítulos pelo silêncio** liam o IndexedDB direto e
+morriam com *"não está neste aparelho"* — justamente depois de o capítulo ter tocado normalmente
+(porque a reprodução já baixava). Os dois passaram pela mesma ponte.
+
+### Medido
+
+Deslogado, no preview local, com audiolivro sintético de 2 arquivos: o painel disse *"Neste
+aparelho 2 de 2 / Na sua nuvem 0 de 2"* e ofereceu só **Guardar na nuvem**; apagando o arquivo 0
+e abrindo o livro, o aviso passou a ser *"Você não está conectado — entre com o Google para
+procurar o áudio deste livro na sua nuvem"* no lugar do antigo *"importe o arquivo de novo aqui"*.
+Selo no card com o texto certo.
+
+⚠️ **O que NÃO foi medido:** a viagem real até o Storage (subir → apagar daqui → baixar → tocar).
+A janela do login do Google não é alcançável pelas ferramentas de navegador, e sem login não
+existe nuvem para exercitar. Registrado em §9.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -12720,6 +12804,23 @@ a dizer *"expressão · C1 · já está no Preparar, esperando análise"*.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada do áudio na nuvem (§8.69, 2026-08-21)
+
+- [ ] **AMPLIAR O TETO DA REGRA DO STORAGE — depende dele.** A regra foi escrita quando só subiam
+      EPUB (4 MB) e episódio de vídeo, e recusa qualquer arquivo acima de **50 MB**. Audiolivro
+      passa disso com folga. No **Console do Firebase → Storage → Rules**, trocar `50` por `1024`
+      na linha do tamanho e publicar. Sem isso, "Guardar na nuvem" só funciona para faixas
+      pequenas — e o app já explica isso na tela em vez de dar erro cru.
+- [ ] **Testar a viagem completa com a conta real:** subir → conferir no console → apagar daqui
+      ("liberar espaço") → abrir o livro → ver o capítulo baixar sozinho e tocar. Não deu para
+      fazer daqui: a janela do login do Google fica fora do alcance das ferramentas.
+- [ ] **A cota gratuita são 5 GB.** Um audiolivro de 700 MB come 14% dela. Se ele guardar vários,
+      vale medir o uso no console antes de virar cobrança — e talvez usar mais o "liberar espaço"
+      do que o "guardar tudo".
+- [ ] **Subida em segundo plano.** Hoje a aba precisa ficar aberta até terminar. O Storage tem
+      upload retomável (`resume()`), então dá para guardar a sessão e continuar depois — só não
+      cabia nesta rodada.
 
 ### Da rodada dos grupos do menu (§8.52, 2026-08-20)
 
@@ -13254,8 +13355,6 @@ a dizer *"expressão · C1 · já está no Preparar, esperando análise"*.
 - [x] Emojis residuais trocados por ícones `ic()` em 2026-07-30 (tela de fim de sessão, toasts,
       botões de Kindle/Mídia/Website, banner de áudio, avisos). Sobra só o mapa de chips de
       variedade/registro em `study.js` — ver item opcional acima.
-## 9. Pendências / a verificar
-
 
 ### Decisões tomadas — ficam aqui para não serem refeitas
 

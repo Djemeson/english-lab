@@ -735,8 +735,11 @@ async function abProcurarCapitulos() {
 // estéreo nem agudo.
 async function _abDetectarSilencios(a, aoAndar) {
   const cap0 = (a.capitulos || [])[0] || { arq: 0 }
-  const blob = await BookDB.get(abChaveArquivo(a.id, cap0.arq))
-  if (!blob) throw new Error('o arquivo deste livro não está neste aparelho')
+  // Mesma história do trecho: o arquivo pode estar só na nuvem depois de
+  // "liberar espaço". Aqui ele desce inteiro mesmo — a varredura de silêncio
+  // precisa do áudio do começo ao fim.
+  const blob = await abGarantirArquivo(a, cap0.arq, (m, pct) => aoAndar && aoAndar(m, pct))
+  if (!blob) throw new Error('não consegui pegar o áudio deste livro')
   const ff = await _abFFmpeg()
   const nome = 'entrada' + (a.formato === 'm4b' ? '.m4b' : '.mp3')
   const arq = new File([blob], nome, { type: blob.type || 'audio/mpeg' })
@@ -1010,9 +1013,12 @@ async function abTranscrever() {
 // ffmpeg (31 MB na primeira vez) só entra quando é inevitável: um `.m4b` de
 // meio giga do qual precisamos de dez minutos.
 async function _abAudioDoTrecho(a, cap, ini, fim, aoAndar) {
-  const chave = abChaveArquivo(a.id, cap.arq)
-  const blob = await BookDB.get(chave)
-  if (!blob) throw new Error('o arquivo deste capítulo não está neste aparelho')
+  // ⚠️ CASO VIZINHO DE "LIBERAR ESPAÇO": ele apaga o áudio daqui, o livro
+  // continua tocando (baixa o capítulo na hora) — e então pede para transcrever.
+  // Sem esta linha, a transcrição morria com "não está neste aparelho" logo
+  // depois de o capítulo ter tocado normalmente.
+  const blob = await abGarantirArquivo(a, cap.arq, (m, pct) => aoAndar && aoAndar(m))
+  if (!blob) throw new Error('não consegui pegar o áudio deste capítulo')
 
   const pedacoInteiro = (cap.ini || 0) === 0 && ini === 0 && (fim <= 0 || fim >= abDurCap(cap) - 0.5)
   if (pedacoInteiro && blob.size <= AB_ENVIO_DIRETO_MB * 1024 * 1024) return blob
