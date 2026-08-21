@@ -1102,9 +1102,12 @@ function _abListaTexto() {
           </span>
         </p>`).join('')}
     </div>
-    ${achados && !achados.length ? `<p class="est-dica" style="margin-top:10px">
-      Nada acima do seu <b>${esc(tr.achadosNivel || nivel)}</b> neste trecho — e nenhum phrasal
-      verb ou expressão idiomática. Se ainda assim travou, marque a frase e peça o Explicar.</p>` : ''}`
+    ${achados && !achados.length ? (achados.incompleto
+      ? `<p class="est-dica est-erro" style="margin-top:10px">
+          A análise não voltou inteira desta vez. Rode de novo — o que vier fica guardado.</p>`
+      : `<p class="est-dica" style="margin-top:10px">
+          Nada acima do seu <b>${esc(tr.achadosNivel || nivel)}</b> neste trecho — e nenhum phrasal
+          verb ou expressão idiomática. Se ainda assim travou, marque a frase e peça o Explicar.</p>`) : ''}`
 }
 
 // ---- O RAIO-X DA PASSAGEM: o que aqui está acima do meu nível ----
@@ -1134,7 +1137,10 @@ async function abAnalisarPassagem() {
     const nivel = cefrNivelAluno()
     const achados = await aiAnalisarDificuldade({
       texto: tr.segs.map(x => x.t).join('\n'),
-      lang: (a.lang || 'en').slice(0, 2), nivel
+      lang: (a.lang || 'en').slice(0, 2), nivel,
+      // Capítulo longo vira várias chamadas: sem o andamento, a tela fica
+      // parada por um minuto e parece travada.
+      aoAndar: (i, n) => { if (btn && n > 1) btn.innerHTML = `Analisando ${i} de ${n}…` }
     })
     tr.achados = achados
     tr.achadosNivel = nivel
@@ -1142,9 +1148,16 @@ async function abAnalisarPassagem() {
     saveAudiolivros()
     if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
     abAba('texto')
+    // ⚠️ "NADA ENCONTRADO" SÓ QUANDO A ANÁLISE INTEIRA DEU CERTO. Se algum
+    // pedaço não voltou legível, dizer "nada acima do seu nível" é mentir —
+    // foi exatamente o que aconteceu no capítulo de Carrie, que está cheio de
+    // phrasal verbs e voltou dizendo que não tinha nenhum.
     toast(achados.length
       ? `${achados.length} ${achados.length === 1 ? 'ponto difícil' : 'pontos difíceis'} para o seu ${nivel}`
-      : `Nada acima do seu ${nivel} por aqui`, achados.length ? 'success' : 'info')
+      : (achados.incompleto
+          ? 'Parte da análise não voltou legível — vale rodar de novo'
+          : `Nada acima do seu ${nivel} por aqui`),
+      achados.length ? 'success' : (achados.incompleto ? 'warning' : 'info'))
   } catch (e) {
     console.warn('[audiobook] raio-x:', e)
     toast('Não consegui analisar: ' + e.message, 'error')

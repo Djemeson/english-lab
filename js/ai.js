@@ -1365,13 +1365,91 @@ const AI_DIF_TIPOS = {
   collocation:  { rotulo: 'combinação', cor: 'var(--role-ia)' }
 }
 
-async function aiAnalisarDificuldade({ texto, lang = 'en', nivel, maxItens = 40 }) {
+// ⚠️ EM BLOCOS, E ESSE É O CONSERTO DA PRIMEIRA VERSÃO. Ele mandou analisar um
+// capítulo de "Carrie" (7,5 mil caracteres) e recebeu *"nada acima do seu nível
+// B1, nenhum phrasal verb"* — numa página com `back away`, `catch up`,
+// `pull her leg`, `tagging along` e `incontrovertible`. A IA tinha achado tudo:
+// a resposta VEIO CORTADA no teto de tokens, o JSON ficou inválido e o parse
+// falhado virava lista vazia. **Falha silenciosa que vira mentira na tela** —
+// o pior tipo, porque parece resposta.
+//
+// Duas travas agora: o texto vai em blocos que cabem na resposta, e JSON
+// quebrado é RESGATADO item a item; se nem isso der, é ERRO, nunca "não achei".
+const AI_DIF_BLOCO = 2200        // caracteres por chamada — cabe na resposta
+const AI_DIF_TOKENS = 2600
+
+// ⚠️ MODELO QUE RACIOCINA PRECISA DE OUTRO ORÇAMENTO, e o projeto já pagou para
+// aprender isso (ver `aiText`): a família gpt-5/o* gasta tokens PENSANDO dentro
+// do mesmo teto, e quando o teto acaba durante o raciocínio volta
+// `finish_reason: length` com content VAZIO — paga-se a entrada e o raciocínio
+// sem receber uma linha. Aqui isso seria idêntico ao bug que acabamos de
+// corrigir: resposta vazia virando "não achei nada".
+// Ele pediu para deixar pronto antes de rodar no Luna (gpt-5.6). Então: teto
+// bem maior e bloco menor — menos texto por chamada é menos raciocínio por
+// chamada, e é o que evita o estouro em vez de só aumentar a fatura.
+function _aiDifOrcamento() {
+  const modelo = (typeof aiChatCfg === 'function' ? aiChatCfg().model : '') || ''
+  const raciocina = typeof _aiRaciocina === 'function' ? _aiRaciocina(modelo) : /^(gpt-5|o\d)/.test(modelo)
+  return raciocina
+    ? { bloco: 1500, tokens: 7000, raciocina: true }
+    : { bloco: AI_DIF_BLOCO, tokens: AI_DIF_TOKENS, raciocina: false }
+}
+
+async function aiAnalisarDificuldade({ texto, lang = 'en', nivel, maxItens = 40, aoAndar } = {}) {
   const t = String(texto || '').trim()
   if (!t) return []
-  const L = (typeof getLangDef === 'function') ? getLangDef(lang) : { nameEn: 'English' }
   const nv = nivel || (typeof cefrNivelAluno === 'function' ? cefrNivelAluno() : 'B1')
-  const def = (typeof CEFR !== 'undefined' ? CEFR.find(x => x.id === nv) : null) || { nome: nv }
+  const orc = _aiDifOrcamento()
+  const blocos = _aiFatiarTexto(t, orc.bloco)
+  const cru = []
+  let falhas = 0
+  for (let i = 0; i < blocos.length; i++) {
+    if (aoAndar) aoAndar(i + 1, blocos.length)
+    try {
+      const parte = await _aiDificuldadeBloco(blocos[i], lang, nv, maxItens, orc)
+      if (parte === null) falhas++
+      else cru.push(...parte)
+    } catch (e) {
+      console.warn('[raio-x] bloco', i + 1, 'falhou:', e && e.message)
+      falhas++
+    }
+  }
+  // Todos os pedaços falharam: isso é erro, e tem de aparecer como erro.
+  if (falhas && !cru.length) {
+    throw new Error('a análise não voltou legível — tente de novo')
+  }
+  const vistos = new Set()
+  const itens = cru
+    .map(x => ({ ...x, ja: aiJaConhecido(x) }))
+    .filter(x => {
+      if (!x.t || x.t.length > 60) return false
+      const k = x.t.toLowerCase()
+      if (vistos.has(k)) return false
+      vistos.add(k)
+      return x.ja !== 'sentido'          // só o sentido JÁ ESTUDADO some
+    })
+  itens.incompleto = falhas > 0
+  return itens
+}
 
+// Fatia por LINHA, nunca no meio de uma frase: o modelo precisa da frase
+// inteira para dizer o que ali está difícil.
+function _aiFatiarTexto(texto, tamanho) {
+  const linhas = String(texto).split('\n')
+  const blocos = []
+  let atual = ''
+  for (const l of linhas) {
+    if (atual && (atual.length + l.length + 1) > tamanho) { blocos.push(atual); atual = '' }
+    atual += (atual ? '\n' : '') + l
+  }
+  if (atual.trim()) blocos.push(atual)
+  return blocos.length ? blocos : [texto]
+}
+
+async function _aiDificuldadeBloco(texto, lang, nv, maxItens, orc) {
+  const o = orc || _aiDifOrcamento()
+  const L = (typeof getLangDef === 'function') ? getLangDef(lang) : { nameEn: 'English' }
+  const def = (typeof CEFR !== 'undefined' ? CEFR.find(x => x.id === nv) : null) || { nome: nv }
   const sistema =
 `Você é professor de ${L.nameEn} e está preparando um aluno de nível ${nv} (${def.nome}).
 Receberá um trecho e deve apontar SÓ o que provavelmente o faria travar.
@@ -1388,33 +1466,37 @@ REGRAS:
 - NÃO inclua: nome próprio, número, palavra transparente com o português (hotel, doctor),
   nem vocabulário que um aluno ${nv} já domina.
 - Máximo ${maxItens} itens. Se não houver nada difícil, devolva {"itens":[]}.
-- Nada além do JSON.`
+- Nada além do JSON: sem raciocínio escrito, sem comentário, sem cerca de código.`
 
-  // `aiTextSeguro` devolve TEXTO (e tem a rede de segurança entre fornecedores);
-  // o JSON sai daí, tolerando cerca de ``` e conversa em volta.
   const bruto = await aiTextSeguro([
     { role: 'system', content: sistema },
-    { role: 'user', content: t.slice(0, 9000) }
-  ], { maxTokens: 1800, timeoutMs: 90000 })
-  const obj = _aiJsonDeTexto(bruto)
-  const itens = (obj && Array.isArray(obj.itens)) ? obj.itens : []
+    { role: 'user', content: texto }
+  ], { maxTokens: o.tokens, timeoutMs: o.raciocina ? 180000 : 90000 })
 
-  const vistos = new Set()
-  return itens
-    .map(x => ({
-      t: String(x.t || '').trim(),
-      tipo: AI_DIF_TIPOS[x.tipo] ? x.tipo : 'word',
-      nivel: String(x.nivel || '').toUpperCase(),
-      pt: String(x.pt || '').trim()
-    }))
-    .map(x => ({ ...x, ja: aiJaConhecido(x) }))
-    .filter(x => {
-      if (!x.t || x.t.length > 60) return false
-      const k = x.t.toLowerCase()
-      if (vistos.has(k)) return false
-      vistos.add(k)
-      return x.ja !== 'sentido'          // só o sentido JÁ ESTUDADO some
-    })
+  const obj = _aiJsonDeTexto(bruto)
+  let lista = (obj && Array.isArray(obj.itens)) ? obj.itens : null
+  if (!lista) lista = _aiResgatarItens(bruto)      // JSON cortado: salva o que deu
+  if (!lista) return null                          // nem isso: o bloco falhou
+  return lista.map(x => ({
+    t: String(x.t || '').trim(),
+    tipo: AI_DIF_TIPOS[x.tipo] ? x.tipo : 'word',
+    nivel: String(x.nivel || '').toUpperCase(),
+    pt: String(x.pt || '').trim()
+  })).filter(x => x.t)
+}
+
+// ⚠️ RESGATE DE JSON CORTADO. Resposta que acaba no meio ("...\"tipo\": \"word")
+// tem, antes do corte, dezenas de itens perfeitos — e eles já foram pagos.
+// Jogar tudo fora por causa da última linha é desperdício em cima de erro.
+function _aiResgatarItens(bruto) {
+  const raw = String(bruto || '')
+  const achados = []
+  const re = /\{[^{}]*"t"\s*:\s*"(?:[^"\\]|\\.)*"[^{}]*\}/g
+  let m
+  while ((m = re.exec(raw))) {
+    try { achados.push(JSON.parse(m[0])) } catch (e) {}
+  }
+  return achados.length ? achados : null
 }
 
 // Em que pé este termo está para ele: `'sentido'` (já estudou ESTE sentido),
