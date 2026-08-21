@@ -207,7 +207,7 @@ async function _abImportarM4b(file) {
   if (!duracao) duracao = await _abDuracaoDoBlob(await BookDB.get(abChaveArquivo(id, 0)))
   const caps = meta.capitulos.length
     ? meta.capitulos.map(c => ({ titulo: c.titulo, arq: 0, ini: c.ini, fim: c.fim || duracao }))
-    : [{ titulo: 'Livro completo', arq: 0, ini: 0, fim: duracao }]
+    : _abPartesPorTempo(duracao, 0)
 
   const nome = _abNomeLimpo(file.name)
   audiolivros.push(_abNovo({
@@ -229,7 +229,9 @@ async function _abImportarFaixas(lista) {
     const blob = new Blob([await f.arrayBuffer()], { type: f.type || 'audio/mpeg' })
     await BookDB.set(abChaveArquivo(id, i), blob)
     const dur = await _abDuracaoDoBlob(blob)
-    caps.push({ titulo: _abNomeDeFaixa(f.name, i, prefixo), arq: i, ini: 0, fim: dur })
+    // Uma faixa so, longa demais para ser um capitulo: vira partes por tempo.
+    if (lista.length === 1 && dur > AB_PARTE_MIN * 60 * 1.5) caps.push(..._abPartesPorTempo(dur, i))
+    else caps.push({ titulo: _abNomeDeFaixa(f.name, i, prefixo), arq: i, ini: 0, fim: dur })
     total += dur; bytes += f.size
   }
   // ⚠️ O NOME DO LIVRO É O PREFIXO COMUM DAS FAIXAS, não o nome do primeiro
@@ -256,6 +258,30 @@ function _abPrefixoComum(nomes) {
   pre = pre.replace(/[\s\-–—_.:,]*\d*$/, '').replace(/\s*(cap[íi]tulo|cap|faixa|track|parte|part|disc)\s*$/i, '')
   pre = pre.replace(/[\s\-–—_.:,]+$/, '').trim()
   return pre.length >= 3 ? pre : ''
+}
+
+// ARQUIVO SEM CAPITULO NAO PODE VIRAR UM BLOCO DE DOZE HORAS. Ele levantou
+// isso: "quando um arquivo vier sem capitulos, tem que capitular de alguma
+// forma?" — e tem, porque um capitulo unico e gigante quebra tres coisas de
+// uma vez: nao ha para onde pular, a barra de progresso do capitulo e inutil, e
+// a transcricao "por capitulo" viraria "o livro inteiro", que e exatamente o
+// que ele nao quer pagar.
+//
+// A saida honesta e dizer o que e: PARTES por tempo, nao capitulos inventados.
+// O app nao sabe onde o autor cortou; sabe cortar de quinze em quinze minutos,
+// e isso ja da navegacao, progresso legivel e transcricao em pedacos pagaveis.
+const AB_PARTE_MIN = 15
+function _abPartesPorTempo(duracao, arq = 0) {
+  const passo = AB_PARTE_MIN * 60
+  if (!duracao || duracao <= passo * 1.5) {
+    return [{ titulo: 'Livro completo', arq, ini: 0, fim: duracao || 0 }]
+  }
+  const partes = []
+  for (let ini = 0, n = 1; ini < duracao; ini += passo, n++) {
+    const fim = Math.min(duracao, ini + passo)
+    partes.push({ titulo: `Parte ${n} · ${abTempo(ini)}–${abTempo(fim)}`, arq, ini, fim })
+  }
+  return partes
 }
 
 function _abNovo(campos) {
@@ -290,13 +316,44 @@ function _abDuracaoDoBlob(blob) {
     if (!blob) return resolve(0)
     const url = URL.createObjectURL(blob)
     const a = new Audio()
-    const fim = d => { URL.revokeObjectURL(url); resolve(Number.isFinite(d) && d > 0 ? d : 0) }
+    let pronto = false
+    const fim = d => {
+      if (pronto) return
+      pronto = true
+      URL.revokeObjectURL(url)
+      resolve(Number.isFinite(d) && d > 0 ? d : 0)
+    }
     a.preload = 'metadata'
     a.onloadedmetadata = () => fim(a.duration)
     a.onerror = () => fim(0)
-    setTimeout(() => fim(a.duration), 8000)   // arquivo estranho não trava a fila
+    setTimeout(() => fim(a.duration), 8000)   // arquivo estranho nao trava a fila
     a.src = url
+    // `load()` explicito: sem ele, o Chrome ADIA o carregamento de midia em aba
+    // que nao esta em primeiro plano. Medido no Chrome real com a aba em
+    // segundo plano: `readyState` ficou em 0, nem `loadedmetadata` nem `error`
+    // dispararam, e o livro inteiro entrou com duracao zero.
+    try { a.load() } catch (e) {}
   })
+}
+
+// ⚠️ A DURACAO PODE CHEGAR DEPOIS. Se a importacao aconteceu com a aba em
+// segundo plano, o capitulo entra com `fim: 0` — e a barra, o "faltam" e a
+// escolha entre capitulo/trecho na transcricao passam a mentir. Entao, na
+// primeira vez que o capitulo realmente TOCA, a medida verdadeira e gravada.
+// Conserta o acervo que ja entrou torto, sem pedir nada ao usuario.
+function _abCorrigirDuracao(a, i, duracaoReal) {
+  if (!a || !Number.isFinite(duracaoReal) || duracaoReal <= 0) return false
+  const cap = a.capitulos[i]; if (!cap) return false
+  const umArquivoPorCapitulo = a.capitulos.every(c => c.arq !== cap.arq || c === cap)
+  if (!umArquivoPorCapitulo) return false          // m4b: o arquivo tem varios capitulos
+  if (Math.abs(abDurCap(cap) - duracaoReal) < 1) return false
+  cap.ini = 0
+  cap.fim = duracaoReal
+  a.duracao = a.capitulos.reduce((s, c) => s + abDurCap(c), 0)
+  a.updatedAt = Date.now()
+  saveAudiolivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  return true
 }
 
 // Capa reduzida a 240px e virada JPEG: precisa caber no localStorage E no
@@ -423,7 +480,7 @@ async function _abAnexar(id, files) {
       let dur = meta.duracao || await _abDuracaoDoBlob(await BookDB.get(abChaveArquivo(id, 0)))
       a.capitulos = meta.capitulos.length
         ? meta.capitulos.map(c => ({ titulo: c.titulo, arq: 0, ini: c.ini, fim: c.fim || dur }))
-        : [{ titulo: 'Livro completo', arq: 0, ini: 0, fim: dur }]
+        : _abPartesPorTempo(dur, 0)
       a.duracao = dur; a.arquivos = 1; a.formato = 'm4b'; a.tamanho = lista[0].size
       // O que veio do catálogo MANDA sobre o que vem do arquivo: foi ele quem
       // escolheu aquela ficha. O arquivo só preenche o que está vazio.
@@ -437,7 +494,8 @@ async function _abAnexar(id, files) {
         const blob = new Blob([await lista[i].arrayBuffer()], { type: lista[i].type || 'audio/mpeg' })
         await BookDB.set(abChaveArquivo(id, i), blob)
         const d = await _abDuracaoDoBlob(blob)
-        caps.push({ titulo: _abNomeDeFaixa(lista[i].name, i, prefixo), arq: i, ini: 0, fim: d })
+        if (lista.length === 1 && d > AB_PARTE_MIN * 60 * 1.5) caps.push(..._abPartesPorTempo(d, i))
+        else caps.push({ titulo: _abNomeDeFaixa(lista[i].name, i, prefixo), arq: i, ini: 0, fim: d })
         total += d; bytes += lista[i].size
       }
       a.capitulos = caps; a.duracao = total; a.arquivos = lista.length
@@ -586,6 +644,258 @@ function _abCapaIlst(dv, buf, ilst) {
 }
 
 // ================================================================
+// OUVIR VIRA CARD — a transcrição por capítulo
+// ================================================================
+// Era a pendência que separava o reprodutor do resto do app: ele tocava, e
+// ouvir não gerava nada. Agora o capítulo vira TEXTO, o texto acompanha o
+// áudio, e selecionar uma frase manda para o Preparar como qualquer palavra
+// capturada no livro — com a obra e a frase certas.
+//
+// ⚠️ POR CAPÍTULO, E ESSA FOI A DECISÃO DELE: *"a transcrição tem que
+// funcionar por capítulo pra assim não ser tudo de uma vez, mas entendo que
+// nem todo audiobook vai vir capitularizado."* Doze horas de uma vez seriam
+// caras, demoradas e inúteis (ele estuda o capítulo que está ouvindo).
+//
+// E o caso que ele mesmo previu tem saída: quando o "capítulo" é o livro
+// inteiro (arquivo sem marcação), transcrever tudo seria justamente o que se
+// quer evitar — então o app propõe o TRECHO em volta de onde ele está, e diz
+// por quê.
+const AB_TRANS_CAP_MAX_MIN = 30     // até aqui, o capítulo inteiro de uma vez
+const AB_TRANS_JANELA_MIN = 10      // acima disso, só o trecho em volta
+const AB_ENVIO_DIRETO_MB = 24       // teto da API; abaixo disso, sem conversor
+
+// A transcrição que cobre este ponto do capítulo (ou null).
+function abTransDoPonto(a, cap, seg) {
+  const t = (a.transcricoes || []).filter(x => x.cap === cap)
+  return t.find(x => seg >= x.ini - 0.5 && seg <= x.fim + 0.5) || null
+}
+
+// Quanto seria transcrito agora, e por quê.
+function _abAlvoDaTranscricao() {
+  const a = _abLivro, au = _abAudio()
+  const cap = a.capitulos[_abCap]
+  const dur = abDurCap(cap)
+  const atual = Math.max(0, (au ? au.currentTime : cap.ini || 0) - (cap.ini || 0))
+  // ⚠️ DURACAO DESCONHECIDA NAO PODE VIRAR "ZERO MINUTOS". Acontece quando a
+  // importacao rodou com a aba em segundo plano (o Chrome adia a leitura dos
+  // metadados): o capitulo fica com `fim: 0`, e sem este ramo o app diria
+  // "transcrever 0 min" e mandaria uma janela vazia. Estimar pelo TAMANHO do
+  // arquivo (~1 MB por minuto em 128 kbps) da um numero honesto para o aviso
+  // de custo, e o trecho enviado e o arquivo inteiro, que e o que existe.
+  if (dur <= 0) {
+    const mb = (a.tamanho || 0) / 1048576 / Math.max(1, a.arquivos || 1)
+    return { ini: 0, fim: 0, inteiro: true, minutos: Math.max(1, Math.round(mb)), estimado: true }
+  }
+  if (dur <= AB_TRANS_CAP_MAX_MIN * 60) {
+    return { ini: 0, fim: dur, inteiro: true, minutos: dur / 60 }
+  }
+  const meia = (AB_TRANS_JANELA_MIN * 60) / 2
+  const ini = Math.max(0, Math.min(atual - meia, dur - AB_TRANS_JANELA_MIN * 60))
+  return { ini, fim: Math.min(dur, ini + AB_TRANS_JANELA_MIN * 60), inteiro: false, minutos: AB_TRANS_JANELA_MIN }
+}
+
+async function abTranscrever() {
+  const a = _abLivro; if (!a) return
+  const stt = typeof aiSttCfg === 'function' ? aiSttCfg() : null
+  if (!stt) {
+    toast('Configure a chave da Groq ou da OpenAI para transcrever (Configurações → IA)', 'error')
+    return
+  }
+  const cap = a.capitulos[_abCap]
+  const alvo = _abAlvoDaTranscricao()
+  const usd = alvo.minutos * stt.usdMin
+  const brl = typeof aiUsdBrl === 'function' ? await aiUsdBrl().catch(() => 5.5) : 5.5
+
+  const ok = await confirmModal({
+    title: alvo.inteiro ? 'Transcrever este capítulo' : 'Transcrever este trecho',
+    icon: 'sparkles', confirmText: 'Transcrever',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      ${alvo.inteiro
+        ? `<b>${esc(cap.titulo)}</b> — ${alvo.estimado
+             ? `cerca de ${alvo.minutos} min de áudio (a duração exata só aparece depois de tocar)`
+             : `${abTempoLongo(abDurCap(cap))} de áudio`}.`
+        : `Este capítulo tem <b>${abTempoLongo(abDurCap(cap))}</b>, tempo demais para transcrever de
+           uma vez. Vou pegar os <b>${AB_TRANS_JANELA_MIN} minutos</b> em volta de onde você está
+           (${abTempo(alvo.ini)}–${abTempo(alvo.fim)}).`}
+      <br><br>Custa cerca de <b>${(usd * brl).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</b>
+      na ${esc(stt.nome)}. Depois disso o texto fica guardado — e selecionar uma frase manda ela
+      para o Preparar.</p>`
+  })
+  if (!ok) return
+
+  const box = el('ab-aba')
+  const msg = m => { if (box) box.innerHTML = `<div class="est-nada"><p>${esc(m)}</p></div>` }
+  try {
+    msg('Separando o áudio…')
+    const blob = await _abAudioDoTrecho(a, cap, alvo.ini, alvo.fim, m => msg(m))
+    msg('Ouvindo e escrevendo… (isso leva alguns segundos)')
+    const r = await aiTranscribe(blob, {
+      nome: 'trecho.mp3', lang: (a.lang || 'en').slice(0, 2), granular: true, timeoutMs: 300000
+    })
+    const segs = (r.segments || []).map(s => ({
+      i: alvo.ini + (s.start || 0), f: alvo.ini + (s.end || 0), t: String(s.text || '').trim()
+    })).filter(s => s.t)
+    if (!segs.length) throw new Error('a transcrição voltou vazia — o trecho tem fala?')
+    // Com duração desconhecida, o fim verdadeiro é o da última fala: sem isso a
+    // transcrição ficaria com `fim: 0` e nunca seria reencontrada pelo ponto.
+    const fimReal = alvo.fim > 0 ? alvo.fim : Math.max(alvo.ini + 1, segs[segs.length - 1].f)
+
+    a.transcricoes = (a.transcricoes || []).filter(x => !(x.cap === _abCap && x.ini === alvo.ini))
+    a.transcricoes.push({ cap: _abCap, ini: alvo.ini, fim: fimReal, segs, at: Date.now() })
+    a.updatedAt = Date.now()
+    saveAudiolivros()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+    toast(`${segs.length} falas transcritas`, 'success')
+    abAba('texto')
+  } catch (e) {
+    console.warn('[audiobook] transcrição:', e)
+    if (box) box.innerHTML = `<div class="est-nada"><p class="est-erro">${esc(e.message)}</p>
+      <button class="btn btn-ghost btn-sm" onclick="abAba('texto')">Voltar</button></div>`
+  }
+}
+
+// O ÁUDIO DO TRECHO, pelo caminho mais barato que servir.
+// ⚠️ O atalho importa mais do que parece: audiolivro em faixas costuma ter
+// capítulos de 5 a 15 minutos, que cabem inteiros no limite de 24 MB da API.
+// Nesses casos não se baixa conversor nenhum — o arquivo vai como está. O
+// ffmpeg (31 MB na primeira vez) só entra quando é inevitável: um `.m4b` de
+// meio giga do qual precisamos de dez minutos.
+async function _abAudioDoTrecho(a, cap, ini, fim, aoAndar) {
+  const chave = abChaveArquivo(a.id, cap.arq)
+  const blob = await BookDB.get(chave)
+  if (!blob) throw new Error('o arquivo deste capítulo não está neste aparelho')
+
+  const pedacoInteiro = (cap.ini || 0) === 0 && ini === 0 && (fim <= 0 || fim >= abDurCap(cap) - 0.5)
+  if (pedacoInteiro && blob.size <= AB_ENVIO_DIRETO_MB * 1024 * 1024) return blob
+
+  if (aoAndar) aoAndar('Preparando o conversor (na 1ª vez baixa ~31 MB)…')
+  const ff = await _abFFmpeg(aoAndar)
+  const nome = 'entrada' + (a.formato === 'm4b' ? '.m4b' : '.mp3')
+  const arq = new File([blob], nome, { type: blob.type || 'audio/mpeg' })
+  try { await ff.unmount('/ab') } catch (e) {}
+  try { await ff.createDir('/ab') } catch (e) {}
+  // WORKERFS lê sob demanda: um `.m4b` de 500 MB nunca entra inteiro na
+  // memória do wasm — sem isso, transcrever um trecho derrubaria a aba.
+  await ff.mount('WORKERFS', { files: [arq] }, '/ab')
+  if (aoAndar) aoAndar('Separando o áudio…')
+  const de = (cap.ini || 0) + ini
+  const dur = Math.max(1, fim - ini)
+  // Mono, 32 kbps, 16 kHz: é o que o Whisper escuta. Menos que isso não
+  // melhora a transcrição e só faria o envio demorar.
+  const code = await ff.exec(['-ss', String(de), '-t', String(dur), '-i', '/ab/' + nome,
+    '-vn', '-ac', '1', '-ar', '16000', '-b:a', '32k', 'trecho.mp3'])
+  if (code !== 0) throw new Error('não consegui separar o áudio (código ' + code + ')')
+  const dados = await ff.readFile('trecho.mp3')
+  try { await ff.deleteFile('trecho.mp3') } catch (e) {}
+  try { await ff.unmount('/ab') } catch (e) {}
+  return new Blob([dados.buffer], { type: 'audio/mpeg' })
+}
+
+let _abFF = null
+async function _abFFmpeg(aoAndar) {
+  if (_abFF) return _abFF
+  const { FFmpeg } = await import('./vendor/ffmpeg/index.js')
+  const ff = new FFmpeg()
+  if (aoAndar) ff.on('progress', ({ progress }) => {
+    if (progress > 0 && progress < 1) aoAndar(`Separando o áudio… ${Math.round(progress * 100)}%`)
+  })
+  const base = new URL('js/vendor/ffmpeg/', document.baseURI).href
+  await ff.load({ coreURL: base + 'ffmpeg-core.js', wasmURL: base + 'ffmpeg-core.wasm' })
+  _abFF = ff
+  return ff
+}
+
+// ---- o painel de texto ----
+function _abListaTexto() {
+  const a = _abLivro, au = _abAudio()
+  const cap = a.capitulos[_abCap]
+  const atual = Math.max(0, (au ? au.currentTime : 0) - (cap.ini || 0))
+  const tr = abTransDoPonto(a, _abCap, atual) || (a.transcricoes || []).find(x => x.cap === _abCap)
+  if (!tr) {
+    const alvo = _abAlvoDaTranscricao()
+    return `<div class="est-nada">${ic('sparkles','ic-lg')}
+      <p>Este capítulo ainda não tem texto.</p>
+      <p class="est-dica" style="max-width:460px">
+        ${alvo.inteiro
+          ? `A IA escuta o capítulo e escreve o que foi dito. Depois é só marcar uma frase para
+             mandá-la ao Preparar — com a obra e o contexto certos.`
+          : `Este capítulo tem ${abTempoLongo(abDurCap(cap))}. Vou transcrever os
+             ${AB_TRANS_JANELA_MIN} minutos em volta de onde você está, e não o arquivo inteiro.`}
+      </p>
+      <button class="btn btn-primary btn-sm" onclick="abTranscrever()">
+        ${ic('sparkles','ic-sm')} Transcrever ${alvo.inteiro ? 'o capítulo' : 'este trecho'}</button>
+      ${(a.transcricoes || []).length ? `<p class="est-dica">Você já transcreveu
+        ${a.transcricoes.length} ${a.transcricoes.length === 1 ? 'trecho' : 'trechos'} deste livro.</p>` : ''}
+    </div>`
+  }
+  return `
+    <div class="ab-trans-topo">
+      <span>${abTempo(tr.ini)} – ${abTempo(tr.fim)} · ${tr.segs.length} falas</span>
+      <span class="est-dica">Marque uma palavra ou frase para mandá-la ao estudo.</span>
+      <button class="est-chip" onclick="abTranscrever()">${ic('plus','ic-3xs')} Outro trecho</button>
+    </div>
+    <div class="ab-trans" id="ab-trans">
+      ${tr.segs.map((s, i) => `
+        <p class="ab-fala" data-i="${i}" data-ini="${s.i}" data-fim="${s.f}">
+          <button class="ab-fala-t" onclick="abIrPara(${s.i})" data-tip="Ouvir a partir daqui">${abTempo(s.i)}</button>
+          <span>${esc(s.t)}</span>
+        </p>`).join('')}
+    </div>`
+}
+
+// Ligar o menu de seleção é o que faz "ouvir virar card": o mesmo gesto do
+// livro e do dossiê, com a frase e a obra desta gravação.
+function _abLigarSelecao() {
+  const box = el('ab-trans')
+  if (!box || typeof selMenuAtivar !== 'function') return
+  selMenuAtivar(box, no => {
+    const a = _abLivro; if (!a) return {}
+    const p = no && (no.nodeType === 1 ? no : no.parentElement)
+    const fala = p && p.closest ? p.closest('.ab-fala') : null
+    const frase = fala ? (fala.querySelector('span')?.textContent || '').trim() : ''
+    const cap = a.capitulos[_abCap] || {}
+    return {
+      frase, lang: (a.lang || 'en').slice(0, 2),
+      fonte: [a.title, cap.titulo].filter(Boolean).join(' · '),
+      origem: {
+        source_type: 'audiobook',
+        source_title: a.title || '',
+        source_context: cap.titulo ? `audiolivro · ${cap.titulo}` : 'audiolivro'
+      }
+    }
+  })
+}
+
+function abIrPara(seg) {
+  const a = _abLivro, au = _abAudio(); if (!a || !au) return
+  const cap = a.capitulos[_abCap]
+  au.currentTime = (cap.ini || 0) + Math.max(0, seg)
+  _abPintarProgresso()
+  if (!_abQuerTocar) { _abQuerTocar = true; _abTocarSeguro() }
+}
+
+// O texto acompanha o áudio: a fala que está tocando fica acesa e se mantém à
+// vista. É o que permite ouvir lendo — e é lendo que ele acha a palavra.
+function _abAcompanharTexto() {
+  const box = el('ab-trans'); if (!box || !_abLivro) return
+  const au = _abAudio(); if (!au) return
+  const cap = _abLivro.capitulos[_abCap]
+  const t = au.currentTime - (cap.ini || 0)
+  let ativa = null
+  box.querySelectorAll('.ab-fala').forEach(p => {
+    const dentro = t >= Number(p.dataset.ini) && t < Number(p.dataset.fim)
+    p.classList.toggle('on', dentro)
+    if (dentro) ativa = p
+  })
+  if (ativa && !_abArrastando) {
+    const r = ativa.getBoundingClientRect(), c = box.getBoundingClientRect()
+    if (r.top < c.top + 8 || r.bottom > c.bottom - 8) {
+      box.scrollTop += (r.top - c.top) - c.height / 2 + r.height / 2
+    }
+  }
+}
+
+// ================================================================
 // MEDIDAS
 // ================================================================
 function abDuracao(a) {
@@ -650,6 +960,7 @@ async function abAbrir(id) {
 
 function abFechar() {
   _abQuerTocar = false
+  _abAbaAtual = 'capitulos'
   _abRegistrarTempo()
   _abSalvarPos(true)
   const au = _abAudio()
@@ -727,20 +1038,31 @@ function _abRenderPlayer() {
       </div>
 
       <div class="ab-abas">
-        <button class="est-aba on" onclick="abAba('capitulos',event)">Capítulos</button>
-        <button class="est-aba" onclick="abAba('marcadores',event)">Marcadores${(a.marcadores || []).length ? ` (${a.marcadores.length})` : ''}</button>
+        ${/* A marca de "onde estou" segue a aba ESCOLHIDA. Fixar `on` no
+             primeiro botão fazia o player reabrir dizendo "Capítulos" com o
+             texto da transcrição na tela — a tela certa, com o rótulo errado. */''}
+        <button class="est-aba${_abAbaAtual === 'capitulos' ? ' on' : ''}" onclick="abAba('capitulos',event)">Capítulos</button>
+        <button class="est-aba${_abAbaAtual === 'texto' ? ' on' : ''}" onclick="abAba('texto',event)">Texto${(a.transcricoes || []).some(t => t.cap === _abCap) ? '' : ' <i class="ab-novo">IA</i>'}</button>
+        <button class="est-aba${_abAbaAtual === 'marcadores' ? ' on' : ''}" onclick="abAba('marcadores',event)">Marcadores${(a.marcadores || []).length ? ` (${a.marcadores.length})` : ''}</button>
       </div>
-      <div id="ab-aba">${_abListaCapitulos()}</div>
+      <div id="ab-aba">${_abAbaAtual === 'texto' ? _abListaTexto()
+        : _abAbaAtual === 'marcadores' ? _abListaMarcadores() : _abListaCapitulos()}</div>
     </div>`
   _abPintarBotao()
   _abPintarProgresso()
+  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abAcompanharTexto() }
 }
 
+let _abAbaAtual = 'capitulos'
 function abAba(qual, ev) {
-  document.querySelectorAll('.ab-abas .est-aba').forEach(b => b.classList.remove('on'))
-  if (ev && ev.currentTarget) ev.currentTarget.classList.add('on')
+  _abAbaAtual = qual || 'capitulos'
+  document.querySelectorAll('.ab-abas .est-aba').forEach(b =>
+    b.classList.toggle('on', (b.getAttribute('onclick') || '').includes(`'${_abAbaAtual}'`)))
   const box = el('ab-aba'); if (!box) return
-  box.innerHTML = qual === 'marcadores' ? _abListaMarcadores() : _abListaCapitulos()
+  box.innerHTML = _abAbaAtual === 'marcadores' ? _abListaMarcadores()
+    : _abAbaAtual === 'texto' ? _abListaTexto()
+    : _abListaCapitulos()
+  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abAcompanharTexto() }
 }
 
 function _abListaCapitulos() {
@@ -796,6 +1118,7 @@ async function _abCarregarCapitulo(i, seg) {
       au.addEventListener('loadedmetadata', pronto)
       setTimeout(res, 6000)
     })
+    if (_abCorrigirDuracao(a, i, au.duration)) _abRenderPlayer()
   }
   au.playbackRate = a.velocidade || 1
   au.currentTime = (cap.ini || 0) + Math.max(0, seg || 0)
@@ -831,6 +1154,7 @@ function _abAoAndar() {
     return
   }
   _abPintarProgresso()
+  if (_abAbaAtual === 'texto') _abAcompanharTexto()
   _abSalvarPos()
 }
 

@@ -707,7 +707,7 @@ function ic(name, extra) {
 }
 // Ícone por tipo de fonte (série, filme, etc.) — usado em Preparar, Adicionar e Estudar
 function srcIcon(t) {
-  const m = { series:'tv', movie:'film', youtube:'playCircle', kindle:'book', podcast:'mic', website:'globe', manual:'pencil' }
+  const m = { series:'tv', movie:'film', youtube:'playCircle', kindle:'book', podcast:'mic', website:'globe', manual:'pencil', audiobook:'volume' }
   return ic(m[t] || 'bookOpen', 'ic-sm')
 }
 function loadWords() {

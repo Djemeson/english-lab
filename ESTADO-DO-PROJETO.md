@@ -7,7 +7,20 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-20 (8ª) — **NASCEU A SEÇÃO AUDIOBOOK, E O ACERVO PASSOU A ACEITAR
+> Última atualização: 2026-08-21 — **OUVIR VIRA CARD**. A pendência que separava o reprodutor
+> do resto do app está fechada: o capítulo vira **texto**, o texto **acompanha o áudio** (a fala
+> que está tocando fica acesa) e **marcar uma frase manda ela ao Preparar**, com a obra e o
+> capítulo certos. **Por capítulo, decisão dele** — doze horas de uma vez seriam caras e
+> inúteis; e quando o arquivo vem sem capítulos, ele é fatiado em **partes de 15 minutos**
+> (partes por tempo, não capítulos inventados). O caminho barato existe: capítulo que cabe no
+> limite da API vai **direto, sem conversor**; só o `.m4b` grande aciona o ffmpeg para recortar
+> a janela. ⚠️ Dois defeitos que só o Chrome dele revelou: **aba em segundo plano não carrega
+> metadados de mídia** (todo audiolivro entrava com duração zero — agora a medida é refeita ao
+> tocar), e o **IDM sequestra `fetch` de `.mp3`** no Chrome dele, devolvendo 204 ao script e
+> baixando o arquivo (isso é do ambiente dele, não do app, mas explica um teste que parecia
+> quebrado). `sw.js` → **englab-v333**. **Detalhes em §8.57.**
+>
+> Última atualização anterior: 2026-08-20 (8ª) — **NASCEU A SEÇÃO AUDIOBOOK, E O ACERVO PASSOU A ACEITAR
 > "QUERO LER" SEM O ARQUIVO**. Três pedidos numa rodada. (1) **Reprodutor de audiolivro em seção
 > própria**: capítulos, velocidade, ±15/30s, marcadores, timer de sono, controles do fone
 > (Media Session) e a posição guardada — com um **parser de `.m4b` escrito aqui** (120 linhas,
@@ -11922,6 +11935,74 @@ duração de 3600s, quatro capítulos com acento, capa) e nos **dois formatos de
 preservados). E, do lado dos livros, o **EPUB do Billy Summers anexado a uma ficha de papel**,
 com nota, tags, notas e histórico intactos. Zero overflow a 375px e a 1536px.
 
+## 8.57 Ouvir vira card (2026-08-21)
+
+A pendência aberta na rodada anterior: o reprodutor tocava, e ouvir não gerava nada. Agora o
+audiolivro entra no mesmo circuito do livro e do vídeo — **selecionar uma frase manda ela ao
+Preparar**, carimbada com a obra e o capítulo.
+
+### Como funciona
+
+Aba **Texto** no player. A IA escuta e escreve; o texto fica guardado no item (é leve e
+sincroniza); cada fala tem o instante, clicável. **A fala que está tocando fica acesa e se
+mantém à vista** — é o que permite ouvir lendo, e é lendo que ele acha a palavra que não
+conhece. A seleção usa o `selMenuAtivar` de sempre (o mesmo do dossiê), então "Explicar" e
+"Preparar" funcionam como em qualquer outra tela.
+
+O item nasce com `source_type: 'audiobook'`, `source_title` = a obra e `source_context` =
+`audiolivro · <capítulo>`.
+
+### Por capítulo, e o que fazer quando não há capítulo
+
+Decisão dele: *"a transcrição tem que funcionar por capítulo pra assim não ser tudo de uma vez,
+mas entendo que nem todo audiobook vai vir capitularizado."*
+
+| Situação | O que o app faz |
+|---|---|
+| Capítulo até 30 min | transcreve o capítulo inteiro |
+| Capítulo maior | transcreve **10 minutos em volta de onde ele está**, e diz por quê |
+| Arquivo **sem capítulos** | fatiado em **Partes de 15 min** já na importação |
+
+⚠️ **"Partes", e não capítulos.** O app não sabe onde o autor cortou; sabe cortar de quinze em
+quinze minutos. Chamar isso de "Capítulo 3" seria inventar uma informação que ninguém tem —
+mas sem cortar nada, um arquivo de doze horas viraria um bloco único: sem para onde pular, com
+barra de progresso inútil e com a transcrição "por capítulo" virando "o livro inteiro".
+
+### O caminho do áudio, e por que ele tem dois ramos
+
+- **Capítulo que cabe em 24 MB** (faixas de 5 a 15 min, o caso comum): vai **direto** para a
+  API. Sem conversor, sem download, 2 ms de preparo — medido.
+- **`.m4b` grande**: o ffmpeg.wasm que já existe no projeto recorta a janela, montando o arquivo
+  em **WORKERFS** (leitura sob demanda) para que meio giga não entre na memória do wasm. O
+  recorte sai mono, 16 kHz, 32 kbps — é o que o Whisper escuta, e mais que isso só faria o envio
+  demorar.
+
+### Os dois defeitos que só o Chrome dele revelou
+
+1. **Aba em segundo plano não carrega metadados de mídia.** O Chrome adia o `preload`, então
+   `loadedmetadata` nunca dispara: `readyState` fica em 0, e **todo audiolivro importado assim
+   entrava com duração zero** — barra inútil, "faltam 0 min" e a escolha entre capítulo e trecho
+   decidida por um número falso. Além do `load()` explícito, a medida agora é **refeita na
+   primeira vez que o capítulo toca**, e o acervo torto se conserta sozinho. E a estimativa de
+   custo, quando a duração ainda é desconhecida, sai do **tamanho do arquivo** (~1 MB por
+   minuto) em vez de dizer "0 min".
+2. **O IDM sequestra `fetch` de `.mp3`.** No Chrome dele, buscar um `.mp3` por script devolve
+   **HTTP 204 com zero byte** e o arquivo aparece em `Downloads\Music` — o gerenciador de
+   download intercepta a requisição. Não é defeito do app (o servidor entregava 200 com 1 MB
+   pelo terminal), mas custou uma rodada de diagnóstico e vale estar escrito: **para testar
+   mídia no Chrome dele, o áudio precisa chegar por outro caminho** (foi por base64 num `.json`).
+
+### Testado ponta a ponta no Chrome dele, a pedido
+
+Com a chave real e áudio real: transcrição pela **Groq em 920 ms** (0,99 MB enviados direto),
+modal mostrando o custo (**R$ 0,01**), texto guardado, painel com as falas, **seleção → item
+criado** com `source_type: 'audiobook'`, obra e capítulo certos. O ramo do ffmpeg também foi
+exercitado: **60 s recortados de dentro do arquivo em 2,6 s**, e o Whisper devolveu inglês real
+(*"How many times my own memories / led me to the end of my life?"*). O acompanhamento do texto
+com o áudio foi conferido no painel embutido (a aba do Chrome, em segundo plano, não toca):
+em 0:38 acendeu a fala de 0:36; em 0:52, a de 0:50. Item de teste **removido do acervo** ao
+final, chave limpa, arquivos de teste apagados.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -11962,11 +12043,17 @@ com nota, tags, notas e histórico intactos. Zero overflow a 375px e a 1536px.
       propósito.
 - [x] ~~**O AUDIOBOOK AINDA NÃO TEM CASA**~~ — **feito em 2026-08-20** (§8.56): seção própria,
       parser de `.m4b`, reprodutor com capítulos, velocidade, marcadores, sono e Media Session.
-- [ ] **O AUDIOLIVRO AINDA NÃO VIRA VOCABULÁRIO** (aberto em 2026-08-20, §8.56). O reprodutor
-      toca, mas ouvir não gera card — falta transcrição. O caminho já existe montado no pacote
-      de vídeo (`video-subs.js` faz legenda por IA com Whisper); ligar os dois transformaria o
-      marcador num trecho com texto, e o trecho em item de estudo. É a fatia que falta para o
-      audiolivro ser do Language Lab, e não só um player.
+- [x] ~~**O AUDIOLIVRO AINDA NÃO VIRA VOCABULÁRIO**~~ — **feito em 2026-08-21** (§8.57):
+      transcrição por capítulo, texto que acompanha o áudio e seleção que vira card.
+- [ ] **O MARCADOR AINDA NÃO CARREGA A FRASE** (aberto em 2026-08-21, §8.57). Marcar guarda o
+      instante; se o trecho já estiver transcrito, dava para mostrar a fala daquele segundo no
+      próprio marcador — a informação existe (`transcricoes[].segs` tem os tempos), é só cruzar.
+      Pequeno, e melhora a lista de marcadores de uma vez.
+- [ ] **DETECTAR OS CORTES REAIS DE UM ARQUIVO SEM CAPÍTULOS** (aberto em 2026-08-21, §8.57).
+      Hoje ele é fatiado em partes de 15 min, que é honesto mas arbitrário. Audiolivro costuma
+      ter 2–3 s de silêncio entre capítulos, e o ffmpeg tem `silencedetect` — daria os cortes de
+      verdade. Custa varrer o arquivo inteiro no wasm (minutos, para 12 h de áudio), então só
+      vale como ação sob demanda ("procurar capítulos"), nunca na importação.
 - [ ] **CAPÍTULO EM TRILHA DE TEXTO NO `.m4b` NÃO É LIDO** (2026-08-20, §8.56). Parte dos
       conversores grava os capítulos como trilha QuickTime (`tref/chap`) em vez de `chpl`. Esses
       arquivos entram como capítulo único — ouvem-se igual, com a posição guardada, mas sem a

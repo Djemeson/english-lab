@@ -5272,6 +5272,33 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ab-cap-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ab-cap-d{font-size:var(--fs-3xs);color:var(--text3);font-variant-numeric:tabular-nums}
 
+/* ---- transcricao: o texto que acompanha o audio ---- */
+.ab-trans-topo{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;
+  font-size:var(--fs-3xs);color:var(--text3);
+}
+.ab-trans-topo .est-dica{flex:1}
+.ab-trans{max-height:420px;overflow-y:auto;padding-right:6px}
+.ab-fala{
+  display:flex;gap:12px;align-items:flex-start;padding:7px 10px;border-radius:var(--radius-xs);
+  font-size:var(--fs-sm);color:var(--text2);line-height:1.65;
+}
+/* A fala que esta tocando fica acesa: e o que permite OUVIR LENDO, e e lendo
+   que ele encontra a palavra que nao conhece. */
+.ab-fala.on{background:rgba(var(--primary-rgb),.14);color:var(--text)}
+.ab-fala-t{
+  background:none;border:0;cursor:pointer;flex-shrink:0;padding:0;
+  font-family:inherit;font-size:var(--fs-3xs);color:var(--text3);
+  font-variant-numeric:tabular-nums;line-height:1.9;
+}
+.ab-fala-t:hover{color:var(--role-energia)}
+.ab-fala.on .ab-fala-t{color:var(--role-energia)}
+.ab-fala span{flex:1;min-width:0}
+.ab-novo{
+  font-style:normal;font-size:8px;letter-spacing:.06em;vertical-align:super;
+  color:var(--role-ia);
+}
+
 .ab-marcas{display:flex;flex-direction:column;gap:2px}
 .ab-marca{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:var(--radius-xs)}
 .ab-marca:hover{background:var(--surface)}
