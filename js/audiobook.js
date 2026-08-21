@@ -1091,8 +1091,11 @@ function _abListaTexto() {
              data-tip="Acha o que está acima do seu nível, e todo phrasal verb e expressão">
              ${ic('eye','ic-3xs')} O que é difícil aqui</button>`}
       <button class="est-chip" onclick="abTranscrever()">${ic('plus','ic-3xs')} Outro trecho</button>
+      <button class="est-chip" onclick="abTextoFull()" id="ab-full-btn"
+              data-tip="Ler em tela cheia, com a fala do momento no centro (Esc sai)">
+        ${ic('expand','ic-3xs')} Tela cheia</button>
     </div>
-    <div class="ab-trans${achados ? ' com-raiox' : ''}" id="ab-trans">
+    <div class="ab-trans${achados ? ' com-raiox' : ''}" id="ab-trans" tabindex="0">
       ${tr.segs.map((s, i) => `
         <p class="ab-fala" data-i="${i}" data-ini="${s.i}" data-fim="${s.f}">
           <button class="ab-fala-t" onclick="abIrPara(${s.i})" data-tip="Ouvir a partir daqui">${abTempo(s.i)}</button>
@@ -1293,6 +1296,15 @@ function abIrPara(seg) {
 
 // O texto acompanha o áudio: a fala que está tocando fica acesa e se mantém à
 // vista. É o que permite ouvir lendo — e é lendo que ele acha a palavra.
+// ⚠️ A FALA QUE TOCA FICA NO CENTRO, e não "em algum lugar visível". Pedido
+// dele, e a diferença é grande na prática: com o texto empurrado só até caber,
+// a linha ativa vive no rodapé da caixa e o que vem A SEGUIR fica fora da
+// vista — justamente o que o ouvido está prestes a receber. No centro, ele lê
+// para os dois lados.
+const AB_VOLTA_AO_CENTRO_MS = 5000
+let _abRolouEm = 0        // quando ELE rolou por último
+let _abAutoRolando = false
+
 function _abAcompanharTexto() {
   const box = el('ab-trans'); if (!box || !_abLivro) return
   const au = _abAudio(); if (!au) return
@@ -1304,12 +1316,72 @@ function _abAcompanharTexto() {
     p.classList.toggle('on', dentro)
     if (dentro) ativa = p
   })
-  if (ativa && !_abArrastando) {
-    const r = ativa.getBoundingClientRect(), c = box.getBoundingClientRect()
-    if (r.top < c.top + 8 || r.bottom > c.bottom - 8) {
-      box.scrollTop += (r.top - c.top) - c.height / 2 + r.height / 2
-    }
-  }
+  if (!ativa || _abArrastando) return
+  // Ele mexeu no texto há pouco: a mão dele manda. Passados os 5 segundos, o
+  // áudio volta a mandar — sem isso, quem sobe para reler uma frase é
+  // arrastado de volta no meio da leitura.
+  if (Date.now() - _abRolouEm < AB_VOLTA_AO_CENTRO_MS) return
+  _abCentralizar(box, ativa)
+}
+
+function _abCentralizar(box, alvo) {
+  const r = alvo.getBoundingClientRect(), c = box.getBoundingClientRect()
+  const destino = box.scrollTop + (r.top - c.top) - (c.height / 2) + (r.height / 2)
+  if (Math.abs(destino - box.scrollTop) < 4) return
+  _abAutoRolando = true
+  // ⚠️ SUAVE SÓ COM A PÁGINA À VISTA. A rolagem animada depende de o navegador
+  // estar compondo quadros: em aba de segundo plano (ou num painel embutido
+  // que não compõe) ela simplesmente não anda, e a fala nunca chega ao centro.
+  // Com a aba escondida, o salto direto faz o trabalho — ninguém está vendo a
+  // animação mesmo.
+  const suave = document.visibilityState === 'visible'
+  const ate = Math.max(0, destino)
+  if (suave) box.scrollTo({ top: ate, behavior: 'smooth' })
+  else box.scrollTop = ate
+  // A rolagem suave dispara `scroll` por meio segundo; sem esta janela, o
+  // próprio ajuste seria lido como "ele rolou" e o auto-centro se desligaria
+  // sozinho para sempre.
+  clearTimeout(_abCentralizar._t)
+  _abCentralizar._t = setTimeout(() => { _abAutoRolando = false }, 700)
+}
+
+// Só o gesto DELE conta como rolagem manual. Escutar `scroll` puro não serve:
+// ele dispara também na rolagem programática.
+function _abLigarRolagemManual(box) {
+  if (!box || box._abRolagem) return
+  box._abRolagem = true
+  const marcar = () => { if (!_abAutoRolando) _abRolouEm = Date.now() }
+  box.addEventListener('wheel', marcar, { passive: true })
+  box.addEventListener('touchmove', marcar, { passive: true })
+  box.addEventListener('pointerdown', marcar, { passive: true })
+  box.addEventListener('keydown', e => {
+    if (/Arrow|Page|Home|End/.test(e.key)) marcar()
+  })
+}
+
+// ================================================================
+// MODO FULL DO TEXTO — "que se comporte igual o livro"
+// ================================================================
+// Pedido dele. A caixa de 420px dentro do player serve para consultar; para
+// LER enquanto ouve, ela é pequena demais — e ler enquanto ouve é o que faz o
+// audiolivro virar estudo. Em tela cheia o texto ganha coluna de leitura,
+// tipografia serifada e o resto do app sai da frente, como no leitor de EPUB.
+//
+// ⚠️ O <audio> NÃO É TOCADO por isto: ele vive fora de `#ab-area` (ver o
+// index.html) e o modo full só troca classes. Mover o elemento de mídia para
+// dentro de um contêiner novo pararia o som no instante do clique.
+function abTextoFull(ligar) {
+  const quer = ligar === undefined ? !document.body.classList.contains('ab-full') : !!ligar
+  document.body.classList.toggle('ab-full', quer)
+  _abSetPref('full', quer)
+  if (quer) document.addEventListener('keydown', _abFullTeclas)
+  else document.removeEventListener('keydown', _abFullTeclas)
+  // Recentraliza logo: entrar em tela cheia muda a altura da caixa, e a fala
+  // ativa estaria no lugar errado.
+  setTimeout(() => { _abRolouEm = 0; _abAcompanharTexto() }, 60)
+}
+function _abFullTeclas(e) {
+  if (e.key === 'Escape') { e.preventDefault(); abTextoFull(false) }
 }
 
 // ================================================================
@@ -1378,6 +1450,7 @@ async function abAbrir(id) {
 function abFechar() {
   _abQuerTocar = false
   _abAbaAtual = 'capitulos'
+  if (document.body.classList.contains('ab-full')) abTextoFull(false)
   _abRegistrarTempo()
   _abSalvarPos(true)
   const au = _abAudio()
@@ -1470,7 +1543,7 @@ function _abRenderPlayer() {
   // ⚠️ RELIGAR A SELEÇÃO DEPOIS DE CADA REDESENHO. O ouvinte mora no container,
   // e o container é recriado inteiro aqui — guardar um marcador redesenhava o
   // player e a lista ficava muda: selecionar a frase não abria mais o menu.
-  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abAcompanharTexto() }
+  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abLigarRolagemManual(el('ab-trans')); _abAcompanharTexto() }
   if (_abAbaAtual === 'marcadores') _abLigarSelecaoMarcas()
 }
 
@@ -1483,7 +1556,7 @@ function abAba(qual, ev) {
   box.innerHTML = _abAbaAtual === 'marcadores' ? _abListaMarcadores()
     : _abAbaAtual === 'texto' ? _abListaTexto()
     : _abListaCapitulos()
-  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abAcompanharTexto() }
+  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abLigarRolagemManual(el('ab-trans')); _abAcompanharTexto() }
   if (_abAbaAtual === 'marcadores') _abLigarSelecaoMarcas()
 }
 
@@ -1908,6 +1981,9 @@ function _abMediaSession() {
 // (é audiolivro — ouvir enquanto se faz outra coisa é o uso normal), mas a
 // posição é gravada na hora, porque a aba pode ser fechada a qualquer momento.
 function abAoSairDaSecao() {
+  // A tela cheia é DESTA seção: sem isto, ir ao Dashboard deixaria o texto
+  // cobrindo a tela inteira do app.
+  if (document.body.classList.contains('ab-full')) abTextoFull(false)
   if (!_abLivro) return
   _abRegistrarTempo()
   _abSalvarPos(true)

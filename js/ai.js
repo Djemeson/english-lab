@@ -1489,9 +1489,15 @@ REGRAS:
 - "t" é a forma EXATA como aparece no trecho (mesma flexão, mesma ordem), para poder ser
   encontrada nele. Nunca o infinitivo, nunca a forma de dicionário.
 - "pt": o sentido AQUI, em português, no máximo 4 palavras. Sem definição, sem explicação.
+- CONFIRA CADA "pt" ANTES DE RESPONDER: troque o trecho pela sua tradução dentro da frase. Se a
+  frase deixar de fazer sentido, a tradução está errada — corrija ou não inclua o item.
+  Exemplo do erro a evitar: em "Macintosh holds out his hand. Billy rises and shakes it",
+  "shakes it" é APERTAR A MÃO. Traduzir por "treme de medo" ignora a frase anterior.
+- Use as frases vizinhas para decidir o sentido: o trecho recebido é contínuo.
 - Inclua vocabulário acima de ${nv} (nivel B2, C1 ou C2 para um aluno ${nv}).
-- Inclua TODO phrasal verb, idiom e collocation não literal, MESMO que as palavras sejam
-  fáceis — é justamente o caso de "put up with" ou "call it a day".
+- Inclua phrasal verb, idiom e collocation SÓ quando o sentido ali NÃO for literal — é o caso de
+  "put up with" e "call it a day". Verbo comum com objeto comum ("open the door", "take the bus")
+  não é idiom.
 - NÃO inclua: nome próprio, número, palavra transparente com o português (hotel, doctor),
   nem vocabulário que um aluno ${nv} já domina.
 - Máximo ${maxItens} itens. Se não houver nada difícil, devolva {"itens":[]}.

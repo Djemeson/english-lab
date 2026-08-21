@@ -2690,8 +2690,37 @@ function _lerRaioXDespintar() {
   cont.normalize()
 }
 
+// ⚠️ O REALCE PRECISA DE UMA AÇÃO, e essa lição veio dele em uma frase: *"não
+// tá aparecendo chip. Como que faz pra mandar pro Preparar?"* Os chips estavam
+// no painel de ferramentas — longe do texto e atrás de um ícone. Marca que
+// acende e não faz nada obriga a procurar o que fazer com ela.
+//
+// Agora clicar no destaque SELECIONA aquele trecho, e a seleção é o gesto que
+// o leitor já ensina: abre o popup de sempre, com a tradução, o Explicar e o
+// Preparar. Nenhum caminho novo para aprender.
+function _lerRaioXLigarClique(cont) {
+  if (!cont || cont._raioxClique) return
+  cont._raioxClique = true
+  cont.addEventListener('click', ev => {
+    const mk = ev.target.closest && ev.target.closest('mark.ler-dif')
+    if (!mk) return
+    ev.preventDefault(); ev.stopPropagation()
+    try {
+      const rng = document.createRange()
+      rng.selectNodeContents(mk)
+      const sel = window.getSelection()
+      sel.removeAllRanges()
+      sel.addRange(rng)
+      // O leitor escuta `selectionchange` com um respiro; disparar na mão
+      // garante o popup mesmo quando o clique não moveu a seleção o bastante.
+      if (typeof _lerAoSelecionar === 'function') setTimeout(_lerAoSelecionar, 10)
+    } catch (e) {}
+  })
+}
+
 function _lerRaioXPintar() {
   const cont = el('ler-conteudo'); if (!cont || !_lerRaioX) return
+  _lerRaioXLigarClique(cont)
   _lerRaioXDespintar()
   const itens = _lerRaioX.itens || []
   if (!itens.length) return

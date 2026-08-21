@@ -5294,6 +5294,43 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ab-fala-t:hover{color:var(--role-energia)}
 .ab-fala.on .ab-fala-t{color:var(--role-energia)}
 .ab-fala span{flex:1;min-width:0}
+/* ---- modo full do texto: ler enquanto ouve ---- */
+/* ⚠️ O <audio> FICA ONDE ESTÁ. Só classes mudam aqui — mover o elemento de
+   mídia para dentro de um contêiner novo pararia o som no clique. */
+body.ab-full .app-layout > .main{overflow:hidden}
+body.ab-full #section-audiobook{
+  position:fixed;inset:0;z-index:var(--z-modal);background:var(--bg);
+  padding:0;margin:0;overflow:hidden;display:flex;flex-direction:column;
+}
+body.ab-full #ab-header,
+body.ab-full .ab-topo,
+body.ab-full .ab-abas{display:none}
+body.ab-full #ab-area{flex:1;min-height:0;display:flex;flex-direction:column;padding:0}
+body.ab-full .ab-player{max-width:none;display:flex;flex-direction:column;flex:1;min-height:0}
+body.ab-full #ab-aba{flex:1;min-height:0;display:flex;flex-direction:column}
+body.ab-full .ab-trans-topo{
+  padding:14px 22px;margin:0;border-bottom:1px solid var(--border);
+  background:var(--surface);flex-shrink:0;
+}
+/* A coluna de leitura, como no livro: medida confortável, serifada e centrada.
+   Sem o teto de largura, a linha atravessa 1500px e o olho perde a volta. */
+body.ab-full .ab-trans{
+  flex:1;min-height:0;max-height:none;
+  padding:26vh 24px;                       /* respiro em cima e embaixo para a
+                                              primeira e a última fala também
+                                              conseguirem chegar ao CENTRO */
+  overflow-y:auto;scroll-behavior:smooth;
+}
+body.ab-full .ab-fala{
+  max-width:34em;margin:0 auto;padding:10px 14px;
+  font-family:Georgia,'Iowan Old Style','Times New Roman',serif;
+  font-size:calc(var(--fs-base) * 1.08);line-height:1.85;
+}
+body.ab-full .ab-fala.on{background:rgba(var(--primary-rgb),.16)}
+body.ab-full .ab-fala-t{opacity:.45}
+body.ab-full .ab-fala.on .ab-fala-t{opacity:1}
+body.ab-full .ab-chips{max-width:34em}
+
 /* ---- raio-x da passagem: o que está acima do nível ---- */
 .ab-fala-corpo{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
 .ab-fala-en{line-height:1.65}
@@ -5381,8 +5418,11 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ler-dif{
   background:none;color:inherit;padding:0;
   border-bottom:2px solid var(--cor,var(--ler-mark));border-radius:0;
-  text-decoration:none;
+  text-decoration:none;cursor:pointer;
 }
+/* O clique tem de parecer clicável: um leve fundo ao passar o mouse avisa que
+   ali há ação, sem pintar o texto enquanto se lê. */
+.ler-dif:hover{background:color-mix(in srgb, var(--cor,var(--ler-mark)) 18%, transparent)}
 /* Saturação média de propósito: o leitor tem tema claro (Papel, Sépia, Cinza) e
    escuro (Noite, Preto), e um lima vibrante que brilha no preto quase some no
    creme. Estes quatro tons se veem nos cinco. */
