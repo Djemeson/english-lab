@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (3ª) — **OS CAPÍTULOS DE VERDADE, ACHADOS PELO SILÊNCIO**. As
+> Última atualização: 2026-08-21 (4ª) — **TRADUÇÃO NA TRANSCRIÇÃO, E O "PREPARAR" APARECENDO
+> DENTRO DO EXPLICAR**. A transcrição ganhou o **PT por baixo de cada fala, com névoa** — o
+> inglês vem primeiro, e o clique revela uma linha por vez (ler o português junto tira o
+> exercício da escuta). É **uma chamada só** para o trecho inteiro, com as linhas numeradas na
+> ida e na volta para nenhuma tradução cair na fala errada. E o "Preparar" do balão do Explicar
+> **deixou de ser um `+` mudo no canto**: ganhou nome no cabeçalho e um botão no fim da
+> resposta, que é onde a decisão acontece. ⚠️ **Dois achados que valem mais que o pedido:** o
+> `estPref` que eu usei no Audiobook mora na **estante** (outro módulo lazy) e derrubava a aba
+> Texto de quem abre o Audiobook direto — armadilha nº 1 na forma mais fácil de cometer; e o
+> **catálogo Groq do app estava morto** (dois `llama-*` fora do ar), o que quebrava o fornecedor
+> inteiro para quem não trocasse o modelo à mão. `sw.js` → **englab-v336**. **Detalhes em §8.60.**
+>
+> Última atualização anterior: 2026-08-21 (3ª) — **OS CAPÍTULOS DE VERDADE, ACHADOS PELO SILÊNCIO**. As
 > "Partes de 15 minutos" eram honestas e arbitrárias; agora o ffmpeg escuta o arquivo inteiro
 > atrás dos **vãos de 2 a 4 segundos** que separam capítulos, propõe os cortes e só aplica com o
 > aval dele. **Aqui no aparelho, sem IA e sem custo.** ⚠️ O que decidiu o desenho: aplicar um
@@ -12094,6 +12106,50 @@ E o remapeamento, conferido item a item: marcador em 200 s virou *capítulo 2, 0
 **Velocidade:** 10 minutos de áudio varridos em **1,4 s** — cerca de 400× o tempo real, o que
 põe um livro de doze horas em torno de dois minutos. Bem abaixo do que eu temia ao registrar
 esta pendência.
+
+## 8.60 Tradução na transcrição, e o "Preparar" saindo do esconderijo (2026-08-21, 4ª)
+
+### A tradução, com névoa
+
+Cada fala pode mostrar o português por baixo — **embaçado até o clique**. Essa é a regra, e ela
+não é enfeite: ler a tradução junto com o original faz o olho pular direto para o português e a
+escuta não treina nada. É o mesmo desenho da trilha PT do vídeo.
+
+**Uma chamada para o trecho inteiro**, não uma por fala: trinta falas seriam trinta idas à IA,
+trinta esperas e trinta vezes o custo, para um texto que ele lê de uma vez. As linhas vão e
+voltam **numeradas** — sem o número, uma linha a menos na resposta desalinharia todas as
+seguintes, e cada fala ficaria com a tradução da vizinha (pior que ficar sem nenhuma).
+
+Provado com o **Gemini**, que é o que ele usa, e a qualidade justifica a escolha de traduzir
+sentido e não palavra: *"had been around the block a few times"* virou **"já tinha vivido muita
+coisa na vida"**; *"kept a tight lid on what he was feeling"*, **"guardava o que sentia a sete
+chaves"**.
+
+### O "Preparar" dentro do Explicar
+
+Ele pediu; a opção **já existia** — como um `+` mudo no canto do cabeçalho do balão. É o mesmo
+caso dos metadados automáticos: **opção que ninguém encontra é opção que não existe**. Agora o
+botão tem nome no cabeçalho, e há outro no **fim da resposta** — que é onde a decisão acontece:
+primeiro se entende a palavra, depois se resolve estudá-la.
+
+### Os dois achados que valem mais que o pedido
+
+1. **`estPref` no Audiobook era a armadilha nº 1 do projeto.** Usei a preferência de tela da
+   estante (`js/estante.js`) dentro de `js/audiobook.js` — dois módulos lazy de seções
+   diferentes. Quem abre o Audiobook direto (o caminho normal de quem vai ouvir) nunca carregou
+   a estante, e a aba Texto morria com `estPref is not defined`. Trocado por
+   `loadUiPrefs`/`saveUiPref`, que são do core e existem sempre. **Só o teste ao vivo pega
+   isto** — `node --check` passa.
+2. **O catálogo de modelos da Groq estava morto.** Perguntei à própria Groq
+   (`GET /v1/models`) e dos três modelos listados no app **só `openai/gpt-oss-120b` existia**;
+   os dois `llama-*` respondiam *"The model does not exist or you do not have access to it"*.
+   Como o primeiro da lista é o padrão de quem escolhe a Groq, **o fornecedor inteiro estava
+   quebrado** para quem não trocasse o modelo à mão. Lista atualizada com o que existe hoje.
+
+⚠️ **E uma informação para ele, não do código:** a chave da **OpenAI está sem créditos**
+(*"You have no credits remaining"*). A transcrição continua funcionando porque usa a **Groq**;
+o chat (tradução, Explicar, análise do Preparar) depende do fornecedor ativo — hoje **Gemini**,
+que respondeu normalmente.
 
 ## 9. Pendências / a verificar
 

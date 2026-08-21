@@ -336,7 +336,11 @@ async function selMenuExplicar() {
   const L = getLangDef(c.lang || 'en')
   const corpo = lexaBalaoAbrir({
     titulo: `"${c.txt}"`, fonte: c.fonte || '', alvo: c.rect,
-    acoes: `<button class="sel-exp-btn" onclick="selMenuPreparar()" data-tip="Mandar para o Preparar">${ic('plus','ic-sm')}</button>`
+    // ⚠️ COM NOME, E NÃO SÓ UM "+". Ele disse "falta adicionar a opção de mandar
+    // pro Preparar dentro do Explicar" — e ela existia: era este botão, mudo,
+    // no canto do cabeçalho. Opção que ninguém encontra é opção que não existe.
+    acoes: `<button class="sel-exp-btn sel-exp-prep" onclick="selMenuPreparar()"
+              data-tip="Mandar para o Preparar">${ic('plus','ic-sm')}<span>Preparar</span></button>`
   })
   // `lexaBalaoAbrir` zera o contexto (fecha o menu antes de abrir o balão), e o
   // botão "Preparar" do cabeçalho precisa dele de volta.
@@ -433,6 +437,14 @@ Explique o que "${c.txt}" significa AQUI, em ${L.nameEn}. Se for gíria, marca, 
   }
   if (!lexaBalaoVivo(corpo)) return
   corpo.innerHTML = lexaFormatar(r.texto)
+  // O CONVITE VEM DEPOIS DA EXPLICAÇÃO, porque é ali que ele decide: primeiro
+  // entende o que a palavra quer dizer, e só então resolve se quer estudá-la.
+  // O botão do cabeçalho continua, para quem já decidiu antes de ler.
+  const pe = document.createElement('div')
+  pe.className = 'sel-exp-acoes'
+  pe.innerHTML = `<button class="btn btn-primary btn-sm" onclick="selMenuPreparar()">
+    ${ic('plus','ic-sm')} Mandar para o Preparar</button>`
+  corpo.appendChild(pe)
   lexaWebRodape(corpo, { ...r, refazer: () => _selExplicarPintar(corpo, c, true) })
   if (typeof lexaChipsMontar === 'function' && c.frase) {
     lexaChipsMontar(corpo, { trecho: c.txt, contexto: c.frase, lang: c.lang || 'en',
@@ -1027,10 +1039,16 @@ const AI_PROVIDERS = {
     keyCfg: 'groqKey',
     placeholder: 'gsk_...',
     json: 'objeto',
+    // ⚠️ CATÁLOGO CONFERIDO NA PRÓPRIA GROQ em 2026-08-21 (`GET /v1/models`), e
+    // não copiado da documentação: os dois `llama-*` que estavam aqui **saíram
+    // do ar** e devolviam "The model does not exist or you do not have access
+    // to it". Como o primeiro da lista é o PADRÃO de quem escolhe a Groq, o
+    // fornecedor inteiro estava quebrado para quem não trocasse o modelo à mão.
+    // Se voltar a falhar assim, é este o comando que dá a resposta certa.
     modelos: [
-      { id: 'llama-3.1-8b-instant',    tier: 'baixo', nota: 'muito rápido, quase grátis',    preco: { in: 0.05, out: 0.08 } },
-      { id: 'llama-3.3-70b-versatile', tier: 'baixo', nota: 'mais qualidade, ainda barato',  preco: { in: 0.59, out: 0.79 } },
-      { id: 'openai/gpt-oss-120b',     tier: 'médio', nota: 'modelo aberto grande',          preco: { in: 0.15, out: 0.60 } },
+      { id: 'openai/gpt-oss-120b',  tier: 'médio', nota: 'modelo aberto grande, o mais capaz aqui', preco: { in: 0.15, out: 0.60 } },
+      { id: 'openai/gpt-oss-20b',   tier: 'baixo', nota: 'rápido e barato',                          preco: { in: 0.10, out: 0.40 } },
+      { id: 'qwen/qwen3.6-27b',     tier: 'baixo', nota: 'bom em tradução',                          preco: { in: 0.10, out: 0.40 } },
     ]
   }
 }

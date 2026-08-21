@@ -5294,6 +5294,16 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ab-fala-t:hover{color:var(--role-energia)}
 .ab-fala.on .ab-fala-t{color:var(--role-energia)}
 .ab-fala span{flex:1;min-width:0}
+.ab-fala-txt{display:flex;flex-direction:column;gap:3px}
+/* A NÉVOA: a tradução existe, ocupa o lugar dela e não se deixa ler antes da
+   hora. Sem `user-select:none` o embaçado seria burlado com um Ctrl+C. */
+.ab-pt{
+  font-style:normal;font-size:var(--fs-xs);color:var(--text3);line-height:1.5;
+  filter:blur(4.5px);opacity:.75;cursor:pointer;user-select:none;
+  transition:filter .18s,opacity .18s;width:fit-content;max-width:100%;
+}
+.ab-pt.aberta,.ab-pt:active{filter:none;opacity:1;user-select:text}
+.ab-fala.on .ab-pt{opacity:.9}
 .ab-novo{
   font-style:normal;font-size:8px;letter-spacing:.06em;vertical-align:super;
   color:var(--role-ia);
@@ -6166,6 +6176,12 @@ body.ler-full .mobile-bottom-nav{display:none}
 #sel-menu.sel-exp .sel-exp-btn{
   flex:none;padding:5px;background:transparent;border:1px solid transparent;color:var(--text3);
 }
+#sel-menu.sel-exp .sel-exp-prep{
+  display:inline-flex;align-items:center;gap:5px;padding:5px 10px;
+  font-size:var(--fs-3xs);border-radius:var(--radius-pill);
+}
+#sel-menu.sel-exp .sel-exp-prep:hover{color:var(--text)}
+.sel-exp-acoes{margin-top:14px;display:flex;justify-content:flex-start}
 #sel-menu.sel-exp .sel-exp-btn:hover{background:var(--surface);border-color:var(--border);color:var(--text)}
 /* `flex:1` com `min-height:0`, e NÃO um `max-height` calculado: a frase é
    opcional, então qualquer conta fixa erraria num dos dois casos — sobrando
