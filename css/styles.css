@@ -5318,6 +5318,16 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ab-chip:hover{border-color:var(--border-strong);background:var(--surface2)}
 .ab-chip b{font-size:var(--fs-xs);color:var(--text);font-weight:600}
 .ab-chip i{font-size:var(--fs-3xs);color:var(--text3);font-style:normal}
+/* O chip do que ele já tem fica mais apagado: continua ali (o sentido pode ser
+   outro), mas não disputa a atenção com o que é realmente novo. */
+.ab-chip-ja{opacity:.72}
+.ab-chip-ja:hover{opacity:1}
+.ab-chip-selo{
+  text-decoration:none;font-size:9px;letter-spacing:.02em;
+  padding:1px 5px;border-radius:20px;white-space:nowrap;
+}
+.ab-selo-outro{background:rgba(var(--primary-rgb),.2);color:var(--role-ia)}
+.ab-selo-marcada{background:var(--surface2);color:var(--text3)}
 .ab-trans.com-raiox .ab-fala{padding-bottom:9px}
 
 .ab-novo{

@@ -1328,10 +1328,24 @@ function _aiParseJSON(data) {
 //      que trava não é a raridade da palavra: "put up with" é feito de três
 //      palavras que um A1 conhece e significa uma quarta coisa.
 //
-// ⚠️ O QUE ELE JÁ SABE FICA DE FORA, e isso é metade do valor: sem filtrar,
-// a passagem inteira acenderia e o destaque deixaria de destacar. Saem as
-// palavras marcadas como conhecidas (`isKnownWord`) e as que já estão no
-// acervo — se já virou card, não é mais mistério.
+// ⚠️ O QUE ELE JÁ SABE SAI — MAS PELO SENTIDO, NUNCA PELA FORMA.
+// A primeira versão apagava a palavra só por ela já existir no acervo, e ele
+// derrubou o critério com uma pergunta: *"já deixamos claro que uma mesma
+// palavra pode ter vários significados. Vai ser simplesmente apagado por eu
+// conhecer ela com um significado, ou vai buscar no significado que eu conheço
+// e, se for igual ao que está sendo analisado, aí sim remove?"*
+//
+// Ele tem razão, e o app inteiro é construído sobre isso (`meanings[]`,
+// `meaningId`, sentidos separados em item próprio). Apagar `ore` porque ele
+// estudou "veio de mina" esconderia justamente a passagem em que a palavra
+// significa "minério" — o caso que este raio-X existe para pegar.
+//
+// A regra passou a ser em três estados:
+//   · sentido JÁ ESTUDADO (a glosa bate com um `meaning_pt` do item) → sai
+//   · palavra no acervo com OUTRO sentido → FICA, com o selo "outro sentido"
+//   · marcada como conhecida (`knownWords`, que não guarda significado nenhum)
+//     → FICA, com selo discreto: ali não há sentido para comparar, e sumir
+//     seria decidir no escuro.
 
 // O JSON de dentro de uma resposta de texto. Gêmeo de `_aiParseJSON`, que só
 // sabe ler o objeto cru da API — aqui a resposta já veio como string.
@@ -1393,19 +1407,54 @@ REGRAS:
       nivel: String(x.nivel || '').toUpperCase(),
       pt: String(x.pt || '').trim()
     }))
+    .map(x => ({ ...x, ja: aiJaConhecido(x) }))
     .filter(x => {
       if (!x.t || x.t.length > 60) return false
       const k = x.t.toLowerCase()
       if (vistos.has(k)) return false
       vistos.add(k)
-      // Já conhecido ou já no acervo: não é mistério, e acender tudo é não
-      // acender nada.
-      if (typeof isKnownWord === 'function' && x.tipo === 'word' && isKnownWord(x.t)) return false
-      if (typeof words !== 'undefined' && Array.isArray(words)) {
-        if (words.some(w => String(w.word || '').toLowerCase() === k)) return false
-      }
-      return true
+      return x.ja !== 'sentido'          // só o sentido JÁ ESTUDADO some
     })
+}
+
+// Em que pé este termo está para ele: `'sentido'` (já estudou ESTE sentido),
+// `'outro'` (tem a palavra, com outro significado), `'marcada'` (declarou
+// conhecer, sem significado registrado) ou `null`.
+function aiJaConhecido(x) {
+  const k = String(x.t || '').toLowerCase().trim()
+  if (!k) return null
+  const item = (typeof words !== 'undefined' && Array.isArray(words))
+    ? words.find(w => String(w.word || '').toLowerCase() === k)
+    : null
+  if (item) {
+    const sentidos = (item.meanings || [])
+      .filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em)
+      .map(m => m.meaning_pt)
+    if (!sentidos.length) return 'outro'
+    return sentidos.some(m => aiSentidoParecido(m, x.pt)) ? 'sentido' : 'outro'
+  }
+  if (typeof isKnownWord === 'function' && x.tipo === 'word' && isKnownWord(x.t)) return 'marcada'
+  return null
+}
+
+// Dois sentidos são "o mesmo" quando compartilham uma palavra de peso.
+// ⚠️ Comparação FROUXA de propósito: a glosa do raio-X tem até quatro palavras
+// e a do card foi escrita noutro momento — exigir igualdade literal faria
+// "tolerar" e "suportar, tolerar" contarem como sentidos diferentes, e o item
+// voltaria a aparecer para sempre. O risco do outro lado (juntar dois sentidos
+// distintos que dividem uma palavra) é pequeno: "minério" e "veio" não têm
+// palavra em comum, nem "luz" e "leve".
+function aiSentidoParecido(a, b) {
+  const limpa = t => String(t || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 4 && !/^(para|como|algo|alguem|fazer|coisa|muito|mais|sobre|entre|quando|pessoa|aquilo|isso)$/.test(w))
+  const A = limpa(a), B = limpa(b)
+  if (!A.length || !B.length) return false
+  // Uma palavra de peso em comum basta — inclusive por prefixo, para pegar
+  // "tolerar/tolerância" e "canceladas/cancelar".
+  return A.some(x => B.some(y => x === y || (x.length >= 5 && y.startsWith(x.slice(0, 5))) || (y.length >= 5 && x.startsWith(y.slice(0, 5)))))
 }
 
 // Onde cada achado APARECE no texto. Casamento por posição, sem regex montada

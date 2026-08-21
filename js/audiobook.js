@@ -1085,7 +1085,8 @@ function _abListaTexto() {
         manda ao estudo.</span>
       ${achados
         ? `<button class="est-chip" id="ab-raiox-btn" onclick="abAnalisarPassagem()"
-             data-tip="Refazer com o nível de agora">${ic('refresh','ic-3xs')} ${achados.length} para o ${tr.achadosNivel || nivel}</button>`
+             data-tip="Refazer com o nível de agora">${ic('refresh','ic-3xs')} ${achados.filter(x => !x.ja).length} novos${
+               achados.filter(x => x.ja).length ? ` · ${achados.filter(x => x.ja).length} conhecidos` : ''}</button>`
         : `<button class="est-chip" id="ab-raiox-btn" onclick="abAnalisarPassagem()"
              data-tip="Acha o que está acima do seu nível, e todo phrasal verb e expressão">
              ${ic('eye','ic-3xs')} O que é difícil aqui</button>`}
@@ -1188,10 +1189,18 @@ function _abChipsDaFala(txt, achados, iFala) {
     .map((x, idx) => ({ ...x, idx }))
     .filter(x => aiAcharNoTexto(txt, x.t).length)
   if (!daFala.length) return ''
+  // O SELO DIZ O QUE ELE JÁ TEM DAQUELA PALAVRA — e é o que responde à pergunta
+  // que derrubou a primeira versão: item que ele já estudou COM OUTRO SENTIDO
+  // não some, aparece marcado. Ver `aiJaConhecido`.
+  const selo = {
+    outro:   { txt: 'outro sentido', tip: 'Você já tem esta palavra no acervo, mas com outro significado — aqui ela quer dizer outra coisa' },
+    marcada: { txt: 'você marcou como conhecida', tip: 'Você declarou conhecer esta palavra; como não há significado registrado, não dá para saber se é este o sentido' }
+  }
   return `<span class="ab-chips">${daFala.map(x => `
-    <button class="ab-chip ab-dif-${x.tipo}" onclick="abChipPreparar(${iFala},${x.idx})"
-            data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + ' — clique para mandar ao Preparar')}">
-      <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}
+    <button class="ab-chip ab-dif-${x.tipo}${x.ja ? ' ab-chip-ja' : ''}" onclick="abChipPreparar(${iFala},${x.idx})"
+            data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + (x.ja && selo[x.ja] ? ' — ' + selo[x.ja].tip : ' — clique para mandar ao Preparar'))}">
+      <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}${
+        x.ja && selo[x.ja] ? `<u class="ab-chip-selo ab-selo-${x.ja}">${selo[x.ja].txt}</u>` : ''}
     </button>`).join('')}</span>`
 }
 

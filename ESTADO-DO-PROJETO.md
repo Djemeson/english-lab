@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (6ª) — **O RAIO-X DA PASSAGEM: "o que aqui está acima do meu
+> Última atualização: 2026-08-21 (7ª) — **O RAIO-X PASSOU A FILTRAR PELO SENTIDO, NÃO PELA
+> FORMA**. Ele derrubou o critério da versão anterior com uma pergunta: *"já deixamos claro que
+> uma mesma palavra pode ter vários significados. Vai ser simplesmente apagado por eu conhecer
+> ela com um significado, ou vai buscar no significado que eu conheço e, se for igual ao que
+> está sendo analisado, aí sim remove?"* Estava errado como ele suspeitava — apagava pela forma.
+> Agora são **três estados**: sentido já estudado **sai**; palavra no acervo com **outro
+> sentido FICA, com o selo "outro sentido"**; palavra só marcada como conhecida **fica com selo
+> discreto**, porque ali não há significado registrado para comparar e sumir seria decidir no
+> escuro. Medido: `ore` = "minério" **aparece** mesmo com "veio de mina" estudado, e some quando
+> a glosa é "veio de mina"; `tolerate` = "suportar, tolerar" é reconhecido como o mesmo sentido
+> de "tolerar". `sw.js` → **englab-v339**. **Detalhes em §8.63.**
+>
+> Última atualização anterior: 2026-08-21 (6ª) — **O RAIO-X DA PASSAGEM: "o que aqui está acima do meu
 > nível"**. Ideia dele, com o diagnóstico junto: *"vejo uma frase que não entendo, mas não sei
 > por que não entendi."* Traduzir diz o que a frase quer dizer, Explicar diz por quê — **faltava
 > a pergunta que vem antes das duas: ONDE está o problema**. Um clique varre a passagem e acende
@@ -12271,6 +12283,54 @@ Item de teste removido do acervo em seguida.
 Só na aba **Texto do audiolivro**. A peça (`aiAnalisarDificuldade` + `aiAcharNoTexto`) mora em
 `js/ai.js`, que é **não-lazy**, justamente para o **leitor de EPUB** ganhar o mesmo botão sem
 duplicar regra — é a pendência natural desta rodada.
+
+## 8.63 O raio-X filtra pelo SENTIDO, não pela forma (2026-08-21, 7ª)
+
+**Ele leu o resumo da rodada anterior e achou o furo:**
+
+> *"Você disse 'o que você já marcou como conhecido, ou já tem no acervo, fica de fora', mas já
+> deixamos claro que uma mesma palavra pode ter vários significados. Vai ser simplesmente
+> apagada a palavra por eu conhecer ela com um significado, ou vai buscar no significado que eu
+> conheço e se ela for igual à que está sendo analisada aí sim remove?"*
+
+Estava como ele suspeitava: **apagava pela forma**. Num app construído sobre `meanings[]`,
+`meaningId` e sentidos que viram item próprio, era incoerente — e escondia justamente o caso que
+o raio-X existe para pegar: a palavra conhecida que ali significa outra coisa.
+
+### Os três estados
+
+| Situação | O que acontece |
+|---|---|
+| A glosa da passagem **bate** com um sentido já registrado | **sai** — já é card dele |
+| A palavra está no acervo com **outro sentido** | **fica**, com selo *"outro sentido"* |
+| Só marcada como conhecida (`knownWords`, sem significado guardado) | **fica**, com selo discreto |
+
+O terceiro caso é o mais delicado e por isso é o mais conservador: `knownWords` guarda apenas a
+forma — não há sentido para comparar. Sumir ali seria decidir no escuro; o selo devolve a
+decisão para ele.
+
+### A comparação é frouxa de propósito
+
+`aiSentidoParecido` considera dois sentidos iguais quando compartilham **uma palavra de peso**
+(≥4 letras, ignorando conectivos), inclusive por prefixo. Exigir igualdade literal faria
+*"tolerar"* e *"suportar, tolerar"* contarem como sentidos diferentes, e o item voltaria a
+aparecer para sempre — a glosa do raio-X tem quatro palavras e a do card foi escrita noutro
+momento. O risco do lado oposto é pequeno: *"minério"* e *"veio"* não têm palavra em comum, nem
+*"luz"* e *"leve"*.
+
+### Medido, caso a caso
+
+| Termo | Glosa da passagem | O que ele já tem | Resultado |
+|---|---|---|---|
+| `ore` | minério | "veio de mina" | **aparece** · outro sentido |
+| `ore` | veio de mina | "veio de mina" | sai |
+| `run` | administrar, gerir | "correr" | **aparece** · outro sentido |
+| `run` | correr | "correr" | sai |
+| `tolerate` | suportar, tolerar | "tolerar" | sai (sinônimo reconhecido) |
+| `brooding` | ruminação | marcada como conhecida | **aparece** · com selo |
+| `petrichor` | cheiro de chuva | nada | **aparece** · novo |
+
+E o botão do painel passou a separar o que interessa: **"2 novos · 2 conhecidos"**.
 
 ## 9. Pendências / a verificar
 
