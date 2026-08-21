@@ -453,6 +453,11 @@ function renderLeitor() {
   // nada. Ele volta sozinho em qualquer livro.
   const c_ferramentas = (_lerLivro && _lerLivro.format === 'manga') ? ''
     : `<button class="ler-btn" onclick="lerToggle('ferramentas')" data-tip="Palavras deste capítulo, cobertura e pré-estudo">${ic('sparkles','ic-sm')}</button>`
+  // Porta PRÓPRIA para o raio-X: ele estava escondido dentro do painel acima,
+  // que abre outra coisa — e a pergunta "como é que ativa isso?" veio dele.
+  const c_raiox = (_lerLivro && _lerLivro.format === 'manga') ? ''
+    : `<button class="ler-btn" id="ler-raiox-btn" onclick="event.stopPropagation();lerRaioXPainel()"
+         data-tip="O que é difícil aqui: acima do seu nível, phrasal verbs e expressões">${ic('eye','ic-sm')}</button>`
   // A barra de zoom só no mangá: num livro ela não teria o que ajustar.
   const c_mgbarra = (_lerLivro && _lerLivro.format === 'manga' && typeof mangaBarraHtml === 'function')
     ? mangaBarraHtml() : ''
@@ -470,7 +475,7 @@ function renderLeitor() {
         <div class="ler-barra-dir">
           ${c_manga}
           <button class="ler-btn" onclick="lerToggle('conversa')" data-tip="Conversar com a ${escA(lexaNome())} sobre este livro — quem é quem, onde se passa, o que está acontecendo">${ic('message','ic-sm')}</button>
-          ${c_ferramentas}
+          ${c_ferramentas}${c_raiox}
           <button class="ler-btn" onclick="lerToggle('tipografia')" data-tip="Tamanho, fonte, tema e largura da coluna"><b style="font-size:15px">Aa</b></button>
           <button class="ler-btn" id="ler-btn-full" onclick="lerAlternarFull()" data-tip="Modo tela cheia (F) — só o texto">${ic('expand','ic-sm')}</button>
         </div>
@@ -2696,91 +2701,17 @@ function _lerRaioXDespintar() {
 // vendo a primeira tentativa: *"ao passar o mouse, em vez de só aparecer a
 // tradução, aparece o chip."*
 //
-// É a solução certa e é melhor do que a minha: o chip **vai até onde o olho já
-// está**. A tradução sozinha responde "o que é", e para de aí; o chip responde
-// e ainda oferece as duas saídas — mandar ao estudo ou dizer que já sabe.
-//
-// Hover E clique abrem o mesmo chip: no celular não há hover, e no computador
-// quem clica também espera algo. Arrastar por cima continua selecionando
-// normalmente — a seleção é do leitor, não deste realce.
-let _lerDifPop = null
-let _lerDifSaiTimer = null
-
-function _lerDifFechar() {
-  clearTimeout(_lerDifSaiTimer)
-  if (_lerDifPop) { _lerDifPop.remove(); _lerDifPop = null }
-}
-
-function _lerDifAbrir(mk) {
-  const i = Number(mk.dataset.i)
-  const x = _lerRaioX && (_lerRaioX.itens || [])[i]
-  if (!x) return
-  if (_lerDifPop && _lerDifPop._i === i && document.body.contains(_lerDifPop)) return
-  _lerDifFechar()
-  const p = document.createElement('div')
-  p._i = i
-  p.className = 'ler-dif-pop ler-dif-' + (x.tipo || 'word')
-  p.innerHTML = `
-    <span class="ler-dif-pop-txt"><b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}</span>
-    <span class="ler-dif-pop-tipo">${esc(AI_DIF_TIPOS[x.tipo] ? AI_DIF_TIPOS[x.tipo].rotulo : '')}${x.nivel ? ' · ' + esc(x.nivel) : ''}</span>
-    <span class="ler-dif-pop-acoes">
-      <button onclick="lerRaioXPreparar(${i});_lerDifFechar()" data-tip="Mandar para o Preparar com a frase do livro">${ic('plus','ic-3xs')} Preparar</button>
-      <button onclick="lerRaioXJaSei(${i});_lerDifFechar()" data-tip="Já sei esta palavra COM ESTE sentido — não aparece mais">${ic('check','ic-3xs')} Já sei</button>
-    </span>`
-  // Fica vivo enquanto o mouse estiver nele: sem isto, tirar o mouse da palavra
-  // para clicar em "Preparar" fecharia o chip no meio do caminho.
-  p.addEventListener('mouseenter', () => clearTimeout(_lerDifSaiTimer))
-  p.addEventListener('mouseleave', () => { _lerDifSaiTimer = setTimeout(_lerDifFechar, 260) })
-  // ⚠️ AS CORES DO PAPEL PRECISAM VIAJAR JUNTO. `--ler-bg`/`--ler-fg` são
-  // declaradas em `.ler-leitor`; o chip vive no `body` (para ficar fora do
-  // texto paginado) e ali essas variáveis NÃO EXISTEM — `var(--ler-bg)` sem
-  // valor não dá erro, simplesmente some, e o chip nasceu transparente, com o
-  // texto do livro atravessando as letras dele. É a armadilha nº 2 do projeto,
-  // e a solução é copiar as quatro variáveis para o próprio elemento.
-  const leitor = document.querySelector('.ler-leitor')
-  if (leitor) {
-    const cs = getComputedStyle(leitor)
-    for (const v of ['--ler-bg', '--ler-fg', '--ler-fg2', '--ler-mark']) {
-      const valor = cs.getPropertyValue(v)
-      if (valor) p.style.setProperty(v, valor.trim())
-    }
-  }
-  document.body.appendChild(p)
-  _lerDifPop = p
-
-  const r = mk.getBoundingClientRect()
-  const larg = p.offsetWidth, alt = p.offsetHeight
-  let left = r.left + r.width / 2 - larg / 2
-  left = Math.max(8, Math.min(left, innerWidth - larg - 8))
-  // Acima da palavra por padrão; abaixo quando não couber — o chip nunca pode
-  // cobrir a linha que ele está lendo.
-  const top = (r.top - alt - 8 > 8) ? (r.top - alt - 8) : (r.bottom + 8)
-  p.style.left = Math.round(left) + 'px'
-  p.style.top = Math.round(top) + 'px'
-}
-
+// A peça vive em `js/ai.js` (`difChipLigar`) porque o Audiobook usa a mesma —
+// ele pediu igual lá depois de ver aqui.
 function _lerRaioXLigarClique(cont) {
-  if (!cont || cont._raioxClique) return
-  cont._raioxClique = true
-  cont.addEventListener('mouseover', ev => {
-    const mk = ev.target.closest && ev.target.closest('mark.ler-dif')
-    if (mk) { clearTimeout(_lerDifSaiTimer); _lerDifAbrir(mk) }
+  if (!cont || typeof difChipLigar !== 'function') return
+  difChipLigar(cont, {
+    classe: 'dif-pop-papel',
+    varsDe: document.querySelector('.ler-leitor'),
+    item: mk => (_lerRaioX && (_lerRaioX.itens || [])[Number(mk.dataset.i)]) || null,
+    preparar: mk => lerRaioXPreparar(Number(mk.dataset.i)),
+    jaSei: mk => lerRaioXJaSei(Number(mk.dataset.i))
   })
-  cont.addEventListener('mouseout', ev => {
-    if (ev.target.closest && ev.target.closest('mark.ler-dif')) {
-      _lerDifSaiTimer = setTimeout(_lerDifFechar, 260)
-    }
-  })
-  cont.addEventListener('click', ev => {
-    const mk = ev.target.closest && ev.target.closest('mark.ler-dif')
-    if (!mk) { _lerDifFechar(); return }
-    ev.preventDefault(); ev.stopPropagation()
-    _lerDifAbrir(mk)
-  })
-  // Virar página, rolar ou trocar de capítulo com o chip aberto o deixaria
-  // pendurado no meio da tela, apontando para uma palavra que já saiu de vista.
-  window.addEventListener('resize', _lerDifFechar)
-  cont.addEventListener('scroll', _lerDifFechar, { passive: true })
 }
 
 function _lerRaioXPintar() {
@@ -2826,6 +2757,95 @@ function _lerRaioXPintar() {
     if (ultimo < no.nodeValue.length) frag.appendChild(document.createTextNode(no.nodeValue.slice(ultimo)))
     no.replaceWith(frag)
   }
+}
+
+// ---- O PAINEL DO RAIO-X: os capítulos, e o que já foi analisado ----
+// Pedido dele: *"quero que essa nova função fique bem evidente em um botão seu,
+// e que ao clicar apareçam os capítulos do livro, mostre o spark nos capítulos
+// já processados, e ao clicar no capítulo sem ele gere o processamento."*
+//
+// ⚠️ Botão PRÓPRIO, e não mais um item dentro do painel de ferramentas. A
+// função estava atrás de um ícone que abre outra coisa (cobertura, frequência,
+// leitura por IA) — ele mesmo perguntou "como é que ativa isso?". Coisa que se
+// usa capítulo a capítulo precisa de porta própria.
+//
+// E a lista responde à pergunta que só ela responde: **o que já foi analisado
+// e o que falta**. Sem ela, descobrir isso exigiria entrar em cada capítulo.
+let _lerRaioXMapa = null      // { [cap]: quantidade }
+
+async function lerRaioXPainel() {
+  const p = el('ler-raiox-painel')
+  if (p && p.classList.contains('aberto')) { p.classList.remove('aberto'); return }
+  await _lerRaioXMapear()
+  _lerRaioXPainelRender()
+  el('ler-raiox-painel').classList.add('aberto')
+}
+
+// Uma varredura só do IndexedDB: as chaves dizem quais capítulos têm análise.
+async function _lerRaioXMapear() {
+  _lerRaioXMapa = {}
+  if (!_lerLivro) return
+  try {
+    const pre = `raiox:${_lerLivro.id}:`
+    for (const k of await BookDB.keys()) {
+      if (typeof k !== 'string' || !k.startsWith(pre)) continue
+      const cap = Number(k.slice(pre.length))
+      const dados = await BookDB.get(k)
+      const obj = typeof dados === 'string' ? JSON.parse(dados) : dados
+      const itens = Array.isArray(obj) ? obj : (obj && obj.itens) || []
+      _lerRaioXMapa[cap] = itens.length
+    }
+  } catch (e) { console.warn('[ler] mapa do raio-x:', e && e.message) }
+}
+
+function _lerRaioXPainelRender(msg) {
+  let p = el('ler-raiox-painel')
+  if (!p) {
+    p = document.createElement('div')
+    p.id = 'ler-raiox-painel'
+    p.className = 'ler-raiox-painel'
+    p.addEventListener('click', e => e.stopPropagation())
+    document.body.appendChild(p)
+    setTimeout(() => document.addEventListener('click', () => p.classList.remove('aberto')), 0)
+  }
+  const caps = (_lerLivro && _lerLivro.chapters) || []
+  const feitos = Object.keys(_lerRaioXMapa || {}).length
+  p.innerHTML = `
+    <div class="ler-raiox-topo">
+      <b>${ic('eye','ic-sm')} O que é difícil aqui</b>
+      <span>${feitos} de ${caps.length} ${caps.length === 1 ? 'capítulo' : 'capítulos'} analisados · nível ${esc(cefrNivelAluno())}</span>
+    </div>
+    ${msg ? `<div class="ler-raiox-msg">${esc(msg)}</div>` : ''}
+    <div class="ler-raiox-lista">
+      ${caps.map((c, i) => {
+        const n = (_lerRaioXMapa || {})[i]
+        return `<button class="ler-raiox-cap${i === _lerCap ? ' atual' : ''}${n ? ' feito' : ''}"
+                  onclick="lerRaioXDoCapitulo(${i})">
+          <span class="ler-raiox-spark">${n ? ic('sparkles','ic-sm') : ''}</span>
+          <span class="ler-raiox-nome">${esc(c.titulo || `Parte ${i + 1}`)}</span>
+          <span class="ler-raiox-n">${n ? n : 'analisar'}</span>
+        </button>`
+      }).join('')}
+    </div>
+    <p class="est-dica">Capítulo com <b>${ic('sparkles','ic-3xs')}</b> já foi analisado — o clique
+      leva até ele. Sem a marca, o clique manda analisar.</p>`
+  const btn = el('ler-raiox-btn')
+  if (btn) {
+    const r = btn.getBoundingClientRect()
+    p.style.top = Math.round(r.bottom + 8) + 'px'
+    p.style.left = Math.round(Math.max(8, Math.min(r.left - 120, innerWidth - 340))) + 'px'
+  }
+}
+
+// Clique num capítulo: vai até ele e, se ainda não tiver análise, manda fazer.
+async function lerRaioXDoCapitulo(i) {
+  const jaTem = (_lerRaioXMapa || {})[i]
+  if (i !== _lerCap) await lerIrParaCapitulo(i, 0)
+  if (jaTem) { el('ler-raiox-painel')?.classList.remove('aberto'); return }
+  _lerRaioXPainelRender('Analisando este capítulo…')
+  await lerRaioXAnalisar()
+  await _lerRaioXMapear()
+  _lerRaioXPainelRender()
 }
 
 // ---- o bloco no painel de ferramentas ----

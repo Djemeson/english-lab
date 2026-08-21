@@ -5321,11 +5321,84 @@ body.ab-full .ab-trans{
                                               conseguirem chegar ao CENTRO */
   overflow-y:auto;scroll-behavior:smooth;
 }
+/* A tipografia vem da MESMA configuração do leitor (`cfg.ler`), aplicada por
+   variáveis em `#ab-trans`. Fora do modo full valem só fonte e tamanho: pintar
+   a caixa de creme dentro do player escuro seria um remendo. */
+.ab-trans .ab-fala-en{font-family:var(--ab-ff, inherit)}
+body.ab-full .ab-trans{background:var(--ler-bg);color:var(--ler-fg)}
 body.ab-full .ab-fala{
-  max-width:34em;margin:0 auto;padding:10px 14px;
-  font-family:Georgia,'Iowan Old Style','Times New Roman',serif;
-  font-size:calc(var(--fs-base) * 1.08);line-height:1.85;
+  max-width:var(--ab-col, 34em);margin:0 auto;padding:10px 14px;
+  font-family:var(--ab-ff, Georgia, serif);
+  font-size:var(--ab-fs, 19px);line-height:var(--ab-lh, 1.8);
+  color:var(--ler-fg);
 }
+body.ab-full .ab-fala.on{background:color-mix(in srgb, var(--ler-fg) 10%, transparent)}
+body.ab-full .ab-fala-t{color:color-mix(in srgb, var(--ler-fg) 45%, transparent)}
+
+/* ---- painel do raio-X: a lista de capítulos ---- */
+.ler-raiox-painel{
+  position:fixed;z-index:var(--z-modal);width:330px;max-height:70vh;display:none;
+  flex-direction:column;gap:10px;padding:14px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+}
+.ler-raiox-painel.aberto{display:flex}
+.ler-raiox-topo{display:flex;flex-direction:column;gap:2px}
+.ler-raiox-topo b{font-size:var(--fs-sm);color:var(--text);display:flex;align-items:center;gap:7px}
+.ler-raiox-topo span{font-size:var(--fs-3xs);color:var(--text3)}
+.ler-raiox-msg{
+  font-size:var(--fs-xs);color:var(--text2);padding:8px 10px;border-radius:var(--radius-xs);
+  background:rgba(var(--primary-rgb),.12);
+}
+.ler-raiox-lista{display:flex;flex-direction:column;overflow-y:auto;min-height:0}
+.ler-raiox-cap{
+  display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;
+  background:none;border:0;border-radius:var(--radius-xs);cursor:pointer;text-align:left;
+  padding:8px 8px;color:var(--text2);font-family:inherit;font-size:var(--fs-xs);
+}
+.ler-raiox-cap:hover{background:var(--surface2)}
+.ler-raiox-cap.atual{background:rgba(var(--primary-rgb),.14);color:var(--text)}
+.ler-raiox-spark{display:flex;color:var(--role-ia)}
+.ler-raiox-nome{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* O número diz quantos achados; "analisar"/"transcrever" dizem o que o clique
+   vai FAZER — a lista precisa responder as duas coisas de uma olhada. */
+.ler-raiox-n{font-size:var(--fs-3xs);color:var(--text3);white-space:nowrap}
+.ler-raiox-cap.feito .ler-raiox-n{color:var(--role-dominio)}
+.est-chip-forte{
+  background:rgba(var(--primary-rgb),.18);border-color:rgba(var(--primary-rgb),.5);
+  color:var(--text);
+}
+
+/* ---- painel Aa do audiolivro ---- */
+.ab-tipo{
+  position:fixed;z-index:var(--z-modal);width:260px;display:none;
+  flex-direction:column;gap:10px;padding:14px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+}
+.ab-tipo.aberto{display:flex}
+.ab-tipo-temas{display:flex;gap:6px}
+.ab-tipo-tema{
+  flex:1;height:34px;border-radius:var(--radius-xs);cursor:pointer;
+  border:2px solid transparent;font-family:Georgia,serif;font-size:13px;
+}
+.ab-tipo-tema.on{border-color:var(--primary)}
+.ab-tipo-fontes{display:flex;gap:6px}
+.ab-tipo-fontes button{
+  flex:1;padding:7px;border-radius:var(--radius-xs);cursor:pointer;
+  background:var(--surface2);border:1px solid var(--border);color:var(--text2);
+  font-family:inherit;font-size:var(--fs-3xs);
+}
+.ab-tipo-fontes button.on{background:rgba(var(--primary-rgb),.18);color:var(--text);border-color:rgba(var(--primary-rgb),.5)}
+.ab-tipo-linha{display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);color:var(--text2)}
+.ab-tipo-linha span{flex:1}
+.ab-tipo-linha b{min-width:44px;text-align:center;color:var(--text);font-variant-numeric:tabular-nums}
+.ab-tipo-linha button{
+  width:26px;height:26px;border-radius:var(--radius-xs);cursor:pointer;
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  font-family:inherit;font-size:var(--fs-sm);line-height:1;
+}
+.ab-tipo-linha button:hover{border-color:var(--border-strong)}
 body.ab-full .ab-fala.on{background:rgba(var(--primary-rgb),.16)}
 body.ab-full .ab-fala-t{opacity:.45}
 body.ab-full .ab-fala.on .ab-fala-t{opacity:1}
@@ -5449,32 +5522,41 @@ body.ab-full .ab-chips{max-width:34em}
 /* O CHIP QUE VEM ATÉ O MOUSE. Vive no `body` (fora do texto paginado) para não
    entrar na conta das colunas: qualquer elemento dentro do fluxo mudaria a
    paginação e faria o livro pular de página. */
-.ler-dif-pop{
+/* O CHIP QUE VEM ATÉ O MOUSE — um só, usado pelo leitor e pelo audiolivro.
+   `dif-pop-papel` herda as cores da leitura (que viajam do `.ler-leitor` por
+   variável inline); `dif-pop-app` usa as do app. */
+.dif-pop{
   position:fixed;z-index:var(--z-modal);max-width:320px;
   display:flex;flex-direction:column;gap:6px;padding:10px 12px;
+  border-radius:var(--radius-sm);box-shadow:0 10px 30px rgba(0,0,0,.34);
+  border:1px solid transparent;border-left-width:3px;font-family:var(--font);
+}
+.dif-pop-papel{
   background:var(--ler-bg);color:var(--ler-fg);
-  border:1px solid color-mix(in srgb, var(--ler-fg) 18%, transparent);
-  border-left:3px solid var(--cor,var(--ler-mark));
-  border-radius:var(--radius-sm);box-shadow:0 10px 30px rgba(0,0,0,.28);
-  font-family:var(--font);
+  border-color:color-mix(in srgb, var(--ler-fg) 18%, transparent);
+  border-left-color:var(--cor,var(--ler-mark));
 }
-.ler-dif-pop-txt{display:flex;flex-direction:column;gap:2px}
-.ler-dif-pop-txt b{font-size:var(--fs-sm);color:var(--ler-fg)}
-.ler-dif-pop-txt i{font-size:var(--fs-sm);color:var(--ler-fg2);font-style:normal}
-.ler-dif-pop-tipo{
-  font-size:var(--fs-3xs);letter-spacing:.04em;text-transform:uppercase;
-  color:color-mix(in srgb, var(--ler-fg) 45%, transparent);
+.dif-pop-app{
+  background:var(--surface);color:var(--text);
+  border-color:var(--border);border-left-color:var(--cor,var(--role-novo));
 }
-.ler-dif-pop-acoes{display:flex;gap:6px;margin-top:2px}
-.ler-dif-pop-acoes button{
-  display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+.dif-pop-txt{display:flex;flex-direction:column;gap:2px}
+.dif-pop-txt b{font-size:var(--fs-sm)}
+.dif-pop-txt i{font-size:var(--fs-sm);font-style:normal;opacity:.72}
+.dif-pop-tipo{font-size:var(--fs-3xs);letter-spacing:.04em;text-transform:uppercase;opacity:.55}
+.dif-pop-acoes{display:flex;gap:6px;margin-top:2px}
+.dif-pop-acoes button{
+  display:inline-flex;align-items:center;gap:5px;cursor:pointer;color:inherit;
   font-family:inherit;font-size:var(--fs-3xs);padding:5px 10px;
   border-radius:var(--radius-pill);
-  background:color-mix(in srgb, var(--ler-fg) 8%, transparent);
-  border:1px solid color-mix(in srgb, var(--ler-fg) 18%, transparent);
-  color:var(--ler-fg);
+  background:color-mix(in srgb, currentColor 8%, transparent);
+  border:1px solid color-mix(in srgb, currentColor 20%, transparent);
 }
-.ler-dif-pop-acoes button:hover{background:color-mix(in srgb, var(--ler-fg) 16%, transparent)}
+.dif-pop-acoes button:hover{background:color-mix(in srgb, currentColor 18%, transparent)}
+.dif-pop-word{--cor:#7C9A16}
+.dif-pop-phrasal_verb{--cor:#2F72D0}
+.dif-pop-idiom{--cor:#C63B62}
+.dif-pop-collocation{--cor:#7B4BC9}
 
 .ler-dif-lista{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 /* ⚠️ O CHIP VIVE DENTRO DO PAPEL, e não na moldura do app. O painel de

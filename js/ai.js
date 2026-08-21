@@ -1534,6 +1534,103 @@ function _aiResgatarItens(bruto) {
   return achados.length ? achados : null
 }
 
+// ================================================================
+// O CHIP QUE VAI ATÉ O MOUSE — peça única, usada pelo leitor e pelo audiolivro
+// ================================================================
+// Nasceu no leitor e ele pediu igual no audiolivro: *"adorei 'o chip vai até o
+// mouse'. Faça o mesmo pro texto do audiobook."* Então a peça mora aqui, em
+// `ai.js` (não-lazy), e as duas telas a chamam — a regra de sempre neste
+// projeto: quando duas telas fazem a mesma coisa, a peça é UMA.
+//
+// Por que o chip vence a lista fixa embaixo do texto: ele **vai até onde o olho
+// já está**, não ocupa espaço no fluxo (num capítulo com 140 achados, 140 chips
+// fixos viram um muro) e carrega as duas saídas — mandar ao estudo ou dizer que
+// já sabe aquele sentido.
+let _difPop = null
+let _difPopTimer = null
+
+function difChipFechar() {
+  clearTimeout(_difPopTimer)
+  if (_difPop) { _difPop.remove(); _difPop = null }
+}
+
+// `cfgChip`: { item(mk) -> {t,pt,tipo,nivel} | null, preparar(mk), jaSei(mk),
+//              varsDe: elemento de onde copiar as variáveis de cor (ou null) }
+function difChipLigar(container, cfgChip) {
+  if (!container || container._difChip) return
+  container._difChip = cfgChip
+  const abrir = mk => _difChipAbrir(mk, container._difChip)
+  container.addEventListener('mouseover', ev => {
+    const mk = ev.target.closest && ev.target.closest('mark.ler-dif, mark.ab-dif')
+    if (mk) { clearTimeout(_difPopTimer); abrir(mk) }
+  })
+  container.addEventListener('mouseout', ev => {
+    if (ev.target.closest && ev.target.closest('mark.ler-dif, mark.ab-dif')) {
+      _difPopTimer = setTimeout(difChipFechar, 260)
+    }
+  })
+  container.addEventListener('click', ev => {
+    const mk = ev.target.closest && ev.target.closest('mark.ler-dif, mark.ab-dif')
+    if (!mk) { difChipFechar(); return }
+    // No celular não há hover: o toque é o que abre.
+    ev.preventDefault(); ev.stopPropagation()
+    abrir(mk)
+  })
+  // Virar página, rolar ou trocar de capítulo com o chip aberto o deixaria
+  // pendurado apontando para uma palavra que já saiu de vista.
+  container.addEventListener('scroll', difChipFechar, { passive: true })
+  window.addEventListener('resize', difChipFechar)
+}
+
+function _difChipAbrir(mk, cfgChip) {
+  const x = cfgChip && typeof cfgChip.item === 'function' ? cfgChip.item(mk) : null
+  if (!x) return
+  const id = mk.dataset.i
+  if (_difPop && _difPop._id === id && document.body.contains(_difPop)) return
+  difChipFechar()
+  const tipo = x.tipo || 'word'
+  const p = document.createElement('div')
+  p._id = id
+  p.className = 'dif-pop ' + (cfgChip.classe || '') + ' dif-pop-' + tipo
+  p.innerHTML = `
+    <span class="dif-pop-txt"><b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}</span>
+    <span class="dif-pop-tipo">${esc(AI_DIF_TIPOS[tipo] ? AI_DIF_TIPOS[tipo].rotulo : '')}${x.nivel ? ' · ' + esc(x.nivel) : ''}${
+      x.ja === 'outro' ? ' · você tem esta palavra com outro sentido' : x.ja === 'marcada' ? ' · você marcou como conhecida' : ''}</span>
+    <span class="dif-pop-acoes">
+      <button data-acao="preparar" data-tip="Mandar para o Preparar com a frase">${ic('plus','ic-3xs')} Preparar</button>
+      <button data-acao="jasei" data-tip="Já sei esta palavra COM ESTE sentido — não aparece mais">${ic('check','ic-3xs')} Já sei</button>
+    </span>`
+  p.querySelector('[data-acao="preparar"]').onclick = () => { difChipFechar(); cfgChip.preparar && cfgChip.preparar(mk) }
+  p.querySelector('[data-acao="jasei"]').onclick = () => { difChipFechar(); cfgChip.jaSei && cfgChip.jaSei(mk) }
+  // Fica vivo enquanto o mouse estiver nele: sem isto, sair da palavra para
+  // clicar num botão fecharia o chip no meio do caminho.
+  p.addEventListener('mouseenter', () => clearTimeout(_difPopTimer))
+  p.addEventListener('mouseleave', () => { _difPopTimer = setTimeout(difChipFechar, 260) })
+
+  // ⚠️ AS CORES DA TELA DE ORIGEM VIAJAM JUNTO. O chip mora no `body` (fora do
+  // texto, para não entrar na conta das colunas do leitor) e ali as variáveis
+  // do papel não existem — `var(--ler-bg)` sem valor não dá erro, só some, e o
+  // chip nasce transparente com o texto atravessando as letras.
+  if (cfgChip.varsDe) {
+    const cs = getComputedStyle(cfgChip.varsDe)
+    for (const v of ['--ler-bg', '--ler-fg', '--ler-fg2', '--ler-mark']) {
+      const valor = cs.getPropertyValue(v)
+      if (valor) p.style.setProperty(v, valor.trim())
+    }
+  }
+  document.body.appendChild(p)
+  _difPop = p
+
+  const r = mk.getBoundingClientRect()
+  const larg = p.offsetWidth, alt = p.offsetHeight
+  let left = Math.max(8, Math.min(r.left + r.width / 2 - larg / 2, innerWidth - larg - 8))
+  // Acima da palavra; abaixo quando não couber — o chip nunca pode cobrir a
+  // linha que está sendo lida.
+  const top = (r.top - alt - 8 > 8) ? (r.top - alt - 8) : (r.bottom + 8)
+  p.style.left = Math.round(left) + 'px'
+  p.style.top = Math.round(top) + 'px'
+}
+
 // A FRASE em que o termo aparece — é ela que vira o contexto do card.
 // ⚠️ Sem isto, o item nasceria com o parágrafo inteiro (ou com nada) no lugar
 // da frase, e a regra que este projeto mediu vale aqui igual: contexto grande

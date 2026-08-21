@@ -1091,6 +1091,10 @@ function _abListaTexto() {
              data-tip="Acha o que está acima do seu nível, e todo phrasal verb e expressão">
              ${ic('eye','ic-3xs')} O que é difícil aqui</button>`}
       <button class="est-chip" onclick="abTranscrever()">${ic('plus','ic-3xs')} Outro trecho</button>
+      <button class="est-chip est-chip-forte" id="ab-raiox-btn2" onclick="event.stopPropagation();abRaioXPainel()"
+              data-tip="Ver os capítulos e o que já foi analisado">${ic('eye','ic-3xs')} O que é difícil</button>
+      <button class="est-chip" id="ab-tipo-btn" onclick="event.stopPropagation();abTipografia()"
+              data-tip="Tipografia e papel — a mesma configuração do leitor de livros">Aa</button>
       <button class="est-chip" onclick="abTextoFull()" id="ab-full-btn"
               data-tip="Ler em tela cheia, com a fala do momento no centro (Esc sai)">
         ${ic('expand','ic-3xs')} Tela cheia</button>
@@ -1101,7 +1105,6 @@ function _abListaTexto() {
           <button class="ab-fala-t" onclick="abIrPara(${s.i})" data-tip="Ouvir a partir daqui">${abTempo(s.i)}</button>
           <span class="ab-fala-corpo">
             <span class="ab-fala-en">${achados ? _abFalaPintada(s.t, achados) : esc(s.t)}</span>
-            ${achados ? _abChipsDaFala(s.t, achados, i) : ''}
           </span>
         </p>`).join('')}
     </div>
@@ -1111,6 +1114,84 @@ function _abListaTexto() {
       : `<p class="est-dica" style="margin-top:10px">
           Nada acima do seu <b>${esc(tr.achadosNivel || nivel)}</b> neste trecho — e nenhum phrasal
           verb ou expressão idiomática. Se ainda assim travou, marque a frase e peça o Explicar.</p>`) : ''}`
+}
+
+// ---- O PAINEL DO RAIO-X: os capítulos, e o que já foi analisado ----
+// O mesmo painel do leitor, com uma diferença que o audiolivro impõe: aqui a
+// análise precisa de TEXTO, e o texto vem da transcrição. Então um capítulo
+// pode estar em três estados, e a lista diz qual é: sem texto, transcrito, ou
+// transcrito e analisado. Clicar num capítulo sem texto faz as duas etapas em
+// sequência — ele pediu "ao clicar no capítulo sem ele gera o processamento",
+// e parar no meio com "agora transcreva" seria empurrar trabalho de volta.
+function abRaioXPainel() {
+  const p = el('ab-raiox-painel')
+  if (p && p.classList.contains('aberto')) { p.classList.remove('aberto'); return }
+  _abRaioXPainelRender()
+  el('ab-raiox-painel').classList.add('aberto')
+}
+
+function _abEstadoDoCap(a, i) {
+  const tr = (a.transcricoes || []).find(x => x.cap === i)
+  if (!tr) return { estado: 'vazio' }
+  if (!tr.achados) return { estado: 'texto', falas: tr.segs.length }
+  return { estado: 'pronto', n: tr.achados.length, falas: tr.segs.length }
+}
+
+function _abRaioXPainelRender(msg) {
+  let p = el('ab-raiox-painel')
+  if (!p) {
+    p = document.createElement('div')
+    p.id = 'ab-raiox-painel'
+    p.className = 'ler-raiox-painel'
+    p.addEventListener('click', e => e.stopPropagation())
+    document.body.appendChild(p)
+    setTimeout(() => document.addEventListener('click', () => p.classList.remove('aberto')), 0)
+  }
+  const a = _abLivro
+  const caps = (a && a.capitulos) || []
+  const prontos = caps.filter((_, i) => _abEstadoDoCap(a, i).estado === 'pronto').length
+  p.innerHTML = `
+    <div class="ler-raiox-topo">
+      <b>${ic('eye','ic-sm')} O que é difícil aqui</b>
+      <span>${prontos} de ${caps.length} ${caps.length === 1 ? 'capítulo' : 'capítulos'} analisados · nível ${esc(cefrNivelAluno())}</span>
+    </div>
+    ${msg ? `<div class="ler-raiox-msg">${esc(msg)}</div>` : ''}
+    <div class="ler-raiox-lista">
+      ${caps.map((c, i) => {
+        const e2 = _abEstadoDoCap(a, i)
+        return `<button class="ler-raiox-cap${i === _abCap ? ' atual' : ''}${e2.estado === 'pronto' ? ' feito' : ''}"
+                  onclick="abRaioXDoCapitulo(${i})">
+          <span class="ler-raiox-spark">${e2.estado === 'pronto' ? ic('sparkles','ic-sm') : ''}</span>
+          <span class="ler-raiox-nome">${esc(c.titulo || `Capítulo ${i + 1}`)}</span>
+          <span class="ler-raiox-n">${e2.estado === 'pronto' ? e2.n
+            : e2.estado === 'texto' ? 'analisar' : 'transcrever'}</span>
+        </button>`
+      }).join('')}
+    </div>
+    <p class="est-dica">Com <b>${ic('sparkles','ic-3xs')}</b> já está analisado. Sem texto ainda, o
+      clique <b>transcreve e analisa</b> — a transcrição tem custo de IA e é mostrado antes.</p>`
+  const btn = el('ab-raiox-btn2')
+  if (btn) {
+    const r = btn.getBoundingClientRect()
+    p.style.top = Math.round(r.bottom + 8) + 'px'
+    p.style.left = Math.round(Math.max(8, Math.min(r.left - 120, innerWidth - 340))) + 'px'
+  }
+}
+
+async function abRaioXDoCapitulo(i) {
+  const a = _abLivro; if (!a) return
+  const antes = _abEstadoDoCap(a, i)
+  if (i !== _abCap) { await _abCarregarCapitulo(i, 0); _abRenderPlayer() }
+  _abAbaAtual = 'texto'
+  if (antes.estado === 'pronto') { el('ab-raiox-painel')?.classList.remove('aberto'); abAba('texto'); return }
+  el('ab-raiox-painel')?.classList.remove('aberto')
+  abAba('texto')
+  if (antes.estado === 'vazio') {
+    await abTranscrever()
+    // Ele pode ter cancelado no aviso de custo: sem texto, não há o que analisar.
+    if (_abEstadoDoCap(a, i).estado === 'vazio') return
+  }
+  await abAnalisarPassagem()
 }
 
 // ---- O RAIO-X DA PASSAGEM: o que aqui está acima do meu nível ----
@@ -1192,47 +1273,30 @@ function _abFalaPintada(txt, achados) {
   let saida = '', de = 0
   for (const m of limpas) {
     saida += esc(txt.slice(de, m.i))
-    saida += `<mark class="ab-dif ab-dif-${m.tipo}" data-idx="${m.idx}">${esc(txt.slice(m.i, m.fim))}</mark>`
+    // `data-i` (e não `data-idx`): é o nome que a peça compartilhada do chip lê,
+    // em js/ai.js. Com dois nomes, o chip do audiolivro abria vazio.
+    saida += `<mark class="ab-dif ab-dif-${m.tipo}" data-i="${m.idx}">${esc(txt.slice(m.i, m.fim))}</mark>`
     de = m.fim
   }
   return saida + esc(txt.slice(de))
 }
 
-// Os chips daquela fala, com o sentido curto e a saída para o estudo.
-function _abChipsDaFala(txt, achados, iFala) {
-  if (!achados || !achados.length) return ''
-  const daFala = achados
-    .map((x, idx) => ({ ...x, idx }))
-    .filter(x => aiAcharNoTexto(txt, x.t).length)
-  if (!daFala.length) return ''
-  // O SELO DIZ O QUE ELE JÁ TEM DAQUELA PALAVRA — e é o que responde à pergunta
-  // que derrubou a primeira versão: item que ele já estudou COM OUTRO SENTIDO
-  // não some, aparece marcado. Ver `aiJaConhecido`.
-  const selo = {
-    outro:   { txt: 'outro sentido', tip: 'Você já tem esta palavra no acervo, mas com outro significado — aqui ela quer dizer outra coisa' },
-    marcada: { txt: 'você marcou como conhecida', tip: 'Você declarou conhecer esta palavra; como não há significado registrado, não dá para saber se é este o sentido' }
-  }
-  return `<span class="ab-chips">${daFala.map(x => `
-    <span class="ab-chip-par">
-      <button class="ab-chip ab-dif-${x.tipo}${x.ja ? ' ab-chip-ja' : ''}" onclick="abChipPreparar(${iFala},${x.idx})"
-              data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + (x.ja && selo[x.ja] ? ' — ' + selo[x.ja].tip : ' — clique para mandar ao Preparar'))}">
-        <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}${
-          x.ja && selo[x.ja] ? `<u class="ab-chip-selo ab-selo-${x.ja}">${selo[x.ja].txt}</u>` : ''}
-      </button>
-      <button class="ab-chip-sei" onclick="abJaSei(${x.idx})"
-              data-tip="Já sei esta palavra COM ESTE sentido — não aparece mais">${ic('check','ic-3xs')}</button>
-    </span>`).join('')}</span>`
+// A transcrição que está na tela agora — usada pelas ações do chip.
+function _abTransAtual() {
+  const a = _abLivro; if (!a) return null
+  const cap = a.capitulos[_abCap] || {}
+  const au = _abAudio()
+  const atual = Math.max(0, (au ? au.currentTime : 0) - (cap.ini || 0))
+  return abTransDoPonto(a, _abCap, atual) || (a.transcricoes || []).find(x => x.cap === _abCap) || null
 }
 
 // "JÁ SEI ESTE SENTIDO" — o item some daqui e das próximas análises.
 // ⚠️ Guarda o PAR (termo + sentido), nunca só a palavra: saber `ore` como "veio
 // de mina" não pode esconder a passagem em que ela é "minério".
-function abJaSei(idx) {
-  const a = _abLivro; if (!a) return
-  const cap = a.capitulos[_abCap] || {}
-  const au = _abAudio()
-  const atual = Math.max(0, (au ? au.currentTime : 0) - (cap.ini || 0))
-  const tr = abTransDoPonto(a, _abCap, atual) || (a.transcricoes || []).find(x => x.cap === _abCap)
+function abJaSei(mk) {
+  const a = _abLivro; if (!a || !mk) return
+  const tr = _abTransAtual()
+  const idx = Number(mk.dataset.i)
   const item = tr && (tr.achados || [])[idx]
   if (!item) return
   if (typeof markKnownSense !== 'function' || !markKnownSense(item.t, item.pt)) {
@@ -1249,14 +1313,17 @@ function abJaSei(idx) {
 
 // O chip vai ao Preparar com a FALA como contexto — é o mesmo caminho da
 // seleção, então o item nasce igual ao que ele criaria à mão.
-function abChipPreparar(iFala, idx) {
-  const a = _abLivro; if (!a) return
+// A fala vem do próprio realce: `mark` está dentro de um `.ab-fala`, e é dela
+// que sai o contexto do card. Antes o índice da fala vinha do HTML do chip
+// fixo; agora vem de onde o mouse está.
+function abChipPreparar(mk) {
+  const a = _abLivro; if (!a || !mk) return
   const cap = a.capitulos[_abCap] || {}
-  const au = _abAudio()
-  const atual = Math.max(0, (au ? au.currentTime : 0) - (cap.ini || 0))
-  const tr = abTransDoPonto(a, _abCap, atual) || (a.transcricoes || []).find(x => x.cap === _abCap)
+  const tr = _abTransAtual()
+  const idx = Number(mk.dataset.i)
   const item = tr && (tr.achados || [])[idx]
-  const fala = tr && tr.segs[iFala]
+  const p = mk.closest('.ab-fala')
+  const fala = tr && p ? tr.segs[Number(p.dataset.i)] : null
   if (!item || !fala) return
   if (typeof lexaChipParaPreparar !== 'function') return
   lexaChipParaPreparar(
@@ -1268,6 +1335,18 @@ function abChipPreparar(iFala, idx) {
 
 // Ligar o menu de seleção é o que faz "ouvir virar card": o mesmo gesto do
 // livro e do dossiê, com a frase e a obra desta gravação.
+// O chip do raio-X, com as mesmas duas saídas do leitor.
+function _abLigarChips() {
+  const box = el('ab-trans')
+  if (!box || typeof difChipLigar !== 'function') return
+  difChipLigar(box, {
+    classe: 'dif-pop-app',
+    item: mk => { const tr = _abTransAtual(); return tr ? (tr.achados || [])[Number(mk.dataset.i)] : null },
+    preparar: mk => abChipPreparar(mk),
+    jaSei: mk => abJaSei(mk)
+  })
+}
+
 function _abLigarSelecao() {
   const box = el('ab-trans')
   if (!box || typeof selMenuAtivar !== 'function') return
@@ -1386,6 +1465,108 @@ function _abLigarRolagemManual(box) {
 }
 
 // ================================================================
+// TIPOGRAFIA DO TEXTO — a MESMA do livro, não uma cópia
+// ================================================================
+// Pedido dele: *"o modo de texto deve ter o mesmo botão 'Aa' pra configurar o
+// texto. Lembra que eu disse que quero que o texto de audiobook se comporte
+// igual o livro."*
+//
+// ⚠️ E "igual o livro" aqui é literal: a configuração é a MESMA (`cfg.ler`),
+// não uma segunda cópia com os mesmos campos. Quem escolhe Sépia com 21px no
+// leitor abre o audiolivro e encontra Sépia com 21px — e ajustar de um lado
+// muda os dois. Duas configurações separadas seriam duas coisas para manter e,
+// pior, duas respostas para a mesma pergunta ("como eu gosto de ler?").
+//
+// O painel é próprio (o do leitor mora em `js/ler.js`, pacote lazy de outra
+// seção — chamá-lo daqui carregaria o leitor inteiro por causa de cinco
+// controles), mas ele ESCREVE no mesmo lugar.
+const AB_TEMAS = [
+  { id: 'papel', nome: 'Papel', bg: '#f7f3ea', fg: '#2b2721' },
+  { id: 'sepia', nome: 'Sépia', bg: '#e8dcc4', fg: '#3a3125' },
+  { id: 'cinza', nome: 'Cinza', bg: '#d8d8d4', fg: '#26262a' },
+  { id: 'noite', nome: 'Noite', bg: '#15181d', fg: '#c8ccd2' },
+  { id: 'preto', nome: 'Preto', bg: '#000000', fg: '#a8adb4' }
+]
+const AB_TIPO_DEF = { tema: 'papel', fonte: 'serif', tamanho: 19, entrelinha: 1.7, largura: 34 }
+
+function abTipoCfg() { return { ...AB_TIPO_DEF, ...(cfg.ler || {}) } }
+function abTipoSet(chave, valor) {
+  cfg.ler = { ...abTipoCfg(), ...(cfg.ler || {}), [chave]: valor }
+  saveCfg()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  abTipoAplicar()
+  _abRenderTipografia()
+}
+
+// Aplica no painel de texto. Fora do modo full a leitura é de consulta: só a
+// fonte e o tamanho entram, e o fundo continua o do app — pintar a caixa de
+// creme dentro da tela escura ficaria um remendo no meio do player.
+function abTipoAplicar() {
+  const box = el('ab-trans'); if (!box) return
+  const c = abTipoCfg()
+  const t = AB_TEMAS.find(x => x.id === c.tema) || AB_TEMAS[0]
+  box.style.setProperty('--ab-fs', c.tamanho + 'px')
+  box.style.setProperty('--ab-lh', c.entrelinha)
+  box.style.setProperty('--ab-col', Math.round(c.largura * c.tamanho) + 'px')
+  box.style.setProperty('--ab-ff', c.fonte === 'serif'
+    ? "'Newsreader', Georgia, 'Times New Roman', serif"
+    : "system-ui, -apple-system, 'Segoe UI', sans-serif")
+  const full = document.body.classList.contains('ab-full')
+  box.style.setProperty('--ler-bg', full ? t.bg : 'transparent')
+  box.style.setProperty('--ler-fg', full ? t.fg : 'var(--text)')
+  box.style.setProperty('--ler-fg2', full ? t.fg + 'a8' : 'var(--text2)')
+  box.style.setProperty('--ler-mark', 'rgba(220,150,40,.30)')
+}
+
+function abTipografia() {
+  const p = el('ab-tipo')
+  if (p && p.classList.contains('aberto')) { p.classList.remove('aberto'); return }
+  _abRenderTipografia()
+  el('ab-tipo').classList.add('aberto')
+}
+
+function _abRenderTipografia() {
+  let p = el('ab-tipo')
+  if (!p) {
+    p = document.createElement('div')
+    p.id = 'ab-tipo'
+    p.className = 'ab-tipo'
+    p.addEventListener('click', e => e.stopPropagation())
+    document.body.appendChild(p)
+    setTimeout(() => document.addEventListener('click', () => p.classList.remove('aberto')), 0)
+  }
+  const c = abTipoCfg()
+  const linha = (rot, campo, min, max, passo, sufixo) => `
+    <div class="ab-tipo-linha">
+      <span>${rot}</span>
+      <button onclick="abTipoSet('${campo}', Math.max(${min}, +(${c[campo]} - ${passo}).toFixed(2)))">−</button>
+      <b>${c[campo]}${sufixo || ''}</b>
+      <button onclick="abTipoSet('${campo}', Math.min(${max}, +(${c[campo]} + ${passo}).toFixed(2)))">+</button>
+    </div>`
+  p.innerHTML = `
+    <div class="ab-tipo-temas">
+      ${AB_TEMAS.map(t => `<button class="ab-tipo-tema${c.tema === t.id ? ' on' : ''}"
+        style="background:${t.bg};color:${t.fg}" onclick="abTipoSet('tema','${t.id}')"
+        data-tip="${t.nome}">Aa</button>`).join('')}
+    </div>
+    <div class="ab-tipo-fontes">
+      <button class="${c.fonte === 'serif' ? 'on' : ''}" onclick="abTipoSet('fonte','serif')" style="font-family:Georgia,serif">Serifada</button>
+      <button class="${c.fonte === 'sans' ? 'on' : ''}" onclick="abTipoSet('fonte','sans')">Sem serifa</button>
+    </div>
+    ${linha('Tamanho', 'tamanho', 13, 30, 1, 'px')}
+    ${linha('Entrelinha', 'entrelinha', 1.2, 2.4, 0.1, '')}
+    ${linha('Largura', 'largura', 24, 48, 2, 'em')}
+    <p class="est-dica">É a mesma configuração do leitor de livros — mudar aqui muda lá.</p>`
+  // Posicionado sob o botão, e preso à tela quando não couber.
+  const btn = el('ab-tipo-btn')
+  if (btn) {
+    const r = btn.getBoundingClientRect()
+    p.style.top = Math.round(r.bottom + 8) + 'px'
+    p.style.left = Math.round(Math.max(8, Math.min(r.right - 260, innerWidth - 268))) + 'px'
+  }
+}
+
+// ================================================================
 // MODO FULL DO TEXTO — "que se comporte igual o livro"
 // ================================================================
 // Pedido dele. A caixa de 420px dentro do player serve para consultar; para
@@ -1404,6 +1585,8 @@ function abTextoFull(ligar) {
   else document.removeEventListener('keydown', _abFullTeclas)
   // Recentraliza logo: entrar em tela cheia muda a altura da caixa, e a fala
   // ativa estaria no lugar errado.
+  abTipoAplicar()
+  el('ab-tipo')?.classList.remove('aberto')
   setTimeout(() => { _abRolouEm = 0; _abAcompanharTexto() }, 60)
 }
 function _abFullTeclas(e) {
@@ -1569,7 +1752,7 @@ function _abRenderPlayer() {
   // ⚠️ RELIGAR A SELEÇÃO DEPOIS DE CADA REDESENHO. O ouvinte mora no container,
   // e o container é recriado inteiro aqui — guardar um marcador redesenhava o
   // player e a lista ficava muda: selecionar a frase não abria mais o menu.
-  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abLigarRolagemManual(el('ab-trans')); _abAcompanharTexto() }
+  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abLigarChips(); _abLigarRolagemManual(el('ab-trans')); abTipoAplicar(); _abAcompanharTexto() }
   if (_abAbaAtual === 'marcadores') _abLigarSelecaoMarcas()
 }
 
@@ -1582,7 +1765,7 @@ function abAba(qual, ev) {
   box.innerHTML = _abAbaAtual === 'marcadores' ? _abListaMarcadores()
     : _abAbaAtual === 'texto' ? _abListaTexto()
     : _abListaCapitulos()
-  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abLigarRolagemManual(el('ab-trans')); _abAcompanharTexto() }
+  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abLigarChips(); _abLigarRolagemManual(el('ab-trans')); abTipoAplicar(); _abAcompanharTexto() }
   if (_abAbaAtual === 'marcadores') _abLigarSelecaoMarcas()
 }
 

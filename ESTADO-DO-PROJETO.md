@@ -7,7 +7,20 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (10ª) — **TELA CHEIA NO TEXTO DO AUDIOLIVRO, REALCE CLICÁVEL NO
+> Última atualização: 2026-08-21 (11ª) — **O CHIP VIROU PEÇA ÚNICA, E O RAIO-X GANHOU PORTA
+> PRÓPRIA**. Três pedidos: *"adorei 'o chip vai até o mouse'. Faça o mesmo pro texto do
+> audiobook"*, *"o modo de texto deve ter o mesmo botão Aa"* e *"quero que essa nova função fique
+> bem evidente em um botão seu, e que ao clicar apareçam os capítulos… com o spark nos já
+> processados"*. Então: o chip do hover saiu do leitor e virou **peça em `js/ai.js`** usada pelas
+> duas telas (a lista fixa de chips embaixo das falas **sumiu** — num capítulo com 140 achados
+> ela era um muro); o texto do audiolivro ganhou **"Aa" com a MESMA configuração do leitor**
+> (`cfg.ler`, não uma cópia — mudar de um lado muda do outro); e o raio-X ganhou **botão próprio
+> nas duas telas**, abrindo a lista de capítulos com **✦ nos analisados**, contagem de achados e
+> o clique que dispara o processamento de quem ainda não tem. No audiolivro, capítulo sem
+> transcrição faz **as duas etapas em sequência**. `sw.js` → **englab-v346**.
+> **Detalhes em §8.67.**
+>
+> Última atualização anterior: 2026-08-21 (10ª) — **TELA CHEIA NO TEXTO DO AUDIOLIVRO, REALCE CLICÁVEL NO
 > LEITOR E "JÁ SEI ESTE SENTIDO"**. Quatro pedidos dele numa rodada. (1) O texto do audiolivro
 > ganhou **modo full com a fala do momento SEMPRE NO CENTRO**; rolar à mão manda por **5
 > segundos** e depois o áudio reassume. (2) O realce do leitor **virou clicável** — ele perguntou
@@ -12578,6 +12591,71 @@ eu escuto são todos gesto humano.
 
 ⚠️ **O movimento em si continua sem prova automática** — aba oculta não rola. A lógica está
 medida; o deslizar é para o olho dele confirmar.
+
+## 8.67 O chip virou peça única, e o raio-X ganhou porta própria (2026-08-21, 11ª)
+
+### O chip, agora em `js/ai.js`
+
+Ele viu o chip do hover no leitor e pediu igual no audiolivro. Em vez de copiar, a peça mudou de
+casa: `difChipLigar` vive em **`js/ai.js` (não-lazy)** e as duas telas a chamam com um `item(mk)`,
+um `preparar(mk)` e um `jaSei(mk)`. É a regra que este projeto repete desde o balão e os chips —
+**quando duas telas fazem a mesma coisa, a peça é uma**.
+
+Com isso, **a lista fixa de chips embaixo de cada fala saiu do audiolivro**. Ela nasceu como
+ideia dele ("uma linha abaixo do texto"), e foi ele mesmo que apontou o melhor: o chip **vai até
+onde o olho já está**. Num capítulo com 140 achados, 140 chips fixos são um muro; o chip
+flutuante não ocupa espaço nenhum.
+
+⚠️ **Um detalhe que quebrou tudo em silêncio:** o realce do audiolivro gravava `data-idx` e a
+peça compartilhada lê `data-i`. O chip abria vazio — sem erro no console, porque `undefined` no
+índice devolve `undefined` no item, e o código simplesmente desistia. Padronizado.
+
+### O "Aa" do audiolivro é a configuração do leitor
+
+> *"O modo de texto deve ter o mesmo botão 'Aa' pra configurar o texto. Lembra que eu disse que
+> quero que o texto de audiobook se comporte igual o livro."*
+
+E "igual o livro" ficou literal: o painel é próprio (o do leitor mora em `js/ler.js`, pacote lazy
+de outra seção — carregá-lo por causa de cinco controles seria caro), mas **escreve em `cfg.ler`,
+a mesma configuração**. Quem lê em Sépia com 21px no livro abre o audiolivro e encontra Sépia com
+21px; ajustar de um lado muda os dois. Duas configurações separadas seriam duas respostas para a
+mesma pergunta — "como eu gosto de ler?".
+
+Fora do modo full, só fonte e tamanho valem: pintar a caixa de creme dentro do player escuro
+seria um remendo no meio da tela.
+
+### O botão próprio, e a lista que responde "o que falta"
+
+> *"Quero que essa nova função fique bem evidente em um botão seu, e que ao clicar apareçam os
+> capítulos do livro ou audiobook e mostre o spark nos capítulos já processados, e ao clicar no
+> capítulo sem ele gera o processamento."*
+
+O raio-X estava atrás do ícone que abre **outra coisa** (cobertura, frequência, leitura por IA) —
+tanto que ele perguntou *"como é que ativa essa opção exatamente? Fiquei meio perdido."* Agora
+tem porta própria nas duas telas, e o painel responde a pergunta que só ele responde: **o que já
+foi analisado e o que falta**, sem entrar capítulo por capítulo.
+
+| Estado do capítulo | O que a lista mostra | O que o clique faz |
+|---|---|---|
+| analisado | **✦** + nº de achados | vai até ele |
+| com texto, sem análise | "analisar" | analisa |
+| sem texto (só audiolivro) | "transcrever" | **transcreve e analisa**, em sequência |
+
+⚠️ No audiolivro a análise precisa de texto, e o texto vem da transcrição — que **custa**. O
+aviso de custo continua aparecendo antes; se ele cancelar ali, o fluxo para sem tentar analisar
+o vazio.
+
+No leitor, saber quais capítulos têm análise é **uma varredura das chaves do IndexedDB**
+(`raiox:<livro>:<cap>`), feita ao abrir o painel.
+
+### Medido
+
+Audiolivro com três capítulos em estados diferentes: a lista mostrou **✦ + "1"** no analisado,
+**"analisar"** no transcrito e **"transcrever"** no vazio, com o topo dizendo *"1 de 3 capítulos
+analisados · nível B1"*. Chip do hover abrindo com *"put up with · suportar · phrasal · B2"* e as
+duas ações. "Aa" mudando o tamanho para 22px: gravou em `cfg.ler` e aplicou no texto. No leitor,
+com o livro real: **"1 de 35 capítulos analisados"**, ✦ e **141** no Chapter 1, "analisar" nos
+demais.
 
 ## 9. Pendências / a verificar
 
