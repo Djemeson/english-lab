@@ -5294,16 +5294,6 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ab-fala-t:hover{color:var(--role-energia)}
 .ab-fala.on .ab-fala-t{color:var(--role-energia)}
 .ab-fala span{flex:1;min-width:0}
-.ab-fala-txt{display:flex;flex-direction:column;gap:3px}
-/* A NÉVOA: a tradução existe, ocupa o lugar dela e não se deixa ler antes da
-   hora. Sem `user-select:none` o embaçado seria burlado com um Ctrl+C. */
-.ab-pt{
-  font-style:normal;font-size:var(--fs-xs);color:var(--text3);line-height:1.5;
-  filter:blur(4.5px);opacity:.75;cursor:pointer;user-select:none;
-  transition:filter .18s,opacity .18s;width:fit-content;max-width:100%;
-}
-.ab-pt.aberta,.ab-pt:active{filter:none;opacity:1;user-select:text}
-.ab-fala.on .ab-pt{opacity:.9}
 .ab-novo{
   font-style:normal;font-size:8px;letter-spacing:.06em;vertical-align:super;
   color:var(--role-ia);
@@ -6173,6 +6163,16 @@ body.ler-full .mobile-bottom-nav{display:none}
   flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   color:var(--text);font-size:var(--fs-sm);font-weight:600;padding:0;
 }
+/* A tradução dentro do menu de seleção: vem antes dos botões, com o peso de
+   resposta (é o que ele foi buscar ao arrastar) e sem empurrar o menu para fora
+   da tela — daí o teto de largura e a quebra. */
+#sel-menu .sel-trad{
+  display:block;width:100%;max-width:340px;
+  font-size:var(--fs-sm);color:var(--text);line-height:1.5;
+  padding:2px 2px 6px;border-bottom:1px solid var(--border);margin-bottom:4px;
+}
+#sel-menu .sel-trad-esperando{font-style:italic;color:var(--text3);font-size:var(--fs-xs)}
+
 #sel-menu.sel-exp .sel-exp-btn{
   flex:none;padding:5px;background:transparent;border:1px solid transparent;color:var(--text3);
 }

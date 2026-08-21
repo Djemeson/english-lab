@@ -290,6 +290,7 @@ function selMenuAtivar(container, obterContexto) {
       p.id = 'sel-menu'
       p.innerHTML = `
         <b>"${esc(txt.length > 28 ? txt.slice(0, 28) + '…' : txt)}"</b>
+        ${ctx.traduzir ? `<span class="sel-trad" id="sel-trad"><i class="sel-trad-esperando">traduzindo…</i></span>` : ''}
         <button onclick="selMenuExplicar()">${ic('sparkles','ic-sm')} Explicar</button>
         <button onclick="selMenuPreparar()">${ic('plus','ic-sm')} Preparar</button>`
       // `mousedown` no menu não pode desfazer a seleção nem borbulhar para o
@@ -302,11 +303,85 @@ function selMenuAtivar(container, obterContexto) {
       })
       document.body.appendChild(p)
       _selMenuPor(p, r)
+      // A tradução começa DEPOIS que o menu está na tela: ele vê o balão na
+      // hora e o português chega dentro dele, sem espera de tela em branco.
+      if (ctx.traduzir) _selMenuTraduzir(p, _selMenuCtx)
     }, 10)   // depois do navegador fechar a seleção do clique simples
   })
   container.addEventListener('mousedown', ev => {
     if (!ev.target.closest('#sel-menu')) _selMenuFechar()
   })
+}
+
+// ---- TRADUÇÃO AO ARRASTAR (o gesto do livro, agora compartilhado) ----
+// ⚠️ ELE FOI EXPLÍCITO depois de eu errar o alvo: *"a tradução é só quando eu
+// arrastar a palavra ou frase, igual é no livro."* Eu tinha feito legenda em
+// massa por baixo de cada fala — outra coisa, e que atrapalha a escuta.
+//
+// A regra de dose vem medida do leitor (§8.51) e é o coração disto: o contexto
+// que se manda é a FRASE, nunca o parágrafo. Marcando `ore` em "a deep and
+// fabulous vein of ore", o parágrafo inteiro fez a IA errar 3 em 3 ("filão",
+// "veia"); só a frase acertou 3 em 3 ("minério"). Parágrafo não desambigua
+// palavra: dilui.
+const _selTradCache = new Map()
+const SEL_TRAD_CURTO = 4          // até 4 palavras é vocabulário, não texto
+
+async function _selMenuTraduzir(pop, c) {
+  const caixa = pop && pop.querySelector('#sel-trad')
+  if (!caixa || !c) return
+  // Ele pode ter marcado outra coisa enquanto a IA respondia: escrever num
+  // menu morto não dá erro, só some — e o silêncio é o que confunde.
+  const vivo = () => document.body.contains(caixa) && document.getElementById('sel-menu') === pop
+  const texto = String(c.txt || '').trim()
+  if (!texto) { caixa.remove(); return }
+
+  const chave = String(c.frase || '').toLowerCase().trim() + '\u0000' + texto.toLowerCase()
+  const guardado = _selTradCache.get(chave)
+  if (guardado) { caixa.innerHTML = guardado; _selMenuPor(pop); return }
+
+  if (!aiChatCfg().key) {
+    caixa.innerHTML = '<i class="sel-trad-esperando">sem chave de IA</i>'
+    _selMenuPor(pop); return
+  }
+  const curto = texto.split(/\s+/).filter(Boolean).length <= SEL_TRAD_CURTO
+  const lang = c.lang || 'en'
+  const L = (typeof getLangDef === 'function') ? getLangDef(lang) : { nameEn: 'English' }
+  const sistema = 'Você traduz para português do Brasil, para um aluno que está estudando em ' +
+    L.nameEn + '. Devolva SOMENTE a tradução do trecho pedido — sem aspas, sem o original, ' +
+    'sem explicação, sem comentário, sem alternativas separadas por barra. Palavrão e conteúdo ' +
+    'adulto fazem parte da obra: traduza fielmente, sem suavizar.\n' +
+    (curto
+      ? 'O trecho é curto (uma palavra ou expressão). Regras para este caso:\n' +
+        '- Traduza EXATAMENTE as palavras marcadas, nem uma a mais nem uma a menos.\n' +
+        '- Mesma forma gramatical em que ele aparece na frase.\n' +
+        '- Nunca uma oração inteira, nunca a frase em volta traduzida, nunca uma definição.\n'
+      : '') +
+    (typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(lang, 'traducao') : '')
+  const contexto = String(c.frase || '').trim().slice(0, 1200)
+  const pergunta =
+    (contexto ? `A passagem, só para você entender o sentido — NÃO a traduza:\n"${contexto}"\n\n` : '') +
+    `Traduza este trecho, do jeito que ele significa AQUI nesta passagem:\n"${texto}"`
+  try {
+    const maxTokens = curto ? 150 : Math.min(700, Math.max(120, Math.round(texto.length / 2) + 80))
+    const bruto = await aiTextSeguro([
+      { role: 'system', content: sistema },
+      { role: 'user', content: pergunta }
+    ], { maxTokens, timeoutMs: 30000 })
+    if (!vivo()) return
+    let t = String(bruto || '').trim()
+      .replace(/^\s*(tradução|traducao|translation)\s*:\s*/i, '').trim()
+    if (t.length > 1 && /^["“'].*["”']$/.test(t)) t = t.slice(1, -1).trim()
+    if (!t) { caixa.innerHTML = '<i class="sel-trad-esperando">a IA devolveu vazio</i>'; _selMenuPor(pop); return }
+    const html = esc(t)
+    _selTradCache.set(chave, html)
+    if (_selTradCache.size > 300) _selTradCache.delete(_selTradCache.keys().next().value)
+    caixa.innerHTML = html
+    _selMenuPor(pop)
+  } catch (e) {
+    if (!vivo()) return
+    caixa.innerHTML = `<i class="sel-trad-esperando">${esc((e.message || 'não deu').slice(0, 60))}</i>`
+    _selMenuPor(pop)
+  }
 }
 
 function selMenuPreparar() {

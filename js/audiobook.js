@@ -1071,92 +1071,25 @@ function _abListaTexto() {
         ${a.transcricoes.length} ${a.transcricoes.length === 1 ? 'trecho' : 'trechos'} deste livro.</p>` : ''}
     </div>`
   }
-  const temPt = tr.segs.some(x => x.pt)
-  const verPt = temPt && _abPref('pt', true)
+  // ⚠️ NADA DE LEGENDA EM MASSA POR BAIXO DAS FALAS. Foi o que eu fiz primeiro,
+  // e ele corrigiu: *"a tradução é só quando eu arrastar a palavra ou frase,
+  // igual é no livro."* Português impresso ao lado do inglês faz o olho pular
+  // para o português e a escuta não treina nada — a tradução tem de ser um
+  // gesto, e só quando ele pedir. Quem traduz é o menu de seleção (`ai.js`).
   return `
     <div class="ab-trans-topo">
       <span>${abTempo(tr.ini)} – ${abTempo(tr.fim)} · ${tr.segs.length} falas</span>
-      <span class="est-dica">Marque uma palavra ou frase para mandá-la ao estudo.</span>
-      ${temPt
-        ? `<button class="est-chip${verPt ? ' on' : ''}" onclick="_abVerTraducao(${!verPt})"
-             data-tip="${verPt ? 'Esconder a tradução' : 'Mostrar a tradução'}">PT</button>`
-        : `<button class="est-chip" id="ab-pt-btn" onclick="abTraduzirTrecho()"
-             data-tip="Uma chamada só, para o trecho inteiro">${ic('sparkles','ic-3xs')} Traduzir</button>`}
+      <span class="est-dica">Marque uma palavra ou frase: a tradução aparece na hora, e o menu
+        manda ao estudo.</span>
       <button class="est-chip" onclick="abTranscrever()">${ic('plus','ic-3xs')} Outro trecho</button>
     </div>
     <div class="ab-trans" id="ab-trans">
       ${tr.segs.map((s, i) => `
         <p class="ab-fala" data-i="${i}" data-ini="${s.i}" data-fim="${s.f}">
           <button class="ab-fala-t" onclick="abIrPara(${s.i})" data-tip="Ouvir a partir daqui">${abTempo(s.i)}</button>
-          <span class="ab-fala-txt">${esc(s.t)}
-            ${verPt && s.pt ? `<i class="ab-pt" onclick="abRevelarPt(${i})" data-tip="Clique para revelar">${esc(s.pt)}</i>` : ''}
-          </span>
+          <span>${esc(s.t)}</span>
         </p>`).join('')}
-    </div>
-    ${verPt ? `<p class="est-dica" style="margin-top:8px">A tradução fica embaçada de propósito —
-      clique na linha para revelar. Ler o português junto tira o exercício da escuta.</p>` : ''}`
-}
-
-// ---- a tradução do trecho, fala por fala ----
-// ⚠️ NÉVOA POR PADRÃO, e esta é a regra que mais importa aqui. O inglês tem de
-// vir primeiro: ler a tradução junto com o original faz o olho pular direto
-// para o português e a escuta não treina nada. A tradução fica embaçada até o
-// clique — o mesmo desenho da trilha PT do vídeo.
-//
-// ⚠️ E É UMA CHAMADA SÓ para o trecho inteiro, não uma por fala: trinta falas
-// seriam trinta idas à IA, trinta esperas e trinta vezes o custo — para um
-// texto que ele vai ler de uma vez.
-async function abTraduzirTrecho() {
-  const a = _abLivro; if (!a) return
-  const cap = a.capitulos[_abCap]
-  const au = _abAudio()
-  const atual = Math.max(0, (au ? au.currentTime : 0) - (cap.ini || 0))
-  const tr = abTransDoPonto(a, _abCap, atual) || (a.transcricoes || []).find(x => x.cap === _abCap)
-  if (!tr) return
-  if (!aiChatCfg().key) {
-    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return
-  }
-  const faltam = tr.segs.filter(x => !x.pt)
-  if (!faltam.length) { _abVerTraducao(true); return }
-
-  const btn = el('ab-pt-btn')
-  if (btn) { btn.disabled = true; btn.textContent = 'Traduzindo…' }
-  try {
-    // Numeradas na ida e na volta: sem o número, uma linha a menos na resposta
-    // desalinharia TODAS as traduções seguintes — e cada fala ficaria com a
-    // tradução da vizinha, que é pior que ficar sem nenhuma.
-    const linhas = faltam.map((x, i) => `${i + 1}. ${x.t}`).join('\n')
-    const r = await aiTextSeguro([
-      { role: 'system', content: `Você traduz legenda de audiolivro para português do Brasil. Devolva SÓ as linhas numeradas, uma por linha, na mesma ordem e na mesma quantidade. Traduza o SENTIDO, em português natural — nunca palavra por palavra. Não explique, não comente, não junte linhas.` },
-      { role: 'user', content: linhas }
-    ], { maxTokens: Math.min(2000, 120 + faltam.length * 60) })
-    const saiu = String(r || '').split('\n').map(l => l.replace(/^\s*\d+[.)]\s*/, '').trim()).filter(Boolean)
-    if (saiu.length !== faltam.length) {
-      console.warn('[audiobook] tradução voltou com', saiu.length, 'linhas para', faltam.length, 'falas')
-    }
-    faltam.forEach((x, i) => { if (saiu[i]) x.pt = saiu[i] })
-    a.updatedAt = Date.now()
-    saveAudiolivros()
-    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
-    _abSetPref('pt', true)
-    abAba('texto')
-    toast('Tradução pronta — clique numa linha para revelar', 'success')
-  } catch (e) {
-    console.warn('[audiobook] tradução:', e)
-    toast('Não consegui traduzir: ' + e.message, 'error')
-    abAba('texto')
-  }
-}
-
-function _abVerTraducao(mostrar) {
-  _abSetPref('pt', !!mostrar)
-  abAba('texto')
-}
-// Revelar UMA linha: o clique tira a névoa só dali, para o resto continuar
-// servindo de exercício.
-function abRevelarPt(i) {
-  const p = document.querySelector(`.ab-fala[data-i="${i}"] .ab-pt`)
-  if (p) p.classList.toggle('aberta')
+    </div>`
 }
 
 // Ligar o menu de seleção é o que faz "ouvir virar card": o mesmo gesto do
@@ -1171,7 +1104,7 @@ function _abLigarSelecao() {
     const frase = fala ? (fala.querySelector('span')?.textContent || '').trim() : ''
     const cap = a.capitulos[_abCap] || {}
     return {
-      frase, lang: (a.lang || 'en').slice(0, 2),
+      frase, lang: (a.lang || 'en').slice(0, 2), traduzir: true,
       fonte: [a.title, cap.titulo].filter(Boolean).join(' · '),
       origem: {
         source_type: 'audiobook',
@@ -1195,7 +1128,7 @@ function _abLigarSelecaoMarcas() {
     const frase = linha ? (linha.querySelector('.ab-marca-frase')?.textContent || '').trim() : ''
     const capTitulo = linha ? (linha.querySelector('.ab-marca-ir span')?.textContent || '').trim() : ''
     return {
-      frase, lang: (a.lang || 'en').slice(0, 2),
+      frase, lang: (a.lang || 'en').slice(0, 2), traduzir: true,
       fonte: [a.title, capTitulo].filter(Boolean).join(' · '),
       origem: {
         source_type: 'audiobook',

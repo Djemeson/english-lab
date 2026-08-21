@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (4ª) — **TRADUÇÃO NA TRANSCRIÇÃO, E O "PREPARAR" APARECENDO
+> Última atualização: 2026-08-21 (5ª) — **A TRADUÇÃO VIROU GESTO, IGUAL À DO LIVRO**. Eu tinha
+> entendido errado e feito **legenda em massa** por baixo de cada fala; ele corrigiu: *"a
+> tradução é só quando eu arrastar a palavra ou frase, igual é no livro."* A legenda saiu, e a
+> tradução ao arrastar entrou **no menu de seleção compartilhado** (`ai.js`, não-lazy) — então
+> nasce servindo o audiolivro, o dossiê e qualquer tela futura que use o mesmo menu, sem cópia
+> do código do leitor. Medido com o Gemini dele: *"tight lid"* → **"controle rigoroso"**;
+> *"had been around the block a few times"* → **"O velhote já tinha vivido muita coisa"**.
+> `sw.js` → **englab-v337**. **Detalhes em §8.61.**
+>
+> Última atualização anterior: 2026-08-21 (4ª) — **TRADUÇÃO NA TRANSCRIÇÃO, E O "PREPARAR" APARECENDO
 > DENTRO DO EXPLICAR**. A transcrição ganhou o **PT por baixo de cada fala, com névoa** — o
 > inglês vem primeiro, e o clique revela uma linha por vez (ler o português junto tira o
 > exercício da escuta). É **uma chamada só** para o trecho inteiro, com as linhas numeradas na
@@ -12150,6 +12159,40 @@ primeiro se entende a palavra, depois se resolve estudá-la.
 (*"You have no credits remaining"*). A transcrição continua funcionando porque usa a **Groq**;
 o chat (tradução, Explicar, análise do Preparar) depende do fornecedor ativo — hoje **Gemini**,
 que respondeu normalmente.
+
+## 8.61 A tradução virou gesto, igual à do livro (2026-08-21, 5ª)
+
+**O erro foi meu, e ele foi direto:** *"a verdade é que eu não fui claro. A tradução é só quando
+eu arrastar a palavra ou frase, igual é no livro."* Eu tinha construído legenda em massa — o
+português impresso por baixo de cada fala, com névoa. Coisa diferente, e que atrapalha o que o
+audiolivro serve para treinar: com o texto traduzido ao lado, o olho pula para o português e a
+escuta não trabalha.
+
+**A legenda em massa foi removida** (código, CSS e o campo `pt` dos segmentos). No lugar, o
+gesto do leitor: marcou, traduziu.
+
+### Onde a tradução foi morar, e por que ali
+
+Não em `audiobook.js`, e não copiada de `ler.js`: entrou no **menu de seleção compartilhado**,
+em `js/ai.js` — que é **não-lazy**. Quem pede a tradução é quem monta o contexto da seleção
+(`obterContexto` devolvendo `traduzir: true`), então o audiolivro ganhou agora e **o dossiê
+ganha no dia em que quiser**, com uma linha. É a regra que o próprio `ai.js` já registra: quando
+várias telas fazem a mesma coisa, a peça é uma e elas a chamam.
+
+A dose de contexto veio **medida** do leitor (§8.51): manda-se a **frase**, nunca o parágrafo —
+parágrafo não desambigua palavra, dilui. Trecho de até quatro palavras pede *equivalente* (do
+tamanho de um equivalente); daí em diante, tradução corrida. Cache por (frase + trecho), porque
+a mesma palavra noutra passagem pode ter outra tradução.
+
+### Testado com o Gemini, que é o que ele usa
+
+| Arrastou | Veio |
+|---|---|
+| `tight lid` | **controle rigoroso** |
+| `The old man had been around the block a few times.` | **O velhote já tinha vivido muita coisa** |
+
+O menu mostra "traduzindo…" no mesmo instante em que abre, e o português entra no lugar — sem
+tela em branco e sem esperar para ver os botões.
 
 ## 9. Pendências / a verificar
 
