@@ -1432,15 +1432,44 @@ async function aiAnalisarDificuldade({ texto, lang = 'en', nivel, maxItens = 40,
   return itens
 }
 
-// Fatia por LINHA, nunca no meio de uma frase: o modelo precisa da frase
-// inteira para dizer o que ali está difícil.
+// Fatia por LINHA e, quando a linha não cabe, por FRASE — nunca no meio de uma
+// frase, porque o modelo precisa dela inteira para dizer o que ali é difícil.
+//
+// ⚠️ O RAMO DA FRASE NÃO É LUXO: a transcrição do audiolivro vem em linhas (uma
+// por fala), mas o texto de um EPUB vem em UMA LINHA SÓ. Sem ele, um capítulo
+// de 20 mil caracteres virava um bloco único, a resposta era cortada no teto e
+// voltávamos ao bug que esta função existe para consertar — medido no capítulo
+// 1 do Billy Summers, que devolveu 33 achados onde havia muito mais.
 function _aiFatiarTexto(texto, tamanho) {
-  const linhas = String(texto).split('\n')
+  const pedacos = []
+  for (const linha of String(texto).split('\n')) {
+    if (linha.length <= tamanho) { pedacos.push(linha); continue }
+    // Linha comprida: quebra nas fronteiras de frase, mantendo a pontuação.
+    const frases = linha.match(/[^.!?…]+[.!?…]+["'”’)\]]*\s*|[^.!?…]+$/g) || [linha]
+    let atual = ''
+    for (const f of frases) {
+      if (atual && (atual.length + f.length) > tamanho) { pedacos.push(atual); atual = '' }
+      // Frase sozinha maior que o bloco (diálogo sem pontuação): corta no espaço.
+      if (f.length > tamanho) {
+        let resto = f
+        while (resto.length > tamanho) {
+          const corte = resto.lastIndexOf(' ', tamanho)
+          pedacos.push(resto.slice(0, corte > 0 ? corte : tamanho))
+          resto = resto.slice(corte > 0 ? corte + 1 : tamanho)
+        }
+        atual = resto
+        continue
+      }
+      atual += f
+    }
+    if (atual.trim()) pedacos.push(atual)
+  }
+  // Junta os pedaços de volta até encher o bloco.
   const blocos = []
   let atual = ''
-  for (const l of linhas) {
-    if (atual && (atual.length + l.length + 1) > tamanho) { blocos.push(atual); atual = '' }
-    atual += (atual ? '\n' : '') + l
+  for (const pe of pedacos) {
+    if (atual && (atual.length + pe.length + 1) > tamanho) { blocos.push(atual); atual = '' }
+    atual += (atual ? '\n' : '') + pe
   }
   if (atual.trim()) blocos.push(atual)
   return blocos.length ? blocos : [texto]
@@ -1497,6 +1526,28 @@ function _aiResgatarItens(bruto) {
     try { achados.push(JSON.parse(m[0])) } catch (e) {}
   }
   return achados.length ? achados : null
+}
+
+// A FRASE em que o termo aparece — é ela que vira o contexto do card.
+// ⚠️ Sem isto, o item nasceria com o parágrafo inteiro (ou com nada) no lugar
+// da frase, e a regra que este projeto mediu vale aqui igual: contexto grande
+// demais dilui, e o Preparar erra o sentido.
+function aiFraseDoTermo(texto, termo) {
+  const t = String(texto || '')
+  const oc = aiAcharNoTexto(t, termo)[0]
+  if (!oc) return ''
+  // Fronteiras de frase, tolerando "Mr." e reticências pela exigência de
+  // espaço + maiúscula depois do ponto.
+  let ini = 0
+  for (let i = oc.i; i > 0; i--) {
+    if (/[.!?]/.test(t[i]) && /\s/.test(t[i + 1] || ' ')) { ini = i + 1; break }
+  }
+  let fim = t.length
+  for (let i = oc.fim; i < t.length; i++) {
+    if (/[.!?]/.test(t[i]) && /\s|$/.test(t[i + 1] || ' ')) { fim = i + 1; break }
+  }
+  const frase = t.slice(ini, fim).replace(/\s+/g, ' ').trim()
+  return frase.length > 400 ? frase.slice(0, 400) : frase
 }
 
 // Em que pé este termo está para ele: `'sentido'` (já estudou ESTE sentido),

@@ -5373,6 +5373,44 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   .ab-marca-ir{width:120px}
 }
 
+/* ---- raio-x dentro do leitor ---- */
+/* ⚠️ O REALCE NÃO PODE OCUPAR ESPAÇO. O texto do leitor é paginado por colunas
+   CSS: qualquer coisa que mude a ALTURA (padding, fundo com respiro, chip
+   inline) faria a paginação ser remedida e o leitor pularia de página sozinho
+   no meio da leitura. Sublinhado resolve — marca sem empurrar nada. */
+.ler-dif{
+  background:none;color:inherit;padding:0;
+  border-bottom:2px solid var(--cor,var(--ler-mark));border-radius:0;
+  text-decoration:none;
+}
+/* Saturação média de propósito: o leitor tem tema claro (Papel, Sépia, Cinza) e
+   escuro (Noite, Preto), e um lima vibrante que brilha no preto quase some no
+   creme. Estes quatro tons se veem nos cinco. */
+.ler-dif-word{--cor:#7C9A16}
+.ler-dif-phrasal_verb{--cor:#2F72D0}
+.ler-dif-idiom{--cor:#C63B62}
+.ler-dif-collocation{--cor:#7B4BC9}
+.ler-dif-lista{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+/* ⚠️ O CHIP VIVE DENTRO DO PAPEL, e não na moldura do app. O painel de
+   ferramentas herda o tema de LEITURA (`--ler-fg`/`--ler-bg`, que muda entre
+   Papel, Sépia, Cinza, Noite e Preto): usar `--surface`/`--text` do app punha
+   um chip preto no meio da página creme. As cores saem do próprio papel. */
+.ler-dif-chip{
+  display:inline-flex;align-items:baseline;gap:6px;cursor:pointer;
+  background:color-mix(in srgb, var(--ler-fg) 6%, transparent);
+  border:1px solid color-mix(in srgb, var(--ler-fg) 16%, transparent);
+  border-left:3px solid var(--cor,var(--ler-mark));
+  border-radius:var(--radius-xs);padding:3px 9px;font-family:inherit;
+}
+.ler-dif-chip:hover{
+  background:color-mix(in srgb, var(--ler-fg) 12%, transparent);
+  border-color:color-mix(in srgb, var(--ler-fg) 30%, transparent);
+}
+.ler-dif-chip b{font-size:var(--fs-xs);color:var(--ler-fg);font-weight:600}
+.ler-dif-chip i{font-size:var(--fs-3xs);color:var(--ler-fg2);font-style:normal}
+.ler-dif-chip.ja{opacity:.6}
+.ler-dif-chip.ja:hover{opacity:1}
+
 /* ---- leitor: a moldura ocupa a tela toda ---- */
 body.lendo .sb-nav,body.lendo .sb-foot{opacity:.35;transition:opacity .2s}
 body.lendo .sb-nav:hover,body.lendo .sb-foot:hover{opacity:1}

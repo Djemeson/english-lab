@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (8ª) — **O RAIO-X DIZIA "NADA DIFÍCIL AQUI" NUMA PÁGINA CHEIA
+> Última atualização: 2026-08-21 (9ª) — **O RAIO-X CHEGOU AO LEITOR DE EPUB**. Mesma peça do
+> Audiobook (`aiAnalisarDificuldade`, em `js/ai.js`), tela diferente — e a diferença não é
+> cosmética: o texto do leitor é **paginado por colunas CSS**, então inserir chips no meio dele
+> mudaria a altura, a paginação seria remedida e o livro pularia de página sozinho. Aqui o texto
+> recebe **só o realce** (sublinhado, que não ocupa espaço) e os chips vivem no **painel de
+> ferramentas**, ao lado da cobertura. O resultado fica no aparelho (`BookDB`, `raiox:<livro>:<cap>`)
+> e **volta sozinho ao reabrir o capítulo**, sem custo. ⚠️ Um bug de fatiamento apareceu no
+> caminho: o texto de EPUB vem em **uma linha só**, e o fatiador cortava por linha — o capítulo
+> inteiro virava um bloco, a resposta era cortada e o capítulo 1 do Billy Summers devolveu **33
+> achados**. Com o corte por frase: **142** (19 phrasal, 39 idioms, 24 collocations, 60 palavras)
+> em 17 s. `sw.js` → **englab-v341**. **Detalhes em §8.65.**
+>
+> Última atualização anterior: 2026-08-21 (8ª) — **O RAIO-X DIZIA "NADA DIFÍCIL AQUI" NUMA PÁGINA CHEIA
 > DE PHRASAL VERBS**. Ele mandou analisar um capítulo de *Carrie* e recebeu *"nada acima do seu
 > B1"* — numa página com `back away`, `catch up`, `pull her leg`, `tagging along`,
 > `incontrovertible`. **Diagnóstico no site publicado**: a IA tinha achado tudo; a resposta veio
@@ -12402,6 +12414,64 @@ mais densos que existem e o nível é B1, então o número é honesto — mas se
 caminho é um filtro por tipo (só expressões / só acima do nível), não mexer no que a análise
 enxerga.
 
+## 8.65 O raio-X no leitor de EPUB (2026-08-21, 9ª)
+
+A pendência aberta na §8.62, fechada. A **peça pensante é a mesma** — `aiAnalisarDificuldade` +
+`aiAcharNoTexto`, em `js/ai.js` (não-lazy) —, com o mesmo critério (acima do nível + todo
+phrasal/idiom/collocation) e o mesmo filtro por sentido da §8.63.
+
+### O que muda é a tela, e isso é estrutural
+
+No audiolivro o texto é uma lista de falas: cabe um chip embaixo de cada uma. **No leitor o
+texto é corrido e paginado por colunas CSS** — qualquer coisa inserida no meio dele muda a
+altura, a paginação é remedida e o leitor **pula de página sozinho no meio da leitura**.
+
+Então:
+- **no texto**, só o realce — `border-bottom`, que não ocupa espaço nenhum;
+- **os chips**, no painel de ferramentas, junto da cobertura e da leitura por IA.
+
+A pintura usa o mesmo mecanismo do `_lerRepintar` (TreeWalker + fragmento) com classe própria
+(`mark.ler-dif`), então as duas convivem sem uma apagar a outra. Os termos são casados **do
+maior para o menor**: sem isso, `put up` acenderia dentro de `put up with` e a expressão inteira
+nunca seria marcada.
+
+### Onde o resultado mora
+
+`BookDB`, chave `raiox:<livro>:<cap>` — **no aparelho**, como a leitura de capítulo (`pre:`).
+São dezenas de itens por capítulo e um livro tem 35: no documento do Firestore isso passaria do
+teto de 1 MB. Ao reabrir o capítulo, `lerRaioXAplicar` repinta **sem custo**.
+
+A **frase** de cada achado é guardada no momento da análise, não na hora de mandar ao Preparar:
+ali o texto do capítulo está em mãos; depois seria preciso reabrir o zip.
+
+### O bug que o EPUB revelou
+
+O fatiador de blocos (§8.64) cortava **por linha**. A transcrição do audiolivro vem em linhas —
+uma por fala —, mas **o texto de um EPUB vem numa linha só**. Resultado: o capítulo inteiro
+virava um bloco, a resposta era cortada no teto e o resgate salvava só o começo.
+
+| Capítulo 1 do Billy Summers (20.623 caracteres) | Achados |
+|---|---|
+| fatiando por linha (1 bloco) | 33 |
+| fatiando por frase (10 blocos) | **142** |
+
+O corte agora é por linha e, quando a linha não cabe, **por fronteira de frase**; frase maior
+que o bloco (diálogo sem pontuação) cai no espaço mais próximo. Testado isolado: nada se perde
+no caminho (o texto recomposto tem os mesmos caracteres).
+
+### Testado ao vivo com o EPUB real
+
+Capítulo 1 do *Billy Summers*: **142 achados em 17 s**, 159 realces no texto, painel dizendo
+**"124 pontos difíceis · 18 você já tem"** — os 18 vindos do filtro por sentido. Achados como
+`breezes through`, `drops Macintosh a wink`, `live large`, `wifebeater`, `crabgrass`. O clique
+no chip criou o item com tipo `phrasal_verb`, a frase do livro e o capítulo. Troquei de capítulo
+(0 realces, como devia) e voltei: **159 realces restaurados** do IndexedDB.
+
+⚠️ **As cores tiveram de sair do papel, não do app.** O painel do leitor herda o tema de leitura
+(Papel, Sépia, Cinza, Noite, Preto): usar `--surface`/`--text` punha um chip preto no meio da
+página creme. Chips e realce agora derivam de `--ler-fg`, e os quatro tons de tipo foram
+escolhidos com saturação média para se ver nos cinco temas.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -12468,10 +12538,13 @@ enxerga.
       faz) esbarra em CORS: o canvas fica "tainted" e o `toDataURL` falha. Caminho, se incomodar:
       buscar o binário e guardar o blob no `BookDB` sob `capa:<id>`.
 
-- [ ] **O RAIO-X NO LEITOR DE EPUB** (aberto em 2026-08-21, §8.62). A varredura por nível existe
-      e é compartilhada (`aiAnalisarDificuldade`, em `js/ai.js`); falta o botão e a pintura no
-      leitor, que é onde ele mais lê. O leitor já tem paginação e realce próprios, então a
-      pintura precisa conviver com `_lerRepintar` — não é copiar e colar.
+- [x] ~~**O RAIO-X NO LEITOR DE EPUB**~~ — **feito em 2026-08-21** (§8.65): realce no texto,
+      chips no painel de ferramentas, resultado guardado por capítulo no `BookDB`.
+- [ ] **O TEXTO DO AUDIOLIVRO PRECISA DE MODO FULL COM ROLAGEM AUTOMÁTICA** (pedido dele em
+      2026-08-21). Hoje a aba Texto vive dentro do player, numa caixa de 420px, e o
+      acompanhamento só empurra a fala para dentro da área visível. Ele quer o texto **em tela
+      cheia, como o livro**, com a fala que está tocando **centralizada**, podendo rolar à mão e
+      **voltando sozinho ao centro depois de 5 segundos**.
 - [ ] **O ÁUDIO DO AUDIOLIVRO AINDA NÃO SOBE PARA A NUVEM** (pedido dele em 2026-08-21). Hoje só
       metadados, transcrições, marcadores e posição viajam; o arquivo fica no aparelho. Ele quer
       **ouvir no desktop e no celular com todo o material gerado**. O Storage já está de pé

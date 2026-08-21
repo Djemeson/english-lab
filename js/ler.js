@@ -887,6 +887,9 @@ async function lerIrParaCapitulo(i, frac = 0) {
     if (i > 0) mangaIrParaPagina(i, false)
   }
   _lerRepintar()
+  // O realce do raio-X é reaplicado aqui: o capítulo foi reconstruído do zero,
+  // e sem isto o que já tinha sido analisado voltaria apagado.
+  lerRaioXAplicar(i).catch(() => {})
   _lerMedirPaginas()
   // A leitura do capítulo anterior NÃO pode sobrar: as glosas são presas ao
   // contexto DAQUELE capítulo, e mostrar a do capítulo 3 no capítulo 4 seria
@@ -2102,6 +2105,7 @@ function _lerFerCorpoHTML() {
       ${_lerDesfazer.length ? `<button class="btn btn-secondary btn-sm" onclick="lerDesfazerTriagem()">${ic('undo','ic-sm')} Desfazer (${_lerDesfazer.length})</button>` : ''}
     </div>
     ${_lerPreBlocoHTML()}
+    ${_lerRaioXBlocoHTML()}
     <div class="ler-fer-triagem" onclick="_lerCliqueTriagem(event)">
       ${topo.map(x => `
         <span class="ler-tri" data-w="${escA(x.w)}">
@@ -2589,6 +2593,183 @@ async function lerPreApagar(cap) {
 // triagem de propósito: primeiro ele decide o que vai estudar, e só então
 // oferece a leitura do resto — que é apoio para a passagem, não material de
 // estudo. O texto do botão diz o que acontece e que custa.
+// ================================================================
+// O RAIO-X DO CAPÍTULO — o mesmo do audiolivro, agora onde ele mais lê
+// ================================================================
+// A peça pensante mora em `js/ai.js` (`aiAnalisarDificuldade`), não-lazy, e é
+// literalmente a mesma que o Audiobook usa: nível do aluno + todo phrasal
+// verb, idiom e collocation, com o que ele já sabe filtrado POR SENTIDO.
+//
+// ⚠️ O QUE MUDA AQUI É A TELA, e a diferença não é cosmética. No audiolivro o
+// texto é uma lista de falas e cabe um chip embaixo de cada uma. Aqui o texto
+// é CORRIDO E PAGINADO por colunas CSS: inserir blocos no meio dele mudaria a
+// altura, a paginação seria remedida e o leitor pularia de página sozinho no
+// meio da leitura. Então o texto recebe só o REALCE (que não ocupa espaço) e
+// os chips vivem no painel de ferramentas, ao lado da cobertura.
+//
+// ⚠️ E O RESULTADO FICA NO APARELHO (`BookDB`, chave `raiox:<livro>:<cap>`),
+// como a leitura de capítulo (`pre:`): são dezenas de itens por capítulo e um
+// livro tem 35 — no documento do Firestore isso estouraria o teto de 1 MB.
+let _lerRaioX = null          // { cap, itens[] } do capítulo aberto
+let _lerRaioXCarregando = false
+
+function _lerChaveRaioX(cap) { return `raiox:${_lerLivro.id}:${cap}` }
+
+async function lerRaioXCarregar(cap) {
+  if (!_lerLivro) return null
+  try {
+    const g = await BookDB.get(_lerChaveRaioX(cap))
+    if (!g) return null
+    const dados = typeof g === 'string' ? JSON.parse(g) : g
+    return Array.isArray(dados) ? dados : (dados.itens || null)
+  } catch (e) { return null }
+}
+
+// Chamada a cada troca de capítulo: se já foi analisado, o realce volta sem
+// custo nenhum.
+async function lerRaioXAplicar(cap) {
+  _lerRaioX = null
+  const itens = await lerRaioXCarregar(cap)
+  if (!itens || _lerCap !== cap) return
+  _lerRaioX = { cap, itens }
+  _lerRaioXPintar()
+}
+
+async function lerRaioXAnalisar() {
+  if (!_lerLivro || _lerRaioXCarregando) return
+  if (!aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return
+  }
+  const cap = _lerCap
+  const texto = await _lerTextoDoCapitulo(cap)
+  if (!texto || texto.length < 40) { toast('Não achei texto neste capítulo.', 'warning'); return }
+  _lerRaioXCarregando = true
+  const area = () => el('ler-raiox-area')
+  const pinta = m => { const a = area(); if (a) a.innerHTML = `<div class="ler-carregando">${esc(m)}</div>` }
+  pinta('Lendo o capítulo…')
+  try {
+    const nivel = cefrNivelAluno()
+    const itens = await aiAnalisarDificuldade({
+      texto, lang: (_lerLivro.lang || 'en').slice(0, 2), nivel,
+      aoAndar: (i, n) => pinta(n > 1 ? `Analisando ${i} de ${n}…` : 'Analisando…')
+    })
+    // A frase entra AGORA, uma vez, e não na hora de mandar ao Preparar: aqui
+    // o texto do capítulo está em mãos; lá seria preciso lê-lo do zip de novo.
+    for (const x of itens) x.frase = aiFraseDoTermo(texto, x.t)
+    if (_lerCap !== cap) { _lerRaioXCarregando = false; return }   // trocou de capítulo no meio
+    await BookDB.set(_lerChaveRaioX(cap), JSON.stringify({ itens, nivel, at: Date.now() }))
+    _lerRaioX = { cap, itens }
+    _lerRaioXPintar()
+    toast(itens.length
+      ? `${itens.length} ${itens.length === 1 ? 'ponto difícil' : 'pontos difíceis'} para o seu ${nivel}`
+      : (itens.incompleto ? 'Parte da análise não voltou legível — vale rodar de novo'
+                          : `Nada acima do seu ${nivel} neste capítulo`),
+      itens.length ? 'success' : (itens.incompleto ? 'warning' : 'info'))
+  } catch (e) {
+    console.warn('[ler] raio-x:', e)
+    toast('Não consegui analisar: ' + e.message, 'error')
+  }
+  _lerRaioXCarregando = false
+  _lerRenderFerramentas()
+}
+
+async function lerRaioXApagar() {
+  if (!_lerLivro) return
+  try { await BookDB.del(_lerChaveRaioX(_lerCap)) } catch (e) {}
+  _lerRaioX = null
+  _lerRaioXDespintar()
+  _lerRenderFerramentas()
+}
+
+// ---- o realce no texto do capítulo ----
+// Mesmo mecanismo do `_lerRepintar` (TreeWalker + fragmento), com classe
+// própria: as duas pinturas convivem sem uma apagar a outra.
+function _lerRaioXDespintar() {
+  const cont = el('ler-conteudo'); if (!cont) return
+  cont.querySelectorAll('mark.ler-dif').forEach(m => m.replaceWith(document.createTextNode(m.textContent)))
+  cont.normalize()
+}
+
+function _lerRaioXPintar() {
+  const cont = el('ler-conteudo'); if (!cont || !_lerRaioX) return
+  _lerRaioXDespintar()
+  const itens = _lerRaioX.itens || []
+  if (!itens.length) return
+  // Do maior para o menor: sem isto, "put up" acenderia dentro de
+  // "put up with" e a expressão inteira nunca seria marcada.
+  const ordem = itens.map((x, i) => ({ ...x, i }))
+    .filter(x => x.t && x.t.length > 1)
+    .sort((a, b) => b.t.length - a.t.length)
+  const escapa = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp('\\b(' + ordem.slice(0, 400).map(x => escapa(x.t)).join('|') + ')\\b', 'gi')
+  const tipoDe = new Map(ordem.map(x => [x.t.toLowerCase(), x]))
+
+  const andarilho = document.createTreeWalker(cont, NodeFilter.SHOW_TEXT)
+  const nos = []
+  let n
+  while ((n = andarilho.nextNode())) {
+    if (n.parentElement && n.parentElement.closest('mark.ler-dif')) continue
+    if (n.nodeValue && n.nodeValue.length > 1 && re.test(n.nodeValue)) nos.push(n)
+    re.lastIndex = 0
+  }
+  for (const no of nos) {
+    const frag = document.createDocumentFragment()
+    let ultimo = 0, m
+    re.lastIndex = 0
+    while ((m = re.exec(no.nodeValue))) {
+      if (m.index > ultimo) frag.appendChild(document.createTextNode(no.nodeValue.slice(ultimo, m.index)))
+      const achado = tipoDe.get(m[0].toLowerCase())
+      const mk = document.createElement('mark')
+      mk.className = 'ler-dif ler-dif-' + ((achado && achado.tipo) || 'word')
+      mk.dataset.i = achado ? achado.i : ''
+      mk.title = achado && achado.pt ? achado.pt : ''
+      mk.textContent = m[0]
+      frag.appendChild(mk)
+      ultimo = m.index + m[0].length
+    }
+    if (ultimo < no.nodeValue.length) frag.appendChild(document.createTextNode(no.nodeValue.slice(ultimo)))
+    no.replaceWith(frag)
+  }
+}
+
+// ---- o bloco no painel de ferramentas ----
+function _lerRaioXBlocoHTML() {
+  const nivel = cefrNivelAluno()
+  if (!_lerRaioX) {
+    return `<div class="ler-pre" id="ler-raiox-area">
+      <button class="btn btn-secondary btn-sm" onclick="lerRaioXAnalisar()">
+        ${ic('eye','ic-sm')} O que é difícil aqui</button>
+      <p class="ler-fer-nota">Acende no texto o que está <b>acima do seu ${esc(nivel)}</b> e
+        <b>todo phrasal verb, idiom e collocation</b> — esses independem de nível, porque o que
+        trava não é a palavra rara: <i>put up with</i> são três palavras fáceis que juntas
+        significam outra coisa. O que você já estuda <b>com aquele mesmo sentido</b> fica de fora.</p>
+    </div>`
+  }
+  const itens = _lerRaioX.itens || []
+  const novos = itens.filter(x => !x.ja).length
+  return `<div class="ler-pre" id="ler-raiox-area">
+    <div class="ler-pre-ok">${ic('check','ic-sm')} ${itens.length
+      ? `${novos} ${novos === 1 ? 'ponto difícil' : 'pontos difíceis'}${itens.length - novos ? ` · ${itens.length - novos} você já tem` : ''}`
+      : `Nada acima do seu ${esc(nivel)} aqui`}</div>
+    ${itens.length ? `<div class="ler-dif-lista">${itens.map((x, i) => `
+      <button class="ler-dif-chip ler-dif-${x.tipo}${x.ja ? ' ja' : ''}" onclick="lerRaioXPreparar(${i})"
+              data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + (x.ja === 'outro' ? ' — você tem esta palavra com OUTRO sentido' : x.ja === 'marcada' ? ' — você marcou como conhecida' : ' — clique para mandar ao Preparar'))}">
+        <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}
+      </button>`).join('')}</div>` : ''}
+    <button class="btn btn-ghost btn-sm" onclick="lerRaioXApagar()">${ic('refresh','ic-sm')} Analisar de novo</button>
+  </div>`
+}
+
+function lerRaioXPreparar(i) {
+  const x = _lerRaioX && (_lerRaioX.itens || [])[i]
+  if (!x || typeof lexaChipParaPreparar !== 'function') return
+  lexaChipParaPreparar(
+    { expr: x.t, gloss: x.pt || '', type: x.tipo === 'word' ? 'word' : x.tipo },
+    { contexto: x.frase || '', lang: (_lerLivro.lang || 'en').slice(0, 2),
+      source_type: 'kindle', source_title: _lerLivro.title || '',
+      source_context: (_lerLivro.chapters[_lerCap] || {}).titulo || '' })
+}
+
 function _lerPreBlocoHTML() {
   const carregado = typeof glossPreChave === 'function' &&
                     glossPreChave() === _lerChavePre(_lerCap)
