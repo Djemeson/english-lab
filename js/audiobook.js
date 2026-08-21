@@ -745,7 +745,18 @@ async function abTranscrever() {
     a.updatedAt = Date.now()
     saveAudiolivros()
     if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
-    toast(`${segs.length} falas transcritas`, 'success')
+    // Os marcadores que ele guardou ANTES desta transcrição ganham a frase
+    // agora — é a ordem real de uso (marca ouvindo, transcreve depois).
+    let ganharam = 0
+    for (const m of (a.marcadores || [])) {
+      if (m.cap !== _abCap || m.frase) continue
+      const f = abFraseDoMarcador(a, m)
+      if (f) { m.frase = f; ganharam++ }
+    }
+    if (ganharam) saveAudiolivros()
+    toast(ganharam
+      ? `${segs.length} falas transcritas · ${ganharam} ${ganharam === 1 ? 'marcador ganhou' : 'marcadores ganharam'} a frase`
+      : `${segs.length} falas transcritas`, 'success')
     abAba('texto')
   } catch (e) {
     console.warn('[audiobook] transcrição:', e)
@@ -861,6 +872,30 @@ function _abLigarSelecao() {
         source_type: 'audiobook',
         source_title: a.title || '',
         source_context: cap.titulo ? `audiolivro · ${cap.titulo}` : 'audiolivro'
+      }
+    }
+  })
+}
+
+// A frase do marcador é texto como qualquer outro: marcar uma palavra ali
+// manda ela ao Preparar igual à aba Texto. Seria estranho o contrário — a
+// mesma frase virar card num lugar e não no outro.
+function _abLigarSelecaoMarcas() {
+  const box = el('ab-marcas')
+  if (!box || typeof selMenuAtivar !== 'function') return
+  selMenuAtivar(box, no => {
+    const a = _abLivro; if (!a) return {}
+    const p = no && (no.nodeType === 1 ? no : no.parentElement)
+    const linha = p && p.closest ? p.closest('.ab-marca') : null
+    const frase = linha ? (linha.querySelector('.ab-marca-frase')?.textContent || '').trim() : ''
+    const capTitulo = linha ? (linha.querySelector('.ab-marca-ir span')?.textContent || '').trim() : ''
+    return {
+      frase, lang: (a.lang || 'en').slice(0, 2),
+      fonte: [a.title, capTitulo].filter(Boolean).join(' · '),
+      origem: {
+        source_type: 'audiobook',
+        source_title: a.title || '',
+        source_context: capTitulo ? `audiolivro · ${capTitulo}` : 'audiolivro'
       }
     }
   })
@@ -1050,7 +1085,11 @@ function _abRenderPlayer() {
     </div>`
   _abPintarBotao()
   _abPintarProgresso()
+  // ⚠️ RELIGAR A SELEÇÃO DEPOIS DE CADA REDESENHO. O ouvinte mora no container,
+  // e o container é recriado inteiro aqui — guardar um marcador redesenhava o
+  // player e a lista ficava muda: selecionar a frase não abria mais o menu.
   if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abAcompanharTexto() }
+  if (_abAbaAtual === 'marcadores') _abLigarSelecaoMarcas()
 }
 
 let _abAbaAtual = 'capitulos'
@@ -1063,6 +1102,7 @@ function abAba(qual, ev) {
     : _abAbaAtual === 'texto' ? _abListaTexto()
     : _abListaCapitulos()
   if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abAcompanharTexto() }
+  if (_abAbaAtual === 'marcadores') _abLigarSelecaoMarcas()
 }
 
 function _abListaCapitulos() {
@@ -1075,23 +1115,52 @@ function _abListaCapitulos() {
     </button>`).join('')}</div>`
 }
 
+// A FALA QUE ESTAVA TOCANDO NAQUELE INSTANTE.
+// ⚠️ DERIVADA NA HORA DE MOSTRAR, e não só no momento em que o marcador nasce.
+// A ordem real das coisas é o contrário da ordem óbvia: ele marca ENQUANTO
+// ouve (não dá para parar e transcrever no meio de uma caminhada) e transcreve
+// DEPOIS. Se a frase só fosse gravada na criação, todo marcador feito antes da
+// transcrição ficaria mudo para sempre — justamente os que mais importam.
+// A cópia guardada em `m.frase` é o segundo caminho: ela sobrevive se aquela
+// janela de transcrição for substituída por outra.
+function abFraseDoMarcador(a, m) {
+  if (!a || !m) return ''
+  const dentro = (a.transcricoes || [])
+    .filter(t => t.cap === m.cap)
+    .flatMap(t => t.segs || [])
+    .find(s => m.seg >= s.i - 0.6 && m.seg <= s.f + 0.6)
+  return (dentro && dentro.t) || m.frase || ''
+}
+
 function _abListaMarcadores() {
   const a = _abLivro
   const ms = (a.marcadores || []).slice().sort((x, y) => (x.cap - y.cap) || (x.seg - y.seg))
   if (!ms.length) {
     return `<div class="est-nada">${ic('clock','ic-lg')}<p>Nenhum marcador ainda.</p>
       <p class="est-dica">O botão <b>Marcador</b> guarda o instante exato em que você está — serve
-      para voltar a uma frase que valeu a pena.</p></div>`
+      para voltar a uma frase que valeu a pena. Com o capítulo transcrito, ele mostra também
+      <b>o que estava sendo dito</b> ali.</p></div>`
   }
-  return `<div class="ab-marcas">${ms.map((m, i) => `
+  const algumSemFrase = ms.some(m => !abFraseDoMarcador(a, m))
+  return `<div class="ab-marcas" id="ab-marcas">${ms.map((m, i) => {
+    const frase = abFraseDoMarcador(a, m)
+    return `
     <div class="ab-marca">
       <button class="ab-marca-ir" onclick="abIrMarcador(${i})">
         <b>${abTempo(m.seg)}</b>
         <span>${esc((a.capitulos[m.cap] || {}).titulo || `Capítulo ${m.cap + 1}`)}</span>
       </button>
-      <span class="ab-marca-nota">${esc(m.nota || '')}</span>
+      <div class="ab-marca-corpo">
+        ${frase ? `<p class="ab-marca-frase">${esc(frase)}</p>` : ''}
+        ${m.nota ? `<p class="ab-marca-nota">${ic('pencil','ic-3xs')} ${esc(m.nota)}</p>` : ''}
+        ${!frase && !m.nota ? `<p class="ab-marca-vazio">sem nota — transcreva o capítulo para ver a fala daqui</p>` : ''}
+      </div>
       <button class="ab-marca-x" onclick="abMarcadorApagar(${i})" data-tip="Apagar">${ic('x','ic-3xs')}</button>
-    </div>`).join('')}</div>`
+    </div>`
+  }).join('')}</div>
+  ${algumSemFrase && !(a.transcricoes || []).length ? `<p class="est-dica" style="margin-top:12px">
+    ${ic('sparkles','ic-3xs')} <b>Transcreva o capítulo</b> na aba Texto e estes marcadores passam a
+    mostrar o que foi dito — inclusive os que você guardou antes.</p>` : ''}`
 }
 
 // ---- carregar arquivo/capítulo ----
@@ -1350,7 +1419,10 @@ function abMarcar() {
 function _abGuardarMarcador(seg, nota) {
   const a = _abLivro; if (!a) return
   a.marcadores = a.marcadores || []
-  a.marcadores.push({ cap: _abCap, seg, nota: (nota || '').trim(), at: Date.now() })
+  const m = { cap: _abCap, seg, nota: (nota || '').trim(), at: Date.now() }
+  const frase = abFraseDoMarcador(a, m)
+  if (frase) m.frase = frase
+  a.marcadores.push(m)
   a.updatedAt = Date.now()
   saveAudiolivros()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()

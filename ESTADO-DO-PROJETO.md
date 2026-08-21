@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 — **OUVIR VIRA CARD**. A pendência que separava o reprodutor
+> Última atualização: 2026-08-21 (2ª) — **O MARCADOR MOSTRA A FRASE**. Ele guardava o instante;
+> agora mostra **o que estava sendo dito ali**, cruzando o segundo marcado com a fala transcrita.
+> ⚠️ O detalhe que decidiu o desenho: a frase é **derivada na hora de mostrar**, não só gravada
+> quando o marcador nasce — porque a ordem real é o contrário da óbvia (ele marca ENQUANTO ouve
+> e transcreve DEPOIS), e assim **os marcadores antigos ganham a frase retroativamente**. A nota
+> escrita à mão continua, menor, embaixo. E a frase do marcador **também vira card**: seria
+> estranho a mesma frase virar card na aba Texto e não ali. `sw.js` → **englab-v334**.
+> **Detalhes em §8.58.**
+>
+> Última atualização anterior: 2026-08-21 — **OUVIR VIRA CARD**. A pendência que separava o reprodutor
 > do resto do app está fechada: o capítulo vira **texto**, o texto **acompanha o áudio** (a fala
 > que está tocando fica acesa) e **marcar uma frase manda ela ao Preparar**, com a obra e o
 > capítulo certos. **Por capítulo, decisão dele** — doze horas de uma vez seriam caras e
@@ -12003,6 +12012,36 @@ com o áudio foi conferido no painel embutido (a aba do Chrome, em segundo plano
 em 0:38 acendeu a fala de 0:36; em 0:52, a de 0:50. Item de teste **removido do acervo** ao
 final, chave limpa, arquivos de teste apagados.
 
+## 8.58 O marcador mostra a frase (2026-08-21, 2ª)
+
+Pendência da rodada anterior, fechada. O marcador guardava o instante e o nome do capítulo —
+para saber por que aquele ponto valia a pena, era preciso voltar e ouvir.
+
+**A regra que decidiu o desenho:** a frase é **derivada na hora de mostrar**, cruzando o segundo
+do marcador com os segmentos da transcrição daquele capítulo. Gravar a frase apenas na criação
+teria sido o caminho óbvio — e o errado, porque a ordem real de uso é o contrário: ele marca
+**enquanto ouve** (não se para no meio de uma caminhada para transcrever) e transcreve depois.
+Com a derivação, **os marcadores antigos ganham a frase retroativamente**, e o toast da
+transcrição diz quantos ganharam. Uma cópia vai para `m.frase` como segundo caminho, para o
+caso de aquela janela de transcrição ser substituída por outra.
+
+**Hierarquia da linha:** a fala vem primeiro, no peso do texto principal; a nota escrita à mão
+entra abaixo e menor. Quem escreveu a nota já sabe o que ela diz — quem volta ao marcador quer
+a frase. Sem transcrição, a linha diz o que fazer em vez de ficar vazia.
+
+**A frase do marcador também vira card.** O mesmo `selMenuAtivar` da aba Texto, com a obra e o
+capítulo daquele marcador. Seria estranho a mesma frase virar item num lugar e não no outro.
+
+⚠️ **Um defeito pego no teste:** guardar um marcador redesenha o player inteiro, e o ouvinte de
+seleção mora no container — que é recriado. A lista ficava muda logo depois de guardar um
+marcador. O religamento passou a acontecer em todo redesenho, para as duas abas.
+
+**Testado:** três marcadores criados ANTES de existir transcrição (dois dentro da janela, um
+fora); a transcrição chegou depois e os dois de dentro ganharam a frase, o de fora manteve o
+aviso honesto; marcador novo já nasceu com a frase; e a seleção na frase criou o item com
+`source_type: 'audiobook'`, obra e capítulo certos, com a fala inteira como contexto. Item de
+teste removido do acervo em seguida.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -12045,10 +12084,8 @@ final, chave limpa, arquivos de teste apagados.
       parser de `.m4b`, reprodutor com capítulos, velocidade, marcadores, sono e Media Session.
 - [x] ~~**O AUDIOLIVRO AINDA NÃO VIRA VOCABULÁRIO**~~ — **feito em 2026-08-21** (§8.57):
       transcrição por capítulo, texto que acompanha o áudio e seleção que vira card.
-- [ ] **O MARCADOR AINDA NÃO CARREGA A FRASE** (aberto em 2026-08-21, §8.57). Marcar guarda o
-      instante; se o trecho já estiver transcrito, dava para mostrar a fala daquele segundo no
-      próprio marcador — a informação existe (`transcricoes[].segs` tem os tempos), é só cruzar.
-      Pequeno, e melhora a lista de marcadores de uma vez.
+- [x] ~~**O MARCADOR AINDA NÃO CARREGA A FRASE**~~ — **feito em 2026-08-21** (§8.58): a fala
+      daquele instante aparece no marcador, inclusive nos guardados antes da transcrição.
 - [ ] **DETECTAR OS CORTES REAIS DE UM ARQUIVO SEM CAPÍTULOS** (aberto em 2026-08-21, §8.57).
       Hoje ele é fatiado em partes de 15 min, que é honesto mas arbitrário. Audiolivro costuma
       ter 2–3 s de silêncio entre capítulos, e o ffmpeg tem `silencedetect` — daria os cortes de
