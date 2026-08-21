@@ -12695,6 +12695,19 @@ estado vizinho que "parece" servir.
 Quando ele analisar o item no Preparar, os `meanings` passam a existir e o estado vira `sentido`
 (se a glosa bater) — e aí sim ele some do raio-X, com razão.
 
+### E dá para dizer QUAL sentido está na fila
+
+Ele perguntou em seguida: *"não tem como deixar 'já está no preparar com esse significado ou com
+significado diferente'?"* Tem — a informação já viajava: quando um chip manda o item ao Preparar,
+a glosa daquela passagem vai junto como semente (`_seedMeaning`), para a análise nascer sabendo
+que sentido procurar. Comparando essa semente com a glosa do raio-X saem dois estados no lugar de
+um: **`fila-mesmo`** (mesmo sentido — o item some da lista, como um já estudado) e
+**`fila-outro`** ("está no Preparar, mas com outro sentido" — fica, porque é caso novo).
+
+Medido: `live large` enfileirado como "viver com luxo" some quando a glosa é essa e **aparece**
+quando é "gastar muito dinheiro"; `run` enfileirado como "correr" some para "correr" e aparece
+para "administrar, gerir"; item sem semente continua no `fila` genérico.
+
 **Medido:** `live large` em `pending_ai` → `fila`; `ore` com "veio de mina" estudado → `outro`
 para "minério" e `sentido` para "veio de mina"; termo desconhecido → novo. Na tela, o chip passou
 a dizer *"expressão · C1 · já está no Preparar, esperando análise"*.

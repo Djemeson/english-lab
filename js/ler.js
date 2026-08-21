@@ -2874,6 +2874,7 @@ function _lerRaioXBlocoHTML() {
                   x.ja === 'outro' ? ' — você tem esta palavra com OUTRO sentido'
                   : x.ja === 'marcada' ? ' — você marcou como conhecida'
                   : x.ja === 'fila' ? ' — já está no Preparar, esperando análise'
+                  : x.ja === 'fila-outro' ? ' — está no Preparar, mas com OUTRO sentido'
                   : ' — clique para mandar ao Preparar'))}">
           <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}
         </button>

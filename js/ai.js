@@ -1426,7 +1426,10 @@ async function aiAnalisarDificuldade({ texto, lang = 'en', nivel, maxItens = 40,
       const k = x.t.toLowerCase()
       if (vistos.has(k)) return false
       vistos.add(k)
-      return x.ja !== 'sentido'          // só o sentido JÁ ESTUDADO some
+      // Some o que ele já tratou COM ESTE SENTIDO: estudado, ou já mandado ao
+      // Preparar com a mesma glosa. O resto fica — inclusive a mesma palavra
+      // enfileirada com outro sentido, que é caso novo.
+      return x.ja !== 'sentido' && x.ja !== 'fila-mesmo'
     })
   itens.incompleto = falhas > 0
   return itens
@@ -1590,9 +1593,10 @@ function _difChipAbrir(mk, cfgChip) {
   difChipFechar()
   const tipo = x.tipo || 'word'
   const situacao = {
-    outro:   'você tem esta palavra com outro sentido',
-    marcada: 'você marcou como conhecida',
-    fila:    'já está no Preparar, esperando análise'
+    outro:        'você tem esta palavra com outro sentido',
+    marcada:      'você marcou como conhecida',
+    fila:         'já está no Preparar, esperando análise',
+    'fila-outro': 'está no Preparar, mas com outro sentido'
   }
   const p = document.createElement('div')
   p._id = id
@@ -1678,10 +1682,17 @@ function aiJaConhecido(x) {
     // Ele pegou o erro com todas as letras: mandou `live large` ao Preparar, a
     // análise ainda não tinha rodado (o item estava em `pending_ai`, sem
     // `meanings`), e o raio-X anunciava *"você tem esta palavra com outro
-    // sentido"* sobre o MESMO trecho de onde ela saiu. Afirmação falsa dita com
-    // convicção — o mesmo tipo de defeito do "nada difícil aqui" (§8.64).
-    // O estado certo é `fila`: já está no Preparar, o sentido ainda não existe.
-    if (!sentidos.length) return 'fila'
+    // sentido"* sobre o MESMO trecho de onde ela saiu.
+    //
+    // E dá para ir além do "não sei", como ele perguntou em seguida: quando o
+    // item foi mandado por um chip, a glosa daquela passagem viaja junto como
+    // SEMENTE (`_seedMeaning`, ver `lexaChipParaPreparar`). Ela responde a
+    // pergunta certa — está na fila com ESTE sentido, ou com outro?
+    if (!sentidos.length) {
+      const semente = String(item._seedMeaning || '').trim()
+      if (!semente) return 'fila'                                   // veio por outro caminho
+      return aiSentidoParecido(semente, x.pt) ? 'fila-mesmo' : 'fila-outro'
+    }
     return sentidos.some(m => aiSentidoParecido(m, x.pt)) ? 'sentido' : 'outro'
   }
   if (typeof isKnownWord === 'function' && x.tipo === 'word' && isKnownWord(x.t)) return 'marcada'
