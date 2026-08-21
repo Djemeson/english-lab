@@ -157,6 +157,113 @@ async function livroApagarDaNuvem(id) {
 }
 
 // ================================================================
+// O ÁUDIO DO AUDIOLIVRO NA NUVEM
+// ================================================================
+// Até aqui o áudio ficava só no aparelho, e o app dizia isso na cara: *"Audiolivro
+// não sobe para a nuvem (são centenas de MB)"*. Ele pediu o contrário, e com
+// motivo: *"quero ter a capacidade de ouvir tanto no desktop quanto no celular
+// com todo material gerado"*. Transcrição, marcadores e análise já atravessavam;
+// só o áudio não, e sem ele o resto não serve para nada no outro aparelho.
+//
+// ⚠️ ESTE É O ARQUIVO MAIS PESADO DO APP — de 100 MB a 1 GB, contra 4 MB de um
+// EPUB. Por isso NADA aqui é automático: o EPUB sobe sozinho porque cabe; o
+// audiolivro só sobe quando ele mandar, e a subida mostra byte a byte o que está
+// acontecendo, com botão de cancelar. Subir 700 MB sem avisar seria queimar a
+// franquia de dados do celular dele em segundo plano.
+//
+// Um audiolivro pode ser UM `.m4b` ou 40 faixas: cada arquivo tem seu lugar
+// (`.../audiolivros/<id>/<n>`), e cada um sobe e desce sozinho. Assim, trocar de
+// aparelho no meio do capítulo 12 baixa a faixa 12, não o livro inteiro.
+function _abNuvemRef(id, n) {
+  if (!_fbStore || !_fbUser) return null
+  return _fbStore.ref(`users/${_fbUser.uid}/audiolivros/${encodeURIComponent(id)}/${n}`)
+}
+
+// O que já está lá, sem baixar nada. Uma listagem só, em vez de N perguntas:
+// um livro em 40 faixas daria 40 idas à rede antes de mostrar a estante.
+async function abNuvemListar(id) {
+  const mapa = {}
+  try {
+    if (!_fbStore || !_fbUser) return mapa
+    const pasta = _fbStore.ref(`users/${_fbUser.uid}/audiolivros/${encodeURIComponent(id)}`)
+    const r = await pasta.listAll()
+    for (const item of (r.items || [])) {
+      const n = Number(item.name)
+      if (!Number.isFinite(n)) continue
+      try { const m = await item.getMetadata(); mapa[n] = Number(m.size) || 0 }
+      catch (e) { mapa[n] = 0 }
+    }
+  } catch (e) { console.warn('[Firebase] audiolivro, listagem:', e.code || e.message) }
+  return mapa
+}
+
+// A subida, com progresso e cancelamento. Uma de cada vez, de propósito: seis
+// arquivos de 30 MB em paralelo entopem a subida de quem está de 4G e fazem a
+// barra andar em pulos.
+let _abNuvemTask = null
+function abNuvemSubindo() { return !!_abNuvemTask }
+function abNuvemCancelar() { try { _abNuvemTask && _abNuvemTask.cancel() } catch (e) {} }
+
+function abNuvemSubirArquivo(id, n, blob, aoAndar) {
+  return new Promise((res, rej) => {
+    const r = _abNuvemRef(id, n)
+    if (!r) return rej(new Error('sem-login'))
+    const task = r.put(blob, { contentType: blob.type || 'audio/mpeg' })
+    _abNuvemTask = task
+    task.on('state_changed',
+      st => { if (aoAndar) aoAndar(st.bytesTransferred, st.totalBytes) },
+      e => { _abNuvemTask = null; rej(e) },
+      () => { _abNuvemTask = null; res(true) })
+  })
+}
+
+// A descida também precisa de barra: 40 MB numa rede ruim são dois minutos de
+// tela parada, e tela parada parece travamento. `Content-Length` vem no
+// cabeçalho do Storage, então dá para contar de verdade em vez de fingir.
+async function abNuvemBaixarArquivo(id, n, aoAndar) {
+  const r = _abNuvemRef(id, n)
+  if (!r) throw new Error('sem-login')
+  const url = await r.getDownloadURL()
+  const resp = await fetch(url)
+  if (!resp.ok) throw new Error('download ' + resp.status)
+  const total = Number(resp.headers.get('content-length')) || 0
+  const tipo = resp.headers.get('content-type') || 'audio/mpeg'
+  if (!resp.body || !aoAndar) return await resp.blob()
+  const leitor = resp.body.getReader()
+  const partes = []
+  let lidos = 0
+  for (;;) {
+    const { done, value } = await leitor.read()
+    if (done) break
+    partes.push(value); lidos += value.length
+    aoAndar(lidos, total)
+  }
+  return new Blob(partes, { type: tipo })
+}
+
+async function abNuvemApagar(id, arquivos) {
+  let n = 0
+  for (let i = 0; i < Math.max(1, arquivos || 1); i++) {
+    try { const r = _abNuvemRef(id, i); if (r) { await r.delete(); n++ } } catch (e) {}
+  }
+  return n
+}
+
+// Qual dos dois registros de subida sabe mais. Empate de partes desempata pela
+// data: o mais novo viu o estado mais recente.
+function _abNuvemMaisCompleta(a, b) {
+  if (!a) return b || null
+  if (!b) return a
+  const na = Object.keys(a.partes || {}).length, nb = Object.keys(b.partes || {}).length
+  if (na !== nb) return na > nb ? a : b
+  return (a.em || 0) >= (b.em || 0) ? a : b
+}
+
+async function abNuvemPorQueNaoVeio(id, n) {
+  return nuvemDiagnostico(_abNuvemRef(id, n || 0))
+}
+
+// ================================================================
 // POR QUE O ARQUIVO NÃO VEIO
 // ================================================================
 // ⚠️ A MENSAGEM AFIRMAVA UM FATO QUE O APP NUNCA VERIFICOU. "O arquivo deste
@@ -809,8 +916,14 @@ function applyCloudDocs(docs) {
     const juntos = nuvem.map(remoto => {
       const local = locais.get(remoto.id)
       if (!local) return remoto
-      if (local.id === abertoId) return local          // tocando aqui: manda quem toca
-      return (local.updatedAt || 0) > (remoto.updatedAt || 0) ? local : remoto
+      const vencedor = local.id === abertoId ? local   // tocando aqui: manda quem toca
+        : (local.updatedAt || 0) > (remoto.updatedAt || 0) ? local : remoto
+      // ⚠️ `nuvem` NÃO obedece ao vencedor: ela descreve o que está no Storage,
+      // um fato do mundo, não uma preferência deste aparelho. Se o celular subiu
+      // o áudio e o computador salvou a posição depois, o registro da subida não
+      // pode sumir junto — senão o computador acha que nunca subiu e sobe de novo.
+      const nv = _abNuvemMaisCompleta(local.nuvem, remoto.nuvem)
+      return nv ? { ...vencedor, nuvem: nv } : vencedor
     })
     for (const a of audiolivros) {
       if (nuvem.some(r => r.id === a.id)) continue

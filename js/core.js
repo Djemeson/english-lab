@@ -714,6 +714,9 @@ const ICONS = {
   palette:'<path d="M12 2a10 10 0 1 0 0 20 2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2h1a4 4 0 0 0 4-4 9 9 0 0 0-9-9z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/>',
   wrench:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.1 2.1-2.3-.6-.6-2.3z"/>',
   cloud:'<path d="M17.5 19a4.5 4.5 0 0 0 .5-9 6 6 0 0 0-11.6-1.5A4 4 0 0 0 7 19z"/>',
+  // "Neste aparelho" no painel de nuvem do audiolivro: um monitor com base, que
+  // lê como "a máquina onde voce esta" tanto no desktop quanto no celular.
+  device:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
   database:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6a8 3 0 0 0 16 0V5"/><path d="M4 11v6a8 3 0 0 0 16 0v-6"/>',
   volume:'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/>',
   pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
@@ -1560,7 +1563,7 @@ function confirmModal({ title, html = '', confirmText = 'Continuar', cancelText 
       </div>
       <div class="confirm-body">${html}</div>
       <div class="confirm-actions">
-        <button class="btn btn-ghost btn-sm" id="el-confirm-cancel">${esc(cancelText)}</button>
+        ${cancelText ? `<button class="btn btn-ghost btn-sm" id="el-confirm-cancel">${esc(cancelText)}</button>` : ''}
         <button class="btn ${danger ? 'btn-danger' : 'btn-primary'} btn-sm" id="el-confirm-ok">${esc(confirmText)}</button>
       </div>
     </div>`
@@ -1571,7 +1574,10 @@ function confirmModal({ title, html = '', confirmText = 'Continuar', cancelText 
     }
     document.addEventListener('keydown', teclas)
     document.getElementById('el-confirm-ok').onclick = () => done(true)
-    document.getElementById('el-confirm-cancel').onclick = () => done(false)
+    // Aviso sem escolha (`cancelText: ''`) não mostra botão de cancelar: dois
+    // botões para uma informação só fazem parecer que existe decisão a tomar.
+    const bc = document.getElementById('el-confirm-cancel')
+    if (bc) bc.onclick = () => done(false)
     setTimeout(() => document.getElementById('el-confirm-ok')?.focus(), 30)
   })
 }

@@ -5207,6 +5207,32 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ab-card-tempo{font-size:var(--fs-3xs);color:var(--text3);margin-top:2px}
 .ab-drop{min-height:220px}
 
+/* ---- o áudio na nuvem ----
+   O selo do card fica no canto OPOSTO ao "remover" e, quando já está guardado,
+   aparece sem hover: é a resposta para "dá para ouvir isso no celular?", e ela
+   precisa ser visível de relance na estante inteira. */
+.ab-card-nuvem{
+  position:absolute;top:6px;left:6px;opacity:0;transition:opacity .15s,background .15s;
+  background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:6px;
+  width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.ab-card:hover .ab-card-nuvem{opacity:1}
+.ab-card-nuvem.on{opacity:.92;background:rgba(var(--primary-rgb),.85)}
+.ab-card-nuvem:hover{background:rgba(var(--primary-rgb),1)}
+.ab-nuvem-grade{display:grid;gap:8px;margin-bottom:16px}
+.ab-nuvem-linha{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;
+  padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);
+}
+.ab-nuvem-ic{color:var(--text3);display:flex}
+.ab-nuvem-tit{font-size:var(--fs-sm);font-weight:600;display:flex;flex-direction:column;min-width:0}
+.ab-nuvem-tit em{font-style:normal;font-weight:400;font-size:var(--fs-3xs);color:var(--text3)}
+.ab-nuvem-linha b{font-size:var(--fs-sm);white-space:nowrap}
+.ab-nuvem-prog{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.ab-nuvem-prog p{font-size:var(--fs-sm);color:var(--text2)}
+.ab-nuvem-prog .est-ficha-barra{width:100%}
+.ab-nuvem-acoes{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+
 /* ---- reprodutor ---- */
 .ab-player{max-width:1000px}
 .ab-topo{display:grid;grid-template-columns:220px minmax(0,1fr);gap:32px;align-items:start;margin-bottom:30px}

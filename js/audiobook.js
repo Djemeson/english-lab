@@ -94,9 +94,10 @@ function _abRenderEstante() {
         <button class="btn btn-ghost btn-sm" onclick="abCatalogoModal()">${ic('search','ic-sm')} Marcar um que quero ouvir</button>
       </div>
       <div class="ler-vazio-dica">
-        <b>O arquivo fica só neste aparelho.</b> Um audiolivro tem centenas de megabytes, então
-        ele não sobe para a nuvem — o que acompanha você entre aparelhos é a lista de capítulos,
-        onde você parou e seus marcadores.
+        <b>O arquivo entra neste aparelho primeiro.</b> Um audiolivro tem centenas de megabytes,
+        então ele não sobe sozinho — mas dá para <b>guardar na nuvem</b> pelo ícone de nuvem no
+        card, e aí o livro toca também no celular. A lista de capítulos, onde você parou e seus
+        marcadores viajam de qualquer jeito.
       </div>`
     return
   }
@@ -123,6 +124,11 @@ function _abRenderEstante() {
         <div class="ler-card-barra"><i style="width:${pct}%;background:var(--role-energia)"></i></div>
         <button class="ler-card-x" data-tip="Remover"
                 onclick="event.stopPropagation();abExcluir('${a.id}')">${ic('trash','ic-sm')}</button>
+        ${semAudio ? '' : `<button class="ab-card-nuvem${abNuvemCompleto(a) ? ' on' : ''}"
+                data-tip="${escA(abNuvemCompleto(a)
+                  ? 'O áudio está na sua nuvem — toca em qualquer aparelho seu'
+                  : 'O áudio só existe neste aparelho. Clique para guardar na nuvem')}"
+                onclick="event.stopPropagation();abNuvemPainel('${a.id}')">${ic('cloud','ic-sm')}</button>`}
       </div>`
     }).join('')
   area.innerHTML = `<div class="ler-estante ab-estante">${cards}</div>`
@@ -1630,6 +1636,355 @@ function abTempoLongo(seg) {
 }
 
 // ================================================================
+// O ÁUDIO NA NUVEM — subir, trazer de volta e liberar espaço
+// ================================================================
+// Pedido dele, palavra por palavra: *"atualmente o audiobook não é mandado pra
+// nuvem, mas isso é necessário pq quero ter a capacidade de ouvir tanto no
+// desktop quanto no celular com todo material gerado."*
+//
+// O resto já atravessava — capítulos, posição, marcadores, transcrição, raio-X.
+// Só o áudio não, e sem ele nada disso serve no outro aparelho: abrir o livro no
+// celular mostrava a estante e um aviso mandando importar o arquivo de novo.
+//
+// ⚠️ TRÊS DECISÕES QUE SUSTENTAM ISTO:
+//
+// 1. **Nunca automático.** O EPUB sobe sozinho porque tem 4 MB; um audiolivro
+//    tem de 100 MB a 1 GB. Subir isso sem ele mandar seria gastar a franquia do
+//    celular em segundo plano — então é sempre um clique consciente, com o
+//    tamanho na tela ANTES de começar.
+// 2. **Arquivo por arquivo, sob demanda.** Num livro em 40 faixas, chegar no
+//    capítulo 12 baixa a faixa 12 (uns 30 MB), não o livro inteiro. Quem quiser
+//    tudo de uma vez tem o botão para isso.
+// 3. **Nuvem e aparelho são estados separados.** Estar na nuvem não obriga a
+//    ocupar disco aqui; "liberar espaço" apaga o local e mantém o de lá. Por
+//    isso a lista do que está no aparelho NUNCA sincroniza: ela é uma pergunta
+//    ao IndexedDB desta máquina, e a resposta é diferente em cada uma.
+const AB_NUVEM_AVISO_MB = 300     // acima disto, o aviso fica mais duro
+
+function abNuvemMB(bytes) {
+  const mb = (bytes || 0) / 1048576
+  if (mb >= 1024) return String(Math.round(mb / 1024 * 10) / 10).replace('.', ',') + ' GB'
+  return Math.round(mb) + ' MB'
+}
+
+// O que está NESTE aparelho. Uma varredura das chaves, não N leituras: ler 40
+// blobs de 30 MB só para saber se existem carregaria 1,2 GB na memória à toa.
+async function abNoAparelho(id) {
+  const pre = `ab:${id}:`
+  const tem = {}
+  for (const k of await BookDB.keys()) {
+    if (typeof k !== 'string' || !k.startsWith(pre)) continue
+    const n = Number(k.slice(pre.length))
+    if (Number.isFinite(n)) tem[n] = true
+  }
+  return tem
+}
+
+function _abNuvemPartes(a) { return (a && a.nuvem && a.nuvem.partes) || {} }
+function abNuvemCompleto(a) {
+  const n = Math.max(1, (a && a.arquivos) || 0)
+  const p = _abNuvemPartes(a)
+  for (let i = 0; i < n; i++) if (!p[i]) return false
+  return true
+}
+
+function _abNuvemGravar(a, n, bytes) {
+  a.nuvem = a.nuvem || { partes: {} }
+  a.nuvem.partes = { ...(a.nuvem.partes || {}), [n]: bytes || 1 }
+  a.nuvem.em = Date.now()
+  a.updatedAt = Date.now()
+  saveAudiolivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+}
+
+// ---- O PAINEL: o que está onde, e o que dá para fazer ----
+async function abNuvemPainel(id) {
+  const a = audiolivroPorId(id); if (!a) return
+  document.getElementById('ab-nuvem')?.remove()
+  const ov = document.createElement('div')
+  ov.id = 'ab-nuvem'; ov.className = 'srs-modal-overlay'
+  ov.addEventListener('click', e => { if (e.target === ov && !abNuvemSubindo()) ov.remove() })
+  ov.innerHTML = `<div class="srs-modal-box" style="width:100%;max-width:520px">
+    <div id="ab-nuvem-corpo"><p class="est-dica">Vendo o que já está na sua nuvem…</p></div></div>`
+  document.body.appendChild(ov)
+  await _abNuvemRender(id)
+}
+
+async function _abNuvemRender(id, msg, pct) {
+  const box = document.getElementById('ab-nuvem-corpo'); if (!box) return
+  const a = audiolivroPorId(id); if (!a) return
+  const total = Math.max(1, a.arquivos || 0)
+  const aqui = await abNoAparelho(id)
+  const nAqui = Object.keys(aqui).length
+
+  // A verdade sobre a nuvem vem de LÁ, e não do registro salvo aqui: o registro
+  // pode estar velho (subiu no celular) ou mentir (foi apagado por fora).
+  let partes = _abNuvemPartes(a)
+  if (msg == null) {
+    const real = await abNuvemListar(id)
+    if (Object.keys(real).length || Object.keys(partes).length) {
+      partes = real
+      a.nuvem = Object.keys(real).length ? { partes: real, em: Date.now() } : null
+      a.updatedAt = Date.now()
+      saveAudiolivros()
+    }
+  }
+  const nNuvem = Object.keys(partes).length
+  const bytesNuvem = Object.values(partes).reduce((t, b) => t + (Number(b) || 0), 0)
+
+  const linha = (icone, titulo, valor, dica) => `
+    <div class="ab-nuvem-linha">
+      <span class="ab-nuvem-ic">${ic(icone, 'ic-sm')}</span>
+      <span class="ab-nuvem-tit">${titulo}<em>${dica}</em></span>
+      <b>${valor}</b>
+    </div>`
+
+  const ocupado = msg != null
+  box.innerHTML = `
+    <h4 style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px">${esc(a.title || 'Audiolivro')}</h4>
+    <p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">
+      Onde está o áudio deste livro — ${total === 1 ? 'um arquivo' : `${total} arquivos`}.</p>
+
+    <div class="ab-nuvem-grade">
+      ${linha('device', 'Neste aparelho', nAqui + ' de ' + total,
+              nAqui === total ? 'toca na hora' : nAqui ? 'o resto baixa quando chegar lá' : 'nada guardado aqui')}
+      ${linha('cloud', 'Na sua nuvem', nNuvem + ' de ' + total,
+              nNuvem ? abNuvemMB(bytesNuvem) + ' guardados' : 'ainda não subiu')}
+    </div>
+
+    ${ocupado ? `<div class="ab-nuvem-prog">
+      <p>${esc(msg)}</p>
+      <div class="est-ficha-barra"><i style="width:${Math.round((pct || 0) * 100)}%;background:var(--role-energia)"></i></div>
+      <button class="btn btn-ghost btn-sm" onclick="abNuvemCancelar()">Cancelar</button>
+    </div>` : `
+    <div class="ab-nuvem-acoes">
+      ${nNuvem < total ? `<button class="btn btn-primary btn-sm" onclick="abNuvemGuardar('${id}')">
+        ${ic('cloud','ic-sm')} Guardar na nuvem${nNuvem ? ' (o que falta)' : ''}</button>` : ''}
+      ${nAqui < total && nNuvem > 0 ? `<button class="btn btn-ghost btn-sm" onclick="abNuvemTrazer('${id}')">
+        ${ic('download','ic-sm')} Baixar tudo para cá</button>` : ''}
+      ${nAqui > 0 && nNuvem >= total ? `<button class="btn btn-ghost btn-sm" onclick="abNuvemLiberar('${id}')">
+        ${ic('trash','ic-sm')} Liberar espaço aqui</button>` : ''}
+      ${nNuvem > 0 ? `<button class="btn btn-ghost btn-sm" onclick="abNuvemTirar('${id}')">Tirar da nuvem</button>` : ''}
+    </div>
+    <p class="est-dica">${nNuvem >= total
+      ? 'Com o áudio na nuvem, abrir este livro em outro aparelho baixa só o capítulo que você for ouvir.'
+      : 'Enquanto o áudio não subir, este livro só toca neste aparelho — a posição e os marcadores viajam mesmo assim.'}</p>`}
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost btn-sm" ${ocupado ? 'disabled' : ''}
+              onclick="document.getElementById('ab-nuvem').remove()">Fechar</button>
+    </div>`
+}
+
+// ⚠️ A BARRA NÃO PODE REPINTAR O PAINEL INTEIRO. `_abNuvemRender` varre todas as
+// chaves do IndexedDB e pergunta à nuvem o que já está lá — e o progresso de uma
+// subida de 700 MB dispara dezenas de vezes por segundo. Enquanto anda, só o
+// texto e a largura da barra mudam.
+function _abNuvemAndar(msg, pct) {
+  const box = document.getElementById('ab-nuvem-corpo'); if (!box) return
+  const p = box.querySelector('.ab-nuvem-prog > p')
+  const b = box.querySelector('.ab-nuvem-prog .est-ficha-barra > i')
+  if (!p || !b) return
+  p.textContent = msg
+  b.style.width = Math.round((pct || 0) * 100) + '%'
+}
+
+// ---- SUBIR ----
+async function abNuvemGuardar(id) {
+  const a = audiolivroPorId(id); if (!a) return
+  const total = Math.max(1, a.arquivos || 0)
+  const partes = _abNuvemPartes(a)
+  const faltam = []
+  let bytes = 0
+  for (let n = 0; n < total; n++) {
+    if (partes[n]) continue
+    const b = await BookDB.get(abChaveArquivo(id, n))
+    if (!b) continue
+    faltam.push({ n, blob: b }); bytes += b.size
+  }
+  const maior = faltam.reduce((m, x) => Math.max(m, x.blob.size), 0)
+  if (!faltam.length) {
+    toast('Não há nada aqui para subir — o que falta na nuvem também não está neste aparelho.', 'warning')
+    return
+  }
+
+  const mb = bytes / 1048576
+  const ok = await confirmModal({
+    title: 'Guardar o áudio na nuvem', icon: 'cloud', confirmText: 'Guardar',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Vou enviar <b>${abNuvemMB(bytes)}</b>${faltam.length > 1 ? ` em ${faltam.length} arquivos` : ''}
+      para a sua nuvem. Depois disso, este livro abre e toca em qualquer aparelho seu.<br><br>
+      ${mb > AB_NUVEM_AVISO_MB ? `<b>É bastante coisa.</b> Numa conexão móvel isso pesa na franquia —
+        vale fazer no Wi-Fi. ` : ''}A subida mostra o andamento e dá para cancelar no meio; o que já
+      tiver subido fica lá e não sobe de novo.<br><br>
+      ${maior > 48 * 1048576 ? `<b>Aviso:</b> o maior arquivo aqui tem ${abNuvemMB(maior)} e a regra
+        da sua nuvem aceita <b>50 MB</b> por arquivo hoje — se ela não tiver sido ampliada, o envio
+        vai ser recusado.<br><br>` : ''}
+      <b>Não feche a aba</b> enquanto envia.</p>`
+  })
+  if (!ok) return
+
+  await _abNuvemRender(id, 'Começando o envio…', 0)   // desenha a moldura da barra
+  try {
+    let feitos = 0
+    for (const item of faltam) {
+      await abNuvemSubirArquivo(id, item.n, item.blob, (env, tot) => {
+        const doArquivo = tot ? env / tot : 0
+        const geral = (feitos + doArquivo) / faltam.length
+        _abNuvemAndar(
+          faltam.length > 1
+            ? `Enviando ${feitos + 1} de ${faltam.length} — ${abNuvemMB(env)} de ${abNuvemMB(tot)}`
+            : `Enviando ${abNuvemMB(env)} de ${abNuvemMB(tot)}`,
+          geral)
+      })
+      _abNuvemGravar(a, item.n, item.blob.size)
+      feitos++
+    }
+    toast('Áudio guardado na nuvem. Já dá para ouvir em outro aparelho.', 'success')
+  } catch (e) {
+    const c = String(e.code || e.message || '')
+    if (c.includes('canceled')) toast('Envio cancelado. O que já subiu ficou lá.', 'info')
+    else if (c.includes('sem-login')) toast('Entre com o Google para guardar na nuvem.', 'warning')
+    else if (c.includes('quota') || c.includes('retry-limit')) toast('Sua nuvem recusou o envio (espaço ou tempo esgotado). Tente de novo.', 'error')
+    else if (c.includes('unauthorized')) _abNuvemAvisoTeto(bytes / Math.max(1, faltam.length))
+    else toast('O envio falhou: ' + c, 'error')
+  }
+  await _abNuvemRender(id)
+  renderAudiobookSection()
+}
+
+// ⚠️ O ERRO QUE O FIREBASE NÃO EXPLICA. A regra do Storage foi escrita quando o
+// que subia era EPUB (4 MB) e episódio de vídeo, e ela recusa qualquer arquivo
+// acima de 50 MB. Audiolivro passa disso com folga — e a resposta é um seco
+// "unauthorized", a mesma palavra de quem não está logado. Sem esta frase, ele
+// tentaria de novo achando que foi a rede.
+function _abNuvemAvisoTeto(bytesMedio) {
+  const grande = bytesMedio > 48 * 1048576
+  confirmModal({
+    title: grande ? 'O arquivo é maior do que sua nuvem aceita' : 'Sua nuvem recusou o envio',
+    icon: 'cloud', confirmText: 'Entendi', cancelText: '',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      ${grande ? `Este áudio tem <b>${abNuvemMB(bytesMedio)}</b>, e a regra de segurança da sua
+        nuvem hoje aceita no máximo <b>50 MB por arquivo</b> — o número foi escolhido quando só
+        subiam livros e vídeos.<br><br>
+        Para liberar, no <b>Console do Firebase → Storage → Rules</b>, troque o
+        <code>50</code> por <code>1024</code> na linha do tamanho e publique.` :
+        `Sua nuvem recusou o envio deste arquivo. Se você acabou de entrar, saia e entre de novo
+         com o Google; se o arquivo for grande, veja o limite de tamanho nas regras do Storage.`}
+    </p>`
+  })
+}
+
+// ---- TRAZER DE VOLTA ----
+// Um arquivo só, com barra. É a peça que `abAbrir` e a troca de capítulo usam:
+// quem chega num aparelho novo não precisa saber que existe download nenhum.
+async function _abTrazerArquivo(id, n, pintar) {
+  const blob = await abNuvemBaixarArquivo(id, n, (lidos, tot) => {
+    if (pintar) pintar(`Baixando ${abNuvemMB(lidos)}${tot ? ' de ' + abNuvemMB(tot) : ''}…`, tot ? lidos / tot : null)
+  })
+  await BookDB.set(abChaveArquivo(id, n), blob)
+  return blob
+}
+
+async function abNuvemTrazer(id) {
+  const a = audiolivroPorId(id); if (!a) return
+  const total = Math.max(1, a.arquivos || 0)
+  const aqui = await abNoAparelho(id)
+  const partes = _abNuvemPartes(a)
+  const faltam = []
+  for (let n = 0; n < total; n++) if (!aqui[n] && partes[n]) faltam.push(n)
+  if (!faltam.length) { toast('Já está tudo neste aparelho.', 'info'); return }
+  await _abNuvemRender(id, 'Começando o download…', 0)
+  try {
+    let feitos = 0
+    for (const n of faltam) {
+      await _abTrazerArquivo(id, n, (m, pct) => {
+        const geral = (feitos + (pct || 0)) / faltam.length
+        _abNuvemAndar(faltam.length > 1 ? `${feitos + 1} de ${faltam.length} — ${m}` : m, geral)
+      })
+      feitos++
+    }
+    toast('Áudio baixado. Toca sem internet a partir de agora.', 'success')
+  } catch (e) {
+    toast('O download falhou: ' + String(e.code || e.message || ''), 'error')
+  }
+  await _abNuvemRender(id)
+  renderAudiobookSection()
+}
+
+// ---- LIBERAR ESPAÇO ----
+// ⚠️ Só aparece com TUDO na nuvem. Apagar o local com metade lá em cima seria
+// destruir a única cópia da outra metade.
+async function abNuvemLiberar(id) {
+  const a = audiolivroPorId(id); if (!a) return
+  if (!abNuvemCompleto(a)) { toast('Guarde tudo na nuvem antes de liberar o espaço daqui.', 'warning'); return }
+  const total = Math.max(1, a.arquivos || 0)
+  const aqui = await abNoAparelho(id)
+  let bytes = 0
+  for (const n of Object.keys(aqui)) {
+    const b = await BookDB.get(abChaveArquivo(id, n)); if (b) bytes += b.size
+  }
+  const ok = await confirmModal({
+    title: 'Liberar espaço neste aparelho', icon: 'trash', confirmText: 'Liberar', danger: true,
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Apagar <b>${abNuvemMB(bytes)}</b> de áudio <b>daqui</b>. A cópia da nuvem fica intacta, e o
+      livro continua abrindo — o capítulo que você tocar baixa na hora.<br><br>
+      Sua posição, seus marcadores e as transcrições <b>não</b> são tocados.</p>`
+  })
+  if (!ok) return
+  if (_abLivro && _abLivro.id === id) abFechar()
+  for (const n of Object.keys(aqui)) await BookDB.del(abChaveArquivo(id, n))
+  toast(`${abNuvemMB(bytes)} liberados neste aparelho.`, 'success')
+  await _abNuvemRender(id)
+  renderAudiobookSection()
+}
+
+// ---- TIRAR DA NUVEM ----
+async function abNuvemTirar(id) {
+  const a = audiolivroPorId(id); if (!a) return
+  const total = Math.max(1, a.arquivos || 0)
+  const aqui = await abNoAparelho(id)
+  const soLa = Object.keys(aqui).length < total
+  const ok = await confirmModal({
+    title: 'Tirar o áudio da nuvem', icon: 'cloud', confirmText: 'Tirar', danger: true,
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Apagar a cópia da nuvem. O livro continua tocando em qualquer aparelho que já tenha o
+      arquivo — mas para de tocar nos outros.
+      ${soLa ? `<br><br><b>Atenção:</b> parte deste áudio <b>só existe na nuvem</b> — este aparelho
+        não tem tudo. Tirando de lá, essa parte se perde.` : ''}</p>`
+  })
+  if (!ok) return
+  const n = await abNuvemApagar(id, total)
+  a.nuvem = null
+  a.updatedAt = Date.now()
+  saveAudiolivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  toast(n ? 'Áudio removido da nuvem.' : 'Não havia nada na nuvem para remover.', 'info')
+  await _abNuvemRender(id)
+  renderAudiobookSection()
+}
+
+// ---- A PONTE: garantir o arquivo antes de tocar ----
+// Chamada por quem vai USAR o áudio. Devolve o blob, baixando se precisar — e
+// diz em português por que não deu, em vez do antigo "importe de novo" que valia
+// para tudo (inclusive para quem só estava deslogado).
+async function abGarantirArquivo(a, n, pintar) {
+  const jaTem = await BookDB.get(abChaveArquivo(a.id, n))
+  if (jaTem) return jaTem
+  if (!_abNuvemPartes(a)[n]) {
+    const d = await abNuvemPorQueNaoVeio(a.id, n)
+    if (d.estado !== 'existe') { toast(nuvemFrase(d, 'o áudio deste livro'), 'warning'); return null }
+  }
+  try {
+    return await _abTrazerArquivo(a.id, n, pintar)
+  } catch (e) {
+    const d = await abNuvemPorQueNaoVeio(a.id, n)
+    toast(nuvemFrase(d, 'o áudio deste livro'), 'error')
+    return null
+  }
+}
+
+// ================================================================
 // ABRIR E FECHAR
 // ================================================================
 async function abAbrir(id) {
@@ -1637,12 +1992,16 @@ async function abAbrir(id) {
   // Item que entrou pelo catálogo ainda não tem o que tocar: o clique vira o
   // convite para anexar, e não um erro.
   if (!a.arquivos || !(a.capitulos || []).length) { abAnexarArquivo(id); return }
-  const primeiro = await BookDB.get(abChaveArquivo(id, 0))
+  // ⚠️ AQUI ESTAVA O FIM DA LINHA. Antes desta versão, abrir um audiolivro cujo
+  // áudio não estivesse NESTE aparelho dava um aviso e parava — porque o áudio
+  // não subia para lugar nenhum. Agora ele pode estar na nuvem, e o primeiro
+  // arquivo desce sozinho, com barra: o download não é uma tarefa dele.
+  const cap0 = (a.capitulos || [])[0] || { arq: 0 }
+  let primeiro = await BookDB.get(abChaveArquivo(id, cap0.arq || 0))
   if (!primeiro) {
-    // ⚠️ FRASE HONESTA: o arquivo não está na nuvem por decisão de projeto, e
-    // não por falha. Dizer "baixando…" seria mentir para sempre.
-    toast('O áudio deste livro não está neste aparelho. Audiolivro não sobe para a nuvem (são centenas de MB) — importe o arquivo de novo aqui.', 'warning')
-    return
+    _abPintarBaixando(a, 'Procurando o áudio na sua nuvem…', null)
+    primeiro = await abGarantirArquivo(a, cap0.arq || 0, (m, pct) => _abPintarBaixando(a, m, pct))
+    if (!primeiro) { renderAudiobookSection(); return }
   }
   _abLivro = a
   _abCap = Math.min(a.pos?.cap || 0, (a.capitulos || []).length - 1)
@@ -1654,6 +2013,19 @@ async function abAbrir(id) {
   renderAudiobookSection()
   await _abCarregarCapitulo(_abCap, a.pos?.seg || 0)
   document.addEventListener('keydown', _abTeclas)
+}
+
+// A tela do download, na área da estante. Não é modal de propósito: ele pode ir
+// fazer outra coisa no app enquanto os 40 MB chegam.
+function _abPintarBaixando(a, msg, pct) {
+  const area = el('ab-area'); if (!area) return
+  area.innerHTML = `<div class="est-nada" style="padding:56px 20px">
+    ${ic('cloud','ic-xl')}
+    <p><b>${esc(a.title || 'Audiolivro')}</b></p>
+    <p>${esc(msg)}</p>
+    <div class="est-ficha-barra" style="width:300px"><i style="width:${Math.round((pct || 0) * 100)}%;background:var(--role-energia)"></i></div>
+    <p class="est-dica">O áudio está na sua nuvem e está vindo para este aparelho. Da próxima vez
+      ele abre na hora.</p></div>`
 }
 
 function abFechar() {
@@ -1675,14 +2047,21 @@ function abFechar() {
 
 async function abExcluir(id) {
   const a = audiolivroPorId(id); if (!a) return
+  // ⚠️ Remover daqui NÃO pode deixar lixo pago na nuvem: o item some da estante
+  // em todos os aparelhos (a lista sincroniza), e sem o item ninguém mais teria
+  // como chegar naqueles arquivos para apagá-los.
+  const naNuvem = Object.keys(_abNuvemPartes(a)).length
   const ok = await confirmModal({
     title: 'Remover audiolivro', icon: 'trash', confirmText: 'Remover', danger: true,
     html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Apagar <b>${esc(a.title)}</b> e
            ${a.arquivos > 1 ? `os ${a.arquivos} arquivos de áudio` : 'o arquivo de áudio'} deste
-           aparelho. Seus marcadores e a posição vão junto.</p>`
+           aparelho. Seus marcadores e a posição vão junto.
+           ${naNuvem ? `<br><br>A cópia da <b>nuvem também é apagada</b> — o livro sai da estante em
+             todos os seus aparelhos.` : ''}</p>`
   })
   if (!ok) return
   for (let i = 0; i < Math.max(1, a.arquivos || 0); i++) await BookDB.del(abChaveArquivo(id, i))
+  if (naNuvem) await abNuvemApagar(id, a.arquivos || 1)
   audiolivros = audiolivros.filter(x => x.id !== id)
   saveAudiolivros()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
@@ -1855,8 +2234,18 @@ async function _abCarregarCapitulo(i, seg) {
   // moram no MESMO arquivo: recarregar a cada troca jogaria fora 500 MB já
   // decodificados e daria um engasgo de segundos entre capítulos.
   if (cap.arq !== _abArqAtual) {
-    const blob = await BookDB.get(abChaveArquivo(a.id, cap.arq))
-    if (!blob) { toast('Falta o arquivo desta parte neste aparelho.', 'error'); return }
+    let blob = await BookDB.get(abChaveArquivo(a.id, cap.arq))
+    if (!blob) {
+      // Num livro em 40 faixas, é aqui que a nuvem paga o aluguel: chegou no
+      // capítulo 12 e a faixa 12 não está aqui, ela desce agora — e só ela.
+      const antes = au.paused
+      try { au.pause() } catch (e) {}
+      _abPintarBaixando(a, 'Buscando esta parte na sua nuvem…', null)
+      blob = await abGarantirArquivo(a, cap.arq, (m, pct) => _abPintarBaixando(a, m, pct))
+      _abRenderPlayer()
+      if (!blob) return
+      if (!antes) _abQuerTocar = true
+    }
     if (_abUrl) { try { URL.revokeObjectURL(_abUrl) } catch (e) {} }
     _abUrl = URL.createObjectURL(blob)
     _abArqAtual = cap.arq
