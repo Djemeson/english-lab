@@ -90,18 +90,12 @@ async function _abManutencao() {
     await garantirArmazenamentoPersistente()
     await abLocaisSincronizar()
     const orfaos = await abOrfaosListar()
-    if (!orfaos.length) return
     const bytes = orfaos.reduce((s, x) => s + x.bytes, 0)
-    if (bytes < 20 * 1048576) return          // migalha não merece interrupção
-    const aviso = el('ab-area')
-    if (!aviso || _abLivro) return
-    const box = document.createElement('div')
-    box.className = 'ler-vazio-dica'
-    box.style.marginTop = '18px'
-    box.innerHTML = `<b>${abNuvemMB(bytes)} de áudio sem dono neste aparelho.</b>
-      Sobra de audiolivro que saiu da estante — o arquivo ficou para trás.
-      <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="abOrfaosLimpar()">Apagar e liberar</button>`
-    aviso.appendChild(box)
+    if (bytes === _abOrfaosBytes) return
+    _abOrfaosBytes = bytes
+    // Redesenha só quando há o que dizer, e só na estante: interromper o
+    // player para falar de espaço em disco seria trocar as prioridades dele.
+    if (bytes >= 20 * 1048576 && !_abLivro) renderAudiobookSection()
   } catch (e) { console.warn('[audiobook] manutenção:', e && e.message) }
 }
 
@@ -162,7 +156,24 @@ function _abRenderEstante() {
                 onclick="event.stopPropagation();abNuvemPainel('${a.id}')">${ic('cloud','ic-sm')}</button>`}
       </div>`
     }).join('')
-  area.innerHTML = `<div class="ler-estante ab-estante">${cards}</div>`
+  // ⚠️ O AVISO MORA NO HTML DA ESTANTE, e não appendChild depois. A primeira
+  // versão colava o aviso na área quando a varredura terminava — e o próximo
+  // `renderAudiobookSection` (que acontece o tempo todo) trocava o innerHTML e
+  // levava o aviso junto. Medido: o órfão era encontrado e a tela não mostrava
+  // nada.
+  area.innerHTML = `<div class="ler-estante ab-estante">${cards}</div>` + _abOrfaosAvisoHTML()
+}
+
+// Quanto há de áudio sem dono, medido pela última varredura. `0` = nada (ou
+// ainda não varreu) e a estante não fala nisso.
+let _abOrfaosBytes = 0
+function _abOrfaosAvisoHTML() {
+  if (_abOrfaosBytes < 20 * 1048576) return ''
+  return `<div class="ler-vazio-dica" style="margin-top:18px">
+    <b>${abNuvemMB(_abOrfaosBytes)} de áudio sem dono neste aparelho.</b>
+    Sobra de audiolivro que saiu da estante — o arquivo ficou para trás.
+    <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="abOrfaosLimpar()">Apagar e liberar</button>
+  </div>`
 }
 
 // ================================================================
@@ -2965,6 +2976,7 @@ async function abOrfaosLimpar() {
   if (!ok) return
   for (const x of lista) await BookDB.del(x.chave)
   await abLocaisSincronizar()
+  _abOrfaosBytes = 0
   toast(`${abNuvemMB(bytes)} liberados.`, 'success')
   renderAudiobookSection()
 }
