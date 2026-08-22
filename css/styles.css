@@ -5008,6 +5008,12 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .est-res-mais:hover{color:var(--text2)}
 .est-res-outros .est-res-selos{margin-left:auto;flex-shrink:0}
 .est-res-outros .est-selo{white-space:nowrap}
+/* ⚠️ PEGO NA TELA, NÃO NO CÓDIGO: o atributo `hidden` do navegador vale como
+   `display:none` do próprio navegador — e QUALQUER regra de classe com
+   `display` ganha dele. A lista dos outros resultados herda `.est-gb-res`, que
+   é `display:flex`, então ela nascia aberta apesar de `hidden` estar lá. O
+   atributo estava certo; quem mentia era o CSS. */
+.est-res-outros[hidden]{display:none}
 .est-form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .est-campo{display:flex;flex-direction:column;gap:5px}
 .est-campo>span{font-size:var(--fs-3xs);color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
