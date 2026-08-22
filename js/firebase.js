@@ -670,13 +670,87 @@ function userRef(path) {
 // ---- PUSH: local → Firestore ----
 // Push rápido: só words/cards/cfg/log/decks — sem áudio/imagem
 // Usado pelo autoSyncAfterChange (frequente)
+// ================================================================
+// A SUBIDA NÃO PODE APAGAR O QUE OUTRA ABA ACABOU DE FAZER
+// ================================================================
+// ⚠️ ISTO JÁ CUSTOU UM DADO. `batch.set(doc, {list: audiolivros})` grava a
+// lista INTEIRA: quem escreve por último vence, e uma aba com estado carregado
+// antes some com o que a outra tinha acabado de gravar. Aconteceu com uma
+// transcrição recém-feita — sumiu do aparelho e da nuvem, e não foi hipótese.
+//
+// A descida já mesclava item a item; a subida, não. Agora as duas mesclam.
+//
+// ⚠️ E MESCLAR TRAZ UM PROBLEMA NOVO: item apagado aqui VOLTA de lá, porque
+// para o merge ele é só "um item que o outro lado tem". É para isso que serve
+// a marca de remoção (`marcarRemovido`) — ela separa "não tenho" de "apaguei".
+//
+// A hora de cada item vem com nome e formato variados (`updatedAt` número,
+// `updated_at` ISO, `addedAt`…), então a leitura é tolerante. Sem hora dos
+// dois lados, vence o LOCAL: quem está subindo acabou de mexer.
+function _fbQuando(it) {
+  if (!it) return 0
+  const v = it.updatedAt ?? it.updated_at ?? it.at ?? it.addedAt ?? it.created_at
+  if (typeof v === 'number') return v
+  const t = Date.parse(v || '')
+  return isFinite(t) ? t : 0
+}
+
+async function _fbMesclarLista(ref, listaLocal, tipo) {
+  const local = Array.isArray(listaLocal) ? listaLocal : []
+  let nuvem = []
+  try {
+    const snap = await ref.get()
+    if (snap.exists) nuvem = snap.data().list || []
+  } catch (e) {
+    // Sem conseguir ler, o seguro é NÃO mesclar às cegas: sobe o local, que é
+    // o comportamento antigo, em vez de arriscar gravar uma lista pela metade.
+    console.warn('[Firebase] não li a nuvem para mesclar', tipo, '—', e.code || e.message)
+    return local
+  }
+  const removidos = typeof removidosDe === 'function' ? removidosDe(tipo) : {}
+  // ⚠️ `words` NÃO USA A MARCA NOVA: ela já tinha a sua desde sempre
+  // (`deletedWords`), e ignorá-la faria toda palavra apagada VOLTAR da nuvem —
+  // uma regressão bem pior que o problema que este merge veio consertar.
+  const apagadas = (tipo === 'words' && typeof loadDeletedIds === 'function') ? loadDeletedIds() : null
+  const mapa = new Map()
+  for (const it of nuvem) {
+    if (!it || it.id == null) continue
+    if (apagadas && apagadas.has(it.id)) continue
+    // Removido aqui depois da última alteração dele lá: fica removido.
+    if (removidos[it.id] && removidos[it.id] >= _fbQuando(it)) continue
+    mapa.set(it.id, it)
+  }
+  for (const it of local) {
+    if (!it || it.id == null) continue
+    const outro = mapa.get(it.id)
+    if (!outro || _fbQuando(it) >= _fbQuando(outro)) mapa.set(it.id, it)
+  }
+  return [...mapa.values()]
+}
+
 async function fbPushData() {
   if (!_fbUser || !_fbDb) return false
   updateSyncNav('syncing')
   try {
     const base = _fbDb.collection('users').doc(_fbUser.uid)
+    // ⚠️ AS LEITURAS VÊM ANTES DO BATCH. Mesclar exige saber o que já está lá,
+    // e o batch é escrita pura — ler dentro dele não existe.
+    const D = base.collection('data')
+    const [mWords, mLivros, mAudio, mVideos, mClips] = await Promise.all([
+      _fbMesclarLista(D.doc('words'), words, 'words'),
+      _fbMesclarLista(D.doc('livros'), livros, 'livros'),
+      _fbMesclarLista(D.doc('audiolivros'), audiolivros, 'audiolivros'),
+      _fbMesclarLista(D.doc('videos'), videos, 'videos'),
+      _fbMesclarLista(D.doc('clips'), clips, 'clips')
+    ])
+    // ⚠️ `srsCards` FICA DE FORA POR ENQUANTO, e a razão é concreta: os cards
+    // moram no IndexedDB (`CardsDB`), não no localStorage, então a marca de
+    // remoção — que trabalha comparando com o que estava salvo — não os
+    // alcança. Mesclar sem ela faria card apagado VOLTAR da nuvem, trocando um
+    // problema raro (perda por aba concorrente) por um constante (o card que
+    // não morre). Ver §9.
     const batch = _fbDb.batch()
-    batch.set(base.collection('data').doc('words'),    { list: words,     updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('words'),    { list: mWords,    updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsCards'), { list: srsCards,  updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsCfg'),   { ...srsCfg,       updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsLog'),   { list: srsLog,    updatedAt: Date.now() })
@@ -713,15 +787,15 @@ async function fbPushData() {
     batch.set(base.collection('data').doc('conversas'), { list: conversas, updatedAt: Date.now() })
     // Vídeo: só METADADOS (títulos, marcadores, cortes) — o arquivo de vídeo
     // nunca sobe (300MB–2GB × limite de 1MB/doc). Legendas ficam locais (IDB).
-    batch.set(base.collection('data').doc('videos'), { list: videos, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('videos'), { list: mVideos, updatedAt: Date.now() })
     // Ebooks: metadados, sumário, ONDE VOCÊ PAROU e os destaques. O arquivo
     // (MBs) fica no IndexedDB de cada aparelho — mesma regra do vídeo.
-    batch.set(base.collection('data').doc('livros'), { list: livros, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('livros'), { list: mLivros, updatedAt: Date.now() })
     // Audiolivros: SÓ METADADOS. O áudio (centenas de MB) fica no aparelho —
     // aqui viaja título, capa reduzida, capítulos, posição e marcadores.
-    batch.set(base.collection('data').doc('audiolivros'), { list: audiolivros, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('audiolivros'), { list: mAudio, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('known'), { map: knownWords || {}, ignored: ignoredWords || {}, senses: knownSenses || {}, updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('clips'),  { list: clips,  updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('clips'),  { list: mClips,  updatedAt: Date.now() })
     // Podcasts: só a lista de programas visitados (ponteiros). O episódio em si
     // já viaja em `videos` e o mp3 nunca sobe.
     batch.set(base.collection('data').doc('podShows'), { list: podShows || [], updatedAt: Date.now() })
@@ -959,6 +1033,16 @@ function attachRealtimeSync() {
 // Doc presente (mesmo com lista vazia) é adotado → exclusões propagam.
 // Doc ausente é ignorado → não apaga um dispositivo que ainda não sincronizou.
 function applyCloudDocs(docs) {
+  // ⚠️ TRAVA A MARCA DE REMOÇÃO ENQUANTO A NUVEM É APLICADA. Aqui as listas são
+  // SUBSTITUÍDAS pelo resultado do merge — e um item local que não sobreviveu
+  // ao merge não foi "removido por ele". Sem a trava, `marcarSumidos` o
+  // carimbaria como apagado e ele nunca mais voltaria da nuvem: o pior tipo de
+  // perda, silenciosa e permanente.
+  fbAplicandoNuvem = true
+  try { return _applyCloudDocs(docs) } finally { fbAplicandoNuvem = false }
+}
+
+function _applyCloudDocs(docs) {
   docs = docs || {}
   if (docs.words)    { words = docs.words.list || []; saveWords() }
   if (docs.srsCards) {

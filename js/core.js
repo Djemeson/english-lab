@@ -9,9 +9,9 @@ const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-ca
 let videos = []   // [{id,title,source_type,lang,duration,coverage,markers[],created_at,updated_at}]
 let clips  = []   // [{id,videoId,start,end,text,wordId,created_at}]
 function loadVideos() { try { videos = JSON.parse(localStorage.getItem(SK.videos) || '[]') } catch { videos = [] } }
-function saveVideos() { localStorage.setItem(SK.videos, JSON.stringify(videos)) }
+function saveVideos() { marcarSumidos('videos', SK.videos, videos); localStorage.setItem(SK.videos, JSON.stringify(videos)) }
 function loadClips()  { try { clips = JSON.parse(localStorage.getItem(SK.clips) || '[]') } catch { clips = [] } }
-function saveClips()  { localStorage.setItem(SK.clips, JSON.stringify(clips)) }
+function saveClips()  { marcarSumidos('clips', SK.clips, clips); localStorage.setItem(SK.clips, JSON.stringify(clips)) }
 
 // ── LEITOR DE EBOOKS: metadados dos livros da estante.
 //    Mesma regra de videos/clips: o ARQUIVO do livro nunca entra aqui (fica
@@ -21,6 +21,7 @@ function saveClips()  { localStorage.setItem(SK.clips, JSON.stringify(clips)) }
 let livros = []   // [{id,title,author,lang,format,cover,chapters[],pos,notes[],stats,...}]
 function loadLivros() { try { livros = JSON.parse(localStorage.getItem(SK.livros) || '[]') } catch { livros = [] } }
 function saveLivros() {
+  marcarSumidos('livros', SK.livros, livros)
   try { localStorage.setItem(SK.livros, JSON.stringify(livros)) }
   catch (e) { console.warn('[livros] save falhou:', e.message) }
 }
@@ -89,6 +90,7 @@ function loadAudiolivros() {
   try { audiolivros = JSON.parse(localStorage.getItem(SK.audiolivros) || '[]') } catch { audiolivros = [] }
 }
 function saveAudiolivros() {
+  marcarSumidos('audiolivros', SK.audiolivros, audiolivros)
   try { localStorage.setItem(SK.audiolivros, JSON.stringify(audiolivros)) }
   catch (e) { console.warn('[audiolivros] save falhou:', e.message) }
 }
@@ -110,6 +112,56 @@ function savePodShows() { localStorage.setItem(SK.podShows, JSON.stringify(podSh
 // navega; video.js consome _pendingClipPlay ao ativar a seção.
 let _pendingClipPlay = null
 function reverCena(clipId) { _pendingClipPlay = clipId; showSection('video') }
+
+// ================================================================
+// O QUE FOI REMOVIDO — para não voltar da nuvem
+// ================================================================
+// ⚠️ ISTO EXISTE POR CAUSA DE UM DADO QUE SUMIU DE VERDADE. A subida mandava a
+// LISTA INTEIRA, e quem gravasse por último vencia: uma aba com estado velho
+// apagava o que a outra tinha acabado de fazer — aconteceu com uma transcrição
+// recém-gerada, que sumiu do aparelho E da nuvem.
+//
+// A correção é mesclar item a item na subida (ver `_fbMesclarLista`). Mas
+// mesclar cria um problema novo: **item apagado aqui volta de lá**, porque
+// para o merge ele é só "um item que o outro lado tem". A marca de remoção é
+// o que separa "não tenho" de "apaguei".
+//
+// `words` já tinha a sua (`deletedWords`); esta serve para o resto — e guarda
+// QUANDO, para que uma edição posterior à remoção ainda possa vencer.
+const SK_REMOVIDOS = 'el-removidos'
+
+function _removidosMapa() {
+  try { return JSON.parse(localStorage.getItem(SK_REMOVIDOS) || '{}') } catch { return {} }
+}
+function marcarRemovido(tipo, id) {
+  if (!tipo || !id) return
+  const m = _removidosMapa()
+  m[tipo] = m[tipo] || {}
+  m[tipo][id] = Date.now()
+  try { localStorage.setItem(SK_REMOVIDOS, JSON.stringify(m)) } catch (e) {}
+}
+function removidosDe(tipo) { return _removidosMapa()[tipo] || {} }
+
+// ⚠️ A MARCA É POSTA NO *SAVE*, E NÃO EM CADA EXCLUSÃO. Há dez lugares que
+// tiram item de uma dessas listas (remover audiolivro, apagar livro, limpar
+// cards órfãos, faxina de demos…), e instrumentar os dez seria garantir que o
+// décimo primeiro nasça sem a marca. Todos passam por aqui.
+//
+// ⚠️ E NUNCA DURANTE UM PULL. Quando a nuvem chega, a lista é substituída pela
+// mesclada — se um item local não estiver nela, isso é resultado do merge, não
+// uma remoção dele. Marcar ali apagaria o item para sempre, do jeito mais
+// silencioso possível. `fbAplicandoNuvem` fecha essa porta.
+let fbAplicandoNuvem = false
+
+function marcarSumidos(tipo, chaveLS, listaNova) {
+  if (fbAplicandoNuvem) return
+  try {
+    const antes = JSON.parse(localStorage.getItem(chaveLS) || '[]')
+    if (!Array.isArray(antes) || !antes.length) return
+    const agora = new Set((listaNova || []).map(x => x && x.id).filter(Boolean))
+    for (const it of antes) if (it && it.id && !agora.has(it.id)) marcarRemovido(tipo, it.id)
+  } catch (e) {}
+}
 
 function loadDeletedIds() { try { return new Set(JSON.parse(localStorage.getItem(SK.deletedWords) || '[]')) } catch { return new Set() } }
 function saveDeletedIds(ids) { localStorage.setItem(SK.deletedWords, JSON.stringify([...ids])) }
