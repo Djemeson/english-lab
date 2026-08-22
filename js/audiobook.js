@@ -2620,13 +2620,19 @@ function _abLigarEventos() {
   if (_abEventosLigados) return
   const au = _abAudio(); if (!au) return
   au.addEventListener('timeupdate', _abAoAndar)
-  au.addEventListener('play', () => { _abQuerTocar = true; _abPintarBotao() })
+  au.addEventListener('play', () => { _abQuerTocar = true; _abPintarBotao(); _abMediaEstado() })
+  // ⚠️ A posição só é aceita depois que o navegador SABE a duração: antes
+  // disso `au.duration` é NaN e `setPositionState` recusa a chamada inteira —
+  // resultado, a barra da tela de bloqueio nunca aparecia.
+  au.addEventListener('loadedmetadata', _abMediaPos)
+  au.addEventListener('ratechange', _abMediaPos)
+  au.addEventListener('seeked', _abMediaPos)
   au.addEventListener('pause', () => {
     // Pausa DURANTE a virada é técnica (o arquivo acabou), não decisão dela.
     // Pausa DURANTE a virada é técnica (o arquivo acabou) e pausa por MOUSE é
     // momentânea — nenhuma das duas é decisão dela de parar de ouvir.
     if (!_abVirando && !_abPausaHover) _abQuerTocar = false
-    _abPintarBotao(); _abSalvarPos(true)
+    _abPintarBotao(); _abSalvarPos(true); _abMediaEstado()
   })
   au.addEventListener('ended', _abAoTerminarArquivo)
   _abEventosLigados = true
@@ -2911,6 +2917,48 @@ function _abSonoRotulo() {
 }
 
 // Fone de ouvido, tela de bloqueio e o botão do carro: o mesmo player, sem UI.
+// ================================================================
+// A TELA DESLIGADA — e o app continua tocando
+// ================================================================
+// Pedido dele: *"o app tem que funcionar com a tela desligada na parte do
+// audiobook."*
+//
+// Quem mantém o som vivo com a tela apagada é o próprio navegador, e o que ele
+// exige em troca é que a página se comporte como um TOCADOR DE VERDADE: dizer
+// o que está tocando, em que estado está e em que ponto está. Faltavam as duas
+// últimas — e é isso que faz o Android tratar a aba como música (mantém) ou
+// como página qualquer (congela).
+//
+// | O que faltava        | O que muda com a tela apagada                       |
+// |----------------------|-----------------------------------------------------|
+// | `playbackState`      | O sistema sabia que havia áudio, não que ele TOCA    |
+// | `setPositionState`   | Sem barra de progresso na tela de bloqueio, e sem o  |
+// |                      | sinal de "isto é uma sessão longa, não um bipe"      |
+// | `seekto`             | Arrastar na notificação não fazia nada               |
+//
+// ⚠️ `setPositionState` REJEITA números impossíveis e derruba a chamada
+// inteira: duração `NaN` (áudio ainda carregando), posição maior que a
+// duração (arredondamento na virada de capítulo) ou velocidade zero. Por isso
+// cada valor é conferido antes — um `try` mudo aqui esconderia o motivo de a
+// barra nunca aparecer.
+function _abMediaPos() {
+  if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return
+  const au = _abAudio(); if (!au) return
+  const dur = Number(au.duration)
+  if (!isFinite(dur) || dur <= 0) return
+  const pos = Math.min(Math.max(0, Number(au.currentTime) || 0), dur)
+  const vel = Number(au.playbackRate) || 1
+  try { navigator.mediaSession.setPositionState({ duration: dur, position: pos, playbackRate: vel }) }
+  catch (e) {}
+}
+
+function _abMediaEstado() {
+  if (!('mediaSession' in navigator)) return
+  const au = _abAudio()
+  try { navigator.mediaSession.playbackState = (au && !au.paused) ? 'playing' : 'paused' } catch (e) {}
+  _abMediaPos()
+}
+
 function _abMediaSession() {
   if (!('mediaSession' in navigator) || !_abLivro) return
   const a = _abLivro, cap = a.capitulos[_abCap] || {}
@@ -2919,13 +2967,27 @@ function _abMediaSession() {
       title: cap.titulo || a.title, artist: a.author || '', album: a.title || '',
       artwork: a.cover ? [{ src: a.cover, sizes: '240x240', type: 'image/jpeg' }] : []
     })
-    navigator.mediaSession.setActionHandler('play', () => abTocarPausar())
-    navigator.mediaSession.setActionHandler('pause', () => abTocarPausar())
+    // ⚠️ `play`/`pause` do sistema NÃO podem cair em `abTocarPausar`, que
+    // ALTERNA: apertar "play" na tela de bloqueio com o áudio já tocando
+    // pausaria. Parecia igual porque no app o botão é um só; na notificação
+    // são dois botões distintos.
+    navigator.mediaSession.setActionHandler('play', () => { _abHoverLimpar(); _abQuerTocar = true; _abTocarSeguro(); _abMediaEstado() })
+    navigator.mediaSession.setActionHandler('pause', () => { _abHoverLimpar(); _abQuerTocar = false; const au = _abAudio(); if (au) au.pause(); _abRegistrarTempo(); _abSalvarPos(true); _abMediaEstado() })
     navigator.mediaSession.setActionHandler('seekbackward', () => abPular(-AB_PULO_VOLTAR))
     navigator.mediaSession.setActionHandler('seekforward', () => abPular(AB_PULO_AVANCAR))
     navigator.mediaSession.setActionHandler('previoustrack', () => abCapAnterior())
     navigator.mediaSession.setActionHandler('nexttrack', () => abCapProximo())
+    // Arrastar a barra na notificação. `fastSeek` quando existe: em arquivo
+    // grande ele pula sem redecodificar o caminho todo.
+    navigator.mediaSession.setActionHandler('seekto', d => {
+      const au = _abAudio(); if (!au || d.seekTime == null) return
+      if (d.fastSeek && au.fastSeek) au.fastSeek(d.seekTime)
+      else au.currentTime = d.seekTime
+      _abSalvarPos(true); _abMediaEstado()
+    })
+    navigator.mediaSession.setActionHandler('stop', () => { _abQuerTocar = false; const au = _abAudio(); if (au) au.pause(); _abRegistrarTempo(); _abSalvarPos(true); _abMediaEstado() })
   } catch (e) {}
+  _abMediaEstado()
 }
 
 // Trocar de seção com o livro aberto: o áudio CONTINUA tocando de propósito

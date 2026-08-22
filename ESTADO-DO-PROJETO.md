@@ -7,7 +7,18 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (17ª) — **TELA CHEIA QUE PREENCHE, "Aa" FORA DELA, MOUSE QUE
+> Última atualização: 2026-08-22 (18ª) — **O APP VOLTA ONDE ESTAVA, E O ÁUDIO SEGUE COM A TELA
+> APAGADA**. Dois pedidos do celular: *"lembrar de onde estava ao alternar entre apps"* e *"o app
+> tem que funcionar com a tela desligada na parte do audiobook"*. O primeiro não era conforto: o
+> Android **descarta a aba** quando precisa de memória, e responder uma mensagem recarregava o app
+> no Dashboard com o audiolivro fechado. Agora a seção e o livro aberto voltam (com prazo de 24 h),
+> e a posição é gravada **ao esconder a aba** — o único momento garantido, porque `beforeunload`
+> muitas vezes nem dispara no celular. O segundo era falta de **`playbackState` e
+> `setPositionState`**: sem eles o sistema sabia que havia áudio, não que ele *tocava*, e tratava a
+> aba como página qualquer em vez de sessão de música. `sw.js` → **englab-v355**.
+> **Detalhes em §8.74.**
+>
+> Última atualização anterior: 2026-08-22 (17ª) — **TELA CHEIA QUE PREENCHE, "Aa" FORA DELA, MOUSE QUE
 > PAUSA E PAINEL DE TRANSCRIÇÃO**. Quatro pedidos: a tela cheia deixava uma **faixa escura à
 > direita** (a seção herda `max-width:1180px`, e `position:fixed` não desfaz teto de largura);
 > fora da tela cheia o **"Aa" não fazia nada** (`.ab-fala` tinha tamanho fixo e só a regra do full
@@ -13190,6 +13201,68 @@ conhecida, e `knownWords` é **união** no sync; se ficasse, entraria no acervo 
 Conferido no fim: 0 audiolivros, 0 palavras conhecidas, `cfg.ler` vazio (a tipografia é
 **compartilhada** com o leitor), fila vazia.
 
+## 8.74 A volta ao lugar de antes, e o áudio com a tela apagada (2026-08-22, 18ª)
+
+### 1. "Lembrar de onde estava ao alternar entre apps"
+
+⚠️ **No celular isso não é conforto, é o uso normal.** O Android descarta a aba do navegador assim
+que precisa de memória — responder uma mensagem e voltar recarregava o app **do zero**, no
+Dashboard, com o audiolivro fechado. A posição *dentro* do livro já sobrevivia (`a.pos`); o que se
+perdia era a **tela**: ele tinha de navegar de volta toda vez.
+
+Agora a seção e o que estava aberto nela voltam sozinhos.
+
+⚠️ **Com prazo, e o prazo importa.** Reabrir o player é a volta certa depois de dez minutos e a
+errada depois de uma semana: quem abre o app dias depois quer a visão geral, não continuar de onde
+parou sem ter pedido. **24 horas** cobre o alternar entre apps e o "amanhã eu continuo".
+
+⚠️ **Falha em silêncio de propósito.** Livro apagado, arquivo que sumiu ou audiolivro removido
+noutro aparelho não podem deixar o app numa tela morta — sem conseguir reabrir, ele fica na estante
+da seção, que é útil.
+
+### 2. Salvar ao ESCONDER, e não só ao sair
+
+`beforeunload` muitas vezes nem dispara no celular, e o debounce de 4 segundos da posição do
+audiolivro perde os últimos segundos ouvidos. **`visibilitychange` é o único momento garantido** —
+é o que o Android entrega antes de congelar a aba. É lá que a posição, o tempo de escuta e a tela
+são gravados.
+
+### 3. "O app tem que funcionar com a tela desligada"
+
+Quem mantém o som vivo com a tela apagada é o **navegador**, e o que ele exige em troca é que a
+página se comporte como um tocador de verdade: dizer o que está tocando, **em que estado está** e
+**em que ponto está**. Faltavam as duas últimas.
+
+| O que faltava | O que muda com a tela apagada |
+|---|---|
+| `playbackState` | O sistema sabia que havia áudio, **não que ele toca** |
+| `setPositionState` | Sem barra na tela de bloqueio, e sem o sinal de "isto é uma sessão longa, não um bipe" |
+| `seekto` | Arrastar na notificação não fazia nada |
+| `stop` | Sem o botão de encerrar |
+
+⚠️ **`setPositionState` rejeita números impossíveis e derruba a chamada inteira:** duração `NaN`
+(áudio ainda carregando), posição maior que a duração (arredondamento na virada de capítulo) ou
+velocidade zero. Cada valor é conferido antes — e a posição só é entregue depois do
+`loadedmetadata`, senão a barra da tela de bloqueio **nunca apareceria**.
+
+⚠️ **O `play` do sistema não podia cair em `abTocarPausar`, que ALTERNA.** Apertar "play" na tela
+de bloqueio com o áudio já tocando o pausaria. Parecia igual porque no app o botão é um só; na
+notificação são dois botões distintos.
+
+### Medido
+
+- **A volta completa:** com um audiolivro aberto tocando no segundo 1,9, escondi a aba e recarreguei
+  a página (é o que o Android faz). O app voltou em **section-audiobook**, com *"Livro da Volta"*
+  aberto, capítulo 0, **no segundo 1,9**, e a MediaSession já com o título do capítulo.
+- **Salvar ao esconder:** `visibilitychange` gravou a tela e `a.pos = {cap:0, seg:1.86}` na hora.
+- **Prazo:** 25 h atrás → não restaura; 1 h atrás → restaura.
+- **Livro fantasma** (id que não existe mais): nenhum erro, e a seção abre na estante.
+- **MediaSession:** estado `playing` durante a reprodução e `paused` depois; posição entregue como
+  `{duration: 20, position: 2.94, playbackRate: 1}`; **oito** ações registradas (play, pause,
+  seekbackward, seekforward, previoustrack, nexttrack, seekto, stop).
+- **Duração inválida:** `_abMediaPos` com `duration = NaN` ignora em silêncio, sem derrubar nada.
+- **O `play` do sistema com o áudio tocando:** continua tocando (não alterna).
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13198,6 +13271,19 @@ Conferido no fim: 0 audiolivros, 0 palavras conhecidas, `cfg.ler` vazio (a tipog
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada da volta ao lugar (§8.74, 2026-08-22)
+
+- [ ] **Confirmar no celular dele**, que é onde o problema existe: ouvir, trocar de app, voltar; e
+      ouvir com a tela apagada por alguns minutos. Os testes rodaram no desktop, simulando o
+      descarte da aba com um recarregamento.
+- [ ] **Instalar o app na tela inicial** (PWA) deixa o áudio em segundo plano bem mais estável do
+      que numa aba comum do Chrome. O `manifest` já está pronto para isso.
+- [ ] **`orientation: portrait-primary` no manifest** trava o app em pé. Para ler o texto do
+      audiolivro em paisagem, teria de virar `any` — não mudei porque mexe em todas as telas e ele
+      não pediu.
+- [ ] **A volta não reabre o vídeo nem o dossiê**, só a seção. Se fizer falta, é a mesma peça com
+      mais um campo.
 
 ### Da rodada da tela do audiolivro (§8.73, 2026-08-22)
 

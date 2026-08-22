@@ -38,6 +38,9 @@ async function initApp() {
   // Só agora o app tem palavras/config na memória: libera a entrega das
   // capturas da extensão (e processa o que já tiver chegado).
   englabAppPronto()
+  // ⚠️ POR ÚLTIMO, e depois do Firebase: a volta ao lugar de antes pode abrir
+  // um audiolivro, e abrir audiolivro pode precisar baixar o áudio da nuvem.
+  ondeEstavaRestaurar()
 }
 // Kick off when DOM is ready
 if (document.readyState === 'loading') {

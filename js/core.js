@@ -1245,7 +1245,81 @@ function _activateSection(name) {
   // é o uso normal dele. Mas a posição precisa ser gravada na hora, porque a
   // aba pode ser fechada a qualquer momento e o debounce é de 4 segundos.
   if (name !== 'audiobook' && typeof abAoSairDaSecao === 'function') abAoSairDaSecao()
+  _secaoAtual = name
+  _ondeEstavaAbrir(name)
+  ondeEstavaSalvar()
 }
+let _secaoAtual = 'dashboard'
+// ================================================================
+// ONDE ELE ESTAVA — a volta ao app cai no mesmo lugar
+// ================================================================
+// Pedido dele: *"e sobre o app de celular lembrar de onde estava ao alternar
+// entre apps?"*
+//
+// ⚠️ E NO CELULAR ISSO NÃO É CONFORTO, É O USO NORMAL. O Android descarta a
+// aba do navegador assim que precisa de memória — responder uma mensagem e
+// voltar recarregava o app do zero, no Dashboard, com o audiolivro fechado.
+// A posição DENTRO do livro já sobrevivia (`a.pos`); o que se perdia era a
+// tela: ele tinha de navegar de volta toda vez.
+//
+// ⚠️ COM PRAZO, E O PRAZO IMPORTA. Reabrir o player é a volta certa depois de
+// dez minutos e a errada depois de uma semana — quem abre o app dias depois
+// quer a visão geral, não continuar de onde parou sem ter pedido. 24 horas
+// cobre o alternar entre apps e o "amanhã eu continuo".
+const ONDE_SK = 'el-onde-estava'
+const ONDE_VALIDADE = 24 * 3600 * 1000
+let _ondePendente = null      // o que abrir assim que a seção montar
+
+function ondeEstavaSalvar() {
+  try {
+    const d = { secao: _secaoAtual || 'dashboard', quando: Date.now() }
+    // Cada seção diz o que precisa para voltar ao mesmo ponto. O `typeof`
+    // protege dos módulos lazy que ainda não carregaram.
+    if (typeof _abLivro !== 'undefined' && _abLivro) d.ab = _abLivro.id
+    if (typeof _lerLivro !== 'undefined' && _lerLivro) d.ler = { id: _lerLivro.id, cap: (typeof _lerCap !== 'undefined' ? _lerCap : 0) }
+    localStorage.setItem(ONDE_SK, JSON.stringify(d))
+  } catch (e) {}
+}
+
+function ondeEstavaRestaurar() {
+  let d = null
+  try { d = JSON.parse(localStorage.getItem(ONDE_SK) || 'null') } catch (e) {}
+  if (!d || !d.secao || d.secao === 'dashboard') return
+  if (Date.now() - (d.quando || 0) > ONDE_VALIDADE) return
+  if (!document.getElementById(`section-${d.secao}`)) return
+  _ondePendente = d
+  showSection(d.secao)
+}
+
+// Roda DEPOIS que a seção montou — é aqui que o módulo lazy já existe.
+// ⚠️ Falha em silêncio de propósito: livro apagado, arquivo que sumiu ou
+// audiolivro removido noutro aparelho não podem deixar o app numa tela morta.
+// Sem conseguir reabrir, ele fica na estante da seção, que é útil.
+function _ondeEstavaAbrir(secao) {
+  const d = _ondePendente
+  if (!d || d.secao !== secao) return
+  _ondePendente = null
+  try {
+    if (secao === 'audiobook' && d.ab && typeof abAbrir === 'function'
+        && typeof audiolivroPorId === 'function' && audiolivroPorId(d.ab)) abAbrir(d.ab)
+    if (secao === 'ler' && d.ler && typeof lerAbrir === 'function') lerAbrir(d.ler.id)
+  } catch (e) { console.warn('[onde estava] não consegui reabrir:', e && e.message) }
+}
+
+// ⚠️ SALVAR AO ESCONDER, E NÃO SÓ AO SAIR. No celular a aba morre sem avisar:
+// `beforeunload` muitas vezes nem dispara, e o debounce de 4 segundos da
+// posição do audiolivro perde os últimos segundos ouvidos. `visibilitychange`
+// é o único momento garantido — é o que o Android entrega antes de congelar.
+function _ondeEstavaAoEsconder() {
+  if (!document.hidden) return
+  ondeEstavaSalvar()
+  if (typeof _abSalvarPos === 'function' && typeof _abLivro !== 'undefined' && _abLivro) {
+    try { _abRegistrarTempo(); _abSalvarPos(true) } catch (e) {}
+  }
+}
+document.addEventListener('visibilitychange', _ondeEstavaAoEsconder)
+window.addEventListener('pagehide', _ondeEstavaAoEsconder)
+
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'))
