@@ -105,7 +105,7 @@ function abChaveArquivo(id, n) { return `ab:${id}:${n}` }
 //    São só ponteiros (nome, capa, URL do feed) — nenhum áudio.
 let podShows = []   // [{title, artist, artwork, feedUrl, collectionId, addedAt}]
 function loadPodShows() { try { podShows = JSON.parse(localStorage.getItem(SK.podShows) || '[]') } catch { podShows = [] } }
-function savePodShows() { localStorage.setItem(SK.podShows, JSON.stringify(podShows)) }
+function savePodShows() { marcarSumidos('podShows', SK.podShows, podShows, 'collectionId'); localStorage.setItem(SK.podShows, JSON.stringify(podShows)) }
 
 // "Rever a cena" a partir do estudo: study.js (lazy) não pode chamar funções
 // de video.js (lazy) — este handoff vive no core: guarda o clipe pedido e
@@ -130,15 +130,43 @@ function reverCena(clipId) { _pendingClipPlay = clipId; showSection('video') }
 // QUANDO, para que uma edição posterior à remoção ainda possa vencer.
 const SK_REMOVIDOS = 'el-removidos'
 
+// ⚠️ A MARCA TEM PRAZO. Ela existe para impedir que um item apagado volte da
+// nuvem — e essa ameaça acaba assim que o outro aparelho sincroniza. Guardar
+// para sempre é acumular um id por exclusão até o localStorage doer, para
+// proteger de um retorno que já não pode acontecer. Noventa dias cobrem com
+// folga um aparelho que ficou meses desligado.
+const REMOVIDO_PRAZO = 90 * 24 * 3600 * 1000
+
 function _removidosMapa() {
   try { return JSON.parse(localStorage.getItem(SK_REMOVIDOS) || '{}') } catch { return {} }
 }
+
+function _removidosPodar(m) {
+  const corte = Date.now() - REMOVIDO_PRAZO
+  let mexeu = false
+  for (const tipo of Object.keys(m)) {
+    for (const id of Object.keys(m[tipo])) {
+      if (m[tipo][id] < corte) { delete m[tipo][id]; mexeu = true }
+    }
+    if (!Object.keys(m[tipo]).length) { delete m[tipo]; mexeu = true }
+  }
+  return mexeu
+}
+
 function marcarRemovido(tipo, id) {
   if (!tipo || !id) return
   const m = _removidosMapa()
   m[tipo] = m[tipo] || {}
   m[tipo][id] = Date.now()
+  _removidosPodar(m)
   try { localStorage.setItem(SK_REMOVIDOS, JSON.stringify(m)) } catch (e) {}
+}
+
+// A poda também acontece na abertura do app: quem apaga pouco nunca chamaria
+// `marcarRemovido` de novo, e as marcas velhas ficariam ali para sempre.
+function removidosPodarNaAbertura() {
+  const m = _removidosMapa()
+  if (_removidosPodar(m)) { try { localStorage.setItem(SK_REMOVIDOS, JSON.stringify(m)) } catch (e) {} }
 }
 function removidosDe(tipo) { return _removidosMapa()[tipo] || {} }
 
@@ -153,13 +181,32 @@ function removidosDe(tipo) { return _removidosMapa()[tipo] || {} }
 // silencioso possível. `fbAplicandoNuvem` fecha essa porta.
 let fbAplicandoNuvem = false
 
-function marcarSumidos(tipo, chaveLS, listaNova) {
+// ⚠️ OS CARDS MORAM NO INDEXEDDB, e `marcarSumidos` compara com o que está no
+// localStorage — por isso eles ficaram de fora do merge na primeira rodada.
+// A saída é barata: guardar SÓ OS IDS num espelho de localStorage. São strings
+// curtas, e é o suficiente para saber o que sumiu entre um save e o outro.
+const SK_SRS_IDS = 'el-srs-ids'
+
+function marcarSumidosCards(lista) {
+  if (fbAplicandoNuvem) return
+  try {
+    const antes = JSON.parse(localStorage.getItem(SK_SRS_IDS) || 'null')
+    const agora = (lista || []).map(c => c && c.id).filter(Boolean)
+    if (Array.isArray(antes) && antes.length) {
+      const vivos = new Set(agora)
+      for (const id of antes) if (!vivos.has(id)) marcarRemovido('srsCards', id)
+    }
+    localStorage.setItem(SK_SRS_IDS, JSON.stringify(agora))
+  } catch (e) {}
+}
+
+function marcarSumidos(tipo, chaveLS, listaNova, chave = 'id') {
   if (fbAplicandoNuvem) return
   try {
     const antes = JSON.parse(localStorage.getItem(chaveLS) || '[]')
     if (!Array.isArray(antes) || !antes.length) return
-    const agora = new Set((listaNova || []).map(x => x && x.id).filter(Boolean))
-    for (const it of antes) if (it && it.id && !agora.has(it.id)) marcarRemovido(tipo, it.id)
+    const agora = new Set((listaNova || []).map(x => x && x[chave]).filter(Boolean))
+    for (const it of antes) if (it && it[chave] && !agora.has(it[chave])) marcarRemovido(tipo, it[chave])
   } catch (e) {}
 }
 
@@ -454,7 +501,8 @@ function _englabReceber(items) {
 let conversas = []
 let activeConversaId = null
 function loadConversas() { try { conversas = JSON.parse(localStorage.getItem(SK.conversas) || '[]') } catch { conversas = [] } }
-function saveConversas() { try { localStorage.setItem(SK.conversas, JSON.stringify(conversas)) } catch(e) { console.warn('[conversas] save falhou:', e.message) } }
+function saveConversas() { marcarSumidos('conversas', SK.conversas, conversas)
+  try { localStorage.setItem(SK.conversas, JSON.stringify(conversas)) } catch(e) { console.warn('[conversas] save falhou:', e.message) } }
 
 // ── O NOME DA LEXA, alcançável de QUALQUER arquivo ─────────────────
 // Nasceu como `const lexaNome` dentro de `ler.js`, que é LAZY — e isso ficou
@@ -1822,7 +1870,7 @@ function loadSrsDecks() {
   if (!srsDecks.length) srsDecks = JSON.parse(JSON.stringify(DEFAULT_DECKS))
   saveSrsDecks()
 }
-function saveSrsDecks() { localStorage.setItem(SK.srsDecks, JSON.stringify(srsDecks)) }
+function saveSrsDecks() { marcarSumidos('srsDecks', SK.srsDecks, srsDecks); localStorage.setItem(SK.srsDecks, JSON.stringify(srsDecks)) }
 function getDeckById(id) { return srsDecks.find(d => d.id === id) }
 function getSrsDeckPath(id) {
   const deck = getDeckById(id); if (!deck) return ''

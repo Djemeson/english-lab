@@ -141,7 +141,7 @@ window.addEventListener('beforeunload', () => {
 })
 
 // saveSrsCards — grava no IDB (fire-and-forget, não bloqueia UI)
-function saveSrsCards() { CardsDB.save(srsCards) }
+function saveSrsCards() { marcarSumidosCards(srsCards); CardsDB.save(srsCards) }
 function persistSrsCfg(){ localStorage.setItem(SK.srsCfg, JSON.stringify(srsCfg)) }
 function saveSrsLog()   { localStorage.setItem(SK.srsLog, JSON.stringify(srsLog)) }
 

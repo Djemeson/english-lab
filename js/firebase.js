@@ -695,7 +695,7 @@ function _fbQuando(it) {
   return isFinite(t) ? t : 0
 }
 
-async function _fbMesclarLista(ref, listaLocal, tipo) {
+async function _fbMesclarLista(ref, listaLocal, tipo, { chave = 'id', combinar = null } = {}) {
   const local = Array.isArray(listaLocal) ? listaLocal : []
   let nuvem = []
   try {
@@ -714,18 +714,44 @@ async function _fbMesclarLista(ref, listaLocal, tipo) {
   const apagadas = (tipo === 'words' && typeof loadDeletedIds === 'function') ? loadDeletedIds() : null
   const mapa = new Map()
   for (const it of nuvem) {
-    if (!it || it.id == null) continue
-    if (apagadas && apagadas.has(it.id)) continue
+    if (!it || it[chave] == null) continue
+    if (apagadas && apagadas.has(it[chave])) continue
     // Removido aqui depois da última alteração dele lá: fica removido.
-    if (removidos[it.id] && removidos[it.id] >= _fbQuando(it)) continue
-    mapa.set(it.id, it)
+    if (removidos[it[chave]] && removidos[it[chave]] >= _fbQuando(it)) continue
+    mapa.set(it[chave], it)
   }
   for (const it of local) {
-    if (!it || it.id == null) continue
-    const outro = mapa.get(it.id)
-    if (!outro || _fbQuando(it) >= _fbQuando(outro)) mapa.set(it.id, it)
+    if (!it || it[chave] == null) continue
+    const outro = mapa.get(it[chave])
+    if (!outro) { mapa.set(it[chave], it); continue }
+    // `combinar` existe para o que NÃO se escolhe, se soma — ver o diário.
+    mapa.set(it[chave], combinar ? combinar(it, outro)
+      : (_fbQuando(it) >= _fbQuando(outro) ? it : outro))
   }
   return [...mapa.values()]
+}
+
+// ⚠️ O DIÁRIO É POR DIA, E FICA COM O MAIOR — NÃO COM A SOMA. Cada linha é um
+// dia (`{date, reviewed, correct, newSeen}`), e a primeira versão disto somava
+// os dois lados: revisar 20 no celular e 15 no computador daria 35.
+//
+// **Somar estava errado, e o teste mostrou na hora.** O contador local não
+// zera depois de subir, então cada push somava de novo: 20 contra 15 virou 35,
+// depois 55, 75, 95 — o gráfico inflando sozinho a cada sincronização. Somar
+// certo exigiria contar POR APARELHO, o que muda o formato do diário e o
+// gráfico que lê dele.
+//
+// Ficar com o maior não é o número perfeito (perde o estudo que só o outro
+// aparelho viu), mas **nunca mente para mais** — e ainda é melhor que hoje,
+// onde o último a subir simplesmente apaga o outro.
+function _fbDiaMaior(a, b) {
+  if (!b) return a
+  const n = (x, y) => Math.max(Number(x) || 0, Number(y) || 0)
+  return { ...b, ...a,
+    date: a.date,
+    reviewed: n(a.reviewed, b.reviewed),
+    correct:  n(a.correct,  b.correct),
+    newSeen:  n(a.newSeen,  b.newSeen) }
 }
 
 async function fbPushData() {
@@ -736,25 +762,35 @@ async function fbPushData() {
     // ⚠️ AS LEITURAS VÊM ANTES DO BATCH. Mesclar exige saber o que já está lá,
     // e o batch é escrita pura — ler dentro dele não existe.
     const D = base.collection('data')
-    const [mWords, mLivros, mAudio, mVideos, mClips] = await Promise.all([
+    const [mWords, mLivros, mAudio, mVideos, mClips, mCards, mDecks, mConv, mPods, mLog] = await Promise.all([
       _fbMesclarLista(D.doc('words'), words, 'words'),
       _fbMesclarLista(D.doc('livros'), livros, 'livros'),
       _fbMesclarLista(D.doc('audiolivros'), audiolivros, 'audiolivros'),
       _fbMesclarLista(D.doc('videos'), videos, 'videos'),
-      _fbMesclarLista(D.doc('clips'), clips, 'clips')
+      _fbMesclarLista(D.doc('clips'), clips, 'clips'),
+      _fbMesclarLista(D.doc('srsCards'), srsCards, 'srsCards'),
+      _fbMesclarLista(D.doc('srsDecks'), srsDecks, 'srsDecks'),
+      _fbMesclarLista(D.doc('conversas'), conversas, 'conversas'),
+      // ⚠️ Podcast não tem `id`: a identidade é o programa no catálogo.
+      _fbMesclarLista(D.doc('podShows'), podShows || [], 'podShows', { chave: 'collectionId' }),
+      // ⚠️ O diário é por DIA e SOMA — ver `_fbSomarDia`.
+      _fbMesclarLista(D.doc('srsLog'), srsLog, 'srsLog', { chave: 'date', combinar: _fbDiaMaior })
     ])
-    // ⚠️ `srsCards` FICA DE FORA POR ENQUANTO, e a razão é concreta: os cards
-    // moram no IndexedDB (`CardsDB`), não no localStorage, então a marca de
-    // remoção — que trabalha comparando com o que estava salvo — não os
-    // alcança. Mesclar sem ela faria card apagado VOLTAR da nuvem, trocando um
-    // problema raro (perda por aba concorrente) por um constante (o card que
-    // não morre). Ver §9.
+    // ⚠️ `srsCards` entrou depois dos outros: os cards moram no IndexedDB, e a
+    // marca de remoção compara com o localStorage. A saída foi um espelho só
+    // com os IDS (`marcarSumidosCards`) — barato, e o bastante para saber o
+    // que sumiu entre um save e o outro.
+    //
+    // ⚠️ `kindleQueue` continua FORA de propósito: é uma FILA sem `id`, feita
+    // para esvaziar. Mesclar faria a captura já processada voltar para a fila
+    // toda vez que o outro aparelho subisse uma versão antiga — o oposto do
+    // que ela serve.
     const batch = _fbDb.batch()
     batch.set(base.collection('data').doc('words'),    { list: mWords,    updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('srsCards'), { list: srsCards,  updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('srsCards'), { list: mCards,    updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsCfg'),   { ...srsCfg,       updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('srsLog'),   { list: srsLog,    updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('srsDecks'), { list: srsDecks,  updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('srsLog'),   { list: mLog,      updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('srsDecks'), { list: mDecks,    updatedAt: Date.now() })
     // Configurações da conta (chave OpenAI, tema, providers).
     // IMPORTANTE: usamos merge:true e SÓ incluímos a chave quando NÃO está vazia.
     // Assim, um dispositivo sem a chave nunca apaga o valor já salvo na nuvem.
@@ -784,7 +820,7 @@ async function fbPushData() {
     // abrir o Lab no celular traria TUDO de novo — o "só o novo entra" só vale
     // se o "já entrou" for o mesmo em todo aparelho.
     batch.set(base.collection('data').doc('kindleSeen'), { list: [...loadKindleSeen()], updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('conversas'), { list: conversas, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('conversas'), { list: mConv, updatedAt: Date.now() })
     // Vídeo: só METADADOS (títulos, marcadores, cortes) — o arquivo de vídeo
     // nunca sobe (300MB–2GB × limite de 1MB/doc). Legendas ficam locais (IDB).
     batch.set(base.collection('data').doc('videos'), { list: mVideos, updatedAt: Date.now() })
@@ -798,7 +834,7 @@ async function fbPushData() {
     batch.set(base.collection('data').doc('clips'),  { list: mClips,  updatedAt: Date.now() })
     // Podcasts: só a lista de programas visitados (ponteiros). O episódio em si
     // já viaja em `videos` e o mp3 nunca sobe.
-    batch.set(base.collection('data').doc('podShows'), { list: podShows || [], updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('podShows'), { list: mPods, updatedAt: Date.now() })
     await batch.commit()
     updateSyncNav('ok')
     return true

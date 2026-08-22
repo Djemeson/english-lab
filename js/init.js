@@ -16,6 +16,7 @@ async function initApp() {
   loadAudiolivros()  // audiobooks (o áudio fica no IDB — são centenas de MB)
   loadObrasNome()    // título limpo da obra (o da fonte traz lixo) — só exibição
   loadPodShows()     // programas de podcast já visitados (sincronizados)
+  removidosPodarNaAbertura()   // marcas de exclusão com mais de 90 dias saem
   loadSrs()          // loads srsCfg, srsLog, decks
   await loadSrsAsync() // loads srsCards from IDB (migrates if needed)
   migrateLangFields()  // multi-idioma: words/cards antigos ganham lang:'en' (aditivo)
