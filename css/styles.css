@@ -5238,8 +5238,14 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
    app. Fica enquanto a fila tiver o que fazer, em qualquer seção — a subida
    roda em segundo plano, e o único jeito de isso não virar mistério é ela ter
    um lugar fixo na tela. */
-.ab-fila{
+/* ⚠️ DOIS TRABALHOS DE FUNDO PODEM RODAR JUNTOS — subir o áudio e transcrever o
+   livro. Cada cartão com `position:fixed` no mesmo canto ficaria um em cima do
+   outro; a caixa é que é fixa, e o flex empilha. */
+.ab-avisos{
   position:fixed; right:24px; bottom:24px; z-index:var(--z-toast);
+  display:flex; flex-direction:column-reverse; gap:8px; align-items:flex-end;
+}
+.ab-fila{
   width:min(320px, calc(100vw - 48px));
   background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
   box-shadow:var(--shadow-lg, var(--shadow)); overflow:hidden;
@@ -5258,7 +5264,8 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ab-fila-barra i{display:block; height:100%; background:var(--role-energia); transition:width .2s}
 /* Na mão, o aviso não pode cobrir os controles do player. */
 @media (max-width: 640px){
-  .ab-fila{right:12px; left:12px; bottom:76px; width:auto}
+  .ab-avisos{right:12px; left:12px; bottom:76px; align-items:stretch}
+  .ab-fila{width:auto}
 }
 
 /* ---- reprodutor ---- */
@@ -5426,8 +5433,9 @@ body.ab-full .ab-fala-t{color:color-mix(in srgb, var(--ler-fg) 45%, transparent)
      padrão comeria o texto inteiro numa tela desta altura. */
   body.ab-full .ab-trans{padding:18vh 20px}
   body.ab-full .ab-trans-topo{padding:8px 16px}
-  /* O aviso da fila não pode cobrir o texto numa tela desta altura. */
-  .ab-fila{bottom:10px; width:min(280px, calc(100vw - 24px))}
+  /* O aviso não pode cobrir o texto numa tela desta altura. */
+  .ab-avisos{bottom:10px}
+  .ab-fila{width:min(280px, calc(100vw - 24px))}
 }
 
 /* ---- painel do raio-X: a lista de capítulos ---- */

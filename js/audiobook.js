@@ -970,43 +970,71 @@ async function abTranscrever() {
   const box = el('ab-aba')
   const msg = m => { if (box) box.innerHTML = `<div class="est-nada"><p>${esc(m)}</p></div>` }
   try {
-    msg('Separando o áudio…')
-    const blob = await _abAudioDoTrecho(a, cap, alvo.ini, alvo.fim, m => msg(m))
-    msg('Ouvindo e escrevendo… (isso leva alguns segundos)')
-    const r = await aiTranscribe(blob, {
-      nome: 'trecho.mp3', lang: (a.lang || 'en').slice(0, 2), granular: true, timeoutMs: 300000
-    })
-    const segs = (r.segments || []).map(s => ({
-      i: alvo.ini + (s.start || 0), f: alvo.ini + (s.end || 0), t: String(s.text || '').trim()
-    })).filter(s => s.t)
-    if (!segs.length) throw new Error('a transcrição voltou vazia — o trecho tem fala?')
-    // Com duração desconhecida, o fim verdadeiro é o da última fala: sem isso a
-    // transcrição ficaria com `fim: 0` e nunca seria reencontrada pelo ponto.
-    const fimReal = alvo.fim > 0 ? alvo.fim : Math.max(alvo.ini + 1, segs[segs.length - 1].f)
-
-    a.transcricoes = (a.transcricoes || []).filter(x => !(x.cap === _abCap && x.ini === alvo.ini))
-    a.transcricoes.push({ cap: _abCap, ini: alvo.ini, fim: fimReal, segs, at: Date.now() })
-    a.updatedAt = Date.now()
-    saveAudiolivros()
-    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
-    // Os marcadores que ele guardou ANTES desta transcrição ganham a frase
-    // agora — é a ordem real de uso (marca ouvindo, transcreve depois).
-    let ganharam = 0
-    for (const m of (a.marcadores || [])) {
-      if (m.cap !== _abCap || m.frase) continue
-      const f = abFraseDoMarcador(a, m)
-      if (f) { m.frase = f; ganharam++ }
-    }
-    if (ganharam) saveAudiolivros()
-    toast(ganharam
-      ? `${segs.length} falas transcritas · ${ganharam} ${ganharam === 1 ? 'marcador ganhou' : 'marcadores ganharam'} a frase`
-      : `${segs.length} falas transcritas`, 'success')
+    const r = await _abTranscreverTrecho(a, _abCap, alvo, msg)
+    toast(r.ganharam
+      ? `${r.falas} falas transcritas · ${r.ganharam} ${r.ganharam === 1 ? 'marcador ganhou' : 'marcadores ganharam'} a frase`
+      : `${r.falas} falas transcritas`, 'success')
     abAba('texto')
   } catch (e) {
     console.warn('[audiobook] transcrição:', e)
     if (box) box.innerHTML = `<div class="est-nada"><p class="est-erro">${esc(e.message)}</p>
       <button class="btn btn-ghost btn-sm" onclick="abAba('texto')">Voltar</button></div>`
   }
+}
+
+// ⚠️ O NÚCLEO, SEM TELA E SEM PERGUNTA. Estava embutido em `abTranscrever`, que
+// pergunta o custo e pinta a área da aba — e nada disso serve para o
+// "transcrever tudo", que roda em segundo plano com ele fazendo outra coisa.
+// Separado, os dois caminhos usam exatamente a mesma transcrição.
+async function _abTranscreverTrecho(a, i, alvo, aoAndar) {
+  const cap = a.capitulos[i]
+  if (aoAndar) aoAndar('Separando o áudio…')
+  const blob = await _abAudioDoTrecho(a, cap, alvo.ini, alvo.fim, m => aoAndar && aoAndar(m))
+  if (aoAndar) aoAndar('Ouvindo e escrevendo… (isso leva alguns segundos)')
+  const r = await aiTranscribe(blob, {
+    nome: 'trecho.mp3', lang: (a.lang || 'en').slice(0, 2), granular: true, timeoutMs: 300000
+  })
+  const segs = (r.segments || []).map(x => ({
+    i: alvo.ini + (x.start || 0), f: alvo.ini + (x.end || 0), t: String(x.text || '').trim()
+  })).filter(x => x.t)
+  if (!segs.length) throw new Error('a transcrição voltou vazia — o trecho tem fala?')
+  // Com duração desconhecida, o fim verdadeiro é o da última fala: sem isso a
+  // transcrição ficaria com `fim: 0` e nunca seria reencontrada pelo ponto.
+  const fimReal = alvo.fim > 0 ? alvo.fim : Math.max(alvo.ini + 1, segs[segs.length - 1].f)
+
+  a.transcricoes = (a.transcricoes || []).filter(x => !(x.cap === i && x.ini === alvo.ini))
+  a.transcricoes.push({ cap: i, ini: alvo.ini, fim: fimReal, segs, at: Date.now() })
+  a.updatedAt = Date.now()
+  saveAudiolivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  // Os marcadores que ele guardou ANTES desta transcrição ganham a frase
+  // agora — é a ordem real de uso (marca ouvindo, transcreve depois).
+  let ganharam = 0
+  for (const m of (a.marcadores || [])) {
+    if (m.cap !== i || m.frase) continue
+    const f = abFraseDoMarcador(a, m)
+    if (f) { m.frase = f; ganharam++ }
+  }
+  if (ganharam) saveAudiolivros()
+  return { falas: segs.length, ganharam }
+}
+
+// O alvo de um capítulo QUALQUER, sem depender de onde o áudio está agora.
+// ⚠️ E aqui o capítulo vai INTEIRO, não a janela de 10 minutos: quem pediu
+// "transcrever tudo" já aceitou o custo do livro todo, e devolver um pedaço do
+// meio de cada capítulo seria uma transcrição que mente sobre o que cobre.
+// O teto existe pelo tamanho do envio — acima dele o capítulo fica de fora, e
+// a lista diz quais foram, em vez de fazer pela metade em silêncio.
+const AB_TRANS_TETO_MIN = 90        // ~14 MB por hora em 32 kbps mono; o teto da API é 24 MB
+
+function _abAlvoInteiro(a, i) {
+  const cap = a.capitulos[i]
+  const dur = abDurCap(cap)
+  if (dur <= 0) {
+    const mb = (a.tamanho || 0) / 1048576 / Math.max(1, a.arquivos || 1)
+    return { ini: 0, fim: 0, inteiro: true, minutos: Math.max(1, Math.round(mb)), estimado: true }
+  }
+  return { ini: 0, fim: dur, inteiro: true, minutos: dur / 60 }
 }
 
 // O ÁUDIO DO TRECHO, pelo caminho mais barato que servir.
@@ -1200,8 +1228,12 @@ function _abTransPainelRender(msg) {
         </button>`
       }).join('')}
     </div>
+    ${caps.some((_, i) => _abEstadoDoCap(a, i).estado === 'vazio') ? `
+    <button class="btn btn-primary btn-sm" style="width:100%" onclick="abTranscreverTudo()">
+      ${ic('captions','ic-sm')} Transcrever tudo o que falta</button>` : ''}
     <p class="est-dica">Com <b>${ic('sparkles','ic-3xs')}</b> o texto já existe — o clique leva até
-      ele. Sem a marca, o clique <b>transcreve</b>, e o custo é mostrado antes.</p>`
+      ele. Sem a marca, o clique <b>transcreve</b>, e o custo é mostrado antes. O botão acima
+      <b>pula</b> os que já têm texto.</p>`
   const btn = el('ab-trans-btn')
   if (btn) {
     const r = btn.getBoundingClientRect()
@@ -2004,14 +2036,33 @@ function _abFilaCarregar() {
 }
 
 // ---- o aviso flutuante, que segue ele pelo app ----
+// ⚠️ DOIS TRABALHOS DE FUNDO PODEM RODAR JUNTOS — subir o áudio e transcrever
+// o livro. Cada um com `position:fixed` no mesmo canto viraria um cartão em
+// cima do outro. Uma caixa só, e o flex empilha.
+function _abAvisos() {
+  let cx = document.getElementById('ab-avisos')
+  if (!cx) {
+    cx = document.createElement('div')
+    cx.id = 'ab-avisos'
+    cx.className = 'ab-avisos'
+    document.body.appendChild(cx)
+  }
+  return cx
+}
+
+function _abAvisosLimpar() {
+  const cx = document.getElementById('ab-avisos')
+  if (cx && !cx.children.length) cx.remove()
+}
+
 function _abFilaPintar() {
   let cx = document.getElementById('ab-fila')
-  if (!_abFila.length && !_abFilaAtual) { if (cx) cx.remove(); return }
+  if (!_abFila.length && !_abFilaAtual) { if (cx) cx.remove(); _abAvisosLimpar(); return }
   if (!cx) {
     cx = document.createElement('div')
     cx.id = 'ab-fila'
     cx.className = 'ab-fila'
-    document.body.appendChild(cx)
+    _abAvisos().appendChild(cx)
   }
   const alvo = _abFilaAtual || _abFila[0]
   const a = alvo ? audiolivroPorId(alvo.id) : null
@@ -2043,7 +2094,11 @@ function _abFilaPintar() {
 // ⚠️ O navegador só deixa AVISAR, não impedir. Ainda assim é melhor que um
 // envio de 700 MB morrer em silêncio porque ele fechou a aba sem saber.
 function _abFilaSair(e) {
-  if (!_abFila.length && !_abFilaAtual) return
+  // Vale para os DOIS trabalhos de fundo: fechar no meio de uma transcrição
+  // longa joga fora o capítulo em andamento, que já foi pago.
+  const ocupado = _abFila.length || _abFilaAtual ||
+                  (typeof _abTr !== 'undefined' && (_abTr.length || _abTrAtual))
+  if (!ocupado) return
   e.preventDefault()
   e.returnValue = ''
   return ''
@@ -2179,6 +2234,192 @@ async function abNuvemGuardar(id) {
   _abFilaPintar()
   document.getElementById('ab-nuvem')?.remove()   // o aviso flutuante assume daqui
   _abFilaRodar()
+}
+
+// ================================================================
+// TRANSCREVER O LIVRO INTEIRO — em segundo plano, pulando o que já tem
+// ================================================================
+// Pedido dele: *"a transcrição deve ter uma opção de transcrever tudo. E se
+// tiver capítulos transcritos o botão vai pular eles."*
+//
+// ⚠️ PULAR NÃO É DETALHE, É O CORAÇÃO DISTO. Cada capítulo já transcrito que
+// fosse refeito seria dinheiro gasto duas vezes pela mesma coisa — e o mais
+// provável é que ele já tenha transcrito alguns à mão antes de pedir o resto.
+// A conta do aviso é feita só sobre o que FALTA.
+//
+// Roda como a fila de subida, e pelo mesmo motivo: um livro de doze horas leva
+// muito tempo, e prender a tela nisso seria transformar uma tarefa do app numa
+// vigília dele.
+let _abTr = []            // [{id, cap}] — capítulos a transcrever
+let _abTrRodando = false
+let _abTrPausada = false
+let _abTrAtual = null     // {id, cap, msg}
+let _abTrFeitos = 0
+let _abTrFalhas = []
+
+function _abTrPintar() {
+  let cx = document.getElementById('ab-trfila')
+  if (!_abTr.length && !_abTrAtual) { if (cx) cx.remove(); _abAvisosLimpar(); return }
+  if (!cx) {
+    cx = document.createElement('div')
+    cx.id = 'ab-trfila'
+    cx.className = 'ab-fila'
+    _abAvisos().appendChild(cx)
+  }
+  const a = _abLivro
+  const restam = _abTr.length || (_abTrAtual ? 1 : 0)
+  const total = _abTrFeitos + restam
+  const cap = _abTrAtual && a ? (a.capitulos[_abTrAtual.cap] || {}) : null
+  const linha = _abTrPausada
+    ? `Pausado — ${restam} ${restam === 1 ? 'capítulo' : 'capítulos'} restando`
+    : _abTrAtual
+      ? `${esc(cap.titulo || 'Capítulo ' + (_abTrAtual.cap + 1))} — ${esc(_abTrAtual.msg || 'transcrevendo…')}`
+      : `${restam} na fila`
+  cx.innerHTML = `
+    <div class="ab-fila-topo">
+      <span class="ab-fila-ic">${ic('captions','ic-sm')}</span>
+      <div class="ab-fila-txt">
+        <b>Transcrevendo ${_abTrFeitos + (_abTrAtual ? 1 : 0)} de ${total}</b>
+        <em>${linha}</em>
+      </div>
+      <button class="ab-fila-x" data-tip="${_abTrPausada ? 'Continuar' : 'Pausar'}"
+              onclick="abTrPausar()">${ic(_abTrPausada ? 'play' : 'pause','ic-3xs')}</button>
+      <button class="ab-fila-x" data-tip="Parar de transcrever"
+              onclick="abTrCancelar()">${ic('x','ic-3xs')}</button>
+    </div>
+    <div class="ab-fila-barra"><i style="width:${total ? Math.round(_abTrFeitos / total * 100) : 0}%"></i></div>`
+}
+
+// ⚠️ A pausa só vale ENTRE capítulos. O que já está no ar não dá para
+// desfazer: a chamada foi paga no instante em que saiu. Parar no meio jogaria
+// fora um capítulo já cobrado — melhor terminar este e não começar o próximo.
+function abTrPausar() {
+  _abTrPausada = !_abTrPausada
+  _abTrPintar()
+  if (!_abTrPausada) _abTrRodar()
+  else toast('Vou parar depois de terminar este capítulo — o que já foi pedido à IA não dá para cancelar.', 'info')
+}
+
+async function abTrCancelar() {
+  const ok = await confirmModal({
+    title: 'Parar de transcrever', icon: 'captions', confirmText: 'Parar',
+    cancelText: 'Continuar', danger: true,
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Os capítulos já transcritos <b>ficam guardados</b> e não são refeitos. O capítulo em
+      andamento termina — ele já foi pedido à IA e cancelar não devolve o custo.</p>`
+  })
+  if (!ok) return
+  _abTr = []
+  _abTrPausada = false
+  _abTrPintar()
+}
+
+async function _abTrRodar() {
+  if (_abTrRodando || _abTrPausada) return
+  _abTrRodando = true
+  try {
+    while (_abTr.length && !_abTrPausada) {
+      const item = _abTr[0]
+      const a = audiolivroPorId(item.id)
+      if (!a) { _abTr.shift(); continue }
+      // Alguém transcreveu enquanto a fila andava (outro aparelho, ou o botão
+      // do capítulo): não repete, não cobra de novo.
+      if (_abEstadoDoCap(a, item.cap).estado !== 'vazio') { _abTr.shift(); _abTrFeitos++; _abTrPintar(); continue }
+      _abTrAtual = { id: item.id, cap: item.cap, msg: 'começando…' }
+      _abTrPintar()
+      try {
+        await _abTranscreverTrecho(a, item.cap, _abAlvoInteiro(a, item.cap), m => {
+          if (_abTrAtual) { _abTrAtual.msg = m; _abTrPintar() }
+        })
+        _abTrFeitos++
+      } catch (e) {
+        // ⚠️ UM CAPÍTULO QUE FALHA NÃO PODE MATAR A FILA. Áudio mudo, rede que
+        // caiu, um trecho que a IA recusou — o resto do livro continua, e no
+        // fim ele fica sabendo exatamente quais ficaram para trás.
+        const nome = (a.capitulos[item.cap] || {}).titulo || `Capítulo ${item.cap + 1}`
+        _abTrFalhas.push(nome + ': ' + String(e && e.message || e))
+        console.warn('[audiobook] transcrever tudo:', nome, e)
+      }
+      _abTr.shift()
+      _abTrAtual = null
+      _abTrPintar()
+      if (_abLivro && _abLivro.id === item.id && _abAbaAtual === 'texto') abAba('texto')
+    }
+  } finally {
+    _abTrRodando = false
+    _abTrAtual = null
+    if (!_abTr.length) {
+      const falhas = _abTrFalhas.slice()
+      const feitos = _abTrFeitos
+      _abTrFeitos = 0; _abTrFalhas = []
+      _abTrPintar()
+      if (feitos || falhas.length) {
+        toast(falhas.length
+          ? `${feitos} ${feitos === 1 ? 'capítulo transcrito' : 'capítulos transcritos'} · ${falhas.length} ${falhas.length === 1 ? 'falhou' : 'falharam'}`
+          : `${feitos} ${feitos === 1 ? 'capítulo transcrito' : 'capítulos transcritos'}`,
+          falhas.length ? 'warning' : 'success')
+      }
+      if (falhas.length) {
+        confirmModal({
+          title: 'Estes capítulos não deram certo', icon: 'alert', confirmText: 'Entendi', cancelText: '',
+          html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+            O resto do livro foi transcrito normalmente. Estes você pode tentar de novo pelo painel
+            de transcrição, um a um:</p>
+            <ul style="font-size:var(--fs-sm);color:var(--text2);margin:10px 0 0 18px">
+              ${falhas.map(f => `<li>${esc(f)}</li>`).join('')}</ul>`
+        })
+      }
+    } else _abTrPintar()
+    if (document.getElementById('ab-trans-painel')?.classList.contains('aberto')) _abTransPainelRender()
+  }
+}
+
+async function abTranscreverTudo() {
+  const a = _abLivro; if (!a) return
+  const stt = typeof aiSttCfg === 'function' ? aiSttCfg() : null
+  if (!stt) { toast('Configure a chave da Groq ou da OpenAI para transcrever (Configurações → IA)', 'error'); return }
+
+  const faltam = [], grandes = []
+  let minutos = 0
+  for (let i = 0; i < (a.capitulos || []).length; i++) {
+    if (_abEstadoDoCap(a, i).estado !== 'vazio') continue     // já tem texto: pula
+    const alvo = _abAlvoInteiro(a, i)
+    if (alvo.minutos > AB_TRANS_TETO_MIN) { grandes.push((a.capitulos[i] || {}).titulo || `Capítulo ${i + 1}`); continue }
+    faltam.push({ id: a.id, cap: i }); minutos += alvo.minutos
+  }
+  const jaTem = (a.capitulos || []).length - faltam.length - grandes.length
+
+  if (!faltam.length) {
+    toast(grandes.length
+      ? `Nada a transcrever — só sobraram capítulos longos demais (${grandes.length}).`
+      : 'Todos os capítulos já têm texto.', 'info')
+    return
+  }
+
+  const usd = minutos * stt.usdMin
+  const brl = typeof aiUsdBrl === 'function' ? await aiUsdBrl().catch(() => 5.5) : 5.5
+  const ok = await confirmModal({
+    title: 'Transcrever o livro inteiro', icon: 'captions', confirmText: 'Transcrever',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Vou transcrever <b>${faltam.length} ${faltam.length === 1 ? 'capítulo' : 'capítulos'}</b> —
+      cerca de <b>${Math.round(minutos)} min</b> de áudio.
+      ${jaTem ? `Os <b>${jaTem}</b> que já têm texto ficam como estão: não são refeitos nem cobrados de novo.` : ''}
+      <br><br>
+      Custa cerca de <b>${(usd * brl).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</b>
+      na ${esc(stt.nome)}, e leva um bom tempo — roda <b>em segundo plano</b>, com um aviso no canto
+      que deixa pausar. Só não feche a aba.
+      ${grandes.length ? `<br><br><b>${grandes.length} ${grandes.length === 1 ? 'capítulo fica' : 'capítulos ficam'} de fora</b>
+        por passar de ${AB_TRANS_TETO_MIN} min (${esc(grandes.slice(0, 3).join(', '))}${grandes.length > 3 ? '…' : ''}) —
+        nesses, use o botão do capítulo, que pega o trecho em volta de onde você está.` : ''}</p>`
+  })
+  if (!ok) return
+
+  for (const f of faltam) if (!_abTr.some(x => x.id === f.id && x.cap === f.cap)) _abTr.push(f)
+  _abTrPausada = false
+  _abTrFeitos = 0; _abTrFalhas = []
+  document.getElementById('ab-trans-painel')?.classList.remove('aberto')
+  _abTrPintar()
+  _abTrRodar()
 }
 
 // ⚠️ RETOMAR NÃO É AUTOMÁTICO. A aba pode ter fechado por qualquer motivo, e

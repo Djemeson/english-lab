@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (19ª) — **ROTAÇÃO LIBERADA, E A VOLTA REABRE VÍDEO E DOSSIÊ**.
+> Última atualização: 2026-08-22 (20ª) — **"TRANSCREVER TUDO", PULANDO O QUE JÁ TEM TEXTO**.
+> Pedido dele: *"a transcrição deve ter uma opção de transcrever tudo. E se tiver capítulos
+> transcritos o botão vai pular eles."* ⚠️ **Pular não é detalhe, é o coração disto:** capítulo já
+> transcrito refeito seria dinheiro gasto duas vezes pela mesma coisa, e a conta do aviso é feita
+> **só sobre o que falta**. Roda em **segundo plano**, como a fila de subida — um livro de doze
+> horas prenderia a tela por muito tempo. Para isso, o núcleo da transcrição foi **separado** da
+> função que pergunta o custo e pinta a tela. ⚠️ Um capítulo que falha **não mata a fila**: o resto
+> continua e no fim ele vê a lista do que ficou para trás. `sw.js` → **englab-v357**.
+> **Detalhes em §8.76.**
+>
+> Última atualização anterior: 2026-08-22 (19ª) — **ROTAÇÃO LIBERADA, E A VOLTA REABRE VÍDEO E DOSSIÊ**.
 > Dois pedidos curtos com trabalho atrás. A rotação era **uma linha no manifest** — mas medir
 > antes mostrou que soltar assim entregaria uma tela inútil: em 740x360 a barra de botões do texto
 > quebrava em várias linhas e comia **227px dos 360**, e no modo tela cheia **313px**, sem sobrar
@@ -13325,6 +13335,70 @@ bastava a aba morrer por outro caminho para o registro ficar velho. Agora cada p
   `dossieAbrir` com a mesma chave e o dossiê reabre.
 - **Manifest:** JSON válido, `orientation: "any"`.
 
+## 8.76 "Transcrever tudo", pulando o que já tem texto (2026-08-22, 20ª)
+
+> *"A transcrição deve ter uma opção de transcrever tudo. E se tiver capítulos transcritos o botão
+> vai pular eles."*
+
+### Pular é o coração disto
+
+⚠️ Cada capítulo já transcrito que fosse refeito seria **dinheiro gasto duas vezes pela mesma
+coisa** — e o mais provável é que ele já tenha transcrito alguns à mão antes de pedir o resto. A
+conta do aviso de custo é feita **só sobre o que falta**, e o texto diz isso com todas as letras:
+*"os 2 que já têm texto ficam como estão: não são refeitos nem cobrados de novo"*.
+
+E a checagem se repete **na hora de transcrever**, não só ao montar a fila: se outro aparelho (ou
+o botão do capítulo) transcrever enquanto a fila anda, aquele capítulo é pulado ali mesmo.
+
+### O núcleo saiu de dentro da tela
+
+`abTranscrever` fazia três coisas: perguntar o custo, pintar a área da aba e transcrever. Nada das
+duas primeiras serve para o "tudo", que roda com ele fazendo outra coisa. O núcleo virou
+`_abTranscreverTrecho(a, i, alvo, aoAndar)` — e os dois caminhos passam exatamente pela mesma
+transcrição.
+
+⚠️ **E o alvo mudou de regra.** No botão de um capítulo, um capítulo longo devolve só a janela de
+10 minutos em volta de onde ele está. No "tudo" isso seria uma transcrição que **mente sobre o que
+cobre**: o capítulo vai inteiro. O teto passa a ser o do envio (**90 min**, ~14 MB por hora em
+32 kbps mono contra o limite de 24 MB da API), e capítulo maior que isso **fica de fora com o nome
+na tela**, em vez de ser feito pela metade em silêncio.
+
+### Em segundo plano, e o que a pausa pode e não pode
+
+Mesmo desenho da fila de subida. Mas com uma diferença que importa:
+
+⚠️ **A pausa só vale ENTRE capítulos.** O que já foi pedido à IA não dá para desfazer — a chamada
+foi paga no instante em que saiu. Parar no meio jogaria fora um capítulo já cobrado, então o app
+termina o atual e não começa o próximo, dizendo isso.
+
+⚠️ **Um capítulo que falha não mata a fila.** Áudio mudo, rede que caiu, um trecho que a IA
+recusou: o resto do livro continua, e no fim aparece a lista do que ficou para trás, para ele
+tentar de novo um a um.
+
+### Dois trabalhos de fundo podem rodar juntos
+
+Subir o áudio e transcrever o livro. Cada cartão com `position:fixed` no mesmo canto ficaria um em
+cima do outro — agora a **caixa** é que é fixa (`.ab-avisos`), e o flex empilha. O aviso de fechar
+a aba passou a valer para os dois.
+
+### Medido
+
+Com um livro de 5 capítulos, **2 já transcritos** (o 1º e o 4º):
+
+- **Pulou exatamente os certos:** pediu transcrever `[1, 2, 4]` e pulou `[0, 3]`.
+- **O aviso de custo:** *"Vou transcrever 3 capítulos — cerca de 30 min de áudio. Os 2 que já têm
+  texto ficam como estão: não são refeitos nem cobrados de novo. Custa cerca de R$ 0,11 na Groq."*
+- **Falha isolada:** forcei o capítulo 2 a falhar; a fila **continuou** e terminou com texto em
+  0, 1, 3 e 4 — só o 2 ficou sem.
+- **Os dois avisos juntos:** dois cartões, empilhados um sobre o outro, sem emoji.
+- **Pausar:** o cartão passa a *"Pausado — 1 capítulo restando"* e o aviso explica que o capítulo
+  em andamento termina.
+- **O painel:** *"2 de 5 capítulos com texto"*, com o botão **"Transcrever tudo o que falta"**, que
+  só aparece quando há o que fazer.
+
+⚠️ **O que NÃO foi medido:** as posições na tela dos dois avisos — `innerWidth` voltou **0** porque
+o painel do navegador não estava em exibição, e medida assim não vale nada. Ficou para o Chrome.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13333,6 +13407,16 @@ bastava a aba morrer por outro caminho para o registro ficar velho. Agora cada p
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada do "transcrever tudo" (§8.76, 2026-08-22)
+
+- [ ] **Rodar com um livro de verdade dele**, com a chave da Groq: os testes simularam a chamada de
+      transcrição. O que foi exercitado de verdade é a fila, o pular e a conta.
+- [ ] **A fila de transcrição não sobrevive ao recarregamento** (a de subida sobrevive, guardando a
+      intenção). Aqui não guardei: cada item custa dinheiro, e retomar sozinho depois de um
+      recarregamento inesperado seria gastar sem ele pedir.
+- [ ] **Capítulo acima de 90 min fica de fora** do "tudo". Se aparecer um livro assim, o caminho é
+      fatiar em janelas e emendar as transcrições — não cabia nesta rodada.
 
 ### Da rodada da rotação (§8.75, 2026-08-22)
 
