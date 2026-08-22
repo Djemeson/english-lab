@@ -889,16 +889,13 @@ function cfgGoogleBooksKey(valor) {
   if (s) s.textContent = cfg.googleBooksKey ? 'Chave guardada. Clique em Testar para confirmar.' : 'Sem chave — a busca usa a cota compartilhada.'
 }
 
-// A chave do Gemini é uma chave do Google Cloud como outra qualquer. Se a
-// Books API estiver habilitada no mesmo projeto, ela serve para as duas coisas
-// — e é um campo a menos para ele administrar.
-function cfgGoogleBooksDoGemini() {
-  const k = (cfg.geminiKey || '').trim()
-  if (!k) { toast('Você ainda não tem chave do Gemini configurada (aba IA).', 'warning'); return }
-  const campo = el('cfg-gbooks-key'); if (campo) campo.value = k
-  cfgGoogleBooksKey(k)
-  toast('Chave copiada do Gemini — clique em Testar', 'info')
-}
+// ⚠️ HOUVE UM BOTÃO "USAR A DO GEMINI" AQUI, E O TESTE AO VIVO O DERRUBOU.
+// A ideia era reaproveitar a chave que ele já tem — as duas são `AIza…`. Só
+// que a chave do Gemini dele nasceu no **AI Studio**, e a Books API a recusa
+// com 401 *"API keys are not supported by this API"*. Um botão que promete
+// atalho e entrega erro é pior que nenhum botão.
+// Chave do Books tem de vir de um projeto do Google Cloud com a Books API
+// habilitada — o texto ao lado do campo diz o caminho.
 
 // Testar é obrigatório aqui, não zelo: a chave pode estar certa e a Books API
 // desligada no projeto, e o sintoma disso (403) é idêntico ao de chave errada.
@@ -916,8 +913,12 @@ async function cfgGoogleBooksTestar() {
       if (s) { s.style.color = 'var(--success, var(--text2))'; s.textContent = k ? 'Funcionou — a busca de livros agora usa a sua cota.' : 'Funcionou, mas sem chave: hoje a cota compartilhada respondeu; amanhã pode não responder.' }
     } else if (r.status === 429) {
       if (s) { s.style.color = 'var(--error)'; s.textContent = k ? 'Cota do dia estourada NESTA chave.' : 'Cota compartilhada estourada — é exatamente para isso que serve a chave.' }
-    } else if (/not been used|disabled|is not enabled/i.test(msg)) {
-      if (s) { s.style.color = 'var(--error)'; s.textContent = 'A chave é válida, mas a Books API está desligada nesse projeto. Habilite "Books API" no Google Cloud e teste de novo.' }
+    } else if (/not been used|disabled|is not enabled|not supported by this API/i.test(msg)) {
+      // ⚠️ MEDIDO COM A CHAVE DELE: a chave do Gemini feita no AI Studio
+      // devolve 401 "API keys are not supported by this API". A mensagem é
+      // enganosa — o problema não é o formato da chave, é que a Books API não
+      // está habilitada no projeto dela. Dizer isso poupa uma hora de busca.
+      if (s) { s.style.color = 'var(--error)'; s.textContent = 'Essa chave não vale para a Books API — falta habilitá-la no projeto. No Google Cloud: APIs e serviços → Ativar API → "Books API", e depois Credenciais → Criar chave de API.' }
     } else {
       if (s) { s.style.color = 'var(--error)'; s.textContent = `Recusada (${r.status}). ${msg.slice(0, 120)}` }
     }

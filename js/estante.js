@@ -1193,7 +1193,14 @@ async function _estFonteGoogle(q, n) {
   // diferentes ao usuário — misturá-los mandaria ele esperar por um erro que
   // só se resolve mexendo na chave.
   if (r.status === 429) { _estGoogleCaiu(); _estGoogleMotivo = 'cota'; return [] }
-  if (r.status === 403 || r.status === 400) { _estGoogleCaiu(); _estGoogleMotivo = _estGoogleKey() ? 'chave' : 'cota'; return [] }
+  // ⚠️ 401 TAMBÉM É CHAVE, e foi o que apareceu no teste real: a chave do
+  // Gemini criada no AI Studio devolve *"API keys are not supported by this
+  // API"* — parece problema de autenticação e é, na verdade, a Books API não
+  // habilitada naquele projeto. Sem tratar aqui, o app repetiria a requisição
+  // condenada a cada busca.
+  if (r.status === 401 || r.status === 403 || r.status === 400) {
+    _estGoogleCaiu(); _estGoogleMotivo = _estGoogleKey() ? 'chave' : 'cota'; return []
+  }
   const j = await r.json()
   _estGoogleMotivo = ''
   return (j.items || []).map(it => {

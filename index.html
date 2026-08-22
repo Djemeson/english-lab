@@ -739,12 +739,11 @@
       </label>
       <div style="margin-top:16px">
         <label for="cfg-gbooks-key" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Chave do Google Books (opcional, mas recomendada)</label>
-        <p class="desc" style="margin-bottom:8px">Sem chave, a busca divide uma cota com o mundo inteiro e costuma falhar — aí só resta a Open Library, que traz mais resultado repetido. A chave é a mesma família <code>AIza…</code> do Gemini: se você habilitar a <b>Books API</b> no mesmo projeto do Google Cloud, a chave que já tem serve.</p>
+        <p class="desc" style="margin-bottom:8px">Sem chave, a busca divide uma cota com o mundo inteiro e costuma falhar — aí só resta a Open Library, que traz mais resultado repetido. Como criar: <b>Google Cloud → APIs e serviços → Ativar API → "Books API"</b>, depois <b>Credenciais → Criar chave de API</b>. <b>A chave do Gemini feita no AI Studio não serve</b> (testado: responde "API keys are not supported"); só serve chave de um projeto com a Books API ligada. Clique em <b>Testar</b> — ele diz qual é o caso.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <input type="password" id="cfg-gbooks-key" placeholder="AIza…" onchange="cfgGoogleBooksKey(this.value)"
                  style="flex:1;min-width:200px;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)">
           <button class="btn btn-ghost btn-sm" onclick="togglePasswordVisibility('cfg-gbooks-key')">Ver</button>
-          <button class="btn btn-ghost btn-sm" onclick="cfgGoogleBooksDoGemini()">Usar a do Gemini</button>
           <button class="btn btn-secondary btn-sm" onclick="cfgGoogleBooksTestar()">Testar</button>
         </div>
         <p id="cfg-gbooks-status" class="desc" style="margin-top:8px;min-height:18px"></p>
