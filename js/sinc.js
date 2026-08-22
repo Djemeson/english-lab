@@ -271,9 +271,19 @@ function sincDesligar(livro, audio) {
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
 }
 
+// ⚠️ O PAR TEM UM DONO SÓ, E É O AUDIOLIVRO. A primeira versão guardava dos
+// dois lados por segurança — e a segurança virou o problema: no teste, o
+// `audioId` do livro sumiu num merge da nuvem (o objeto do livro veio de lá
+// sem o campo novo) enquanto o `livroId` do áudio ficou. Dois lugares para a
+// mesma verdade é um lugar para ela se perder.
+// O campo no livro continua sendo escrito como atalho, mas quem responde é a
+// varredura dos audiolivros — que é curta e nunca discorda de si mesma.
 function sincAudioDoLivro(livro) {
-  if (!livro || !livro.audioId) return null
-  return (typeof audiolivros !== 'undefined' ? audiolivros : []).find(a => a.id === livro.audioId) || null
+  if (!livro) return null
+  const lista = (typeof audiolivros !== 'undefined' ? audiolivros : [])
+  const porTras = lista.find(a => a.livroId === livro.id)
+  if (porTras) return porTras
+  return (livro.audioId && lista.find(a => a.id === livro.audioId)) || null
 }
 function sincLivroDoAudio(audio) {
   if (!audio || !audio.livroId) return null
