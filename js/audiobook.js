@@ -662,6 +662,223 @@ function _abCapaIlst(dv, buf, ilst) {
 }
 
 // ================================================================
+// AGRUPAR AS PARTES EM CAPÍTULOS — pelo que o narrador diz
+// ================================================================
+// Ele descreveu a estrutura ouvindo: *"ele tem o capítulo 1 e as partes 1, 2,
+// 3… aí entra o capítulo 2 e acontece a mesma coisa. Essa quantidade de partes
+// são exatamente essas partes de cada capítulo."* Estava certo, e os dados
+// confirmaram: as 200 "partes" do Billy Summers são as **seções numeradas** do
+// livro, e o `.m4b` só guarda `001`…`200` — nem o `chpl` nem a trilha de texto
+// têm nome nenhum. Verificado no arquivo dele, nos dois formatos.
+//
+// ⚠️ E A ESTRUTURA NÃO PODE VIR DO LIVRO. Foi a primeira ideia — cruzar com o
+// EPUB, cuja contagem fechou (197 seções contra 200 partes) — e ele cortou
+// pelo motivo certo: *"nem sempre vou ter o livro."* Um audiolivro precisa se
+// organizar sozinho.
+//
+// A CHAVE ESTÁ NA NARRAÇÃO, e é mais simples do que parece: **o número da
+// seção reinicia em 1 a cada capítulo**. Então basta ouvir o começo de cada
+// parte e anotar o número que o narrador diz; onde ele volta para 1, começou
+// um capítulo. Medido nas transcrições que ele já tinha: parte 003 diz "2.",
+// 004 diz "3.", 005 diz "Four." — exatamente as seções 2, 3 e 4 do Chapter 1.
+//
+// ⚠️ E ISSO NÃO MEXE NOS CORTES. Os grupos são uma camada de exibição
+// (`a.grupos`), não uma nova lista de capítulos: `a.capitulos` fica intacto, e
+// com ele a posição, os marcadores e as transcrições, que guardam `{cap, seg}`.
+// Trocar a lista exigiria remapear tudo; agrupar não exige nada.
+const AB_DESC_SEG = 25          // segundos do começo de cada parte: o número é dito logo
+
+const AB_NUM_EN = {
+  one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10,
+  eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16,
+  seventeen:17, eighteen:18, nineteen:19, twenty:20, thirty:30, forty:40, fifty:50
+}
+
+// "Twenty-three" → 23; "twenty three" → 23; "seven" → 7.
+function _abNumPorExtenso(txt) {
+  const partes = String(txt).toLowerCase().split(/[\s-]+/).filter(Boolean)
+  let total = 0, achou = false
+  for (const w of partes.slice(0, 2)) {
+    const v = AB_NUM_EN[w]
+    if (v == null) break
+    total += v; achou = true
+  }
+  return achou ? total : null
+}
+
+// ⚠️ O WHISPER ESCREVE COMO OUVE, e o mesmo narrador sai "2." numa parte e
+// "Four." na outra — foi o que apareceu nas transcrições reais dele. Ler só
+// dígito perderia metade.
+function _abNumeroDoInicio(texto) {
+  const t = String(texto || '').trim().slice(0, 80)
+  // "Chapter Two" dito em voz alta vale mais que qualquer inferência.
+  const cap = t.match(/^\s*chapter\s+([a-z0-9-]+)/i)
+  const capNum = cap ? (/^\d+$/.test(cap[1]) ? Number(cap[1]) : _abNumPorExtenso(cap[1])) : null
+  // o número da seção: dígito ou por extenso, seguido de ponto ou espaço
+  const resto = cap ? t.slice(cap[0].length) : t
+  const dig = resto.match(/^[\s.,:—-]*(\d{1,3})\s*[.,]/)
+  let sec = dig ? Number(dig[1]) : null
+  if (sec == null) {
+    const ext = resto.match(/^[\s.,:—-]*([a-z]+(?:[\s-][a-z]+)?)\s*[.,]/i)
+    if (ext) sec = _abNumPorExtenso(ext[1])
+  }
+  return { capitulo: capNum, secao: (sec != null && sec >= 1 && sec <= 200) ? sec : null }
+}
+
+// Dos números lidos, os grupos. Um capítulo novo começa quando a seção volta
+// para 1 — ou quando o narrador anuncia "Chapter N".
+//
+// ⚠️ O QUE VEM ANTES DA PRIMEIRA SEÇÃO 1 NÃO É CAPÍTULO. Abertura, título e
+// aviso de direitos autorais moram nas primeiras faixas; jogá-los dentro do
+// Chapter 1 faria o primeiro capítulo começar com o nome da editora.
+function _abGruposDosNumeros(lidos, total) {
+  const grupos = []
+  let atual = null, nCap = 0
+  for (let i = 0; i < total; i++) {
+    const l = lidos[i]
+    const comeca = l && (l.capitulo != null || l.secao === 1)
+    if (comeca) {
+      nCap = l.capitulo != null ? l.capitulo : nCap + 1
+      atual = { titulo: `Chapter ${nCap}`, de: i, ate: i }
+      grupos.push(atual)
+    } else if (atual) {
+      atual.ate = i
+    } else {
+      // antes do primeiro capítulo: a abertura
+      if (!grupos.length || grupos[0].titulo !== 'Abertura') grupos.unshift({ titulo: 'Abertura', de: 0, ate: i })
+      else grupos[0].ate = i
+    }
+  }
+  return grupos
+}
+
+async function abAgruparCapitulos() {
+  const a = _abLivro; if (!a) return
+  const caps = a.capitulos || []
+  if (caps.length < 3) { toast('Este livro já está em capítulos.', 'info'); return }
+  const stt = typeof aiSttCfg === 'function' ? aiSttCfg() : null
+  if (!stt) { toast('Configure a chave da Groq ou da OpenAI (Configurações → IA)', 'error'); return }
+
+  // O que já está transcrito sai de graça: o número está na primeira fala.
+  const jaTem = caps.map((_, i) => {
+    const tr = (a.transcricoes || []).find(x => x.cap === i)
+    return tr && tr.segs && tr.segs.length ? _abNumeroDoInicio(tr.segs[0].t) : null
+  })
+  const faltam = jaTem.map((x, i) => (x && x.secao != null) ? -1 : i).filter(i => i >= 0)
+  const usd = (faltam.length * AB_DESC_SEG / 60) * stt.usdMin
+  const brl = typeof aiUsdBrl === 'function' ? await aiUsdBrl().catch(() => 5.5) : 5.5
+
+  const ok = await confirmModal({
+    title: 'Descobrir os capítulos', icon: 'layers', confirmText: 'Descobrir',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Este livro está em <b>${caps.length} partes</b> numeradas, sem os capítulos. O narrador diz o
+      número de cada parte no começo — e esse número <b>volta para 1</b> quando entra um capítulo
+      novo. É por aí que dá para montar a estrutura, <b>sem precisar do livro em texto</b>.<br><br>
+      Vou ouvir só os <b>${AB_DESC_SEG} segundos iniciais</b> de ${faltam.length}
+      ${faltam.length === 1 ? 'parte' : 'partes'}${faltam.length < caps.length
+        ? ` (as outras ${caps.length - faltam.length} já estão transcritas e saem de graça)` : ''} —
+      cerca de <b>${(usd * brl).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</b>
+      na ${esc(stt.nome)}, e leva ${_abTempoDaFila(faltam.length)}.<br><br>
+      <b>Nada é apagado.</b> Os cortes, sua posição, os marcadores e as transcrições ficam como
+      estão — os capítulos entram só como agrupamento na lista, e você vê a prévia antes de
+      confirmar.</p>`
+  })
+  if (!ok) return
+  _abDescRodar(a, jaTem, faltam)
+}
+
+let _abDescCancelar = false
+
+async function _abDescRodar(a, lidos, faltam) {
+  _abDescCancelar = false
+  const total = (a.capitulos || []).length
+  const box = () => el('ab-aba')
+  const pintar = (feitos) => {
+    const b = box(); if (!b) return
+    b.innerHTML = `<div class="est-nada">${ic('layers','ic-lg')}
+      <p>Ouvindo o começo de cada parte… <b>${feitos} de ${faltam.length}</b></p>
+      <div class="est-ficha-barra" style="width:300px"><i style="width:${Math.round(feitos / Math.max(1, faltam.length) * 100)}%;background:var(--role-energia)"></i></div>
+      <p class="est-dica">Dá para continuar usando o app; só não feche a aba.</p>
+      <button class="btn btn-ghost btn-sm" onclick="_abDescCancelar=true">Parar</button></div>`
+  }
+  pintar(0)
+  let feitos = 0
+  for (const i of faltam) {
+    if (_abDescCancelar) break
+    try {
+      const cap = a.capitulos[i]
+      const dur = abDurCap(cap)
+      const alvo = { ini: 0, fim: Math.min(AB_DESC_SEG, dur > 0 ? dur : AB_DESC_SEG) }
+      const blob = await _abAudioDoTrecho(a, cap, alvo.ini, alvo.fim)
+      const r = await aiTranscribe(blob, { nome: 'ini.mp3', lang: (a.lang || 'en').slice(0, 2), timeoutMs: 120000 })
+      lidos[i] = _abNumeroDoInicio(r.text || (r.segments || [])[0]?.text || '')
+    } catch (e) {
+      console.warn('[audiobook] parte', i, 'não deu:', e && e.message)
+      lidos[i] = null
+    }
+    feitos++
+    pintar(feitos)
+  }
+  const grupos = _abGruposDosNumeros(lidos, total)
+  _abDescPrevia(a, grupos, lidos)
+}
+
+// ⚠️ PRÉVIA ANTES DE APLICAR, e não depois. O agrupamento é um palpite montado
+// a partir do que a IA ouviu: um número perdido no meio desloca tudo dali para
+// frente. Ver 24 capítulos com contagens plausíveis é o que separa "funcionou"
+// de "parece que funcionou".
+async function _abDescPrevia(a, grupos, lidos) {
+  const semNumero = lidos.filter((x, i) => !x || x.secao == null).length
+  const reais = grupos.filter(g => g.titulo !== 'Abertura')
+  const b = el('ab-aba')
+  if (!reais.length) {
+    if (b) b.innerHTML = `<div class="est-nada">${ic('alert','ic-lg')}
+      <p>Não consegui achar a numeração.</p>
+      <p class="est-dica" style="max-width:460px">O narrador deste livro talvez não anuncie o
+        número das partes. Nada foi alterado.</p>
+      <button class="btn btn-ghost btn-sm" onclick="abAba('capitulos')">Voltar</button></div>`
+    return
+  }
+  const ok = await confirmModal({
+    title: 'Confira antes de aplicar', icon: 'layers', confirmText: 'Aplicar',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Achei <b>${reais.length} capítulos</b> nas ${(a.capitulos || []).length} partes.
+      ${semNumero ? `<br><br>⚠️ Em <b>${semNumero}</b> ${semNumero === 1 ? 'parte' : 'partes'} não
+        deu para ler o número — ${semNumero === 1 ? 'ela ficou' : 'elas ficaram'} junto do capítulo
+        anterior.` : ''}</p>
+      <div style="max-height:220px;overflow:auto;margin-top:10px;font-size:var(--fs-sm)">
+        ${grupos.map(g => `<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px solid var(--border)">
+          <span>${esc(g.titulo)}</span>
+          <b style="white-space:nowrap">${g.ate - g.de + 1} ${g.ate === g.de ? 'parte' : 'partes'}</b></div>`).join('')}
+      </div>
+      <p class="est-dica" style="margin-top:10px">Os cortes, sua posição e as transcrições não
+        mudam — isto é só o agrupamento da lista, e dá para desfazer.</p>`
+  })
+  if (!ok) { abAba('capitulos'); return }
+  a.grupos = grupos
+  a.updatedAt = Date.now()
+  saveAudiolivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  toast(`${reais.length} capítulos montados`, 'success')
+  abAba('capitulos')
+}
+
+function abDesagrupar() {
+  const a = _abLivro; if (!a || !a.grupos) return
+  a.grupos = null
+  a.updatedAt = Date.now()
+  saveAudiolivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  abAba('capitulos')
+}
+
+// Em que grupo mora a parte `i` — para o player dizer "Chapter 3 · parte 2 de 8".
+function abGrupoDaParte(a, i) {
+  for (const g of (a && a.grupos) || []) if (i >= g.de && i <= g.ate) return g
+  return null
+}
+
+// ================================================================
 // PROCURAR OS CAPÍTULOS DE VERDADE — pelo silêncio entre eles
 // ================================================================
 // As "Partes de 15 minutos" são honestas, mas arbitrárias: cortam no meio de
@@ -2729,6 +2946,10 @@ async function abExcluir(id) {
 function _abRenderPlayer() {
   const a = _abLivro, caps = a.capitulos || []
   const cap = caps[_abCap] || { titulo: '—', ini: 0, fim: 0 }
+  // Com capítulos montados, "001" sozinho não diz nada: o que orienta é
+  // "Chapter 3 · parte 2 de 8".
+  const _g = abGrupoDaParte(a, _abCap)
+  const capNome = _g ? `${_g.titulo} · parte ${_abCap - _g.de + 1} de ${_g.ate - _g.de + 1}` : cap.titulo
   const area = el('ab-area')
   area.innerHTML = `
     <div class="ab-player">
@@ -2740,7 +2961,7 @@ function _abRenderPlayer() {
         <div class="ab-info">
           <h2>${esc(a.title || 'Sem título')}</h2>
           <p class="ab-autor">${esc(a.author || '')}</p>
-          <p class="ab-cap-nome" id="ab-cap-nome">${esc(cap.titulo)}</p>
+          <p class="ab-cap-nome" id="ab-cap-nome">${esc(capNome)}</p>
           <p class="ab-cap-conta">Capítulo ${_abCap + 1} de ${caps.length} · ${abTempoLongo(abDuracao(a))} no total</p>
 
           <div class="ab-barra" id="ab-barra" onclick="abBarraClique(event)">
@@ -2853,12 +3074,59 @@ function _abListaCapitulos() {
            cortes pelo <b>silêncio</b>, aqui no aparelho e sem custo.</span>
          <button class="btn btn-ghost btn-sm" onclick="abProcurarCapitulos()">Procurar pelo silêncio</button>
        </div>`
-  return `${convite}<div class="ab-caps">${(a.capitulos || []).map((c, i) => `
+
+  // ⚠️ A PORTA DO AGRUPAMENTO É OUTRA COISA, e por isso é outra faixa: procurar
+  // pelo silêncio TROCA os cortes; agrupar os mantém e só os organiza. Só
+  // aparece quando faz sentido — muitas partes, sem grupos ainda.
+  const podeAgrupar = caps.length >= 6 && !(a.grupos || []).length
+  const conviteGrupo = podeAgrupar
+    ? `<div class="ab-conv">
+         ${ic('layers','ic-sm')}
+         <span>São <b>${caps.length} partes</b> numeradas, sem os capítulos. O narrador diz o
+           número de cada uma no começo — dá para <b>montar os capítulos</b> a partir disso, sem
+           precisar do livro em texto.</span>
+         <button class="btn btn-ghost btn-sm" onclick="abAgruparCapitulos()">Descobrir capítulos</button>
+       </div>` : ''
+  const item = (c, i) => `
     <button class="ab-cap${i === _abCap ? ' on' : ''}" onclick="abIrCapitulo(${i})">
       <span class="ab-cap-n">${i + 1}</span>
       <span class="ab-cap-t">${esc(c.titulo)}</span>
       <span class="ab-cap-d">${abTempo(abDurCap(c))}</span>
-    </button>`).join('')}</div>`
+    </button>`
+
+  // ⚠️ AGRUPADO QUANDO HÁ GRUPOS, E SÓ ENTÃO. `a.grupos` é camada de exibição:
+  // os índices continuam sendo os de `a.capitulos`, que é o que a posição, os
+  // marcadores e as transcrições guardam. Nada aqui pode renumerar nada.
+  if ((a.grupos || []).length) {
+    const abertoAgora = abGrupoDaParte(a, _abCap)
+    return `${conviteGrupo}${convite}
+      <div class="ab-grupos">
+        ${a.grupos.map((g, gi) => {
+          const n = g.ate - g.de + 1
+          const dur = caps.slice(g.de, g.ate + 1).reduce((t, c) => t + (abDurCap(c) || 0), 0)
+          const aberto = g === abertoAgora || _abGrupoAberto === gi
+          return `<div class="ab-grupo${aberto ? ' aberto' : ''}">
+            <button class="ab-grupo-cab" onclick="abGrupoAbrir(${gi})">
+              <span class="ab-grupo-seta">${ic('chevronRight','ic-3xs')}</span>
+              <span class="ab-grupo-t">${esc(g.titulo)}</span>
+              <span class="ab-grupo-n">${n} ${n === 1 ? 'parte' : 'partes'}</span>
+              <span class="ab-cap-d">${abTempo(dur)}</span>
+            </button>
+            ${aberto ? `<div class="ab-caps">${caps.slice(g.de, g.ate + 1)
+              .map((c, k) => item(c, g.de + k)).join('')}</div>` : ''}
+          </div>`
+        }).join('')}
+      </div>
+      <p class="est-dica" style="margin-top:10px">Capítulos montados pela numeração que o narrador
+        diz. <button class="btn btn-ghost btn-sm" onclick="abDesagrupar()">Desfazer o agrupamento</button></p>`
+  }
+  return `${conviteGrupo}${convite}<div class="ab-caps">${caps.map(item).join('')}</div>`
+}
+
+let _abGrupoAberto = -1
+function abGrupoAbrir(gi) {
+  _abGrupoAberto = (_abGrupoAberto === gi) ? -1 : gi
+  abAba('capitulos')
 }
 
 // A FALA QUE ESTAVA TOCANDO NAQUELE INSTANTE.
@@ -3302,7 +3570,11 @@ function _abMediaSession() {
   const a = _abLivro, cap = a.capitulos[_abCap] || {}
   try {
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: cap.titulo || a.title, artist: a.author || '', album: a.title || '',
+      // Na tela de bloqueio, "001" nao diz nada; "Chapter 3 - parte 2 de 8" diz.
+      title: (() => { const g = abGrupoDaParte(a, _abCap)
+        return g ? `${g.titulo} · parte ${_abCap - g.de + 1} de ${g.ate - g.de + 1}`
+                 : (cap.titulo || a.title) })(),
+      artist: a.author || '', album: a.title || '',
       artwork: a.cover ? [{ src: a.cover, sizes: '240x240', type: 'image/jpeg' }] : []
     })
     // ⚠️ `play`/`pause` do sistema NÃO podem cair em `abTocarPausar`, que

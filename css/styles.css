@@ -5578,6 +5578,23 @@ body.ab-full .ab-chips{max-width:34em}
 /* A mesma faixa, em voz baixa: quando os capítulos vieram do arquivo, procurar
    pelo silêncio é uma saída disponível, não uma recomendação. */
 .ab-conv-fraca{opacity:.72; border-style:dashed}
+
+/* ---- capítulos com as partes dentro ----
+   Sanfona simples: um capítulo aberto por vez, e o que contém a parte tocando
+   abre sozinho. Com 24 capítulos e 200 partes, mostrar tudo aberto seria a
+   mesma lista de antes com mais linhas. */
+.ab-grupos{display:flex;flex-direction:column;gap:4px}
+.ab-grupo{border:1px solid var(--border);border-radius:var(--radius-xs);overflow:hidden}
+.ab-grupo-cab{
+  width:100%;display:flex;align-items:center;gap:10px;padding:10px 12px;
+  background:var(--surface2);border:0;cursor:pointer;text-align:left;color:var(--text);
+}
+.ab-grupo-cab:hover{background:var(--surface3, var(--surface))}
+.ab-grupo-seta{display:flex;color:var(--text3);transition:transform .15s}
+.ab-grupo.aberto .ab-grupo-seta{transform:rotate(90deg)}
+.ab-grupo-t{flex:1;min-width:0;font-size:var(--fs-sm);font-weight:600}
+.ab-grupo-n{font-size:var(--fs-3xs);color:var(--text3);white-space:nowrap}
+.ab-grupo .ab-caps{padding:4px}
 .ab-conv-fraca:hover{opacity:1}
 .ab-conv span{flex:1}
 .ab-conv b{color:var(--text)}
