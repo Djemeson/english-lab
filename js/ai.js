@@ -2597,19 +2597,38 @@ async function aiTranscribe(blob, { nome = 'audio.webm', lang, granular = true, 
   fd.append('model', stt.model)
   if (granular) fd.append('response_format', 'verbose_json')
   if (lang) fd.append('language', lang)
-  const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), timeoutMs)
-  try {
-    const res = await fetch(stt.url, {
-      method: 'POST', headers: { 'Authorization': `Bearer ${stt.key}` }, body: fd, signal: ctl.signal
-    })
-    if (!res.ok) {
-      let m = 'HTTP ' + res.status
-      try { const e = await res.json(); if (e.error?.message) m = e.error.message } catch {}
-      throw new Error(`[${stt.nome}] ${m}`)
-    }
-    return await res.json()
-  } finally { clearTimeout(timer) }
+  // ⚠️ O 429 NÃO PODE SER TRATADO COMO FALHA — E ERA. Uma transcrição solta
+  // nunca esbarra no limite; duzentas em sequência esbarram na vigésima. Foi
+  // exatamente o que aconteceu com ele: das 200 partes do audiolivro, as **19
+  // primeiras** foram lidas e **173 falharam** — o desenho de um limite por
+  // minuto, não de um defeito. Desistir na primeira recusa transformava um
+  // "espere um pouco" em "não deu".
+  //
+  // `retry-after` vem no cabeçalho quando o servidor sabe dizer quanto esperar;
+  // sem ele, a espera dobra a cada tentativa.
+  for (let tent = 0; ; tent++) {
+    const ctl = new AbortController()
+    const timer = setTimeout(() => ctl.abort(), timeoutMs)
+    try {
+      const res = await fetch(stt.url, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${stt.key}` }, body: fd, signal: ctl.signal
+      })
+      if (res.status === 429 && tent < 4) {
+        const cab = Number(res.headers.get('retry-after'))
+        const espera = Math.min(60, cab > 0 ? cab : Math.pow(2, tent) * 4)
+        console.warn(`[${stt.nome}] limite de requisições — esperando ${espera}s`)
+        clearTimeout(timer)
+        await new Promise(r => setTimeout(r, espera * 1000))
+        continue
+      }
+      if (!res.ok) {
+        let m = 'HTTP ' + res.status
+        try { const e = await res.json(); if (e.error?.message) m = e.error.message } catch {}
+        throw new Error(`[${stt.nome}] ${m}`)
+      }
+      return await res.json()
+    } finally { clearTimeout(timer) }
+  }
 }
 
 // Tokens médios de UMA análise de item (prompt do card + resposta), medidos

@@ -760,7 +760,9 @@ async function abAgruparCapitulos() {
   if (!stt) { toast('Configure a chave da Groq ou da OpenAI (Configurações → IA)', 'error'); return }
 
   // O que já está transcrito sai de graça: o número está na primeira fala.
+  const guardado = a._descLidos || []
   const jaTem = caps.map((_, i) => {
+    if (guardado[i] && guardado[i].secao != null) return guardado[i]
     const tr = (a.transcricoes || []).find(x => x.cap === i)
     return tr && tr.segs && tr.segs.length ? _abNumeroDoInicio(tr.segs[0].t) : null
   })
@@ -788,6 +790,7 @@ async function abAgruparCapitulos() {
 }
 
 let _abDescCancelar = false
+let _abDescMotivo = ''
 
 async function _abDescRodar(a, lidos, faltam) {
   _abDescCancelar = false
@@ -802,7 +805,7 @@ async function _abDescRodar(a, lidos, faltam) {
       <button class="btn btn-ghost btn-sm" onclick="_abDescCancelar=true">Parar</button></div>`
   }
   pintar(0)
-  let feitos = 0
+  let feitos = 0, seguidas = 0, ultimoErro = ''
   for (const i of faltam) {
     if (_abDescCancelar) break
     try {
@@ -812,13 +815,24 @@ async function _abDescRodar(a, lidos, faltam) {
       const blob = await _abAudioDoTrecho(a, cap, alvo.ini, alvo.fim)
       const r = await aiTranscribe(blob, { nome: 'ini.mp3', lang: (a.lang || 'en').slice(0, 2), timeoutMs: 120000 })
       lidos[i] = _abNumeroDoInicio(r.text || (r.segments || [])[0]?.text || '')
+      seguidas = 0
     } catch (e) {
-      console.warn('[audiobook] parte', i, 'não deu:', e && e.message)
+      ultimoErro = String(e && e.message || e)
+      console.warn('[audiobook] parte', i, 'não deu:', ultimoErro)
       lidos[i] = null
+      // ⚠️ ERRO QUE SE REPETE NÃO É AZAR, É PAREDE. Chave errada, cota
+      // estourada, rede fora — insistir 180 vezes só troca tempo por lixo, e
+      // no fim entrega uma prévia com 173 buracos e um botão "Aplicar", que
+      // foi o que ele viu. Cinco seguidas e a varredura para.
+      if (++seguidas >= 5) { _abDescMotivo = ultimoErro; break }
     }
     feitos++
     pintar(feitos)
   }
+  // O que já foi lido fica guardado: "tentar de novo" retoma de onde parou, em
+  // vez de pagar outra vez pelas partes que deram certo.
+  a._descLidos = lidos.map(x => (x && x.secao != null) ? x : null)
+  saveAudiolivros()
   const grupos = _abGruposDosNumeros(lidos, total)
   _abDescPrevia(a, grupos, lidos)
 }
@@ -831,6 +845,28 @@ async function _abDescPrevia(a, grupos, lidos) {
   const semNumero = lidos.filter((x, i) => !x || x.secao == null).length
   const reais = grupos.filter(g => g.titulo !== 'Abertura')
   const b = el('ab-aba')
+  // ⚠️ COM MUITOS BURACOS, O RESULTADO NÃO É "PARCIAL": É ERRADO. Cada número
+  // perdido gruda a parte no capítulo anterior, então 173 falhas viram dois
+  // capítulos gigantes — e foi isso que a tela ofereceu para ele aplicar.
+  // Abaixo de 70% lido, não há prévia que valha: só o motivo e a saída.
+  const lidosOk = lidos.filter(x => x && x.secao != null).length
+  if (lidosOk < lidos.length * 0.7) {
+    const limite = /429|rate|limit|quota/i.test(_abDescMotivo)
+    if (b) b.innerHTML = `<div class="est-nada">${ic('alert','ic-lg')}
+      <p>Só consegui ler <b>${lidosOk} de ${lidos.length}</b> partes — pouco para montar os capítulos.</p>
+      <p class="est-dica" style="max-width:520px">${limite
+        ? `A ${esc((typeof aiSttCfg === 'function' && aiSttCfg() || {}).nome || 'IA')} <b>limita quantas
+           transcrições você pode pedir por minuto</b>, e uma varredura de ${lidos.length} partes
+           esbarra nisso. O app agora espera e tenta de novo sozinho — <b>tente outra vez</b>, que
+           o que já foi lido não é refeito.`
+        : `Motivo da última falha: <i>${esc(_abDescMotivo || 'desconhecido')}</i>`}</p>
+      <p class="est-dica"><b>Nada foi alterado.</b></p>
+      <div class="ab-vazio-acoes">
+        <button class="btn btn-primary btn-sm" onclick="abAgruparCapitulos()">Tentar de novo</button>
+        <button class="btn btn-ghost btn-sm" onclick="abAba('capitulos')">Voltar</button>
+      </div></div>`
+    return
+  }
   if (!reais.length) {
     if (b) b.innerHTML = `<div class="est-nada">${ic('alert','ic-lg')}
       <p>Não consegui achar a numeração.</p>
