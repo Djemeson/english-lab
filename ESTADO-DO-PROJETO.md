@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (15ª) — **TODO MATERIAL GERADO PASSA A VIAJAR, E O REALCE PARA
+> Última atualização: 2026-08-22 (16ª) — **A SUBIDA DO AUDIOLIVRO VIROU FILA DE SEGUNDO PLANO**.
+> Pedido dele: *"deve fazer upload em segundo plano"* — e o pedido descobriu três defeitos da
+> versão anterior: **todos os blobs iam para a memória de uma vez** (700 MB de RAM presos para
+> subir um arquivo por vez), **o progresso morava dentro do painel** (fechou, a subida continuava
+> às cegas) e **"não feche a aba" era só um pedido**. Agora existe uma fila com **aviso flutuante
+> que segue ele por qualquer seção**, pausar/continuar, e o navegador pergunta antes de fechar. As
+> **regras do Storage foram publicadas** nesta rodada: audiolivro tem faixa própria de **2 GB por
+> arquivo**. `sw.js` → **englab-v353**. **Detalhes em §8.72.**
+>
+> Última atualização anterior: 2026-08-21 (15ª) — **TODO MATERIAL GERADO PASSA A VIAJAR, E O REALCE PARA
 > DE MENTIR**. Ele abriu o app no computador: *"a análise que fiz no telefone não apareceu aqui"*
 > e *"cellar voltou a ficar marcado como desconhecido"*. Dois defeitos e um pedido maior que os
 > dois — *"todo material gerado precisa ir pra todos os aparelhos"*. A varredura achou **quatro**
@@ -13016,6 +13025,76 @@ dois blocos, e basta um permitir. Por isso o bloco genérico não precisa de exc
 é alcançável pelas ferramentas de navegador, e sem login não existe nuvem para exercitar. Mesma
 pendência de §8.69.
 
+## 8.72 A subida do audiolivro virou fila de segundo plano (2026-08-22, 16ª)
+
+> *"Deve fazer upload em segundo plano."*
+
+O pedido parecia de conforto e era de correção: a versão anterior tinha três defeitos reais.
+
+| Defeito | Por que doía |
+|---|---|
+| **Todos os blobs na memória de uma vez** | Um livro de 700 MB em 20 faixas ficava inteiro na RAM durante toda a subida — para nada, porque só um arquivo sobe por vez |
+| **O progresso morava no painel** | Fechou o painel, acabou a notícia: a subida continuava rodando às cegas |
+| **"Não feche a aba" era só um pedido** | Fechar no meio matava o envio sem dizer nada |
+
+### O que existe agora
+
+Uma **fila** (`_abFila`), um **motor** que a consome um arquivo por vez, e um **aviso flutuante**
+que acompanha ele por qualquer seção do app — com o nome do livro, quanto já foi, quantos faltam,
+e os botões de **pausar** e **cancelar**.
+
+- O blob é lido do IndexedDB **na vez dele**, e solto em seguida.
+- Um arquivo por vez de propósito: seis de 30 MB em paralelo entopem a subida de quem está no 4G
+  e fazem a barra andar em pulos.
+- `beforeunload` faz o navegador perguntar antes de fechar.
+
+### ⚠️ O que NÃO dá para fazer, e por quê
+
+**Retomar um arquivo pela metade depois de recarregar.** O Storage tem upload retomável, mas o SDK
+não entrega o endereço da sessão para guardar — reimplementar o protocolo à mão seria trocar uma
+peça testada por uma nossa. O que sobrevive é a **intenção**: a fila vai para o `localStorage`, e
+ao voltar o app sabe o que faltava. Arquivo inteiro que já subiu não repete.
+
+⚠️ **E retomar não é automático.** A aba pode ter fechado por qualquer motivo, e recomeçar 700 MB
+sozinho — talvez no 4G — seria decidir pelo bolso dele. O que fica é a fila **pausada**, com o
+botão de continuar à vista.
+
+### Duas armadilhas que a fila criou, e o conserto
+
+- **Remover o audiolivro** com arquivos na fila deixaria o motor procurando um blob que não existe
+  mais a cada volta. A remoção agora limpa a fila daquele livro.
+- **"Liberar espaço aqui"** durante o envio apagaria a **fonte** do que está subindo, e o envio
+  morreria no meio sem explicação. Fica barrado enquanto a fila tiver aquele livro.
+
+### O bug de contagem que o teste pegou
+
+O item em curso **continua em `_abFila[0]`** — só sai depois de subir, para que uma pausa o
+devolva inteiro. Somar `_abFilaAtual` à contagem contava duas vezes: com três arquivos o aviso
+dizia *"+3 na fila"* em vez de *"+2"*.
+
+### Medido
+
+- Três arquivos na fila: *"+2 na fila"* → *"+1 na fila"* → sem sufixo. As três partes gravadas,
+  fila vazia, aviso removido, `localStorage` limpo.
+- **Sair da seção no meio do envio:** o aviso continua na tela e a subida segue.
+- **Pausar no arquivo 1:** ele volta **inteiro** para a fila (restam 1 e 2) e o aviso passa a
+  dizer *"Envio pausado — 2 arquivos restando"*. Continuar termina os dois.
+- **Retomar de outra sessão:** volta **pausado**, não sai enviando sozinho.
+- **"Liberar espaço" durante o envio:** barrado com *"Este livro ainda está sendo enviado."*
+- **`beforeunload`:** avisa com fila, não avisa sem.
+- **O aviso na tela:** 320px, `position:fixed` a 24px do canto, dentro da janela, barra em 43%
+  para 18 MB de 42 MB, botões "Pausar" e "Cancelar o envio", **sem emoji**.
+
+⚠️ **Uma nota do teste, não do app:** o primeiro simulador usava `setInterval`, e **aba oculta
+desacelera timers** — a fila parecia travar no segundo arquivo. Refeito com microtasks, correu
+inteiro. Upload real usa rede, que não sofre esse freio.
+
+### As regras do Storage foram publicadas
+
+`firebase deploy --only storage` e `--only firestore:rules` rodaram nesta rodada. **Conferido lendo
+de volta do servidor** (API `firebaserules`), e não pelo console: `users/{uid}/audiolivros/**` com
+**2048 MB**, o resto com **500 MB**.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13025,11 +13104,20 @@ pendência de §8.69.
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada da fila em segundo plano (§8.72, 2026-08-22)
+
+- [ ] **Testar com um audiolivro de verdade:** guardar na nuvem, sair da seção, ver a barra andar,
+      pausar, continuar. Os testes foram com arquivos sintéticos e a subida simulada — a rede real
+      nunca entrou na conta, porque o login do Google está fora do alcance das ferramentas.
+- [ ] **Arquivo pela metade recomeça** se a aba fechar. Só resolve reimplementando o protocolo de
+      upload retomável à mão; não vale por enquanto.
+- [ ] **A fila não sobrevive ao fechamento do navegador em si** (só ao recarregamento da página),
+      porque o JS morre junto. Um Service Worker com Background Fetch resolveria — é outra rodada.
+
 ### Da rodada do material gerado (§8.71, 2026-08-21)
 
-- [ ] **PUBLICAR AS REGRAS — depende dele.** `firebase deploy --only storage` (o classificador do
-      modo automático barra o comando; em modo manual roda direto). Sem isso, o teto continua em
-      500 MB por arquivo e um `.m4b` grande é recusado. As regras já estão certas no repositório.
+- [x] ~~**PUBLICAR AS REGRAS**~~ — **feito em 2026-08-22**, em modo manual. Conferido lendo de
+      volta do servidor: `audiolivros/**` com 2 GB, o resto com 500 MB.
 - [ ] **Testar a viagem real telefone ↔ computador:** analisar um capítulo num aparelho e abrir no
       outro sem pagar de novo. Não deu para fazer daqui (login do Google fora de alcance).
 - [ ] **O material antigo não sobe sozinho.** O que já foi gerado antes desta versão continua só

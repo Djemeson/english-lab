@@ -5233,6 +5233,34 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ab-nuvem-prog .est-ficha-barra{width:100%}
 .ab-nuvem-acoes{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 
+/* ---- o aviso da fila de envio ----
+   Acima dos toasts e no mesmo canto: é o lugar onde o olho já procura recado do
+   app. Fica enquanto a fila tiver o que fazer, em qualquer seção — a subida
+   roda em segundo plano, e o único jeito de isso não virar mistério é ela ter
+   um lugar fixo na tela. */
+.ab-fila{
+  position:fixed; right:24px; bottom:24px; z-index:var(--z-toast);
+  width:min(320px, calc(100vw - 48px));
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-lg, var(--shadow)); overflow:hidden;
+}
+.ab-fila-topo{display:flex; align-items:center; gap:10px; padding:10px 12px}
+.ab-fila-ic{color:rgba(var(--primary-rgb),.9); display:flex; flex:0 0 auto}
+.ab-fila-txt{display:flex; flex-direction:column; min-width:0; flex:1 1 auto}
+.ab-fila-txt b{font-size:var(--fs-sm); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.ab-fila-txt em{font-style:normal; font-size:var(--fs-3xs); color:var(--text3)}
+.ab-fila-x{
+  flex:0 0 auto; width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+  background:none; border:0; border-radius:6px; color:var(--text3); cursor:pointer;
+}
+.ab-fila-x:hover{background:var(--surface2); color:var(--text)}
+.ab-fila-barra{height:3px; background:var(--surface2)}
+.ab-fila-barra i{display:block; height:100%; background:var(--role-energia); transition:width .2s}
+/* Na mão, o aviso não pode cobrir os controles do player. */
+@media (max-width: 640px){
+  .ab-fila{right:12px; left:12px; bottom:76px; width:auto}
+}
+
 /* ---- reprodutor ---- */
 .ab-player{max-width:1000px}
 .ab-topo{display:grid;grid-template-columns:220px minmax(0,1fr);gap:32px;align-items:start;margin-bottom:30px}

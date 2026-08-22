@@ -72,6 +72,9 @@ function renderAudiobookSection() {
   }
   if (_abLivro) _abRenderPlayer()
   else _abRenderEstante()
+  // Sobrou envio de uma sessão anterior? Reaparece PAUSADO, com o botão de
+  // continuar — retomar 700 MB sozinho, talvez no 4G, não é decisão do app.
+  abFilaRetomarPendencias()
 }
 
 // ================================================================
@@ -1732,8 +1735,11 @@ function _abNuvemGravar(a, n, bytes) {
 }
 
 // ---- O PAINEL: o que está onde, e o que dá para fazer ----
+let _abNuvemPainelId = null
+
 async function abNuvemPainel(id) {
   const a = audiolivroPorId(id); if (!a) return
+  _abNuvemPainelId = id
   document.getElementById('ab-nuvem')?.remove()
   const ov = document.createElement('div')
   ov.id = 'ab-nuvem'; ov.className = 'srs-modal-overlay'
@@ -1823,20 +1829,190 @@ function _abNuvemAndar(msg, pct) {
   b.style.width = Math.round((pct || 0) * 100) + '%'
 }
 
-// ---- SUBIR ----
+// ---- SUBIR: UMA FILA QUE RODA EM SEGUNDO PLANO ----
+// ⚠️ ANTES, A SUBIDA PRENDIA A TELA E A MEMÓRIA. Ele pediu segundo plano, e o
+// pedido descobriu três defeitos reais da versão anterior:
+//
+// 1. **Todos os blobs iam para a memória de uma vez.** Um livro de 700 MB em 20
+//    faixas ficava inteiro na RAM durante toda a subida — para nada, porque só
+//    um arquivo sobe por vez. Agora cada blob é lido na sua vez e solto depois.
+// 2. **O progresso morava dentro do painel.** Fechou o painel, acabou a
+//    notícia: a subida continuava rodando às cegas. Agora existe um aviso
+//    flutuante que acompanha ele por qualquer seção do app.
+// 3. **"Não feche a aba" era só um pedido.** Fechar no meio matava o envio sem
+//    dizer nada. Agora o navegador pergunta antes.
+//
+// ⚠️ O QUE NÃO DÁ PARA FAZER, E POR QUÊ: retomar um arquivo pela METADE depois
+// de recarregar. O Storage tem upload retomável, mas o SDK não entrega o
+// endereço da sessão para guardar — reimplementar o protocolo à mão seria
+// trocar uma peça testada por uma nossa. O que sobrevive é a INTENÇÃO: ao
+// voltar, o app sabe o que faltava, e arquivo inteiro que já subiu não repete.
+const AB_FILA_SK = 'el-ab-fila'
+
+let _abFila = []          // [{id, n}] — o que ainda falta subir
+let _abFilaRodando = false
+let _abFilaPausada = false
+let _abFilaAtual = null   // {id, n, env, tot}
+
+function _abFilaSalvar() {
+  try { localStorage.setItem(AB_FILA_SK, JSON.stringify(_abFila.map(x => ({ id: x.id, n: x.n })))) }
+  catch (e) {}
+}
+
+function _abFilaCarregar() {
+  try { const v = JSON.parse(localStorage.getItem(AB_FILA_SK) || '[]'); return Array.isArray(v) ? v : [] }
+  catch (e) { return [] }
+}
+
+// ---- o aviso flutuante, que segue ele pelo app ----
+function _abFilaPintar() {
+  let cx = document.getElementById('ab-fila')
+  if (!_abFila.length && !_abFilaAtual) { if (cx) cx.remove(); return }
+  if (!cx) {
+    cx = document.createElement('div')
+    cx.id = 'ab-fila'
+    cx.className = 'ab-fila'
+    document.body.appendChild(cx)
+  }
+  const alvo = _abFilaAtual || _abFila[0]
+  const a = alvo ? audiolivroPorId(alvo.id) : null
+  // ⚠️ O item em curso CONTINUA em `_abFila[0]` — só sai depois de subir, para
+  // que uma pausa o devolva inteiro. Somar `_abFilaAtual` aqui contava duas
+  // vezes: com três arquivos o aviso dizia "+3 na fila" em vez de "+2".
+  const restam = _abFila.length || (_abFilaAtual ? 1 : 0)
+  const pct = _abFilaAtual && _abFilaAtual.tot ? _abFilaAtual.env / _abFilaAtual.tot : 0
+  const linha = _abFilaPausada
+    ? `Envio pausado — ${restam} ${restam === 1 ? 'arquivo' : 'arquivos'} restando`
+    : _abFilaAtual
+      ? `${abNuvemMB(_abFilaAtual.env)} de ${abNuvemMB(_abFilaAtual.tot)}${restam > 1 ? ` · +${restam - 1} na fila` : ''}`
+      : `${restam} ${restam === 1 ? 'arquivo' : 'arquivos'} na fila`
+  cx.innerHTML = `
+    <div class="ab-fila-topo">
+      <span class="ab-fila-ic">${ic('cloud', 'ic-sm')}</span>
+      <div class="ab-fila-txt">
+        <b>${esc((a && a.title) || 'Audiolivro')}</b>
+        <em>${esc(linha)}</em>
+      </div>
+      <button class="ab-fila-x" data-tip="${_abFilaPausada ? 'Continuar' : 'Pausar'}"
+              onclick="abFilaPausar()">${ic(_abFilaPausada ? 'play' : 'pause', 'ic-3xs')}</button>
+      <button class="ab-fila-x" data-tip="Cancelar o envio"
+              onclick="abFilaCancelar()">${ic('x', 'ic-3xs')}</button>
+    </div>
+    <div class="ab-fila-barra"><i style="width:${Math.round(pct * 100)}%"></i></div>`
+}
+
+// ⚠️ O navegador só deixa AVISAR, não impedir. Ainda assim é melhor que um
+// envio de 700 MB morrer em silêncio porque ele fechou a aba sem saber.
+function _abFilaSair(e) {
+  if (!_abFila.length && !_abFilaAtual) return
+  e.preventDefault()
+  e.returnValue = ''
+  return ''
+}
+window.addEventListener('beforeunload', _abFilaSair)
+
+function abFilaPausar() {
+  _abFilaPausada = !_abFilaPausada
+  if (_abFilaPausada) {
+    // Nada a devolver: o item em curso nunca saiu de `_abFila[0]`, e é por isso
+    // que ele volta INTEIRO. Metade de arquivo não vale nada — o Storage não
+    // guarda o pedaço.
+    abNuvemCancelar()
+    _abFilaSalvar()
+    _abFilaPintar()
+  } else {
+    _abFilaPintar()
+    _abFilaRodar()
+  }
+}
+
+async function abFilaCancelar() {
+  const ok = await confirmModal({
+    title: 'Cancelar o envio', icon: 'cloud', confirmText: 'Cancelar o envio',
+    cancelText: 'Continuar enviando', danger: true,
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Os arquivos que já subiram <b>ficam na nuvem</b> e não sobem de novo. Só o que ainda faltava
+      é descartado — dá para retomar depois pelo ícone de nuvem no card.</p>`
+  })
+  if (!ok) return
+  _abFila = []
+  _abFilaPausada = false
+  abNuvemCancelar()
+  _abFilaSalvar()
+  _abFilaPintar()
+}
+
+// O motor. Um arquivo por vez, de propósito: seis de 30 MB em paralelo entopem
+// a subida de quem está no 4G e fazem a barra andar em pulos.
+async function _abFilaRodar() {
+  if (_abFilaRodando || _abFilaPausada) return
+  _abFilaRodando = true
+  let subiuAlgo = false
+  try {
+    while (_abFila.length && !_abFilaPausada) {
+      const item = _abFila[0]
+      const a = audiolivroPorId(item.id)
+      // Livro removido enquanto a fila andava: descarta e segue.
+      if (!a) { _abFila.shift(); _abFilaSalvar(); continue }
+      // Já está lá (subiu no outro aparelho, ou nesta mesma fila): não repete.
+      if (_abNuvemPartes(a)[item.n]) { _abFila.shift(); _abFilaSalvar(); continue }
+      // ⚠️ O blob é lido AGORA, e não no enfileiramento: guardar 20 faixas de
+      // 30 MB na memória enquanto sobem uma a uma seria 600 MB parados à toa.
+      const blob = await BookDB.get(abChaveArquivo(item.id, item.n))
+      if (!blob) { _abFila.shift(); _abFilaSalvar(); continue }
+
+      _abFilaAtual = { id: item.id, n: item.n, env: 0, tot: blob.size }
+      _abFilaPintar()
+      try {
+        await abNuvemSubirArquivo(item.id, item.n, blob, (env, tot) => {
+          _abFilaAtual.env = env; _abFilaAtual.tot = tot
+          _abFilaPintar()
+          _abNuvemAndar(`Enviando ${abNuvemMB(env)} de ${abNuvemMB(tot)}`, tot ? env / tot : 0)
+        })
+        _abNuvemGravar(a, item.n, blob.size)
+        _abFila.shift()
+        _abFilaSalvar()
+        subiuAlgo = true
+        _abFilaAtual = null
+      } catch (e) {
+        const c = String(e.code || e.message || '')
+        _abFilaAtual = null
+        if (c.includes('canceled')) break     // pausa ou cancelamento já ajustaram a fila
+        _abFila = []; _abFilaSalvar()
+        if (c.includes('sem-login')) toast('Entre com o Google para guardar na nuvem.', 'warning')
+        else if (c.includes('unauthorized')) _abNuvemAvisoTeto(blob.size)
+        else if (c.includes('quota') || c.includes('retry-limit')) toast('Sua nuvem recusou o envio (espaço ou tempo esgotado). Tente de novo.', 'error')
+        else toast('O envio falhou: ' + c, 'error')
+        break
+      }
+    }
+    if (subiuAlgo && !_abFila.length && !_abFilaPausada) {
+      toast('Áudio guardado na nuvem. Já dá para ouvir em outro aparelho.', 'success')
+    }
+  } finally {
+    _abFilaRodando = false
+    _abFilaAtual = null
+    _abFilaPintar()
+    if (document.getElementById('ab-nuvem-corpo') && _abNuvemPainelId) _abNuvemRender(_abNuvemPainelId)
+    renderAudiobookSection()
+  }
+}
+
 async function abNuvemGuardar(id) {
   const a = audiolivroPorId(id); if (!a) return
   const total = Math.max(1, a.arquivos || 0)
   const partes = _abNuvemPartes(a)
   const faltam = []
-  let bytes = 0
+  let bytes = 0, maior = 0
   for (let n = 0; n < total; n++) {
     if (partes[n]) continue
+    // Aqui só interessa o TAMANHO; o conteúdo é lido na hora de subir.
     const b = await BookDB.get(abChaveArquivo(id, n))
     if (!b) continue
-    faltam.push({ n, blob: b }); bytes += b.size
+    faltam.push({ id, n })
+    bytes += b.size
+    maior = Math.max(maior, b.size)
   }
-  const maior = faltam.reduce((m, x) => Math.max(m, x.blob.size), 0)
   if (!faltam.length) {
     toast('Não há nada aqui para subir — o que falta na nuvem também não está neste aparelho.', 'warning')
     return
@@ -1849,63 +2025,37 @@ async function abNuvemGuardar(id) {
       Vou enviar <b>${abNuvemMB(bytes)}</b>${faltam.length > 1 ? ` em ${faltam.length} arquivos` : ''}
       para a sua nuvem. Depois disso, este livro abre e toca em qualquer aparelho seu.<br><br>
       ${mb > AB_NUVEM_AVISO_MB ? `<b>É bastante coisa.</b> Numa conexão móvel isso pesa na franquia —
-        vale fazer no Wi-Fi. ` : ''}A subida mostra o andamento e dá para cancelar no meio; o que já
-      tiver subido fica lá e não sobe de novo.<br><br>
+        vale fazer no Wi-Fi. ` : ''}O envio roda <b>em segundo plano</b>: pode fechar esta janela e
+      seguir usando o app, que um aviso no canto mostra o andamento e deixa pausar.<br><br>
       ${maior > AB_NUVEM_TETO_MB * 1048576 ? `<b>Aviso:</b> o maior arquivo aqui tem
         ${abNuvemMB(maior)} e sua nuvem aceita <b>${AB_NUVEM_TETO_MB / 1024} GB</b> por arquivo —
         este vai ser recusado.<br><br>` : ''}
-      <b>Não feche a aba</b> enquanto envia.</p>`
+      Só não <b>feche a aba</b>: o arquivo que estiver a meio caminho recomeça.</p>`
   })
   if (!ok) return
 
-  await _abNuvemRender(id, 'Começando o envio…', 0)   // desenha a moldura da barra
-  try {
-    let feitos = 0
-    for (const item of faltam) {
-      await abNuvemSubirArquivo(id, item.n, item.blob, (env, tot) => {
-        const doArquivo = tot ? env / tot : 0
-        const geral = (feitos + doArquivo) / faltam.length
-        _abNuvemAndar(
-          faltam.length > 1
-            ? `Enviando ${feitos + 1} de ${faltam.length} — ${abNuvemMB(env)} de ${abNuvemMB(tot)}`
-            : `Enviando ${abNuvemMB(env)} de ${abNuvemMB(tot)}`,
-          geral)
-      })
-      _abNuvemGravar(a, item.n, item.blob.size)
-      feitos++
-    }
-    toast('Áudio guardado na nuvem. Já dá para ouvir em outro aparelho.', 'success')
-  } catch (e) {
-    const c = String(e.code || e.message || '')
-    if (c.includes('canceled')) toast('Envio cancelado. O que já subiu ficou lá.', 'info')
-    else if (c.includes('sem-login')) toast('Entre com o Google para guardar na nuvem.', 'warning')
-    else if (c.includes('quota') || c.includes('retry-limit')) toast('Sua nuvem recusou o envio (espaço ou tempo esgotado). Tente de novo.', 'error')
-    else if (c.includes('unauthorized')) _abNuvemAvisoTeto(bytes / Math.max(1, faltam.length))
-    else toast('O envio falhou: ' + c, 'error')
-  }
-  await _abNuvemRender(id)
-  renderAudiobookSection()
+  for (const f of faltam) if (!_abFila.some(x => x.id === f.id && x.n === f.n)) _abFila.push(f)
+  _abFilaPausada = false
+  _abFilaSalvar()
+  _abFilaPintar()
+  document.getElementById('ab-nuvem')?.remove()   // o aviso flutuante assume daqui
+  _abFilaRodar()
 }
 
-// ⚠️ O ERRO QUE O FIREBASE NÃO EXPLICA. A regra do Storage foi escrita quando o
-// que subia era EPUB (4 MB) e episódio de vídeo, e ela recusa qualquer arquivo
-// acima de 50 MB. Audiolivro passa disso com folga — e a resposta é um seco
-// "unauthorized", a mesma palavra de quem não está logado. Sem esta frase, ele
-// tentaria de novo achando que foi a rede.
-function _abNuvemAvisoTeto(bytesMedio) {
-  const grande = bytesMedio > 400 * 1048576
-  confirmModal({
-    title: 'Sua nuvem recusou o envio',
-    icon: 'cloud', confirmText: 'Entendi', cancelText: '',
-    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
-      ${grande ? `Este áudio tem <b>${abNuvemMB(bytesMedio)}</b>, e o mais provável é que ele
-        passe do <b>tamanho máximo por arquivo</b> que sua nuvem aceita.<br><br>
-        O limite mora nas <b>regras do Storage</b>. O projeto guarda a versão certa em
-        <code>storage.rules</code> — publicá-la resolve.` :
-        `Se você acabou de entrar, saia e entre de novo com o Google. Se não for isso, o arquivo
-         passou do tamanho máximo que suas regras do Storage aceitam.`}
-    </p>`
+// ⚠️ RETOMAR NÃO É AUTOMÁTICO. A aba pode ter fechado por qualquer motivo, e
+// recomeçar 700 MB sozinho — talvez no 4G — seria decidir pelo bolso dele. O
+// que fica é a fila PAUSADA, com o botão de continuar à vista.
+function abFilaRetomarPendencias() {
+  if (_abFila.length || _abFilaRodando) return
+  const guardada = _abFilaCarregar().filter(x => {
+    const a = audiolivroPorId(x.id)
+    return a && !_abNuvemPartes(a)[x.n]
   })
+  if (!guardada.length) { try { localStorage.removeItem(AB_FILA_SK) } catch (e) {} ; return }
+  _abFila = guardada
+  _abFilaPausada = true
+  _abFilaSalvar()
+  _abFilaPintar()
 }
 
 // ---- TRAZER DE VOLTA ----
@@ -1950,6 +2100,12 @@ async function abNuvemTrazer(id) {
 // destruir a única cópia da outra metade.
 async function abNuvemLiberar(id) {
   const a = audiolivroPorId(id); if (!a) return
+  // ⚠️ Apagar daqui enquanto a fila ainda lê estes arquivos destruiria a fonte
+  // do que está subindo — e o envio morreria no meio sem explicação.
+  if (_abFila.some(x => x.id === id) || (_abFilaAtual && _abFilaAtual.id === id)) {
+    toast('Este livro ainda está sendo enviado. Espere terminar para liberar o espaço.', 'warning')
+    return
+  }
   if (!abNuvemCompleto(a)) { toast('Guarde tudo na nuvem antes de liberar o espaço daqui.', 'warning'); return }
   const total = Math.max(1, a.arquivos || 0)
   const aqui = await abNoAparelho(id)
@@ -2093,6 +2249,13 @@ async function abExcluir(id) {
              todos os seus aparelhos.` : ''}</p>`
   })
   if (!ok) return
+  // ⚠️ A fila aponta para arquivos por id: deixar o livro removido lá dentro
+  // faria o motor procurar um blob que não existe mais a cada volta.
+  if (_abFila.some(x => x.id === id)) {
+    _abFila = _abFila.filter(x => x.id !== id)
+    _abFilaSalvar(); _abFilaPintar()
+  }
+  if (_abFilaAtual && _abFilaAtual.id === id) abNuvemCancelar()
   for (let i = 0; i < Math.max(1, a.arquivos || 0); i++) await BookDB.del(abChaveArquivo(id, i))
   if (naNuvem) await abNuvemApagar(id, a.arquivos || 1)
   audiolivros = audiolivros.filter(x => x.id !== id)
