@@ -1185,8 +1185,36 @@ function _estParecido(a, b) {
 // Cada uma devolve objetos idênticos; quem chama não sabe (nem precisa saber)
 // de onde veio. A diferença aparece só no rótulo que a tela mostra.
 
+// ⚠️ A BUSCA LIVRE DO GOOGLE BOOKS É RUIM, E ISSO SÓ APARECEU COM A CHAVE NA
+// MÃO. Antes ela vivia em 429 e ninguém via o resultado. Medido em 2026-08-22,
+// com a chave dele, buscando «Billy Summers»: os três primeiros foram *King
+// Noir*, *Carolina Summers* e *The Descendant* — o livro **não estava em lugar
+// nenhum** da lista. O mesmo termo com `intitle:"…"` devolve os três certos.
+// A explicação é que a busca livre procura o texto no livro INTEIRO (miolo,
+// resenha, descrição), e o nome de um personagem aparece dentro de mil livros.
+// Aqui se procura uma OBRA pelo NOME dela.
+// ⚠️ E NÃO DÁ PARA FICAR SÓ NO `intitle`: quem digita o nome de um AUTOR
+// ("Stephen King") não acha nada com ele. Por isso: título primeiro, livre
+// como reserva — e a Open Library entra sempre, que é quem salva a busca por
+// autor.
+function _estGoogleTermo(q) {
+  const t = String(q || '').trim()
+  // `isbn:` (e qualquer prefixo de campo) já é busca exata; envolver quebraria.
+  if (/^[a-z]+:/i.test(t)) return t
+  return `intitle:"${t.replace(/"/g, '')}"`
+}
+
 async function _estFonteGoogle(q, n) {
   if (!_estGooglePodeTentar()) return []
+  let saida = await _estFonteGoogleCrua(_estGoogleTermo(q), n)
+  if (saida.length < 2 && !/^[a-z]+:/i.test(String(q).trim())) {
+    const livre = await _estFonteGoogleCrua(q, n)
+    saida = _estDedup(saida.concat(livre))
+  }
+  return saida
+}
+
+async function _estFonteGoogleCrua(q, n) {
   const r = await fetch(_estGoogleURL(q, n))
   // 429 é cota; 403 costuma ser chave recusada ou Books API desligada no
   // projeto. Os dois tiram o Google da roda por meia hora, mas dizem coisas
@@ -1372,10 +1400,13 @@ async function estMetaBuscar(l, opts) {
   if (!saida.length) {
     try { saida = await _estFonteGoogle(q, n) } catch (e) {}
   }
-  // A segunda fonte entra quando a primeira veio vazia OU rala. "Rala" é o
-  // caso real do Google com chave nova: responde, mas com dois resultados
-  // fracos — e a Open Library tem justamente o acervo antigo que falta lá.
-  if (saida.length < 3) {
+  // ⚠️ A OPEN LIBRARY ENTRA SEMPRE, e a lição custou uma regressão. Antes ela
+  // só era consultada se o Google viesse ralo — e no dia em que a chave do
+  // Google passou a funcionar, ele respondeu SEIS resultados errados para
+  // «Billy Summers» e a Open Library, que tinha o livro certo, nunca foi
+  // chamada. Fonte que responde não é fonte que acertou.
+  // Duas listas juntas, deduplicadas por obra, e quem decide é o ranking.
+  if (!audio || saida.length < 3) {
     try { saida = saida.concat(await _estFonteOpenLibrary(q, n)) } catch (e) {}
   }
 
