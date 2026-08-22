@@ -1033,6 +1033,8 @@ const ICONS = {
   home:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
   plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   eye:'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff:'<path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c7 0 11 7 11 7a19 19 0 0 1-3.2 4"/><path d="M6.6 6.7A19 19 0 0 0 1 12s4 7 11 7a11 11 0 0 0 4.2-.8"/>',
+  headphones:'<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="2" y="14" width="5" height="7" rx="2"/><rect x="17" y="14" width="5" height="7" rx="2"/>',
   book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
   bookOpen:'<path d="M12 6.5C10 5 7 4.5 3 5v14c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5z"/><path d="M12 6.5V20"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
@@ -1462,7 +1464,10 @@ const _LAZY = {
   // `estante.js` vem ANTES de ler.js de propósito: é ele que desenha a tela
   // inicial da seção, e ler.js apenas o chama. Invertido, a primeira pintura
   // da estante dependeria de um arquivo ainda em voo.
-  ler: ['js/epub.js', 'js/manga.js', 'js/estante.js', 'js/ler.js'],
+  // `sinc.js` entra nos DOIS pacotes porque a sincronia é uma ponte: o leitor
+  // pergunta "em que segundo estou?" e o reprodutor pergunta "que frase é
+  // esta?". Ele não depende de nenhum dos dois — só de texto e números.
+  ler: ['js/epub.js', 'js/manga.js', 'js/estante.js', 'js/sinc.js', 'js/ler.js'],
   // revisar = SRS (study.js); estudar = os dossiês (dossie.js). Ver o mapa
   // acima de SECTIONS antes de mexer: os nomes trocaram de lugar.
   revisar: 'js/study.js', biblioteca: 'js/study.js',
@@ -1471,7 +1476,7 @@ const _LAZY = {
   video: ['js/video.js', 'js/video-subs.js', 'js/video-sync.js', 'js/video-study.js', 'js/video-podcast.js'],
   // Audiobook é uma ilha de propósito: não depende do pacote de vídeo (que
   // carrega cinco arquivos e um player de legenda que aqui não serve).
-  audiobook: 'js/audiobook.js'
+  audiobook: ['js/epub.js', 'js/sinc.js', 'js/audiobook.js']
 }
 const _loadedModules = new Set()
 

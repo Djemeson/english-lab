@@ -459,6 +459,11 @@ function renderLeitor() {
   const c_raiox = (_lerLivro && _lerLivro.format === 'manga') ? ''
     : `<button class="ler-btn" id="ler-raiox-btn" onclick="event.stopPropagation();lerRaioXPainel()"
          data-tip="O que é difícil aqui: acima do seu nível, phrasal verbs e expressões">${ic('eye','ic-sm')}</button>`
+  // OUVIR JUNTO (§8.92): só faz sentido em livro de texto, e a porta existe
+  // mesmo antes de haver audiolivro ligado — é por ela que se liga.
+  const c_ouvir = (_lerLivro && _lerLivro.format === 'manga') ? ''
+    : `<button class="ler-btn" id="ler-btn-ouvir" onclick="event.stopPropagation();sincLeitorAlternar()"
+         data-tip="Ouvir o narrador com o texto do autor acompanhando">${ic('headphones','ic-sm')}</button>`
   // A barra de zoom só no mangá: num livro ela não teria o que ajustar.
   const c_mgbarra = (_lerLivro && _lerLivro.format === 'manga' && typeof mangaBarraHtml === 'function')
     ? mangaBarraHtml() : ''
@@ -476,7 +481,7 @@ function renderLeitor() {
         <div class="ler-barra-dir">
           ${c_manga}
           <button class="ler-btn" onclick="lerToggle('conversa')" data-tip="Conversar com a ${escA(lexaNome())} sobre este livro — quem é quem, onde se passa, o que está acontecendo">${ic('message','ic-sm')}</button>
-          ${c_ferramentas}${c_raiox}
+          ${c_ferramentas}${c_raiox}${c_ouvir}
           <button class="ler-btn" onclick="lerToggle('tipografia')" data-tip="Tamanho, fonte, tema e largura da coluna"><b style="font-size:15px">Aa</b></button>
           <button class="ler-btn" id="ler-btn-full" onclick="lerAlternarFull()" data-tip="Modo tela cheia (F) — só o texto">${ic('expand','ic-sm')}</button>
         </div>
@@ -896,6 +901,10 @@ async function lerIrParaCapitulo(i, frac = 0) {
   // O realce do raio-X é reaplicado aqui: o capítulo foi reconstruído do zero,
   // e sem isto o que já tinha sido analisado voltaria apagado.
   lerRaioXAplicar(i).catch(() => {})
+  // ⚠️ TROCAR DE CAPÍTULO COM O MODO LIGADO É TROCAR DE MAPA. Sem isto, o
+  // texto novo continuaria sendo lido com os instantes do capítulo anterior —
+  // a voz falando de uma coisa e a frase acesa apontando outra.
+  if (typeof sincTrocouCapitulo === 'function') sincTrocouCapitulo(i)
   _lerMedirPaginas()
   // A leitura do capítulo anterior NÃO pode sobrar: as glosas são presas ao
   // contexto DAQUELE capítulo, e mostrar a do capítulo 3 no capítulo 4 seria

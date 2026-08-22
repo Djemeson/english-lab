@@ -8031,3 +8031,43 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
    botão, porque são a mesma decisão. */
 #mg-lote.mg-lendo{color:var(--role-ia)}
 #mg-lote .spinner{width:13px;height:13px;border-width:2px;margin-right:5px}
+
+/* ================================================================
+   OUVIR JUNTO — o texto do autor com a voz do narrador (§8.92)
+   ================================================================
+   ⚠️ O REALCE NÃO É UM ELEMENTO. `::highlight()` pinta um trecho sem que nada
+   entre no HTML do livro — é o que permite acender a frase atual sem brigar
+   com a paginação por colunas nem com o realce do raio-X, que já vive dentro
+   do texto. Sem esta regra, o destaque simplesmente não aparece: a API existe
+   e fica invisível até alguém dizer como pintar. */
+::highlight(sinc-atual){
+  background: rgba(var(--primary-rgb), .26);
+  color: var(--text);
+}
+.ler-btn.on{color:rgb(var(--primary-rgb));background:rgba(var(--primary-rgb),.14)}
+
+.sinc-barra{
+  position:fixed; left:50%; transform:translateX(-50%); bottom:18px; z-index:60;
+  display:flex; align-items:center; gap:6px; max-width:min(680px, calc(100vw - 24px));
+  background:var(--surface); border:1px solid var(--border); border-radius:999px;
+  box-shadow:0 10px 30px rgba(0,0,0,.38); padding:6px 10px;
+}
+.sinc-b{
+  display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+  width:32px; height:32px; border-radius:50%; border:none; cursor:pointer;
+  background:none; color:var(--text2);
+}
+.sinc-b:hover{background:var(--surface2); color:var(--text)}
+.sinc-play{background:rgba(var(--primary-rgb),.16); color:rgb(var(--primary-rgb))}
+.sinc-play:hover{background:rgba(var(--primary-rgb),.26)}
+/* A frase que está tocando, na barra: uma linha só. `min-width:0` porque
+   `flex` cresce até o conteúdo e estouraria a barra num celular. */
+.sinc-frase{
+  flex:1; min-width:0; font-size:var(--fs-xs); color:var(--text3);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px;
+}
+.sinc-msg{font-size:var(--fs-xs); color:var(--text2); display:inline-flex; align-items:center; gap:6px; padding:4px 8px}
+@media (max-width: 560px){
+  .sinc-frase{display:none}
+  .sinc-barra{bottom:10px}
+}

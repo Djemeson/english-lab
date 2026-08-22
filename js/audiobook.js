@@ -63,8 +63,16 @@ function renderAudiobookSection() {
   const area = el('ab-area'); if (!area) return
   const acoes = el('ab-ph-actions')
   if (acoes) {
+    // "Ver o texto" só aparece com o livro aberto, e diz duas coisas
+    // diferentes conforme já haja par: abrir o texto ou escolher qual livro é.
+    const ligado = _abLivro && typeof sincLivroDoAudio === 'function' ? sincLivroDoAudio(_abLivro) : null
+    const c_texto = _abLivro
+      ? `<button class="btn btn-ghost btn-sm" onclick="sincAbrirTexto(_abLivro, _abCap, (_abAudio()||{}).currentTime||0)"
+           data-tip="${escA(ligado ? 'Abrir o livro no ponto em que o narrador está' : 'Ligar este audiolivro ao livro da estante')}">
+           ${ic('book','ic-sm')} ${ligado ? 'Ver o texto' : 'Ligar ao livro'}</button>`
+      : ''
     acoes.innerHTML = _abLivro
-      ? `<button class="btn btn-ghost btn-sm" onclick="abFechar()">${ic('chevronLeft','ic-sm')} Estante</button>`
+      ? `${c_texto}<button class="btn btn-ghost btn-sm" onclick="abFechar()">${ic('chevronLeft','ic-sm')} Estante</button>`
       : (audiolivros.length
           ? `<button class="btn btn-ghost btn-sm" onclick="abCatalogoModal()" data-tip="Entra na estante só com capa e ficha; o áudio você anexa quando tiver">${ic('search','ic-sm')} Quero ouvir</button>
              <button class="btn btn-primary btn-sm" onclick="abEscolherArquivo()">${ic('upload','ic-sm')} Adicionar audiolivro</button>`
@@ -3559,8 +3567,17 @@ function abGrupoAbrir(gi) {
 // transcrição ficaria mudo para sempre — justamente os que mais importam.
 // A cópia guardada em `m.frase` é o segundo caminho: ela sobrevive se aquela
 // janela de transcrição for substituída por outra.
+// ⚠️ A FRASE DO AUTOR VEM ANTES DA TRANSCRITA (§8.92). O Whisper escreveu
+// "Garrod did not rise to the bait"; o Martin escreveu "Gared". Quando o livro
+// está ligado a este áudio e o capítulo já foi casado, é o texto do LIVRO que
+// vai para o marcador e para o card — a transcrição volta a ser o que ela é,
+// um meio de achar o instante, e não a obra.
 function abFraseDoMarcador(a, m) {
   if (!a || !m) return ''
+  if (typeof sincFraseDoInstante === 'function') {
+    const doLivro = sincFraseDoInstante(a, m.cap, m.seg)
+    if (doLivro) return doLivro
+  }
   const dentro = (a.transcricoes || [])
     .filter(t => t.cap === m.cap)
     .flatMap(t => t.segs || [])
@@ -3606,6 +3623,10 @@ async function _abCarregarCapitulo(i, seg) {
   i = Math.max(0, Math.min(i, caps.length - 1))
   const cap = caps[i]; if (!cap) return
   _abCap = i
+  // Em segundo plano: se este audiolivro está ligado a um livro, carrega o
+  // mapa deste capítulo para que os marcadores guardem a frase do AUTOR.
+  // Falha calada — sem mapa, tudo segue como antes.
+  if (typeof sincPrepararParaAudio === 'function') sincPrepararParaAudio(a, i).catch(() => {})
   const au = _abAudio(); if (!au) return
 
   // ⚠️ SÓ TROCA O ARQUIVO SE FOR OUTRO ARQUIVO. Num `.m4b` os 40 capítulos
