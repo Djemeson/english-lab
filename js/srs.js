@@ -36,6 +36,7 @@ function _easyInterval() { return srsCfg.easyInterval ?? srsCfg.graduateEasyInte
 function loadSrs() {
   try { srsCfg = { ...SRS_DEF_CFG, ...JSON.parse(localStorage.getItem(SK.srsCfg) || '{}') } } catch { srsCfg = { ...SRS_DEF_CFG } }
   try { srsLog = JSON.parse(localStorage.getItem(SK.srsLog) || '[]') } catch { srsLog = [] }
+  srsLogMigrar()
   loadSrsDecks()
 }
 
@@ -192,6 +193,49 @@ function srsLogRefazerTotais(log) {
   }
   log.reviewed = rv; log.correct = co; log.newSeen = ns
   return log
+}
+
+// ⚠️ A MIGRAÇÃO PRECISA ACONTECER NA CARGA, E NÃO SÓ AO ESTUDAR. Enquanto um
+// dia não tem parcelas, o merge cai na regra velha ("fica com o maior") — ou
+// seja, o dia de hoje continuaria perdendo metade do estudo até a primeira
+// revisão nesta versão. Rodar na abertura fecha essa janela.
+//
+// ⚠️ E CONSOLIDA O QUE JÁ PASSOU. Dia fechado não recebe estudo novo, então
+// guardar de quem foi cada parcela dele é peso sem uso: vira um `_antes` só.
+// É o que impede `porAparelho` de crescer para sempre — trocar de celular ou
+// limpar o navegador gera um id novo, e a parcela antiga ficaria ali.
+const SRS_LOG_DIAS_VIVOS = 7
+
+function srsLogMigrar() {
+  if (!Array.isArray(srsLog) || !srsLog.length) return
+  const hoje = todayStr()
+  const limite = new Date(Date.now() - SRS_LOG_DIAS_VIVOS * 86400000).toISOString().slice(0, 10)
+  let mexeu = false
+  for (const log of srsLog) {
+    if (!log || !log.date) continue
+    const antigo = log.date < limite && log.date !== hoje
+    const p = log.porAparelho
+    if (!p || !Object.keys(p).length) {
+      // Sem parcelas: o total vira a parcela de "antes deste aparelho".
+      if (log.reviewed || log.correct || log.newSeen) {
+        log.porAparelho = { _antes: { reviewed: log.reviewed || 0, correct: log.correct || 0, newSeen: log.newSeen || 0 } }
+        mexeu = true
+      }
+      continue
+    }
+    // Parcelas zeradas não dizem nada — só ocupam.
+    for (const k of Object.keys(p)) {
+      if (!p[k] || (!p[k].reviewed && !p[k].correct && !p[k].newSeen)) { delete p[k]; mexeu = true }
+    }
+    if (antigo && Object.keys(p).length > 1) {
+      let rv = 0, co = 0, ns = 0
+      for (const k of Object.keys(p)) { rv += p[k].reviewed | 0; co += p[k].correct | 0; ns += p[k].newSeen | 0 }
+      log.porAparelho = { _antes: { reviewed: rv, correct: co, newSeen: ns } }
+      mexeu = true
+    }
+    srsLogRefazerTotais(log)
+  }
+  if (mexeu) saveSrsLog()
 }
 
 function srsLogSomarNoAparelho(log, dir, wasNew, acertou) {
