@@ -7,7 +7,21 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (35ª) — **IMPORTAR AUDIOLIVRO GRANDE DERRUBAVA A ABA**. Print
+> Última atualização: 2026-08-22 (36ª) — **O TEXTO DO AUTOR E A VOZ DO NARRADOR, NO MESMO
+> INSTANTE**. Ele pôs o EPUB de *A Game of Thrones* ao lado do audiolivro e mandou fazer as três
+> coisas do estudo. Nasceu **`js/sinc.js`**: casa o capítulo por trigramas (**88,7% contra
+> 2,5%** no caso real), casa palavra a palavra por 5-gramas únicos (**3.168 âncoras em 37 ms**) e
+> interpola o resto — **sem IA nenhuma**. Com isso: **ler ouvindo** (frase acesa, página virando
+> sozinha, tocar numa frase pula o áudio), **ouvir lendo** ("Ver o texto" abre o livro na fração
+> certa — medido: minuto 15 → fração 0,627) e **a captura com as duas coisas** (o marcador passa
+> a guardar *"**Ser** Waymar"*, do Martin, no lugar de *"Sir Waymar"*, do Whisper).
+> ⚠️ **Três armadilhas no caminho:** a contagem de palavras precisava bater dos dois lados
+> (3.883 = 3.883), o arquivo de áudio estava **sem MIME type** (dano de §8.91, consertado sem
+> copiar 1,8 GB) e o par livro↔áudio **perdia um lado no merge**. ⚠️ **A reprodução não pôde ser
+> verificada aqui** — aba oculta não carrega mídia. `sw.js` → **englab-v387**.
+> **Detalhes em §8.92.**
+>
+> Última atualização anterior: 2026-08-22 (35ª) — **IMPORTAR AUDIOLIVRO GRANDE DERRUBAVA A ABA**. Print
 > dele: crash do Chrome (*"Ah, bolas!!"*, código 39) com um `.m4b` de **1,8 GB**. A importação
 > pedia **duas cópias inteiras na memória** — `arrayBuffer()` e `new Blob([buf])`, ~3,6 GB numa
 > aba — para gravar um arquivo que já estava no disco. Nenhuma era necessária: **`File` já é um
@@ -1694,6 +1708,11 @@ js/init.js        — bootstrap (initApp) + service worker
 js/add.js         — aba Adicionar (manual/Kindle/Mídia/Website)  (CARREGADO LAZY)
 js/kindle-db.js   — leitor SQLite só-leitura (vocab.db do Kindle), sem WASM  (LAZY, antes de add.js)
 js/epub.js        — leitor de ZIP (DecompressionStream nativo) + parser EPUB  (LAZY, antes de ler.js)
+js/sinc.js        — SINCRONIA livro x audiolivro: casa capitulo por trigramas, casa
+                    palavra por 5-gramas (ancoras), interpola. Da o modo OUVIR JUNTO no
+                    leitor, o "Ver o texto" no reprodutor e a frase do AUTOR no marcador.
+                    Nao depende de nenhum dos dois — so de texto e numeros (§8.92)  (LAZY,
+                    nos dois pacotes)
 js/estante.js     — GERENCIADOR DO ACERVO: estante (busca/filtros/ordem), ficha do livro,
                     cadastro sem arquivo e o MOTOR DE CATÁLOGO usado por todas as telas de
                     busca do app (Google Books + Open Library + Apple, ranking, capa local,
@@ -14519,6 +14538,95 @@ batendo com o banco (13/13), console limpo.
 - **Cabe:** o aparelho tem 10 GB livres de cota e a proteção está ligada. A regra do Storage
   aceita até **2 GB** por arquivo, então 1,8 GB passa — por pouco.
 
+## 8.92 O texto do autor e a voz do narrador, no mesmo instante (2026-08-22, 36ª)
+
+**O pedido:** *"a transcrição é excelente, mas ela não pega as nuances de um livro, a escrita de
+um autor. estuda como podemos fazer com que seja pego o capítulo do livro, casar com o capítulo
+do audiobook."* Depois do estudo, ele pôs o EPUB de *A Game of Thrones* na estante e mandou
+fazer as três coisas.
+
+⚠️ **A prova do problema estava na tela dele:** no áudio, o Whisper escreveu **"Garrod"** e
+**"Sir Waymar"**; o Martin escreveu **"Gared"** e **"Ser Waymar"** — e o "Ser" é escolha do
+autor, não erro de ninguém. Ler pela transcrição é ler um livro que ninguém escreveu.
+
+### O caminho oficial não serve
+
+EPUB 3 **Media Overlays** (SMIL) existe e é o padrão para texto sincronizado com narração.
+Conferido nos 10 EPUBs dele: **nenhum** traz `.smil` nem áudio embutido. Editora comercial não
+publica assim — publica no formato fechado da Amazon. O que existe de aberto (aeneas, afaligner,
+syncabook) é Python com servidor; o projeto **Storyteller** faz o mesmo desenho que este aqui
+(transcrever, achar o capítulo, alinhar por semelhança), também fora do navegador.
+
+### O motor (`js/sinc.js`), três passos e nenhuma IA
+
+| Passo | Como | Medido no acervo real |
+|---|---|---|
+| 1. Casar **capítulo** | trigramas de palavras contra todos os capítulos do livro | Prologue do áudio × PROLOGUE do EPUB: **88,7% contra 2,5%** do segundo |
+| 2. Casar **palavra** | 5-gramas únicos dos dois lados viram âncoras, filtradas para serem crescentes | **3.168 âncoras**, todas em ordem, uma a cada **1,2 palavras**, em **37 ms** |
+| 3. **Interpolar** | entre duas âncoras, regra de três | dá instante a qualquer ponto, inclusive palavra que a transcrição errou |
+
+⚠️ **Dois cortes no casamento de capítulo, e os dois são necessários:** nota ≥ 0,25 **e** margem
+≥ 0,10 sobre o segundo colocado. Nota alta sozinha não basta (capítulo enorme contém muita
+coisa); margem sozinha também não (dois capítulos ruins podem estar longe um do outro).
+
+⚠️ **Guardar as 3.168 âncoras seria guardar o que a interpolação refaz.** Uma a cada 8 palavras
+mantém o erro dentro de meio segundo e derruba o mapa em 8× — e ele viaja para a nuvem, onde
+cada documento tem teto. **Medido: 450 âncoras, 6,2 KB por capítulo, cobertura de 82%.**
+
+### As três coisas
+
+**1. Ler ouvindo** — botão de fone no leitor. A frase acende e a página vira sozinha.
+⚠️ **O realce não podia tocar no HTML do livro:** o leitor pagina por colunas medidas e o raio-X
+já injeta marcação dentro do texto; envolver a frase num `<span>` a cada três segundos
+remexeria o layout e brigaria com o que já está lá. `CSS.highlights` pinta **sem alterar o DOM**
+— é o que faz isto caber no leitor existente sem reescrevê-lo.
+⚠️ **Seguir a voz é VIRAR A PÁGINA, não rolar:** `scrollIntoView` levaria a viewport para um
+ponto que a paginação não reconhece. Tocar numa frase pula o áudio para ela — só com o modo
+ligado e nada selecionado, para não brigar com a captura de vocabulário.
+⚠️ **Áudio próprio, separado do reprodutor da seção**, que tem estado próprio (capítulo,
+marcadores, timer de sono, Media Session). O que os dois compartilham é o **arquivo**.
+
+**2. Ouvir lendo** — "Ver o texto" no reprodutor abre o livro no capítulo **e na fração** do
+instante atual. O áudio continua tocando, que é a graça. **Medido: o minuto 15 do prólogo abriu
+o PROLOGUE na fração 0,627 — em 6,2 segundos.**
+
+**3. Captura com as duas coisas** — `abFraseDoMarcador` passa a preferir a frase do **livro**
+quando há mapa. Medido, lado a lado, aos 18 s:
+
+| | |
+|---|---|
+| **Autor** | *"Ser Waymar Royce asked with just the hint of a smile."* |
+| Whisper | *"Sir Waymar Royce asked with just the hint of a smile."* |
+
+A transcrição volta a ser o que ela é — um meio de achar o instante —, e não a obra.
+
+### O que o teste ao vivo cobrou
+
+1. **A contagem de palavras tem de bater dos dois lados.** O mapa nasce de `epubTextoLimpo`; o
+   destaque conta a partir do DOM já montado. Se divergirem, o realce anda o capítulo inteiro.
+   **Medido: 3.883 = 3.883, diferença zero.**
+2. **O arquivo de áudio estava sem MIME type** — dano que a correção de memória de §8.91 causou:
+   guardar o `File` sem cópia trouxe junto o `type` dele, e o Windows entrega `.m4b` com type
+   **vazio**. `abComTipo` põe o rótulo com `blob.slice(0, size, tipo)`, que é uma **vista** do
+   mesmo blob — sem copiar um byte. Aplicado também **na leitura**, porque o arquivo de 1,8 GB
+   já está no aparelho sem tipo e reescrevê-lo custaria o download inteiro.
+3. **O par livro↔audiolivro perdia um lado no merge.** Depois de ligar, `livro.audioId` sumiu e
+   `audiolivro.livroId` ficou: o objeto do livro voltou do snapshot sem o campo novo. Agora o
+   par tem **um dono só** — o audiolivro —, e o livro guarda apenas um atalho.
+
+### Testado ao vivo (regra nº 5)
+
+Com o par real (EPUB de 105 seções e 303.452 palavras × áudio de 33,8 h e 75 capítulos):
+casamento de capítulo, alinhamento, mapa guardado e relido, indexação das frases da tela,
+destaque caindo na frase certa em cinco instantes conferidos contra a transcrição, "ver o texto"
+abrindo na fração certa, e a frase do autor chegando ao marcador. Console limpo.
+
+⚠️ **O que NÃO foi possível verificar aqui: a reprodução.** O Chrome não carrega mídia em aba
+oculta, e a aba de teste está sempre oculta — o controle prova que não é o código nem o tamanho
+do arquivo: **o Carrie de 202 MB, que ele já ouve normalmente, também não carrega nessa
+condição**. O `play()` por script ainda esbarra na política de autoplay, que o clique dele
+resolve. Falta o olho dele nessa parte.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -14527,6 +14635,25 @@ batendo com o banco (13/13), console limpo.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada da sincronia (§8.92, 2026-08-22)
+
+- [ ] **O PLAY PRECISA DO OLHO DELE** — aba oculta não carrega mídia no Chrome (o Carrie de
+      202 MB, que ele ouve normalmente, também não carregou), e `play()` por script esbarra na
+      política de autoplay. Todo o resto foi medido; falta ver o áudio andando com a frase acesa
+      e a página virando sozinha.
+- [ ] **SÓ 1 DOS 75 CAPÍTULOS ESTÁ TRANSCRITO** — a sincronia funciona capítulo a capítulo, e o
+      modo oferece transcrever quando falta. O livro inteiro pela Groq: **R$ 6,95**.
+- [ ] **CAPÍTULO SEM CASAMENTO PRÉVIO USA PALPITE POR ORDEM** (`sincPalpiteCapAudio`), com
+      desconto dos créditos de abertura. Funciona quando os dois seguem a mesma ordem; livro com
+      apêndice no meio ou audiolivro com faixa extra vai errar — e aí o casamento por conteúdo
+      conserta assim que a transcrição chega.
+- [ ] **PARTE DO EPUB NÃO EXISTE NO ÁUDIO** (mapas, apêndices, "sobre o autor") e vice-versa
+      (créditos de abertura). Nesses trechos não há instante possível: o app não inventa, mas
+      também ainda não avisa que ali a sincronia não vale.
+- [ ] **O MAPA É POR CAPÍTULO DO LIVRO** (`sinc:<livroId>:<cap>`). Trocar o EPUB por outra edição
+      invalida todos os mapas em silêncio — o texto muda de lugar e as âncoras apontam para o
+      nada. Ainda não há detecção disso.
 
 ### Da rodada do arquivo grande (§8.91, 2026-08-22)
 
