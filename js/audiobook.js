@@ -2364,6 +2364,14 @@ async function _abNuvemRender(id, msg, pct) {
               _abProtegido === false
                 ? 'o navegador pode apagar este áudio para liberar espaço'
                 : 'o navegador não apaga para liberar espaço')}
+      ${(() => {
+        // Só aparece se JÁ ACONTECEU. Linha permanente dizendo "nunca sumiu
+        // nada" seria plantar uma preocupação que ninguém tinha.
+        const s = typeof sumicoUltimo === 'function' ? sumicoUltimo() : null
+        return s ? linha('alert', 'O navegador já apagou',
+                         `${s.quantos} ${s.quantos === 1 ? 'arquivo' : 'arquivos'}`,
+                         `em ${s.dia} às ${s.hora}${s.persistente === false ? ' — sem proteção na época' : ''}`) : ''
+      })()}
     </div>
 
     ${ocupado ? `<div class="ab-nuvem-prog">

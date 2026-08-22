@@ -25,6 +25,13 @@ async function initApp() {
   // concedeu no primeiro pedido. Não segura o boot: falhar aqui só devolve o
   // comportamento antigo.
   if (typeof garantirArmazenamentoPersistente === 'function') garantirArmazenamentoPersistente()
+  // A conferência do censo roda ANTES do primeiro pull: é ela que diz ao merge
+  // quais livros têm arquivo neste aparelho, e sem isso o merge decidiria com
+  // um espelho velho. É uma leitura de chaves — não carrega blob nenhum.
+  if (typeof censoConferir === 'function') {
+    const sumiram = await censoConferir()
+    if (sumiram.length && typeof avisarSumico === 'function') avisarSumico(sumiram)
+  }
   loadSrs()          // loads srsCfg, srsLog, decks
   await loadSrsAsync() // loads srsCards from IDB (migrates if needed)
   migrateLangFields()  // multi-idioma: words/cards antigos ganham lang:'en' (aditivo)

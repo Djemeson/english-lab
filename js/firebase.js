@@ -1153,9 +1153,19 @@ function _applyCloudDocs(docs) {
       return { ...vence, historico }
     })
     // Livro importado aqui e ainda não empurrado não pode sumir da estante.
+    // ⚠️ E LIVRO CUJO ARQUIVO ESTÁ NESTE APARELHO TAMBÉM NÃO — mesmo defeito
+    // que custou 202 MB órfãos no audiolivro (§8.89), com um agravante que o
+    // audiolivro não tem: **o histórico de leitura morre junto**. O EPUB volta
+    // por importação; os dias lidos, as páginas e a sequência do calendário,
+    // não. A pergunta é respondida pelo censo local, que é síncrono.
     for (const l of livros) {
       if (nuvem.some(r => r.id === l.id)) continue
-      if ((l.addedAt || 0) > carimbo || l.id === abertoId) juntos.push(l)
+      const temArquivo = typeof livroTemArquivoAqui === 'function' && livroTemArquivoAqui(l.id)
+      // ⚠️ E O LIVRO DE PAPEL NÃO TEM ARQUIVO NENHUM PARA PROTEGÊ-LO — o que
+      // ele tem é justamente o que dói perder: os dias lidos, digitados um a
+      // um. Histórico é trabalho humano; o arquivo, no máximo, é download.
+      const temHistorico = (l.historico || []).length > 0
+      if ((l.addedAt || 0) > carimbo || l.id === abertoId || temArquivo || temHistorico) juntos.push(l)
     }
     livros = juntos
     if (abertoId && typeof _lerLivro !== 'undefined') {

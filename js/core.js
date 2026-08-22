@@ -54,7 +54,12 @@ const BookDB = {
     return new Promise((res, rej) => {
       const tx = db.transaction('files', 'readwrite')
       tx.objectStore('files').put(blob, id)
-      tx.oncomplete = () => res(true); tx.onerror = () => rej(tx.error)
+      // ⚠️ O CENSO É ATUALIZADO AQUI DENTRO, e não em quem chama, pelo mesmo
+      // motivo que a marca de remoção mora no `save`: há dez lugares que
+      // gravam e apagam arquivo, e instrumentar os dez é garantir que o
+      // décimo primeiro nasça sem instrumentação.
+      tx.oncomplete = () => { censoAnotar(id); res(true) }
+      tx.onerror = () => rej(tx.error)
     })
   },
   async del(id) {
@@ -63,7 +68,8 @@ const BookDB = {
       return await new Promise(res => {
         const tx = db.transaction('files', 'readwrite')
         tx.objectStore('files').delete(id)
-        tx.oncomplete = () => res(true); tx.onerror = () => res(false)
+        tx.oncomplete = () => { censoEsquecer(id); res(true) }
+        tx.onerror = () => res(false)
       })
     } catch { return false }
   },
@@ -122,6 +128,104 @@ async function garantirArmazenamentoPersistente() {
 }
 
 // ================================================================
+// CENSO E SENTINELA — a prova que não dava para produzir sob demanda
+// ================================================================
+// ⚠️ ESTA PEÇA NASCEU DE UM LIMITE HONESTO. Em §8.89 a conclusão foi: *"não
+// existe como provar que o navegador apagou — depende de o disco encher"*. É
+// verdade que ninguém reproduz a limpeza quando quer; **não é verdade** que ela
+// tenha de passar despercebida quando acontecer.
+// O censo é a lista do que ESTE aparelho guardou, escrita quando o app grava e
+// riscada quando o app apaga — as duas coisas dentro do próprio `BookDB`, para
+// que nenhum caminho novo escape. Na abertura, o censo é comparado com o banco
+// de verdade:
+//   • está no banco e não no censo  → arquivo antigo, de antes desta versão;
+//     o censo se corrige em silêncio.
+//   • está no censo e não no banco  → **ninguém deste app mandou apagar.**
+//     Isso é o navegador limpando espaço, e vira registro com data e hora.
+// A partir daqui, "o audiobook sumiu de novo" deixa de ser palavra contra
+// palavra: ou existe o registro, ou a causa é outra.
+const SK_CENSO = 'el-censo-local'
+const SK_SUMICO = 'el-sumico'
+
+function censoLer() { try { return JSON.parse(localStorage.getItem(SK_CENSO) || '{}') } catch { return {} } }
+function censoGravar(m) { try { localStorage.setItem(SK_CENSO, JSON.stringify(m || {})) } catch (e) {} }
+function censoAnotar(chave) {
+  if (!chave) return
+  const m = censoLer()
+  if (m[chave]) return
+  m[chave] = Date.now(); censoGravar(m)
+}
+function censoEsquecer(chave) {
+  const m = censoLer()
+  if (!(chave in m)) return
+  delete m[chave]; censoGravar(m)
+}
+
+function sumicosLer() { try { return JSON.parse(localStorage.getItem(SK_SUMICO) || '[]') } catch { return [] } }
+
+// Roda uma vez por sessão, depois que o app está de pé. Devolve a lista do que
+// sumiu sem ordem do app — vazia na esmagadora maioria das vezes.
+let _censoConferido = false
+async function censoConferir() {
+  if (_censoConferido) return []
+  _censoConferido = true
+  try {
+    const noBanco = new Set((await BookDB.keys()).map(String))
+    const censo = censoLer()
+    const sumiram = Object.keys(censo).filter(k => !noBanco.has(k))
+    // O que existe no banco e ainda não foi censado entra agora, sem alarde:
+    // é arquivo anterior a esta versão, não novidade.
+    const novo = {}
+    for (const k of noBanco) novo[k] = censo[k] || Date.now()
+    censoGravar(novo)
+    if (!sumiram.length) return []
+    // ⚠️ O ESTADO DO ARMAZENAMENTO É GRAVADO JUNTO, porque é ele que explica.
+    // Sumiço com `persistente: false` é o navegador liberando espaço; com
+    // `true`, é outra coisa (limpeza manual, outro perfil) e merece outra
+    // investigação.
+    let persistente = null, usoMB = null, cotaMB = null
+    try {
+      if (navigator.storage && navigator.storage.persisted) persistente = await navigator.storage.persisted()
+      if (navigator.storage && navigator.storage.estimate) {
+        const e = await navigator.storage.estimate()
+        usoMB = Math.round((e.usage || 0) / 1048576); cotaMB = Math.round((e.quota || 0) / 1048576)
+      }
+    } catch (e) {}
+    const lista = sumicosLer()
+    lista.unshift({ em: Date.now(), chaves: sumiram.slice(0, 40), quantos: sumiram.length, persistente, usoMB, cotaMB })
+    try { localStorage.setItem(SK_SUMICO, JSON.stringify(lista.slice(0, 10))) } catch (e) {}
+    console.warn('[armazenamento] sumiram sem o app mandar:', sumiram.length, sumiram.slice(0, 5))
+    return sumiram
+  } catch (e) { return [] }
+}
+
+// ⚠️ AVISAR É PARTE DA CORREÇÃO, e não enfeite. Um audiolivro que sumiu volta
+// a ser baixado em silêncio — ele paga a banda sem entender por quê. Dito o
+// que houve, ele decide: baixar de novo, deixar na nuvem, ou liberar espaço no
+// disco para não acontecer outra vez.
+function avisarSumico(sumiram) {
+  const audios = (sumiram || []).filter(k => String(k).startsWith('ab:')).length
+  const livros = (sumiram || []).length - audios
+  const partes = []
+  if (audios) partes.push(audios === 1 ? 'um audiolivro' : `${audios} arquivos de audiolivro`)
+  if (livros) partes.push(livros === 1 ? 'um livro' : `${livros} livros`)
+  if (!partes.length) return
+  const msg = `O navegador apagou ${partes.join(' e ')} deste aparelho para liberar espaço. O que está na sua nuvem baixa de novo quando você abrir.`
+  if (typeof toast === 'function') setTimeout(() => toast(msg, 'warning'), 2500)
+}
+
+// Em português, para a tela: o que sumiu da última vez e quando.
+function sumicoUltimo() {
+  const s = sumicosLer()[0]
+  if (!s) return null
+  const quando = new Date(s.em)
+  const dia = quando.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+  const hora = quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const audios = (s.chaves || []).filter(k => String(k).startsWith('ab:')).length
+  return { ...s, dia, hora, audios }
+}
+
+// ================================================================
 // ESPELHO DO QUE ESTÁ NESTE APARELHO
 // ================================================================
 // ⚠️ O MERGE DA NUVEM É SÍNCRONO E O INDEXEDDB NÃO É — e sem este espelho o
@@ -129,6 +233,11 @@ async function garantirArmazenamentoPersistente() {
 // estante tem 924 MB de áudio guardados aqui. Mesma solução que os cards já
 // usam (`el-srs-ids`): guardar só os IDS no localStorage, que é barato e
 // síncrono.
+// O arquivo de um livro (EPUB/CBZ/TXT) mora no `BookDB` sob a chave que é o
+// PRÓPRIO id do livro — sem prefixo. Então o censo já responde a pergunta que
+// o merge precisa fazer, e não é preciso um segundo espelho para os livros.
+function livroTemArquivoAqui(id) { return !!(id && censoLer()[id]) }
+
 const SK_AB_LOCAIS = 'el-ab-locais'
 function abLocaisLer() {
   try { return JSON.parse(localStorage.getItem(SK_AB_LOCAIS) || '{}') } catch { return {} }
