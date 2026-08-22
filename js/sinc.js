@@ -455,6 +455,10 @@ function _sincPintarFrase(ix) {
   if (sincTemRealce()) {
     try { CSS.highlights.set('sinc-atual', new Highlight(f.range)) } catch (e) {}
   }
+  // A barra mostra a frase que está tocando — quem pula sem olhar a página
+  // precisa ver onde caiu.
+  const alvo = document.querySelector('.sinc-frase')
+  if (alvo) alvo.textContent = f.texto.slice(0, 70)
   if (!_sincSeguir) return
   // ⚠️ SEGUIR A VOZ É VIRAR A PÁGINA, não rolar. O leitor deste app é
   // paginado por colunas; um `scrollIntoView` puxaria a viewport para um lugar

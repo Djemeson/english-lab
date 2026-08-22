@@ -286,7 +286,7 @@ async function _abImportarM4b(file) {
   // modo descartável é convidar o navegador a apagá-los depois.
   await garantirArmazenamentoPersistente()
   // O próprio arquivo, sem cópia. O `type` já vem dele.
-  await BookDB.set(abChaveArquivo(id, 0), file)
+  await BookDB.set(abChaveArquivo(id, 0), abComTipo(file, file.name))
   abLocaisMarcar(id)
 
   // Sem capítulos dentro do arquivo, o livro inteiro é um capítulo só. Melhor
@@ -318,7 +318,7 @@ async function _abImportarFaixas(lista) {
     // Mesmo motivo do `.m4b`: o `File` já é um `Blob`. Copiá-lo pela memória
     // dobrava o custo de cada faixa sem ganho nenhum — e uma pasta de 40 mp3
     // chega perto do mesmo estouro.
-    const blob = f
+    const blob = abComTipo(f, f.name)
     if (!i) await garantirArmazenamentoPersistente()
     await BookDB.set(abChaveArquivo(id, i), blob)
     abLocaisMarcar(id)
@@ -450,6 +450,24 @@ function _abCorrigirDuracao(a, i, duracaoReal) {
   return true
 }
 
+// ⚠️ ARQUIVO SEM `type` NÃO É ARQUIVO CONFIÁVEL PARA O `<audio>`, e isto é
+// consequência direta da correção de memória de §8.91: guardar o `File` sem
+// cópia trouxe junto o `type` dele — e o Windows entrega `.m4b` com type
+// **vazio**, porque não conhece a extensão. Antes, o `new Blob([buf], {type:
+// … || 'audio/mp4'})` consertava isso de graça; a cópia sumiu e o conserto
+// junto. Medido no arquivo real de 1,8 GB dele: `blob.type === ""`.
+// `slice` com tipo devolve uma VISTA do mesmo blob — troca o rótulo sem copiar
+// um byte, que é exatamente o que se precisa aqui.
+function abComTipo(blob, nome) {
+  if (!blob) return blob
+  if (blob.type) return blob
+  const ext = String(nome || '').toLowerCase().match(/\.([a-z0-9]+)$/)
+  const mapa = { m4b: 'audio/mp4', m4a: 'audio/mp4', mp4: 'audio/mp4', mp3: 'audio/mpeg',
+                 aac: 'audio/aac', ogg: 'audio/ogg', opus: 'audio/ogg', wav: 'audio/wav' }
+  const tipo = (ext && mapa[ext[1]]) || 'audio/mp4'
+  try { return blob.slice(0, blob.size, tipo) } catch (e) { return blob }
+}
+
 // Capa reduzida a 240px e virada JPEG: precisa caber no localStorage E no
 // documento do Firestore junto com o resto. Capa de m4b vem em 1200px.
 function _abMiniatura(blob) {
@@ -572,7 +590,7 @@ async function _abAnexar(id, files) {
       const buf = await _abMoovDoArquivo(lista[0])
       const meta = buf ? abLerM4b(buf) : { titulo: '', autor: '', duracao: 0, capitulos: [], capa: null }
       await garantirArmazenamentoPersistente()
-      await BookDB.set(abChaveArquivo(id, 0), lista[0])
+      await BookDB.set(abChaveArquivo(id, 0), abComTipo(lista[0], lista[0].name))
       abLocaisMarcar(id)
       let dur = meta.duracao || await _abDuracaoDoBlob(await BookDB.get(abChaveArquivo(id, 0)))
       a.capitulos = meta.capitulos.length
@@ -588,7 +606,7 @@ async function _abAnexar(id, files) {
       const caps = []
       let total = 0, bytes = 0
       for (let i = 0; i < lista.length; i++) {
-        const blob = lista[i]
+        const blob = abComTipo(lista[i], lista[i].name)
         if (!i) await garantirArmazenamentoPersistente()
         await BookDB.set(abChaveArquivo(id, i), blob)
         abLocaisMarcar(id)
@@ -3153,7 +3171,11 @@ async function abGarantirArquivo(a, n, pintar) {
   try {
     if (await BookDB.existe(abChaveArquivo(a.id, n))) {
       const b = await BookDB.get(abChaveArquivo(a.id, n))
-      if (b) return b
+      // ⚠️ O TIPO É CORRIGIDO NA LEITURA TAMBÉM, e não só ao gravar: o arquivo
+      // de 1,8 GB dele JÁ ESTÁ no aparelho sem tipo nenhum. Reescrevê-lo
+      // custaria o download inteiro de novo; aqui o rótulo é posto na saída,
+      // sem tocar no que está guardado.
+      if (b) return abComTipo(b, a.title)
     }
   } catch (e) {
     console.warn('[audiobook] não consegui ler o armazenamento local:', e && e.message)
@@ -3633,7 +3655,7 @@ async function _abCarregarCapitulo(i, seg) {
   // moram no MESMO arquivo: recarregar a cada troca jogaria fora 500 MB já
   // decodificados e daria um engasgo de segundos entre capítulos.
   if (cap.arq !== _abArqAtual) {
-    let blob = await BookDB.get(abChaveArquivo(a.id, cap.arq))
+    let blob = abComTipo(await BookDB.get(abChaveArquivo(a.id, cap.arq)), a.title)
     if (!blob) {
       // Num livro em 40 faixas, é aqui que a nuvem paga o aluguel: chegou no
       // capítulo 12 e a faixa 12 não está aqui, ela desce agora — e só ela.
