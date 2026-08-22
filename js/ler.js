@@ -2354,7 +2354,8 @@ function _lerFrasesPara(txt, palavras) {
 
 async function _lerPreDoCache(cap) {
   try {
-    const b = await BookDB.get(_lerChavePre(cap))
+    const b = typeof geradoLer === 'function' ? await geradoLer(_lerChavePre(cap))
+                                             : await BookDB.get(_lerChavePre(cap))
     if (!b) return null
     const t = typeof b.text === 'function' ? await b.text() : String(b)
     const d = JSON.parse(t)
@@ -2560,7 +2561,11 @@ async function lerPreAnalisar(cap, refazer) {
     // Grava SEMPRE (o trabalho foi pago, guardar é o mínimo), mas só carrega no
     // glossário se ele ainda estiver NESTE capítulo — a chamada leva segundos e
     // nesse tempo ele pode ter virado a página para outro.
-    await BookDB.set(_lerChavePre(cap), new Blob([JSON.stringify({ v: LER_PRE_VER, itens: saida, at: Date.now() })]))
+    // ⚠️ O comentário acima ("o trabalho foi pago, guardar é o mínimo") estava
+    // certo pela metade: guardava só NESTE aparelho, e abrir o mesmo capítulo
+    // no telefone mandava pagar tudo de novo. Agora vai para a nuvem junto.
+    await _lerGuardar(_lerChavePre(cap),
+      JSON.stringify({ v: LER_PRE_VER, itens: saida, at: Date.now() }), 'pre', cap, saida.length)
     if (_lerCap === cap) glossPreCarregar(_lerChavePre(cap), saida)
     const perdidos = itens.length - saida.length
 
@@ -2590,6 +2595,7 @@ async function lerPreAnalisar(cap, refazer) {
 async function lerPreApagar(cap) {
   if (cap === undefined) cap = _lerCap
   await BookDB.del(_lerChavePre(cap))
+  if (typeof geradoApagar === 'function') geradoApagar(_lerChavePre(cap))
   glossPreLimpar()
   toast('leitura deste capítulo apagada', 'info')
 }
@@ -2620,6 +2626,18 @@ let _lerRaioXCarregando = false
 
 function _lerChaveRaioX(cap) { return `raiox:${_lerLivro.id}:${cap}` }
 
+// TUDO O QUE ESTE LEITOR GERA PASSA POR AQUI. Guardar só no aparelho era o
+// defeito que ele pegou — *"a análise que fiz no telefone não apareceu aqui"* —
+// e ele valia para três coisas pagas com IA (raio-X, pré-estudo, quebra) mais
+// a triagem de nível, que é trabalho manual dele. As marcas (`tipo`, `cap`, `n`)
+// existem para o painel saber o que já foi feito sem baixar nada.
+async function _lerGuardar(chave, valor, tipo, cap, n) {
+  const marcas = { tipo, livroId: String(_lerLivro ? _lerLivro.id : ''), cap: Number(cap), n }
+  if (typeof geradoGuardar === 'function') return geradoGuardar(chave, valor, marcas)
+  try { await BookDB.set(chave, valor) } catch (e) {}
+  return false
+}
+
 // A PROCEDÊNCIA DESTE CAPÍTULO, do jeito que o acervo a guarda. É o que deixa
 // o raio-X reconhecer que um item do Preparar saiu DAQUI — e, portanto, que
 // não existe "outro sentido" a anunciar.
@@ -2633,9 +2651,13 @@ function _lerOrigemDoCap(cap) {
 async function lerRaioXCarregar(cap) {
   if (!_lerLivro) return null
   try {
-    const g = await BookDB.get(_lerChaveRaioX(cap))
+    // `geradoLer` procura aqui e, se faltar, na nuvem — é assim que a análise
+    // feita no telefone aparece no computador sem ser paga de novo.
+    const g = typeof geradoLer === 'function'
+      ? await geradoLer(_lerChaveRaioX(cap))
+      : await BookDB.get(_lerChaveRaioX(cap))
     if (!g) return null
-    const dados = typeof g === 'string' ? JSON.parse(g) : g
+    const dados = typeof g === 'string' ? JSON.parse(g) : (g instanceof Blob ? JSON.parse(await g.text()) : g)
     const itens = Array.isArray(dados) ? dados : (dados.itens || null)
     // ⚠️ O rótulo guardado envelhece: entre uma leitura e outra ele estuda a
     // palavra, marca "já sei", ou a análise do Preparar termina. Sem esta
@@ -2680,7 +2702,10 @@ async function lerRaioXAnalisar() {
     // o texto do capítulo está em mãos; lá seria preciso lê-lo do zip de novo.
     for (const x of itens) x.frase = aiFraseDoTermo(texto, x.t)
     if (_lerCap !== cap) { _lerRaioXCarregando = false; return }   // trocou de capítulo no meio
-    await BookDB.set(_lerChaveRaioX(cap), JSON.stringify({ itens, nivel, at: Date.now() }))
+    const pacote = { itens, nivel, at: Date.now() }
+    // Guarda aqui E na nuvem: análise custa dinheiro, e o outro aparelho não
+    // pode ser obrigado a pagar de novo pelo mesmo capítulo.
+    await _lerGuardar(_lerChaveRaioX(cap), JSON.stringify(pacote), 'raiox', cap, itens.length)
     _lerRaioX = { cap, itens }
     _lerRaioXPintar()
     toast(itens.length
@@ -2763,7 +2788,14 @@ function _lerRaioXPintar() {
       if (m.index > ultimo) frag.appendChild(document.createTextNode(no.nodeValue.slice(ultimo, m.index)))
       const achado = tipoDe.get(m[0].toLowerCase())
       const mk = document.createElement('mark')
-      mk.className = 'ler-dif ler-dif-' + ((achado && achado.tipo) || 'word')
+      // ⚠️ O REALCE NÃO DIZIA NADA SOBRE O QUE JÁ É DELE. `cellar` está marcada
+      // como conhecida desde agosto e era sublinhada EXATAMENTE como uma palavra
+      // nova — ele leu isso como "voltou a ficar desconhecido", e estava certo:
+      // a tela não distinguia. O esmaecido existia só no chip da lista, que nem
+      // é mais a forma de ver isto. Agora o traço do que já é dele é fraco, e o
+      // do que é novidade é cheio.
+      mk.className = 'ler-dif ler-dif-' + ((achado && achado.tipo) || 'word') +
+        (achado && achado.ja ? ' ler-dif-ja' : '')
       mk.dataset.i = achado ? achado.i : ''
       // Sem `title`: o tooltip nativo competia com o chip do hover e piscava por
       // cima dele. Quem mostra a glosa (e as ações) agora é `_lerDifAbrir`.
@@ -2803,6 +2835,15 @@ async function lerRaioXPainel() {
 async function _lerRaioXMapear() {
   _lerRaioXMapa = {}
   if (!_lerLivro) return
+  // ⚠️ A NUVEM ENTRA PRIMEIRO. Sem isto, um capítulo analisado no telefone
+  // aparecia como "analisar" no computador — e o clique cobraria a análise de
+  // novo. As chaves locais escrevem por cima logo abaixo, o que é o certo:
+  // aqui a contagem é a que ele acabou de ver.
+  try {
+    if (typeof geradoDoLivro === 'function') {
+      _lerRaioXMapa = await geradoDoLivro(_lerLivro.id, 'raiox')
+    }
+  } catch (e) {}
   try {
     const pre = `raiox:${_lerLivro.id}:`
     for (const k of await BookDB.keys()) {
@@ -2913,8 +2954,8 @@ async function lerRaioXJaSei(i) {
   }
   _lerRaioX.itens = _lerRaioX.itens.filter((_, k) => k !== i)
   try {
-    await BookDB.set(_lerChaveRaioX(_lerCap),
-      JSON.stringify({ itens: _lerRaioX.itens, nivel: cefrNivelAluno(), at: Date.now() }))
+    const pacote = { itens: _lerRaioX.itens, nivel: cefrNivelAluno(), at: Date.now() }
+    await _lerGuardar(_lerChaveRaioX(_lerCap), JSON.stringify(pacote), 'raiox', _lerCap, _lerRaioX.itens.length)
   } catch (e) {}
   _lerRaioXPintar()
   _lerRenderFerramentas()
@@ -3104,7 +3145,10 @@ function _lerNivSalvarMarcas() {
   const chave = _lerChaveNivMarca(_lerNiv.chave)
   const marca = [..._lerNiv.marca]
   _lerNivGravando = setTimeout(() => {
-    BookDB.set(chave, new Blob([JSON.stringify({ v: LER_NIV_VER, marca, at: Date.now() })]))
+    // ⚠️ ISTO É TRABALHO MANUAL DELE: sim/não em centenas de palavras. Perder
+    // ao trocar de aparelho dói mais que perder uma análise de IA, porque não
+    // dá para "pagar de novo" — tem de refazer no braço.
+    _lerGuardar(chave, JSON.stringify({ v: LER_NIV_VER, marca, at: Date.now() }), 'nivmarca', _lerCap)
       .catch(e => console.warn('[niv] não gravei as marcas:', e && e.message))
   }, 400)
 }
@@ -3118,7 +3162,8 @@ function _lerNivSalvarMarcas() {
 async function _lerNivCarregarMarcas() {
   if (!_lerNiv) return
   try {
-    const b = await BookDB.get(_lerChaveNivMarca(_lerNiv.chave))
+    const b = typeof geradoLer === 'function' ? await geradoLer(_lerChaveNivMarca(_lerNiv.chave))
+                                             : await BookDB.get(_lerChaveNivMarca(_lerNiv.chave))
     if (!b) return
     const d = JSON.parse(typeof b.text === 'function' ? await b.text() : String(b))
     if (!d || !Array.isArray(d.marca) || Number(d.v || 0) < LER_NIV_VER) return
@@ -3131,7 +3176,8 @@ async function _lerNivCarregarMarcas() {
 
 async function _lerNivDoCache(cap) {
   try {
-    const b = await BookDB.get(_lerChaveNiv(cap))
+    const b = typeof geradoLer === 'function' ? await geradoLer(_lerChaveNiv(cap))
+                                             : await BookDB.get(_lerChaveNiv(cap))
     if (!b) return null
     const d = JSON.parse(typeof b.text === 'function' ? await b.text() : String(b))
     if (!d || !Array.isArray(d.itens) || Number(d.v || 0) < LER_NIV_VER) return null
@@ -3317,12 +3363,14 @@ async function lerClassificar(cap, refazer) {
     }
     if (!saida.length) throw new Error('a IA não devolveu nenhuma classificação reconhecível')
 
-    await BookDB.set(_lerChaveNiv(cap), new Blob([JSON.stringify({ v: LER_NIV_VER, itens: saida, at: Date.now() })]))
+    await _lerGuardar(_lerChaveNiv(cap),
+      JSON.stringify({ v: LER_NIV_VER, itens: saida, at: Date.now() }), 'niv', cap, saida.length)
     // Classificação nova = triagem nova. Marcas de uma classificação anterior
     // apontam para uma lista que não existe mais, e ressuscitá-las daria a
     // pior impressão possível: palavra marcada como conhecida sem ele ter
     // olhado. "Refazer" recomeça do palpite.
     await BookDB.del(_lerChaveNivMarca(_lerChaveNiv(cap)))
+    if (typeof geradoApagar === 'function') geradoApagar(_lerChaveNivMarca(_lerChaveNiv(cap)))
     if (_lerCap === cap) _lerNivMontar(_lerChaveNiv(cap), saida)
 
     let extra = ''

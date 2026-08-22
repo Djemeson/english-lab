@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (14ª) — **"VOCÊ TEM ESTA PALAVRA COM OUTRO SENTIDO" CONTINUAVA
+> Última atualização: 2026-08-21 (15ª) — **TODO MATERIAL GERADO PASSA A VIAJAR, E O REALCE PARA
+> DE MENTIR**. Ele abriu o app no computador: *"a análise que fiz no telefone não apareceu aqui"*
+> e *"cellar voltou a ficar marcado como desconhecido"*. Dois defeitos e um pedido maior que os
+> dois — *"todo material gerado precisa ir pra todos os aparelhos"*. A varredura achou **quatro**
+> coisas presas no aparelho: o **raio-X do capítulo**, o **pré-estudo** (cujo próprio comentário
+> dizia "o trabalho foi pago"), a **quebra de trecho** e a **triagem de nível** — as três primeiras
+> pagas com IA, a última com trabalho manual dele. Agora todas passam por **uma peça só**
+> (`geradoGuardar`/`geradoLer`), sob demanda. E o **realce no texto** ganhou traço fraco para o
+> que já é dele: `cellar` era sublinhada exatamente como uma descoberta. De quebra, as **regras do
+> Storage e do Firestore entraram no repositório** — elas só existiam no console, e o descompasso
+> apareceu na mesma rodada. `sw.js` → **englab-v352**. **Detalhes em §8.71.**
+>
+> Última atualização anterior: 2026-08-21 (14ª) — **"VOCÊ TEM ESTA PALAVRA COM OUTRO SENTIDO" CONTINUAVA
 > MENTINDO — E A CULPA ERA DE COMPARAR GLOSAS**. Ele mandou quatro telas seguidas: `bosomy`,
 > `stands still`, `live large` e `crabgrass`, todas anunciadas como "outro sentido" ou sem rótulo
 > nenhum — e **todas as quatro estavam no acervo vindas de *Billy Summers · Chapter 1***, o
@@ -9689,7 +9701,12 @@ gratuita de 5 GB **só vale em regiões dos EUA**. São Paulo custaria desde o p
 Para arquivo que se baixa uma vez e fica em cache no aparelho, latência não pesa; cota pesa.
 Ficou US-EAST1. **Não dá para trocar depois.**
 
-**As regras** dão a cada pessoa a própria pasta e nada além, com teto de 50 MB por arquivo:
+**As regras** dão a cada pessoa a própria pasta e nada além.
+
+⚠️ **O QUE ESTÁ ABAIXO É HISTÓRICO, E FICOU DESATUALIZADO** — o teto foi para 500 MB em algum
+momento sem que esta seção acompanhasse, e em 2026-08-21 eu recomendei a ele uma mudança que já
+estava feita. Desde então as regras moram em **`storage.rules`** no repositório, e é lá que se
+olha. Como era no começo, com teto de 50 MB por arquivo:
 
 ```
 match /users/{uid}/{allPaths=**} {
@@ -12898,6 +12915,107 @@ O `bruto` corta em 40 000 caracteres — serve para olhar, não para alimentar t
 grava o documento inteiro em arquivo, e foi assim que o acervo verdadeiro entrou no app rodando
 em vez de item inventado.
 
+## 8.71 Todo material gerado viaja, e o realce para de mentir (2026-08-21, 15ª)
+
+### O que ele viu
+
+> *"Eu abri o site no navegador e a análise que fiz no telefone não apareceu aqui. E além do mais
+> `cellar` voltou a ficar marcado como desconhecido. No telefone acho que era uns 120 que tinha
+> gerado e agora são 90."*
+
+Três coisas diferentes num relato só, e as três verdadeiras.
+
+### 1. A análise não viajava — e o audiolivro viajava
+
+O raio-X do leitor morava só no `BookDB` do aparelho (`raiox:<livro>:<cap>`), e `firebase.js` nem
+sabia que ele existia. Abrir o mesmo capítulo na outra máquina mandava analisar de novo, **cobrando
+duas vezes pelo mesmo trabalho**.
+
+⚠️ E o audiolivro **já atravessava** — os achados moram dentro de `audiolivros`, que sincroniza.
+Duas telas irmãs com comportamentos opostos: o pior tipo de inconsistência, a que ensina uma regra
+errada.
+
+### 2. A varredura que ele pediu
+
+> *"Analisa todo material gerado que precisa ir pra todos os aparelhos simultaneamente."*
+
+| O que é | Custo | Viajava antes? |
+|---|---|---|
+| Raio-X do capítulo (`raiox:`) | IA | ❌ → **agora sim** |
+| Pré-estudo do capítulo (`pre:`) | IA | ❌ → **agora sim** |
+| Quebra de trecho (`quebra:`) | IA | ❌ → **agora sim** |
+| Triagem de nível (`niv:`, `nivmarca:`) | **trabalho manual dele** | ❌ → **agora sim** |
+| Raio-X e transcrição do audiolivro | IA / Whisper | ✔ (dentro de `audiolivros`) |
+| Áudio TTS e imagens | IA | ✔ (Storage `audio/`, `images/`) |
+| Análise de palavras, cards, conversas, legendas | IA | ✔ |
+
+O `pre:` é o caso mais irônico: o comentário no código dizia *"o trabalho foi pago, guardar é o
+mínimo"* — e guardava só neste aparelho.
+
+A triagem de nível não custa IA, mas **dói mais**: é sim/não em centenas de palavras, e não dá
+para "pagar de novo" — tem de ser refeita no braço.
+
+### 3. Uma peça só, sob demanda
+
+`geradoGuardar(chave, valor, marcas)` grava aqui **e** lá; `geradoLer(chave)` procura aqui e, se
+faltar, na nuvem — gravando local para a próxima abertura não custar rede. A chave local
+(`raiox:<livro>:<cap>`) já identifica o item com precisão, então **ela vira o nome do documento**.
+
+⚠️ **Sob demanda, e não no sync geral.** São 35 capítulos por livro vezes quatro tipos: arrastar
+tudo a cada sincronização encareceria a abertura do app para pagar por algo que só interessa ao
+capítulo aberto. Mesmo desenho do arquivo do livro.
+
+⚠️ **Teto de 1 MB por documento no Firestore.** Um pré-estudo enorme pode chegar perto — acima de
+900 KB o app não sobe e avisa no console, em vez de derrubar o lote com um erro no meio.
+
+As regras do Firestore **já cobriam** a subcoleção nova (`match /users/{userId}/{document=**}`):
+nada a mudar lá.
+
+### 4. `cellar`: o realce não dizia o que já é dele
+
+`cellar` está marcada como conhecida desde agosto, e o app **sabia disso** — o estado `marcada`
+aparecia certinho no chip do hover. Mas o **traço embaixo da palavra no texto** era idêntico ao de
+uma descoberta. Ele leu "voltou a ficar desconhecido", e estava certo: a tela não distinguia.
+
+Agora o que já é dele tem traço **fino e pontilhado**, com opacidade menor; o que é novidade
+continua com traço cheio. O hover devolve o traço sólido, para não encolher a área de clique.
+Vale no leitor e no audiolivro.
+
+### 5. Por que 120 no telefone e 90 no computador
+
+Duas causas somadas, e nenhuma é defeito novo:
+
+- **A análise não viajava** (item 1), então o computador rodou uma análise **nova** — e cada
+  raio-X é uma chamada nova ao modelo, que não devolve o mesmo conjunto duas vezes.
+- **A correção de §8.70** passou a esconder o que ele já tem daquele capítulo: **42 itens** no
+  Chapter 1, medidos com o acervo real.
+
+### 6. As regras saíram do console e entraram no repositório
+
+⚠️ **E o descompasso já tinha custado.** O ESTADO-DO-PROJETO documentava um teto de **50 MB** por
+arquivo no Storage; a regra no ar tinha **500 MB**. Eu recomendei a ele uma mudança que em parte já
+estava feita. Regra que não está no repositório é regra que ninguém confere.
+
+Agora existem `storage.rules`, `firestore.rules`, `firebase.json` e `.firebaserc`. O audiolivro
+ganhou **faixa própria de 2 GB por arquivo** (24 h de narração a 128 kbps passam de 1,3 GB); o
+resto continua em 500 MB, que é o freio certo para EPUB e vídeo.
+
+⚠️ As regras do Storage são **união, não precedência**: um arquivo em `audiolivros/` casa com os
+dois blocos, e basta um permitir. Por isso o bloco genérico não precisa de exceção nenhuma.
+
+### Medido
+
+- Realce, nas duas telas: `cellar` → `ler-dif-ja` / `ab-dif-ja`; `rumpus room` (novidade) sem a
+  marca. No CSS aplicado: **1px pontilhado, opacidade 0,72** contra **2px sólido, opacidade 1**.
+- `geradoGuardar` deslogado: **grava local**, devolve `false` para a nuvem e não quebra;
+  `geradoLer` devolve o mesmo conteúdo; chave inexistente devolve `null`.
+- Id higienizado: `pre:livro/x.y:3` → `pre:livro_x_y:3` (o Firestore não aceita `/` em id).
+- `lerRaioXCarregar` continua lendo o cache local quando não há nuvem.
+
+⚠️ **O que NÃO foi medido:** a viagem real telefone ↔ computador. A janela do login do Google não
+é alcançável pelas ferramentas de navegador, e sem login não existe nuvem para exercitar. Mesma
+pendência de §8.69.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -12906,6 +13024,19 @@ em vez de item inventado.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada do material gerado (§8.71, 2026-08-21)
+
+- [ ] **PUBLICAR AS REGRAS — depende dele.** `firebase deploy --only storage` (o classificador do
+      modo automático barra o comando; em modo manual roda direto). Sem isso, o teto continua em
+      500 MB por arquivo e um `.m4b` grande é recusado. As regras já estão certas no repositório.
+- [ ] **Testar a viagem real telefone ↔ computador:** analisar um capítulo num aparelho e abrir no
+      outro sem pagar de novo. Não deu para fazer daqui (login do Google fora de alcance).
+- [ ] **O material antigo não sobe sozinho.** O que já foi gerado antes desta versão continua só
+      no aparelho onde nasceu — sobe na próxima vez que for regravado. Se incomodar, cabe uma
+      varredura única que empurra o que existe no `BookDB` para a nuvem.
+- [ ] **A quebra de trecho não tem livro nem capítulo**, então não aparece em nenhum painel de
+      "o que já foi feito". Só é reaproveitada quando o mesmo trecho reaparece.
 
 ### Da rodada da procedência (§8.70, 2026-08-21)
 

@@ -264,6 +264,117 @@ async function abNuvemPorQueNaoVeio(id, n) {
 }
 
 // ================================================================
+// O QUE A IA GEROU VIAJA COM ELE
+// ================================================================
+// ⚠️ ELE PAGOU UMA ANÁLISE NO TELEFONE E ELA NÃO EXISTIA NO COMPUTADOR, e o
+// pedido que veio em seguida foi maior que o caso: *"do desktop também deve ir
+// pro telefone. Todo material gerado precisa ir pra todos os aparelhos."*
+//
+// A varredura achou TRÊS coisas presas no `BookDB` de um aparelho só, todas
+// pagas com chamada de IA:
+//
+//   raiox:<livro>:<cap>   o raio-X do capítulo
+//   pre:<livro>:<cap>     o pré-estudo (o próprio código dizia "o trabalho foi
+//                         pago, guardar é o mínimo" — e guardava só aqui)
+//   quebra:<lang>:<hash>  a quebra de trecho do Preparar
+//
+// E uma paga com trabalho MANUAL dele, que dói igual perder:
+//
+//   niv:<livro>:<cap> / nivmarca:…   a triagem de nível, palavra por palavra
+//
+// O audiolivro já atravessava (os achados moram dentro de `audiolivros`, que
+// sincroniza) — duas telas irmãs com comportamentos opostos, que é o pior tipo
+// de inconsistência: a que ensina uma regra errada.
+//
+// UMA PEÇA SÓ, e não uma função por tipo. A chave local já identifica o item
+// com precisão; ela vira o nome do documento, e o resto é o mesmo desenho para
+// todos.
+//
+// ⚠️ SOB DEMANDA, E NÃO NO SYNC GERAL. São 35 capítulos por livro vezes quatro
+// tipos: arrastar tudo a cada sincronização encareceria a abertura do app para
+// pagar por algo que só interessa ao capítulo aberto. Mesmo desenho do arquivo
+// do livro — sobe quando termina, desce quando falta.
+function _geradoId(chave) {
+  // Id de documento não aceita `/`; o resto vai junto para a chave continuar
+  // legível no console. `:` é permitido e é o que as nossas chaves usam.
+  return String(chave).replace(/[\/\\.#$\[\]]/g, '_').slice(0, 1400)
+}
+
+function _geradoRef(chave) {
+  if (!_fbDb || !_fbUser || !chave) return null
+  return _fbDb.collection('users').doc(_fbUser.uid).collection('gerado').doc(_geradoId(chave))
+}
+
+// `marcas` é o que permite achar depois sem baixar tudo: {tipo, livroId, cap}.
+async function geradoSubir(chave, valor, marcas) {
+  try {
+    const r = _geradoRef(chave); if (!r || valor == null) return false
+    const texto = typeof valor === 'string' ? valor
+      : (valor instanceof Blob) ? await valor.text() : JSON.stringify(valor)
+    // ⚠️ Teto de 1 MB por documento no Firestore. Um pré-estudo de capítulo
+    // gigante pode chegar perto; melhor não subir do que derrubar o sync
+    // inteiro com um erro no meio do lote.
+    if (texto.length > 900000) {
+      console.warn('[Firebase] gerado grande demais para a nuvem:', chave, texto.length)
+      return false
+    }
+    await r.set({ chave: String(chave), texto, ...(marcas || {}), updatedAt: Date.now() })
+    return true
+  } catch (e) { console.warn('[Firebase] gerado não subiu:', e.code || e.message); return false }
+}
+
+async function geradoBaixar(chave) {
+  try {
+    const r = _geradoRef(chave); if (!r) return null
+    const d = await r.get()
+    if (!d.exists) return null
+    const v = d.data() || {}
+    return typeof v.texto === 'string' ? v.texto : null
+  } catch (e) { return null }
+}
+
+// Que capítulos deste livro já têm material deste tipo, em QUALQUER aparelho.
+// É o que o painel do raio-X precisa para pôr a marca ✦ — sem isto, capítulo
+// analisado no telefone aparecia como "analisar" no computador, e o clique
+// cobraria a análise de novo.
+async function geradoDoLivro(livroId, tipo) {
+  const mapa = {}
+  try {
+    if (!_fbDb || !_fbUser) return mapa
+    let q = _fbDb.collection('users').doc(_fbUser.uid).collection('gerado')
+                 .where('livroId', '==', String(livroId))
+    if (tipo) q = q.where('tipo', '==', tipo)
+    const r = await q.get()
+    r.forEach(d => {
+      const v = d.data() || {}
+      if (v.cap != null) mapa[Number(v.cap)] = v.n != null ? v.n : true
+    })
+  } catch (e) { console.warn('[Firebase] gerado, listagem:', e.code || e.message) }
+  return mapa
+}
+
+async function geradoApagar(chave) {
+  try { const r = _geradoRef(chave); if (r) await r.delete() } catch (e) {}
+}
+
+// ---- os dois atalhos que quem chama realmente quer ----
+// Guardar aqui E lá, numa linha. E ler daqui, caindo para a nuvem quando falta.
+async function geradoGuardar(chave, valor, marcas) {
+  try { await BookDB.set(chave, valor) } catch (e) {}
+  return geradoSubir(chave, valor, marcas)
+}
+
+async function geradoLer(chave) {
+  const local = await BookDB.get(chave)
+  if (local != null) return local
+  const daNuvem = await geradoBaixar(chave)
+  if (daNuvem == null) return null
+  // Grava aqui para a próxima abertura não custar rede.
+  try { await BookDB.set(chave, daNuvem) } catch (e) {}
+  return daNuvem
+}
+
+// ================================================================
 // POR QUE O ARQUIVO NÃO VEIO
 // ================================================================
 // ⚠️ A MENSAGEM AFIRMAVA UM FATO QUE O APP NUNCA VERIFICOU. "O arquivo deste

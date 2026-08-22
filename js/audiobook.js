@@ -1287,7 +1287,7 @@ function _abFalaPintada(txt, achados) {
   if (!achados || !achados.length) return esc(txt)
   const marcas = []
   achados.forEach((x, idx) => {
-    for (const oc of aiAcharNoTexto(txt, x.t)) marcas.push({ ...oc, idx, tipo: x.tipo })
+    for (const oc of aiAcharNoTexto(txt, x.t)) marcas.push({ ...oc, idx, tipo: x.tipo, ja: x.ja })
   })
   if (!marcas.length) return esc(txt)
   marcas.sort((p, q) => p.i - q.i)
@@ -1306,7 +1306,9 @@ function _abFalaPintada(txt, achados) {
     saida += esc(txt.slice(de, m.i))
     // `data-i` (e não `data-idx`): é o nome que a peça compartilhada do chip lê,
     // em js/ai.js. Com dois nomes, o chip do audiolivro abria vazio.
-    saida += `<mark class="ab-dif ab-dif-${m.tipo}" data-i="${m.idx}">${esc(txt.slice(m.i, m.fim))}</mark>`
+    // Traço fraco no que já é dele, cheio no que é novidade — a mesma regra do
+    // leitor. Sem isto, palavra já conhecida era sublinhada como descoberta.
+    saida += `<mark class="ab-dif ab-dif-${m.tipo}${m.ja ? ' ab-dif-ja' : ''}" data-i="${m.idx}">${esc(txt.slice(m.i, m.fim))}</mark>`
     de = m.fim
   }
   return saida + esc(txt.slice(de))
@@ -1685,6 +1687,13 @@ function abTempoLongo(seg) {
 //    isso a lista do que está no aparelho NUNCA sincroniza: ela é uma pergunta
 //    ao IndexedDB desta máquina, e a resposta é diferente em cada uma.
 const AB_NUVEM_AVISO_MB = 300     // acima disto, o aviso fica mais duro
+// O teto que `storage.rules` define para a pasta dos audiolivros (2 GB). Está
+// aqui só para AVISAR antes de tentar — quem manda é o servidor.
+// ⚠️ Eu já errei este número uma vez: escrevi "50 MB" a partir do que o
+// ESTADO-DO-PROJETO dizia, e a regra no ar era 500 MB. Por isso as regras
+// passaram a morar no repositório (`storage.rules`) — o número deste arquivo e
+// o do servidor agora saem do mesmo lugar.
+const AB_NUVEM_TETO_MB = 2048
 
 function abNuvemMB(bytes) {
   const mb = (bytes || 0) / 1048576
@@ -1842,9 +1851,9 @@ async function abNuvemGuardar(id) {
       ${mb > AB_NUVEM_AVISO_MB ? `<b>É bastante coisa.</b> Numa conexão móvel isso pesa na franquia —
         vale fazer no Wi-Fi. ` : ''}A subida mostra o andamento e dá para cancelar no meio; o que já
       tiver subido fica lá e não sobe de novo.<br><br>
-      ${maior > 48 * 1048576 ? `<b>Aviso:</b> o maior arquivo aqui tem ${abNuvemMB(maior)} e a regra
-        da sua nuvem aceita <b>50 MB</b> por arquivo hoje — se ela não tiver sido ampliada, o envio
-        vai ser recusado.<br><br>` : ''}
+      ${maior > AB_NUVEM_TETO_MB * 1048576 ? `<b>Aviso:</b> o maior arquivo aqui tem
+        ${abNuvemMB(maior)} e sua nuvem aceita <b>${AB_NUVEM_TETO_MB / 1024} GB</b> por arquivo —
+        este vai ser recusado.<br><br>` : ''}
       <b>Não feche a aba</b> enquanto envia.</p>`
   })
   if (!ok) return
@@ -1884,18 +1893,17 @@ async function abNuvemGuardar(id) {
 // "unauthorized", a mesma palavra de quem não está logado. Sem esta frase, ele
 // tentaria de novo achando que foi a rede.
 function _abNuvemAvisoTeto(bytesMedio) {
-  const grande = bytesMedio > 48 * 1048576
+  const grande = bytesMedio > 400 * 1048576
   confirmModal({
-    title: grande ? 'O arquivo é maior do que sua nuvem aceita' : 'Sua nuvem recusou o envio',
+    title: 'Sua nuvem recusou o envio',
     icon: 'cloud', confirmText: 'Entendi', cancelText: '',
     html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
-      ${grande ? `Este áudio tem <b>${abNuvemMB(bytesMedio)}</b>, e a regra de segurança da sua
-        nuvem hoje aceita no máximo <b>50 MB por arquivo</b> — o número foi escolhido quando só
-        subiam livros e vídeos.<br><br>
-        Para liberar, no <b>Console do Firebase → Storage → Rules</b>, troque o
-        <code>50</code> por <code>1024</code> na linha do tamanho e publique.` :
-        `Sua nuvem recusou o envio deste arquivo. Se você acabou de entrar, saia e entre de novo
-         com o Google; se o arquivo for grande, veja o limite de tamanho nas regras do Storage.`}
+      ${grande ? `Este áudio tem <b>${abNuvemMB(bytesMedio)}</b>, e o mais provável é que ele
+        passe do <b>tamanho máximo por arquivo</b> que sua nuvem aceita.<br><br>
+        O limite mora nas <b>regras do Storage</b>. O projeto guarda a versão certa em
+        <code>storage.rules</code> — publicá-la resolve.` :
+        `Se você acabou de entrar, saia e entre de novo com o Google. Se não for isso, o arquivo
+         passou do tamanho máximo que suas regras do Storage aceitam.`}
     </p>`
   })
 }

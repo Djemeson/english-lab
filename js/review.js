@@ -2934,7 +2934,11 @@ function _quebraChave(trecho, lang) {
 async function _quebraDoDisco(trecho, lang) {
   if (typeof BookDB === 'undefined') return null
   try {
-    const b = await BookDB.get(_quebraChave(trecho, lang))
+    // ⚠️ Procura aqui e, faltando, na nuvem. Esta quebra é uma chamada de IA:
+    // o mesmo trecho aberto no telefone e no computador cobrava duas vezes.
+    const b = typeof geradoLer === 'function'
+      ? await geradoLer(_quebraChave(trecho, lang))
+      : await BookDB.get(_quebraChave(trecho, lang))
     if (!b) return null
     const d = JSON.parse(typeof b.text === 'function' ? await b.text() : String(b))
     if (!d || !Array.isArray(d.items) || Number(d.v || 0) < QUEBRA_VER) return null
@@ -3048,8 +3052,13 @@ ${promptRegrasLexicais(lang, 'glosa')}
   // condenaria a frase a nunca mais ser quebrada. Na memória tudo bem — morre
   // com a sessão.
   if (items.length && typeof BookDB !== 'undefined') {
-    BookDB.set(_quebraChave(alvo, lang),
-      new Blob([JSON.stringify({ v: QUEBRA_VER, items, trad: saida.trad, at: Date.now() })]))
+    const pacote = JSON.stringify({ v: QUEBRA_VER, items, trad: saida.trad, at: Date.now() })
+    // Aqui E na nuvem: o trecho quebrado no computador não precisa ser pago de
+    // novo no telefone. `tipo` marca o que é; não tem livro nem capítulo — a
+    // quebra nasce de um trecho solto.
+    ;(typeof geradoGuardar === 'function'
+      ? geradoGuardar(_quebraChave(alvo, lang), pacote, { tipo: 'quebra', lang })
+      : BookDB.set(_quebraChave(alvo, lang), pacote))
       .catch(e => console.warn('[quebra] não gravei:', e && e.message))
   }
   return saida

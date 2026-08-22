@@ -5545,6 +5545,15 @@ body.ab-full .ab-chips{max-width:34em}
 .ler-dif-phrasal_verb{--cor:#2F72D0}
 .ler-dif-idiom{--cor:#C63B62}
 .ler-dif-collocation{--cor:#7B4BC9}
+/* ⚠️ O QUE JÁ É DELE TEM TRAÇO FRACO. Antes, palavra marcada como conhecida era
+   sublinhada IGUAL a uma descoberta — ele viu `cellar` acesa e leu "voltou a
+   ficar desconhecida". Pontilhado e fino: continua clicável e continua achável,
+   mas o olho passa por cima dele e para no que é novo, que é a razão de existir
+   o raio-X. O hover devolve o traço cheio, para não sumir com a área de clique. */
+.ler-dif-ja, .ab-dif-ja{
+  border-bottom-width:1px; border-bottom-style:dotted; opacity:.72;
+}
+.ler-dif-ja:hover, .ab-dif-ja:hover{ border-bottom-style:solid; opacity:1 }
 /* O CHIP QUE VEM ATÉ O MOUSE. Vive no `body` (fora do texto paginado) para não
    entrar na conta das colunas: qualquer elemento dentro do fluxo mudaria a
    paginação e faria o livro pular de página. */
