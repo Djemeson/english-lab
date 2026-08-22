@@ -216,9 +216,17 @@ function estSalvar() {
 // ================================================================
 // RAIZ — quem decide qual das quatro telas aparece
 // ================================================================
+// Uma vez por sessão: quem já tem link de capa e nenhuma cópia guardada tenta
+// baixar. Roda depois da tela, nunca antes.
+let _estCapasJaVarreu = false
+
 function estanteRender() {
   estMigrar()
   const area = el('ler-area'); if (!area) return
+  if (!_estCapasJaVarreu) {
+    _estCapasJaVarreu = true
+    setTimeout(() => estCapasPendentes(), 800)
+  }
   const acoes = el('ler-ph-actions')
   if (acoes) acoes.innerHTML = _estAcoesHTML()
   if (_estVista === 'ficha')  return _estRenderFicha()
@@ -1109,6 +1117,26 @@ let _estGoogleFora = 0
 function _estGooglePodeTentar() { return !_estGoogleFora || (Date.now() - _estGoogleFora) > 30 * 60 * 1000 }
 function _estGoogleCaiu() { _estGoogleFora = Date.now() }
 
+// ⚠️ SEM CHAVE, A COTA DO GOOGLE É DIVIDIDA COM O MUNDO INTEIRO. Medido em
+// 2026-08-22, do terminal: CINCO buscas seguidas ("Billy Summers", "Project
+// Hail Mary", "One Piece Vol 100", "Berserk vol 1", "The Hobbit") voltaram
+// **429 nas cinco**. Não é azar de um dia — é o desenho: chamada anônima cai
+// numa cota comum que estoura cedo. O efeito prático era o pior possível: o
+// app caía sempre na Open Library, a fonte mais suja das duas, e ninguém via
+// por quê. Com chave, a cota passa a ser do projeto DELE.
+// A chave é da mesma família `AIza…` do Gemini: se a Books API estiver
+// habilitada no projeto, a chave que ele já tem serve.
+function _estGoogleKey() { return String((typeof cfg !== 'undefined' && cfg.googleBooksKey) || '').trim() }
+function _estGoogleURL(q, n) {
+  const k = _estGoogleKey()
+  return `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=${n}${k ? `&key=${encodeURIComponent(k)}` : ''}`
+}
+// Por que o Google não respondeu — a tela precisa saber a diferença entre
+// "cota estourada" (espere ou ponha chave) e "chave recusada" (a chave está
+// errada, ou a Books API não está ligada no projeto).
+let _estGoogleMotivo = ''
+function estGoogleMotivo() { return _estGoogleMotivo }
+
 // Consulta montada para o caso real: mangá busca pela SÉRIE + volume (o título
 // do arquivo, "One Piece v12", não existe em catálogo nenhum).
 function _estConsultaDe(l) {
@@ -1151,69 +1179,399 @@ function _estParecido(a, b) {
   return A.filter(w => B.has(w)).length / A.length
 }
 
-// Uma busca, as duas fontes, o melhor candidato. Devolve `null` quando nada
-// serve — o silêncio aqui é resposta, não falha.
-async function estMetaBuscar(l) {
-  const q = _estConsultaDe(l)
-  if (!q) return []
-  const saida = []
-  try {
-    if (!_estGooglePodeTentar()) throw new Error('cota')
-    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=5`)
-    if (r.status === 429) _estGoogleCaiu()
-    else {
-      const j = await r.json()
-      for (const it of (j.items || [])) {
-        const v = it.volumeInfo || {}
-        const img = (v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail)) || ''
-        saida.push({
-          fonte: 'Google Books', title: v.title || '', author: (v.authors || []).join(', '),
-          editora: v.publisher || '', ano: (v.publishedDate || '').slice(0, 4),
-          isbn: ((v.industryIdentifiers || []).find(x => /ISBN_13|ISBN_10/.test(x.type)) || {}).identifier || '',
-          paginas: v.pageCount || '', genero: (v.categories || [])[0] || '',
-          resumo: (v.description || '').slice(0, 1200), capa: img.replace(/^http:/, 'https:')
-        })
-      }
+// ================================================================
+// AS FONTES — três, com a mesma forma de saída
+// ================================================================
+// Cada uma devolve objetos idênticos; quem chama não sabe (nem precisa saber)
+// de onde veio. A diferença aparece só no rótulo que a tela mostra.
+
+async function _estFonteGoogle(q, n) {
+  if (!_estGooglePodeTentar()) return []
+  const r = await fetch(_estGoogleURL(q, n))
+  // 429 é cota; 403 costuma ser chave recusada ou Books API desligada no
+  // projeto. Os dois tiram o Google da roda por meia hora, mas dizem coisas
+  // diferentes ao usuário — misturá-los mandaria ele esperar por um erro que
+  // só se resolve mexendo na chave.
+  if (r.status === 429) { _estGoogleCaiu(); _estGoogleMotivo = 'cota'; return [] }
+  if (r.status === 403 || r.status === 400) { _estGoogleCaiu(); _estGoogleMotivo = _estGoogleKey() ? 'chave' : 'cota'; return [] }
+  const j = await r.json()
+  _estGoogleMotivo = ''
+  return (j.items || []).map(it => {
+    const v = it.volumeInfo || {}
+    const img = (v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail)) || ''
+    return {
+      fonte: 'Google Books', title: v.title || '', author: (v.authors || []).join(', '),
+      editora: v.publisher || '', ano: (v.publishedDate || '').slice(0, 4),
+      isbn: ((v.industryIdentifiers || []).find(x => /ISBN_13|ISBN_10/.test(x.type)) || {}).identifier || '',
+      paginas: v.pageCount || '', genero: (v.categories || [])[0] || '',
+      resumo: (v.description || '').slice(0, 1200), lang: v.language || '',
+      capa: img.replace(/^http:/, 'https:')
     }
-  } catch (e) {}
-  if (!saida.length) {
-    try {
-      const campos = 'key,title,author_name,first_publish_year,number_of_pages_median,cover_i,publisher,isbn,subject'
-      const r2 = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=5&fields=${campos}`)
-      const j2 = await r2.json()
-      for (const d of (j2.docs || [])) {
-        saida.push({
-          fonte: 'Open Library', key: d.key || '', title: d.title || '',
-          author: (d.author_name || []).join(', '), editora: (d.publisher || [])[0] || '',
-          ano: d.first_publish_year || '', isbn: (d.isbn || [])[0] || '',
-          paginas: d.number_of_pages_median || '', genero: (d.subject || [])[0] || '', resumo: '',
-          capa: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : ''
-        })
-      }
-    } catch (e) {}
+  })
+}
+
+async function _estFonteOpenLibrary(q, n) {
+  const campos = 'key,title,author_name,first_publish_year,number_of_pages_median,cover_i,publisher,isbn,subject,language'
+  const r = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=${n}&fields=${campos}`)
+  const j = await r.json()
+  return (j.docs || []).map(d => ({
+    fonte: 'Open Library', key: d.key || '', title: d.title || '',
+    author: (d.author_name || []).join(', '), editora: (d.publisher || [])[0] || '',
+    ano: d.first_publish_year || '', isbn: (d.isbn || [])[0] || '',
+    paginas: d.number_of_pages_median || '', genero: (d.subject || [])[0] || '', resumo: '',
+    lang: ((d.language || [])[0] || '').slice(0, 2),
+    capa: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : ''
+  }))
+}
+
+// ⚠️ AUDIOLIVRO NÃO É LIVRO, E O CATÁLOGO ERRADO ERA A CAUSA DA SUJEIRA LÁ.
+// Google Books e Open Library catalogam a EDIÇÃO IMPRESSA; audiolivro entra lá
+// por acaso, quando entra. Medido em 2026-08-22 com "Billy Summers": a Open
+// Library devolveu 1 resultado útil em 6 e 4 sem capa nenhuma; a busca da
+// Apple devolveu 5 de 5 do livro certo, todas com capa. O ruído dela é "qual
+// edição", que é um problema pequeno; o da outra era "qual livro".
+// Grátis, sem chave, e a capa vem em 600px trocando o pedaço da URL.
+async function _estFonteApple(q, n) {
+  const r = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=audiobook&limit=${n}`)
+  const j = await r.json()
+  return (j.results || []).map(d => {
+    const nome = String(d.collectionName || '')
+    return {
+      fonte: 'Apple', title: nome.replace(/\s*\((?:Un)?[Aa]bridged\)\s*$/i, '').trim(),
+      author: d.artistName || '', editora: '', ano: String(d.releaseDate || '').slice(0, 4),
+      isbn: '', paginas: '', genero: d.primaryGenreName || '',
+      // A sinopse da Apple vem com HTML dentro; texto puro é o que o app usa.
+      resumo: String(d.description || '').replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 1200),
+      lang: '', resumida: /\(Abridged\)/i.test(nome),
+      capa: String(d.artworkUrl100 || '').replace('100x100', '600x600')
+    }
+  })
+}
+
+// ⚠️ A MESMA OBRA REPETIDA É A SUJEIRA QUE ELE VIU, E O CULPADO NÃO É SÓ A
+// MISTURA DE FONTES. Medido em 2026-08-22 com "Billy Summers" no catálogo de
+// audiolivros: **sete** das oito linhas eram o mesmo livro do Stephen King —
+// edições diferentes, datas diferentes, capa igual, indistinguíveis na tela.
+// Deduplicar por título+ano não pegaria nenhuma delas, porque o ano é
+// justamente o que muda de uma edição para outra.
+// A chave certa é a OBRA: título + autor. E autor vazio conta como igual —
+// ficha órfã ("Billy Summers", sem autor) é a mesma obra com dado faltando,
+// não outro livro.
+// Roda DEPOIS do ranking: quem sobrevive é sempre a melhor versão da obra.
+function _estChaveObra(r) {
+  return String(r.title || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+function _estAutorChave(r) {
+  return String(r.author || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+function _estDedup(lista) {
+  const saida = []
+  for (const r of lista) {
+    const t = _estChaveObra(r), a = _estAutorChave(r)
+    const jaTem = saida.some(o => _estChaveObra(o) === t &&
+      (!a || !_estAutorChave(o) || _estAutorChave(o) === a))
+    if (!jaTem) saida.push(r)
   }
-  // ⚠️ O NÚMERO DO VOLUME DESEMPATA, E PESA MAIS QUE O TÍTULO. Medido: para o
-  // volume 2 de One Piece, os três primeiros resultados vieram com semelhança
-  // 1,00 — "ONE PIECE 1", "ONE PIECE 2" e "ONE PIECE 13" — e o primeiro da
-  // fila era o volume ERRADO. Numa série, gravar ano, páginas e capa de outro
-  // volume é pior que não gravar nada, porque parece certo.
-  const alvo = (l.serie || '').trim() || _estTituloLimpo(obraNome(l.title))
-  const numAlvo = Number(l.serieNum) || 0
-  return saida.map(r => {
+  return saida
+}
+
+// ⚠️ PARASITA DE CATÁLOGO. "Summary of The Martian by Andy Weir — Conversation
+// Starters" contém TODAS as palavras da busca e por isso ganhava de "The
+// Martian" na ordenação. Livro sobre o livro não é o livro.
+// A lista cresceu em 2026-08-22 com o que o teste real trouxe: "Review of
+// Billy Summers" e "Summary and Final Trailer of Billy Summers" passavam pela
+// versão antiga — três dos seis resultados de "Project Hail Mary" eram assim.
+const EST_PARASITA = /\b(summary|summaries|study guide|conversation starters|analysis|workbook|quiz|companion|unofficial|cliffsnotes|sparknotes|review of|reviews of|critique|trailer of|notes on|guide to|insights on)\b/i
+// Coletânea não é parasita — é o livro certo em embalagem errada. Penalidade
+// leve: perde de "Project Hail Mary" sozinho, mas serve quando é tudo que há.
+const EST_COLETANEA = /\b(collection|omnibus|box set|boxed set|trilogy|complete series|\d+ books in \d+)\b/i
+
+// ⚠️ O NÚMERO DO VOLUME DESEMPATA, E PESA MAIS QUE O TÍTULO. Medido: para o
+// volume 2 de One Piece, os três primeiros resultados vieram com semelhança
+// 1,00 — "ONE PIECE 1", "ONE PIECE 2" e "ONE PIECE 13" — e o primeiro da fila
+// era o volume ERRADO. Numa série, gravar ano, páginas e capa de outro volume
+// é pior que não gravar nada, porque parece certo.
+//
+// ⚠️ E A FICHA COMPLETA DESEMPATA O RESTO. Medido em 2026-08-22 com as fontes
+// reais: em "Billy Summers" TRÊS resultados empatavam em semelhança 1,00 — o
+// livro do Stephen King, uma ficha órfã sem autor nem capa, e uma resenha. O
+// título não separava; a ficha, sim. Com o bônus de completude o certo subiu
+// para o primeiro lugar em 5 das 7 buscas de teste (contra nenhuma garantia
+// antes). Os 2 que sobram são de julgamento, e é neles que a IA entra.
+// ⚠️ E PALAVRA A MAIS TAMBÉM É SINAL — descoberto medindo, não pensando. A
+// semelhança olha só de um lado: quantas palavras do NOSSO título aparecem no
+// do catálogo. Por isso "Berserk of Gluttony Vol. 1" marcava 1,00 contra
+// «Berserk vol 1» (a única palavra nossa está lá) e ganhava do mangá certo.
+// O que denuncia o impostor é o que ele tem A MAIS e ninguém pediu: "of",
+// "Gluttony". Quanto mais palavras estranhas ao pedido, menor a chance de ser
+// a mesma obra — e isso derruba junto "The Hobbit (Lord of the Rings)" quando
+// se pediu só «The Hobbit».
+function _estExtra(alvo, titulo) {
+  const limpa = t => String(t || '').toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 1)
+  const A = new Set(limpa(alvo)), B = limpa(titulo)
+  if (!B.length || !A.size) return 0
+  return B.filter(w => !A.has(w)).length / B.length
+}
+
+function _estRankear(lista, alvo, numAlvo) {
+  return lista.map(r => {
     const semelhanca = _estParecido(alvo, r.title)
     const incomparavel = semelhanca === null
     const num = _estNumDeTitulo(r.title)
     const bate = numAlvo && num === numAlvo
     const briga = numAlvo && num && num !== numAlvo
-    // ⚠️ PARASITA DE CATÁLOGO. "Summary of The Martian by Andy Weir —
-    // Conversation Starters" contém TODAS as palavras da busca e por isso
-    // ganhava de "The Martian" na ordenação. Livro sobre o livro não é o
-    // livro; a penalidade empurra esses para o fim sem escondê-los.
-    const parasita = /\b(summary|summaries|study guide|conversation starters|analysis|workbook|quiz|companion|unofficial|cliffsnotes|sparknotes)\b/i.test(r.title)
+    const parasita = EST_PARASITA.test(r.title)
+    const coletanea = EST_COLETANEA.test(r.title)
+    const completude = (r.capa ? 0.25 : 0) + (r.author ? 0.15 : 0) + ((r.paginas || r.resumo) ? 0.15 : 0)
+    const extra = _estExtra(alvo, r.title)
     return { ...r, semelhanca: incomparavel ? 0 : semelhanca, incomparavel, num,
-             volumeBate: !!bate, volumeBriga: !!briga, parasita,
-             peso: (incomparavel ? 0.35 : semelhanca) + (bate ? 0.6 : 0) - (briga ? 0.9 : 0) - (parasita ? 1.2 : 0) }
+             volumeBate: !!bate, volumeBriga: !!briga, parasita, coletanea, completude, extra,
+             peso: (incomparavel ? 0.35 : semelhanca) + (bate ? 0.6 : 0) - (briga ? 0.9 : 0)
+                   - (parasita ? 1.2 : 0) - (coletanea ? 0.35 : 0) - (r.resumida ? 0.2 : 0)
+                   + completude - extra * 0.5 }
   }).sort((a, b) => b.peso - a.peso)
+}
+
+// Uma busca, as fontes que servem ao caso, o melhor candidato na frente.
+// Devolve lista vazia quando nada serve — o silêncio aqui é resposta, não
+// falha. `opts.audio` troca a ordem das fontes (Apple primeiro).
+async function estMetaBuscar(l, opts) {
+  const q = _estConsultaDe(l)
+  if (!q) return []
+  const audio = !!(opts && opts.audio)
+  const n = (opts && opts.n) || 6
+  let saida = []
+
+  if (audio) {
+    try { saida = await _estFonteApple(q, n) } catch (e) {}
+  }
+  if (!saida.length) {
+    try { saida = await _estFonteGoogle(q, n) } catch (e) {}
+  }
+  // A segunda fonte entra quando a primeira veio vazia OU rala. "Rala" é o
+  // caso real do Google com chave nova: responde, mas com dois resultados
+  // fracos — e a Open Library tem justamente o acervo antigo que falta lá.
+  if (saida.length < 3) {
+    try { saida = saida.concat(await _estFonteOpenLibrary(q, n)) } catch (e) {}
+  }
+
+  // ⚠️ QUANDO ELE DIGITA "One Piece Vol 100", O 100 É O VOLUME — e ignorá-lo
+  // custava caro. Medido: sem ler o número da consulta, o primeiro lugar era
+  // "One Piece, Vol. 9 (The 100 Million Berry Man…)", porque as palavras "vol"
+  // e "100" estavam lá, só que em papéis trocados. O livro cadastrado já traz
+  // `serieNum`; a busca livre precisa extrair do que foi digitado.
+  // Exige marca explícita (vol/v/#/volume): senão *Fahrenheit 451* viraria o
+  // volume 451 e *1984* o volume 1984.
+  let alvo = (l.serie || '').trim() || _estTituloLimpo(obraNome(l.title))
+  let numAlvo = Number(l.serieNum) || 0
+  if (!numAlvo) {
+    const m = alvo.match(/[\s\-–—:]*\b(?:v(?:ol(?:ume)?)?\.?|#)\s*0*(\d{1,3})\b\s*$/i)
+    if (m) { numAlvo = Number(m[1]); alvo = alvo.slice(0, m.index).trim() }
+  }
+  // Rankear ANTES de deduplicar: assim, das sete edições do mesmo audiolivro,
+  // quem fica é a melhor, não a primeira que a fonte cuspiu.
+  const res = _estDedup(_estRankear(saida, alvo, numAlvo))
+  // O desempate só entra quando ELE está olhando (as telas de busca). No lote
+  // automático seriam quarenta idas à IA sem ninguém para aproveitar.
+  return (opts && opts.ia) ? await _estDesempatarIA(q, res) : res
+}
+
+// ================================================================
+// O DESEMPATE PELA IA — ela ESCOLHE, nunca PREENCHE
+// ================================================================
+// ⚠️ ESTA É A FRONTEIRA, E ELA É O PONTO INTEIRO DESTA PEÇA. Deixar a IA
+// "buscar os metadados na web" parece a saída óbvia e é a pior das duas: ela
+// não tem capa (e URL de imagem inventada é o erro mais comum dela), erra
+// número de páginas e ISBN com cara de certeza, custa em toda busca e demora
+// segundos. O catálogo faz isso de graça e com dado verificável.
+// O que o catálogo NÃO faz é julgar. Medido em 2026-08-22 contra as fontes
+// reais: o ranking daqui acerta 5 das 7 buscas de teste; os 2 erros são de
+// julgamento puro — «Berserk vol 1» devolve "Berserk of Gluttony Vol. 1"
+// (título casa, número casa, livro errado) e «1984 Orwell» devolve "George
+// Orwell's 1984", que é de outro autor. Nenhuma regra de texto resolve isso.
+// Então: o catálogo busca, a IA escolhe entre o que ele trouxe.
+//
+// Três freios, porque isto gasta o dinheiro dele:
+//   1. Só dispara no EMPATE (diferença de peso < 0,35 entre os dois primeiros)
+//      ou quando o líder é fraco. Busca fácil não paga pedágio nenhum.
+//   2. Só manda TÍTULO, AUTOR e ANO — os campos ficam com o catálogo.
+//   3. Falha em silêncio: sem chave, sem crédito ou sem resposta, fica o
+//      ranking. Nada na tela espera por ela.
+function estCatalogoIALigado() { return cfg.catalogoIA !== false }
+
+function _estPrecisaDeIA(res) {
+  if (!res || res.length < 2) return false
+  const [a, b] = res
+  return (a.peso - b.peso) < 0.35 || a.peso < 0.9
+}
+
+async function _estDesempatarIA(q, res) {
+  if (!estCatalogoIALigado() || !_estPrecisaDeIA(res)) return res
+  if (typeof aiJSON !== 'function' || typeof aiChatCfg !== 'function' || !aiChatCfg().key) return res
+  const top = res.slice(0, 6)
+  const lista = top.map((r, i) =>
+    `${i + 1}. "${r.title}" — ${r.author || 'autor desconhecido'}${r.ano ? `, ${r.ano}` : ''}`).join('\n')
+  try {
+    const j = await aiJSON([
+      { role: 'system', content: 'Você casa a busca de um leitor com resultados de catálogo. Responda só JSON.' },
+      { role: 'user', content:
+`Busca: "${q}"
+
+Resultados:
+${lista}
+
+Qual desses é a OBRA que ele procura? Cuidado com dois enganos comuns: livro SOBRE o livro (resenha, resumo, guia) e obra de outro autor com título parecido. O título pode estar em outro idioma — o que vale é ser a mesma obra.
+Devolva {"escolha": <número da lista, ou 0 se nenhum servir>}` }
+    ], { maxTokens: 60, timeoutMs: 12000, retries: 0, temperature: 0 })
+    const n = Number(j && j.escolha) || 0
+    if (n >= 1 && n <= top.length) {
+      const eleito = top[n - 1]
+      if (eleito !== res[0]) {
+        eleito.escolhidoIA = true
+        return [eleito, ...res.filter(r => r !== eleito)]
+      }
+    }
+  } catch (e) { console.warn('[estante] desempate IA:', e && e.message) }
+  return res
+}
+
+// ================================================================
+// A CAPA DEIXA DE SER UM LINK
+// ================================================================
+// ⚠️ PENDÊNCIA ABERTA DESDE §8.53, e o que a travava mudou. A capa do catálogo
+// era guardada como URL: sem internet não aparece, e no dia em que o serviço
+// tirar a imagem do ar ela some. O caminho óbvio — baixar e reduzir no canvas
+// — esbarrava em CORS: imagem de outro domínio deixa o canvas "tainted" e
+// `toDataURL` falha.
+// Medido em 2026-08-22, requisição a requisição: a Open Library responde com
+// `access-control-allow-origin` refletindo a origem, a Apple responde `*`, e
+// o Google Books NÃO manda o cabeçalho. Ou seja: nas duas fontes que passaram
+// a importar dá para baixar o BINÁRIO por `fetch` — e blob baixado é arquivo
+// local, o canvas não vê "outro domínio" e a conversão passa.
+// Google continua guardando só a URL: melhor um link que funciona online do
+// que nenhuma capa.
+async function estCapaLocal(url) {
+  const u = String(url || '')
+  if (!u || u.startsWith('data:')) return ''
+  try {
+    const r = await fetch(u, { mode: 'cors' })
+    if (!r.ok) return ''
+    const blob = await r.blob()
+    if (!/^image\//.test(blob.type)) return ''
+    const obj = URL.createObjectURL(blob)
+    const img = await new Promise((res, rej) => {
+      const i = new Image()
+      i.onload = () => res(i); i.onerror = () => rej(new Error('imagem inválida'))
+      i.src = obj
+    })
+    // 180px é a mesma medida da miniatura do EPUB — e aqui ela pesa mais,
+    // porque são MUITOS livros no mesmo documento da nuvem (teto de 1 MB).
+    const L = 180
+    const cv = document.createElement('canvas')
+    cv.width = L
+    cv.height = Math.round(L * (img.height / img.width)) || Math.round(L * 1.5)
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height)
+    URL.revokeObjectURL(obj)
+    const dataUrl = cv.toDataURL('image/jpeg', 0.72)
+    // Teto mais apertado que o do EPUB (120 KB): lá é uma capa por livro
+    // importado, aqui pode ser uma por livro cadastrado.
+    return dataUrl.length > 60000 ? '' : dataUrl
+  } catch (e) { return '' }
+}
+
+// Baixa a capa de um livro que só tem link. Roda em segundo plano e salva
+// sozinho; se não der (Google, offline, imagem enorme), o link continua lá.
+async function estCapaGuardar(l) {
+  if (!l || l.cover || !l.coverUrl) return false
+  const mini = await estCapaLocal(l.coverUrl)
+  if (!mini) return false
+  l.cover = mini
+  l.updatedAt = Date.now()
+  return true
+}
+
+// Varredura de manutenção: ao abrir a estante, os livros que só têm link
+// tentam virar capa guardada. Três por vez e com respiro — isto é conveniência
+// de fundo, não pode competir com a tela por banda.
+let _estCapasRodando = false
+async function estCapasPendentes() {
+  if (_estCapasRodando) return
+  const fila = livros.filter(l => !l.cover && l.coverUrl).slice(0, 12)
+  if (!fila.length) return
+  _estCapasRodando = true
+  let n = 0
+  try {
+    for (const l of fila) {
+      if (await estCapaGuardar(l)) n++
+      await new Promise(r => setTimeout(r, 150))
+    }
+    if (n) {
+      estSalvar()
+      if (_estVista === 'estante' && typeof estanteRender === 'function') estanteRender()
+    }
+  } finally { _estCapasRodando = false }
+}
+
+// ================================================================
+// UM RESULTADO, NÃO SEIS
+// ================================================================
+// ⚠️ A LISTA CRUA ERA A SUJEIRA QUE ELE VIU. A tela mostrava os seis
+// resultados do catálogo lado a lado, do mesmo tamanho, e cabia a ele
+// descobrir qual era o livro — sendo que, medido, cinco dos seis costumam ser
+// lixo: resenha, resumo de terceiro, homônimo, ficha órfã sem autor nem capa.
+// Agora a tela responde a pergunta em vez de devolvê-la: **um** candidato em
+// tamanho de resposta ("é este?"), e os outros atrás de um clique para o caso
+// raro de errar. É a mesma informação, com a decisão já tomada.
+function estResultadosHTML(res, onclickDe, opts) {
+  const o = opts || {}
+  if (!res || !res.length) return ''
+  const [topo, ...resto] = res
+  const linha = r => [r.author || 'autor desconhecido', r.ano, r.paginas ? `${r.paginas} pág` : '', r.fonte]
+    .filter(Boolean).join(' · ')
+  const selos = r => [
+    r.escolhidoIA ? `<span class="est-selo">${ic('sparkles','ic-3xs')} escolhido pela IA</span>` : '',
+    r.volumeBate ? `<span class="est-selo">este volume</span>` : '',
+    r.volumeBriga ? `<span class="est-selo est-selo-alerta">vol. ${r.num}</span>` : '',
+    r.parasita ? `<span class="est-selo est-selo-alerta">livro sobre o livro</span>` : '',
+    r.coletanea ? `<span class="est-selo est-selo-alerta">coletânea</span>` : '',
+    r.resumida ? `<span class="est-selo est-selo-alerta">versão resumida</span>` : ''
+  ].filter(Boolean).join('')
+  const capa = r => r.capa
+    ? `<img src="${escA(r.capa)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : `<span class="est-gb-sem">${ic(o.icone || 'book','ic-sm')}</span>`
+
+  return `
+    <div class="est-res">
+      <button class="est-res-topo" onclick="${onclickDe(0)}">
+        <span class="est-res-capa">${capa(topo)}</span>
+        <span class="est-res-info">
+          <b>${esc(topo.title)}</b>
+          <i>${esc(linha(topo))}</i>
+          ${selos(topo) ? `<span class="est-res-selos">${selos(topo)}</span>` : ''}
+          ${topo.resumo ? `<span class="est-res-resumo">${esc(String(topo.resumo).slice(0, 190))}…</span>` : ''}
+        </span>
+        <span class="est-res-usar">${ic('check','ic-sm')} ${esc(o.acao || 'Usar este')}</span>
+      </button>
+      ${resto.length ? `
+      <button type="button" class="est-res-mais" onclick="estResMais(this)">
+        Não é este? Ver os outros ${resto.length}
+      </button>
+      <div class="est-gb-res est-res-outros" hidden>
+        ${resto.map((r, i) => `
+        <button class="est-gb-item" onclick="${onclickDe(i + 1)}">
+          ${capa(r)}
+          <span class="est-gb-txt"><b>${esc(r.title)}</b><i>${esc(linha(r))}</i></span>
+          ${selos(r) ? `<span class="est-res-selos">${selos(r)}</span>` : ''}
+        </button>`).join('')}
+      </div>` : ''}
+    </div>`
+}
+
+function estResMais(btn) {
+  const box = btn.nextElementSibling
+  if (box) box.hidden = false
+  btn.remove()
 }
 
 // Número solto num título de catálogo: "ONE PIECE 2", "One Piece, Vol. 12".
@@ -1349,7 +1707,7 @@ async function estMetaModal(id) {
     </div>
   </div>`
   document.body.appendChild(ov)
-  _estMetaRes = await estMetaBuscar(l)
+  _estMetaRes = await estMetaBuscar(l, { ia: true })
   _estMetaPintar(l)
 }
 
@@ -1361,24 +1719,15 @@ function _estMetaPintar(l) {
       sem o número do volume — ou preencha à mão em Editar.</p>`
     return
   }
-  box.innerHTML = `<div class="est-gb-res">${_estMetaRes.map((r, i) => `
-    <button class="est-gb-item" onclick="estMetaEscolher('${l.id}',${i})">
-      ${r.capa ? `<img src="${escA(r.capa)}" alt="" loading="lazy">` : `<span class="est-gb-sem">${ic('book','ic-sm')}</span>`}
-      <span class="est-gb-txt">
-        <b>${esc(r.title)}</b>
-        <i>${esc(r.author || 'autor desconhecido')}${r.ano ? ` · ${r.ano}` : ''}${r.paginas ? ` · ${r.paginas} pág` : ''} · ${r.fonte}</i>
-      </span>
-      ${r.volumeBate ? `<span class="est-selo">este volume</span>`
-        : r.volumeBriga ? `<span class="est-selo est-selo-alerta">vol. ${r.num}</span>`
-        : r.semelhanca >= 0.6 ? `<span class="est-selo">provável</span>` : ''}
-    </button>`).join('')}</div>`
+  box.innerHTML = estResultadosHTML(_estMetaRes, i => `estMetaEscolher('${l.id}',${i})`,
+    { acao: 'Completar com este' })
 }
 
 async function estMetaRebuscar(id) {
   const l = livroPorId(id); if (!l) return
   const termo = (document.getElementById('est-meta-termo').value || '').trim()
   const box = document.getElementById('est-meta-res'); if (box) box.innerHTML = `<p class="est-dica">Buscando…</p>`
-  _estMetaRes = await estMetaBuscar({ ...l, serie: '', serieNum: '', author: '', title: termo })
+  _estMetaRes = await estMetaBuscar({ ...l, serie: '', serieNum: '', author: '', title: termo }, { ia: true })
   _estMetaPintar(l)
 }
 
@@ -1398,6 +1747,9 @@ async function estMetaEscolher(id, i) {
   document.getElementById('est-meta')?.remove()
   toast(n ? `${n} ${n === 1 ? 'campo preenchido' : 'campos preenchidos'}` : 'Nada a preencher — já estava tudo lá', n ? 'success' : 'info')
   estanteRender()
+  // A capa vira arquivo guardado em segundo plano: a tela já apareceu com o
+  // link funcionando, e quando a cópia chegar ela se redesenha sozinha.
+  if (await estCapaGuardar(l)) { estSalvar(); estanteRender() }
 }
 
 // ================================================================
@@ -1797,75 +2149,40 @@ function _estGBResHTML() {
   // na tela é informação; pintar de vermelho faria parecer que falhou.
   const aviso = _estGBerro ? `<p class="est-dica${_estGB.length ? '' : ' est-erro'}">${esc(_estGBerro)}</p>` : ''
   if (!_estGB.length) return aviso
-  return `${aviso}<div class="est-gb-res">${_estGB.map((r, i) => `
-    <button class="est-gb-item" onclick="estGBUsar(${i})">
-      ${r.capa ? `<img src="${escA(r.capa)}" alt="" loading="lazy">` : `<span class="est-gb-sem">${ic('book','ic-sm')}</span>`}
-      <span class="est-gb-txt"><b>${esc(r.title)}</b><i>${esc(r.author || 'autor desconhecido')}${r.ano ? ` · ${r.ano}` : ''}${r.paginas ? ` · ${r.paginas} pág` : ''}</i></span>
-    </button>`).join('')}</div>`
+  return aviso + estResultadosHTML(_estGB, i => `estGBUsar(${i})`, { acao: 'Usar este' })
 }
 
-// DUAS FONTES, nesta ordem. As duas são públicas, sem chave e sem custo.
-//
-// ⚠️ O GOOGLE BOOKS FALHA COM FREQUÊNCIA E NÃO É "SEM INTERNET". Sem chave,
-// a cota é compartilhada por todo mundo que chama daquele jeito, e ela estoura
-// no meio do dia — foi exatamente o que aconteceu no primeiro teste desta
-// tela: HTTP 429, "Quota exceeded... per day". Um app que dissesse "sem
-// internet" ali estaria mentindo, e o usuário ficaria reiniciando o roteador.
-// Por isso o 429 é reconhecido pelo nome e a busca CAI SOZINHA na Open
-// Library, que não tem essa cota. A tela diz de onde vieram os dados.
+// ⚠️ ESTA TELA TINHA A PRÓPRIA BUSCA, E ERA A CRUA. O app já sabia limpar
+// catálogo — penalizar livro-sobre-o-livro, comparar título, desempatar por
+// número de volume —, só que essa inteligência morava no caminho AUTOMÁTICO
+// (o que completa o livro na importação). A tela em que ele digita o nome de
+// um livro que quer ler despejava os seis resultados como vieram.
+// Agora as duas usam o mesmo motor: mesma limpeza, mesmo ranking, mesma
+// desempatadora. Uma regra escrita duas vezes envelhece pela metade.
 async function estGBBuscar() {
   const q = (document.getElementById('est-gb-q').value || '').trim()
   if (!q) return
   _estGBerro = ''; _estGB = []
   const box = el('est-gb-res'); if (box) box.innerHTML = `<p class="est-dica">Buscando…</p>`
+  // ISBN é busca exata e merece o prefixo que o Google entende; a Open Library
+  // acha o número solto sozinha.
   const soDigitos = q.replace(/[^0-9Xx]/g, '')
   const ehIsbn = soDigitos.length === 10 || soDigitos.length === 13
+  const termo = ehIsbn ? `isbn:${soDigitos}` : q
 
-  let cota = false
   try {
-    if (!_estGooglePodeTentar()) throw new Error('cota')
-    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(ehIsbn ? `isbn:${soDigitos}` : q)}&maxResults=6`)
-    if (r.status === 429) { cota = true; _estGoogleCaiu() }
-    else {
-      const j = await r.json()
-      _estGB = (j.items || []).map(it => {
-        const v = it.volumeInfo || {}
-        const img = (v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail)) || ''
-        return {
-          fonte: 'Google Books',
-          title: v.title || '', author: (v.authors || []).join(', '),
-          editora: v.publisher || '', ano: (v.publishedDate || '').slice(0, 4),
-          isbn: ((v.industryIdentifiers || []).find(x => /ISBN_13|ISBN_10/.test(x.type)) || {}).identifier || '',
-          paginas: v.pageCount || '', genero: (v.categories || [])[0] || '',
-          resumo: (v.description || '').slice(0, 1200), lang: v.language || 'en',
-          capa: img.replace(/^http:/, 'https:')
-        }
-      })
-    }
-  } catch (e) { cota = true }
+    _estGB = await estMetaBuscar({ title: termo, author: '', serie: '', serieNum: '' }, { ia: !ehIsbn })
+  } catch (e) { _estGB = [] }
 
   if (!_estGB.length) {
-    try {
-      const campos = 'key,title,author_name,first_publish_year,number_of_pages_median,cover_i,publisher,isbn,subject,language'
-      const r2 = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(ehIsbn ? `isbn:${soDigitos}` : q)}&limit=6&fields=${campos}`)
-      const j2 = await r2.json()
-      _estGB = (j2.docs || []).map(d => ({
-        fonte: 'Open Library', key: d.key || '',
-        title: d.title || '', author: (d.author_name || []).join(', '),
-        editora: (d.publisher || [])[0] || '', ano: d.first_publish_year || '',
-        isbn: (d.isbn || [])[0] || '', paginas: d.number_of_pages_median || '',
-        genero: (d.subject || [])[0] || '', resumo: '',
-        lang: ((d.language || [])[0] || 'eng').slice(0, 2),
-        capa: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : ''
-      }))
-      if (_estGB.length && cota) _estGBerro = 'O Google Books estourou a cota do dia — estes vieram da Open Library.'
-    } catch (e) {
-      _estGBerro = cota
-        ? 'O Google Books estourou a cota do dia e a Open Library não respondeu. Preencha à mão — funciona igual.'
-        : 'Não consegui falar com as fontes de catálogo (sem internet?). Preencha à mão — funciona igual.'
-    }
+    _estGBerro = _estGoogleMotivo === 'chave'
+      ? 'A chave do Google Books foi recusada (confira em Configurações → Dados dos livros) e a Open Library não achou nada. Preencha à mão — funciona igual.'
+      : 'Não achei nada com isso. Tente o título junto com o autor.'
+  } else if (_estGoogleMotivo === 'cota' && !_estGoogleKey()) {
+    _estGBerro = 'O Google Books estourou a cota compartilhada — estes vieram da Open Library. Uma chave própria resolve (Configurações → Dados dos livros).'
+  } else if (_estGoogleMotivo === 'chave') {
+    _estGBerro = 'A chave do Google Books foi recusada — estes vieram da Open Library.'
   }
-  if (!_estGB.length && !_estGBerro) _estGBerro = 'Não achei nada com isso. Tente o título junto com o autor.'
   const b = el('est-gb-res'); if (b) b.innerHTML = _estGBResHTML()
 }
 
@@ -1921,6 +2238,10 @@ function estSalvarForm(id) {
   toast(l ? 'Livro atualizado' : `"${titulo}" entrou na estante`, 'success')
   // Cadastro à mão sem usar a busca: o catálogo completa o resto sozinho.
   if (!l) estAutoCompletar([_estId], () => { if (_estVista === 'ficha') estanteRender() })
+  // A capa que entrou como link vira arquivo guardado — em segundo plano, para
+  // a ficha abrir na hora.
+  const alvo = l || livroPorId(_estId)
+  if (alvo) estCapaGuardar(alvo).then(ok => { if (ok) { estSalvar(); estanteRender() } })
   estIr('ficha', _estId)
 }
 

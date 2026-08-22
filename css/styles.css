@@ -4970,6 +4970,44 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .est-gb-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
 .est-gb-txt b{font-size:var(--fs-sm);color:var(--text)}
 .est-gb-txt i{font-size:var(--fs-xs);color:var(--text3);font-style:normal}
+
+/* ---- UM RESULTADO, NÃO SEIS (2026-08-22) ----
+   O primeiro candidato tem tamanho de RESPOSTA; os outros ficam atrás de um
+   clique. `min-width:0` em toda coluna de texto porque `1fr`/`flex:1` crescem
+   até o min-content e estouram a tela de 375px — foi assim que a ficha vazou
+   265px em §8.53. */
+.est-res{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.est-res-topo{
+  display:flex;gap:14px;align-items:flex-start;text-align:left;cursor:pointer;width:100%;
+  background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:12px;flex-wrap:wrap;
+}
+.est-res-topo:hover{border-color:rgba(var(--primary-rgb),.5)}
+.est-res-capa{flex-shrink:0}
+.est-res-capa img{width:64px;height:94px;object-fit:cover;border-radius:var(--radius-xs);display:block}
+.est-res-capa .est-gb-sem{width:64px;height:94px}
+.est-res-info{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 180px}
+.est-res-info b{font-size:var(--fs-base);color:var(--text);line-height:1.3}
+.est-res-info i{font-size:var(--fs-xs);color:var(--text3);font-style:normal}
+.est-res-resumo{
+  font-size:var(--fs-xs);color:var(--text2);line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.est-res-selos{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.est-res-usar{
+  display:inline-flex;align-items:center;gap:6px;flex-shrink:0;align-self:center;white-space:nowrap;
+  font-size:var(--fs-xs);font-weight:600;color:rgb(var(--primary-rgb));
+  background:rgba(var(--primary-rgb),.10);border:1px solid rgba(var(--primary-rgb),.35);
+  border-radius:var(--radius-xs);padding:7px 11px;
+}
+.est-res-topo:hover .est-res-usar{background:rgba(var(--primary-rgb),.18)}
+.est-res-mais{
+  align-self:flex-start;background:none;border:none;cursor:pointer;padding:2px 0;
+  font-size:var(--fs-xs);color:var(--text3);text-decoration:underline;text-underline-offset:3px;
+}
+.est-res-mais:hover{color:var(--text2)}
+.est-res-outros .est-res-selos{margin-left:auto;flex-shrink:0}
+.est-res-outros .est-selo{white-space:nowrap}
 .est-form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .est-campo{display:flex;flex-direction:column;gap:5px}
 .est-campo>span{font-size:var(--fs-3xs);color:var(--text3);text-transform:uppercase;letter-spacing:.05em}

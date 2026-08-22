@@ -728,11 +728,27 @@
 <!-- Manutenção de Áudio --><!-- Manutenção de Áudio -->
     <div class="settings-card">
       <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Dados dos livros</h3>
-      <p class="desc">Ao importar um livro ou audiolivro, o app procura no Google Books e na Open Library o que o arquivo não trouxe — ano, editora, páginas, gênero, sinopse e a capa quando não houver. <b>Nunca substitui o que já veio no arquivo</b> e nunca troca o título.</p>
+      <p class="desc">Ao importar ou cadastrar, o app procura o que faltou — ano, editora, páginas, gênero, sinopse e capa. Livro vem do <b>Google Books</b> e da <b>Open Library</b>; audiolivro vem do catálogo de audiolivros da <b>Apple</b>. <b>Nunca substitui o que já veio no arquivo</b> e nunca troca o título.</p>
       <label class="cfg-linha">
         <input type="checkbox" id="cfg-auto-meta" onchange="cfgAutoMeta(this.checked)">
         <span>Completar automaticamente ao importar</span>
       </label>
+      <label class="cfg-linha">
+        <input type="checkbox" id="cfg-catalogo-ia" onchange="cfgCatalogoIA(this.checked)">
+        <span>Deixar a IA escolher quando o catálogo empatar <small style="color:var(--text3)">— só no empate, e ela nunca inventa dados</small></span>
+      </label>
+      <div style="margin-top:16px">
+        <label for="cfg-gbooks-key" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Chave do Google Books (opcional, mas recomendada)</label>
+        <p class="desc" style="margin-bottom:8px">Sem chave, a busca divide uma cota com o mundo inteiro e costuma falhar — aí só resta a Open Library, que traz mais resultado repetido. A chave é a mesma família <code>AIza…</code> do Gemini: se você habilitar a <b>Books API</b> no mesmo projeto do Google Cloud, a chave que já tem serve.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input type="password" id="cfg-gbooks-key" placeholder="AIza…" onchange="cfgGoogleBooksKey(this.value)"
+                 style="flex:1;min-width:200px;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)">
+          <button class="btn btn-ghost btn-sm" onclick="togglePasswordVisibility('cfg-gbooks-key')">Ver</button>
+          <button class="btn btn-ghost btn-sm" onclick="cfgGoogleBooksDoGemini()">Usar a do Gemini</button>
+          <button class="btn btn-secondary btn-sm" onclick="cfgGoogleBooksTestar()">Testar</button>
+        </div>
+        <p id="cfg-gbooks-status" class="desc" style="margin-top:8px;min-height:18px"></p>
+      </div>
     </div>
     <div class="settings-card">
       <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>Manutenção de Áudio</h3>

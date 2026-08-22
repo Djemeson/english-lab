@@ -124,6 +124,8 @@ function fillSettings() {
   const stt = el('cfg-stt-provider'); if (stt) stt.value = cfg.sttProvider || 'auto'
   // Ligado por padrão: `cfg.autoMeta` só existe depois que ele DESLIGA.
   const am = el('cfg-auto-meta'); if (am) am.checked = cfg.autoMeta !== false
+  const cia = el('cfg-catalogo-ia'); if (cia) cia.checked = cfg.catalogoIA !== false
+  const gbk = el('cfg-gbooks-key'); if (gbk) gbk.value = cfg.googleBooksKey || ''
   setSettingsTab(_settingsTab)
   renderThemePicker()
   renderAccentPicker()
@@ -862,6 +864,66 @@ function cfgAutoMeta(ligado) {
   saveCfg()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   toast(ligado ? 'Vou completar os dados ao importar' : 'Não vou mais buscar dados sozinho', 'info')
+}
+
+// O desempate por IA (2026-08-22). Ligado por padrão, mas ele só dispara
+// quando os dois primeiros resultados do catálogo empatam — busca fácil não
+// paga pedágio nenhum.
+function cfgCatalogoIA(ligado) {
+  cfg.catalogoIA = !!ligado
+  saveCfg()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  toast(ligado ? 'A IA vai desempatar quando o catálogo empatar' : 'Só o catálogo decide agora', 'info')
+}
+
+// ⚠️ A CHAVE DO GOOGLE BOOKS NÃO É SEGREDO NO SENTIDO USUAL — ela viaja no
+// endereço da requisição e qualquer um que abra o app a vê. É assim por
+// desenho: a proteção dela não é esconder, é PRENDER AO SITE (Google Cloud →
+// Credenciais → Restrições de aplicativo → Sites). Sem restrição, ela funciona
+// igual, mas a cota é de quem a copiar.
+function cfgGoogleBooksKey(valor) {
+  cfg.googleBooksKey = String(valor || '').trim()
+  saveCfg()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  const s = el('cfg-gbooks-status')
+  if (s) s.textContent = cfg.googleBooksKey ? 'Chave guardada. Clique em Testar para confirmar.' : 'Sem chave — a busca usa a cota compartilhada.'
+}
+
+// A chave do Gemini é uma chave do Google Cloud como outra qualquer. Se a
+// Books API estiver habilitada no mesmo projeto, ela serve para as duas coisas
+// — e é um campo a menos para ele administrar.
+function cfgGoogleBooksDoGemini() {
+  const k = (cfg.geminiKey || '').trim()
+  if (!k) { toast('Você ainda não tem chave do Gemini configurada (aba IA).', 'warning'); return }
+  const campo = el('cfg-gbooks-key'); if (campo) campo.value = k
+  cfgGoogleBooksKey(k)
+  toast('Chave copiada do Gemini — clique em Testar', 'info')
+}
+
+// Testar é obrigatório aqui, não zelo: a chave pode estar certa e a Books API
+// desligada no projeto, e o sintoma disso (403) é idêntico ao de chave errada.
+// Melhor descobrir neste botão do que numa busca de livro.
+async function cfgGoogleBooksTestar() {
+  const s = el('cfg-gbooks-status')
+  const k = (el('cfg-gbooks-key')?.value || '').trim()
+  if (s) { s.style.color = 'var(--text3)'; s.textContent = 'Testando…' }
+  try {
+    const url = `https://www.googleapis.com/books/v1/volumes?q=hobbit&maxResults=1${k ? `&key=${encodeURIComponent(k)}` : ''}`
+    const r = await fetch(url)
+    const j = await r.json().catch(() => ({}))
+    const msg = (j.error && j.error.message) || ''
+    if (r.ok) {
+      if (s) { s.style.color = 'var(--success, var(--text2))'; s.textContent = k ? 'Funcionou — a busca de livros agora usa a sua cota.' : 'Funcionou, mas sem chave: hoje a cota compartilhada respondeu; amanhã pode não responder.' }
+    } else if (r.status === 429) {
+      if (s) { s.style.color = 'var(--error)'; s.textContent = k ? 'Cota do dia estourada NESTA chave.' : 'Cota compartilhada estourada — é exatamente para isso que serve a chave.' }
+    } else if (/not been used|disabled|is not enabled/i.test(msg)) {
+      if (s) { s.style.color = 'var(--error)'; s.textContent = 'A chave é válida, mas a Books API está desligada nesse projeto. Habilite "Books API" no Google Cloud e teste de novo.' }
+    } else {
+      if (s) { s.style.color = 'var(--error)'; s.textContent = `Recusada (${r.status}). ${msg.slice(0, 120)}` }
+    }
+  } catch (e) {
+    if (s) { s.style.color = 'var(--error)'; s.textContent = 'Não consegui falar com o Google (sem internet?).' }
+  }
 }
 
 function togglePasswordVisibility(id) {

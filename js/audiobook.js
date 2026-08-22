@@ -191,17 +191,24 @@ async function _abAutoMeta(a) {
       await _loadScript('js/estante.js')
     }
     if (typeof estMetaBuscar !== 'function') return
-    const res = await estMetaBuscar({ title: a.title, author: a.author, serie: '', serieNum: '' })
-    const bom = (res || []).find(r => !r.incomparavel && r.semelhanca >= 0.6)
+    // ⚠️ `audio: true` põe a APPLE na frente — ela cataloga audiolivro, e as
+    // outras duas catalogam a edição impressa. Medido: para "Billy Summers" a
+    // Open Library trazia 1 resultado útil em 6 e quatro sem capa; a Apple
+    // trouxe 5 de 5 do livro certo, todas com capa.
+    const res = await estMetaBuscar({ title: a.title, author: a.author, serie: '', serieNum: '' }, { audio: true })
+    const bom = (res || []).find(r => !r.parasita && !r.incomparavel && r.semelhanca >= 0.6)
     if (!bom) return
     let mudou = false
     if (!a.author && bom.author) { a.author = bom.author; mudou = true }
     if (!a.cover && bom.capa) {
-      // A capa vem como URL de outro domínio; guardamos a URL (o mesmo que a
-      // estante de livros faz) porque o canvas não consegue converter imagem
-      // de terceiro em miniatura sem esbarrar em CORS.
-      a.cover = bom.capa; mudou = true
+      // A capa vira arquivo guardado quando a fonte deixa (Apple e Open
+      // Library mandam o cabeçalho de CORS; o Google não). Quando não deixa,
+      // fica o link — melhor um link que funciona online do que capa nenhuma.
+      a.cover = (typeof estCapaLocal === 'function' && await estCapaLocal(bom.capa)) || bom.capa
+      mudou = true
     }
+    if (!a.resumo && bom.resumo) { a.resumo = bom.resumo; mudou = true }
+    if (!a.ano && bom.ano) { a.ano = bom.ano; mudou = true }
     if (mudou) {
       a.updatedAt = Date.now()
       saveAudiolivros()
@@ -411,8 +418,8 @@ async function abCatalogoModal() {
   ov.innerHTML = `<div class="srs-modal-box" style="width:100%;max-width:620px">
     <h4 style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px">Quero ouvir</h4>
     <p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">
-      Busque o livro pelo nome. Ele entra na estante com capa e ficha; o áudio você anexa
-      quando tiver o arquivo.</p>
+      Busque pelo nome no catálogo de audiolivros. Ele entra na estante com capa, sinopse e
+      ficha; o áudio você anexa quando tiver o arquivo.</p>
     <div class="est-gb-busca" style="margin-bottom:12px">
       ${ic('search','ic-sm')}
       <input type="text" id="ab-cat-q" placeholder="ex.: Project Hail Mary" onkeydown="if(event.key==='Enter')abCatalogoBuscar()">
@@ -441,25 +448,24 @@ async function abCatalogoBuscar() {
     if (box) box.innerHTML = `<p class="est-dica est-erro">Não consegui carregar a busca. Tente de novo.</p>`
     return
   }
-  _abCatRes = await estMetaBuscar({ title: q, author: '', serie: '', serieNum: '' })
+  // A Apple na frente, e o desempate pela IA ligado: aqui ELE está olhando.
+  _abCatRes = await estMetaBuscar({ title: q, author: '', serie: '', serieNum: '' }, { audio: true, ia: true })
   if (!box) return
   box.innerHTML = _abCatRes.length
-    ? `<div class="est-gb-res">${_abCatRes.map((r, i) => `
-        <button class="est-gb-item" onclick="abCatalogoUsar(${i})">
-          ${r.capa ? `<img src="${escA(r.capa)}" alt="" loading="lazy">` : `<span class="est-gb-sem">${ic('volume','ic-sm')}</span>`}
-          <span class="est-gb-txt"><b>${esc(r.title)}</b>
-            <i>${esc(r.author || 'autor desconhecido')}${r.ano ? ` · ${r.ano}` : ''} · ${r.fonte}</i></span>
-        </button>`).join('')}</div>`
+    ? estResultadosHTML(_abCatRes, i => `abCatalogoUsar(${i})`, { acao: 'Quero ouvir este', icone: 'volume' })
     : `<p class="est-dica est-erro">Não achei nada com isso. Tente o título com o autor.</p>`
 }
 
-function abCatalogoUsar(i) {
+async function abCatalogoUsar(i) {
   const r = _abCatRes[i]; if (!r) return
   if (audiolivros.some(a => String(a.title).toLowerCase() === String(r.title).toLowerCase())) {
     toast('Esse já está na sua estante.', 'info'); return
   }
+  // A capa da Apple vem em 600px e com CORS liberado: dá para guardar a
+  // miniatura aqui dentro em vez de depender do link para sempre.
+  const capa = (typeof estCapaLocal === 'function' && await estCapaLocal(r.capa)) || r.capa || ''
   audiolivros.push(_abNovo({
-    id: uid(), title: r.title, author: r.author || '', cover: r.capa || '',
+    id: uid(), title: r.title, author: r.author || '', cover: capa,
     ano: r.ano || '', editora: r.editora || '', resumo: r.resumo || '',
     // ⚠️ SEM ARQUIVO: `arquivos: 0` é o que a estante lê para mostrar o selo
     // "quero ouvir" e mandar o clique para o anexo em vez do reprodutor.
