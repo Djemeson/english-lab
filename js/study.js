@@ -737,13 +737,16 @@ async function undoLastCard() {
 // término natural registrava: encerrar no "X" (ou fechar a aba) jogava fora
 // tudo o que já tinha sido revisado — a barra do dia voltava a zero.
 // `dir` é +1 ao avaliar e −1 ao desfazer.
+// ⚠️ O NÚMERO DO DIA PASSOU A SER A SOMA DE PARCELAS, UMA POR APARELHO. O
+// total continua em `reviewed`/`correct`/`newSeen` — é o que o gráfico e a
+// ofensiva leem —, mas ele agora é DERIVADO de `porAparelho`. Sem isso, dois
+// aparelhos no mesmo dia não tinham saída: somar os totais inflava a cada
+// sincronização, e escolher um deles jogava fora o estudo do outro.
 function _logRevisao(dir, wasNew, acertou) {
   const today = todayStr()
   let log = srsLog.find(l => l.date === today)
   if (!log) { log = { date: today, reviewed: 0, correct: 0, newSeen: 0 }; srsLog.push(log) }
-  log.reviewed = Math.max(0, (log.reviewed || 0) + dir)
-  if (acertou) log.correct = Math.max(0, (log.correct || 0) + dir)
-  if (wasNew)  log.newSeen = Math.max(0, (log.newSeen || 0) + dir)
+  srsLogSomarNoAparelho(log, dir, wasNew, acertou)
   saveSrsLog()
 }
 

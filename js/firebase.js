@@ -712,20 +712,23 @@ async function _fbMesclarLista(ref, listaLocal, tipo, { chave = 'id', combinar =
   // (`deletedWords`), e ignorá-la faria toda palavra apagada VOLTAR da nuvem —
   // uma regressão bem pior que o problema que este merge veio consertar.
   const apagadas = (tipo === 'words' && typeof loadDeletedIds === 'function') ? loadDeletedIds() : null
+  // ⚠️ Chave DERIVADA: a fila do Kindle não guarda a sua no item — ela é
+  // calculada do texto do destaque. `_k` é o pedido para calcular na hora.
+  const kde = it => (chave === '_k' && typeof kindleChave === 'function') ? kindleChave(it) : (it && it[chave])
   const mapa = new Map()
   for (const it of nuvem) {
-    if (!it || it[chave] == null) continue
-    if (apagadas && apagadas.has(it[chave])) continue
+    if (!it || kde(it) == null || kde(it) === '') continue
+    if (apagadas && apagadas.has(kde(it))) continue
     // Removido aqui depois da última alteração dele lá: fica removido.
-    if (removidos[it[chave]] && removidos[it[chave]] >= _fbQuando(it)) continue
-    mapa.set(it[chave], it)
+    if (removidos[kde(it)] && removidos[kde(it)] >= _fbQuando(it)) continue
+    mapa.set(kde(it), it)
   }
   for (const it of local) {
-    if (!it || it[chave] == null) continue
-    const outro = mapa.get(it[chave])
-    if (!outro) { mapa.set(it[chave], it); continue }
+    if (!it || kde(it) == null || kde(it) === '') continue
+    const outro = mapa.get(kde(it))
+    if (!outro) { mapa.set(kde(it), it); continue }
     // `combinar` existe para o que NÃO se escolhe, se soma — ver o diário.
-    mapa.set(it[chave], combinar ? combinar(it, outro)
+    mapa.set(kde(it), combinar ? combinar(it, outro)
       : (_fbQuando(it) >= _fbQuando(outro) ? it : outro))
   }
   return [...mapa.values()]
@@ -747,6 +750,23 @@ async function _fbMesclarLista(ref, listaLocal, tipo, { chave = 'id', combinar =
 function _fbDiaMaior(a, b) {
   if (!b) return a
   const n = (x, y) => Math.max(Number(x) || 0, Number(y) || 0)
+  // ⚠️ COM PARCELAS, A SOMA VOLTA A SER POSSÍVEL — e correta. Cada aparelho tem
+  // a sua, cumulativa no dia; unir os dois lados é ficar com o MAIOR DE CADA
+  // parcela (o contador daquele aparelho só cresce) e refazer o total. Assim
+  // 20 no celular e 15 no computador dão 35 de verdade, e um segundo push não
+  // vira 55 — porque a parcela do celular continua sendo 20.
+  const pa = a.porAparelho, pb = b.porAparelho
+  if (pa || pb) {
+    const juntas = {}
+    for (const k of new Set([...Object.keys(pa || {}), ...Object.keys(pb || {})])) {
+      const x = (pa || {})[k] || {}, y = (pb || {})[k] || {}
+      juntas[k] = { reviewed: n(x.reviewed, y.reviewed), correct: n(x.correct, y.correct), newSeen: n(x.newSeen, y.newSeen) }
+    }
+    let rv = 0, co = 0, ns = 0
+    for (const k of Object.keys(juntas)) { rv += juntas[k].reviewed; co += juntas[k].correct; ns += juntas[k].newSeen }
+    return { ...b, ...a, date: a.date, porAparelho: juntas, reviewed: rv, correct: co, newSeen: ns }
+  }
+  // Sem parcelas dos dois lados (dias antigos): o maior, como antes.
   return { ...b, ...a,
     date: a.date,
     reviewed: n(a.reviewed, b.reviewed),
@@ -781,10 +801,13 @@ async function fbPushData() {
     // com os IDS (`marcarSumidosCards`) — barato, e o bastante para saber o
     // que sumiu entre um save e o outro.
     //
-    // ⚠️ `kindleQueue` continua FORA de propósito: é uma FILA sem `id`, feita
-    // para esvaziar. Mesclar faria a captura já processada voltar para a fila
-    // toda vez que o outro aparelho subisse uma versão antiga — o oposto do
-    // que ela serve.
+    // ⚠️ `kindleQueue` ENTROU DEPOIS, e o que faltava não era `id`: era ver que
+    // a identidade já existia espalhada em `kindleItemVisto` — um destaque é o
+    // hash do seu texto. Virou `kindleChave`.
+    //
+    // E o medo de "a captura processada volta para a fila" já tinha resposta
+    // pronta: `kindleSeen`, o histórico do que passou. Ele é o tombstone
+    // natural desta lista, e o filtro abaixo é o mesmo que a descida usa.
     const batch = _fbDb.batch()
     batch.set(base.collection('data').doc('words'),    { list: mWords,    updatedAt: Date.now() })
     batch.set(base.collection('data').doc('srsCards'), { list: mCards,    updatedAt: Date.now() })
@@ -814,7 +837,11 @@ async function fbPushData() {
     cfgPayload.imgProvider = cfg.imgProvider || 'openai'
     batch.set(base.collection('data').doc('cfg'), cfgPayload, { merge: true })
     if (kindleItems.length > 0) {
-      batch.set(base.collection('data').doc('kindleQueue'), { list: kindleItems, updatedAt: Date.now() })
+      const vistos = loadKindleSeen()
+      const mFila = (await _fbMesclarLista(D.doc('kindleQueue'), kindleItems, 'kindleQueue', { chave: '_k' }))
+        .filter(it => !kindleItemVisto(it, vistos))
+        .map(it => { const c = { ...it }; delete c._k; return c })
+      batch.set(base.collection('data').doc('kindleQueue'), { list: mFila, updatedAt: Date.now() })
     }
     // Histórico do Kindle: sem ele na nuvem, importar o vocab.db no PC e depois
     // abrir o Lab no celular traria TUDO de novo — o "só o novo entra" só vale

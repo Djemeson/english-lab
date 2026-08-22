@@ -392,6 +392,38 @@ function kindleItemKey(item) {
   if (Array.isArray(item.kids) && item.kids.length) return 'L:' + item.kids[0]
   return kindleHighlightHash(item.context || item.word)
 }
+// ================================================================
+// QUEM É ESTE APARELHO
+// ================================================================
+// ⚠️ NASCEU PARA O DIÁRIO DE ESTUDO. Ele guarda um número por dia, e dois
+// aparelhos no mesmo dia não podiam ser somados nem escolhidos: somar inflava
+// a cada sincronização (o contador local não zera depois de subir), e escolher
+// jogava fora o estudo de um dos dois. A saída é contar SEPARADO — e para isso
+// cada aparelho precisa saber quem é.
+//
+// Um número aleatório, gerado uma vez e guardado aqui. Não identifica pessoa
+// nem máquina: só distingue "este navegador" de "aquele outro".
+const SK_APARELHO = 'el-aparelho-id'
+function aparelhoId() {
+  let id = null
+  try { id = localStorage.getItem(SK_APARELHO) } catch (e) {}
+  if (!id) {
+    id = 'ap' + Math.random().toString(36).slice(2, 10)
+    try { localStorage.setItem(SK_APARELHO, id) } catch (e) {}
+  }
+  return id
+}
+
+// A identidade de um item da fila do Kindle. Já existia, espalhada em
+// `kindleItemVisto`: um destaque é o hash do seu texto, e um item com filhos é
+// o conjunto deles. Virou função própria porque agora a sincronização também
+// precisa dela — sem uma chave, a fila não podia entrar no merge.
+function kindleChave(item) {
+  if (!item) return ''
+  if (Array.isArray(item.kids) && item.kids.length) return 'L:' + item.kids.join(',')
+  return kindleHighlightHash(item.context || item.word)
+}
+
 function kindleItemVisto(item, seen) {
   if (Array.isArray(item.kids) && item.kids.length) return item.kids.some(k => seen.has('L:' + k))
   return seen.has(kindleHighlightHash(item.context || item.word))

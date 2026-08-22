@@ -90,10 +90,14 @@ function _applySessionBackup() {
       if (entry.date === today) {
         let log = srsLog.find(l => l.date === today)
         if (!log) { log = { date: today, reviewed: 0, correct: 0, newSeen: 0 }; srsLog.push(log) }
+        // ⚠️ O BACKUP É DESTE APARELHO, então entra na parcela DELE — escrever
+        // no total sobrescreveria a soma e o próximo cálculo o desfaria.
         if ((entry.reviewed || 0) > (log.reviewed || 0)) {
-          log.reviewed = entry.reviewed
-          log.correct  = entry.correct
-          log.newSeen  = entry.newSeen
+          const meu = srsLogParcela(log)
+          meu.reviewed = entry.reviewed || 0
+          meu.correct  = entry.correct  || 0
+          meu.newSeen  = entry.newSeen  || 0
+          srsLogRefazerTotais(log)
           saveSrsLog()
         }
       }
@@ -152,6 +156,51 @@ function saveSrsCards() {
 }
 function persistSrsCfg(){ localStorage.setItem(SK.srsCfg, JSON.stringify(srsCfg)) }
 function saveSrsLog()   { localStorage.setItem(SK.srsLog, JSON.stringify(srsLog)) }
+
+// ================================================================
+// O DIÁRIO CONTA POR APARELHO
+// ================================================================
+// Cada dia guarda `porAparelho: { ap1:{reviewed,correct,newSeen}, ap2:{...} }`,
+// e os campos do topo são a SOMA das parcelas. É o que permite mesclar sem
+// mentir: na sincronização, cada parcela fica com o maior valor visto daquele
+// aparelho — e o total se refaz a partir delas.
+//
+// ⚠️ O TOTAL CONTINUA NO TOPO de propósito. O gráfico, a ofensiva e o "quantos
+// novos hoje" leem `log.reviewed` direto; mudar isso obrigaria a mexer em
+// quatro telas para resolver um problema de sincronização.
+function srsLogParcela(log) {
+  const id = typeof aparelhoId === 'function' ? aparelhoId() : 'ap'
+  log.porAparelho = log.porAparelho || {}
+  // ⚠️ MIGRAÇÃO: dia que já existia sem parcelas. O total antigo vira a parcela
+  // de um aparelho fictício (`_antes`), e NÃO a deste — senão o que este
+  // aparelho estudar hoje somaria em cima de um número que talvez venha do
+  // outro, e o dia inflaria na primeira revisão.
+  if (!Object.keys(log.porAparelho).length && (log.reviewed || log.correct || log.newSeen)) {
+    log.porAparelho._antes = { reviewed: log.reviewed || 0, correct: log.correct || 0, newSeen: log.newSeen || 0 }
+  }
+  log.porAparelho[id] = log.porAparelho[id] || { reviewed: 0, correct: 0, newSeen: 0 }
+  return log.porAparelho[id]
+}
+
+function srsLogRefazerTotais(log) {
+  const p = log.porAparelho || {}
+  let rv = 0, co = 0, ns = 0
+  for (const k of Object.keys(p)) {
+    rv += Number(p[k].reviewed) || 0
+    co += Number(p[k].correct)  || 0
+    ns += Number(p[k].newSeen)  || 0
+  }
+  log.reviewed = rv; log.correct = co; log.newSeen = ns
+  return log
+}
+
+function srsLogSomarNoAparelho(log, dir, wasNew, acertou) {
+  const meu = srsLogParcela(log)
+  meu.reviewed = Math.max(0, (meu.reviewed || 0) + dir)
+  if (acertou) meu.correct = Math.max(0, (meu.correct || 0) + dir)
+  if (wasNew)  meu.newSeen = Math.max(0, (meu.newSeen || 0) + dir)
+  srsLogRefazerTotais(log)
+}
 
 // "Hoje" no horário LOCAL (Brasília) — o dia vira à meia-noite local, não às 21h (00:00 UTC).
 // Não usar toISOString (UTC): no Brasil (UTC−3) faria a contagem renovar às 21h.
