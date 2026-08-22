@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (34ª) — **A ESTANTE DE LIVROS GANHA O MESMO ESCUDO, E O SUMIÇO
+> Última atualização: 2026-08-22 (35ª) — **IMPORTAR AUDIOLIVRO GRANDE DERRUBAVA A ABA**. Print
+> dele: crash do Chrome (*"Ah, bolas!!"*, código 39) com um `.m4b` de **1,8 GB**. A importação
+> pedia **duas cópias inteiras na memória** — `arrayBuffer()` e `new Blob([buf])`, ~3,6 GB numa
+> aba — para gravar um arquivo que já estava no disco. Nenhuma era necessária: **`File` já é um
+> `Blob`** (vai direto para o banco) e **os capítulos moram no átomo `moov`**, que agora é
+> localizado lendo **16 bytes por vez**. **Medido com o `.m4b` real de 202 MB: o `moov` (2,3 MB)
+> saiu em 22 ms e a importação inteira custou 2,4 MB de memória** — antes seriam ~400 MB.
+> ⚠️ E a sentinela de §8.90 **não** acusou sumiço do Billy Summers de 924 MB: quem apagou foi o
+> app, a mando dele. `sw.js` → **englab-v384**. **Detalhes em §8.91.**
+>
+> Última atualização anterior: 2026-08-22 (34ª) — **A ESTANTE DE LIVROS GANHA O MESMO ESCUDO, E O SUMIÇO
 > DEIXA PROVA**. As duas pendências de §8.89, fechadas. O merge de livros tinha o mesmo defeito
 > do de audiolivros, com um agravante: o EPUB volta por importação, **o histórico de leitura
 > não volta nunca** — daí o segundo escudo, **livro com histórico nunca é descartado** (o de
@@ -14444,6 +14454,71 @@ limpas, registro de sumiço de teste apagado, censo batendo com o banco (15/15) 
 agora (5 de Stephen King, 3 de George R. R. Martin). Os dez têm arquivo neste aparelho — ou
 seja, os dez estavam sob a regra antiga e passaram a estar protegidos.
 
+## 8.91 Importar audiolivro grande derrubava a aba (2026-08-22, 35ª)
+
+**O relato, com print:** *"to tentando mandar um audiobook de 1,8 GB pro projeto, mas ele trava
+ou dá essa mensagem de erro"* — a tela do Chrome com *"Ah, bolas!!"* e **código de erro 39**, que
+é o processo da aba morrendo.
+
+### A conta que estourava
+
+Por arquivo importado, o caminho antigo pedia **duas** cópias inteiras na memória:
+
+| Passo | Custo com um `.m4b` de 1,8 GB |
+|---|---|
+| `await file.arrayBuffer()` | 1,8 GB |
+| `new Blob([buf])` — copia | + 1,8 GB |
+| **Total numa aba** | **~3,6 GB** |
+
+Tudo isso para gravar um arquivo **que já estava no disco**. Nenhuma das duas cópias era
+necessária.
+
+### Os dois consertos
+
+1. **`File` já é um `Blob`.** `BookDB.set(chave, file)` entrega o arquivo ao IndexedDB sem
+   passar pela memória. Vale para o `.m4b` e para cada faixa solta — uma pasta com 40 mp3
+   chegava perto do mesmo estouro pelo mesmo motivo.
+2. **Os capítulos não moram no áudio.** Um `.m4b` é uma pilha de átomos no nível de cima
+   (`ftyp`, `moov`, `mdat`, `free`): o áudio está no `mdat`, que é ~100% do arquivo, e tudo o que
+   interessa — duração, capítulos, título, autor e capa — está no `moov`.
+   **`_abMoovDoArquivo`** pula de caixa em caixa lendo **16 bytes por vez** com `file.slice()` e
+   baixa só o `moov`.
+   - ⚠️ A varredura vai até o fim do arquivo, porque quem não fez *faststart* tem o `moov` lá
+     atrás.
+   - Teto de 200 MB para o `moov`: acima disso é coisa errada, e o livro entra sem capítulos.
+   - **O parser não mudou uma linha.** A fatia começa no cabeçalho do `moov`, então ele encontra
+     o átomo como se estivesse na raiz de um arquivo.
+
+Sem `moov` legível o livro entra como capítulo único — ouve-se igual e a posição continua sendo
+guardada. E a subida para a nuvem **já era** por blocos (`r.put(blob)` do SDK), então nunca teve
+esse problema.
+
+### Testado ao vivo (regra nº 5)
+
+Com o `.m4b` real do acervo dele (**Carrie, 202 MB**), sem baixar nada:
+
+| Medida | Resultado |
+|---|---|
+| Achou o `moov`? | sim — **2,3 MB**, lidos em **22 ms** |
+| Memória durante a leitura | **0 MB** de variação |
+| Leu o quê? | 60 capítulos, título, autor, 7,4 h e a capa |
+| **Importação completa** | **4,6 s**, e a memória subiu **2,4 MB** — o tamanho do `moov` |
+
+Antes, o mesmo arquivo custaria ~400 MB de memória. Extrapolando para o livro de 1,8 GB dele: o
+custo passa a ser o `moov`, não o livro.
+
+Item de teste removido em seguida; acervo restaurado (4 audiolivros, 271 MB em uso), censo
+batendo com o banco (13/13), console limpo.
+
+### O que o mesmo diagnóstico revelou de passagem
+
+- **O Billy Summers de 924 MB não está mais no aparelho** — ele o removeu ao tentar a
+  reimportação. ⚠️ E a **sentinela de §8.90 não registrou sumiço nenhum**, que é a resposta
+  certa: quem apagou foi o app, a mando dele, e não o navegador. Primeira vez que a sentinela
+  serviu para *inocentar* uma causa.
+- **Cabe:** o aparelho tem 10 GB livres de cota e a proteção está ligada. A regra do Storage
+  aceita até **2 GB** por arquivo, então 1,8 GB passa — por pouco.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -14452,6 +14527,18 @@ seja, os dez estavam sob a regra antiga e passaram a estar protegidos.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada do arquivo grande (§8.91, 2026-08-22)
+
+- [ ] **O TESTE DE 1,8 GB É DELE** — aqui o maior arquivo real tem 202 MB, e nele a importação
+      passou a custar 2,4 MB de memória. A extrapolação é direta (o custo virou o tamanho do
+      `moov`), mas quem fecha a conta é o arquivo dele.
+- [ ] **A REGRA DO STORAGE ACEITA ATÉ 2 GB** e o arquivo tem 1,8 GB — passa por pouco. Um
+      audiolivro de 2,5 GB seria recusado pelo servidor, com a mensagem certa vindo de
+      `abNuvemPorQueNaoVeio`.
+- [ ] **EPUB E CBZ AINDA LEEM O ARQUIVO INTEIRO** (`_lerMetaDoArquivo`). Ali é preciso — o parser
+      abre o zip todo —, e um EPUB tem 4 MB. **Mangá é o risco**: um `.cbz` de 300 MB paga o
+      dobro na memória. Não aconteceu ainda; se acontecer, o caminho é o mesmo desta rodada.
 
 ### Da rodada do audiolivro descartável (§8.89, 2026-08-22)
 
