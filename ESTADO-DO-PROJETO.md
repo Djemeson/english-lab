@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (36ª) — **O TEXTO DO AUTOR E A VOZ DO NARRADOR, NO MESMO
+> Última atualização: 2026-08-22 (37ª) — **OS TRÊS ERROS DE DESENHO DA SINCRONIA**. Ele usou e
+> disse: *"ficou muito esquisito"* — e os três pontos estavam certos. (1) **O texto tinha de vir
+> para o reprodutor**, não mandá-lo para outra tela: as frases do livro passam a entrar no mesmo
+> formato das falas transcritas, e todo o mecanismo que já existia (acender, centralizar, tela
+> cheia, capturar) funciona sem uma linha nova. (2) **Dois áudios tocavam** — o `<audio>` próprio
+> saiu; o leitor pilota o mesmo `#ab-audio` do reprodutor. (3) ⚠️ **E a causa de tudo: os
+> instantes estavam na régua errada** — a transcrição conta a partir do capítulo, o arquivo conta
+> do começo, e o *Prologue* dele começa aos **16 s**; num capítulo adiantado o erro seria de
+> **horas**. **Testado no site publicado:** 412 frases do autor no reprodutor com *"Ser Waymar"*
+> (e sem *"Sir"*), realce acompanhando o relógio nos dois lados, clique numa frase pulando para o
+> instante exato, **um áudio só**. `sw.js` → **englab-v388**. **Detalhes em §8.93.**
+>
+> Última atualização anterior: 2026-08-22 (36ª) — **O TEXTO DO AUTOR E A VOZ DO NARRADOR, NO MESMO
 > INSTANTE**. Ele pôs o EPUB de *A Game of Thrones* ao lado do audiolivro e mandou fazer as três
 > coisas do estudo. Nasceu **`js/sinc.js`**: casa o capítulo por trigramas (**88,7% contra
 > 2,5%** no caso real), casa palavra a palavra por 5-gramas únicos (**3.168 âncoras em 37 ms**) e
@@ -14627,6 +14639,62 @@ do arquivo: **o Carrie de 202 MB, que ele já ouve normalmente, também não car
 condição**. O `play()` por script ainda esbarra na política de autoplay, que o clique dele
 resolve. Falta o olho dele nessa parte.
 
+## 8.93 Os três erros de desenho da sincronia, corrigidos pelo que ele viu (2026-08-22, 37ª)
+
+**O relato:** *"ficou muito esquisito. Ao ir no audiobook eu dou play e aperto o botão de
+acompanhar com texto e isso faz carregar o livro, quando o que eu queria era que o texto do
+livro viesse pra cá. lá não acendeu a frase que estava sendo falada. Lá eu vi o botão de ligar o
+áudio no livro e ao clicar um segundo áudio do mesmo audiobook começou a rodar."*
+
+Os três pontos estavam certos, e um deles era a causa de todo o resto.
+
+### 1. O texto tinha de vir para o reprodutor, não o contrário
+
+Mandá-lo para outra seção respondia a pergunta errada: **quem está ouvindo quer o texto onde
+está ouvindo**. `sincFalasDoLivro` devolve as frases do livro no **mesmo formato das falas
+transcritas** (`{i, f, t}` em segundos relativos ao capítulo) — e com isso a aba *Texto* passa a
+mostrar o autor sem que nada mais mude: acender a frase, centralizar a rolagem, tela cheia,
+seleção que traduz e captura **já sabiam trabalhar com esse formato**. Um selo *"texto do autor"*
+diz de onde veio o que está na tela. Abrir no leitor virou um botão à parte, para quem quiser.
+
+### 2. Dois áudios tocando
+
+Eu criei um `<audio>` próprio "para não amarrar duas telas" — argumento correto sobre o **código**
+e errado sobre o **usuário**: para quem ouve existe uma narração só. Agora o leitor pilota o
+mesmo `#ab-audio` do reprodutor, pelo caminho normal dele (`abAbrir` + `_abCarregarCapitulo`).
+Sair do leitor e ir ao reprodutor é a mesma escuta, no mesmo ponto.
+
+### 3. ⚠️ OS INSTANTES ESTAVAM NA RÉGUA ERRADA — a causa da estranheza toda
+
+A transcrição guarda o tempo **relativo ao capítulo** (começa em 0); o `<audio>` toca o
+**arquivo inteiro**, onde o mesmo capítulo começa em `cap.ini`. Medido no acervo dele: o
+*Prologue* começa aos **16 s** do arquivo. Eu mandava o tempo relativo direto para o
+`currentTime` — e num capítulo adiantado do livro de 33,8 h o erro seria de **horas**, não de
+segundos. `_sincParaAudio` / `_sincDoAudio` fazem a conversão nos dois sentidos.
+
+### Testado ao vivo, no site publicado (regra nº 5)
+
+Com o par real (*A Game of Thrones*, EPUB × áudio de 1,8 GB):
+
+| O que | Resultado |
+|---|---|
+| Texto do autor no reprodutor | **412 frases**, selo *"texto do autor"*, cabeçalho *"0:00 – 24:51"* |
+| A grafia do autor sobreviveu | **"Gared"** e **"Ser Waymar"** presentes; **"Sir Waymar"** ausente |
+| Acompanhar (5 instantes) | 18 s → *"**Ser** Waymar Royce asked…"*; 1150 s → *"There was a faint blue shimmer…"* |
+| A conversão de régua | relógio em 92 s (arquivo) → frase de **1:16** (capítulo) acesa |
+| Áudios na página | **um só**, `ab-audio` — o paralelo não existe mais |
+| Realce no leitor | acompanha o mesmo relógio, com o texto do autor |
+| Clicar numa frase | pulou de 1166 s para **191 s**, exatamente o esperado |
+| Sair do modo | barra some, realce limpo, áudio pausado, nada órfão |
+
+Console limpo.
+
+⚠️ **O que ainda não deu para verificar aqui: o som saindo.** `readyState` fica em 0 e o áudio
+não carrega — pela **terceira** medição seguida, com controle: o *Carrie* de 202 MB, que ele ouve
+normalmente, também não carrega nessa condição. É o Chrome adiando mídia em **aba oculta**, e a
+aba de automação está sempre oculta. Tudo o que depende do relógio foi verificado movendo o
+relógio à mão; o que falta é o alto-falante.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -14638,10 +14706,10 @@ resolve. Falta o olho dele nessa parte.
 
 ### Da rodada da sincronia (§8.92, 2026-08-22)
 
-- [ ] **O PLAY PRECISA DO OLHO DELE** — aba oculta não carrega mídia no Chrome (o Carrie de
-      202 MB, que ele ouve normalmente, também não carregou), e `play()` por script esbarra na
-      política de autoplay. Todo o resto foi medido; falta ver o áudio andando com a frase acesa
-      e a página virando sozinha.
+- [ ] **O SOM SAINDO PRECISA DO OLHO DELE** — medido tres vezes: aba oculta nao carrega midia no
+      Chrome (`readyState` fica em 0), e o controle prova que nao e o codigo — o Carrie de 202 MB,
+      que ele ouve normalmente, tambem nao carrega assim. Tudo o que depende do relogio foi
+      verificado movendo o relogio a mao; falta o alto-falante.
 - [ ] **SÓ 1 DOS 75 CAPÍTULOS ESTÁ TRANSCRITO** — a sincronia funciona capítulo a capítulo, e o
       modo oferece transcrever quando falta. O livro inteiro pela Groq: **R$ 6,95**.
 - [ ] **CAPÍTULO SEM CASAMENTO PRÉVIO USA PALPITE POR ORDEM** (`sincPalpiteCapAudio`), com
