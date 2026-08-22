@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (27ª) — **REFORÇO NO REFRESCO, E UM RISCO DE SYNC ENCONTRADO NO
+> Última atualização: 2026-08-22 (28ª) — **A SUBIDA DEIXA DE APAGAR O QUE OUTRA ABA ACABOU DE
+> FAZER**. O push mandava a **lista inteira** — quem escrevia por último vencia, e uma aba com
+> estado velho sumia com o trabalho da outra. A descida já mesclava item a item; a subida, não.
+> ⚠️ **E o conserto não só previne: recuperou.** No primeiro push depois da correção, a nuvem tinha
+> **7** transcrições e passou a ter **10** — as três perdidas voltaram, porque o aparelho ainda as
+> tinha. Mesclar trouxe um problema novo (item apagado volta de lá), resolvido com **marca de
+> remoção** posta no `save`, e **travada durante o pull**. `sw.js` → **englab-v371**.
+> **Detalhes em §8.84.**
+>
+> Última atualização anterior: 2026-08-22 (27ª) — **REFORÇO NO REFRESCO, E UM RISCO DE SYNC ENCONTRADO NO
 > CAMINHO**. Ele relatou de novo que a lista não muda ao terminar. ⚠️ **Não reproduzi:** rodei três
 > vezes no Chrome com o livro real — um capítulo, dois capítulos e de novo um —, e as três
 > atualizaram sozinhas, com a v369 servida e `_abRefrescar` presente. Como o relato é confiável, o
@@ -13865,6 +13874,62 @@ Os testes desta rodada e da anterior geraram transcrições reais no Billy Summe
 012** (as de 001 se perderam no episódio acima). Custaram centavos e são úteis — ele quer
 transcrever o livro todo —, mas são **dado criado por teste**, e ele decide se ficam.
 
+## 8.84 A subida deixa de apagar o que outra aba acabou de fazer (2026-08-22, 28ª)
+
+`batch.set(doc, { list: audiolivros })` grava a **lista inteira**. Quem escreve por último vence, e
+uma aba com estado carregado antes some com o que a outra tinha acabado de gravar. ⚠️ **Não é
+hipótese: aconteceu** — uma transcrição recém-feita sumiu do aparelho e da nuvem (§8.83).
+
+A **descida** já mesclava item a item desde sempre. A **subida**, não.
+
+### `_fbMesclarLista`: ler antes de escrever
+
+Lê o que está na nuvem, combina por `id` e mantém o mais recente de cada lado.
+
+- A hora vem com nome e formato variados (`updatedAt` número, `updated_at` ISO, `addedAt`), então
+  a leitura é tolerante. **Sem hora dos dois lados vence o local** — quem está subindo acabou de
+  mexer.
+- ⚠️ **Se a leitura da nuvem falhar, sobe o local** (o comportamento antigo), em vez de arriscar
+  gravar uma lista pela metade.
+- As leituras acontecem **antes** do batch: batch é escrita pura, ler dentro dele não existe.
+
+### ⚠️ Mesclar cria um problema novo: o item apagado volta
+
+Para o merge, item removido aqui é só "um item que o outro lado tem". A **marca de remoção**
+(`marcarRemovido`/`removidosDe`) separa *"não tenho"* de *"apaguei"*, e guarda **quando** — para
+que uma edição **posterior** à remoção ainda possa vencer.
+
+⚠️ **A marca é posta no `save`, não em cada exclusão.** Há dez lugares que tiram item dessas listas
+(remover audiolivro, apagar livro, faxina de demos, cards órfãos…), e instrumentar os dez seria
+garantir que o décimo primeiro nasça sem a marca. Todos passam por
+`saveAudiolivros`/`saveLivros`/`saveVideos`/`saveClips`.
+
+⚠️ **E nunca durante um pull.** Ali as listas são **substituídas** pelo resultado do merge, e um
+item local que não sobreviveu não foi "removido por ele" — marcar ali o apagaria para sempre, do
+jeito mais silencioso possível. `applyCloudDocs` liga `fbAplicandoNuvem` enquanto escreve.
+
+### Dois riscos vistos antes de publicar
+
+| Lista | O que ia acontecer | Decisão |
+|---|---|---|
+| `words` | já tinha tombstone próprio (`deletedWords`); ignorá-lo faria **toda palavra apagada voltar** | o merge passou a respeitá-lo |
+| `srsCards` | moram no **IndexedDB**, e a marca de remoção compara com o localStorage — não os alcança | **ficaram de fora**; mesclar sem a marca trocaria um problema raro por um constante |
+
+### Medido
+
+**Fora do navegador, 7/7** nos casos que importam: o caso que apagou o dado (aba velha sobe e a
+versão nova **sobrevive**), item só na nuvem não some, item removido não volta, removido-e-editado
+volta, datas ISO comparam com as numéricas, sem data vence o local.
+
+**No Firestore real** (documento de teste, criado e apagado): a versão nova sobreviveu à subida da
+aba velha; o item só-da-nuvem ficou; o item marcado como removido saiu.
+
+**No push de verdade, com o acervo dele:** `words` 104 → 104, `livros` 2 → 2, `audiolivros` 2 → 2 —
+**e as transcrições do Billy Summers foram de 7 para 10**. A nuvem estava atrás; o merge trouxe de
+volta as três que o episódio anterior tinha apagado, porque o aparelho ainda as tinha.
+
+Conferido no fim: nenhuma marca de remoção residual, nenhum documento de teste na nuvem.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13874,12 +13939,21 @@ transcrever o livro todo —, mas são **dado criado por teste**, e ele decide s
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do merge na subida (§8.84, 2026-08-22)
+
+- [ ] **`srsCards` continua sobrescrevendo.** Para entrar no merge, a marca de remoção precisa
+      alcançar o IndexedDB — o caminho é `saveSrsCards` comparar com o que o `CardsDB` tinha antes,
+      ou os cards ganharem um campo `removidoEm` em vez de sumirem.
+- [ ] **`conversas`, `podShows`, `kindleQueue` e `srsLog`** também sobem inteiros. O dano ali é
+      menor (são listas que crescem), mas a regra devia ser a mesma.
+- [ ] **A marca de remoção nunca é limpa.** Cresce um id por item apagado, para sempre. Some com o
+      tempo se apagar as mais velhas que uns 90 dias — não urgente, mas fica.
+
 ### Da rodada do reforço (§8.83, 2026-08-22)
 
-- [ ] **O PUSH SOBRESCREVE A LISTA INTEIRA — e isso já apagou dado.** Uma aba com estado velho
-      manda `{list: audiolivros}` por cima do que outra acabou de gravar. O conserto é mesclar por
-      item na SUBIDA (como já é feito na descida), ou marcar cada item com a hora da última
-      alteração e não deixar o antigo vencer. Vale para `audiolivros`, `livros`, `videos`.
+- [x] ~~**O PUSH SOBRESCREVE A LISTA INTEIRA**~~ — **feito em 2026-08-22** (§8.84): a subida
+      mescla item a item em `words`, `livros`, `audiolivros`, `videos` e `clips`, com marca de
+      remoção. E o primeiro push recuperou 3 transcrições que já tinham sido perdidas.
 - [ ] **1,2 s de espera antes de subir**: recarregar logo depois de uma transcrição pode perdê-la
       antes que chegue à nuvem. Trabalho pago devia subir na hora, sem espera.
 - [ ] **Ele precisa confirmar o refresco** com a v370. Se ainda falhar, o próximo passo é registrar
