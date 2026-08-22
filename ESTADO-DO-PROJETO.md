@@ -7,7 +7,15 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (24ª) — **A LISTA MOSTRA O QUE JÁ TEM TEXTO, E DÁ PARA MARCAR
+> Última atualização: 2026-08-22 (25ª) — **A MARCA DISTINGUE TRANSCRITO DE ANALISADO**, e o
+> ícone volta a ter um sentido só. ⚠️ O defeito era maior que o pedido: **o mesmo ✦ queria dizer
+> duas coisas** — "tem texto" no painel de Transcrição, "está analisado" no do raio-X. Dois painéis
+> irmãos, mesmo símbolo, sentidos opostos. Agora o vocabulário é um só em toda a seção:
+> **legenda = texto, brilho = análise**. Um ícone por linha (o brilho já implica a legenda), com a
+> diferença no **peso**: transcrito é estado de passagem e fica discreto; analisado é o fim da
+> linha e brilha. `sw.js` → **englab-v368**. **Detalhes em §8.81.**
+>
+> Última atualização anterior: 2026-08-22 (24ª) — **A LISTA MOSTRA O QUE JÁ TEM TEXTO, E DÁ PARA MARCAR
 > VÁRIOS**. Dois pedidos: *"quero que aqui já apareça o simbolozinho dos capítulos que foram
 > gerados a transcrição. E quero que dê pra marcar várias pra gerar mais de uma."* A primeira era
 > uma pergunta simples — *"já transcrevi este?"* — que custava dois cliques e outra tela. A segunda
@@ -13697,6 +13705,57 @@ A caixa vazia só aparece no **hover**: 200 quadradinhos vazios seriam ruído nu
 `abTranscreverTudo` — quem chamava não conseguia esperar o aviso de custo, e o teste lia a tela
 antes de o modal existir.
 
+## 8.81 Um ícone, um sentido (2026-08-22, 25ª)
+
+Ele pediu para resolver a pendência que eu mesmo tinha registrado: *"a marca não distingue
+transcrito de transcrito e analisado."*
+
+### ⚠️ E o defeito era maior que o pedido
+
+O mesmo ícone queria dizer **duas coisas**:
+
+| Onde | O que ✦ significava |
+|---|---|
+| Painel de Transcrição | "tem texto" |
+| Painel do raio-X | "está analisado" |
+
+Dois painéis irmãos, mesmo símbolo, sentidos opostos — e na **lista de capítulos**, onde os dois
+estados convivem, isso vira uma marca que não responde nada.
+
+### O vocabulário, agora um só
+
+```
+legenda (captions) → tem TEXTO
+brilho  (sparkles) → tem ANÁLISE (e texto, que a análise exige)
+```
+
+**Um ícone por linha, e não dois:** o brilho já implica a legenda, e duas marcas numa coluna de
+34px viram sujeira antes de virar informação.
+
+⚠️ **A diferença fica no peso.** Transcrito é um estado de **passagem** — o texto existe, falta a
+análise —, então fica discreto (`--text3`); analisado é o fim da linha e brilha (`--role-ia`). Com
+os dois no mesmo peso, o olho não saberia onde ainda há trabalho.
+
+E a linha passou a dizer o que tem: **"71 achados · 10:59"** quando analisado, **"53 falas ·
+3:29"** quando só transcrito.
+
+Alinhados também os três lugares que falavam de **transcrição** com o símbolo de **análise**: a
+tela de capítulo vazio, o botão "Transcrever o capítulo" e a dica dos marcadores.
+
+### Medido — no Chrome, com o livro dele
+
+Os três estados reais do Billy Summers, lado a lado na lista:
+
+| Linha | Marca | Cor | Texto |
+|---|---|---|---|
+| 003 | legenda | cinza (`rgba(255,255,255,.5)`) | *53 falas · 3:29* |
+| 004 | brilho | roxo (`rgb(155,107,232)`) | *71 achados · 10:59* |
+| 005 | legenda | cinza | *11 falas · 1:15* |
+| 002 e 006+ | nenhuma | — | só a duração |
+
+E as dicas: *"Transcrito — falta a análise"* contra *"Transcrito e analisado — 71 achados"*.
+Conferido também que nada ficou no acervo dele.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13710,8 +13769,8 @@ antes de o modal existir.
 
 - [ ] **Não há "marcar um intervalo"** (clicar no 10 e no 25 com Shift). Com 200 capítulos, marcar
       de um em um cansa — mas "marcar os que faltam" cobre o caso mais comum.
-- [ ] **A marca não distingue transcrito de transcrito E analisado.** O painel do raio-X mostra
-      isso; a lista, não. Se fizer falta, é um segundo ícone.
+- [x] ~~**A marca não distingue transcrito de transcrito E analisado**~~ — **feito em 2026-08-22**
+      (§8.81), e de quebra o ✦ deixou de ter dois sentidos entre os painéis.
 
 ### Da rodada do 429 (§8.79, 2026-08-22)
 
