@@ -1217,6 +1217,16 @@ async function _estFonteGoogle(q, n) {
   })
 }
 
+// A Open Library usa código de três letras (`eng`, `fre`, `por`); o app usa
+// dois. E entre as edições de uma obra, a que interessa aqui é a inglesa.
+function _estIdiomaDe(lista) {
+  const L = (lista || []).map(x => String(x).toLowerCase())
+  if (L.some(x => x === 'eng' || x === 'en')) return 'en'
+  const mapa = { por: 'pt', spa: 'es', fre: 'fr', fra: 'fr', ger: 'de', deu: 'de', jpn: 'ja', ita: 'it' }
+  const p = L[0] || ''
+  return mapa[p] || p.slice(0, 2)
+}
+
 async function _estFonteOpenLibrary(q, n) {
   const campos = 'key,title,author_name,first_publish_year,number_of_pages_median,cover_i,publisher,isbn,subject,language'
   const r = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=${n}&fields=${campos}`)
@@ -1224,9 +1234,15 @@ async function _estFonteOpenLibrary(q, n) {
   return (j.docs || []).map(d => ({
     fonte: 'Open Library', key: d.key || '', title: d.title || '',
     author: (d.author_name || []).join(', '), editora: (d.publisher || [])[0] || '',
-    ano: d.first_publish_year || '', isbn: (d.isbn || [])[0] || '',
+    ano: d.first_publish_year || '',
+    // ⚠️ A OPEN LIBRARY AGRUPA TODAS AS EDIÇÕES NUM REGISTRO SÓ, e devolve as
+    // listas na ordem dela. Pego na tela: *Project Hail Mary* entrou com
+    // **idioma FR** e o ISBN da edição francesa — o primeiro item da lista.
+    // ISBN de 13 dígitos é o padrão atual; e num app de inglês, se o inglês
+    // está entre as edições, é o inglês que interessa.
+    isbn: (d.isbn || []).find(x => String(x).replace(/\D/g, '').length === 13) || (d.isbn || [])[0] || '',
     paginas: d.number_of_pages_median || '', genero: (d.subject || [])[0] || '', resumo: '',
-    lang: ((d.language || [])[0] || '').slice(0, 2),
+    lang: _estIdiomaDe(d.language),
     capa: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : ''
   }))
 }
