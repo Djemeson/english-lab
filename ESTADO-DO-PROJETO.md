@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (32ª) — **O BUSCADOR DE CATÁLOGO DEVOLVE UMA RESPOSTA, NÃO SEIS**.
+> Última atualização: 2026-08-22 (33ª) — **O AUDIOLIVRO ERA GUARDADO EM MODO DESCARTÁVEL**.
+> Relato dele: *"o audiobook não fica salvo entre sessões, toda vez fica baixando da nuvem"*.
+> Os arquivos **estavam** no aparelho (1.397 MB, incluindo um **órfão de 202 MB**) e abrir usava
+> o local — o que faltava era **proteção**: `navigator.storage.persisted()` era **false**, ou
+> seja, 1,4 GB que o navegador podia apagar quando o disco apertasse. Pedida, foi **concedida na
+> hora**. Junto vieram quatro consertos: "não achei" deixou de ser confundido com "não consegui
+> olhar" (valia 924 MB de download), o merge parou de descartar item cujo áudio está aqui, a
+> exclusão varre por prefixo e cada download passa a deixar rastro.
+> ⚠️ **Na mesma rodada, a chave do Google Books entrou e revelou outro defeito:** a busca livre
+> devolvia lixo (o livro certo **fora da lista**), consertada com `intitle:` e com a Open Library
+> passando a ser consultada sempre. `sw.js` → **englab-v382**. **Detalhes em §8.89.**
+>
+> Última atualização anterior: 2026-08-22 (32ª) — **O BUSCADOR DE CATÁLOGO DEVOLVE UMA RESPOSTA, NÃO SEIS**.
 > O buscador de "Quero ler"/"Quero ouvir" **não faltava** — estava apoiado na fonte errada e
 > mostrando o catálogo cru. Medido antes de escrever: **429 nas cinco** buscas do Google (a cota
 > sem chave é do mundo inteiro), então o app já vivia só na Open Library, a fonte mais suja; e a
@@ -14254,6 +14266,99 @@ teste em seguida — acervo de volta a 2 livros. No painel a **375px**: card de 
 descendo para a segunda linha, `scrollWidth === innerWidth`, **zero overflow**. Console limpo
 numa carga limpa.
 
+## 8.89 O audiolivro era guardado em modo descartável (2026-08-22, 33ª)
+
+**O relato:** *"o audiobook não fica salvo entre sessões no navegador. toda vez ele fica baixando
+da nuvem. analisa minuciosamente."* — e, na mesma rodada, a chave do Google Books entrou em
+operação e revelou um defeito próprio (§8.89.1, no fim).
+
+### O que o aparelho dele mostrou
+
+Diagnóstico no Chrome real, com o acervo real, antes de tocar em qualquer linha:
+
+| Pergunta | Resposta medida |
+|---|---|
+| Os arquivos estão aqui? | **Sim** — 1.397 MB em três chaves `ab:*` |
+| O que há? | Carrie 202 MB, Billy Summers **924 MB**, e um **órfão de 202 MB** |
+| Abrir usa o local? | **Sim** — Billy Summers abriu em 7 s, sem download |
+| O merge troca os ids? | **Não** — reload, pull e os ids continuam os mesmos |
+| O armazenamento é protegido? | **`navigator.storage.persisted()` = false** |
+| E se pedir? | **`persist()` → `true`, na hora** |
+
+⚠️ **A última linha é a causa raiz.** Por padrão o que um site guarda no aparelho é
+*best-effort*: o navegador tem licença para apagar tudo quando o disco aperta, e apaga primeiro
+o que é grande e não foi aberto ontem — a descrição exata de um audiolivro. **1,4 GB dele
+estavam nesse regime**, e o Chrome concedeu a proteção no primeiro pedido. Nunca foi negada:
+ninguém tinha pedido.
+
+⚠️ **E o órfão é a segunda história.** 202 MB sob `ab:mt1zwec7j56np:0`, de um audiolivro que não
+existe mais na estante — exatamente o rastro de "o item sumiu e o arquivo ficou".
+
+### Os cinco consertos
+
+1. **`garantirArmazenamentoPersistente()`** (core.js) — pedido no boot, ao importar audiolivro e
+   antes de gravar o que desceu da nuvem. Falhar aqui não quebra nada: volta ao regime antigo.
+   Vale para **tudo** que o app guarda (EPUB, vídeo, áudio de card), porque a proteção é da
+   origem, não do banco.
+2. **`BookDB.existe()`** — o `get` devolvia `null` tanto para "não tenho" quanto para "não
+   consegui abrir o banco", e no audiolivro essa confusão vale **924 MB de download**. `existe`
+   lê só a chave e **propaga o erro**; `abGarantirArquivo` passou a avisar em vez de baixar
+   quando a leitura falha.
+3. **O merge não descarta mais item cujo áudio está aqui.** A regra antiga jogava fora
+   audiolivro local ausente do snapshot e mais antigo que o carimbo — sem marca de remoção
+   nenhuma. Como o merge é síncrono e o IndexedDB não é, entrou o espelho **`el-ab-locais`**
+   (mesmo padrão do `el-srs-ids` dos cards), conferido contra o banco a cada abertura da seção.
+4. **Exclusão varre por prefixo** `ab:<id>:` em vez de contar até `arquivos` — contador zerado
+   deixava centenas de MB invisíveis. E entrou a **limpeza de órfãos**, oferecida na estante
+   quando passam de 20 MB.
+5. **`abDiagRegistrar`** — cada download deixa rastro (quando, qual parte, se estava protegido,
+   quanto havia guardado, quantas chaves existiam). Sintoma sem rastro custou uma rodada de
+   teoria; a próxima responde com fato.
+
+De quebra, o painel da nuvem ganhou a linha **"Protegido de apagar"** — é onde a resposta a esta
+pergunta passa a morar, junto de "neste aparelho" e "na sua nuvem".
+
+### A armadilha que só a tela pegou
+
+**O aviso do órfão não sobrevivia ao redesenho.** A primeira versão colava o aviso com
+`appendChild` quando a varredura terminava — e `renderAudiobookSection`, que roda o tempo todo,
+trocava o `innerHTML` e levava o aviso junto. Medido: o órfão **era encontrado** (`_abOrfaosBytes`
+= 202 MB) e a tela não mostrava nada. Agora o aviso é parte do HTML da estante, e a varredura só
+guarda o número e pede um redesenho — nunca com o player aberto.
+
+### Testado ao vivo (regra nº 5)
+
+No Chrome real: `persisted()` **false → true**; espelho sincronizado com as três chaves;
+`existe()` devolvendo `true` para o arquivo real e `false` para chave inventada; o órfão de
+**202 MB** detectado e o aviso **na tela**, com o botão de limpar; o painel da nuvem exibindo
+*"Protegido de apagar: sim"*. Console limpo.
+
+⚠️ **O que NÃO foi possível provar:** ninguém consegue reproduzir "o navegador apagou" sob
+demanda — depende de o disco encher. O que se provou é o **regime**: os dados estavam
+desprotegidos, o pedido foi aceito, e daqui em diante o navegador não pode mais apagá-los para
+liberar espaço. Se voltar a acontecer, o registro de diagnóstico dirá em que estado o aparelho
+estava.
+
+### 8.89.1 A busca livre do Google Books é ruim — e só a chave dele revelou
+
+Com a chave funcionando, o Google virou a primeira fonte e devolveu **lixo**: buscando
+«Billy Summers», os três primeiros foram *King Noir*, *Carolina Summers* e *The Descendant* — o
+livro **não aparecia na lista**. A busca livre procura o texto no miolo do livro, e nome de
+personagem aparece dentro de mil obras. `intitle:"Billy Summers"` devolve os três certos.
+
+Dois consertos, e o segundo é a regressão de verdade:
+
+- **`_estGoogleTermo`**: a consulta vai como `intitle:"…"` e cai na busca livre só se vier com
+  menos de 2 resultados — porque quem digita o nome de um **autor** não acha nada com `intitle`.
+  Prefixo de campo (`isbn:`) passa intocado.
+- **A Open Library passou a ser consultada SEMPRE** (antes: só se o Google viesse ralo). O
+  desenho antigo pressupunha que *fonte que responde* é *fonte que acertou* — e o dia em que a
+  chave começou a funcionar provou o contrário: a Open Library tinha o livro certo e nunca era
+  chamada.
+
+Depois do conserto, no app dele: **Billy Summers, Project Hail Mary, The Hobbit, Dune e One Piece
+Vol 100 — os cinco certos em primeiro lugar, todos vindos do Google Books.**
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -14263,15 +14368,28 @@ numa carga limpa.
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do audiolivro descartável (§8.89, 2026-08-22)
+
+- [ ] **O MERGE DE LIVROS TEM O MESMO DEFEITO DO DE AUDIOLIVROS** — livro local ausente do
+      snapshot e mais antigo que o carimbo é descartado sem marca de remoção. Aqui não corrigi:
+      exigiria um espelho próprio (o do audiolivro é `el-ab-locais`) e o dano é menor — o EPUB
+      tem 4 MB e volta por importação. **Mas o histórico de leitura do livro morre junto**, e
+      isso não volta. Vale a mesma proteção numa próxima rodada.
+- [ ] **A PROTEÇÃO DO ARMAZENAMENTO PRECISA SER PEDIDA EM CADA APARELHO** — ela é por navegador.
+      O celular dele só ganha proteção quando abrir o app depois desta versão. O Firefox
+      PERGUNTA ao usuário em vez de conceder sozinho; se ele usar Firefox, vai ver um pedido.
+- [ ] **NÃO DÁ PARA PROVAR QUE O NAVEGADOR APAGOU** — depende de o disco encher. Se o download
+      repetido voltar, ler `el-ab-diag` (últimos 20 downloads, com o estado do aparelho em cada
+      um) antes de teorizar.
+
 ### Da rodada do buscador de catálogo (§8.88, 2026-08-22)
 
-- [ ] **A CHAVE DO GOOGLE BOOKS DEPENDE DELE** — o campo e o teste estão prontos, a chave não.
-      Google Cloud → APIs e serviços → **Ativar API → "Books API"** → Credenciais → **Criar chave
-      de API**, e colar em Configurações → Dados dos livros → *Testar*. ⚠️ **A chave do Gemini do
-      AI Studio não serve** (401 medido). Sem ela nada quebra: a busca continua caindo na Open
-      Library, que é onde ela já vivia — só que com resultado mais pobre.
-      **Vale prender a chave ao site** (Restrições de aplicativo → Sites), porque ela fica visível
-      no app.
+- [x] ~~**A CHAVE DO GOOGLE BOOKS DEPENDE DELE**~~ — **feita em 2026-08-22**. A Books API foi
+      ativada no projeto `english-lab` (conta djemeson16), a chave criada por ele com restrição a
+      **só a Books API** e aos sites do app (Vercel, GitHub Pages, localhost), e colada em
+      Configurações. **Conferido no app:** os cinco livros de teste passaram a vir do Google Books
+      com o resultado certo em primeiro lugar. ⚠️ **A chave do Gemini do AI Studio não serve**
+      (401 medido) — só chave de projeto com a Books API habilitada.
 - [ ] **A CONTA DA OPENAI ESTÁ SEM CRÉDITO** (descoberto em 2026-08-22, testando). *"You have no
       credits remaining"*. O app hoje roda no **Gemini**, que tem crédito — mas tudo que é
       exclusivo da OpenAI fica parado, e a **busca na web do "Explicar"** é exatamente isso
