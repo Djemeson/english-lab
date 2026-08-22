@@ -2714,9 +2714,22 @@ async function _abTrRodar() {
 // capítulos com texto).
 function _abRefrescar(id) {
   if (!_abLivro || (id && _abLivro.id !== id)) return
-  if (_abAbaAtual) abAba(_abAbaAtual)
-  if (document.getElementById('ab-trans-painel')?.classList.contains('aberto')) _abTransPainelRender()
-  if (document.getElementById('ab-raiox-painel')?.classList.contains('aberto')) _abRaioXPainelRender()
+  try {
+    // ⚠️ RECONSTRÓI A SEÇÃO, E NÃO SÓ A ABA. Reproduzi o caso dele duas vezes
+    // (um capítulo e dois) e a aba sozinha bastou — mas ele viu a tela parada,
+    // e a diferença entre "quase sempre funciona" e "funciona" é o `#ab-aba`
+    // existir naquele instante: `abAba` desiste em silêncio quando ele não
+    // está lá, e uma tela que não se atualiza depois de um trabalho pago é o
+    // pior lugar para uma desistência silenciosa.
+    _abRenderPlayer()
+    if (_abAbaAtual) abAba(_abAbaAtual)
+    if (document.getElementById('ab-trans-painel')?.classList.contains('aberto')) _abTransPainelRender()
+    if (document.getElementById('ab-raiox-painel')?.classList.contains('aberto')) _abRaioXPainelRender()
+  } catch (e) {
+    // Última rede: se o desenho fino falhar, a seção inteira volta do zero.
+    console.warn('[audiobook] refresco falhou, redesenhando a seção:', e && e.message)
+    try { renderAudiobookSection() } catch (e2) {}
+  }
 }
 
 // ⚠️ "LEVA UM BOM TEMPO" NÃO ERA AVISO, ERA VAGUEZA — e o acervo real mostrou
