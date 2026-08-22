@@ -7,7 +7,15 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (28ª) — **A SUBIDA DEIXA DE APAGAR O QUE OUTRA ABA ACABOU DE
+> Última atualização: 2026-08-22 (29ª) — **AS TRÊS PENDÊNCIAS DO MERGE, FECHADAS**. `srsCards`
+> entrou (a marca de remoção alcançou o IndexedDB por um **espelho só com os ids**); `srsDecks`,
+> `conversas`, `podShows` e o **diário de estudo** entraram no merge; e a marca de remoção ganhou
+> **prazo de 90 dias**, podada ao marcar e na abertura. ⚠️ **Duas armadilhas caíram no teste:** o
+> diário, que eu escrevi para **somar**, inflava a cada push (35 → 55 → 75 → 95) e virou "fica com
+> o maior"; e uma página com `srs.js` novo + `core.js` velho **derrubaria o salvamento dos cards** —
+> as chamadas que cruzam de arquivo ganharam guarda. `sw.js` → **englab-v373**. **Detalhes em §8.85.**
+>
+> Última atualização anterior: 2026-08-22 (28ª) — **A SUBIDA DEIXA DE APAGAR O QUE OUTRA ABA ACABOU DE
 > FAZER**. O push mandava a **lista inteira** — quem escrevia por último vencia, e uma aba com
 > estado velho sumia com o trabalho da outra. A descida já mesclava item a item; a subida, não.
 > ⚠️ **E o conserto não só previne: recuperou.** No primeiro push depois da correção, a nuvem tinha
@@ -13930,6 +13938,72 @@ volta as três que o episódio anterior tinha apagado, porque o aparelho ainda a
 
 Conferido no fim: nenhuma marca de remoção residual, nenhum documento de teste na nuvem.
 
+## 8.85 As três pendências do merge, fechadas (2026-08-22, 29ª)
+
+### 1. `srsCards` entrou — por um espelho de ids
+
+Ficaram de fora em §8.84 porque moram no **IndexedDB**, e a marca de remoção compara com o
+localStorage. A saída foi barata: guardar **só os ids** num espelho de localStorage
+(`marcarSumidosCards`). São strings curtas, e é o bastante para saber o que sumiu entre um save e o
+outro.
+
+### 2. As listas que faltavam
+
+| Lista | Chave do merge |
+|---|---|
+| `srsDecks` | `id` |
+| `conversas` | `id` (tem `updated_at`) |
+| `podShows` | **`collectionId`** — podcast não tem `id` |
+| `srsLog` | **`date`**, com regra própria (abaixo) |
+
+⚠️ **`kindleQueue` continua fora de propósito.** É uma **fila** sem `id`, feita para esvaziar.
+Mesclar faria a captura já processada **voltar para a fila** toda vez que o outro aparelho subisse
+uma versão antiga — o oposto do que ela serve.
+
+### ⚠️ O diário quase virou um bug pior que o original
+
+Escrevi primeiro que ele **soma**: 20 revisados no celular + 15 no computador = 35. O teste
+derrubou na hora — **o contador local não zera depois de subir**, então cada push somava de novo:
+
+```
+push 1 → 35     push 2 → 55     push 3 → 75     push 4 → 95
+```
+
+O gráfico inflando sozinho a cada sincronização. Somar **certo** exigiria contar **por aparelho**,
+o que muda o formato do diário e o gráfico que lê dele.
+
+Ficou com **o maior**. Não é o número perfeito (perde o estudo que só o outro aparelho viu), mas
+**nunca mente para mais** — e ainda é melhor que hoje, onde o último a subir apaga o outro.
+**Medido:** estável em 20 por quatro pushes seguidos; 40 vence 20 quando o outro lado tem mais.
+
+### 3. A marca de remoção ganhou prazo
+
+Ela existe para impedir que um item apagado volte da nuvem — e essa ameaça **acaba quando o outro
+aparelho sincroniza**. Guardar para sempre era acumular um id por exclusão até o localStorage doer.
+**90 dias** cobrem com folga um aparelho que ficou meses desligado.
+
+A poda roda **ao marcar** e **na abertura do app**: quem apaga pouco nunca chamaria `marcarRemovido`
+de novo, e as marcas velhas ficariam ali para sempre.
+
+### ⚠️ E uma armadilha que só apareceu porque eu testei ao vivo
+
+A página ficou com **`srs.js` novo** (chamando `marcarSumidosCards`) e **`core.js` velho** (sem a
+função) — um deploy parcial, de alguns segundos. Sem guarda, o `ReferenceError` derruba
+`saveSrsCards` inteiro e **os cards não são salvos**: um problema muito pior que o que a marca veio
+resolver. As três chamadas que cruzam de arquivo (`marcarSumidosCards`, `removidosPodarNaAbertura`,
+`fbAplicandoNuvem`) ganharam `typeof`.
+
+### Medido
+
+- **Fora do navegador:** a poda tira a marca de 100 dias e mantém a de 1 s, e o tipo que esvazia
+  some inteiro; o espelho dos cards não marca nada no primeiro save, marca `c2` quando `c2` sai, e
+  não cresce quando entra um card novo.
+- **No Firestore real, com o acervo dele, dois pushes seguidos:** as 10 listas idênticas antes e
+  depois, e o **diário byte a byte igual** — nenhum número inflou.
+- **O espelho dos cards, ao vivo:** nasceu com os **45** cards e **nenhuma marca de remoção** —
+  que é o comportamento certo do primeiro save.
+- **Push final:** nada sumiu em nenhuma das 10 listas, nenhuma marca residual.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13939,14 +14013,26 @@ Conferido no fim: nenhuma marca de remoção residual, nenhum documento de teste
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada das três pendências (§8.85, 2026-08-22)
+
+- [ ] **O diário fica com o maior, não com a soma.** Estudar nos dois aparelhos no mesmo dia
+      registra só o maior dos dois. Somar certo exige contar por aparelho
+      (`{date, porAparelho:{}}`), o que muda o formato e o gráfico — vale no dia em que ele estudar
+      nos dois no mesmo dia.
+- [ ] **`kindleQueue` fora do merge:** se ele capturar no celular e o computador subir uma fila
+      antiga, a captura nova se perde. Precisaria de `id` por item para entrar.
+
 ### Da rodada do merge na subida (§8.84, 2026-08-22)
 
-- [ ] **`srsCards` continua sobrescrevendo.** Para entrar no merge, a marca de remoção precisa
+- [x] ~~**`srsCards` continua sobrescrevendo**~~ — **feito em 2026-08-22** (§8.85), por um
+      espelho de ids no localStorage. Texto original: Para entrar no merge, a marca de remoção precisa
       alcançar o IndexedDB — o caminho é `saveSrsCards` comparar com o que o `CardsDB` tinha antes,
       ou os cards ganharem um campo `removidoEm` em vez de sumirem.
-- [ ] **`conversas`, `podShows`, `kindleQueue` e `srsLog`** também sobem inteiros. O dano ali é
+- [x] ~~**`conversas`, `podShows` e `srsLog`**~~ — **feito em 2026-08-22** (§8.85);
+      `kindleQueue` ficou de fora de propósito (é fila). Texto original: O dano ali é
       menor (são listas que crescem), mas a regra devia ser a mesma.
-- [ ] **A marca de remoção nunca é limpa.** Cresce um id por item apagado, para sempre. Some com o
+- [x] ~~**A marca de remoção nunca é limpa**~~ — **feito em 2026-08-22** (§8.85): 90 dias,
+      podada ao marcar e na abertura. Texto original: Cresce um id por item apagado, para sempre. Some com o
       tempo se apagar as mais velhas que uns 90 dias — não urgente, mas fica.
 
 ### Da rodada do reforço (§8.83, 2026-08-22)
