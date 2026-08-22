@@ -7,7 +7,20 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (31ª) — **AS PARCELAS DO DIÁRIO NASCEM NA CARGA, E O QUE JÁ
+> Última atualização: 2026-08-22 (32ª) — **O BUSCADOR DE CATÁLOGO DEVOLVE UMA RESPOSTA, NÃO SEIS**.
+> O buscador de "Quero ler"/"Quero ouvir" **não faltava** — estava apoiado na fonte errada e
+> mostrando o catálogo cru. Medido antes de escrever: **429 nas cinco** buscas do Google (a cota
+> sem chave é do mundo inteiro), então o app já vivia só na Open Library, a fonte mais suja; e a
+> limpeza que o projeto **já tinha** rodava só na importação, nunca na tela onde ele digita.
+> Cinco peças: chave própria do Google, motor de busca único nas três telas, **Apple** como fonte
+> de audiolivro, capa que vira arquivo guardado (fecha pendência de §8.53) e **a IA desempatando
+> — nunca preenchendo**. Acerto no 1º lugar: **7 de 7** contra nenhuma garantia antes.
+> ⚠️ **Três armadilhas caíram só no teste ao vivo:** a lista dos "outros" nascia **aberta**
+> (`display` de classe vence o atributo `hidden`), a chave do Gemini **não serve** para a Books
+> API (401 disfarçado), e o livro entrava com **idioma FR** e o ISBN da edição francesa.
+> `sw.js` → **englab-v379**. **Detalhes em §8.88.**
+>
+> Última atualização anterior: 2026-08-22 (31ª) — **AS PARCELAS DO DIÁRIO NASCEM NA CARGA, E O QUE JÁ
 > PASSOU CONSOLIDA**. As duas pendências que sobraram de §8.86. A migração precisava rodar **ao
 > abrir o app**, não só ao estudar: enquanto um dia não tem parcelas, o merge cai na regra velha —
 > o dia de hoje continuaria perdendo metade do estudo até a primeira revisão. E dia fechado não
@@ -1648,7 +1661,9 @@ js/add.js         — aba Adicionar (manual/Kindle/Mídia/Website)  (CARREGADO L
 js/kindle-db.js   — leitor SQLite só-leitura (vocab.db do Kindle), sem WASM  (LAZY, antes de add.js)
 js/epub.js        — leitor de ZIP (DecompressionStream nativo) + parser EPUB  (LAZY, antes de ler.js)
 js/estante.js     — GERENCIADOR DO ACERVO: estante (busca/filtros/ordem), ficha do livro,
-                    cadastro sem arquivo (Google Books + Open Library), registro de progresso,
+                    cadastro sem arquivo e o MOTOR DE CATÁLOGO usado por todas as telas de
+                    busca do app (Google Books + Open Library + Apple, ranking, capa local,
+                    desempate por IA — §8.88), registro de progresso,
                     painel de leitura (calendário/metas/sequência)  (LAZY, antes de ler.js)
 js/ler.js         — seção LER: o LEITOR (tipografia, captura, cobertura). A estante saiu daqui
                     em 2026-08-20; `renderLerSection` delega a `estanteRender()`  (LAZY)
@@ -1805,6 +1820,13 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
   aqui saber um sentido **não apaga os outros** da mesma palavra (§8.66).
 - **`cfg.autoMeta`** — o interruptor do "completar sozinho ao importar" (Configurações → Dados
   dos livros). **Ligado por padrão**: o campo só existe depois que ele DESLIGA.
+- **`cfg.catalogoIA`** (§8.88) — o desempate por IA na busca de catálogo. **Ligado por padrão**
+  (o campo só existe depois que ele desliga), mas só dispara no EMPATE, então busca fácil não
+  custa nada.
+- **`cfg.googleBooksKey`** (§8.88) — a chave própria da Books API. Vazia por padrão; sem ela a
+  cota é a compartilhada, que estoura quase sempre. ⚠️ **Chave do Gemini do AI Studio não serve**
+  (401 "API keys are not supported by this API" — a Books API não está habilitada naquele
+  projeto).
 - **`audiolivros[]`** (core.js, localStorage `el-audiolivros`, **sincronizado** em
   `data/audiolivros`) — a estante da seção Audiobook. ⚠️ **O ÁUDIO NUNCA SOBE**: um audiolivro
   tem de 100 MB a 1 GB; o arquivo mora no `BookDB` sob a chave **`ab:<id>:<n>`** e o que viaja é
@@ -2017,7 +2039,10 @@ maxInterval (36500), leechThreshold (50)
     `obraNome`) e *Notas*.
   - **Cadastrar livro sem arquivo** — o de papel, o e-book de fora, o que ainda quer ler.
     Busca de catálogo por ISBN ou título preenchendo tudo: **Google Books e, quando ele estoura
-    a cota, Open Library** (ver §8.53). Progresso por página, registrado à mão.
+    a cota, Open Library** (§8.53). Desde §8.88 a tela mostra **um candidato em tamanho de
+    resposta** ("é este?") com os outros atrás de um clique, usando o mesmo motor de limpeza da
+    importação — e a **IA desempata** quando os dois primeiros ficam colados. Progresso por
+    página, registrado à mão.
   - **Leitura em números** — páginas hoje/7/30 dias, sequência, calendário mensal em mapa de
     calor, meta diária de páginas e meta de livros no ano, concluídos do ano.
   - **Leitor** (`js/ler.js`) — tipografia de descanso, virar página ou rolar, seleção que já
@@ -2026,7 +2051,10 @@ maxInterval (36500), leechThreshold (50)
 - **Audiobook** (id `audiobook`, `js/audiobook.js`, LAZY) — estante de audiolivros e o
   reprodutor. Entra por três portas: **arquivo `.m4b`** (capítulos lidos de dentro dele),
   **vários `.mp3`/`.m4a`** (um capítulo por faixa, em ordem natural) ou **"Quero ouvir"**
-  (busca no catálogo; entra só com capa e ficha, e o áudio é anexado depois).
+  (busca no catálogo; entra só com capa e ficha, e o áudio é anexado depois). ⚠️ **A busca de
+  audiolivro vai à APPLE, não ao catálogo de livros** (§8.88): as outras duas fontes catalogam a
+  edição impressa, e para "Billy Summers" a Open Library trazia 1 resultado útil em 6 contra
+  5 de 5 da Apple. Capa em 600px e sinopse vêm junto; narrador e duração não existem lá.
   - Reprodutor: play/pause, **−15s / +30s**, velocidade (0,8× a 2×), barra clicável, lista de
     capítulos, **marcadores com nota**, **timer de sono** (minutos ou fim do capítulo) e
     **Media Session** (fone, tela de bloqueio, botão do carro).
@@ -14115,6 +14143,117 @@ E o ciclo completo, num objeto de teste (sem tocar no diário dele):
 
 Dia antigo com três parcelas (uma zerada) consolidou em `_antes` com o total certo: 5 + 7 + 0 = 12.
 
+## 8.88 O buscador de catálogo: uma resposta em vez de seis (2026-08-22, 32ª)
+
+**O pedido:** *"ao querer colocar livros e audiobooks como 'quero ler' deve ter um buscador que
+já traz tudo, metadados e capa de algum lugar. ou talvez a própria IA preencha automaticamente
+buscando na web já que esses locais que tem cadastros de livros repetem vários livros e sendo
+sujo e desnecessário. analisa."* — e, depois da análise: *"faz todas as 5 vc mesmo. e eu tenho
+créditos no gemini. usa o chrome pra fazer testes de ponta a ponta."*
+
+### O diagnóstico: o buscador não faltava
+
+Ele já existia nas duas telas ("Quero ler" e "Quero ouvir"). O que faltava era **a fonte certa e
+a limpeza ligada**. Medido do terminal antes de escrever uma linha:
+
+| Busca | Google Books | Open Library | Úteis | Com capa |
+|---|---|---|---|---|
+| Billy Summers | **429** | 6 | 1 | 2/6 |
+| Project Hail Mary | **429** | 6 | 1 (3 eram "Summary of…") | 1/6 |
+| One Piece Vol 100 | **429** | 6 | 1 | 6/6 |
+| Berserk vol 1 | **429** | 4 | 1 (em japonês) | 4/4 |
+| The Hobbit | **429** | 6 | 1 | 6/6 |
+
+**429 nas cinco.** Sem chave, a cota do Google é dividida com o mundo e estoura cedo — ou seja, o
+app já morava só na Open Library, a fonte mais suja. E a limpeza que o projeto tinha (penalidade
+a livro-sobre-o-livro, semelhança de título, desempate por volume) rodava **só no caminho
+automático da importação**; a tela de cadastro à mão despejava o catálogo cru.
+
+### As cinco peças
+
+1. **Chave própria do Google Books** (`cfg.googleBooksKey`, Configurações → Dados dos livros),
+   com *Testar* que separa três estados de mesmo sintoma: cota estourada, chave recusada, Books
+   API desligada. `_estGoogleMotivo` leva o motivo até a tela.
+2. **Motor único.** As três telas de busca (cadastro, "Completar pelo catálogo", "Quero ouvir")
+   passaram a usar `estMetaBuscar`. Novo no ranking: `EST_PARASITA` maior (`review of`,
+   `trailer of`, `notes on`, `guide to`); **completude desempata** (capa .25 + autor .15 +
+   páginas/resumo .15); **`_estExtra`** penaliza palavra a mais no título do candidato; **número
+   de volume lido da CONSULTA** quando não há `serieNum` (exige marca `vol/v/#`, senão
+   *Fahrenheit 451* vira volume 451); **`_estDedup` por OBRA** (título+autor, autor vazio conta
+   como igual) rodando **depois** do ranking.
+3. **Apple como fonte de audiolivro** (`_estFonteApple`, `opts.audio`).
+4. **A capa deixa de ser link** (`estCapaLocal`/`estCapaGuardar`/`estCapasPendentes`).
+5. **A IA desempata, nunca preenche** (`_estDesempatarIA`, `cfg.catalogoIA`): só no empate
+   (diferença de peso < 0,35) ou com líder fraco (< 0,9), mandando só título/autor/ano, e
+   falhando em silêncio.
+
+### O que o número mostrou, em três rodadas
+
+| Etapa | Acerto no 1º lugar (7 buscas) |
+|---|---|
+| Ranking antigo, tela crua | sem critério |
+| + parasita e completude | 5 de 7 |
+| ⚠️ a mesma versão **piorou** *One Piece Vol 100* | 4 de 7 |
+| + `_estExtra` e volume lido da consulta | 5 de 7 |
+| + **IA no empate** (Gemini, chave dele, no Chrome) | **7 de 7** |
+
+⚠️ **A primeira versão piorou um caso, e só a medição mostrou.** Sem ler o "100" da consulta como
+volume, o primeiro lugar de *One Piece Vol 100* virou *"One Piece, Vol. 9 (The 100 Million Berry
+Man…)"* — as palavras estavam lá, em papéis trocados.
+
+Os dois que o ranking não resolve são de julgamento, e a IA acertou ambos:
+
+- *1984 Orwell*: "George Orwell's 1984 — Robert Owens" → **"Nineteen Eighty-Four — George Orwell"**
+- *Berserk vol 1*: "Berserk of Gluttony Vol. 1" → **"ベルセルク 1 — 三浦建太郎"**
+
+Custo: 1,7 s e 4,0 s nas duas chamadas, no `gemini-flash-lite-latest` dele.
+
+### Audiolivro: a fonte estava errada, não a busca
+
+| | Open Library | Apple |
+|---|---|---|
+| "Billy Summers" | 1 útil em 6 | 5 de 5 do livro certo |
+| Capa | falta na maioria | sempre, 600px |
+| Sinopse | segunda requisição | vem junto |
+
+⚠️ **A Apple repete edições:** a busca crua devolveu **7 das 8 linhas iguais** (mesmo livro, datas
+diferentes) — foi o que obrigou o dedup a ser por obra, e não por título+ano, que não pegaria
+nenhuma. Caiu para **3 linhas**. Narrador e duração não existem em fonte gratuita nenhuma.
+
+### A capa, e por que agora deu
+
+Medido requisição a requisição: **Open Library** reflete a origem no `access-control-allow-origin`,
+**Apple** manda `*`, **Google Books não manda**. Blob baixado por `fetch` é arquivo local — o
+canvas não fica *tainted* e o `toDataURL` passa. Miniatura de 180px/JPEG 0.72 com teto de 60 KB
+(mais apertado que os 120 KB do EPUB: aqui são muitos livros no mesmo documento de 1 MB). Medido
+dentro do app: **14 KB** (Open Library), **13 KB** (Apple); Google fica no link.
+
+### As três coisas que só o teste ao vivo pegou
+
+1. **A lista dos outros resultados nascia ABERTA.** `.est-res-outros` também é `.est-gb-res`, que
+   é `display:flex` — e regra de classe com `display` vence o `display:none` que o navegador dá
+   ao atributo `hidden`. O atributo estava certo; o CSS é que mentia. Varrido o resto do app
+   (`querySelectorAll('[hidden]')` com display calculado): **só este elemento** sofria disso.
+2. **A chave do Gemini NÃO serve para a Books API.** Havia um botão "Usar a do Gemini": a chave
+   do AI Studio responde **401 "API keys are not supported by this API"** — parece erro de
+   autenticação e é a Books API não habilitada naquele projeto. O botão saiu; o 401 entrou na
+   lista que tira o Google da roda por meia hora; o *Testar* passou a explicar o caminho no
+   Google Cloud.
+3. **O livro entrava com idioma FR e o ISBN da edição francesa.** A Open Library agrupa todas as
+   edições num registro só e devolve as listas na ordem dela — pegar `[0]` é pegar a edição que
+   ficou na frente. Agora, se o inglês está entre as edições o item é inglês (é um app de aprender
+   inglês), com tabela de três letras → duas (antes um `.slice(0,2)` cru fazia "por" virar "po"),
+   e o ISBN prefere o de 13 dígitos.
+
+### Testado ao vivo (regra nº 5)
+
+No **Chrome real dele**, com a chave de IA dele e o acervo real: as 7 buscas de livro, a busca de
+audiolivro, o formulário preenchido pelo catálogo, o cadastro completo de *Project Hail Mary*
+(ficha com capa guardada, sinopse, editora, ano, ISBN e 496 páginas) e a **remoção** do item de
+teste em seguida — acervo de volta a 2 livros. No painel a **375px**: card de 318px, botão
+descendo para a segunda linha, `scrollWidth === innerWidth`, **zero overflow**. Console limpo
+numa carga limpa.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -14123,6 +14262,24 @@ Dia antigo com três parcelas (uma zerada) consolidou em `_antes` com o total ce
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada do buscador de catálogo (§8.88, 2026-08-22)
+
+- [ ] **A CHAVE DO GOOGLE BOOKS DEPENDE DELE** — o campo e o teste estão prontos, a chave não.
+      Google Cloud → APIs e serviços → **Ativar API → "Books API"** → Credenciais → **Criar chave
+      de API**, e colar em Configurações → Dados dos livros → *Testar*. ⚠️ **A chave do Gemini do
+      AI Studio não serve** (401 medido). Sem ela nada quebra: a busca continua caindo na Open
+      Library, que é onde ela já vivia — só que com resultado mais pobre.
+      **Vale prender a chave ao site** (Restrições de aplicativo → Sites), porque ela fica visível
+      no app.
+- [ ] **A CONTA DA OPENAI ESTÁ SEM CRÉDITO** (descoberto em 2026-08-22, testando). *"You have no
+      credits remaining"*. O app hoje roda no **Gemini**, que tem crédito — mas tudo que é
+      exclusivo da OpenAI fica parado, e a **busca na web do "Explicar"** é exatamente isso
+      (`aiTextWeb` recusa provedor que não seja OpenAI).
+- [ ] **O DESEMPATE POR IA NÃO TEM MEMÓRIA** — duas buscas iguais pagam duas vezes. É barato
+      (~1,7 s e um punhado de tokens), mas um cache por termo dentro da sessão seria de graça.
+- [ ] **NARRADOR E DURAÇÃO DO AUDIOLIVRO NÃO EXISTEM** em nenhuma fonte gratuita — a Apple manda
+      `trackCount`, que é número de faixas, não tempo. Só a Audible tem, e ela não abre porta.
 
 ### Da rodada do diário por aparelho (§8.86, 2026-08-22)
 
@@ -14356,11 +14513,11 @@ Dia antigo com três parcelas (uma zerada) consolidou em `_antes` com o total ce
       há algo lá.**
 - [x] ~~**Edição de autor em lote**~~ — **feita em 2026-08-20** (§8.55), junto com série,
       gênero, status e busca de catálogo, na tela "Editar vários".
-- [ ] **A CAPA VINDA DO CATÁLOGO É URL, não arquivo** (2026-08-20, §8.53). Livro cadastrado à
-      mão guarda `coverUrl` apontando para o Google/Open Library — **offline ela não aparece** e,
-      se o serviço tirar a imagem do ar, some. Baixar e converter para miniatura (como o EPUB
-      faz) esbarra em CORS: o canvas fica "tainted" e o `toDataURL` falha. Caminho, se incomodar:
-      buscar o binário e guardar o blob no `BookDB` sob `capa:<id>`.
+- [x] ~~**A CAPA VINDA DO CATÁLOGO É URL, não arquivo**~~ — **feita em 2026-08-22** (§8.88). O
+      que travava era CORS, e a medição desfez o impasse: Open Library e Apple mandam o cabeçalho,
+      o Google não. Blob baixado por fetch é arquivo local, e o canvas deixa de ficar "tainted".
+      Miniatura de 180px com teto de 60 KB (medido no app: 14 KB e 13 KB). A capa do Google
+      continua como link — melhor um link que funciona online do que capa nenhuma.
 
 - [x] ~~**O RAIO-X NO LEITOR DE EPUB**~~ — **feito em 2026-08-21** (§8.65): realce no texto,
       chips no painel de ferramentas, resultado guardado por capítulo no `BookDB`.
