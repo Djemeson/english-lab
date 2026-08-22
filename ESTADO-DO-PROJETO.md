@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-21 (13ª) — **O ÁUDIO DO AUDIOLIVRO VAI PARA A NUVEM**. Pedido
+> Última atualização: 2026-08-21 (14ª) — **"VOCÊ TEM ESTA PALAVRA COM OUTRO SENTIDO" CONTINUAVA
+> MENTINDO — E A CULPA ERA DE COMPARAR GLOSAS**. Ele mandou quatro telas seguidas: `bosomy`,
+> `stands still`, `live large` e `crabgrass`, todas anunciadas como "outro sentido" ou sem rótulo
+> nenhum — e **todas as quatro estavam no acervo vindas de *Billy Summers · Chapter 1***, o
+> capítulo que estava aberto na tela. Três defeitos numa raiz só: o app comparava **glosas**
+> (duas descrições do mesmo sentido, escritas por chamadas de IA diferentes, quase nunca
+> coincidem), casava o termo pela **forma exata** (o raio-X devolve `stands still`; o acervo
+> guarda `stand still`) e cortava o prefixo em 5 letras, **exatamente onde o português põe o
+> gênero** (`fartos` × `farta`). Agora a **procedência decide antes da glosa**: item que veio
+> desta obra e deste capítulo é esta ocorrência, ponto. `sw.js` → **englab-v351**.
+> **Detalhes em §8.70.**
+>
+> Última atualização anterior: 2026-08-21 (13ª) — **O ÁUDIO DO AUDIOLIVRO VAI PARA A NUVEM**. Pedido
 > dele: *"atualmente o audiobook não é mandado pra nuvem, mas isso é necessário pq quero ter a
 > capacidade de ouvir tanto no desktop quanto no celular com todo material gerado."* Capítulos,
 > posição, marcadores, transcrição e raio-X já atravessavam; só o áudio não — e sem ele o resto
@@ -12796,6 +12808,96 @@ Selo no card com o texto certo.
 A janela do login do Google não é alcançável pelas ferramentas de navegador, e sem login não
 existe nuvem para exercitar. Registrado em §9.
 
+## 8.70 A procedência decide antes da glosa (2026-08-21, 14ª)
+
+Ele mandou quatro telas em sequência, todas do *Chapter 1* de **Billy Summers**:
+
+| Termo | O que a tela dizia | A verdade |
+|---|---|---|
+| `bosomy` | "você tem esta palavra com OUTRO sentido" | em revisão, 3 cards, mesmo sentido |
+| `stands still` | **nada** | `stand still` em revisão, 3 cards |
+| `live large` | "está no Preparar, mas com OUTRO sentido" | no Preparar, mesma passagem |
+| `crabgrass` | "esperando análise" (sem dizer qual sentido) | no Preparar, mesma passagem |
+
+E os quatro itens, no acervo real, trazem **`source_context: "Chapter 1"`** e
+**`source_title: "Billy Summers (US Edition)"`** — a mesma obra e o mesmo capítulo que o raio-X
+estava analisando. A informação decisiva estava lá o tempo todo, e o código a ignorava.
+
+### Três defeitos, uma raiz
+
+**1. Comparar glosas nunca ia funcionar.** O acervo diz `de seios fartos`; a análise desta rodada
+disse `farta em peitos`. É o **mesmo sentido**, escrito por duas chamadas de IA diferentes — e sem
+uma palavra em comum. Qualquer comparador de texto ia errar aqui, mais cedo ou mais tarde.
+
+**2. O termo vinha flexionado, o acervo guarda o lema.** `stands still` contra `stand still`:
+comparação literal, e o app simplesmente **não enxergava** um item que está em revisão com três
+cards. Agora o casamento passa por `aiFormasDoTermo`, que reduz **palavra a palavra** (a flexão
+de uma expressão cai sobre um termo só) usando o mesmo lematizador do glossário — o que sabe
+verbo irregular.
+
+**3. O prefixo de 5 cortava onde mora o gênero.** `fartos` → `farto`; `farta` → `farta`. Divergem
+no 5º caractere, e por essa letra o app anunciava "outro sentido". A comparação agora tira a
+desinência (`-s`, `-o/-a/-e`) antes de olhar, o que resolve a família inteira: farto/farta/fartos,
+avantajado/avantajada, curvilíneo/curvilínea.
+
+### A regra nova
+
+> **Mesma obra + mesmo capítulo = mesma ocorrência.** Se o item do acervo veio daqui, não existe
+> "outro sentido" a comparar — e o veredito sai sem consultar glosa nenhuma.
+
+⚠️ O risco do outro lado é a mesma palavra usada com dois sentidos dentro do mesmo capítulo. É
+raro, e o custo é **assimétrico**: esconder um item que ele já tem incomoda muito menos do que
+gritar "outro sentido!" sobre a frase de onde o item saiu. O casamento da obra é tolerante
+(a estante pode ter "Billy Summers" e o item "Billy Summers (US Edition)"); o do **capítulo é
+exato** — é ele que separa as ocorrências.
+
+### O rótulo guardado envelhece
+
+A análise fica no IndexedDB com o `ja` de quando rodou. Entre uma leitura e outra ele estuda a
+palavra, marca "já sei", ou a análise do Preparar termina. Sem revalidar, o capítulo repetiria
+"outro sentido" **até ser reanalisado** — e ninguém reanalisa 35 capítulos à mão. `aiRevalidarAchados`
+recalcula ao carregar, nas duas telas.
+
+### O horizonte: o MESMO defeito estava no Preparar
+
+`prepAcharItem` já tentava reduzir os dois lados, mas com `glossLemas` aplicado à expressão
+**inteira** — e ele reduz uma palavra. **Medido com o acervo real:** `prepAcharItem('stands still')`
+não achava o item `stand still`. Ou seja, clicar em "Preparar" numa expressão flexionada criaria
+a **duplicata que aquele achador existe para impedir**. Passou a usar a mesma peça.
+
+### `cellar`: este NÃO era bug
+
+Ele perguntou por que `cellar` aparecia antes e não aparece mais. **Medido:** `cellar` não está no
+Preparar; está em `knownWords`, marcada em **2026-08-08**, num lote de **549 palavras no mesmo
+segundo** — a triagem de nível do leitor (`lerNivConfirmar`). O estado é `marcada`, e `marcada`
+**não é filtrado**: o item continua na lista com o rótulo "você marcou como conhecida". Confirmado
+rodando a revalidação: dos seis itens de teste, os quatro com defeito sumiram e `cellar` ficou.
+
+Se ela não apareceu numa rodada, foi a análise que não a trouxe — **cada raio-X é uma chamada nova
+ao modelo**, e "isto está acima do B1?" é julgamento, não varredura de dicionário. Vale registrar
+como limitação, não como conserto.
+
+### Medido
+
+Com o **acervo real** (103 itens, lidos do Firestore pelo terminal e carregados no app rodando):
+
+- Os quatro casos das telas dele: **todos somem** — `bosomy` e `stands still` como `sentido`,
+  `live large` e `crabgrass` como `fila-mesmo`.
+- Isolando a procedência (glosa proposital que não casa com nada): **42 itens escondidos no
+  Chapter 1**, todos com `source_context: Chapter 1`; **0 no Chapter 20**; **0 sem origem**. A
+  regra não vaza.
+- Comparador de glosas, 10 pares: 10 acertos. Casam `fartos × farta`, `tolerar × tolerância`,
+  `viver com luxo × viver com ostentação`; **não** casam `minério × veio de mina`, `luz × leve`,
+  `correr × administrar`, `peito × peixe`.
+- `prepAcharItem('stands still')` → `stand still` (antes: nada). `prepAcharItem('zzqxwv')` → nada.
+- Revalidação do cache: 6 itens guardados → 4 somem, `cellar` (marcada) e a palavra inventada ficam.
+
+### De quebra: `node tools/acervo.mjs json <doc> <arquivo>`
+
+O `bruto` corta em 40 000 caracteres — serve para olhar, não para alimentar teste. O modo novo
+grava o documento inteiro em arquivo, e foi assim que o acervo verdadeiro entrou no app rodando
+em vez de item inventado.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -12804,6 +12906,19 @@ existe nuvem para exercitar. Registrado em §9.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada da procedência (§8.70, 2026-08-21)
+
+- [ ] **549 palavras foram marcadas como conhecidas de uma vez em 2026-08-08** (triagem de nível
+      do leitor). É o motivo de `cellar` contar como conhecida. Se ele discordar de alguma, hoje
+      **não dá para desmarcar do chip** — o caminho é Conhecidas. Um botão "não sei ainda" ali
+      seria barato; não foi feito porque ele não pediu.
+- [ ] **O raio-X não é determinístico.** Cada análise é uma chamada nova ao modelo, então o mesmo
+      capítulo pode devolver conjuntos ligeiramente diferentes. Se isso incomodar, o caminho é
+      acumular (unir a análise nova com a guardada) em vez de substituir.
+- [ ] **A mesma palavra com dois sentidos no mesmo capítulo** passa a ser tratada como o mesmo
+      sentido. Decisão consciente (custo assimétrico), mas se aparecer um caso real vale afinar
+      pela frase, e não só pelo capítulo.
 
 ### Da rodada do áudio na nuvem (§8.69, 2026-08-21)
 

@@ -23,13 +23,14 @@
 //   node tools/acervo.mjs item <palavra>  tudo sobre um item (sentidos crus)
 //   node tools/acervo.mjs procedencia     itens com obra possivelmente herdada
 //   node tools/acervo.mjs bruto <doc>     despeja um documento (words, livros, …)
+//   node tools/acervo.mjs json <doc> <arq> grava o documento INTEIRO em arquivo
 //
 // CREDENCIAL: `_dados-de-teste/firebase-admin.json` (a pasta é gitignored).
 // Console do Firebase → Configurações do projeto → Contas de serviço →
 // Gerar nova chave privada. Depois, no Console do Google Cloud → IAM, deixe a
 // conta só com "Cloud Datastore Viewer".
 
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { createSign } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -326,6 +327,19 @@ async function bruto(a, nome) {
   console.log(JSON.stringify(d, null, 1).slice(0, 40000))
 }
 
+// O documento INTEIRO em arquivo, sem o corte de 40 000 do `bruto`. O `bruto`
+// existe para olhar; este existe para ALIMENTAR um teste — carregar o acervo
+// verdadeiro no app rodando e exercitar a função com ele, em vez de inventar
+// item de mentira.
+//   node tools/acervo.mjs json words saida.json
+async function json(a, nome, destino) {
+  const d = await a.doc(nome || 'words')
+  const arq = destino || `${nome || 'words'}.json`
+  writeFileSync(arq, JSON.stringify(d), 'utf8')
+  const n = Array.isArray(d && d.list) ? d.list.length : '?'
+  console.log(`${arq} — ${n} itens`)
+}
+
 // ---- main -------------------------------------------------------
 const modo = process.argv[2] || 'resumo'
 const arg = process.argv[3]
@@ -339,6 +353,7 @@ else if (modo === 'familia') await familia(a)
 else if (modo === 'item') await item(a, arg || 'tuck')
 else if (modo === 'procedencia') await procedencia(a)
 else if (modo === 'bruto') await bruto(a, arg)
+else if (modo === 'json') await json(a, arg, process.argv[4])
 else if (modo === 'tudo') { await resumo(a); await lista(a); await familia(a); await procedencia(a) }
 else { console.log('modos: resumo | lista | familia | item <palavra> | procedencia | bruto <doc> | tudo') }
 nl()

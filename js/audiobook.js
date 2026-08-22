@@ -1088,6 +1088,14 @@ function _abListaTexto() {
   // igual é no livro."* Português impresso ao lado do inglês faz o olho pular
   // para o português e a escuta não treina nada — a tradução tem de ser um
   // gesto, e só quando ele pedir. Quem traduz é o menu de seleção (`ai.js`).
+  // ⚠️ Revalida o rótulo guardado antes de pintar: a análise fica salva no
+  // audiolivro e o mundo muda em volta dela (ele estuda a palavra, marca
+  // "já sei", a análise do Preparar termina). Ver `aiRevalidarAchados`.
+  if (tr.achados && typeof aiRevalidarAchados === 'function') {
+    const antes = tr.achados.length
+    tr.achados = aiRevalidarAchados(tr.achados, _abOrigemDoCap(_abLivro, _abCap))
+    if (tr.achados.length !== antes) { _abLivro.updatedAt = Date.now(); saveAudiolivros() }
+  }
   const achados = tr.achados || null
   const nivel = cefrNivelAluno()
   return `
@@ -1206,6 +1214,16 @@ async function abRaioXDoCapitulo(i) {
   await abAnalisarPassagem()
 }
 
+// A PROCEDÊNCIA DESTE CAPÍTULO, no MESMO formato que o chip grava no acervo
+// (ver `abChipPreparar`) — é o casamento entre os dois que faz o raio-X
+// reconhecer o que já saiu daqui.
+function _abOrigemDoCap(a, i) {
+  if (!a) return null
+  const cap = (a.capitulos || [])[i] || {}
+  return { source_title: a.title || '',
+           source_context: cap.titulo ? `audiolivro · ${cap.titulo}` : 'audiolivro' }
+}
+
 // ---- O RAIO-X DA PASSAGEM: o que aqui está acima do meu nível ----
 // ⚠️ ELE MOSTRA ONDE DÓI, e essa é a diferença para o que já existia. Traduzir
 // diz o que a frase quer dizer; explicar diz por quê. Faltava a pergunta que
@@ -1234,6 +1252,7 @@ async function abAnalisarPassagem() {
     const achados = await aiAnalisarDificuldade({
       texto: tr.segs.map(x => x.t).join('\n'),
       lang: (a.lang || 'en').slice(0, 2), nivel,
+      origem: _abOrigemDoCap(a, _abCap),
       // Capítulo longo vira várias chamadas: sem o andamento, a tela fica
       // parada por um minuto e parece travada.
       aoAndar: (i, n) => { if (btn && n > 1) btn.innerHTML = `Analisando ${i} de ${n}…` }

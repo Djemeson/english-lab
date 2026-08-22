@@ -2620,13 +2620,30 @@ let _lerRaioXCarregando = false
 
 function _lerChaveRaioX(cap) { return `raiox:${_lerLivro.id}:${cap}` }
 
+// A PROCEDÊNCIA DESTE CAPÍTULO, do jeito que o acervo a guarda. É o que deixa
+// o raio-X reconhecer que um item do Preparar saiu DAQUI — e, portanto, que
+// não existe "outro sentido" a anunciar.
+function _lerOrigemDoCap(cap) {
+  if (!_lerLivro) return null
+  const i = cap == null ? _lerCap : cap
+  return { source_title: _lerLivro.title || '',
+           source_context: (_lerLivro.chapters[i] || {}).titulo || '' }
+}
+
 async function lerRaioXCarregar(cap) {
   if (!_lerLivro) return null
   try {
     const g = await BookDB.get(_lerChaveRaioX(cap))
     if (!g) return null
     const dados = typeof g === 'string' ? JSON.parse(g) : g
-    return Array.isArray(dados) ? dados : (dados.itens || null)
+    const itens = Array.isArray(dados) ? dados : (dados.itens || null)
+    // ⚠️ O rótulo guardado envelhece: entre uma leitura e outra ele estuda a
+    // palavra, marca "já sei", ou a análise do Preparar termina. Sem esta
+    // passada, o capítulo repetiria "outro sentido" até ser reanalisado — e
+    // ninguém reanalisa 35 capítulos à mão.
+    return itens && typeof aiRevalidarAchados === 'function'
+      ? aiRevalidarAchados(itens, _lerOrigemDoCap(cap))
+      : itens
   } catch (e) { return null }
 }
 
@@ -2656,6 +2673,7 @@ async function lerRaioXAnalisar() {
     const nivel = cefrNivelAluno()
     const itens = await aiAnalisarDificuldade({
       texto, lang: (_lerLivro.lang || 'en').slice(0, 2), nivel,
+      origem: _lerOrigemDoCap(cap),
       aoAndar: (i, n) => pinta(n > 1 ? `Analisando ${i} de ${n}…` : 'Analisando…')
     })
     // A frase entra AGORA, uma vez, e não na hora de mandar ao Preparar: aqui
@@ -2873,7 +2891,7 @@ function _lerRaioXBlocoHTML() {
                 data-tip="${escA(AI_DIF_TIPOS[x.tipo].rotulo + (x.nivel ? ' · ' + x.nivel : '') + (
                   x.ja === 'outro' ? ' — você tem esta palavra com OUTRO sentido'
                   : x.ja === 'marcada' ? ' — você marcou como conhecida'
-                  : x.ja === 'fila' ? ' — já está no Preparar, esperando análise'
+                  : x.ja === 'fila' ? ' — já está no Preparar (sem análise ainda, não dá para comparar o sentido)'
                   : x.ja === 'fila-outro' ? ' — está no Preparar, mas com OUTRO sentido'
                   : ' — clique para mandar ao Preparar'))}">
           <b>${esc(x.t)}</b>${x.pt ? `<i>${esc(x.pt)}</i>` : ''}

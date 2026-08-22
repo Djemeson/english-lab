@@ -1395,7 +1395,7 @@ function _aiDifOrcamento() {
     : { bloco: AI_DIF_BLOCO, tokens: AI_DIF_TOKENS, raciocina: false }
 }
 
-async function aiAnalisarDificuldade({ texto, lang = 'en', nivel, maxItens = 40, aoAndar } = {}) {
+async function aiAnalisarDificuldade({ texto, lang = 'en', nivel, maxItens = 40, aoAndar, origem } = {}) {
   const t = String(texto || '').trim()
   if (!t) return []
   const nv = nivel || (typeof cefrNivelAluno === 'function' ? cefrNivelAluno() : 'B1')
@@ -1420,7 +1420,7 @@ async function aiAnalisarDificuldade({ texto, lang = 'en', nivel, maxItens = 40,
   }
   const vistos = new Set()
   const itens = cru
-    .map(x => ({ ...x, ja: aiJaConhecido(x) }))
+    .map(x => ({ ...x, ja: aiJaConhecido(x, origem) }))
     .filter(x => {
       if (!x.t || x.t.length > 60) return false
       const k = x.t.toLowerCase()
@@ -1595,7 +1595,10 @@ function _difChipAbrir(mk, cfgChip) {
   const situacao = {
     outro:        'você tem esta palavra com outro sentido',
     marcada:      'você marcou como conhecida',
-    fila:         'já está no Preparar, esperando análise',
+    // ⚠️ Frase honesta: aqui o app NÃO SABE se é o mesmo sentido — o item foi
+    // para o Preparar por outro caminho, sem glosa, e a análise ainda não
+    // rodou. "Esperando análise" fazia parecer que a comparação existia.
+    fila:         'já está no Preparar — sem análise ainda, não dá para comparar o sentido',
     'fila-outro': 'está no Preparar, mas com outro sentido'
   }
   const p = document.createElement('div')
@@ -1665,16 +1668,110 @@ function aiFraseDoTermo(texto, termo) {
 // Em que pé este termo está para ele: `'sentido'` (já estudou ESTE sentido),
 // `'outro'` (tem a palavra, com outro significado), `'marcada'` (declarou
 // conhecer, sem significado registrado) ou `null`.
-function aiJaConhecido(x) {
+// ⚠️ O TERMO DO RAIO-X VEM FLEXIONADO; O ACERVO GUARDA O LEMA. A análise
+// devolve a forma que está no texto — "stands still", "tucks", "bosomier" —
+// e o Preparar guarda "stand still", "tuck", "bosomy". Comparar string com
+// string fazia o app NÃO ENXERGAR o que ele tem: `stands still` apareceu sem
+// rótulo nenhum, apesar de "stand still" estar em revisão com 3 cards.
+//
+// `glossLemas` é o mesmo lematizador que o glossário e o `isKnownWord` usam
+// (mora em `js/glossario.js`, que não é lazy) — e ele sabe verbo irregular,
+// que nenhuma regra de sufixo enxerga.
+// ⚠️ PÚBLICA porque o mesmo defeito existia no Preparar: `glossLemas` reduz
+// UMA palavra, e recebendo "stands still" inteiro devolve "stands still". Por
+// isso `prepAcharItem` não achava o item "stand still" e o chip criaria um
+// DUPLICADO da expressão que ele já tem. Uma peça, dois usuários.
+function aiFormasDoTermo(k) {
+  const partes = String(k).split(/\s+/)
+  const lemas = w => (typeof glossLemas === 'function')
+    ? glossLemas(w, { estrito: true })
+    : [w, w.replace(/ies$/, 'y'), w.replace(/(es|s)$/, '')]
+  // Uma palavra por vez, e não o produto cartesiano: numa expressão a flexão
+  // cai sobre um termo só ("stands still", "stood still"), e combinar tudo
+  // com tudo explodiria numa expressão de cinco palavras.
+  const out = new Set([k])
+  partes.forEach((w, i) => {
+    for (const l of lemas(w)) {
+      if (!l || l === w) continue
+      const c = partes.slice(); c[i] = l
+      out.add(c.join(' '))
+    }
+  })
+  return out
+}
+
+function _aiItemDoAcervo(termo) {
+  if (typeof words === 'undefined' || !Array.isArray(words)) return null
+  const k = String(termo || '').toLowerCase().trim()
+  if (!k) return null
+  const chave = w => String(w.word || '').toLowerCase().trim()
+  const exato = words.find(w => chave(w) === k)
+  if (exato) return exato
+  const formas = aiFormasDoTermo(k)
+  return words.find(w => formas.has(chave(w)))
+      || words.find(w => {
+           const l = String(w.lemma || '').toLowerCase().trim()
+           return l && (l === k || formas.has(l))
+         })
+      || null
+}
+
+// ⚠️ MESMA PASSAGEM = MESMO SENTIDO, e isso vale MAIS do que comparar glosas.
+// Foi o erro que ele pegou quatro vezes seguidas: `bosomy`, `stands still`,
+// `live large` e `crabgrass` estavam todos no acervo vindos de *Billy Summers ·
+// Chapter 1* — exatamente o capítulo que o raio-X estava analisando —, e mesmo
+// assim a tela anunciava "você tem esta palavra com OUTRO sentido".
+//
+// Comparar duas glosas nunca ia resolver: "de seios fartos" e "farta em peitos"
+// são o MESMO sentido escrito por duas chamadas de IA diferentes, e não têm
+// palavra em comum. Já a procedência é um fato: se o item do acervo veio desta
+// obra e deste capítulo, é esta ocorrência. Não existe "outro sentido" a
+// comparar.
+//
+// O risco do outro lado — a mesma palavra usada com dois sentidos dentro do
+// mesmo capítulo — é raro, e o custo é assimétrico: esconder um item que ele
+// já tem incomoda muito menos do que gritar "outro sentido!" sobre a frase de
+// onde o item saiu.
+function _aiMesmaPassagem(item, origem) {
+  if (!item || !origem) return false
+  const n = t => String(t || '').toLowerCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
+  const obra = n(origem.source_title), cap = n(origem.source_context)
+  if (!obra || !cap) return false
+  const oi = n(item.source_title), ci = n(item.source_context)
+  if (!oi || !ci) return false
+  // Título tolerante: a estante pode ter "Billy Summers" e o item "Billy
+  // Summers (US Edition)". Capítulo exato — é ele que separa as ocorrências.
+  const mesmaObra = oi === obra || oi.includes(obra) || obra.includes(oi)
+  return mesmaObra && ci === cap
+}
+
+// ⚠️ O RÓTULO GUARDADO ENVELHECE. A análise fica no IndexedDB com o `ja` de
+// quando rodou — e entre uma leitura e outra ele estuda a palavra, marca
+// "já sei", ou a análise do Preparar termina e o item ganha significados.
+// Sem esta passada, o capítulo continuaria dizendo "outro sentido" até ele
+// mandar reanalisar; com 35 capítulos, isso é trabalho que ninguém faz.
+function aiRevalidarAchados(itens, origem) {
+  if (!Array.isArray(itens)) return []
+  const saida = itens.map(x => ({ ...x, ja: aiJaConhecido(x, origem) }))
+                     .filter(x => x.ja !== 'sentido' && x.ja !== 'fila-mesmo')
+  saida.incompleto = itens.incompleto
+  return saida
+}
+
+function aiJaConhecido(x, origem) {
   const k = String(x.t || '').toLowerCase().trim()
   if (!k) return null
   // "Eu já sei esta palavra NESTE sentido": a marca dele vale mais que
   // qualquer inferência — foi ele que declarou, olhando a passagem.
   if (typeof isKnownSense === 'function' && isKnownSense(x.t, x.pt)) return 'sentido'
-  const item = (typeof words !== 'undefined' && Array.isArray(words))
-    ? words.find(w => String(w.word || '').toLowerCase() === k)
-    : null
+  const item = _aiItemDoAcervo(x.t)
   if (item) {
+    // A procedência responde antes de qualquer comparação de texto.
+    if (_aiMesmaPassagem(item, origem)) {
+      const temAnalise = (item.meanings || []).some(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em)
+      return temAnalise ? 'sentido' : 'fila-mesmo'
+    }
     const sentidos = (item.meanings || [])
       .filter(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em)
       .map(m => m.meaning_pt)
@@ -1712,11 +1809,19 @@ function aiSentidoParecido(a, b) {
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length >= 4 && !/^(para|como|algo|alguem|fazer|coisa|muito|mais|sobre|entre|quando|pessoa|aquilo|isso)$/.test(w))
-  const A = limpa(a), B = limpa(b)
+  // ⚠️ O PREFIXO DE 5 CORTAVA EXATAMENTE ONDE MORA O GÊNERO. "de seios fartos"
+  // e "farta em peitos" falhavam por UMA letra: "farto" contra "farta" divergem
+  // no 5º caractere, e o app anunciava "outro sentido" sobre o mesmo sentido.
+  // Tirar a desinência antes de comparar resolve a família inteira —
+  // farto/farta/fartos, avantajado/avantajada, curvilíneo/curvilínea.
+  const radical = w => w.replace(/s$/, '').replace(/[oae]$/, '')
+  const A = limpa(a).map(radical), B = limpa(b).map(radical)
   if (!A.length || !B.length) return false
   // Uma palavra de peso em comum basta — inclusive por prefixo, para pegar
   // "tolerar/tolerância" e "canceladas/cancelar".
-  return A.some(x => B.some(y => x === y || (x.length >= 5 && y.startsWith(x.slice(0, 5))) || (y.length >= 5 && x.startsWith(y.slice(0, 5)))))
+  const pref = (x, y) => x.length >= 4 && y.length >= 4 &&
+    (x.startsWith(y.slice(0, 4)) || y.startsWith(x.slice(0, 4)))
+  return A.some(x => B.some(y => x === y || pref(x, y)))
 }
 
 // Onde cada achado APARECE no texto. Casamento por posição, sem regex montada

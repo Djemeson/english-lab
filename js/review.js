@@ -2566,6 +2566,15 @@ function prepAcharItem(palavra, lang) {
   if (typeof glossLemas === 'function') {
     for (const l of glossLemas(alvo, { estrito: true })) if (!formas.includes(l)) formas.push(l)
   }
+  // ⚠️ EXPRESSÃO FLEXIONADA ESCAPAVA. `glossLemas` reduz uma palavra: recebendo
+  // "stands still" inteiro, devolve "stands still" e pronto. Resultado medido
+  // com o acervo real: `prepAcharItem('stands still')` não achava o item
+  // "stand still" que está em revisão com 3 cards — e o clique em Preparar
+  // criaria a duplicata que este achador existe para impedir. `aiFormasDoTermo`
+  // reduz palavra a palavra e resolve os dois lados.
+  if (typeof aiFormasDoTermo === 'function') {
+    for (const f of aiFormasDoTermo(alvo.toLowerCase())) if (!formas.includes(f)) formas.push(f)
+  }
   const mesmoIdioma = w => !lang || !w.lang || w.lang === lang
   const chaves = formas.map(norm)
   // 1ª passada, barata: reduz o ALVO e compara com a palavra do item tal e qual.
@@ -2588,6 +2597,9 @@ function prepAcharItem(palavra, lang) {
     if (!p) continue
     const suas = [norm(p), norm(w.lemma || '')].filter(Boolean)
     for (const l of glossLemas(p, { estrito: true })) suas.push(norm(l))
+    if (typeof aiFormasDoTermo === 'function') {
+      for (const f of aiFormasDoTermo(p.toLowerCase())) suas.push(norm(f))
+    }
     if (suas.some(x => chaves.includes(x))) return w
   }
   return null
