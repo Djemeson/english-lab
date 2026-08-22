@@ -7,7 +7,18 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (37ª) — **OS TRÊS ERROS DE DESENHO DA SINCRONIA**. Ele usou e
+> Última atualização: 2026-08-22 (38ª) — **O REALCE EXISTIA; A PÁGINA É QUE NÃO IA ATÉ ELE**.
+> *"no livro não acende a frase"* — e o realce estava certo o tempo todo: medido, `CSS.highlights`
+> continha o trecho certo em quatro instantes seguidos, só que **3.780px acima da viewport**.
+> Duas causas somadas: seguir a voz **só ia para a frente** (e o caso normal é voltar, porque o
+> áudio começa do princípio do capítulo), e ⚠️ **`scrollTop = valor` não move essa viewport** —
+> ela tem `scroll-behavior:smooth`, e rolagem animada não anda sem o navegador compor quadros.
+> **O projeto já tinha essa armadilha registrada em `_abCentralizar`, e eu a repeti.**
+> Testado nos **dois modos**: rolagem (4545→26→3622→8224→495) e virar página
+> (0→15000→2000, sempre múltiplo exato da largura) — **frase na tela em todos**.
+> `sw.js` → **englab-v390**. **Detalhes em §8.94.**
+>
+> Última atualização anterior: 2026-08-22 (37ª) — **OS TRÊS ERROS DE DESENHO DA SINCRONIA**. Ele usou e
 > disse: *"ficou muito esquisito"* — e os três pontos estavam certos. (1) **O texto tinha de vir
 > para o reprodutor**, não mandá-lo para outra tela: as frases do livro passam a entrar no mesmo
 > formato das falas transcritas, e todo o mecanismo que já existia (acender, centralizar, tela
@@ -14694,6 +14705,42 @@ não carrega — pela **terceira** medição seguida, com controle: o *Carrie* d
 normalmente, também não carrega nessa condição. É o Chrome adiando mídia em **aba oculta**, e a
 aba de automação está sempre oculta. Tudo o que depende do relógio foi verificado movendo o
 relógio à mão; o que falta é o alto-falante.
+
+## 8.94 O realce existia, a página é que não ia até ele (2026-08-22, 38ª)
+
+**O relato, com print:** *"no livro não acende a frase. fica esse painel embaixo."* A barra
+mostrava *"Gared said with iron certainty."* — do começo do prólogo — e a página na tela estava
+lá adiante.
+
+### O realce nunca esteve errado
+
+Medido no leitor dele: em quatro instantes seguidos, `CSS.highlights` **continha o trecho certo**
+(*"Ser Waymar Royce asked with just the hint of…"*, *"He stood there beside the sentinel…"*), e a
+regra de cor estava carregada. O que faltava era **a página ir até lá**: a frase estava a 3.780px
+acima da viewport.
+
+### Duas causas somadas
+
+1. **Seguir a voz só ia para a frente.** A primeira versão chamava `lerAvancarPagina()` até três
+   vezes. E o caso normal é o oposto: ele lê até certo ponto, o áudio começa do princípio do
+   capítulo, e acompanhar significa **voltar**. Agora o deslocamento é calculado com sinal — para
+   frente ou para trás, nos dois modos de leitura.
+2. ⚠️ **`scrollTop = valor` não move a viewport do leitor.** Medido: com `scrollHeight` 13.546 e
+   `overflow-y:auto`, atribuir `scrollTop + 300` deixou o valor parado em 4.545. A viewport tem
+   `scroll-behavior:smooth`, e rolagem animada depende de o navegador estar compondo quadros.
+   **O projeto já tinha essa armadilha registrada** no comentário de `_abCentralizar`, e eu a
+   repeti. `scrollTo` com `behavior` explícito vence o CSS — suave com a página à vista,
+   instantâneo quando não está.
+
+### Testado ao vivo, nos dois modos de leitura
+
+| Modo | O que fiz | Resultado |
+|---|---|---|
+| Rolagem | 18s, 400s, 900s e **60s** (voltando) | rolou 4545→26, 26→3622, 3622→8224, 8224→495 — **frase na tela nas quatro** |
+| Virar página | 18s, 700s e **120s** (voltando) | coluna 0→15000→2000, sempre múltiplo exato da largura da página, **frase na tela nas três** |
+
+Config devolvida como estava (rolagem), modo desligado sem deixar barra nem áudio órfão, console
+limpo.
 
 ## 9. Pendências / a verificar
 
