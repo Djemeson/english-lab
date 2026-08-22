@@ -5219,6 +5219,12 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ab-card:hover .ab-card-nuvem{opacity:1}
 .ab-card-nuvem.on{opacity:.92;background:rgba(var(--primary-rgb),.85)}
 .ab-card-nuvem:hover{background:rgba(var(--primary-rgb),1)}
+/* As três saídas da tela de capítulo sem texto. Em fileira quando cabem, em
+   coluna quando não — são botões de largura desigual, e quebrar no meio de um
+   deles ficaria torto. */
+.ab-vazio-acoes{
+  display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:4px 0 10px;
+}
 .ab-nuvem-grade{display:grid;gap:8px;margin-bottom:16px}
 .ab-nuvem-linha{
   display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;

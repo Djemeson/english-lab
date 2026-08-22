@@ -1099,6 +1099,14 @@ function _abListaTexto() {
   const tr = abTransDoPonto(a, _abCap, atual) || (a.transcricoes || []).find(x => x.cap === _abCap)
   if (!tr) {
     const alvo = _abAlvoDaTranscricao()
+    // ⚠️ ESTA TELA ERA UM BECO. Ele chegava nela justamente quando queria
+    // texto — e a única saída era transcrever ESTE capítulo, um de cada vez.
+    // As outras duas portas (escolher na lista, ou mandar tudo) só existiam na
+    // barra de cima, que nem aparece aqui: sem transcrição não há barra.
+    // Quem está sem texto é quem mais precisa das três.
+    const caps = a.capitulos || []
+    const comTexto = caps.filter((_, i) => _abEstadoDoCap(a, i).estado !== 'vazio').length
+    const faltam = caps.length - comTexto
     return `<div class="est-nada">${ic('sparkles','ic-lg')}
       <p>Este capítulo ainda não tem texto.</p>
       <p class="est-dica" style="max-width:460px">
@@ -1108,10 +1116,17 @@ function _abListaTexto() {
           : `Este capítulo tem ${abTempoLongo(abDurCap(cap))}. Vou transcrever os
              ${AB_TRANS_JANELA_MIN} minutos em volta de onde você está, e não o arquivo inteiro.`}
       </p>
-      <button class="btn btn-primary btn-sm" onclick="abTranscrever()">
-        ${ic('sparkles','ic-sm')} Transcrever ${alvo.inteiro ? 'o capítulo' : 'este trecho'}</button>
-      ${(a.transcricoes || []).length ? `<p class="est-dica">Você já transcreveu
-        ${a.transcricoes.length} ${a.transcricoes.length === 1 ? 'trecho' : 'trechos'} deste livro.</p>` : ''}
+      <div class="ab-vazio-acoes">
+        <button class="btn btn-primary btn-sm" onclick="abTranscrever()">
+          ${ic('sparkles','ic-sm')} Transcrever ${alvo.inteiro ? 'o capítulo' : 'este trecho'}</button>
+        ${caps.length > 1 ? `<button class="btn btn-ghost btn-sm" id="ab-trans-btn-vazio"
+          onclick="event.stopPropagation();abTransPainel('ab-trans-btn-vazio')">
+          ${ic('captions','ic-sm')} Escolher capítulos</button>` : ''}
+        ${faltam > 1 ? `<button class="btn btn-ghost btn-sm" onclick="abTranscreverTudo()">
+          ${ic('layers','ic-sm')} Transcrever os ${faltam} que faltam</button>` : ''}
+      </div>
+      ${caps.length > 1 ? `<p class="est-dica">${comTexto} de ${caps.length} capítulos já têm texto.
+        ${comTexto ? 'Os que já têm não são refeitos nem cobrados de novo.' : ''}</p>` : ''}
     </div>`
   }
   // ⚠️ NADA DE LEGENDA EM MASSA POR BAIXO DAS FALAS. Foi o que eu fiz primeiro,
@@ -1190,7 +1205,14 @@ function _abListaTexto() {
 //
 // A peça é a mesma do raio-X de propósito — mesmo desenho, mesma marca ✦, mesmo
 // jeito de clicar. O que muda é a pergunta que cada uma responde.
-function abTransPainel() {
+// ⚠️ O PAINEL SE POSICIONAVA SOB UM BOTÃO QUE PODE NÃO EXISTIR. Ele nascia
+// preso ao `ab-trans-btn` da barra de cima — e na tela de capítulo sem texto
+// essa barra nem aparece, então o painel abriria no canto errado. A âncora
+// virou parâmetro.
+let _abTransAncora = 'ab-trans-btn'
+
+function abTransPainel(ancora) {
+  _abTransAncora = ancora || 'ab-trans-btn'
   const p = el('ab-trans-painel')
   if (p && p.classList.contains('aberto')) { p.classList.remove('aberto'); return }
   _abTransPainelRender()
@@ -1234,10 +1256,14 @@ function _abTransPainelRender(msg) {
     <p class="est-dica">Com <b>${ic('sparkles','ic-3xs')}</b> o texto já existe — o clique leva até
       ele. Sem a marca, o clique <b>transcreve</b>, e o custo é mostrado antes. O botão acima
       <b>pula</b> os que já têm texto.</p>`
-  const btn = el('ab-trans-btn')
+  const btn = el(_abTransAncora) || el('ab-trans-btn')
   if (btn) {
     const r = btn.getBoundingClientRect()
-    p.style.top = Math.round(r.bottom + 8) + 'px'
+    // ⚠️ Preso à tela nos dois eixos: aberto por um botão lá embaixo, um painel
+    // de 70vh sairia pela base. Sobe quando não couber.
+    const alt = Math.min(innerHeight * 0.7, 460)
+    const top = (r.bottom + 8 + alt > innerHeight) ? Math.max(8, r.top - alt - 8) : r.bottom + 8
+    p.style.top = Math.round(top) + 'px'
     p.style.left = Math.round(Math.max(8, Math.min(r.left - 120, innerWidth - 340))) + 'px'
   }
 }
