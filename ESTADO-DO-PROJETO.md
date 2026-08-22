@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (23ª) — **O 429 NÃO PODE SER TRATADO COMO FALHA — E ERA**. Ele
+> Última atualização: 2026-08-22 (24ª) — **A LISTA MOSTRA O QUE JÁ TEM TEXTO, E DÁ PARA MARCAR
+> VÁRIOS**. Dois pedidos: *"quero que aqui já apareça o simbolozinho dos capítulos que foram
+> gerados a transcrição. E quero que dê pra marcar várias pra gerar mais de uma."* A primeira era
+> uma pergunta simples — *"já transcrevi este?"* — que custava dois cliques e outra tela. A segunda
+> preenche o vão entre **este capítulo** e **o livro inteiro**, que é o uso mais comum: transcrever
+> os cinco que ele vai ouvir hoje. ⚠️ Marcado que **já tem texto não entra na conta** — a barra
+> mostra o número que vai ser cobrado, não o número de marcas.
+> `sw.js` → **englab-v367**. **Detalhes em §8.80.**
+>
+> Última atualização anterior: 2026-08-22 (23ª) — **O 429 NÃO PODE SER TRATADO COMO FALHA — E ERA**. Ele
 > rodou o agrupamento e mandou o print: *"Achei 5 capítulos nas 200 partes. Em 173 partes não deu
 > para ler o número"* — e o app **ainda ofereceu Aplicar** em cima disso. A pista estava na própria
 > prévia: as **19 primeiras** partes foram lidas e o resto falhou, que é o desenho de um **limite
@@ -13636,6 +13645,58 @@ varredura.
 - **Nada ficou no acervo dele**: conferido no localStorage — `grupos: null`, `_descLidos: null`, as
   3 transcrições e os 200 capítulos intactos.
 
+## 8.80 A marca na lista, e a seleção múltipla (2026-08-22, 24ª)
+
+> *"Quero que aqui já apareça o simbolozinho dos capítulos que foram gerados a transcrição. E
+> quero que dê pra marcar várias pra gerar mais de uma."*
+
+### 1. A lista não dizia o que já tinha texto
+
+Para responder *"já transcrevi este?"* ele precisava abrir o painel de transcrição — dois cliques e
+outra tela para uma pergunta que nasce **na lista**. Agora cada linha traz a marca e o número de
+falas ao lado da duração: *"003 · 53 falas · 3:29"*.
+
+### 2. Entre "este capítulo" e "o livro inteiro" não havia nada
+
+E o meio é o que mais se usa: transcrever os cinco capítulos que ele vai ouvir hoje. A linha ganhou
+caixa de seleção, e apareceu uma barra com **Marcar os que faltam**, **Limpar** e
+**Transcrever N**.
+
+⚠️ **Marcado que já tem texto não entra na conta.** Transcrever de novo é pagar duas vezes pela
+mesma coisa, então a barra mostra o número que vai ser **cobrado**, não o número de marcas — e diz
+quantos ficaram de fora: *"3 marcados · 1 já tem texto e fica de fora · Transcrever 2"*.
+
+⚠️ **A seleção não é salva.** É intenção do momento: marcar cinco, mandar, pronto. Guardá-la faria
+a lista abrir amanhã com marcas que ele não lembra de ter feito — e o risco é gastar IA sem querer.
+
+`abTranscreverTudo` passou a aceitar uma lista opcional de índices; a regra de pular o que já tem
+texto é a mesma nos dois caminhos, e a fila de segundo plano é a mesma.
+
+### ⚠️ A linha virou dois botões
+
+Antes o capítulo inteiro era um botão só. Com a caixa de seleção, um clique nela não pode virar
+"tocar aqui". E o realce do capítulo atual passou para a **linha**, não para o botão de dentro —
+senão a caixa ficaria fora do destaque.
+
+A caixa vazia só aparece no **hover**: 200 quadradinhos vazios seriam ruído numa lista dessas.
+
+### Medido — no Chrome, com o livro dele
+
+- **A marca:** exatamente os capítulos 3, 4 e 5 (os três que ele tem transcritos) aparecem com o
+  ícone e as falas — *"003 · 53 falas"*, *"004 · 177 falas"*, *"005 · 11 falas"*.
+- **A barra sem seleção:** *"197 de 200 capítulos ainda não têm texto · Marcar os que faltam"*.
+- **Marcando 2 vazios + 1 já transcrito:** *"3 marcados · 1 já tem texto e fica de fora · Limpar ·
+  Transcrever 2"*.
+- **O aviso de custo** (lido e cancelado): *"Vou transcrever 2 capítulos **dos que você marcou** —
+  cerca de 7 min de áudio. Custa cerca de R$ 0,02 na Groq, e leva poucos minutos"*.
+- **"Marcar os que faltam":** pegou 197 e **não incluiu** nenhum dos 3 transcritos.
+- **Nada ficou no acervo dele:** seleção limpa, `grupos: null`, as 3 transcrições e os 200
+  capítulos intactos.
+
+⚠️ **Uma correção que o teste forçou:** `abTranscreverSelecionados` não devolvia a promessa de
+`abTranscreverTudo` — quem chamava não conseguia esperar o aviso de custo, e o teste lia a tela
+antes de o modal existir.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13644,6 +13705,13 @@ varredura.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada da seleção (§8.80, 2026-08-22)
+
+- [ ] **Não há "marcar um intervalo"** (clicar no 10 e no 25 com Shift). Com 200 capítulos, marcar
+      de um em um cansa — mas "marcar os que faltam" cobre o caso mais comum.
+- [ ] **A marca não distingue transcrito de transcrito E analisado.** O painel do raio-X mostra
+      isso; a lista, não. Se fizer falta, é um segundo ícone.
 
 ### Da rodada do 429 (§8.79, 2026-08-22)
 
