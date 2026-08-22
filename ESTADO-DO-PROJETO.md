@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (30ª) — **O DIÁRIO SOMA DE VERDADE, E A FILA DO KINDLE ENTRA**.
+> Última atualização: 2026-08-22 (31ª) — **AS PARCELAS DO DIÁRIO NASCEM NA CARGA, E O QUE JÁ
+> PASSOU CONSOLIDA**. As duas pendências que sobraram de §8.86. A migração precisava rodar **ao
+> abrir o app**, não só ao estudar: enquanto um dia não tem parcelas, o merge cai na regra velha —
+> o dia de hoje continuaria perdendo metade do estudo até a primeira revisão. E dia fechado não
+> recebe estudo novo, então guardar de quem foi cada parcela dele é peso sem uso: acima de **7
+> dias** vira um `_antes` só, o que impede `porAparelho` de crescer para sempre.
+> **Medido com os sete dias reais dele: totais idênticos antes e depois.**
+> `sw.js` → **englab-v375**. **Detalhes em §8.87.**
+>
+> Última atualização anterior: 2026-08-22 (30ª) — **O DIÁRIO SOMA DE VERDADE, E A FILA DO KINDLE ENTRA**.
 > Na rodada anterior o diário virou "fica com o maior" porque somar totais inflava a cada push. A
 > saída certa era **contar separado**: cada dia guarda uma parcela por aparelho, e o total é a soma
 > delas — 20 no celular e 15 no computador dão **35 de verdade**, e um segundo push continua 35.
@@ -14067,6 +14076,45 @@ usa.
   chave do Kindle (mesma captura em dois aparelhos → mesma chave; capturas diferentes → chaves
   diferentes).
 
+## 8.87 As parcelas nascem na carga, e o que já passou consolida (2026-08-22, 31ª)
+
+As duas pendências que sobraram de §8.86.
+
+### 1. A migração tinha de rodar ao ABRIR o app
+
+⚠️ Enquanto um dia não tem parcelas, o merge cai na regra velha (*"fica com o maior"*) — ou seja,
+**o dia de hoje continuaria perdendo metade do estudo** até a primeira revisão nesta versão.
+`srsLogMigrar()` roda em `loadSrs` e fecha essa janela.
+
+### 2. Dia fechado não precisa saber de quem foi cada parcela
+
+Dia que já passou não recebe estudo novo, então guardar a divisão por aparelho é peso sem uso.
+Acima de **7 dias**, as parcelas viram um `_antes` só — e parcelas zeradas saem.
+
+⚠️ **É o que impede `porAparelho` de crescer para sempre.** Trocar de celular ou limpar o navegador
+gera um id novo, e a parcela antiga ficaria ali, dia após dia.
+
+### Medido — com os sete dias reais dele
+
+| | Resultado |
+|---|---|
+| Totais antes da migração | 8, 30, 42, 15, 15, 21, 24 |
+| Totais depois | **8, 30, 42, 15, 15, 21, 24** — idênticos |
+| Todos os dias com parcela | sim (`_antes`) |
+| Soma das parcelas = total | sim, em todos |
+| Ofensiva e "novos hoje" | continuam lendo certo (0 e 3) |
+
+E o ciclo completo, num objeto de teste (sem tocar no diário dele):
+
+- **Uma revisão:** 24 → **25**, com `_antes:24` e a parcela deste aparelho em 1 — não somou em cima
+  do número antigo.
+- Mais quatro → **29**; desfazer uma → **28**.
+- **Merge com outro aparelho** (que tinha 10): **38**, com as três parcelas.
+- **Três pushes seguidos:** 38, 38, 38 — não infla.
+- **Push real:** os totais na nuvem idênticos antes e depois, e agora **com as parcelas**.
+
+Dia antigo com três parcelas (uma zerada) consolidou em `_antes` com o total certo: 5 + 7 + 0 = 12.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -14078,11 +14126,13 @@ usa.
 
 ### Da rodada do diário por aparelho (§8.86, 2026-08-22)
 
-- [ ] **As parcelas só nascem ao estudar.** Um dia antigo continua sem `porAparelho` até receber
+- [x] ~~**As parcelas só nascem ao estudar**~~ — **feito em 2026-08-22** (§8.87): migram na
+      carga. Texto original: Um dia antigo continua sem `porAparelho` até receber
       uma revisão — o que está certo, mas significa que o dia de hoje dele (24 revisados) ainda
       mescla pela regra velha ("o maior") se ele estudar nos dois aparelhos antes da primeira
       revisão desta versão. Some sozinho no primeiro estudo.
-- [ ] **`porAparelho` cresce um campo por navegador usado.** Trocar de celular ou limpar o
+- [x] ~~**`porAparelho` cresce um campo por navegador usado**~~ — **feito em 2026-08-22**
+      (§8.87): dia acima de 7 dias consolida em `_antes`. Texto original: Trocar de celular ou limpar o
       localStorage cria um id novo, e a parcela antiga fica. É pequeno (três números por aparelho
       por dia), mas nunca é limpo.
 
