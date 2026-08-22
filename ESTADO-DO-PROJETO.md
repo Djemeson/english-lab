@@ -7,7 +7,15 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (29ª) — **AS TRÊS PENDÊNCIAS DO MERGE, FECHADAS**. `srsCards`
+> Última atualização: 2026-08-22 (30ª) — **O DIÁRIO SOMA DE VERDADE, E A FILA DO KINDLE ENTRA**.
+> Na rodada anterior o diário virou "fica com o maior" porque somar totais inflava a cada push. A
+> saída certa era **contar separado**: cada dia guarda uma parcela por aparelho, e o total é a soma
+> delas — 20 no celular e 15 no computador dão **35 de verdade**, e um segundo push continua 35.
+> A fila do Kindle entrou sem inventar `id`: a identidade **já existia** espalhada em
+> `kindleItemVisto` (o hash do destaque), e o `kindleSeen` já era o tombstone natural.
+> `sw.js` → **englab-v374**. **Detalhes em §8.86.**
+>
+> Última atualização anterior: 2026-08-22 (29ª) — **AS TRÊS PENDÊNCIAS DO MERGE, FECHADAS**. `srsCards`
 > entrou (a marca de remoção alcançou o IndexedDB por um **espelho só com os ids**); `srsDecks`,
 > `conversas`, `podShows` e o **diário de estudo** entraram no merge; e a marca de remoção ganhou
 > **prazo de 90 dias**, podada ao marcar e na abertura. ⚠️ **Duas armadilhas caíram no teste:** o
@@ -14004,6 +14012,61 @@ resolver. As três chamadas que cruzam de arquivo (`marcarSumidosCards`, `removi
   que é o comportamento certo do primeiro save.
 - **Push final:** nada sumiu em nenhuma das 10 listas, nenhuma marca residual.
 
+## 8.86 O diário soma de verdade, e a fila do Kindle entra (2026-08-22, 30ª)
+
+### 1. Contar separado é o que faltava
+
+Em §8.85 o diário virou *"fica com o maior"* porque somar os totais inflava a cada push — o
+contador local não zera depois de subir. A saída certa não era escolher entre somar e escolher:
+era **contar separado**.
+
+Cada dia passa a guardar `porAparelho: { ap1:{…}, ap2:{…} }`, e os campos do topo são a **soma das
+parcelas**. Unir dois lados vira *"o maior de **cada** parcela"* — o contador daquele aparelho só
+cresce — e o total se refaz a partir delas.
+
+| Situação | Resultado |
+|---|---|
+| 20 no celular + 15 no computador | **35** |
+| O mesmo celular sobe 4× seguidas | 35, 35, 35, 35 — **não infla** |
+| Celular estuda mais 10 e sobe | **45** (30 dele + 15 do outro) |
+| Dia antigo, sem parcelas dos dois lados | o maior, como antes |
+
+⚠️ **O total continua no topo de propósito.** O gráfico, a ofensiva e o "quantos novos hoje" leem
+`log.reviewed` direto; mudar isso obrigaria a mexer em quatro telas para resolver um problema de
+sincronização.
+
+⚠️ **A migração não podia somar em cima.** Dia que já existia sem parcelas tem o total antigo
+movido para um aparelho fictício (`_antes`), **não** para o atual — senão o que este aparelho
+estudasse hoje somaria sobre um número que talvez venha do outro, e o dia **inflaria na primeira
+revisão**. Medido: dia com 24 vira **25** após uma revisão (não 1, nem 49), 29 após mais quatro, e
+28 ao desfazer.
+
+⚠️ **O backup de sessão também mudou de lugar:** escreve na parcela **deste** aparelho, não no
+total — escrever no total seria desfeito no próximo cálculo.
+
+Nasceu junto `aparelhoId()`: um número aleatório guardado uma vez. Não identifica pessoa nem
+máquina, só distingue *este* navegador do outro.
+
+### 2. A fila do Kindle entrou — e o que faltava não era `id`
+
+Era **ver que a identidade já existia**, espalhada dentro de `kindleItemVisto`: um destaque é o
+hash do seu texto, e um item com filhos é o conjunto deles. Virou `kindleChave()`, e
+`_fbMesclarLista` passou a aceitar **chave derivada** (o item não guarda a dele).
+
+⚠️ **E o medo de "a captura processada volta para a fila" já tinha resposta pronta:** `kindleSeen`,
+o histórico do que passou, é o **tombstone natural** desta lista — o mesmo filtro que a descida
+usa.
+
+### Medido — com o acervo real, dois pushes seguidos
+
+- **As 10 listas idênticas** antes e depois; o **diário byte a byte igual** (nenhum número inflou).
+- **A fila com 41 itens preservados**, e — o que garante que o merge funcionou de verdade —
+  **os 41 com chave, 41 chaves únicas, nenhuma vazia**. Chave vazia descartaria o item, e a fila
+  teria ido a zero.
+- Fora do navegador: os quatro casos da tabela acima, mais a migração (24 → 25 → 29 → 28) e a
+  chave do Kindle (mesma captura em dois aparelhos → mesma chave; capturas diferentes → chaves
+  diferentes).
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -14013,13 +14076,25 @@ resolver. As três chamadas que cruzam de arquivo (`marcarSumidosCards`, `removi
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do diário por aparelho (§8.86, 2026-08-22)
+
+- [ ] **As parcelas só nascem ao estudar.** Um dia antigo continua sem `porAparelho` até receber
+      uma revisão — o que está certo, mas significa que o dia de hoje dele (24 revisados) ainda
+      mescla pela regra velha ("o maior") se ele estudar nos dois aparelhos antes da primeira
+      revisão desta versão. Some sozinho no primeiro estudo.
+- [ ] **`porAparelho` cresce um campo por navegador usado.** Trocar de celular ou limpar o
+      localStorage cria um id novo, e a parcela antiga fica. É pequeno (três números por aparelho
+      por dia), mas nunca é limpo.
+
 ### Da rodada das três pendências (§8.85, 2026-08-22)
 
-- [ ] **O diário fica com o maior, não com a soma.** Estudar nos dois aparelhos no mesmo dia
+- [x] ~~**O diário fica com o maior, não com a soma**~~ — **feito em 2026-08-22** (§8.86): conta
+      por aparelho, e a soma voltou a ser possível sem inflar. Texto original: Estudar nos dois aparelhos no mesmo dia
       registra só o maior dos dois. Somar certo exige contar por aparelho
       (`{date, porAparelho:{}}`), o que muda o formato e o gráfico — vale no dia em que ele estudar
       nos dois no mesmo dia.
-- [ ] **`kindleQueue` fora do merge:** se ele capturar no celular e o computador subir uma fila
+- [x] ~~**`kindleQueue` fora do merge**~~ — **feito em 2026-08-22** (§8.86), pela chave que já
+      existia em `kindleItemVisto`. Texto original: se ele capturar no celular e o computador subir uma fila
       antiga, a captura nova se perde. Precisaria de `id` por item para entrar.
 
 ### Da rodada do merge na subida (§8.84, 2026-08-22)
