@@ -5327,15 +5327,47 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 
 .ab-abas{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px}
 .ab-caps{display:flex;flex-direction:column;max-height:420px;overflow-y:auto}
+/* ⚠️ A LINHA VIROU DOIS BOTÕES. Antes o capítulo inteiro era um botão só; com
+   a marca de seleção, um clique na caixinha não pode virar "tocar aqui". O
+   realce do capítulo atual passou para a LINHA, e não para o botão de dentro,
+   senão a caixinha ficaria fora do destaque. */
+.ab-cap-linha{
+  display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;
+  border-radius:var(--radius-xs);
+}
+.ab-cap-linha:hover{background:var(--surface)}
+.ab-cap-linha.on{background:rgba(var(--primary-rgb),.14)}
+.ab-cap-linha.on .ab-cap{color:var(--text)}
+.ab-cap-linha.sel{background:rgba(var(--primary-rgb),.20);box-shadow:inset 2px 0 0 var(--role-energia)}
+.ab-cap-check{
+  display:flex;align-items:center;justify-content:center;height:100%;
+  background:none;border:0;cursor:pointer;color:var(--role-ia, var(--primary));padding:0;
+}
+.ab-cap-check:hover{color:var(--role-energia)}
+/* A caixa vazia só aparece no hover: 200 quadradinhos vazios seriam ruído. */
+.ab-cap-vazio{
+  width:14px;height:14px;border:1.5px solid var(--border);border-radius:4px;opacity:0;transition:opacity .15s;
+}
+.ab-cap-linha:hover .ab-cap-vazio{opacity:.7}
+.ab-cap-check:hover .ab-cap-vazio{opacity:1;border-color:var(--role-energia)}
+
 .ab-cap{
   display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:12px;align-items:center;
   background:none;border:0;border-radius:var(--radius-xs);cursor:pointer;text-align:left;
   padding:9px 10px;color:var(--text2);font-family:inherit;font-size:var(--fs-sm);
 }
-.ab-cap:hover{background:var(--surface)}
-.ab-cap.on{background:rgba(var(--primary-rgb),.14);color:var(--text)}
 .ab-cap-n{font-size:var(--fs-3xs);color:var(--text3);text-align:right}
-.ab-cap.on .ab-cap-n{color:var(--role-energia)}
+.ab-cap-linha.on .ab-cap-n{color:var(--role-energia)}
+
+/* A barra da seleção: some quando não há nada marcado e nada a marcar. */
+.ab-selbar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:8px 12px;margin-bottom:8px;border-radius:var(--radius-xs);
+  background:rgba(var(--primary-rgb),.10);border:1px solid rgba(var(--primary-rgb),.25);
+  font-size:var(--fs-sm);color:var(--text2);
+}
+.ab-selbar > span{flex:1;min-width:0}
+.ab-selbar-vazia{background:var(--surface2);border-color:var(--border);color:var(--text3);font-size:var(--fs-3xs)}
 .ab-cap-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ab-cap-d{font-size:var(--fs-3xs);color:var(--text3);font-variant-numeric:tabular-nums}
 

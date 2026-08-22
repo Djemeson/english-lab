@@ -2703,20 +2703,24 @@ function _abTempoDaFila(n) {
   return `cerca de ${txt} — vale deixar rodando`
 }
 
-async function abTranscreverTudo() {
+// `somenteEstes` (opcional) restringe aos capítulos marcados; sem ele, vale o
+// livro inteiro. A regra de pular o que já tem texto é a mesma nos dois casos.
+async function abTranscreverTudo(somenteEstes) {
   const a = _abLivro; if (!a) return
   const stt = typeof aiSttCfg === 'function' ? aiSttCfg() : null
   if (!stt) { toast('Configure a chave da Groq ou da OpenAI para transcrever (Configurações → IA)', 'error'); return }
 
+  const escopo = Array.isArray(somenteEstes) && somenteEstes.length
+    ? somenteEstes : (a.capitulos || []).map((_, i) => i)
   const faltam = [], grandes = []
   let minutos = 0
-  for (let i = 0; i < (a.capitulos || []).length; i++) {
+  for (const i of escopo) {
     if (_abEstadoDoCap(a, i).estado !== 'vazio') continue     // já tem texto: pula
     const alvo = _abAlvoInteiro(a, i)
     if (alvo.minutos > AB_TRANS_TETO_MIN) { grandes.push((a.capitulos[i] || {}).titulo || `Capítulo ${i + 1}`); continue }
     faltam.push({ id: a.id, cap: i }); minutos += alvo.minutos
   }
-  const jaTem = (a.capitulos || []).length - faltam.length - grandes.length
+  const jaTem = escopo.length - faltam.length - grandes.length
 
   if (!faltam.length) {
     toast(grandes.length
@@ -2730,7 +2734,8 @@ async function abTranscreverTudo() {
   const ok = await confirmModal({
     title: 'Transcrever o livro inteiro', icon: 'captions', confirmText: 'Transcrever',
     html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
-      Vou transcrever <b>${faltam.length} ${faltam.length === 1 ? 'capítulo' : 'capítulos'}</b> —
+      Vou transcrever <b>${faltam.length} ${faltam.length === 1 ? 'capítulo' : 'capítulos'}</b>${
+        Array.isArray(somenteEstes) && somenteEstes.length ? ' dos que você marcou' : ''} —
       cerca de <b>${Math.round(minutos)} min</b> de áudio.
       ${jaTem ? `Os <b>${jaTem}</b> que já têm texto ficam como estão: não são refeitos nem cobrados de novo.` : ''}
       <br><br>
@@ -2928,6 +2933,7 @@ function _abPintarBaixando(a, msg, pct) {
 }
 
 function abFechar() {
+  _abSel.clear()
   _abHoverLimpar()
   _abQuerTocar = false
   _abAbaAtual = 'capitulos'
@@ -3133,19 +3139,32 @@ function _abListaCapitulos() {
            precisar do livro em texto.</span>
          <button class="btn btn-ghost btn-sm" onclick="abAgruparCapitulos()">Descobrir capítulos</button>
        </div>` : ''
-  const item = (c, i) => `
-    <button class="ab-cap${i === _abCap ? ' on' : ''}" onclick="abIrCapitulo(${i})">
-      <span class="ab-cap-n">${i + 1}</span>
-      <span class="ab-cap-t">${esc(c.titulo)}</span>
-      <span class="ab-cap-d">${abTempo(abDurCap(c))}</span>
-    </button>`
+  // ⚠️ A LISTA NÃO DIZIA O QUE JÁ TINHA TEXTO. Para saber, ele precisava abrir o
+  // painel de transcrição — uma pergunta simples ("já transcrevi este?") que
+  // custava dois cliques e uma tela. A marca resolve onde a dúvida nasce.
+  const item = (c, i) => {
+    const e = _abEstadoDoCap(a, i)
+    const temTexto = e.estado !== 'vazio'
+    const marcado = _abSel.has(i)
+    return `<div class="ab-cap-linha${i === _abCap ? ' on' : ''}${marcado ? ' sel' : ''}">
+      <button class="ab-cap-check" data-tip="${temTexto ? 'Já transcrito' : 'Marcar para transcrever'}"
+              onclick="event.stopPropagation();abSelAlternar(${i})">
+        ${marcado ? ic('checkCircle','ic-sm') : temTexto ? ic('sparkles','ic-sm') : `<span class="ab-cap-vazio"></span>`}
+      </button>
+      <button class="ab-cap" onclick="abIrCapitulo(${i})">
+        <span class="ab-cap-n">${i + 1}</span>
+        <span class="ab-cap-t">${esc(c.titulo)}</span>
+        <span class="ab-cap-d">${temTexto ? `${e.falas} falas · ` : ''}${abTempo(abDurCap(c))}</span>
+      </button>
+    </div>`
+  }
 
   // ⚠️ AGRUPADO QUANDO HÁ GRUPOS, E SÓ ENTÃO. `a.grupos` é camada de exibição:
   // os índices continuam sendo os de `a.capitulos`, que é o que a posição, os
   // marcadores e as transcrições guardam. Nada aqui pode renumerar nada.
   if ((a.grupos || []).length) {
     const abertoAgora = abGrupoDaParte(a, _abCap)
-    return `${conviteGrupo}${convite}
+    return `${conviteGrupo}${convite}${_abBarraSel(a)}
       <div class="ab-grupos">
         ${a.grupos.map((g, gi) => {
           const n = g.ate - g.de + 1
@@ -3166,7 +3185,68 @@ function _abListaCapitulos() {
       <p class="est-dica" style="margin-top:10px">Capítulos montados pela numeração que o narrador
         diz. <button class="btn btn-ghost btn-sm" onclick="abDesagrupar()">Desfazer o agrupamento</button></p>`
   }
-  return `${conviteGrupo}${convite}<div class="ab-caps">${caps.map(item).join('')}</div>`
+  return `${conviteGrupo}${convite}${_abBarraSel(a)}<div class="ab-caps">${caps.map(item).join('')}</div>`
+}
+
+// ================================================================
+// MARCAR VÁRIOS CAPÍTULOS E TRANSCREVER DE UMA VEZ
+// ================================================================
+// Pedido dele: *"quero que aqui já apareça o simbolozinho dos capítulos que
+// foram gerados a transcrição. E quero que dê pra marcar várias pra gerar mais
+// de uma."*
+//
+// Entre "este capítulo" e "o livro inteiro" não havia nada — e o meio é o que
+// mais se usa: transcrever os cinco capítulos que ele vai ouvir hoje.
+//
+// ⚠️ A SELEÇÃO NÃO É SALVA. É uma intenção do momento: marcar cinco, mandar,
+// pronto. Guardá-la faria a lista abrir amanhã com marcas que ele não lembra
+// de ter feito — e o risco é gastar IA sem querer.
+let _abSel = new Set()
+
+function abSelAlternar(i) {
+  if (_abSel.has(i)) _abSel.delete(i); else _abSel.add(i)
+  abAba('capitulos')
+}
+
+function abSelLimpar() { _abSel.clear(); abAba('capitulos') }
+
+function abSelTodosQueFaltam() {
+  const a = _abLivro; if (!a) return
+  _abSel = new Set((a.capitulos || []).map((_, i) => i).filter(i => _abEstadoDoCap(a, i).estado === 'vazio'))
+  abAba('capitulos')
+}
+
+function _abBarraSel(a) {
+  const caps = a.capitulos || []
+  const faltamTodos = caps.filter((_, i) => _abEstadoDoCap(a, i).estado === 'vazio').length
+  if (!_abSel.size) {
+    if (!faltamTodos || caps.length < 2) return ''
+    return `<div class="ab-selbar ab-selbar-vazia">
+      <span>${faltamTodos} de ${caps.length} ${faltamTodos === 1 ? 'capítulo ainda não tem' : 'capítulos ainda não têm'} texto</span>
+      <button class="btn btn-ghost btn-sm" onclick="abSelTodosQueFaltam()">Marcar os que faltam</button>
+    </div>`
+  }
+  // ⚠️ Marcado que JÁ tem texto não entra na conta: transcrever de novo é
+  // pagar duas vezes pela mesma coisa, e a barra precisa dizer o número que
+  // vai ser cobrado, não o número de marcas.
+  const novos = [..._abSel].filter(i => _abEstadoDoCap(a, i).estado === 'vazio')
+  const repetidos = _abSel.size - novos.length
+  return `<div class="ab-selbar">
+    <span><b>${_abSel.size}</b> ${_abSel.size === 1 ? 'marcado' : 'marcados'}${
+      repetidos ? ` · ${repetidos} já ${repetidos === 1 ? 'tem' : 'têm'} texto e ${repetidos === 1 ? 'fica' : 'ficam'} de fora` : ''}</span>
+    <button class="btn btn-ghost btn-sm" onclick="abSelLimpar()">Limpar</button>
+    <button class="btn btn-primary btn-sm" ${novos.length ? '' : 'disabled'}
+            onclick="abTranscreverSelecionados()">
+      ${ic('captions','ic-sm')} Transcrever ${novos.length || ''}</button>
+  </div>`
+}
+
+function abTranscreverSelecionados() {
+  const a = _abLivro; if (!a) return
+  const alvos = [..._abSel].filter(i => _abEstadoDoCap(a, i).estado === 'vazio').sort((x, y) => x - y)
+  if (!alvos.length) { toast('Os marcados já têm texto.', 'info'); return }
+  _abSel.clear()
+  abTranscreverTudo(alvos)
 }
 
 let _abGrupoAberto = -1
