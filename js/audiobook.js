@@ -1390,7 +1390,7 @@ function _abListaTexto() {
     const caps = a.capitulos || []
     const comTexto = caps.filter((_, i) => _abEstadoDoCap(a, i).estado !== 'vazio').length
     const faltam = caps.length - comTexto
-    return `<div class="est-nada">${ic('sparkles','ic-lg')}
+    return `<div class="est-nada">${ic('captions','ic-lg')}
       <p>Este capítulo ainda não tem texto.</p>
       <p class="est-dica" style="max-width:460px">
         ${alvo.inteiro
@@ -1401,7 +1401,7 @@ function _abListaTexto() {
       </p>
       <div class="ab-vazio-acoes">
         <button class="btn btn-primary btn-sm" onclick="abTranscrever()">
-          ${ic('sparkles','ic-sm')} Transcrever ${alvo.inteiro ? 'o capítulo' : 'este trecho'}</button>
+          ${ic('captions','ic-sm')} Transcrever ${alvo.inteiro ? 'o capítulo' : 'este trecho'}</button>
         ${caps.length > 1 ? `<button class="btn btn-ghost btn-sm" id="ab-trans-btn-vazio"
           onclick="event.stopPropagation();abTransPainel('ab-trans-btn-vazio')">
           ${ic('captions','ic-sm')} Escolher capítulos</button>` : ''}
@@ -1527,7 +1527,7 @@ function _abTransPainelRender(msg) {
         const tem = e2.estado !== 'vazio'
         return `<button class="ler-raiox-cap${i === _abCap ? ' atual' : ''}${tem ? ' feito' : ''}"
                   onclick="abTransDoCapitulo(${i})">
-          <span class="ler-raiox-spark">${tem ? ic('sparkles','ic-sm') : ''}</span>
+          <span class="ler-raiox-spark">${tem ? ic('captions','ic-sm') : ''}</span>
           <span class="ler-raiox-nome">${esc(c.titulo || `Capítulo ${i + 1}`)}</span>
           <span class="ler-raiox-n">${tem ? `${e2.falas} ${e2.falas === 1 ? 'fala' : 'falas'}` : 'transcrever'}</span>
         </button>`
@@ -1536,7 +1536,7 @@ function _abTransPainelRender(msg) {
     ${caps.some((_, i) => _abEstadoDoCap(a, i).estado === 'vazio') ? `
     <button class="btn btn-primary btn-sm" style="width:100%" onclick="abTranscreverTudo()">
       ${ic('captions','ic-sm')} Transcrever tudo o que falta</button>` : ''}
-    <p class="est-dica">Com <b>${ic('sparkles','ic-3xs')}</b> o texto já existe — o clique leva até
+    <p class="est-dica">Com <b>${ic('captions','ic-3xs')}</b> o texto já existe — o clique leva até
       ele. Sem a marca, o clique <b>transcreve</b>, e o custo é mostrado antes. O botão acima
       <b>pula</b> os que já têm texto.</p>`
   const btn = el(_abTransAncora) || el('ab-trans-btn')
@@ -1567,6 +1567,25 @@ function abRaioXPainel() {
   if (p && p.classList.contains('aberto')) { p.classList.remove('aberto'); return }
   _abRaioXPainelRender()
   el('ab-raiox-painel').classList.add('aberto')
+}
+
+// ⚠️ O MESMO ÍCONE QUERIA DIZER DUAS COISAS. O painel de Transcrição usava ✦
+// para "tem texto"; o do raio-X usava ✦ para "está analisado". Dois painéis
+// irmãos, mesmo símbolo, sentidos diferentes — e na lista de capítulos, onde
+// os dois estados convivem, isso vira uma marca que não responde nada.
+//
+// O vocabulário agora é um só, e vale em toda a seção:
+//
+//   legenda (captions) → tem TEXTO
+//   brilho  (sparkles) → tem ANÁLISE (e texto, que a análise exige)
+//
+// Um ícone por linha, e não dois: o brilho já implica a legenda, e duas marcas
+// numa coluna de 34px viram sujeira antes de virar informação.
+function abIconeDoCap(a, i) {
+  const e = _abEstadoDoCap(a, i)
+  if (e.estado === 'pronto') return { ic: 'sparkles', classe: 'analisado', dica: `Transcrito e analisado — ${e.n} ${e.n === 1 ? 'achado' : 'achados'}` }
+  if (e.estado === 'texto')  return { ic: 'captions', classe: 'transcrito', dica: 'Transcrito — falta a análise' }
+  return null
 }
 
 function _abEstadoDoCap(a, i) {
@@ -3144,17 +3163,19 @@ function _abListaCapitulos() {
   // custava dois cliques e uma tela. A marca resolve onde a dúvida nasce.
   const item = (c, i) => {
     const e = _abEstadoDoCap(a, i)
-    const temTexto = e.estado !== 'vazio'
+    const marca = abIconeDoCap(a, i)
     const marcado = _abSel.has(i)
     return `<div class="ab-cap-linha${i === _abCap ? ' on' : ''}${marcado ? ' sel' : ''}">
-      <button class="ab-cap-check" data-tip="${temTexto ? 'Já transcrito' : 'Marcar para transcrever'}"
+      <button class="ab-cap-check${marca ? ' ' + marca.classe : ''}"
+              data-tip="${escA(marcado ? 'Marcado' : marca ? marca.dica : 'Marcar para transcrever')}"
               onclick="event.stopPropagation();abSelAlternar(${i})">
-        ${marcado ? ic('checkCircle','ic-sm') : temTexto ? ic('sparkles','ic-sm') : `<span class="ab-cap-vazio"></span>`}
+        ${marcado ? ic('checkCircle','ic-sm') : marca ? ic(marca.ic,'ic-sm') : `<span class="ab-cap-vazio"></span>`}
       </button>
       <button class="ab-cap" onclick="abIrCapitulo(${i})">
         <span class="ab-cap-n">${i + 1}</span>
         <span class="ab-cap-t">${esc(c.titulo)}</span>
-        <span class="ab-cap-d">${temTexto ? `${e.falas} falas · ` : ''}${abTempo(abDurCap(c))}</span>
+        <span class="ab-cap-d">${e.estado === 'pronto' ? `${e.n} ${e.n === 1 ? 'achado' : 'achados'} · `
+          : e.estado === 'texto' ? `${e.falas} falas · ` : ''}${abTempo(abDurCap(c))}</span>
       </button>
     </div>`
   }
@@ -3300,7 +3321,7 @@ function _abListaMarcadores() {
     </div>`
   }).join('')}</div>
   ${algumSemFrase && !(a.transcricoes || []).length ? `<p class="est-dica" style="margin-top:12px">
-    ${ic('sparkles','ic-3xs')} <b>Transcreva o capítulo</b> na aba Texto e estes marcadores passam a
+    ${ic('captions','ic-3xs')} <b>Transcreva o capítulo</b> na aba Texto e estes marcadores passam a
     mostrar o que foi dito — inclusive os que você guardou antes.</p>` : ''}`
 }
 

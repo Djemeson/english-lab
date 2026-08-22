@@ -5343,6 +5343,12 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   display:flex;align-items:center;justify-content:center;height:100%;
   background:none;border:0;cursor:pointer;color:var(--role-ia, var(--primary));padding:0;
 }
+/* Duas marcas, dois pesos. Transcrito é um estado de PASSAGEM — o texto existe,
+   falta a análise —, então fica discreto; analisado é o fim da linha e brilha.
+   Sem a diferença de peso, a lista teria dois ícones iguais em importância e o
+   olho não saberia onde ainda há trabalho. */
+.ab-cap-check.transcrito{color:var(--text3)}
+.ab-cap-check.analisado{color:var(--role-ia, var(--primary))}
 .ab-cap-check:hover{color:var(--role-energia)}
 /* A caixa vazia só aparece no hover: 200 quadradinhos vazios seriam ruído. */
 .ab-cap-vazio{
