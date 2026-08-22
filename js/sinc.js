@@ -469,24 +469,39 @@ function _sincPintarFrase(ix) {
   const alvo = document.querySelector('.sinc-frase')
   if (alvo) alvo.textContent = f.texto.slice(0, 70)
   if (!_sincSeguir) return
-  // ⚠️ SEGUIR A VOZ É VIRAR A PÁGINA, não rolar. O leitor deste app é
-  // paginado por colunas; um `scrollIntoView` puxaria a viewport para um lugar
-  // que a paginação não reconhece e a página seguinte nasceria torta.
+  _sincLevarAVista(f)
+}
+
+// ⚠️ SEGUIR A VOZ TEM DE IR PARA OS DOIS LADOS, e a primeira versão só ia para
+// a frente. Foi o que ele viu: a barra dizia *"Gared said with iron
+// certainty"*, que é do começo do prólogo, e a página na tela estava lá
+// adiante — o destaque existia numa coluna que ninguém estava olhando.
+// Acontece o tempo todo: ele lê até certo ponto, o áudio começa do princípio
+// do capítulo, e acompanhar significa **voltar**.
+// ⚠️ E não é `scrollIntoView`: no modo paginado o leitor rola por COLUNAS de
+// largura exata, e um scroll arbitrário deixaria meia linha cortada na borda —
+// por isso o deslocamento é sempre um número inteiro de páginas.
+function _sincLevarAVista(f) {
   try {
-    const rect = f.range.getBoundingClientRect()
     const vp = document.getElementById('ler-viewport')
-    if (!rect || !vp || (!rect.width && !rect.height)) return
+    if (!vp || !f) return
+    const r = f.range.getClientRects()[0] || f.range.getBoundingClientRect()
+    if (!r || (!r.width && !r.height)) return
     const cx = vp.getBoundingClientRect()
-    if (rect.top >= cx.top - 4 && rect.bottom <= cx.bottom + 4 && rect.left >= cx.left - 4 && rect.right <= cx.right + 4) return
-    if (typeof _lerIrParaFrac === 'function' && typeof lerAvancarPagina === 'function') {
-      // Fora da página visível: avança até a frase aparecer (no máximo 3
-      // páginas, para nunca entrar em laço com um texto que não cabe).
-      for (let k = 0; k < 3; k++) {
-        lerAvancarPagina()
-        const r2 = f.range.getBoundingClientRect()
-        const c2 = vp.getBoundingClientRect()
-        if (r2.top >= c2.top - 4 && r2.bottom <= c2.bottom + 4) break
-      }
+    const paginado = typeof _lerPaginado === 'function' ? _lerPaginado() : false
+    if (paginado) {
+      if (r.left >= cx.left - 2 && r.right <= cx.right + 2) return
+      const largura = vp.clientWidth || 1
+      // Quantas páginas inteiras separam a frase da coluna visível. Negativo =
+      // ela ficou para trás.
+      const paginas = Math.round((r.left - cx.left) / largura)
+      if (!paginas) return
+      vp.scrollLeft = Math.max(0, Math.min(vp.scrollWidth - largura, vp.scrollLeft + paginas * largura))
+    } else {
+      if (r.top >= cx.top && r.bottom <= cx.bottom) return
+      // No modo rolagem a frase fica a um terço do alto: acompanhar de olho
+      // no meio da tela cansa menos que colada no topo.
+      vp.scrollTop = Math.max(0, vp.scrollTop + (r.top - cx.top) - vp.clientHeight * 0.33)
     }
   } catch (e) {}
 }
