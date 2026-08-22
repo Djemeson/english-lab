@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (22ª) — **24 CAPÍTULOS COM AS PARTES DENTRO, SEM DEPENDER DO
+> Última atualização: 2026-08-22 (23ª) — **O 429 NÃO PODE SER TRATADO COMO FALHA — E ERA**. Ele
+> rodou o agrupamento e mandou o print: *"Achei 5 capítulos nas 200 partes. Em 173 partes não deu
+> para ler o número"* — e o app **ainda ofereceu Aplicar** em cima disso. A pista estava na própria
+> prévia: as **19 primeiras** partes foram lidas e o resto falhou, que é o desenho de um **limite
+> por minuto**, não de um defeito de leitura (dez partes em série, medidas depois: 10 de 10).
+> `aiTranscribe` desistia no primeiro 429 — uma transcrição solta nunca esbarra no limite,
+> duzentas em sequência esbarram na vigésima. Agora **espera e repete**, e a varredura **para
+> depois de cinco erros seguidos** em vez de trocar tempo por lixo.
+> `sw.js` → **englab-v365**. **Detalhes em §8.79.**
+>
+> Última atualização anterior: 2026-08-22 (22ª) — **24 CAPÍTULOS COM AS PARTES DENTRO, SEM DEPENDER DO
 > LIVRO**. Ele descreveu a estrutura ouvindo — *"tem o capítulo 1 e as partes 1, 2, 3… aí entra o
 > capítulo 2"* — e estava certo. O `.m4b` só guarda `001`…`200` (verificado nos **dois** formatos
 > do arquivo dele), mas **o narrador diz o número**, e esse número **reinicia em 1 a cada
@@ -13575,6 +13585,57 @@ Chapter 2, Chapter 3"* — desmontaria o que ele acabou de montar.
 - **Nada foi gravado no acervo dele:** conferido no fim, `grupos: null` em memória e no
   localStorage.
 
+## 8.79 O 429 não pode ser tratado como falha (2026-08-22, 23ª)
+
+Ele rodou o agrupamento de §8.78 e mandou o print:
+
+> *"Achei **5 capítulos** nas 200 partes. ⚠️ Em **173 partes** não deu para ler o número — elas
+> ficaram junto do capítulo anterior."* — com *Chapter 4: 24 partes* e *Chapter 8: 157 partes*.
+
+E, pior que o resultado ruim: **o app ofereceu "Aplicar"** em cima dele.
+
+### O diagnóstico, com o arquivo real
+
+| O que medi | Resultado |
+|---|---|
+| Uma parte isolada (nº 30) | extração 4,4 s, transcrição 0,6 s, **número lido certo** |
+| Dez em série (041–050) | **10 de 10** — inclusive *"Chapter 8. One."*, que explica o "Chapter 8" da prévia dele |
+| A própria prévia dele | Abertura 1 + Ch1 6 + Ch2 4 + Ch3 8 = as **19 primeiras** lidas, o resto não |
+
+⚠️ **19 acertos e depois nada** não é defeito de leitura — é o desenho de um **limite de
+requisições por minuto**. A leitura sempre funcionou.
+
+### A causa raiz
+
+`aiTranscribe` lançava erro em **qualquer** status ≠ ok, sem esperar e sem repetir. Uma transcrição
+solta nunca esbarra no limite; **duzentas em sequência esbarram na vigésima**. Desistir na primeira
+recusa transformava um *"espere um pouco"* em *"não deu"*.
+
+Agora ela espera e tenta de novo (até 4 vezes), respeitando `retry-after` quando o servidor manda e
+dobrando a espera quando não manda. **Vale para toda transcrição do app**, não só para esta
+varredura.
+
+### E a varredura não pode entregar lixo
+
+- ⚠️ **Cinco erros seguidos param tudo.** Erro que se repete não é azar, é parede — chave, cota,
+  rede. Insistir 180 vezes só troca tempo por lixo.
+- ⚠️ **Abaixo de 70% lido não há prévia.** Cada número perdido gruda a parte no capítulo anterior,
+  então 173 falhas viram dois capítulos gigantes. A tela passa a mostrar **o motivo** e a saída —
+  e, quando o motivo é limite de requisições, explica isso em português.
+- **O que já foi lido fica guardado** (`_descLidos`): "tentar de novo" retoma de onde parou, em vez
+  de pagar outra vez pelas partes que deram certo.
+
+### Medido
+
+- **Com 429 forçado** (duas recusas com `retry-after: 1`, depois sucesso): **3 tentativas**, 4 s de
+  espera, e o texto certo no fim.
+- **Com erro repetido**: a varredura parou na **5ª** tentativa, a tela mostrou *"Só consegui ler 0
+  de 200 partes… A Groq limita quantas transcrições você pode pedir por minuto… tente outra vez,
+  que o que já foi lido não é refeito"*, com o botão de tentar de novo — e **nenhum grupo foi
+  aplicado**.
+- **Nada ficou no acervo dele**: conferido no localStorage — `grupos: null`, `_descLidos: null`, as
+  3 transcrições e os 200 capítulos intactos.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13583,6 +13644,16 @@ Chapter 2, Chapter 3"* — desmontaria o que ele acabou de montar.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada do 429 (§8.79, 2026-08-22)
+
+- [ ] **Rodar o agrupamento de novo** — agora com a espera automática. Deve levar mais tempo (o
+      limite obriga a esperar), mas chegar ao fim.
+- [ ] **O app não conhece o limite da conta dele.** Ele descobre esbarrando e esperando. Espaçar as
+      chamadas desde o começo seria mais rápido do que bater e recuar, mas exige saber o limite —
+      que varia por conta e por modelo.
+- [ ] **A mesma falta de retry existe no chat** (`aiJSON`/análise), não só na transcrição. Não
+      apareceu ainda porque nada lá dispara 200 chamadas seguidas; o raio-X em lote pode chegar lá.
 
 ### Da rodada do agrupamento (§8.78, 2026-08-22)
 
