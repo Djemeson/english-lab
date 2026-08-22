@@ -488,6 +488,14 @@ function _sincLevarAVista(f) {
     const r = f.range.getClientRects()[0] || f.range.getBoundingClientRect()
     if (!r || (!r.width && !r.height)) return
     const cx = vp.getBoundingClientRect()
+    // ⚠️ ATRIBUIR `scrollTop` NÃO FUNCIONA AQUI, e isto já mordeu o projeto uma
+    // vez (o mesmo comentário está em `_abCentralizar`): a viewport do leitor
+    // tem `scroll-behavior:smooth`, e rolagem animada depende de o navegador
+    // estar compondo quadros. Medido: `vp.scrollTop = x + 300` deixou o valor
+    // em 4545, parado. `scrollTo` com `behavior` explícito vence o CSS sem
+    // alterar o elemento — e acompanhar a voz quer o pulo pronto, não uma
+    // animação que ainda está a caminho quando a frase seguinte começa.
+    const suave = document.visibilityState === 'visible'
     const paginado = typeof _lerPaginado === 'function' ? _lerPaginado() : false
     if (paginado) {
       if (r.left >= cx.left - 2 && r.right <= cx.right + 2) return
@@ -496,12 +504,14 @@ function _sincLevarAVista(f) {
       // ela ficou para trás.
       const paginas = Math.round((r.left - cx.left) / largura)
       if (!paginas) return
-      vp.scrollLeft = Math.max(0, Math.min(vp.scrollWidth - largura, vp.scrollLeft + paginas * largura))
+      const alvo = Math.max(0, Math.min(vp.scrollWidth - largura, vp.scrollLeft + paginas * largura))
+      vp.scrollTo({ left: alvo, behavior: suave ? 'smooth' : 'instant' })
     } else {
       if (r.top >= cx.top && r.bottom <= cx.bottom) return
-      // No modo rolagem a frase fica a um terço do alto: acompanhar de olho
-      // no meio da tela cansa menos que colada no topo.
-      vp.scrollTop = Math.max(0, vp.scrollTop + (r.top - cx.top) - vp.clientHeight * 0.33)
+      // No modo rolagem a frase para a um terço do alto: acompanhar de olho no
+      // meio da tela cansa menos que colada no topo.
+      const alvo = Math.max(0, vp.scrollTop + (r.top - cx.top) - vp.clientHeight * 0.33)
+      vp.scrollTo({ top: alvo, behavior: suave ? 'smooth' : 'instant' })
     }
   } catch (e) {}
 }
