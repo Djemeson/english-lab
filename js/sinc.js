@@ -382,7 +382,6 @@ let _sincOn = false
 let _sincMapa = null
 let _sincFrases = null          // [{ini, fim, pos, range}]
 let _sincAtual = -1
-let _sincAudioEl = null
 let _sincCapLivro = -1
 let _sincSeguir = true
 
@@ -506,52 +505,52 @@ function _sincFraseDoTempo(t) {
 }
 
 // ---------------------------------------------------------------
-// O ÁUDIO DO MODO — separado do reprodutor de propósito
+// O ÁUDIO É UM SÓ — o do reprodutor
 // ---------------------------------------------------------------
-// ⚠️ REUSAR O PLAYER DA SEÇÃO AUDIOBOOK SERIA AMARRAR DUAS TELAS. Ele tem
-// estado próprio (capítulo aberto, marcadores, timer de sono, Media Session) e
-// mexer nele daqui deixaria as duas telas discordando sobre o que está
-// tocando. Aqui é um `<audio>` só, com uma responsabilidade: tocar do
-// instante X ao instante Y. O que os dois compartilham é o ARQUIVO.
-function _sincAudio() {
-  if (_sincAudioEl) return _sincAudioEl
-  const el = document.createElement('audio')
-  el.id = 'sinc-audio'
-  el.preload = 'metadata'
-  document.body.appendChild(el)
+// ⚠️ A PRIMEIRA VERSÃO CRIOU UM SEGUNDO `<audio>`, E ELE OUVIU OS DOIS AO MESMO
+// TEMPO. O relato foi direto: *"ao clicar, um segundo áudio do mesmo audiobook
+// começou a rodar"*. O argumento de separar (o reprodutor tem estado próprio:
+// marcadores, timer de sono, Media Session) estava certo sobre o CÓDIGO e
+// errado sobre o USUÁRIO — para quem ouve, existe uma narração só.
+// Agora o leitor pilota o mesmo `#ab-audio` do reprodutor, pelo caminho normal
+// dele. Sair do leitor e ir ao reprodutor continua a MESMA escuta.
+function _sincAudio() { return document.getElementById('ab-audio') }
+
+// ⚠️ E OS INSTANTES NÃO ESTÃO NA MESMA RÉGUA. A transcrição guarda o tempo
+// RELATIVO ao capítulo (começa em 0); o `<audio>` toca o ARQUIVO INTEIRO, onde
+// o mesmo capítulo começa em `cap.ini`. Medido no acervo dele: o Prologue
+// começa aos **16 s** do arquivo, e a transcrição dele vai de 0 a 1491.
+// Somar errado aqui é o que fazia o áudio pular para o lugar errado — e num
+// capítulo adiantado o erro seria de HORAS, não de segundos.
+function _sincParaAudio(cap, t) { return (cap && cap.ini ? cap.ini : 0) + (t || 0) }
+function _sincDoAudio(cap, t) { return (t || 0) - (cap && cap.ini ? cap.ini : 0) }
+
+let _sincLigadoNoAudio = false
+function _sincLigarEventos(el) {
+  if (!el || _sincLigadoNoAudio) return
+  _sincLigadoNoAudio = true
   el.addEventListener('timeupdate', () => {
-    if (!_sincOn) return
-    const ix = _sincFraseDoTempo(el.currentTime)
+    if (!_sincOn || !_sincMapa) return
+    const ix = _sincFraseDoTempo(_sincDoAudio(_sincMapa.cap, el.currentTime))
     if (ix >= 0) _sincPintarFrase(ix)
-    _sincPintarBarra()
-    // Fim do capítulo: para em vez de invadir o próximo, que ainda não tem
-    // mapa e faria o texto e a voz falarem de coisas diferentes.
-    if (_sincMapa && _sincMapa.fimAudio && el.currentTime >= _sincMapa.fimAudio) {
-      el.pause(); _sincPintarBarra()
-    }
   })
   el.addEventListener('play', _sincPintarBarra)
   el.addEventListener('pause', _sincPintarBarra)
-  _sincAudioEl = el
-  return el
 }
 
+// Põe o reprodutor no capítulo certo, sem trocar de seção. É o caminho normal
+// do audiolivro — o que garante que o player e o leitor nunca discordem sobre
+// o que está tocando.
 async function _sincCarregarAudio(audio, capAudio) {
-  const el = _sincAudio()
   const cap = (audio.capitulos || [])[capAudio]
   if (!cap) throw new Error('capítulo do áudio não encontrado')
-  if (typeof abGarantirArquivo !== 'function' && typeof _loadScript === 'function') {
-    await _loadScript('js/audiobook.js')
-  }
-  if (typeof abGarantirArquivo !== 'function') throw new Error('não consegui carregar o reprodutor')
-  const chave = `${audio.id}:${cap.arq || 0}`
-  if (el.dataset.chave !== chave) {
-    const blob = await abGarantirArquivo(audio, cap.arq || 0, null)
-    if (!blob) throw new Error('o áudio deste livro não está aqui nem na sua nuvem')
-    if (el.src && el.src.startsWith('blob:')) URL.revokeObjectURL(el.src)
-    el.src = URL.createObjectURL(blob)
-    el.dataset.chave = chave
-  }
+  if (typeof abAbrir !== 'function' && typeof _loadScript === 'function') await _loadScript('js/audiobook.js')
+  if (typeof abAbrir !== 'function') throw new Error('não consegui carregar o reprodutor')
+  if (typeof _abLivro === 'undefined' || !_abLivro || _abLivro.id !== audio.id) await abAbrir(audio.id)
+  if (typeof _abCap === 'undefined' || _abCap !== capAudio) await _abCarregarCapitulo(capAudio, 0)
+  const el = _sincAudio()
+  if (!el) throw new Error('o reprodutor não está pronto')
+  _sincLigarEventos(el)
   return { el, cap }
 }
 
@@ -574,11 +573,12 @@ async function sincLeitorAlternar() {
     document.getElementById('ler-conteudo')?.addEventListener('click', sincCliqueNoTexto)
     document.getElementById('ler-btn-ouvir')?.classList.add('on')
     _sincPintarBarra()
-    const { el } = await _sincCarregarAudio(audio, _sincMapa.capAudio)
+    const { el, cap } = await _sincCarregarAudio(audio, _sincMapa.capAudio)
+    _sincMapa.cap = cap
     // Começa de onde ele está LENDO — é isso que "ouvir daqui" quer dizer.
     const pos = _sincPosicaoVisivel()
     const t = sincTempoDe(_sincMapa, pos)
-    if (t != null) el.currentTime = t
+    if (t != null) el.currentTime = _sincParaAudio(cap, t)
     await el.play().catch(() => {})
     _sincPintarBarra()
   } catch (e) {
@@ -590,7 +590,7 @@ async function sincLeitorAlternar() {
 
 function sincLeitorSair() {
   _sincOn = false
-  if (_sincAudioEl) _sincAudioEl.pause()
+  const _el = _sincAudio(); if (_el) _el.pause()
   _sincLimparRealce()
   _sincFrases = null; _sincAtual = -1
   _sincBarraFechar()
@@ -680,7 +680,7 @@ function _sincBarraMsg(msg) {
 function _sincPintarBarra() {
   if (!_sincOn) return
   const b = _sincBarra()
-  const el = _sincAudioEl
+  const el = _sincAudio()
   const tocando = el && !el.paused
   const f = _sincFrases && _sincFrases[_sincAtual]
   b.innerHTML = `
@@ -695,17 +695,18 @@ function _sincPintarBarra() {
 }
 
 function sincPlay() {
-  const el = _sincAudioEl; if (!el) return
+  const el = _sincAudio(); if (!el) return
   if (el.paused) el.play().catch(() => {}); else el.pause()
   _sincPintarBarra()
 }
 function sincSeguirAlternar() { _sincSeguir = !_sincSeguir; _sincPintarBarra() }
 
 function sincPular(d) {
-  if (!_sincFrases || !_sincMapa || !_sincAudioEl) return
+  const el = _sincAudio()
+  if (!_sincFrases || !_sincMapa || !el) return
   const ix = Math.max(0, Math.min(_sincFrases.length - 1, (_sincAtual < 0 ? 0 : _sincAtual) + d))
   const t = sincTempoDe(_sincMapa, _sincFrases[ix].pos)
-  if (t != null) { _sincAudioEl.currentTime = t; _sincPintarFrase(ix) }
+  if (t != null) { el.currentTime = _sincParaAudio(_sincMapa.cap, t); _sincPintarFrase(ix) }
 }
 
 // ⚠️ TOCAR NUMA FRASE É O GESTO MAIS ÓBVIO DESTA TELA, e ele não pode brigar
@@ -724,10 +725,11 @@ function sincCliqueNoTexto(ev) {
     for (const r of rects) {
       if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
         const t = sincTempoDe(_sincMapa, _sincFrases[i].pos)
-        if (t != null && _sincAudioEl) {
-          _sincAudioEl.currentTime = t
+        const el = _sincAudio()
+        if (t != null && el) {
+          el.currentTime = _sincParaAudio(_sincMapa.cap, t)
           _sincPintarFrase(i)
-          if (_sincAudioEl.paused) _sincAudioEl.play().catch(() => {})
+          if (el.paused) el.play().catch(() => {})
           _sincPintarBarra()
         }
         return
@@ -779,7 +781,7 @@ async function sincTrocouCapitulo(capLivro) {
   }
   const audio = sincAudioDoLivro(_lerLivro)
   if (!audio) return sincLeitorSair()
-  if (_sincAudioEl) _sincAudioEl.pause()
+  const _p = _sincAudio(); if (_p) _p.pause()
   _sincLimparRealce(); _sincAtual = -1
   try {
     _sincBarraMsg('Procurando este capítulo no audiolivro…')
@@ -850,6 +852,32 @@ async function sincPrepararParaAudio(audio, capAudio) {
   } catch (e) { return false }
 }
 
+// ---------------------------------------------------------------
+// O TEXTO DO LIVRO NO FORMATO DAS FALAS
+// ---------------------------------------------------------------
+// ⚠️ ESTA É A PEÇA QUE ELE PEDIU DEPOIS DE VER A PRIMEIRA VERSÃO: *"o que eu
+// queria era que o texto do livro viesse pra cá"*. Devolvendo as frases no
+// MESMO formato das falas transcritas (`{i, f, t}`, em segundos relativos ao
+// capítulo), a aba de texto do reprodutor passa a mostrar o autor sem que nada
+// mais mude — o acompanhamento, a rolagem que centraliza, a tela cheia, a
+// seleção que traduz e a captura já sabem trabalhar com isso.
+// Devolve `null` quando não há mapa: aí a transcrição continua sendo mostrada,
+// como sempre foi.
+function sincFalasDoLivro(audio, capAudio) {
+  const c = _sincCacheAudio
+  if (!c.mapa || !c.frases || c.audioId !== (audio && audio.id) || c.capAudio !== capAudio) return null
+  const fim = (c.mapa.ancoras[c.mapa.ancoras.length - 1] || [0, 0])[1]
+  const out = []
+  for (let k = 0; k < c.frases.length; k++) {
+    const f = c.frases[k], prox = c.frases[k + 1]
+    const i = sincTempoDe(c.mapa, f.pos)
+    const ff = prox ? sincTempoDe(c.mapa, prox.pos) : fim
+    if (i == null) continue
+    out.push({ i, f: Math.max(i + 0.3, ff == null ? i + 3 : ff), t: f.texto })
+  }
+  return out.length ? out : null
+}
+
 // Síncrona de propósito — ver o comentário do cache acima.
 function sincFraseDoInstante(audio, capAudio, seg) {
   const c = _sincCacheAudio
@@ -865,29 +893,63 @@ function sincFraseDoInstante(audio, capAudio, seg) {
 }
 
 // ---------------------------------------------------------------
-// OUVIR LENDO — do reprodutor para a página certa do livro
+// O TEXTO DO AUTOR, AQUI MESMO
 // ---------------------------------------------------------------
-// ⚠️ "ABRIR O LIVRO" NÃO É ABRIR NO COMEÇO. Quem está no minuto 12 do capítulo
-// quer o parágrafo do minuto 12 — abrir na primeira página seria devolver o
-// trabalho de procurar, que é exatamente o que esta peça existe para evitar.
-async function sincAbrirTexto(audio, capAudio, seg) {
+// ⚠️ A PRIMEIRA VERSÃO MANDAVA ELE PARA OUTRA SEÇÃO, e o relato foi que ficou
+// *"muito esquisito"*: ele estava ouvindo, apertou o botão e o app trocou de
+// tela. Quem ouve quer o texto ONDE está ouvindo. Trocar de seção agora é uma
+// escolha à parte (`sincAbrirNoLeitor`), não a resposta padrão.
+async function sincTextoAqui(audio, capAudio) {
   if (!audio) return
   const livro = sincLivroDoAudio(audio)
   if (!livro) return sincLigarModalAudio(audio)
   try {
-    toast('Procurando este trecho no livro…', 'info')
-    let capLivro = (audio.capMapa || {})[capAudio]
-    if (capLivro == null) {
-      const mapa = await sincProcessarCapitulo(livro, audio, capAudio).catch(e => { throw e })
-      capLivro = mapa.capLivro
+    if ((audio.capMapa || {})[capAudio] == null) {
+      toast('Procurando este capítulo dentro do livro…', 'info')
+      const textos = await sincTextosDoLivro(livro)
+      const temTr = (audio.transcricoes || []).some(x => x.cap === capAudio)
+      if (!temTr) {
+        const nome = ((audio.capitulos || [])[capAudio] || {}).titulo || `capítulo ${capAudio + 1}`
+        const ok = await confirmModal({
+          title: 'Falta a transcrição deste capítulo', icon: 'sparkles', confirmText: 'Transcrever agora',
+          html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+            Para casar o texto do autor com a voz, preciso do que o narrador diz em
+            <b>${esc(nome)}</b>. É pago uma vez só, e depois vale nos seus dois aparelhos.</p>`
+        })
+        if (!ok) return
+        await _abTranscreverTrecho(audio, capAudio, _abAlvoInteiro(audio, capAudio),
+          m => { const b = el('ab-aba'); if (b) b.innerHTML = `<div class="est-nada"><p>${esc(m)}</p></div>` })
+      }
+      await sincProcessarCapitulo(livro, audio, capAudio)
     }
+    const ok = await sincPrepararParaAudio(audio, capAudio)
+    if (!ok) { toast('Não consegui casar este capítulo com o livro.', 'warning'); return }
+    if (typeof abAba === 'function') abAba('texto')
+    toast('Este é o texto do autor — a frase acende conforme ele lê', 'success')
+  } catch (e) {
+    toast(String(e.message || e), 'error')
+  }
+}
+
+// ⚠️ "ABRIR NO LEITOR" NÃO É ABRIR NO COMEÇO. Quem está no minuto 12 quer o
+// parágrafo do minuto 12 — abrir na primeira página devolveria o trabalho de
+// procurar, que é o que esta peça existe para evitar.
+async function sincAbrirNoLeitor(audio, capAudio, seg) {
+  if (!audio) return
+  const livro = sincLivroDoAudio(audio)
+  if (!livro) return sincLigarModalAudio(audio)
+  try {
+    let capLivro = (audio.capMapa || {})[capAudio]
+    if (capLivro == null) { await sincTextoAqui(audio, capAudio); capLivro = (audio.capMapa || {})[capAudio] }
+    if (capLivro == null) return
     const mapa = await sincMapaLer(livro.id, capLivro)
     const textos = await sincTextosDoLivro(livro)
     const total = Math.max(1, sincNorm(textos[capLivro]).length)
-    const pos = mapa ? sincPosicaoDe(mapa, seg) : 0
+    const cap = (audio.capitulos || [])[capAudio]
+    const rel = _sincDoAudio(cap, seg)
+    const pos = mapa ? sincPosicaoDe(mapa, rel) : 0
     const frac = Math.max(0, Math.min(0.98, (pos || 0) / total))
-    // O reprodutor continua tocando: sair da seção nunca parou o áudio (§8.72),
-    // e aqui isso é a graça — ele lê acompanhando o que já está no ouvido.
+    // O reprodutor continua tocando: sair da seção nunca parou o áudio (§8.72).
     showSection('ler')
     await new Promise(r => setTimeout(r, 60))
     if (typeof lerAbrir === 'function') await lerAbrir(livro.id)

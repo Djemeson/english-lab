@@ -67,9 +67,11 @@ function renderAudiobookSection() {
     // diferentes conforme já haja par: abrir o texto ou escolher qual livro é.
     const ligado = _abLivro && typeof sincLivroDoAudio === 'function' ? sincLivroDoAudio(_abLivro) : null
     const c_texto = _abLivro
-      ? `<button class="btn btn-ghost btn-sm" onclick="sincAbrirTexto(_abLivro, _abCap, (_abAudio()||{}).currentTime||0)"
-           data-tip="${escA(ligado ? 'Abrir o livro no ponto em que o narrador está' : 'Ligar este audiolivro ao livro da estante')}">
-           ${ic('book','ic-sm')} ${ligado ? 'Ver o texto' : 'Ligar ao livro'}</button>`
+      ? `<button class="btn btn-ghost btn-sm" onclick="sincTextoAqui(_abLivro, _abCap)"
+           data-tip="${escA(ligado ? 'Mostrar aqui o texto do autor, com a frase acendendo conforme o narrador lê' : 'Ligar este audiolivro ao livro da estante')}">
+           ${ic('book','ic-sm')} ${ligado ? 'Texto do autor' : 'Ligar ao livro'}</button>
+         ${ligado ? `<button class="btn btn-ghost btn-sm" onclick="sincAbrirNoLeitor(_abLivro, _abCap, (_abAudio()||{}).currentTime||0)"
+           data-tip="Abrir no leitor de livros, no ponto em que o narrador está">${ic('expand','ic-sm')}</button>` : ''}`
       : ''
     acoes.innerHTML = _abLivro
       ? `${c_texto}<button class="btn btn-ghost btn-sm" onclick="abFechar()">${ic('chevronLeft','ic-sm')} Estante</button>`
@@ -1568,9 +1570,19 @@ function _abListaTexto() {
   }
   const achados = tr.achados || null
   const nivel = cefrNivelAluno()
+  // ⚠️ QUANDO HÁ O LIVRO, É O LIVRO QUE APARECE AQUI. Ele foi direto ao ponto:
+  // *"o que eu queria era que o texto do livro viesse pra cá"* — e tinha razão.
+  // Mandá-lo para outra seção era resolver a pergunta errada; quem está ouvindo
+  // quer o texto do autor NA TELA DE OUVIR, com a frase acesa como a
+  // transcrição já fazia. As frases do livro entram no mesmo formato das falas
+  // (`.ab-fala` com `data-ini`/`data-fim`), então acompanhar, centralizar, tela
+  // cheia, seleção e captura continuam funcionando sem uma linha nova.
+  const doLivro = typeof sincFalasDoLivro === 'function' ? sincFalasDoLivro(a, _abCap) : null
+  const segs = doLivro || tr.segs
   return `
     <div class="ab-trans-topo">
-      <span>${abTempo(tr.ini)} – ${abTempo(tr.fim)} · ${tr.segs.length} falas</span>
+      <span>${abTempo(tr.ini)} – ${abTempo(tr.fim)} · ${segs.length} ${doLivro ? 'frases do livro' : 'falas'}</span>
+      ${doLivro ? `<span class="est-selo">${ic('book','ic-3xs')} texto do autor</span>` : ''}
       <span class="est-dica">Marque uma palavra ou frase: a tradução aparece na hora, e o menu
         manda ao estudo.</span>
       ${achados
@@ -1592,7 +1604,7 @@ function _abListaTexto() {
         ${ic('expand','ic-3xs')} Tela cheia</button>
     </div>
     <div class="ab-trans${achados ? ' com-raiox' : ''}" id="ab-trans" tabindex="0">
-      ${tr.segs.map((s, i) => `
+      ${segs.map((s, i) => `
         <p class="ab-fala" data-i="${i}" data-ini="${s.i}" data-fim="${s.f}">
           <button class="ab-fala-t" onclick="abIrPara(${s.i})" data-tip="Ouvir a partir daqui">${abTempo(s.i)}</button>
           <span class="ab-fala-corpo">
