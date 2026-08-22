@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (26ª) — **A TELA NÃO SE ATUALIZAVA QUANDO A TRANSCRIÇÃO
+> Última atualização: 2026-08-22 (27ª) — **REFORÇO NO REFRESCO, E UM RISCO DE SYNC ENCONTRADO NO
+> CAMINHO**. Ele relatou de novo que a lista não muda ao terminar. ⚠️ **Não reproduzi:** rodei três
+> vezes no Chrome com o livro real — um capítulo, dois capítulos e de novo um —, e as três
+> atualizaram sozinhas, com a v369 servida e `_abRefrescar` presente. Como o relato é confiável, o
+> refresco passou a **reconstruir a seção** e não só a aba, com rede de segurança. ⚠️ **E a
+> investigação achou coisa pior:** uma transcrição gerada nos testes **sumiu do aparelho E da
+> nuvem** — o push manda a lista inteira, então uma aba com estado velho sobrescreve o que outra
+> acabou de fazer. `sw.js` → **englab-v370**. **Detalhes em §8.83.**
+>
+> Última atualização anterior: 2026-08-22 (26ª) — **A TELA NÃO SE ATUALIZAVA QUANDO A TRANSCRIÇÃO
 > TERMINAVA**. Ele mandou transcrever dois capítulos pela lista, esperou, e *"nada aconteceu"* —
 > precisou recarregar para ver a marca e o texto. ⚠️ O redesenho existia, mas **cravado numa aba
 > só** (`_abAbaAtual === 'texto'`), e a aba onde ele estava (Capítulos) era justamente a que mostra
@@ -13808,6 +13817,54 @@ sendo *"This is Audible."*
 capítulo 001 do Billy Summers. Foi o único jeito de provar "em tempo real" — mas é dado real
 criado por teste, e ele precisa saber.
 
+## 8.83 Reforço no refresco, e um risco de sync encontrado no caminho (2026-08-22, 27ª)
+
+> *"Transcrevi o 8 e o 9 e deu informação que acabou mas nada mudou, além da seleção que não fica
+> mais. Fui na transcrição tbm e não estava lá. Depois que recarreguei apareceu."*
+
+### ⚠️ Não reproduzi — e isso precisa ser dito
+
+Três tentativas no Chrome, com o livro real dele e transcrição **de verdade**:
+
+| Teste | Antes | Depois, **sem recarregar** |
+|---|---|---|
+| Um capítulo (001) | *"001 · 0:47"* | *"001 · **9 falas** · 0:47"*, com ícone |
+| Dois (009 e 012) | *"012 · 2:35"* | *"012 · **25 falas** · 2:35"*, com ícone |
+| Um (011), após o reforço | *"011 · 3:57"* | *"011 · **50 falas** · 3:57"*, com ícone |
+
+E conferido que o navegador servia a **v369** com `_abRefrescar` presente. Metade do relato dele
+bate (a seleção parou de ficar), o que indica que ele **estava** na versão nova.
+
+### O reforço, mesmo sem reproduzir
+
+`abAba` **desiste em silêncio** quando `#ab-aba` não existe naquele instante — e uma tela que não
+se atualiza depois de um trabalho **pago** é o pior lugar possível para uma desistência silenciosa.
+Então `_abRefrescar` passou a reconstruir o **player** antes da aba, dentro de um `try`, com
+`renderAudiobookSection()` como última rede.
+
+### ⚠️ E a investigação achou coisa pior: uma transcrição sumiu
+
+Conferindo o acervo depois dos testes, a transcrição do capítulo **001** (que eu tinha acabado de
+gerar) **não estava mais nem no aparelho nem na nuvem**.
+
+A causa é do desenho do sync, não do audiolivro: **o push envia a lista inteira**
+(`{ list: audiolivros }`), com "quem escreveu por último vence" no documento todo. Numa sessão com
+**várias abas abertas** — que é exatamente como eu testei —, uma aba com estado carregado antes
+sobrescreve o que outra acabou de fazer. Some com o dado dos dois lados.
+
+⚠️ **Não é hipótese: aconteceu.** E o mesmo risco existe para qualquer coisa que more nessas
+listas — audiolivros, livros, vídeos. É pouco provável no uso normal dele (um aparelho por vez),
+mas real quando o celular e o computador estão abertos juntos.
+
+O `autoSyncAfterChange` tem 1,2 s de espera antes de subir, então **recarregar logo depois de uma
+transcrição também pode perdê-la** antes que ela chegue à nuvem.
+
+### O que ficou no acervo dele
+
+Os testes desta rodada e da anterior geraram transcrições reais no Billy Summers: **002, 011 e
+012** (as de 001 se perderam no episódio acima). Custaram centavos e são úteis — ele quer
+transcrever o livro todo —, mas são **dado criado por teste**, e ele decide se ficam.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13816,6 +13873,17 @@ criado por teste, e ele precisa saber.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada do reforço (§8.83, 2026-08-22)
+
+- [ ] **O PUSH SOBRESCREVE A LISTA INTEIRA — e isso já apagou dado.** Uma aba com estado velho
+      manda `{list: audiolivros}` por cima do que outra acabou de gravar. O conserto é mesclar por
+      item na SUBIDA (como já é feito na descida), ou marcar cada item com a hora da última
+      alteração e não deixar o antigo vencer. Vale para `audiolivros`, `livros`, `videos`.
+- [ ] **1,2 s de espera antes de subir**: recarregar logo depois de uma transcrição pode perdê-la
+      antes que chegue à nuvem. Trabalho pago devia subir na hora, sem espera.
+- [ ] **Ele precisa confirmar o refresco** com a v370. Se ainda falhar, o próximo passo é registrar
+      no console o que `_abRefrescar` vê no momento em que a fila termina.
 
 ### Da rodada do tempo real (§8.82, 2026-08-22)
 
