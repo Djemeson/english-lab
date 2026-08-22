@@ -2400,6 +2400,26 @@ async function _abTrRodar() {
   }
 }
 
+// ⚠️ "LEVA UM BOM TEMPO" NÃO ERA AVISO, ERA VAGUEZA — e o acervo real mostrou
+// o tamanho da conta: o Billy Summers dele tem 200 capítulos, 197 sem texto.
+// São 197 idas à IA em sequência, uma esperando a outra. Barato (R$ 3,43) e
+// LONGO: quem lê "um bom tempo" pensa em minutos, não em horas com a aba
+// aberta. Meio minuto por capítulo é a conta grosseira de extrair o áudio,
+// enviar e receber — erra para mais ou para menos, mas dá a ordem de grandeza,
+// que é o que falta para ele decidir se começa agora ou à noite.
+function _abTempoDaFila(n) {
+  const min = Math.round(n * 0.5)
+  if (min < 3) return 'poucos minutos'
+  if (min < 90) return `cerca de ${min} min`
+  // Horas e minutos, como se fala: "1h30", "3h". Escrever "3,5 horas" já me
+  // custou um "uma boa 3,5 horas" na primeira versão — número decimal não
+  // combina com frase.
+  const h = Math.floor(min / 60)
+  const m = Math.round((min - h * 60) / 30) * 30      // meia hora mais próxima
+  const txt = m === 60 ? `${h + 1}h` : m ? `${h}h${m}` : `${h}h`
+  return `cerca de ${txt} — vale deixar rodando`
+}
+
 async function abTranscreverTudo() {
   const a = _abLivro; if (!a) return
   const stt = typeof aiSttCfg === 'function' ? aiSttCfg() : null
@@ -2432,8 +2452,8 @@ async function abTranscreverTudo() {
       ${jaTem ? `Os <b>${jaTem}</b> que já têm texto ficam como estão: não são refeitos nem cobrados de novo.` : ''}
       <br><br>
       Custa cerca de <b>${(usd * brl).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</b>
-      na ${esc(stt.nome)}, e leva um bom tempo — roda <b>em segundo plano</b>, com um aviso no canto
-      que deixa pausar. Só não feche a aba.
+      na ${esc(stt.nome)}, e leva <b>${_abTempoDaFila(faltam.length)}</b> — roda <b>em segundo
+      plano</b>, com um aviso no canto que deixa pausar. Só não feche a aba.
       ${grandes.length ? `<br><br><b>${grandes.length} ${grandes.length === 1 ? 'capítulo fica' : 'capítulos ficam'} de fora</b>
         por passar de ${AB_TRANS_TETO_MIN} min (${esc(grandes.slice(0, 3).join(', '))}${grandes.length > 3 ? '…' : ''}) —
         nesses, use o botão do capítulo, que pega o trecho em volta de onde você está.` : ''}</p>`

@@ -7,7 +7,16 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (20ª) — **"TRANSCREVER TUDO", PULANDO O QUE JÁ TEM TEXTO**.
+> Última atualização: 2026-08-22 (21ª) — **A TELA DE CAPÍTULO SEM TEXTO DEIXOU DE SER UM BECO**.
+> Ele mandou o print: ali a única saída era transcrever *este* capítulo, um de cada vez — as
+> outras duas portas (escolher na lista, mandar tudo) só existiam na barra de cima, **que nem
+> aparece quando não há transcrição**. Quem está sem texto é quem mais precisa das três. Testado
+> no Chrome com o acervo real: *Billy Summers*, **200 capítulos, 3 com texto**, e o botão dizendo
+> *"Transcrever os 197 que faltam"*. ⚠️ E o dado real corrigiu o aviso: 197 capítulos são 197
+> idas à IA em sequência — *"leva um bom tempo"* virou **"cerca de 1h30 — vale deixar rodando"**.
+> `sw.js` → **englab-v359**. **Detalhes em §8.77.**
+>
+> Última atualização anterior: 2026-08-22 (20ª) — **"TRANSCREVER TUDO", PULANDO O QUE JÁ TEM TEXTO**.
 > Pedido dele: *"a transcrição deve ter uma opção de transcrever tudo. E se tiver capítulos
 > transcritos o botão vai pular eles."* ⚠️ **Pular não é detalhe, é o coração disto:** capítulo já
 > transcrito refeito seria dinheiro gasto duas vezes pela mesma coisa, e a conta do aviso é feita
@@ -13420,6 +13429,61 @@ sessão não estava autenticada, então o sync não rodou) — conferido depois 
 lixo de teste na nuvem`. Teste em navegador que pode ter os dados dele exige limpar **e conferir
 de fora**, não só confiar na limpeza.
 
+## 8.77 A tela de capítulo sem texto deixou de ser um beco (2026-08-22, 21ª)
+
+> *"A opção de transcrever capítulos ou todo o livro deveria aparecer aqui."*
+
+⚠️ **E o print mostrava um beco.** A tela *"Este capítulo ainda não tem texto"* oferecia uma saída
+só: transcrever **este** capítulo. As outras duas portas — escolher na lista e mandar tudo — moram
+na barra de cima, **que só existe quando há transcrição**. Ou seja: quem está sem texto, que é
+exatamente quem precisa das três, era quem tinha uma.
+
+| A tela agora oferece | O que faz |
+|---|---|
+| **Transcrever o capítulo** | o que já havia, continua sendo o principal |
+| **Escolher capítulos** | abre o painel com a lista e as marcas |
+| **Transcrever os N que faltam** | só aparece quando falta mais de um |
+
+E a linha de baixo deixou de contar "trechos" para dizer o que interessa: *"3 de 200 capítulos já
+têm texto. Os que já têm não são refeitos nem cobrados de novo."*
+
+### Duas armadilhas de posicionamento
+
+⚠️ **O painel se prendia a um botão que pode não existir.** `abTransPainel` nascia ancorado ao
+`ab-trans-btn` da barra de cima; aberto daqui, abriria no canto errado. A âncora virou parâmetro.
+
+⚠️ **E ele só se prendia à tela num eixo.** Aberto por um botão lá embaixo, um painel de 70vh sairia
+pela base — agora sobe quando não couber. **Medido** com o livro real: painel de 184 a 671 numa
+janela de 695.
+
+### O dado real corrigiu o aviso de tempo
+
+`"leva um bom tempo"` era vagueza, não aviso. O acervo dele mostrou o tamanho da conta: **197
+capítulos sem texto**, ou seja **197 idas à IA em sequência**, uma esperando a outra. Barato
+(**R$ 3,43**) e **longo** — quem lê "um bom tempo" pensa em minutos, não em horas com a aba aberta.
+
+Meio minuto por capítulo é a conta grosseira de extrair, enviar e receber. Erra para os dois lados,
+mas dá a ordem de grandeza, que é o que falta para decidir se começa agora ou à noite.
+
+⚠️ A primeira versão da frase saiu **"uma boa 3,5 horas"** — número decimal não combina com frase.
+Virou `1h30`, `2h`, `3h30`.
+
+### Medido — no Chrome, com o acervo real
+
+- **A tela:** três botões — *Transcrever o capítulo · Escolher capítulos · Transcrever os 197 que
+  faltam* — e *"3 de 200 capítulos já têm texto"*.
+- **O painel pela âncora nova:** *"Transcrição · 3 de 200 capítulos com texto"*, com "001
+  transcrever", "003 · 53 falas", dentro da tela.
+- **O aviso de custo, lido e CANCELADO** (sem gastar nada dele): *"Vou transcrever 197 capítulos —
+  cerca de 1002 min de áudio. Os 3 que já têm texto ficam como estão… Custa cerca de R$ 3,43 na
+  Groq"*. Cancelar deixou a fila vazia.
+- **A frase de tempo**, em vários tamanhos: 20 → "cerca de 10 min"; 197 → "cerca de 1h30"; 400 →
+  "cerca de 3h30".
+
+⚠️ **Uma armadilha de teste que me pegou duas vezes:** `audiolivros`, `words` e `livros` são `let`
+no topo do `core.js` — **`window.audiolivros` é `undefined`**. Lendo por `window.`, o acervo parece
+vazio e dá para concluir que o app apagou os dados dele. Ler a variável direto, sem `window.`.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13428,6 +13492,14 @@ de fora**, não só confiar na limpeza.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada da tela sem texto (§8.77, 2026-08-22)
+
+- [ ] **O Billy Summers dele está em 200 partes de ~5 min**, não em capítulos de verdade — foi
+      importado como arquivo único e fatiado por tempo. "Procurar os capítulos de verdade" (pelo
+      silêncio) daria uma lista muito melhor para transcrever e navegar.
+- [ ] **197 chamadas em sequência dependem da aba aberta.** Se ele quiser rodar de noite, vale
+      confirmar antes que o computador não vai dormir.
 
 ### Da rodada do "transcrever tudo" (§8.76, 2026-08-22)
 
