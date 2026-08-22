@@ -7,7 +7,19 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (33ª) — **O AUDIOLIVRO ERA GUARDADO EM MODO DESCARTÁVEL**.
+> Última atualização: 2026-08-22 (34ª) — **A ESTANTE DE LIVROS GANHA O MESMO ESCUDO, E O SUMIÇO
+> DEIXA PROVA**. As duas pendências de §8.89, fechadas. O merge de livros tinha o mesmo defeito
+> do de audiolivros, com um agravante: o EPUB volta por importação, **o histórico de leitura
+> não volta nunca** — daí o segundo escudo, **livro com histórico nunca é descartado** (o de
+> papel não tem arquivo para protegê-lo). E o "não dá para provar que o navegador apagou" virou
+> o que dava para fazer: **censo** escrito no `BookDB.set` e riscado no `del`, conferido antes do
+> primeiro pull; o que está no censo e não no banco é o navegador limpando espaço, e vira
+> registro com data + aviso na tela. **Testado com um sumiço de verdade** — chave apagada por
+> fora do `del`, registro e aviso corretos — e com um snapshot que "perdeu" itens: os três casos
+> que deviam sobreviver sobreviveram, e o que devia sair saiu. `sw.js` → **englab-v383**.
+> **Detalhes em §8.90.**
+>
+> Última atualização anterior: 2026-08-22 (33ª) — **O AUDIOLIVRO ERA GUARDADO EM MODO DESCARTÁVEL**.
 > Relato dele: *"o audiobook não fica salvo entre sessões, toda vez fica baixando da nuvem"*.
 > Os arquivos **estavam** no aparelho (1.397 MB, incluindo um **órfão de 202 MB**) e abrir usava
 > o local — o que faltava era **proteção**: `navigator.storage.persisted()` era **false**, ou
@@ -1854,6 +1866,12 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
     TOCANDO manda sobre o snapshot.
 
 ### Onde cada coisa é persistida
+> ⚠️ **NADA DISTO É GARANTIDO SE A PROTEÇÃO NÃO FOR PEDIDA** (§8.89). Por padrão o navegador
+> pode apagar tudo o que o site guarda quando o disco aperta — e apaga primeiro o que é grande.
+> `garantirArmazenamentoPersistente()` roda no boot e antes de gravar áudio; o **censo**
+> (`el-censo-local`) e o registro de sumiços (`el-sumico`) existem para flagrar o dia em que
+> acontecer mesmo assim (§8.90).
+
 - **localStorage:** `cfg` (`englab_cfg`), `words`, `srsCfg`, `srsLog`, `srsDecks`, filas Kindle.
 - **IndexedDB:** `CardsDB` (cards — fonte local primária), `AudioDB` (áudios b64),
   `ImageDB` (imagens b64), `SettingsDB` (**backup da cfg** — sobrevive à limpeza do localStorage).
@@ -14359,6 +14377,73 @@ Dois consertos, e o segundo é a regressão de verdade:
 Depois do conserto, no app dele: **Billy Summers, Project Hail Mary, The Hobbit, Dune e One Piece
 Vol 100 — os cinco certos em primeiro lugar, todos vindos do Google Books.**
 
+## 8.90 A estante de livros ganha o mesmo escudo, e o sumiço passa a deixar prova (2026-08-22, 34ª)
+
+**O pedido:** ele leu as duas pendências que ficaram de §8.89 e mandou fazer as duas — a
+proteção do merge de livros e o "não existe como provar que o navegador apagou".
+
+### 1. O merge de livros tinha o mesmo defeito — com um agravante
+
+Livro local ausente do snapshot e mais antigo que o carimbo era descartado sem marca de remoção
+nenhuma, exatamente como acontecia com o audiolivro. O agravante é o que se perde: o EPUB volta
+por importação, **o histórico de leitura não volta nunca**.
+
+Dois escudos, e o segundo é o que realmente importa:
+
+| Escudo | Protege | Por quê |
+|---|---|---|
+| `livroTemArquivoAqui(id)` | EPUB, CBZ, TXT | o arquivo mora no `BookDB` sob a chave que **é** o id do livro, então o censo já responde — não precisou de um segundo espelho |
+| `(l.historico || []).length` | **o livro de papel** | ele não tem arquivo nenhum para protegê-lo, e carrega justamente o que dói: os dias digitados um a um |
+
+⚠️ **Isto não virou "nunca apaga nada".** Livro sem arquivo e sem histórico continua saindo da
+estante quando some da nuvem — que é como uma exclusão feita no celular chega aqui.
+
+### 2. Provar o sumiço: não sob demanda, mas quando acontecer
+
+A conclusão de §8.89 foi honesta e incompleta: ninguém reproduz a limpeza do navegador quando
+quer — mas ela **não precisa passar despercebida**.
+
+- **O censo** é a lista do que este aparelho guardou, escrita quando o app grava e riscada
+  quando o app apaga. As duas coisas moram **dentro do `BookDB`**, pelo mesmo motivo que a marca
+  de remoção mora no `save`: há dez lugares que gravam e apagam arquivo, e instrumentar os dez é
+  garantir que o décimo primeiro nasça sem instrumentação.
+- **A conferência** roda uma vez por sessão, **antes do primeiro pull** — é ela que informa ao
+  merge quais livros têm arquivo aqui. É leitura de chaves, não carrega blob nenhum.
+  - no banco e não no censo → arquivo anterior a esta versão, absorvido em silêncio;
+  - **no censo e não no banco → ninguém deste app mandou apagar.**
+- O evento vira registro em `el-sumico` com data, hora, quantidade, **se o armazenamento estava
+  protegido** e quanto havia guardado. Sumiço com proteção ligada é outra história (limpeza
+  manual, outro perfil) e merece outra investigação — por isso o estado vai junto.
+- **Ele é avisado em português**, porque hoje o audiolivro voltaria a ser baixado em silêncio e
+  ele pagaria a banda sem entender: *"O navegador apagou um audiolivro deste aparelho para
+  liberar espaço. O que está na sua nuvem baixa de novo quando você abrir."*
+- O painel da nuvem ganhou a linha **"O navegador já apagou"**, que só aparece se já aconteceu —
+  linha permanente dizendo "nunca sumiu nada" seria plantar preocupação que ninguém tinha.
+
+### Testado ao vivo (regra nº 5)
+
+**A sentinela, com um sumiço de verdade.** Gravei uma chave de teste (entrou no censo), apaguei
+**por fora do `BookDB.del`** — que é como o navegador faria, sem avisar o app — e recarreguei. O
+registro apareceu: *1 arquivo, 22/08 às 14:51, protegido: sim, 1.693 MB em uso*. O aviso na tela
+saiu com o texto certo, e o censo se corrigiu sozinho depois.
+
+**O merge, com um snapshot que "perdeu" itens** — entregue a `_applyCloudDocs` sem tocar na
+nuvem:
+
+| Caso | Resultado |
+|---|---|
+| Livro com o arquivo neste aparelho | **sobreviveu** |
+| Livro de papel com histórico | **sobreviveu** |
+| Livro sem arquivo e sem histórico | **descartado**, como deve ser |
+| Audiolivro com o áudio aqui | **sobreviveu** |
+
+Estado real restaurado ao fim do teste (10 livros, 4 audiolivros), marcas de remoção do teste
+limpas, registro de sumiço de teste apagado, censo batendo com o banco (15/15) e console limpo.
+
+⚠️ **O acervo dele cresceu no meio da rodada:** eram 2 livros na abertura de §8.89 e são **10**
+agora (5 de Stephen King, 3 de George R. R. Martin). Os dez têm arquivo neste aparelho — ou
+seja, os dez estavam sob a regra antiga e passaram a estar protegidos.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -14370,17 +14455,24 @@ Vol 100 — os cinco certos em primeiro lugar, todos vindos do Google Books.**
 
 ### Da rodada do audiolivro descartável (§8.89, 2026-08-22)
 
-- [ ] **O MERGE DE LIVROS TEM O MESMO DEFEITO DO DE AUDIOLIVROS** — livro local ausente do
-      snapshot e mais antigo que o carimbo é descartado sem marca de remoção. Aqui não corrigi:
-      exigiria um espelho próprio (o do audiolivro é `el-ab-locais`) e o dano é menor — o EPUB
-      tem 4 MB e volta por importação. **Mas o histórico de leitura do livro morre junto**, e
-      isso não volta. Vale a mesma proteção numa próxima rodada.
+- [x] ~~**O MERGE DE LIVROS TEM O MESMO DEFEITO DO DE AUDIOLIVROS**~~ — **feito em 2026-08-22**
+      (§8.90). O espelho próprio não foi preciso: o arquivo do livro mora no `BookDB` sob a chave
+      que É o id, então o censo responde. E entrou um segundo escudo que o audiolivro não tem —
+      **livro com histórico nunca é descartado**, porque o livro de papel não tem arquivo para
+      protegê-lo e é ele quem carrega os dias digitados um a um.
+- [x] ~~**NÃO DÁ PARA PROVAR QUE O NAVEGADOR APAGOU**~~ — **feito em 2026-08-22** (§8.90), na
+      medida do possível: sob demanda continua impossível (depende de o disco encher), mas o
+      sumiço deixou de passar despercebido. Censo escrito no `BookDB.set` e riscado no `del`,
+      conferido na abertura; o que está no censo e não no banco é registrado em `el-sumico` com
+      data e o estado do armazenamento, e ele é avisado na tela. **Testado com sumiço de verdade**
+      (chave apagada por fora do `del`): registro e aviso corretos.
 - [ ] **A PROTEÇÃO DO ARMAZENAMENTO PRECISA SER PEDIDA EM CADA APARELHO** — ela é por navegador.
       O celular dele só ganha proteção quando abrir o app depois desta versão. O Firefox
       PERGUNTA ao usuário em vez de conceder sozinho; se ele usar Firefox, vai ver um pedido.
-- [ ] **NÃO DÁ PARA PROVAR QUE O NAVEGADOR APAGOU** — depende de o disco encher. Se o download
-      repetido voltar, ler `el-ab-diag` (últimos 20 downloads, com o estado do aparelho em cada
-      um) antes de teorizar.
+- [ ] **O CENSO NÃO GUARDA TAMANHO** — ele diz *quais* arquivos sumiram, não *quantos MB*. Ler o
+      tamanho de cada blob para censar carregaria centenas de MB na memória a cada abertura, que
+      é justamente o que `abNoAparelho` evita de propósito. O uso total do disco vai no registro
+      (`estimate()`), e serve para a conta grossa.
 
 ### Da rodada do buscador de catálogo (§8.88, 2026-08-22)
 
