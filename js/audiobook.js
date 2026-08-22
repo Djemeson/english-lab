@@ -1257,6 +1257,7 @@ async function abTranscrever() {
     toast(r.ganharam
       ? `${r.falas} falas transcritas · ${r.ganharam} ${r.ganharam === 1 ? 'marcador ganhou' : 'marcadores ganharam'} a frase`
       : `${r.falas} falas transcritas`, 'success')
+    _abRenderPlayer()          // o cabeçalho conta os capítulos com texto
     abAba('texto')
   } catch (e) {
     console.warn('[audiobook] transcrição:', e)
@@ -2671,7 +2672,7 @@ async function _abTrRodar() {
       _abTr.shift()
       _abTrAtual = null
       _abTrPintar()
-      if (_abLivro && _abLivro.id === item.id && _abAbaAtual === 'texto') abAba('texto')
+      _abRefrescar(item.id)
     }
   } finally {
     _abTrRodando = false
@@ -2698,8 +2699,24 @@ async function _abTrRodar() {
         })
       }
     } else _abTrPintar()
-    if (document.getElementById('ab-trans-painel')?.classList.contains('aberto')) _abTransPainelRender()
+    _abRefrescar(_abLivro && _abLivro.id)
   }
+}
+
+// ⚠️ A TELA SÓ SE ATUALIZAVA NA ABA "TEXTO". Ele mandou transcrever dois
+// capítulos pela lista, esperou terminar, e **nada aconteceu**: a marca não
+// apareceu, o texto não apareceu, e as marcas de seleção continuaram na tela.
+// Precisou recarregar. O redesenho existia — só que cravado numa aba só, e a
+// aba onde ele estava (Capítulos) era justamente a que mostra o resultado.
+//
+// Uma peça que redesenha O QUE ESTIVER ABERTO: a aba corrente, o painel de
+// transcrição se estiver aberto, e o cabeçalho do player (que conta os
+// capítulos com texto).
+function _abRefrescar(id) {
+  if (!_abLivro || (id && _abLivro.id !== id)) return
+  if (_abAbaAtual) abAba(_abAbaAtual)
+  if (document.getElementById('ab-trans-painel')?.classList.contains('aberto')) _abTransPainelRender()
+  if (document.getElementById('ab-raiox-painel')?.classList.contains('aberto')) _abRaioXPainelRender()
 }
 
 // ⚠️ "LEVA UM BOM TEMPO" NÃO ERA AVISO, ERA VAGUEZA — e o acervo real mostrou
@@ -3267,6 +3284,9 @@ function abTranscreverSelecionados() {
   const alvos = [..._abSel].filter(i => _abEstadoDoCap(a, i).estado === 'vazio').sort((x, y) => x - y)
   if (!alvos.length) { toast('Os marcados já têm texto.', 'info'); return }
   _abSel.clear()
+  // ⚠️ Limpar o Set não apaga as marcas da TELA — e elas ficavam lá até algo
+  // redesenhar, dando a impressão de que o clique não tinha feito nada.
+  if (_abAbaAtual) abAba(_abAbaAtual)
   // Devolve a promessa: quem chama precisa poder esperar o aviso de custo.
   return abTranscreverTudo(alvos)
 }
