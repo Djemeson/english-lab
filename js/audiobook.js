@@ -3246,7 +3246,8 @@ function abTranscreverSelecionados() {
   const alvos = [..._abSel].filter(i => _abEstadoDoCap(a, i).estado === 'vazio').sort((x, y) => x - y)
   if (!alvos.length) { toast('Os marcados já têm texto.', 'info'); return }
   _abSel.clear()
-  abTranscreverTudo(alvos)
+  // Devolve a promessa: quem chama precisa poder esperar o aviso de custo.
+  return abTranscreverTudo(alvos)
 }
 
 let _abGrupoAberto = -1
