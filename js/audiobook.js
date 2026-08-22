@@ -693,6 +693,17 @@ function abPodeProcurarCapitulos(a) {
 // O remapeamento existe e é testado (`_abRemapearParaNovosCapitulos`), mas
 // quem tem 3 transcrições e 12 marcadores merece saber ANTES que eles vão ser
 // realinhados, e não descobrir depois que "o capítulo 3" virou outro número.
+// ⚠️ "AS PARTES POR TEMPO" ERA MENTIRA NA METADE DOS CASOS. A frase nasceu
+// quando este botão só aparecia para livro fatiado pelo relógio; agora ele
+// aparece também para quem tem capítulos vindos do arquivo, e dizer "as partes
+// por tempo" a quem tem "Chapter 1..60" descreve outra coisa.
+function _abComoEstaDividido(a) {
+  const caps = a.capitulos || []
+  if (caps.length <= 1) return 'a divisão atual'
+  const porTempo = caps.some(c => /^(Parte \d|Livro completo)/.test(c.titulo || ''))
+  return porTempo ? 'as partes por tempo' : `os ${caps.length} capítulos de agora`
+}
+
 function _abOQueVaiMudar(a) {
   const t = (a.transcricoes || []).length
   const m = (a.marcadores || []).length
@@ -700,8 +711,10 @@ function _abOQueVaiMudar(a) {
   const partes = []
   if (t) partes.push(`<b>${t}</b> ${t === 1 ? 'transcrição' : 'transcrições'}`)
   if (m) partes.push(`<b>${m}</b> ${m === 1 ? 'marcador' : 'marcadores'}`)
-  return `<br><br>Você tem ${partes.join(' e ')} neste livro. Nada se perde: eles são
-    <b>realinhados</b> para os capítulos novos, junto com onde você parou.`
+  // Sem pronome: com "3 transcrições" saía "eles são realinhados", e com
+  // "1 marcador e 2 transcrições" não há concordância que sirva para os dois.
+  return `<br><br>Você tem ${partes.join(' e ')} neste livro. <b>Nada se perde</b> — tudo é
+    realinhado para os capítulos novos, junto com onde você parou.`
 }
 
 async function abProcurarCapitulos() {
@@ -711,7 +724,7 @@ async function abProcurarCapitulos() {
     title: 'Procurar os capítulos de verdade', icon: 'search', confirmText: 'Procurar',
     html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
       Vou escutar o arquivo inteiro atrás dos <b>silêncios longos</b> — o vão de dois a quatro
-      segundos que separa um capítulo do outro — e trocar as partes por tempo pelos cortes
+      segundos que separa um capítulo do outro — e trocar ${_abComoEstaDividido(a)} pelos cortes
       encontrados.<br><br>
       É tudo feito <b>neste aparelho</b>, sem IA e sem custo algum. Em compensação <b>demora</b>:
       o áudio precisa ser decodificado do começo ao fim${dur ? ` (${abTempoLongo(dur)} de livro)` : ''}.
