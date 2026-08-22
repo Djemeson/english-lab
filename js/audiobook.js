@@ -3063,7 +3063,12 @@ function _abListaCapitulos() {
   // vieram do arquivo". São respostas concorrentes para a mesma pergunta, e a
   // de agrupar é a certa aqui — quem tem 200 partes numeradas quer organizá-las,
   // não trocar os cortes por outros iguais.
-  const convite = !abPodeProcurarCapitulos(a) || podeAgrupar ? ''
+  // ⚠️ E COM OS CAPÍTULOS JÁ MONTADOS ELA TAMBÉM SOME. Vista embaixo de
+  // "Chapter 1, Chapter 2, Chapter 3…", a frase "estes 200 capítulos vieram do
+  // arquivo" contradiz o que está logo abaixo dela — e ele acabou de resolver
+  // a organização. Trocar os cortes agora desmontaria o que ele montou.
+  const jaAgrupado = ((a.grupos || []).length) > 0
+  const convite = !abPodeProcurarCapitulos(a) || podeAgrupar || jaAgrupado ? ''
     : porTempo
     ? `<div class="ab-conv">
          ${ic('search','ic-sm')}
