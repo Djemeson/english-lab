@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (21ª) — **A TELA DE CAPÍTULO SEM TEXTO DEIXOU DE SER UM BECO**.
+> Última atualização: 2026-08-22 (22ª) — **24 CAPÍTULOS COM AS PARTES DENTRO, SEM DEPENDER DO
+> LIVRO**. Ele descreveu a estrutura ouvindo — *"tem o capítulo 1 e as partes 1, 2, 3… aí entra o
+> capítulo 2"* — e estava certo. O `.m4b` só guarda `001`…`200` (verificado nos **dois** formatos
+> do arquivo dele), mas **o narrador diz o número**, e esse número **reinicia em 1 a cada
+> capítulo**. Cruzar com o EPUB fechava a conta (24 capítulos, 197 seções contra 200 partes), e
+> ele cortou pelo motivo certo: *"nem sempre vou ter o livro."* Então a estrutura vem da narração:
+> 25 s do começo de cada parte, **R$ 0,28** para as 200. ⚠️ E **não mexe nos cortes** — os grupos
+> são camada de exibição, então posição, marcadores e transcrições ficam intactos.
+> `sw.js` → **englab-v364**. **Detalhes em §8.78.**
+>
+> Última atualização anterior: 2026-08-22 (21ª) — **A TELA DE CAPÍTULO SEM TEXTO DEIXOU DE SER UM BECO**.
 > Ele mandou o print: ali a única saída era transcrever *este* capítulo, um de cada vez — as
 > outras duas portas (escolher na lista, mandar tudo) só existiam na barra de cima, **que nem
 > aparece quando não há transcrição**. Quem está sem texto é quem mais precisa das três. Testado
@@ -13484,6 +13494,87 @@ Virou `1h30`, `2h`, `3h30`.
 no topo do `core.js` — **`window.audiolivros` é `undefined`**. Lendo por `window.`, o acervo parece
 vazio e dá para concluir que o app apagou os dados dele. Ler a variável direto, sem `window.`.
 
+## 8.78 24 capítulos com as partes dentro, sem depender do livro (2026-08-22, 22ª)
+
+> *"Nesse caso de Billy Summers ele tem o capítulo 1 e as partes 1, 2, 3 e assim por diante. Aí
+> entra o capítulo 2 e acontece a mesma coisa. Essa quantidade de partes são exatamente essas
+> partes de cada capítulo. O que faltaria na verdade é adicionar os capítulos a que eles
+> pertencem."*
+
+Ele descreveu a estrutura **ouvindo**, e estava certo.
+
+### O que o arquivo real disse
+
+| Onde olhei | O que achei |
+|---|---|
+| `chpl` (Nero) do `.m4b` | `001`, `002`, … `200` |
+| Trilha de texto (QuickTime) — **que o app nem lia** | as mesmas 200 amostras, `001`…`200` |
+| As 3 transcrições que ele já tinha | começam com **"2."**, **"3."** e **"Four."** |
+| O EPUB dele | **24 capítulos**, somando **197 seções** contra 200 partes |
+
+Ou seja: o nome do capítulo **não existe no arquivo** — o app não perdeu nada. Mas o **narrador
+anuncia o número de cada parte**, e as partes são as seções numeradas do livro.
+
+### Por que não pelo livro
+
+Cruzar com o EPUB funcionava e a conta fechava. Ele cortou pelo motivo certo:
+
+> *"Mas eu não queria depender do livro pra poder organizar o audiobook pq nem sempre vou ter o
+> livro."*
+
+Um audiolivro precisa se organizar sozinho.
+
+### A chave: o número reinicia a cada capítulo
+
+É mais simples do que cruzar com nada. Basta ouvir o começo de cada parte e anotar o número dito;
+**onde ele volta para 1, começou um capítulo**.
+
+- **25 segundos** do início de cada parte bastam — o número é dito logo.
+- **Parte já transcrita sai de graça**: o número está na primeira fala.
+- Lê **dígito** (`"2."`) **e por extenso** (`"Four."`, `"Twenty-three"`) — ⚠️ o Whisper escreve
+  como ouve, e o mesmo narrador alterna entre os dois. Ler só dígito perderia metade.
+- `"Chapter Two"` dito em voz alta, quando houver, vale mais que qualquer inferência.
+- **Prévia antes de aplicar:** o agrupamento é um palpite montado do que a IA ouviu, e um número
+  perdido no meio desloca tudo dali para frente. Ver 24 capítulos com contagens plausíveis é o que
+  separa "funcionou" de "parece que funcionou".
+
+### ⚠️ E não mexe nos cortes
+
+Os grupos são **camada de exibição** (`a.grupos`), não uma lista nova: `a.capitulos` fica intacto,
+e com ele a posição, os marcadores e as transcrições, que guardam `{cap, seg}`. Trocar a lista
+exigiria remapear tudo (é o que `abProcurarCapitulos` faz); **agrupar não exige nada**, e dá para
+desfazer com um clique.
+
+Na tela: sanfona de capítulos com as partes dentro — o que contém a parte tocando abre sozinho — e
+o player passa a dizer **"Chapter 2 · parte 2 de 4"** em vez de `009`, inclusive na tela de
+bloqueio do celular.
+
+### Três contradições que só apareceram com o livro real na tela
+
+⚠️ **Duas faixas dizendo o oposto:** *"São 200 partes numeradas, SEM os capítulos"* logo acima de
+*"Estes 200 CAPÍTULOS vieram de dentro do arquivo"*. São respostas concorrentes para a mesma
+pergunta — agora só a de agrupar aparece.
+
+⚠️ **E ela voltava depois de agrupar**, sugerindo trocar os cortes logo abaixo de *"Chapter 1,
+Chapter 2, Chapter 3"* — desmontaria o que ele acabou de montar.
+
+⚠️ **"cerca de R$ 0,28, e leva cerca de 1h30"** — `_abTempoDaFila` já traz o "cerca de".
+
+### Medido
+
+- **Leitor de números: 8/8**, incluindo os três textos reais dele e os que **não** podem virar
+  seção (*"Billy Summers by Stephen King"*, *"Copyright 2021"*).
+- **Agrupamento com a estrutura real** (seções por capítulo contadas no EPUB dele): **24 capítulos,
+  200 partes somadas**, contagem batendo em 23 dos 24.
+- **Com um número perdido no meio:** continua dando 24 capítulos, e a parte fica junto do capítulo
+  anterior.
+- **No Chrome, com o livro dele:** aviso de *"197 partes (as outras 3 já estão transcritas e saem
+  de graça): cerca de R$ 0,28 na Groq, cerca de 1h30"*; a tela agrupada mostrando *"Abertura · 1
+  parte · 0:47"*, *"Chapter 1 · 6 partes · 24:49"*, *"Chapter 2 · 4 partes · 31:25"*, com o
+  Chapter 2 aberto sozinho por conter a parte tocando, e o player em *"Chapter 2 · parte 2 de 4"*.
+- **Nada foi gravado no acervo dele:** conferido no fim, `grupos: null` em memória e no
+  localStorage.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13492,6 +13583,17 @@ vazio e dá para concluir que o app apagou os dados dele. Ler a variável direto
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada do agrupamento (§8.78, 2026-08-22)
+
+- [ ] **Rodar de verdade no Billy Summers** — o custo é R$ 0,28 e leva ~1h30. Os testes usaram os
+      textos reais dele, mas a varredura das 200 partes nunca rodou.
+- [ ] **Narrador que não anuncia o número** faz o agrupamento não achar nada — o app avisa e não
+      altera nada, mas não há plano B. O caminho seria o silêncio longo entre capítulos.
+- [ ] **Os grupos não são reconstruídos** se ele depois trocar os cortes (`abProcurarCapitulos`).
+      Como os índices mudam, o certo seria apagá-los junto; hoje ficariam apontando errado.
+- [ ] **A leitura do número só entende inglês.** Um audiolivro em espanhol ou português precisaria
+      da tabela do idioma.
 
 ### Da rodada da tela sem texto (§8.77, 2026-08-22)
 
