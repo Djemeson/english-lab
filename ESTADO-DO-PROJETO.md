@@ -7,7 +7,15 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (25ª) — **A MARCA DISTINGUE TRANSCRITO DE ANALISADO**, e o
+> Última atualização: 2026-08-22 (26ª) — **A TELA NÃO SE ATUALIZAVA QUANDO A TRANSCRIÇÃO
+> TERMINAVA**. Ele mandou transcrever dois capítulos pela lista, esperou, e *"nada aconteceu"* —
+> precisou recarregar para ver a marca e o texto. ⚠️ O redesenho existia, mas **cravado numa aba
+> só** (`_abAbaAtual === 'texto'`), e a aba onde ele estava (Capítulos) era justamente a que mostra
+> o resultado. E as **marcas de seleção não sumiam**: limpar o conjunto não apaga o que está
+> desenhado. **Medido com transcrição real** do capítulo 001: a linha passou de *"001 · 0:47"* para
+> *"001 · 9 falas · 0:47"* **sem recarregar**. `sw.js` → **englab-v369**. **Detalhes em §8.82.**
+>
+> Última atualização anterior: 2026-08-22 (25ª) — **A MARCA DISTINGUE TRANSCRITO DE ANALISADO**, e o
 > ícone volta a ter um sentido só. ⚠️ O defeito era maior que o pedido: **o mesmo ✦ queria dizer
 > duas coisas** — "tem texto" no painel de Transcrição, "está analisado" no do raio-X. Dois painéis
 > irmãos, mesmo símbolo, sentidos opostos. Agora o vocabulário é um só em toda a seção:
@@ -13756,6 +13764,50 @@ Os três estados reais do Billy Summers, lado a lado na lista:
 E as dicas: *"Transcrito — falta a análise"* contra *"Transcrito e analisado — 71 achados"*.
 Conferido também que nada ficou no acervo dele.
 
+## 8.82 A tela não se atualizava quando a transcrição terminava (2026-08-22, 26ª)
+
+> *"Eu coloquei pra transcrever o 6 e o 7 e quando acabou nada aconteceu, e ainda continuou com a
+> marcação de seleção. Tive que recarregar pra aparecer o ícone de transcrito e pra aparecer a
+> transcrição em si. Quero que seja em tempo real assim que finalizar."*
+
+### ⚠️ O redesenho existia — cravado numa aba só
+
+```js
+if (_abLivro && _abLivro.id === item.id && _abAbaAtual === 'texto') abAba('texto')
+```
+
+E a aba onde ele estava — **Capítulos** — era justamente a que mostra o resultado: a marca de
+transcrito e a contagem de falas. Quem manda transcrever *pela lista* fica **na lista**; a única
+aba que se atualizava era a que ele não estava vendo.
+
+Virou `_abRefrescar(id)`, que redesenha **o que estiver aberto**: a aba corrente, seja qual for,
+mais o painel de transcrição e o do raio-X quando abertos. Chamado ao fim de **cada** capítulo da
+fila e quando ela esvazia.
+
+### ⚠️ E limpar o conjunto não apaga a tela
+
+`abTranscreverSelecionados` fazia `_abSel.clear()` — mas as marcas continuavam **desenhadas** até
+algo redesenhar, dando a impressão de que o clique não tinha feito nada. Agora a lista é repintada
+no mesmo instante em que a seleção é consumida.
+
+### Medido — com transcrição REAL, no livro dele
+
+Capítulo **001** (0:47, o mais curto sem texto), do começo ao fim **sem recarregar nada**:
+
+| Momento | O que a tela mostrava |
+|---|---|
+| Antes | *"1 · 001 · 0:47"*, sem ícone |
+| Ao marcar | 1 linha marcada |
+| **Logo após mandar** | **0 marcas** e o aviso da fila no canto |
+| **Ao terminar** | *"1 · 001 · **9 falas** · 0:47"*, **com o ícone de legenda**, aviso sumido |
+
+E a aba Texto, aberta em seguida: *"0:00 – 0:47 · 9 falas"*, com as 9 falas montadas — a primeira
+sendo *"This is Audible."*
+
+⚠️ **Isto gastou crédito dele** (≈ R$ 0,003) e **deixou uma transcrição nova no acervo**: o
+capítulo 001 do Billy Summers. Foi o único jeito de provar "em tempo real" — mas é dado real
+criado por teste, e ele precisa saber.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13764,6 +13816,12 @@ Conferido também que nada ficou no acervo dele.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada do tempo real (§8.82, 2026-08-22)
+
+- [ ] **O redesenho a cada capítulo pode atrapalhar quem está LENDO** na aba Texto durante uma fila
+      longa: a rolagem volta ao topo. Não apareceu no teste (fila de um capítulo só), mas com 197
+      é provável. O conserto seria repintar só a linha que mudou, em vez da aba inteira.
 
 ### Da rodada da seleção (§8.80, 2026-08-22)
 
