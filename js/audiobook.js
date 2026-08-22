@@ -776,9 +776,9 @@ async function abAgruparCapitulos() {
       novo. É por aí que dá para montar a estrutura, <b>sem precisar do livro em texto</b>.<br><br>
       Vou ouvir só os <b>${AB_DESC_SEG} segundos iniciais</b> de ${faltam.length}
       ${faltam.length === 1 ? 'parte' : 'partes'}${faltam.length < caps.length
-        ? ` (as outras ${caps.length - faltam.length} já estão transcritas e saem de graça)` : ''} —
+        ? ` (as outras ${caps.length - faltam.length} já estão transcritas e saem de graça)` : ''}:
       cerca de <b>${(usd * brl).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</b>
-      na ${esc(stt.nome)}, e leva ${_abTempoDaFila(faltam.length)}.<br><br>
+      na ${esc(stt.nome)}, ${_abTempoDaFila(faltam.length)}.<br><br>
       <b>Nada é apagado.</b> Os cortes, sua posição, os marcadores e as transcrições ficam como
       estão — os capítulos entram só como agrupamento na lista, e você vê a prévia antes de
       confirmar.</p>`
@@ -3057,7 +3057,13 @@ function _abListaCapitulos() {
   // marcador de faixa, não de divisão narrativa. Quem quiser refazer precisa
   // de um caminho; o que muda é o tom, não a existência do botão.
   const maior = caps.reduce((m, c) => Math.max(m, abDurCap(c) || 0), 0)
-  const convite = !abPodeProcurarCapitulos(a) ? ''
+  const podeAgrupar = caps.length >= 6 && !(a.grupos || []).length
+  // ⚠️ UMA FAIXA POR VEZ. Com as duas na tela o app se contradizia: "São 200
+  // partes numeradas, SEM os capítulos" logo acima de "Estes 200 CAPÍTULOS
+  // vieram do arquivo". São respostas concorrentes para a mesma pergunta, e a
+  // de agrupar é a certa aqui — quem tem 200 partes numeradas quer organizá-las,
+  // não trocar os cortes por outros iguais.
+  const convite = !abPodeProcurarCapitulos(a) || podeAgrupar ? ''
     : porTempo
     ? `<div class="ab-conv">
          ${ic('search','ic-sm')}
@@ -3078,7 +3084,6 @@ function _abListaCapitulos() {
   // ⚠️ A PORTA DO AGRUPAMENTO É OUTRA COISA, e por isso é outra faixa: procurar
   // pelo silêncio TROCA os cortes; agrupar os mantém e só os organiza. Só
   // aparece quando faz sentido — muitas partes, sem grupos ainda.
-  const podeAgrupar = caps.length >= 6 && !(a.grupos || []).length
   const conviteGrupo = podeAgrupar
     ? `<div class="ab-conv">
          ${ic('layers','ic-sm')}
