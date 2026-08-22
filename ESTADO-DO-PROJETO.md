@@ -7,7 +7,17 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (16ª) — **A SUBIDA DO AUDIOLIVRO VIROU FILA DE SEGUNDO PLANO**.
+> Última atualização: 2026-08-22 (17ª) — **TELA CHEIA QUE PREENCHE, "Aa" FORA DELA, MOUSE QUE
+> PAUSA E PAINEL DE TRANSCRIÇÃO**. Quatro pedidos: a tela cheia deixava uma **faixa escura à
+> direita** (a seção herda `max-width:1180px`, e `position:fixed` não desfaz teto de largura);
+> fora da tela cheia o **"Aa" não fazia nada** (`.ab-fala` tinha tamanho fixo e só a regra do full
+> lia a configuração); **passar o mouse sobre o texto agora pausa o áudio** e tirá-lo volta a
+> tocar; e a **transcrição ganhou painel próprio**, porque a lista de capítulos só existia dentro
+> do raio-X — quem queria só o texto não tinha por onde. ⚠️ A lista de ligações do texto estava
+> **duplicada**, e o hover foi parar na cópia que não roda. `sw.js` → **englab-v354**.
+> **Detalhes em §8.73.**
+>
+> Última atualização anterior: 2026-08-22 (16ª) — **A SUBIDA DO AUDIOLIVRO VIROU FILA DE SEGUNDO PLANO**.
 > Pedido dele: *"deve fazer upload em segundo plano"* — e o pedido descobriu três defeitos da
 > versão anterior: **todos os blobs iam para a memória de uma vez** (700 MB de RAM presos para
 > subir um arquivo por vez), **o progresso morava dentro do painel** (fechou, a subida continuava
@@ -13095,6 +13105,91 @@ inteiro. Upload real usa rede, que não sofre esse freio.
 de volta do servidor** (API `firebaserules`), e não pelo console: `users/{uid}/audiolivros/**` com
 **2048 MB**, o resto com **500 MB**.
 
+## 8.73 A tela do audiolivro: preencher, ajustar, pausar e transcrever (2026-08-22, 17ª)
+
+### 1. "O modo full pode preencher todo o espaço"
+
+`#section-audiobook` herda o `max-width:1180px` de todas as seções do app, e **`position:fixed`
+com `inset:0` não desfaz um teto de largura** — sobrava uma faixa do fundo escuro à direita do
+papel. **Medido:** papel indo até 1180px numa janela de 1280.
+
+Agora `max-width:none` + `width:100vw`. E o "Aa" passou a permitir coluna de até **64em** (era 48),
+para quem quiser o texto largo também — a coluna estreita continua sendo o padrão, porque linha de
+1500px faz o olho perder a volta.
+
+### 2. "Fora do modo full a letra tá pequena e o botão só funciona em modo full"
+
+Verdade, e a causa estava no CSS: `.ab-fala` tinha `font-size:var(--fs-sm)` **fixo**, e só a regra
+`body.ab-full .ab-fala` lia `--ab-fs`. Ele mexia no tamanho e nada acontecia.
+
+Agora tamanho e entrelinha vêm da **mesma configuração** nos dois modos. O que continua exclusivo
+da tela cheia é o **papel colorido** — pintar a caixa de creme dentro do player escuro seria um
+remendo no meio da tela.
+
+⚠️ De quebra: `.ab-trans` tinha **420px fixos** de altura, o que virava uma fresta de três linhas
+assim que a letra subia. Passou a `min(58vh, 640px)`.
+
+### 3. O mouse no texto pausa o áudio
+
+> *"Ao passar o mouse sobre uma linha do texto o áudio deve pausar, pois posso querer ver o chip,
+> selecionar texto e etc, e deve voltar a rodar ao afastar o mouse do texto."*
+
+O motivo é prático: quando ele para o olho numa palavra, o áudio segue e a fala acesa muda de linha
+embaixo dele — **o texto foge enquanto ele lê**. Levar o mouse até ali já é a declaração de
+"espera".
+
+⚠️ **Três coisas que a volta não pode fazer:**
+
+| Situação | Por que não pode voltar |
+|---|---|
+| Ele pausou no botão | Trava própria (`_abPausaHover`), e o listener de `pause` não zera a intenção de tocar — mesmo desenho de `_abVirando` |
+| O chip está aberto | O chip mora no `body`, **fora** do texto: ir até ele com o mouse é *sair* do texto, e o áudio voltaria bem na hora de ler a tradução |
+| Há texto selecionado | É o gesto mais claro de "estou trabalhando nesta frase" |
+
+Nos dois últimos a volta fica **agendada** e tenta de novo — senão o áudio ficaria parado para
+sempre depois de um chip fechado longe do texto.
+
+### 4. Painel próprio para a transcrição
+
+> *"Deve ter um botão, igual o de análise de IA, pra gerar a transcrição e assim ver os que já
+> estão gerados e os que posso gerar."*
+
+E fazia falta: a lista de capítulos existia **só dentro do painel do raio-X**, onde "transcrever"
+aparecia como um passo do caminho para *analisar*. Quem queria apenas o **texto** — para ler
+ouvindo, sem gastar com análise — não tinha por onde. São duas decisões com preços diferentes, e a
+transcrição (Whisper) é a cara das duas.
+
+Mesmo desenho do painel irmão, mesma marca. Clique em capítulo sem texto **só transcreve**, sem
+emendar a análise. Ícone novo `captions` em `core.js`.
+
+### A lista de ligações do texto estava duplicada
+
+⚠️ `_abLigarSelecao() + _abLigarChips() + _abLigarRolagemManual()` aparecia **duas vezes** (no
+redesenho do player e no clique da aba). Acrescentei o hover a uma delas e não funcionou — quem
+roda no clique era a outra. Viraram `_abLigarTexto()`, uma peça só. É a regra que este projeto
+repete desde o balão: **quando duas partes fazem a mesma coisa, a peça é uma.**
+
+### Medido — no Chrome real, no site publicado
+
+Janela de 1536px, `sw.js` em v354:
+
+- **Tela cheia:** seção e papel a **1536px = a janela inteira**, fundo creme sem faixa escura.
+- **"Aa" fora da tela cheia:** 23 → letra renderizada em **23px** (antes ficava presa em `--fs-sm`).
+- **Hover com áudio de verdade tocando** (WAV gerado na hora): tocando → mouse entra → **pausa em
+  0,3s** com a trava ligada → mouse sai → **volta a tocar**, trava desligada, seguindo em 1,2s.
+- **Realce:** `turnpike` (marcada como conhecida) com **0,8px pontilhado, opacidade 0,72**;
+  `busts out` (novidade) com **1,6px sólido, opacidade 1**.
+- **Painel de transcrição:** *"2 de 3 capítulos com texto"*, com "3 falas", "1 fala" e
+  "transcrever"; dentro da tela, sem emoji.
+- **Painel do raio-X, lado a lado:** *"1 de 3 capítulos analisados · nível B1"*. São dois painéis
+  diferentes respondendo perguntas diferentes.
+
+⚠️ **O teste rodou deslogado** (o login do Google continua fora do alcance das ferramentas), com um
+audiolivro sintético. **Tudo foi desfeito depois** — e isto importa: o teste marcou `turnpike` como
+conhecida, e `knownWords` é **união** no sync; se ficasse, entraria no acervo real dele ao logar.
+Conferido no fim: 0 audiolivros, 0 palavras conhecidas, `cfg.ler` vazio (a tipografia é
+**compartilhada** com o leitor), fila vazia.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13103,6 +13198,13 @@ de volta do servidor** (API `firebaserules`), e não pelo console: `users/{uid}/
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada da tela do audiolivro (§8.73, 2026-08-22)
+
+- [ ] **O hover não existe no celular** — não há "passar o mouse" no toque. Se ele quiser o mesmo
+      efeito lá, o gesto equivalente seria tocar e segurar, ou pausar ao rolar o texto.
+- [ ] **Conferir a tela cheia com um audiolivro de verdade dele**, com transcrição longa: o teste
+      usou três falas.
 
 ### Da rodada da fila em segundo plano (§8.72, 2026-08-22)
 
