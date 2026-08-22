@@ -1074,8 +1074,10 @@ function applyCloudDocs(docs) {
   // ao merge não foi "removido por ele". Sem a trava, `marcarSumidos` o
   // carimbaria como apagado e ele nunca mais voltaria da nuvem: o pior tipo de
   // perda, silenciosa e permanente.
-  fbAplicandoNuvem = true
-  try { return _applyCloudDocs(docs) } finally { fbAplicandoNuvem = false }
+  // `fbAplicandoNuvem` mora no core.js — mesma guarda de deploy parcial.
+  const temTrava = typeof fbAplicandoNuvem !== 'undefined'
+  if (temTrava) fbAplicandoNuvem = true
+  try { return _applyCloudDocs(docs) } finally { if (temTrava) fbAplicandoNuvem = false }
 }
 
 function _applyCloudDocs(docs) {

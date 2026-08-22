@@ -141,7 +141,15 @@ window.addEventListener('beforeunload', () => {
 })
 
 // saveSrsCards — grava no IDB (fire-and-forget, não bloqueia UI)
-function saveSrsCards() { marcarSumidosCards(srsCards); CardsDB.save(srsCards) }
+// ⚠️ `typeof` PORQUE A CHAMADA CRUZA DE ARQUIVO. `marcarSumidosCards` mora em
+// core.js, e durante um deploy o navegador pode ficar com um arquivo novo e o
+// outro velho por alguns segundos — vi acontecer testando. Sem a guarda, o
+// ReferenceError derrubaria `saveSrsCards` inteiro e OS CARDS NÃO SERIAM
+// SALVOS: um problema muito pior que o que a marca veio resolver.
+function saveSrsCards() {
+  if (typeof marcarSumidosCards === 'function') marcarSumidosCards(srsCards)
+  CardsDB.save(srsCards)
+}
 function persistSrsCfg(){ localStorage.setItem(SK.srsCfg, JSON.stringify(srsCfg)) }
 function saveSrsLog()   { localStorage.setItem(SK.srsLog, JSON.stringify(srsLog)) }
 
