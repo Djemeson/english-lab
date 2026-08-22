@@ -1114,6 +1114,8 @@ function _abListaTexto() {
              data-tip="Acha o que está acima do seu nível, e todo phrasal verb e expressão">
              ${ic('eye','ic-3xs')} O que é difícil aqui</button>`}
       <button class="est-chip" onclick="abTranscrever()">${ic('plus','ic-3xs')} Outro trecho</button>
+      <button class="est-chip est-chip-forte" id="ab-trans-btn" onclick="event.stopPropagation();abTransPainel()"
+              data-tip="Ver os capítulos e o que já virou texto">${ic('captions','ic-3xs')} Transcrição</button>
       <button class="est-chip est-chip-forte" id="ab-raiox-btn2" onclick="event.stopPropagation();abRaioXPainel()"
               data-tip="Ver os capítulos e o que já foi analisado">${ic('eye','ic-3xs')} O que é difícil</button>
       <button class="est-chip" id="ab-tipo-btn" onclick="event.stopPropagation();abTipografia()"
@@ -1146,6 +1148,79 @@ function _abListaTexto() {
 // transcrito e analisado. Clicar num capítulo sem texto faz as duas etapas em
 // sequência — ele pediu "ao clicar no capítulo sem ele gera o processamento",
 // e parar no meio com "agora transcreva" seria empurrar trabalho de volta.
+// ================================================================
+// O PAINEL DA TRANSCRIÇÃO — o que já virou texto, e o que falta
+// ================================================================
+// Pedido dele: *"deve ter um botão, igual o de análise de IA, pra gerar a
+// transcrição e assim ver os que já estão gerados e os que posso gerar."*
+//
+// ⚠️ E FAZIA FALTA MESMO. A lista de capítulos existia só dentro do painel do
+// raio-X, onde "transcrever" aparecia como um passo do caminho para analisar —
+// quem só queria o TEXTO (para ler ouvindo, sem gastar com análise) não tinha
+// por onde. São duas decisões diferentes e com preços diferentes: a transcrição
+// passa pelo Whisper e é a cara das duas.
+//
+// A peça é a mesma do raio-X de propósito — mesmo desenho, mesma marca ✦, mesmo
+// jeito de clicar. O que muda é a pergunta que cada uma responde.
+function abTransPainel() {
+  const p = el('ab-trans-painel')
+  if (p && p.classList.contains('aberto')) { p.classList.remove('aberto'); return }
+  _abTransPainelRender()
+  el('ab-trans-painel').classList.add('aberto')
+}
+
+function _abTransPainelRender(msg) {
+  let p = el('ab-trans-painel')
+  if (!p) {
+    p = document.createElement('div')
+    p.id = 'ab-trans-painel'
+    p.className = 'ler-raiox-painel'
+    p.addEventListener('click', e => e.stopPropagation())
+    document.body.appendChild(p)
+    setTimeout(() => document.addEventListener('click', () => p.classList.remove('aberto')), 0)
+  }
+  const a = _abLivro
+  const caps = (a && a.capitulos) || []
+  const prontos = caps.filter((_, i) => _abEstadoDoCap(a, i).estado !== 'vazio').length
+  p.innerHTML = `
+    <div class="ler-raiox-topo">
+      <b>${ic('captions','ic-sm')} Transcrição</b>
+      <span>${prontos} de ${caps.length} ${caps.length === 1 ? 'capítulo' : 'capítulos'} com texto</span>
+    </div>
+    ${msg ? `<div class="ler-raiox-msg">${esc(msg)}</div>` : ''}
+    <div class="ler-raiox-lista">
+      ${caps.map((c, i) => {
+        const e2 = _abEstadoDoCap(a, i)
+        const tem = e2.estado !== 'vazio'
+        return `<button class="ler-raiox-cap${i === _abCap ? ' atual' : ''}${tem ? ' feito' : ''}"
+                  onclick="abTransDoCapitulo(${i})">
+          <span class="ler-raiox-spark">${tem ? ic('sparkles','ic-sm') : ''}</span>
+          <span class="ler-raiox-nome">${esc(c.titulo || `Capítulo ${i + 1}`)}</span>
+          <span class="ler-raiox-n">${tem ? `${e2.falas} ${e2.falas === 1 ? 'fala' : 'falas'}` : 'transcrever'}</span>
+        </button>`
+      }).join('')}
+    </div>
+    <p class="est-dica">Com <b>${ic('sparkles','ic-3xs')}</b> o texto já existe — o clique leva até
+      ele. Sem a marca, o clique <b>transcreve</b>, e o custo é mostrado antes.</p>`
+  const btn = el('ab-trans-btn')
+  if (btn) {
+    const r = btn.getBoundingClientRect()
+    p.style.top = Math.round(r.bottom + 8) + 'px'
+    p.style.left = Math.round(Math.max(8, Math.min(r.left - 120, innerWidth - 340))) + 'px'
+  }
+}
+
+// Só transcreve — não emenda a análise. Quem quiser as duas usa o outro painel.
+async function abTransDoCapitulo(i) {
+  const a = _abLivro; if (!a) return
+  const antes = _abEstadoDoCap(a, i)
+  if (i !== _abCap) { await _abCarregarCapitulo(i, 0); _abRenderPlayer() }
+  _abAbaAtual = 'texto'
+  el('ab-trans-painel')?.classList.remove('aberto')
+  abAba('texto')
+  if (antes.estado === 'vazio') await abTranscrever()
+}
+
 function abRaioXPainel() {
   const p = el('ab-raiox-painel')
   if (p && p.classList.contains('aberto')) { p.classList.remove('aberto'); return }
@@ -1482,6 +1557,70 @@ function _abCentralizar(box, alvo) {
 
 // Só o gesto DELE conta como rolagem manual. Escutar `scroll` puro não serve:
 // ele dispara também na rolagem programática.
+// ================================================================
+// O MOUSE NO TEXTO PAUSA — e tirar o mouse volta a tocar
+// ================================================================
+// Pedido dele: *"ao passar o mouse sobre uma linha do texto o áudio deve
+// pausar, pois posso querer ver o chip, selecionar texto e etc, e deve voltar a
+// rodar ao afastar o mouse do texto."*
+//
+// O motivo é prático: quando ele para o olho numa palavra, o áudio segue e a
+// fala acesa muda de linha embaixo dele — o texto foge enquanto ele lê. Levar
+// o mouse até ali já é a declaração de "espera".
+//
+// ⚠️ TRÊS COISAS QUE NÃO PODEM ACONTECER NA VOLTA:
+// 1. Retomar o que ELE pausou. Por isso a pausa por mouse tem trava própria
+//    (`_abPausaHover`) e o listener de `pause` não zera a intenção de tocar —
+//    mesmo desenho da virada de capítulo (`_abVirando`).
+// 2. Voltar a tocar com o chip aberto. O chip mora no `body`, fora do texto:
+//    ir até ele com o mouse é SAIR do texto, e o áudio voltaria bem na hora em
+//    que ele foi ler a tradução.
+// 3. Voltar com texto selecionado. Selecionar é o gesto mais claro de "estou
+//    trabalhando nesta frase".
+//
+// Nos casos 2 e 3 a volta fica agendada, e tenta de novo — senão o áudio
+// ficaria parado para sempre depois de um chip fechado longe do texto.
+let _abPausaHover = false
+let _abHoverTimer = null
+
+function _abLigarHoverPausa(box) {
+  if (!box || box._abHoverLigado) return
+  box._abHoverLigado = true
+  box.addEventListener('mouseenter', _abHoverEntrou)
+  box.addEventListener('mouseleave', _abHoverSaiu)
+}
+
+function _abHoverEntrou() {
+  clearTimeout(_abHoverTimer)
+  const au = _abAudio()
+  if (!au || au.paused || _abPausaHover) return
+  _abPausaHover = true
+  try { au.pause() } catch (e) {}
+  _abPintarBotao()
+}
+
+function _abOcupado() {
+  if (document.querySelector('.dif-pop')) return true          // chip aberto
+  const sel = window.getSelection()
+  return !!(sel && String(sel).trim() && !sel.isCollapsed)     // texto selecionado
+}
+
+function _abHoverSaiu() {
+  if (!_abPausaHover) return
+  clearTimeout(_abHoverTimer)
+  if (_abOcupado()) { _abHoverTimer = setTimeout(_abHoverSaiu, 400); return }
+  _abPausaHover = false
+  _abTocarSeguro()
+  _abPintarBotao()
+}
+
+// Qualquer decisão dele sobre tocar/pausar apaga a trava: a partir daí quem
+// manda é ele, não o mouse.
+function _abHoverLimpar() {
+  _abPausaHover = false
+  clearTimeout(_abHoverTimer)
+}
+
 function _abLigarRolagemManual(box) {
   if (!box || box._abRolagem) return
   box._abRolagem = true
@@ -1591,7 +1730,7 @@ function _abRenderTipografia() {
     </div>
     ${linha('Tamanho', 'tamanho', 13, 30, 1, 'px')}
     ${linha('Entrelinha', 'entrelinha', 1.2, 2.4, 0.1, '')}
-    ${linha('Largura', 'largura', 24, 48, 2, 'em')}
+    ${linha('Largura', 'largura', 24, 64, 2, 'em')}
     <p class="est-dica">É a mesma configuração do leitor de livros — mudar aqui muda lá.</p>`
   // Posicionado sob o botão, e preso à tela quando não couber.
   const btn = el('ab-tipo-btn')
@@ -2218,6 +2357,7 @@ function _abPintarBaixando(a, msg, pct) {
 }
 
 function abFechar() {
+  _abHoverLimpar()
   _abQuerTocar = false
   _abAbaAtual = 'capitulos'
   if (document.body.classList.contains('ab-full')) abTextoFull(false)
@@ -2327,8 +2467,22 @@ function _abRenderPlayer() {
   // ⚠️ RELIGAR A SELEÇÃO DEPOIS DE CADA REDESENHO. O ouvinte mora no container,
   // e o container é recriado inteiro aqui — guardar um marcador redesenhava o
   // player e a lista ficava muda: selecionar a frase não abria mais o menu.
-  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abLigarChips(); _abLigarRolagemManual(el('ab-trans')); abTipoAplicar(); _abAcompanharTexto() }
+  if (_abAbaAtual === 'texto') _abLigarTexto()
   if (_abAbaAtual === 'marcadores') _abLigarSelecaoMarcas()
+}
+
+// ⚠️ UMA LISTA SÓ. Esta sequência existia DUPLICADA (aqui e no clique da aba),
+// e o preço apareceu na hora: acrescentei o hover a uma das cópias e ele não
+// funcionava, porque quem roda no clique era a outra. Regra do projeto: quando
+// duas partes fazem a mesma coisa, a peça é uma.
+function _abLigarTexto() {
+  const box = el('ab-trans')
+  _abLigarSelecao()
+  _abLigarChips()
+  _abLigarRolagemManual(box)
+  _abLigarHoverPausa(box)
+  abTipoAplicar()
+  _abAcompanharTexto()
 }
 
 let _abAbaAtual = 'capitulos'
@@ -2340,7 +2494,7 @@ function abAba(qual, ev) {
   box.innerHTML = _abAbaAtual === 'marcadores' ? _abListaMarcadores()
     : _abAbaAtual === 'texto' ? _abListaTexto()
     : _abListaCapitulos()
-  if (_abAbaAtual === 'texto') { _abLigarSelecao(); _abLigarChips(); _abLigarRolagemManual(el('ab-trans')); abTipoAplicar(); _abAcompanharTexto() }
+  if (_abAbaAtual === 'texto') _abLigarTexto()
   if (_abAbaAtual === 'marcadores') _abLigarSelecaoMarcas()
 }
 
@@ -2469,7 +2623,9 @@ function _abLigarEventos() {
   au.addEventListener('play', () => { _abQuerTocar = true; _abPintarBotao() })
   au.addEventListener('pause', () => {
     // Pausa DURANTE a virada é técnica (o arquivo acabou), não decisão dela.
-    if (!_abVirando) _abQuerTocar = false
+    // Pausa DURANTE a virada é técnica (o arquivo acabou) e pausa por MOUSE é
+    // momentânea — nenhuma das duas é decisão dela de parar de ouvir.
+    if (!_abVirando && !_abPausaHover) _abQuerTocar = false
     _abPintarBotao(); _abSalvarPos(true)
   })
   au.addEventListener('ended', _abAoTerminarArquivo)
@@ -2547,6 +2703,7 @@ function _abTocarSeguro(tentativa = 0) {
 // ---- controles ----
 function abTocarPausar() {
   const au = _abAudio(); if (!au || !_abLivro) return
+  _abHoverLimpar()
   if (au.paused) { _abQuerTocar = true; _abTocarSeguro(); _abInicioSessao = Date.now() }
   else { _abQuerTocar = false; au.pause(); _abRegistrarTempo() }
 }

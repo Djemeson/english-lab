@@ -5332,10 +5332,18 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   font-size:var(--fs-3xs);color:var(--text3);
 }
 .ab-trans-topo .est-dica{flex:1}
-.ab-trans{max-height:420px;overflow-y:auto;padding-right:6px}
+/* A caixa cresce junto com a letra: 420px fixos viravam uma fresta de três
+   linhas assim que o tamanho subia. */
+.ab-trans{max-height:min(58vh, 640px);overflow-y:auto;padding-right:6px}
 .ab-fala{
   display:flex;gap:12px;align-items:flex-start;padding:7px 10px;border-radius:var(--radius-xs);
-  font-size:var(--fs-sm);color:var(--text2);line-height:1.65;
+  /* ⚠️ O "Aa" NÃO PEGAVA FORA DA TELA CHEIA. Aqui estava `--fs-sm` fixo, e só
+     a regra do modo full lia `--ab-fs` — ele mexia no tamanho, nada acontecia,
+     e o texto ficava miúdo para ler ouvindo. Agora as duas medidas vêm da
+     MESMA configuração; o que continua exclusivo do full é o papel colorido,
+     que dentro do player escuro seria um remendo. */
+  font-size:var(--ab-fs, var(--fs-sm));line-height:var(--ab-lh, 1.65);
+  color:var(--text2);
 }
 /* A fala que esta tocando fica acesa: e o que permite OUVIR LENDO, e e lendo
    que ele encontra a palavra que nao conhece. */
@@ -5355,6 +5363,12 @@ body.ab-full .app-layout > .main{overflow:hidden}
 body.ab-full #section-audiobook{
   position:fixed;inset:0;z-index:var(--z-modal);background:var(--bg);
   padding:0;margin:0;overflow:hidden;display:flex;flex-direction:column;
+  /* ⚠️ SEM ISTO O "TELA CHEIA" NÃO ERA TELA CHEIA. A seção herda o
+     `max-width:1180px` de todas as seções do app, e `position:fixed; inset:0`
+     não desfaz um teto de largura — sobrava uma faixa do fundo escuro à
+     direita do papel, que foi exatamente o que ele viu. Medido: papel indo até
+     1180px numa janela de 1280. */
+  max-width:none;width:100vw;
 }
 body.ab-full #ab-header,
 body.ab-full .ab-topo,

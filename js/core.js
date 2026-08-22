@@ -717,6 +717,9 @@ const ICONS = {
   // "Neste aparelho" no painel de nuvem do audiolivro: um monitor com base, que
   // lê como "a máquina onde voce esta" tanto no desktop quanto no celular.
   device:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  // Transcrição: o símbolo de legenda — a moldura da tela com as linhas do que
+  // foi dito. Diz "áudio virou texto" sem precisar de rótulo.
+  captions:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 11h4M7 15h10M14 11h3"/>',
   database:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6a8 3 0 0 0 16 0V5"/><path d="M4 11v6a8 3 0 0 0 16 0v-6"/>',
   volume:'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/>',
   pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
