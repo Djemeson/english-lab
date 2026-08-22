@@ -75,6 +75,34 @@ function renderAudiobookSection() {
   // Sobrou envio de uma sessão anterior? Reaparece PAUSADO, com o botão de
   // continuar — retomar 700 MB sozinho, talvez no 4G, não é decisão do app.
   abFilaRetomarPendencias()
+  // Manutenção silenciosa, uma vez por sessão: pedir a proteção do
+  // armazenamento (sem ela o navegador pode apagar o áudio), conferir o
+  // espelho do que está aqui contra o banco de verdade, e avisar se sobrou
+  // áudio sem dono.
+  _abManutencao()
+}
+
+let _abManutencaoFeita = false
+async function _abManutencao() {
+  if (_abManutencaoFeita) return
+  _abManutencaoFeita = true
+  try {
+    await garantirArmazenamentoPersistente()
+    await abLocaisSincronizar()
+    const orfaos = await abOrfaosListar()
+    if (!orfaos.length) return
+    const bytes = orfaos.reduce((s, x) => s + x.bytes, 0)
+    if (bytes < 20 * 1048576) return          // migalha não merece interrupção
+    const aviso = el('ab-area')
+    if (!aviso || _abLivro) return
+    const box = document.createElement('div')
+    box.className = 'ler-vazio-dica'
+    box.style.marginTop = '18px'
+    box.innerHTML = `<b>${abNuvemMB(bytes)} de áudio sem dono neste aparelho.</b>
+      Sobra de audiolivro que saiu da estante — o arquivo ficou para trás.
+      <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="abOrfaosLimpar()">Apagar e liberar</button>`
+    aviso.appendChild(box)
+  } catch (e) { console.warn('[audiobook] manutenção:', e && e.message) }
 }
 
 // ================================================================
@@ -223,7 +251,11 @@ async function _abImportarM4b(file) {
   const buf = await file.arrayBuffer()
   const meta = abLerM4b(buf)
   const id = uid()
+  // A proteção é pedida ANTES da primeira gravação pesada: guardar 900 MB em
+  // modo descartável é convidar o navegador a apagá-los depois.
+  await garantirArmazenamentoPersistente()
   await BookDB.set(abChaveArquivo(id, 0), new Blob([buf], { type: file.type || 'audio/mp4' }))
+  abLocaisMarcar(id)
 
   // Sem capítulos dentro do arquivo, o livro inteiro é um capítulo só. Melhor
   // isso do que recusar o arquivo: dá para ouvir e a posição continua sendo
@@ -252,7 +284,9 @@ async function _abImportarFaixas(lista) {
   for (let i = 0; i < lista.length; i++) {
     const f = lista[i]
     const blob = new Blob([await f.arrayBuffer()], { type: f.type || 'audio/mpeg' })
+    if (!i) await garantirArmazenamentoPersistente()
     await BookDB.set(abChaveArquivo(id, i), blob)
+    abLocaisMarcar(id)
     const dur = await _abDuracaoDoBlob(blob)
     // Uma faixa so, longa demais para ser um capitulo: vira partes por tempo.
     if (lista.length === 1 && dur > AB_PARTE_MIN * 60 * 1.5) caps.push(..._abPartesPorTempo(dur, i))
@@ -500,7 +534,9 @@ async function _abAnexar(id, files) {
     if (ehM4b) {
       const buf = await lista[0].arrayBuffer()
       const meta = abLerM4b(buf)
+      await garantirArmazenamentoPersistente()
       await BookDB.set(abChaveArquivo(id, 0), new Blob([buf], { type: lista[0].type || 'audio/mp4' }))
+      abLocaisMarcar(id)
       let dur = meta.duracao || await _abDuracaoDoBlob(await BookDB.get(abChaveArquivo(id, 0)))
       a.capitulos = meta.capitulos.length
         ? meta.capitulos.map(c => ({ titulo: c.titulo, arq: 0, ini: c.ini, fim: c.fim || dur }))
@@ -516,7 +552,9 @@ async function _abAnexar(id, files) {
       let total = 0, bytes = 0
       for (let i = 0; i < lista.length; i++) {
         const blob = new Blob([await lista[i].arrayBuffer()], { type: lista[i].type || 'audio/mpeg' })
+        if (!i) await garantirArmazenamentoPersistente()
         await BookDB.set(abChaveArquivo(id, i), blob)
+        abLocaisMarcar(id)
         const d = await _abDuracaoDoBlob(blob)
         if (lista.length === 1 && d > AB_PARTE_MIN * 60 * 1.5) caps.push(..._abPartesPorTempo(d, i))
         else caps.push({ titulo: _abNomeDeFaixa(lista[i].name, i, prefixo), arq: i, ini: 0, fim: d })
@@ -2256,9 +2294,20 @@ async function abNuvemPainel(id) {
   await _abNuvemRender(id)
 }
 
+// `null` enquanto ninguém perguntou ao navegador — mostrar "não" sem ter
+// perguntado seria assustar à toa.
+let _abProtegido = null
+
 async function _abNuvemRender(id, msg, pct) {
   const box = document.getElementById('ab-nuvem-corpo'); if (!box) return
   const a = audiolivroPorId(id); if (!a) return
+  try {
+    if (navigator.storage && navigator.storage.persisted) {
+      _abProtegido = await navigator.storage.persisted()
+      // Aproveita a visita para pedir, se ainda não é protegido.
+      if (!_abProtegido) _abProtegido = await garantirArmazenamentoPersistente()
+    }
+  } catch (e) {}
   const total = Math.max(1, a.arquivos || 0)
   const aqui = await abNoAparelho(id)
   const nAqui = Object.keys(aqui).length
@@ -2296,6 +2345,14 @@ async function _abNuvemRender(id, msg, pct) {
               nAqui === total ? 'toca na hora' : nAqui ? 'o resto baixa quando chegar lá' : 'nada guardado aqui')}
       ${linha('cloud', 'Na sua nuvem', nNuvem + ' de ' + total,
               nNuvem ? abNuvemMB(bytesNuvem) + ' guardados' : 'ainda não subiu')}
+      ${/* Esta linha existe porque a resposta a "por que baixou de novo?" mora
+            aqui: sem proteção, o navegador apaga o áudio quando o disco aperta,
+            e o app não tem como saber que isso aconteceu. */''}
+      ${linha('shield', 'Protegido de apagar',
+              _abProtegido === null ? '—' : _abProtegido ? 'sim' : 'NÃO',
+              _abProtegido === false
+                ? 'o navegador pode apagar este áudio para liberar espaço'
+                : 'o navegador não apaga para liberar espaço')}
     </div>
 
     ${ocupado ? `<div class="ab-nuvem-prog">
@@ -2834,8 +2891,82 @@ async function _abTrazerArquivo(id, n, pintar) {
   const blob = await abNuvemBaixarArquivo(id, n, (lidos, tot) => {
     if (pintar) pintar(`Baixando ${abNuvemMB(lidos)}${tot ? ' de ' + abNuvemMB(tot) : ''}…`, tot ? lidos / tot : null)
   })
+  // ⚠️ PEDIR A PROTEÇÃO ANTES DE GUARDAR, não depois. Sem ela, o que acabou de
+  // descer entra em modo descartável e o navegador pode apagá-lo quando o
+  // disco apertar — que é exatamente como 1,4 GB dele estavam guardados.
+  await garantirArmazenamentoPersistente()
   await BookDB.set(abChaveArquivo(id, n), blob)
+  abLocaisMarcar(id)
   return blob
+}
+
+// ================================================================
+// POR QUE ESTE DOWNLOAD ACONTECEU
+// ================================================================
+// ⚠️ ESTE REGISTRO EXISTE PORQUE UM SINTOMA SEM RASTRO CUSTOU UMA RODADA DE
+// ADIVINHAÇÃO. Ele relatou *"toda vez fica baixando da nuvem"*, e ao olhar o
+// aparelho os arquivos ESTAVAM lá — o download tinha acontecido em outra
+// sessão, sem deixar marca. Sem rastro, a causa vira teoria.
+// Guarda as últimas 20 vezes, com o que dava para saber no momento: se o
+// armazenamento estava protegido, quanto havia guardado e quanto o navegador
+// permitia. É pouco espaço e é o que responde a pergunta na próxima vez.
+const AB_DIAG_SK = 'el-ab-diag'
+function abDiagLer() {
+  try { return JSON.parse(localStorage.getItem(AB_DIAG_SK) || '[]') } catch { return [] }
+}
+async function abDiagRegistrar(id, n) {
+  try {
+    const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : {}
+    const persistente = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : null
+    const lista = abDiagLer()
+    lista.unshift({
+      em: Date.now(), id, n, persistente,
+      usoMB: Math.round((est.usage || 0) / 1048576),
+      cotaMB: Math.round((est.quota || 0) / 1048576),
+      chavesAb: (await BookDB.keys()).filter(k => String(k).startsWith('ab:')).length
+    })
+    localStorage.setItem(AB_DIAG_SK, JSON.stringify(lista.slice(0, 20)))
+  } catch (e) {}
+}
+
+// ================================================================
+// ÁUDIO ÓRFÃO — o que sobrou de um item que já não existe
+// ================================================================
+// ⚠️ ACHADO NO ACERVO REAL: **202 MB** sob `ab:mt1zwec7j56np:0`, de um
+// audiolivro que não está mais na estante. Dois caminhos levam a isso: o item
+// sumir num merge (corrigido nesta rodada) e a exclusão apagar de 0 a
+// `arquivos - 1` — se `arquivos` estiver zerado ou errado, ela não apaga nada.
+// A varredura por PREFIXO não depende de nenhum contador estar certo.
+async function abOrfaosListar() {
+  const vivos = new Set(audiolivros.map(a => a.id))
+  const achados = []
+  for (const k of await BookDB.keys()) {
+    const s = String(k)
+    if (!s.startsWith('ab:')) continue
+    const id = s.slice(3).split(':')[0]
+    if (vivos.has(id)) continue
+    const b = await BookDB.get(k)
+    achados.push({ chave: s, id, bytes: b ? b.size : 0 })
+  }
+  return achados
+}
+
+async function abOrfaosLimpar() {
+  const lista = await abOrfaosListar()
+  if (!lista.length) { toast('Não há áudio órfão neste aparelho.', 'info'); return }
+  const bytes = lista.reduce((s, x) => s + x.bytes, 0)
+  const ok = await confirmModal({
+    title: 'Apagar áudio sem dono', icon: 'trash', confirmText: 'Apagar', danger: true,
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Encontrei <b>${abNuvemMB(bytes)}</b> de áudio guardado aqui que não pertence a nenhum
+      audiolivro da sua estante — sobra de item removido.<br><br>
+      Nenhum livro da estante é tocado.</p>`
+  })
+  if (!ok) return
+  for (const x of lista) await BookDB.del(x.chave)
+  await abLocaisSincronizar()
+  toast(`${abNuvemMB(bytes)} liberados.`, 'success')
+  renderAudiobookSection()
 }
 
 async function abNuvemTrazer(id) {
@@ -2892,6 +3023,7 @@ async function abNuvemLiberar(id) {
   if (!ok) return
   if (_abLivro && _abLivro.id === id) abFechar()
   for (const n of Object.keys(aqui)) await BookDB.del(abChaveArquivo(id, n))
+  abLocaisTirar(id)
   toast(`${abNuvemMB(bytes)} liberados neste aparelho.`, 'success')
   await _abNuvemRender(id)
   renderAudiobookSection()
@@ -2927,8 +3059,20 @@ async function abNuvemTirar(id) {
 // diz em português por que não deu, em vez do antigo "importe de novo" que valia
 // para tudo (inclusive para quem só estava deslogado).
 async function abGarantirArquivo(a, n, pintar) {
-  const jaTem = await BookDB.get(abChaveArquivo(a.id, n))
-  if (jaTem) return jaTem
+  // ⚠️ ANTES DE BAIXAR, TER CERTEZA DE QUE OLHOU. `BookDB.get` devolve `null`
+  // tanto para "não tenho" quanto para "não consegui abrir o banco" — e aqui a
+  // diferença entre as duas vale 924 MB. `existe` levanta o erro em vez de
+  // engolir, e erro de leitura vira aviso, nunca download.
+  try {
+    if (await BookDB.existe(abChaveArquivo(a.id, n))) {
+      const b = await BookDB.get(abChaveArquivo(a.id, n))
+      if (b) return b
+    }
+  } catch (e) {
+    console.warn('[audiobook] não consegui ler o armazenamento local:', e && e.message)
+    toast('Não consegui ler o áudio guardado neste aparelho. Recarregue a página antes de baixar de novo.', 'error')
+    return null
+  }
   if (!_abNuvemPartes(a)[n]) {
     const d = await abNuvemPorQueNaoVeio(a.id, n)
     if (d.estado !== 'existe') { toast(nuvemFrase(d, 'o áudio deste livro'), 'warning'); return null }
@@ -2955,8 +3099,12 @@ async function abAbrir(id) {
   // não subia para lugar nenhum. Agora ele pode estar na nuvem, e o primeiro
   // arquivo desce sozinho, com barra: o download não é uma tarefa dele.
   const cap0 = (a.capitulos || [])[0] || { arq: 0 }
-  let primeiro = await BookDB.get(abChaveArquivo(id, cap0.arq || 0))
+  let primeiro = null
+  try { primeiro = await BookDB.get(abChaveArquivo(id, cap0.arq || 0)) } catch (e) {}
   if (!primeiro) {
+    // O download é caro e some da vista assim que termina. Fica registrado por
+    // que ele aconteceu — sem isso, "baixa toda vez" é palavra contra palavra.
+    abDiagRegistrar(id, cap0.arq || 0)
     _abPintarBaixando(a, 'Procurando o áudio na sua nuvem…', null)
     primeiro = await abGarantirArquivo(a, cap0.arq || 0, (m, pct) => _abPintarBaixando(a, m, pct))
     if (!primeiro) { renderAudiobookSection(); return }
@@ -3028,7 +3176,15 @@ async function abExcluir(id) {
     _abFilaSalvar(); _abFilaPintar()
   }
   if (_abFilaAtual && _abFilaAtual.id === id) abNuvemCancelar()
-  for (let i = 0; i < Math.max(1, a.arquivos || 0); i++) await BookDB.del(abChaveArquivo(id, i))
+  // ⚠️ VARRER POR PREFIXO, NÃO CONTAR ATÉ `arquivos`. O contador pode estar
+  // zerado (item que entrou pelo catálogo e depois recebeu áudio) ou menor que
+  // a realidade — e o que sobra são centenas de MB invisíveis, exatamente como
+  // os 202 MB órfãos achados no aparelho dele. O prefixo não depende de
+  // contador nenhum estar certo.
+  for (const k of await BookDB.keys()) {
+    if (String(k).startsWith(`ab:${id}:`)) await BookDB.del(k)
+  }
+  abLocaisTirar(id)
   if (naNuvem) await abNuvemApagar(id, a.arquivos || 1)
   audiolivros = audiolivros.filter(x => x.id !== id)
   saveAudiolivros()

@@ -1185,9 +1185,21 @@ function _applyCloudDocs(docs) {
       const nv = _abNuvemMaisCompleta(local.nuvem, remoto.nuvem)
       return nv ? { ...vencedor, nuvem: nv } : vencedor
     })
+    // ⚠️ ITEM CUJO ÁUDIO ESTÁ NESTE APARELHO NUNCA É DESCARTADO — e esta linha
+    // nasceu de um achado no acervo real dele: 202 MB guardados sob
+    // `ab:mt1zwec7j56np:0`, de um audiolivro que **não existia mais na
+    // estante**. O áudio ficou órfão porque o item sumiu daqui, e a regra
+    // abaixo é a suspeita: um item local ausente da nuvem e mais antigo que o
+    // carimbo do documento era jogado fora em silêncio. Some da estante, sobra
+    // o arquivo — e no dia seguinte tudo é baixado de novo.
+    // O saldo é assimétrico: manter um item a mais custa uma linha na estante
+    // (e um clique para remover); descartá-lo custa 924 MB de download.
+    // Marca de remoção de verdade continua valendo — ela é o caminho por onde
+    // uma exclusão atravessa, e não passa por aqui.
+    const comAudioAqui = typeof abLocaisLer === 'function' ? abLocaisLer() : {}
     for (const a of audiolivros) {
       if (nuvem.some(r => r.id === a.id)) continue
-      if ((a.addedAt || 0) > carimbo || a.id === abertoId) juntos.push(a)
+      if ((a.addedAt || 0) > carimbo || a.id === abertoId || comAudioAqui[a.id]) juntos.push(a)
     }
     audiolivros = juntos
     saveAudiolivros()

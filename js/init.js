@@ -18,6 +18,13 @@ async function initApp() {
   loadPodShows()     // programas de podcast já visitados (sincronizados)
   // mesma razão do `typeof` em srs.js: arquivos diferentes, deploys parciais
   if (typeof removidosPodarNaAbertura === 'function') removidosPodarNaAbertura()
+  // ⚠️ SEM ISTO, TUDO O QUE O APP GUARDA É DESCARTÁVEL. O navegador pode
+  // apagar o armazenamento do site quando o disco aperta, e apaga primeiro o
+  // que é grande — o audiolivro de 924 MB, o EPUB, os áudios de card. Medido
+  // no aparelho dele: 1,4 GB guardados com a proteção DESLIGADA, e o Chrome
+  // concedeu no primeiro pedido. Não segura o boot: falhar aqui só devolve o
+  // comportamento antigo.
+  if (typeof garantirArmazenamentoPersistente === 'function') garantirArmazenamentoPersistente()
   loadSrs()          // loads srsCfg, srsLog, decks
   await loadSrsAsync() // loads srsCards from IDB (migrates if needed)
   migrateLangFields()  // multi-idioma: words/cards antigos ganham lang:'en' (aditivo)

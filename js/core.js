@@ -75,7 +75,92 @@ const BookDB = {
         r.onsuccess = () => res(r.result || []); r.onerror = () => res([])
       })
     } catch { return [] }
+  },
+  // ⚠️ "NÃO ACHEI" E "NÃO CONSEGUI OLHAR" SÃO COISAS DIFERENTES, e confundi-las
+  // sai caro aqui. O `get` acima devolve `null` nos dois casos — foi escrito
+  // para leitura de EPUB, onde reabrir o arquivo custa nada. No audiolivro o
+  // mesmo `null` manda o app buscar **924 MB** na nuvem: um tropeço de um
+  // instante no banco vira download inteiro, em silêncio.
+  // `existe` PROPAGA o erro, e lê só a CHAVE — não carrega o blob para saber
+  // que ele está lá.
+  async existe(id) {
+    const db = await this.open()
+    return await new Promise((res, rej) => {
+      const r = db.transaction('files', 'readonly').objectStore('files').getKey(id)
+      r.onsuccess = () => res(r.result !== undefined)
+      r.onerror = () => rej(r.error)
+    })
   }
+}
+
+// ================================================================
+// O ARMAZENAMENTO PRECISA SER PEDIDO — SENÃO É DESCARTÁVEL
+// ================================================================
+// ⚠️ ESTA É A CAUSA DE "O AUDIOLIVRO BAIXA DE NOVO TODA VEZ". Por padrão, o que
+// um site guarda no aparelho é **best-effort**: o navegador tem licença para
+// apagar tudo quando o disco aperta, e apaga primeiro quem é grande e não foi
+// aberto ontem — a descrição exata de um audiolivro de 924 MB.
+// Medido no Chrome dele em 2026-08-22: `navigator.storage.persisted()` era
+// **false**, com **1.397 MB** de áudio guardado. Ou seja, 1,4 GB em modo
+// "pode apagar quando quiser". Pedido no mesmo instante,
+// `navigator.storage.persist()` devolveu **true** — o Chrome concedeu na hora,
+// sem perguntar nada. Nunca foi negado: foi que ninguém pediu.
+// (O Chrome concede sozinho a quem tem engajamento no site ou o PWA instalado;
+// o Firefox pergunta ao usuário. Falhar aqui não quebra nada — só volta ao
+// modo descartável de antes.)
+let _persistPedido = false
+async function garantirArmazenamentoPersistente() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) return false
+    if (await navigator.storage.persisted()) return true
+    if (_persistPedido) return false
+    _persistPedido = true
+    const ok = await navigator.storage.persist()
+    console.log('[armazenamento] persistente:', ok)
+    return ok
+  } catch (e) { return false }
+}
+
+// ================================================================
+// ESPELHO DO QUE ESTÁ NESTE APARELHO
+// ================================================================
+// ⚠️ O MERGE DA NUVEM É SÍNCRONO E O INDEXEDDB NÃO É — e sem este espelho o
+// merge não tem como saber que aquele item que ele está prestes a descartar da
+// estante tem 924 MB de áudio guardados aqui. Mesma solução que os cards já
+// usam (`el-srs-ids`): guardar só os IDS no localStorage, que é barato e
+// síncrono.
+const SK_AB_LOCAIS = 'el-ab-locais'
+function abLocaisLer() {
+  try { return JSON.parse(localStorage.getItem(SK_AB_LOCAIS) || '{}') } catch { return {} }
+}
+function abLocaisGravar(m) {
+  try { localStorage.setItem(SK_AB_LOCAIS, JSON.stringify(m || {})) } catch (e) {}
+}
+function abLocaisMarcar(id) {
+  if (!id) return
+  const m = abLocaisLer()
+  if (m[id]) return
+  m[id] = Date.now(); abLocaisGravar(m)
+}
+function abLocaisTirar(id) {
+  const m = abLocaisLer()
+  if (!m[id]) return
+  delete m[id]; abLocaisGravar(m)
+}
+// A verdade continua sendo o IndexedDB: o espelho se corrige a partir dele
+// sempre que a seção abre. Espelho que nunca é conferido vira mentira antiga.
+async function abLocaisSincronizar() {
+  try {
+    const m = {}
+    for (const k of await BookDB.keys()) {
+      const s = String(k)
+      if (!s.startsWith('ab:')) continue
+      const id = s.slice(3).split(':')[0]
+      if (id) m[id] = abLocaisLer()[id] || Date.now()
+    }
+    abLocaisGravar(m)
+    return m
+  } catch (e) { return abLocaisLer() }
 }
 
 // ── AUDIOBOOKS: a estante da seção Audiobook (2026-08-20).
@@ -849,6 +934,7 @@ const ICONS = {
   // "Neste aparelho" no painel de nuvem do audiolivro: um monitor com base, que
   // lê como "a máquina onde voce esta" tanto no desktop quanto no celular.
   device:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  shield:'<path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6z"/>',
   // Transcrição: o símbolo de legenda — a moldura da tela com as linhas do que
   // foi dito. Diz "áudio virou texto" sem precisar de rótulo.
   captions:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 11h4M7 15h10M14 11h3"/>',
