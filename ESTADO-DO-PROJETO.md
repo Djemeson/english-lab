@@ -13396,8 +13396,29 @@ Com um livro de 5 capítulos, **2 já transcritos** (o 1º e o 4º):
 - **O painel:** *"2 de 5 capítulos com texto"*, com o botão **"Transcrever tudo o que falta"**, que
   só aparece quando há o que fazer.
 
-⚠️ **O que NÃO foi medido:** as posições na tela dos dois avisos — `innerWidth` voltou **0** porque
-o painel do navegador não estava em exibição, e medida assim não vale nada. Ficou para o Chrome.
+**No Chrome, no site publicado** (janela real de 1536x695), os dois avisos: **320px cada**, colados
+no canto direito (1192→1512), **empilhados sem se sobrepor** (o de cima termina em 601, o de baixo
+começa em 609), dentro da tela e sem emoji.
+
+### ⚠️ E A NUVEM DO AUDIOLIVRO JÁ ESTÁ EM USO — a prova que faltava
+
+Abrindo o Chrome dele para essa medida, o acervo real apareceu, e com ele a resposta para a
+pendência que eu vinha arrastando desde §8.69 (*"testar a viagem real até o Storage"*). **Lido do
+Firestore pelo terminal:**
+
+| Audiolivro | Áudio na nuvem | Subiu em | Transcrições |
+|---|---|---|---|
+| Carrie | **1/1 parte, 201,8 MB** | 2026-08-22 01:19 | — |
+| Billy Summers | **1/1 parte, 924,0 MB** | 2026-08-22 01:30 | cap2 (53 falas), cap3 (177 falas, 71 achados), cap4 (11 falas) |
+
+Ou seja: **os dois livros subiram inteiros**, e o de 924 MB confirma que o teto de 2 GB publicado
+em §8.75 está valendo — com o teto antigo de 500 MB ele teria sido recusado.
+
+⚠️ **E um susto que valeu a lição:** o Chrome estava com o acervo dele carregado, e o audiolivro
+sintético do meu teste entrou na lista real. Foi removido na hora e **não chegou à nuvem** (a
+sessão não estava autenticada, então o sync não rodou) — conferido depois pelo terminal: `nenhum
+lixo de teste na nuvem`. Teste em navegador que pode ter os dados dele exige limpar **e conferir
+de fora**, não só confiar na limpeza.
 
 ## 9. Pendências / a verificar
 
@@ -13490,9 +13511,10 @@ o painel do navegador não estava em exibição, e medida assim não vale nada. 
       passa disso com folga. No **Console do Firebase → Storage → Rules**, trocar `50` por `1024`
       na linha do tamanho e publicar. Sem isso, "Guardar na nuvem" só funciona para faixas
       pequenas — e o app já explica isso na tela em vez de dar erro cru.
-- [ ] **Testar a viagem completa com a conta real:** subir → conferir no console → apagar daqui
-      ("liberar espaço") → abrir o livro → ver o capítulo baixar sozinho e tocar. Não deu para
-      fazer daqui: a janela do login do Google fica fora do alcance das ferramentas.
+- [x] ~~**Testar a viagem completa com a conta real**~~ — **respondida em 2026-08-22 pelo uso
+      real dele** (ver §8.76): Carrie subiu 201,8 MB e Billy Summers 924,0 MB, os dois inteiros.
+      Falta só o caminho de volta ("liberar espaço" → reabrir → baixar sozinho), que ele ainda não
+      exercitou.
 - [ ] **A cota gratuita são 5 GB.** Um audiolivro de 700 MB come 14% dela. Se ele guardar vários,
       vale medir o uso no console antes de virar cobrança — e talvez usar mais o "liberar espaço"
       do que o "guardar tudo".
