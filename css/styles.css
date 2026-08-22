@@ -5575,6 +5575,10 @@ body.ab-full .ab-chips{max-width:34em}
   border-radius:var(--radius-sm);font-size:var(--fs-sm);color:var(--text2);line-height:1.55;
   background:rgba(var(--primary-rgb),.09);border:1px solid rgba(var(--primary-rgb),.22);
 }
+/* A mesma faixa, em voz baixa: quando os capítulos vieram do arquivo, procurar
+   pelo silêncio é uma saída disponível, não uma recomendação. */
+.ab-conv-fraca{opacity:.72; border-style:dashed}
+.ab-conv-fraca:hover{opacity:1}
 .ab-conv span{flex:1}
 .ab-conv b{color:var(--text)}
 .ab-proposta p{font-size:var(--fs-sm);color:var(--text2);line-height:1.6}

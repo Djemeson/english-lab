@@ -688,6 +688,22 @@ function abPodeProcurarCapitulos(a) {
   return !!a && (a.arquivos === 1) && (a.capitulos || []).length >= 1
 }
 
+// ⚠️ TROCAR A LISTA DE CAPÍTULOS MEXE EM TUDO O QUE APONTA PARA UM DELES —
+// a posição de leitura, cada marcador e cada transcrição guardam `{cap, seg}`.
+// O remapeamento existe e é testado (`_abRemapearParaNovosCapitulos`), mas
+// quem tem 3 transcrições e 12 marcadores merece saber ANTES que eles vão ser
+// realinhados, e não descobrir depois que "o capítulo 3" virou outro número.
+function _abOQueVaiMudar(a) {
+  const t = (a.transcricoes || []).length
+  const m = (a.marcadores || []).length
+  if (!t && !m) return ''
+  const partes = []
+  if (t) partes.push(`<b>${t}</b> ${t === 1 ? 'transcrição' : 'transcrições'}`)
+  if (m) partes.push(`<b>${m}</b> ${m === 1 ? 'marcador' : 'marcadores'}`)
+  return `<br><br>Você tem ${partes.join(' e ')} neste livro. Nada se perde: eles são
+    <b>realinhados</b> para os capítulos novos, junto com onde você parou.`
+}
+
 async function abProcurarCapitulos() {
   const a = _abLivro; if (!a || !abPodeProcurarCapitulos(a)) return
   const dur = abDuracao(a)
@@ -699,7 +715,8 @@ async function abProcurarCapitulos() {
       encontrados.<br><br>
       É tudo feito <b>neste aparelho</b>, sem IA e sem custo algum. Em compensação <b>demora</b>:
       o áudio precisa ser decodificado do começo ao fim${dur ? ` (${abTempoLongo(dur)} de livro)` : ''}.
-      Dá para continuar usando o app; só não feche esta aba.</p>`
+      Dá para continuar usando o app; só não feche esta aba.
+      ${_abOQueVaiMudar(a)}</p>`
   })
   if (!ok) return
 
@@ -2795,14 +2812,34 @@ function _abListaCapitulos() {
   // fatiado, ou um `.m4b` cujos capítulos não estavam em `chpl`).
   const caps = a.capitulos || []
   const porTempo = caps.length === 1 || caps.some(c => /^(Parte \d|Livro completo)/.test(c.titulo || ''))
-  const convite = abPodeProcurarCapitulos(a) && porTempo
+  // ⚠️ ELE PERGUNTOU "CADÊ ESSA OPÇÃO?" E A RESPOSTA ERA: escondida. O convite
+  // só aparecia quando os cortes tinham sido feitos pelo relógio — e nos dois
+  // livros dele os capítulos vieram DE DENTRO do `.m4b` ("001", "Chapter 1"),
+  // então ele nunca via o botão.
+  //
+  // Na maioria das vezes não ver é o certo: capítulo que veio do arquivo já é
+  // o de verdade. Mas "veio do arquivo" não quer dizer "está bom" — o Billy
+  // Summers dele tem capítulos de 38 SEGUNDOS e um de 51 MINUTOS, sinal de
+  // marcador de faixa, não de divisão narrativa. Quem quiser refazer precisa
+  // de um caminho; o que muda é o tom, não a existência do botão.
+  const maior = caps.reduce((m, c) => Math.max(m, abDurCap(c) || 0), 0)
+  const convite = !abPodeProcurarCapitulos(a) ? ''
+    : porTempo
     ? `<div class="ab-conv">
          ${ic('search','ic-sm')}
          <span>Estes cortes são de <b>15 em 15 minutos</b>, não os capítulos do livro.
            Dá para procurar os de verdade pelo <b>silêncio</b> entre eles — aqui no aparelho,
            sem custo.</span>
          <button class="btn btn-ghost btn-sm" onclick="abProcurarCapitulos()">Procurar capítulos</button>
-       </div>` : ''
+       </div>`
+    : `<div class="ab-conv ab-conv-fraca">
+         ${ic('search','ic-sm')}
+         <span>Estes ${caps.length} capítulos vieram <b>de dentro do arquivo</b>.
+           ${maior > 25 * 60 ? `O maior tem <b>${abTempoLongo(maior)}</b> — se ele juntar mais de um
+             capítulo do livro, ` : 'Se a divisão não bater com a do livro, '}dá para procurar os
+           cortes pelo <b>silêncio</b>, aqui no aparelho e sem custo.</span>
+         <button class="btn btn-ghost btn-sm" onclick="abProcurarCapitulos()">Procurar pelo silêncio</button>
+       </div>`
   return `${convite}<div class="ab-caps">${(a.capitulos || []).map((c, i) => `
     <button class="ab-cap${i === _abCap ? ' on' : ''}" onclick="abIrCapitulo(${i})">
       <span class="ab-cap-n">${i + 1}</span>
