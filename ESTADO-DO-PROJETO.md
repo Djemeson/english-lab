@@ -7,7 +7,18 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (18ª) — **O APP VOLTA ONDE ESTAVA, E O ÁUDIO SEGUE COM A TELA
+> Última atualização: 2026-08-22 (19ª) — **ROTAÇÃO LIBERADA, E A VOLTA REABRE VÍDEO E DOSSIÊ**.
+> Dois pedidos curtos com trabalho atrás. A rotação era **uma linha no manifest** — mas medir
+> antes mostrou que soltar assim entregaria uma tela inútil: em 740x360 a barra de botões do texto
+> quebrava em várias linhas e comia **227px dos 360**, e no modo tela cheia **313px**, sem sobrar
+> texto. Com as regras de altura baixa, a barra caiu para **26px** (rola de lado) e o texto na
+> tela cheia subiu de 187px para **317px**. E a volta ao lugar de antes passou a incluir vídeo e
+> dossiê — ⚠️ o vídeo em **modo silencioso**, porque `videoOpen` pede o arquivo ao usuário e
+> abriria um seletor de arquivos sozinho ao iniciar o app. ⚠️ **O manifest mudou: quem tem o PWA
+> instalado precisa reinstalar** para a rotação valer. `sw.js` → **englab-v356**.
+> **Detalhes em §8.75.**
+>
+> Última atualização anterior: 2026-08-22 (18ª) — **O APP VOLTA ONDE ESTAVA, E O ÁUDIO SEGUE COM A TELA
 > APAGADA**. Dois pedidos do celular: *"lembrar de onde estava ao alternar entre apps"* e *"o app
 > tem que funcionar com a tela desligada na parte do audiobook"*. O primeiro não era conforto: o
 > Android **descarta a aba** quando precisa de memória, e responder uma mensagem recarregava o app
@@ -13263,6 +13274,57 @@ notificação são dois botões distintos.
 - **Duração inválida:** `_abMediaPos` com `duration = NaN` ignora em silêncio, sem derrubar nada.
 - **O `play` do sistema com o áudio tocando:** continua tocando (não alterna).
 
+## 8.75 Rotação liberada, e a volta reabre vídeo e dossiê (2026-08-22, 19ª)
+
+### 1. "Libera a rotação também"
+
+A trava era **uma linha** (`"orientation": "portrait-primary"` no manifest). Mas medir antes de
+soltar mudou a rodada: **não havia uma única regra de CSS para tela deitada**, e o resultado em
+740x360 era inutilizável.
+
+| Em 740x360 | Antes | Depois |
+|---|---|---|
+| Barra de botões do texto | **227px** dos 360 (quebrava em várias linhas) | **26px**, rolando de lado |
+| Barra na tela cheia | **313px** dos 360 | **43px** |
+| Texto visível na tela cheia | 187px, quase todo padding | **317px** |
+
+A régua é a **altura**, não a orientação (`@media (max-height: 560px)`): o que importa é o espaço
+vertical, e assim a regra também pega tablet deitado e janela baixa no desktop.
+
+⚠️ **O respiro de 26vh** que leva a fala ao centro comeria o texto inteiro numa tela dessa altura —
+encolhe para 18vh. E o aviso da fila de envio sobe, para não cobrir o texto.
+
+⚠️ **O MANIFEST MUDOU.** Diferente das rodadas anteriores, desta vez **quem tem o PWA instalado
+precisa reinstalar** — orientação, nome e ícone são lidos na instalação. O Chrome atualiza o WebAPK
+sozinho depois de um tempo, mas reinstalar é o caminho garantido.
+
+### 2. "Faz reabrir vídeo e dossiê também"
+
+A peça de §8.74 já existia; o que faltava era o que cada seção precisa guardar (`_vidCur.id`,
+`_dossieAberto`).
+
+⚠️ **E o vídeo não podia entrar como os outros.** `videoOpen` existe para quando ELE clica: sem o
+arquivo autorizado, ela mostra um toast e **abre o seletor de arquivos do sistema**. Numa volta
+automática isso seria um diálogo brotando sozinho ao iniciar o app, sem ninguém ter clicado em
+nada. Ganhou um modo `silencioso` que desiste e deixa a biblioteca na tela — a resposta honesta.
+
+### 3. O estado só era gravado ao TROCAR de seção
+
+⚠️ Abrir um dossiê, um vídeo ou um livro **não troca de seção** — e era só na troca que a volta era
+registrada. Na prática o `visibilitychange` salvava antes de o app ir para segundo plano, mas
+bastava a aba morrer por outro caminho para o registro ficar velho. Agora cada porta que muda
+"onde ele está" avisa: `abAbrir`, `lerAbrir`, `videoOpenPlayer`, `dossieAbrir`.
+
+### Medido
+
+- **Paisagem (740x360):** barra do texto em 26px com `overflow-x: auto`; na tela cheia, barra em
+  43px e texto em 317px (187px úteis depois do respiro). **Sem rolagem horizontal na página.**
+- **Vídeo no modo silencioso:** com id inexistente e com vídeo sem handle autorizado, **não abriu
+  seletor de arquivo** e não emitiu aviso nenhum.
+- **Dossiê:** abrir grava `{secao:'estudar', dossie:'teste:chave'}` na hora; a volta chama
+  `dossieAbrir` com a mesma chave e o dossiê reabre.
+- **Manifest:** JSON válido, `orientation: "any"`.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -13272,6 +13334,17 @@ notificação são dois botões distintos.
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada da rotação (§8.75, 2026-08-22)
+
+- [ ] **REINSTALAR O PWA — depende dele.** O manifest mudou, e orientação só é lida na instalação.
+      Sem isso, o app instalado continua travado em pé.
+- [ ] **Conferir as outras telas deitadas.** As regras de altura baixa cobrem o texto do
+      audiolivro, que era o caso dele; o leitor de EPUB, o Preparar e o Revisar não foram medidos
+      em paisagem.
+- [ ] **A volta não reabre o audiolivro quando ele estava em OUTRA seção** com o áudio tocando —
+      restaura a seção onde ele estava, que é o pedido, e a posição do áudio fica salva de
+      qualquer jeito.
+
 ### Da rodada da volta ao lugar (§8.74, 2026-08-22)
 
 - [ ] **Confirmar no celular dele**, que é onde o problema existe: ouvir, trocar de app, voltar; e
@@ -13279,11 +13352,10 @@ notificação são dois botões distintos.
       descarte da aba com um recarregamento.
 - [ ] **Instalar o app na tela inicial** (PWA) deixa o áudio em segundo plano bem mais estável do
       que numa aba comum do Chrome. O `manifest` já está pronto para isso.
-- [ ] **`orientation: portrait-primary` no manifest** trava o app em pé. Para ler o texto do
-      audiolivro em paisagem, teria de virar `any` — não mudei porque mexe em todas as telas e ele
-      não pediu.
-- [ ] **A volta não reabre o vídeo nem o dossiê**, só a seção. Se fizer falta, é a mesma peça com
-      mais um campo.
+- [x] ~~**`orientation: portrait-primary` no manifest**~~ — **liberado em 2026-08-22** (§8.75),
+      junto com as regras de CSS para tela baixa, sem as quais a paisagem ficaria inutilizável.
+- [x] ~~**A volta não reabre o vídeo nem o dossiê**~~ — **feito em 2026-08-22** (§8.75). O vídeo
+      entra em modo silencioso, para não abrir seletor de arquivo sozinho.
 
 ### Da rodada da tela do audiolivro (§8.73, 2026-08-22)
 

@@ -137,6 +137,10 @@ function dossieDesfazerEstudo(wordId, meaningId) {
 }
 
 function dossieAbrir(chave) {
+  // ⚠️ Abrir um dossiê NÃO troca de seção, e era só na troca que a volta ao
+  // lugar de antes era gravada — o dossiê aberto nunca entrava no registro.
+  // Cada porta que muda "onde ele está" precisa avisar.
+  setTimeout(() => { if (typeof ondeEstavaSalvar === 'function') ondeEstavaSalvar() }, 0)
   _dossieAberto = chave || null
   try { localStorage.setItem(SK_DOSSIE_ABERTO, chave || '') } catch (e) {}
   renderDossieSection()

@@ -377,6 +377,7 @@ async function lerAbrir(id) {
   }
   _lerLivro = l
   _lerCap = Math.min(l.pos?.cap || 0, l.chapters.length - 1)
+  if (typeof ondeEstavaSalvar === 'function') ondeEstavaSalvar()
   _lerInicioLeitura = Date.now()
   l.lastOpen = Date.now()
   // Abrir já é começar: sem isto o livro ficaria em "quero ler" para sempre

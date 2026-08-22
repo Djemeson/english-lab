@@ -218,8 +218,15 @@ async function videoAcceptFile(file, handle) {
   await videoOpenPlayer(v)
 }
 
-// Reabre um vídeo da biblioteca (tenta o handle persistido primeiro)
-async function videoOpen(id) {
+// Reabre um vídeo da biblioteca (tenta o handle persistido primeiro).
+//
+// ⚠️ `silencioso` EXISTE POR CAUSA DA VOLTA AUTOMÁTICA. Quando o app reabre
+// sozinho o que estava aberto (ver `ondeEstavaRestaurar`), esta função não
+// pode pedir NADA: sem o handle autorizado ela mostra um toast e abre o
+// seletor de arquivos do sistema — um diálogo brotando sozinho ao iniciar o
+// app, sem ele ter clicado em nada. No modo silencioso ela desiste e deixa a
+// biblioteca na tela, que é a resposta honesta.
+async function videoOpen(id, { silencioso = false } = {}) {
   const v = videos.find(x => x.id === id); if (!v) return
   // Podcast: o "arquivo" é o episódio baixado (ou baixável de novo pela URL
   // do feed). Nunca pede arquivo ao usuário — nem em outro aparelho.
@@ -233,6 +240,8 @@ async function videoOpen(id) {
   if (handle) {
     try {
       let perm = await handle.queryPermission({ mode: 'read' })
+      // Pedir permissão abre uma caixa do navegador: só quando ELE mandou abrir.
+      if (perm !== 'granted' && silencioso) return
       if (perm !== 'granted') perm = await handle.requestPermission({ mode: 'read' })
       if (perm === 'granted') {
         _vidFile = await handle.getFile()
@@ -241,6 +250,7 @@ async function videoOpen(id) {
       }
     } catch (e) { console.warn('[video] handle inválido:', e.message) }
   }
+  if (silencioso) return          // nada de seletor de arquivo sem ele pedir
   toast('Escolha o arquivo do vídeo (o navegador não o guarda — só o atalho)', 'info')
   if (window.showOpenFilePicker) {
     try {
@@ -269,6 +279,7 @@ async function videoOpen(id) {
 // PLAYER + TRANSCRIPT
 // ================================================================
 async function videoOpenPlayer(v) {
+  setTimeout(() => { if (typeof ondeEstavaSalvar === 'function') ondeEstavaSalvar() }, 0)
   if (_vidSubsSaveTimer) _vidSaveSubsNow()   // flush do vídeo anterior
   _vidCur = v
   _videoView = 'player'

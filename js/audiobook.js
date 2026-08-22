@@ -2335,6 +2335,7 @@ async function abAbrir(id) {
   _abCap = Math.min(a.pos?.cap || 0, (a.capitulos || []).length - 1)
   _abArqAtual = -1
   _abInicioSessao = Date.now()
+  if (typeof ondeEstavaSalvar === 'function') ondeEstavaSalvar()
   a.lastOpen = Date.now()
   if (a.status === 'quero') a.status = 'ouvindo'
   saveAudiolivros()

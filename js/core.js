@@ -1277,6 +1277,8 @@ function ondeEstavaSalvar() {
     // protege dos módulos lazy que ainda não carregaram.
     if (typeof _abLivro !== 'undefined' && _abLivro) d.ab = _abLivro.id
     if (typeof _lerLivro !== 'undefined' && _lerLivro) d.ler = { id: _lerLivro.id, cap: (typeof _lerCap !== 'undefined' ? _lerCap : 0) }
+    if (typeof _vidCur !== 'undefined' && _vidCur) d.video = _vidCur.id
+    if (typeof _dossieAberto !== 'undefined' && _dossieAberto) d.dossie = _dossieAberto
     localStorage.setItem(ONDE_SK, JSON.stringify(d))
   } catch (e) {}
 }
@@ -1303,6 +1305,10 @@ function _ondeEstavaAbrir(secao) {
     if (secao === 'audiobook' && d.ab && typeof abAbrir === 'function'
         && typeof audiolivroPorId === 'function' && audiolivroPorId(d.ab)) abAbrir(d.ab)
     if (secao === 'ler' && d.ler && typeof lerAbrir === 'function') lerAbrir(d.ler.id)
+    // ⚠️ O vídeo entra no modo SILENCIOSO: sem o arquivo autorizado, ele
+    // desiste em vez de abrir um seletor de arquivos sozinho no início do app.
+    if (secao === 'video' && d.video && typeof videoOpen === 'function') videoOpen(d.video, { silencioso: true })
+    if (secao === 'estudar' && d.dossie && typeof dossieAbrir === 'function') dossieAbrir(d.dossie)
   } catch (e) { console.warn('[onde estava] não consegui reabrir:', e && e.message) }
 }
 

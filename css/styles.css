@@ -5403,6 +5403,33 @@ body.ab-full .ab-fala{
 body.ab-full .ab-fala.on{background:color-mix(in srgb, var(--ler-fg) 10%, transparent)}
 body.ab-full .ab-fala-t{color:color-mix(in srgb, var(--ler-fg) 45%, transparent)}
 
+/* ---- CELULAR DEITADO: pouca altura, e cada pixel conta ----
+   ⚠️ MEDIDO ANTES DE LIBERAR A ROTAÇÃO, e o resultado justificou o trabalho:
+   em 740x360 a barra de botões do texto quebrava em várias linhas e ocupava
+   227px dos 360 — no modo tela cheia, 313px, sobrando praticamente nada de
+   texto. Liberar a rotação sem isto seria entregar uma tela inútil.
+
+   A régua é a ALTURA, não a orientação: o que importa é o espaço vertical, e
+   `max-height` também pega tablet deitado e janela baixa no desktop. */
+@media (max-height: 560px) {
+  /* A barra vira uma fileira que ROLA de lado, em vez de empilhar. */
+  .ab-trans-topo{
+    flex-wrap:nowrap; overflow-x:auto; gap:8px; margin-bottom:8px;
+    scrollbar-width:none;
+  }
+  .ab-trans-topo::-webkit-scrollbar{display:none}
+  .ab-trans-topo > *{flex:0 0 auto}
+  /* A dica longa some: ela explica o gesto, e ocupa duas linhas inteiras. */
+  .ab-trans-topo .est-dica{display:none}
+  .ab-trans{max-height:none}
+  /* O respiro que leva a fala ao centro encolhe junto com a tela: 26vh do
+     padrão comeria o texto inteiro numa tela desta altura. */
+  body.ab-full .ab-trans{padding:18vh 20px}
+  body.ab-full .ab-trans-topo{padding:8px 16px}
+  /* O aviso da fila não pode cobrir o texto numa tela desta altura. */
+  .ab-fila{bottom:10px; width:min(280px, calc(100vw - 24px))}
+}
+
 /* ---- painel do raio-X: a lista de capítulos ---- */
 .ler-raiox-painel{
   position:fixed;z-index:var(--z-modal);width:330px;max-height:70vh;display:none;
