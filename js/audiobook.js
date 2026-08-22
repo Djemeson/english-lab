@@ -258,14 +258,27 @@ async function _abAutoMeta(a) {
   } catch (e) { console.warn('[audiobook] auto-metadados:', e && e.message) }
 }
 
+// ⚠️ ISTO DERRUBAVA A ABA COM ARQUIVO GRANDE, e o print dele mostrou o crash do
+// Chrome ("Ah, bolas!!", código 39) ao importar um `.m4b` de **1,8 GB**.
+// A conta do jeito antigo:
+//   `await file.arrayBuffer()`      → 1,8 GB na memória
+//   `new Blob([buf])`               → mais 1,8 GB, porque copia
+//   = ~3,6 GB numa aba, para gravar um arquivo que já estava no disco.
+// Nenhuma das duas cópias era necessária. **`File` já é um `Blob`**: dá para
+// entregá-lo ao IndexedDB como está, sem passar pela memória. E os capítulos
+// não moram no áudio, moram no átomo `moov` — alguns megabytes que dá para ler
+// por fatias.
+// Resultado: a importação de 1,8 GB passa a custar o tamanho do `moov`, não o
+// tamanho do livro.
 async function _abImportarM4b(file) {
-  const buf = await file.arrayBuffer()
-  const meta = abLerM4b(buf)
+  const buf = await _abMoovDoArquivo(file)
+  const meta = buf ? abLerM4b(buf) : { titulo: '', autor: '', duracao: 0, capitulos: [], capa: null }
   const id = uid()
   // A proteção é pedida ANTES da primeira gravação pesada: guardar 900 MB em
   // modo descartável é convidar o navegador a apagá-los depois.
   await garantirArmazenamentoPersistente()
-  await BookDB.set(abChaveArquivo(id, 0), new Blob([buf], { type: file.type || 'audio/mp4' }))
+  // O próprio arquivo, sem cópia. O `type` já vem dele.
+  await BookDB.set(abChaveArquivo(id, 0), file)
   abLocaisMarcar(id)
 
   // Sem capítulos dentro do arquivo, o livro inteiro é um capítulo só. Melhor
@@ -294,7 +307,10 @@ async function _abImportarFaixas(lista) {
   let total = 0, bytes = 0
   for (let i = 0; i < lista.length; i++) {
     const f = lista[i]
-    const blob = new Blob([await f.arrayBuffer()], { type: f.type || 'audio/mpeg' })
+    // Mesmo motivo do `.m4b`: o `File` já é um `Blob`. Copiá-lo pela memória
+    // dobrava o custo de cada faixa sem ganho nenhum — e uma pasta de 40 mp3
+    // chega perto do mesmo estouro.
+    const blob = f
     if (!i) await garantirArmazenamentoPersistente()
     await BookDB.set(abChaveArquivo(id, i), blob)
     abLocaisMarcar(id)
@@ -543,10 +559,12 @@ async function _abAnexar(id, files) {
   try {
     const ehM4b = lista.length === 1 && /\.(m4b|m4a)$/i.test(lista[0].name)
     if (ehM4b) {
-      const buf = await lista[0].arrayBuffer()
-      const meta = abLerM4b(buf)
+      // Mesmo caminho de memória do import (ver `_abImportarM4b`): só o `moov`
+      // é lido, e o arquivo vai para o banco sem cópia.
+      const buf = await _abMoovDoArquivo(lista[0])
+      const meta = buf ? abLerM4b(buf) : { titulo: '', autor: '', duracao: 0, capitulos: [], capa: null }
       await garantirArmazenamentoPersistente()
-      await BookDB.set(abChaveArquivo(id, 0), new Blob([buf], { type: lista[0].type || 'audio/mp4' }))
+      await BookDB.set(abChaveArquivo(id, 0), lista[0])
       abLocaisMarcar(id)
       let dur = meta.duracao || await _abDuracaoDoBlob(await BookDB.get(abChaveArquivo(id, 0)))
       a.capitulos = meta.capitulos.length
@@ -562,7 +580,7 @@ async function _abAnexar(id, files) {
       const caps = []
       let total = 0, bytes = 0
       for (let i = 0; i < lista.length; i++) {
-        const blob = new Blob([await lista[i].arrayBuffer()], { type: lista[i].type || 'audio/mpeg' })
+        const blob = lista[i]
         if (!i) await garantirArmazenamentoPersistente()
         await BookDB.set(abChaveArquivo(id, i), blob)
         abLocaisMarcar(id)
@@ -596,6 +614,47 @@ async function _abAnexar(id, files) {
 // ⚠️ O QUE ESTE PARSER NÃO LÊ: o formato de capítulo em TRILHA DE TEXTO
 // (QuickTime `tref/chap`), usado por parte dos conversores. Nesse caso o livro
 // entra como capítulo único — ouve-se igual, e a posição continua guardada.
+// ================================================================
+// O `moov` SEM LER O LIVRO INTEIRO
+// ================================================================
+// Um `.m4b` é uma pilha de caixas ("átomos") no nível de cima: `ftyp`, `moov`,
+// `mdat`, `free`. O áudio está no `mdat` — que é ~100% do arquivo — e tudo o
+// que interessa (duração, capítulos, título, autor, capa) está no `moov`.
+// Cada caixa começa com 8 bytes dizendo tamanho e tipo, então dá para pular de
+// caixa em caixa lendo 16 bytes por vez e baixar só a que importa.
+// Num livro de 1,8 GB isso lê tipicamente **três fatias de 16 bytes** e depois
+// o `moov` inteiro — alguns MB, capa incluída.
+// ⚠️ O `moov` pode estar no FIM do arquivo (é o padrão de quem não fez
+// "faststart"), e por isso a varredura vai até achar, não só no começo.
+const AB_MOOV_TETO = 200 * 1024 * 1024        // moov maior que isto é coisa errada
+async function _abMoovDoArquivo(file) {
+  try {
+    const total = file.size
+    let p = 0
+    while (p + 8 <= total) {
+      const cab = new DataView(await file.slice(p, Math.min(p + 16, total)).arrayBuffer())
+      if (cab.byteLength < 8) break
+      let tam = cab.getUint32(0)
+      let hdr = 8
+      if (tam === 1) {
+        if (cab.byteLength < 16) break
+        tam = Number(cab.getBigUint64(8)); hdr = 16
+      } else if (tam === 0) tam = total - p
+      let tipo = ''
+      for (let i = 4; i < 8; i++) tipo += String.fromCharCode(cab.getUint8(i))
+      if (tipo === 'moov') {
+        if (tam > AB_MOOV_TETO) return null
+        // A fatia começa no cabeçalho do `moov`, então o parser encontra o
+        // átomo como se estivesse na raiz de um arquivo — nada nele muda.
+        return await file.slice(p, p + tam).arrayBuffer()
+      }
+      if (tam < hdr) break
+      p += tam
+    }
+  } catch (e) { console.warn('[audiobook] não achei o moov por fatias:', e && e.message) }
+  return null
+}
+
 function abLerM4b(buf) {
   const saida = { titulo: '', autor: '', duracao: 0, capitulos: [], capa: null }
   try {
