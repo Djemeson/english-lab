@@ -21,7 +21,7 @@
 > ⚠️ **Uma armadilha pega a tempo:** apagar a linha do número de página desalinharia o "ler
 > ouvindo" — passou a esconder, não apagar. Medido no app com 4 EPUBs reais: **659 parágrafos
 > remontados**, **57 itálicos recuperados** num capítulo, mangá intacto.
-> `sw.js` → **englab-v397**. **Detalhes em §8.98.**
+> `sw.js` → **englab-v398**. **Detalhes em §8.98.**
 >
 > Última atualização anterior: 2026-08-22 (41ª) — **A FICHA CHEGA AO PRÉ-ESTUDO E À QUEBRA**. Os dois
 > últimos materiais pagos que ainda decidiam por quantidade e recência. ⚠️ **E eles expuseram um
@@ -15037,6 +15037,37 @@ importação do app (`_lerImportarUm`) e abertos no leitor. Console limpo em tod
 | Nome na barra, cap. 8 de Different Seasons | **"1. Hope Springs Eternal"** — era "Parte 9" |
 | **Mangá** (CBZ de teste) | margem de `div` **0px**, nomes "Página 1…3", imagens no lugar — nada mudou |
 
+### A pergunta seguinte dele: "e o EPUB todo desorganizado, tudo junto e misturado?"
+
+Pergunta certa, e a resposta e "em parte" — medida, nao suposta. Varri os **194 EPUBs do disco
+dele**. ⚠️ **Duas medicoes minhas deram falso positivo antes de eu olhar o arquivo**: a amostra
+"5 maiores arquivos" caiu na pagina de CATALOGO dos Boxcar Children (paragrafos curtos porque e
+uma lista de titulos), e contar `<div>` com regex somou o INVOLUCRO como bloco unico — media de
+47 mil caracteres por paragrafo, que e artefato, nao livro. **Regex nao entende aninhamento**, e
+metrica sem olhar o arquivo mente.
+
+O acervo em ingles dele e quase todo EPUB comercial com `<p>` de verdade. **Um livro e caotico
+mesmo:** *Israel, De Herodes a Dayan* (portugues, conversao de PDF/OCR) — uma linha impressa por
+paragrafo, `&#160;` como recuo, tabela de diagramacao, `<span style>` por fragmento, palavra
+cortada pela margem e erro de OCR no texto ("sumariamen-!c", "corl.ados").
+
+**Foi nele que a regra de juncao disparou pela primeira vez de verdade: 29 emendas num capitulo**
+(nos quatro livros da rodada anterior tinha dado zero — estava sem prova de fogo, e a pendencia
+registrada dizia isso). E o teste expos uma falha que fechou na hora: **palavra partida pela
+margem** ("leva-" + "ram"). Sao **7 remendos** no mesmo capitulo.
+
+⚠️ **E o remendo repetiu a armadilha do numero de pagina, de proposito.** Juntar "leva-"+"ram"
+em "levaram" transformaria DUAS palavras em UMA, e o "ler ouvindo" conta palavras contra o
+arquivo cru. Entao o hifen e **escondido**, nao apagado: a tela mostra `levaram`, o texto
+continua `leva-ram`, e `sincNorm` (que troca tudo que nao e letra/numero por espaco) conta dois
+tokens dos dois lados. Medido na tela: *"e **levaram** para suas terras"*, *"as **colonias**
+judaicas"*, *"cristaos e **muculmanos** de todas"*.
+
+**O que a faxina ainda NAO faz** (e nao vai fazer sem outra rodada): criar paragrafo onde o
+arquivo nao tem marca nenhuma, desmontar tabela usada como diagramacao, consertar acento
+quebrado, tirar cabecalho de pagina repetido, e dividir livro que veio inteiro num capitulo so.
+Erro de OCR dentro da palavra e dano no original — so IA resolveria, e ai ja e outra coisa.
+
 ### ⚠️ Outra sessão commitou por cima no meio da rodada
 
 Durante esta rodada, **outra sessão de Claude Code trabalhando no mesmo repositório** commitou
@@ -15065,10 +15096,15 @@ mensagem alheia. Nada se perdeu, mas o histórico ficou impreciso — e a liçã
       `chapters[n.cap].titulo` na lista de marcações, e ali ainda aparece "Parte 9".
       `lerCapNome` depende do livro ABERTO (`_lerLivro`), então usá-la ali exigiria uma versão
       que receba o livro por parâmetro.
-- [ ] **A JUNÇÃO DE PARÁGRAFO NUNCA DISPAROU NO ACERVO DELE** — a regra existe (`rel.junta`) e
-      foi escrita para o dano clássico de PDF→EPUB, mas nos 4 livros testados deu zero. Ou seja:
-      **está sem prova de fogo**. Quando entrar um livro assim, conferir se ela emenda o certo
-      e não colou duas falas de diálogo.
+- [x] ~~**A JUNÇÃO DE PARÁGRAFO NUNCA DISPAROU NO ACERVO DELE**~~ — **fechada na mesma rodada**:
+      disparou **29 vezes num capítulo** de *Israel, De Herodes a Dayan* (OCR), e o teste rendeu
+      a regra do hífen de margem (7 remendos). Conferido bloco a bloco: nenhuma fala de diálogo
+      foi colada — a regra exige minúscula na linha seguinte, e fala começa com travessão ou aspas.
+- [ ] **O QUE A FAXINA AINDA NÃO FAZ, EM ORDEM DE VALOR** — criar parágrafo onde o arquivo não
+      tem marca nenhuma; dividir livro que veio inteiro num capítulo só (*Sandkings*, 15.553
+      palavras numa peça); desmontar tabela usada como diagramação; tirar cabeçalho de página
+      repetido; consertar acento quebrado (mojibake). Nenhum deles apareceu no acervo em inglês
+      dele — **não construir sem um arquivo real para medir**, que foi a lição desta rodada.
 - [ ] **VERSALETE SÓ É RECONHECIDO QUANDO O CSS DIZ `font-variant: small-caps`** — Bag of Bones
       usa `.smallcaps { font-size: 0.8em }`, que é versalete na intenção e tamanho na letra. Não
       dá para inferir sem heurística de nome de classe, e heurística de nome erra. Fica assim.

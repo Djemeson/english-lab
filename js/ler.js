@@ -771,6 +771,7 @@ function _lerArrumouTexto() {
   if (r.virados) partes.push(`${r.virados} parágrafos remontados`)
   if (r.vazios)  partes.push(`${r.vazios} buracos`)
   if (r.junta)   partes.push(`${r.junta} emendas`)
+  if (r.hifen)   partes.push(`${r.hifen} palavras remendadas`)
   if (r.nbsp)    partes.push(`${r.nbsp} recuos`)
   if (r.cena)    partes.push(`${r.cena} quebras de cena`)
   if (r.br)      partes.push(`${r.br} rajadas de linha`)
@@ -963,8 +964,16 @@ function _lerClassesDoSentido(e, sem) {
 // aparece no painel Aa — sem isso o botão seria fé.
 let _lerArrumouRel = null
 
+// O último nó de texto de um elemento — é nele que mora o hífen da margem.
+function _lerUltimoTexto(e) {
+  const c = document.createTreeWalker(e, NodeFilter.SHOW_TEXT)
+  let ultimo = null, n
+  while ((n = c.nextNode())) if (n.nodeValue.trim()) ultimo = n
+  return ultimo
+}
+
 function _lerArrumar(doc) {
-  const rel = { vazios: 0, cena: 0, br: 0, nbsp: 0, junta: 0, ancora: 0, pagina: 0 }
+  const rel = { vazios: 0, cena: 0, br: 0, nbsp: 0, junta: 0, hifen: 0, ancora: 0, pagina: 0 }
   const corpo = doc.body
 
   // âncoras de número de página: `<a id="page_246"/>` já perdeu o id acima e
@@ -1043,11 +1052,32 @@ function _lerArrumar(doc) {
     if (a.className || b.className) continue
     const ta = a.textContent.trim(), tb = b.textContent.trim()
     if (ta.length < 40 || tb.length < 2) continue
-    if (!/[a-zà-ú,;]$/.test(ta)) continue          // terminou em letra ou vírgula
-    if (!/^[a-zà-ú]/.test(tb)) continue            // e o seguinte começa em minúscula
-    a.appendChild(doc.createTextNode(' '))
+    if (!/^[a-zà-ú]/.test(tb)) continue            // o seguinte começa em minúscula
+    // PALAVRA CORTADA PELA MARGEM DA PÁGINA IMPRESSA ("leva-" + "ram"). Medido
+    // num livro OCR de verdade do acervo dele: 10 num capítulo só, e sem isto
+    // ele lê "leva-" e "ram" como duas palavras.
+    const hifenada = /[a-zà-ú]-$/.test(ta)
+    if (!hifenada && !/[a-zà-ú,;]$/.test(ta)) continue
+    if (hifenada) {
+      // ⚠️ O HÍFEN É ESCONDIDO, NÃO APAGADO — mesma razão do número de página:
+      // o "ler ouvindo" conta palavras e o mapa vem do arquivo cru, onde
+      // "leva- ram" são dois pedaços. Escondido, a tela mostra "levaram" e a
+      // contagem continua batendo dos dois lados.
+      const ultimo = _lerUltimoTexto(a)
+      if (ultimo && /-$/.test(ultimo.nodeValue)) {
+        ultimo.nodeValue = ultimo.nodeValue.replace(/-$/, '')
+        const h = doc.createElement('span')
+        h.className = 'ler-oculto'
+        h.textContent = '-'
+        a.appendChild(h)
+      }
+      rel.hifen++
+    } else {
+      a.appendChild(doc.createTextNode(' '))
+      rel.junta++
+    }
     while (b.firstChild) a.appendChild(b.firstChild)
-    b.remove(); rel.junta++
+    b.remove()
   }
   return rel
 }
