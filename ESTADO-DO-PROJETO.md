@@ -7,7 +7,26 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (42ª) — **O LIVRO NÃO VINHA FEIO; O APP É QUE O ACHATAVA**.
+> Última atualização: 2026-08-23 (43ª) — **AUDITORIA DE PONTA A PONTA — NADA FOI ALTERADO NO
+> CÓDIGO**. Leitura fina das ~53 mil linhas em seis frentes (IA auditada à mão, linha a linha;
+> cinco varreduras paralelas para núcleo/sync, leitura/áudio, vídeo/extensão, captura/telas e
+> infra/segurança). **74 achados confirmados no código** (16 graves · 33 médios · 25 baixos),
+> relatório completo publicado como Artifact ("Raio-X do Language Lab") e resumido em §8.99.
+> Os três blocos que mais doem: (1) **as redes de segurança de dados estão furadas** —
+> "Apagar todos os dados" não apaga a nuvem (o push mescla e re-envia tudo; `fbWipeCloud`
+> existe e ninguém chama) e o `importData` só restaura words/kindleSeen/podShows do backup
+> "completo"; (2) **a família de defeitos exposta pela troca para o Gemini** — 6 chamadas com
+> `model: AI_DEFAULT_MODEL` cravado (audio.js ×4, add.js ×2), `temperature: 0.7` fixo no
+> streaming do Assistente (a família gpt-5 recusa), folga de raciocínio só para gpt-5/o* (os
+> Flash 3.x do Google também pensam e voltam vazios), `same_as` descartado pelo normalizador
+> do `applyAiResult`, e `aiConfirmBatch` DENTRO do `tasks.map` em 3 fluxos da Biblioteca;
+> (3) **padrões repetidos** — `escA` em onclick mata clique com apóstrofo em 5 telas, e
+> operação longa sem trava de contexto aplica resultado no alvo errado (legenda, mangá,
+> Kindle). ⚠️ **Medido ao vivo em 23/08: a conta OpenAI está SEM CRÉDITOS** (429 "no credits
+> remaining") — toda a rede de segurança que cai na OpenAI está morta enquanto isso durar.
+> Plano de conserto em 6 rodadas e pendências novas em §9. **Detalhes em §8.99.**
+>
+> Última atualização anterior: 2026-08-22 (42ª) — **O LIVRO NÃO VINHA FEIO; O APP É QUE O ACHATAVA**.
 > *"os livros vêm com a formatação muito feia e bagunçada"* — e a medição nos 10 livros dele
 > apontou para dentro de casa: o sanitizador tira `class` (e tem de tirar), mas a classe
 > carregava **sentido**. **380 `<span class="txit">` de *Bag of Bones*** — todo o pensamento
@@ -15312,6 +15331,70 @@ os arquivos deste trabalho a meio caminho, dentro de commits sobre outro assunto
 mensagem alheia. Nada se perdeu, mas o histórico ficou impreciso — e a lição é a de sempre:
 **duas sessões no mesmo repositório precisam de `git worktree`.**
 
+## 8.99 A auditoria de ponta a ponta (2026-08-23, 43ª)
+
+Pedido dele: *"faz uma analise de ponta a ponta em cada linha de codigo […] analise
+principalmente a parte da IA […] é onde tenho enncontrado muitos problemas ao usar o projeto"*.
+**Nada foi alterado no código nesta rodada** — o produto é o diagnóstico.
+
+**Como foi feito:** a IA foi auditada à mão, linha a linha (ai.js completo, lang.js, os ~40
+pontos de chamada em 15 arquivos, todos os prompts e esquemas); cinco agentes paralelos
+varreram o resto (núcleo/sync, leitura/áudio, vídeo/extensão, captura/telas, infra/segurança),
+cada um lendo os arquivos por inteiro e citando trecho por achado. Um teste rodou **ao vivo**
+contra a API real com a chave do `.env`.
+
+**O resultado:** 74 achados (16 graves · 33 médios · 25 baixos/melhorias), todos com
+localização `arquivo:linha` e cenário concreto, publicados no Artifact **"Raio-X do Language
+Lab"** — que é a referência canônica desta rodada (tabelas completas por área, as 5
+causas-raiz, plano de conserto em 6 rodadas e 7 propostas de melhoria). O que precisa estar
+NESTE arquivo para as próximas sessões:
+
+### O que foi medido ao vivo
+- **A conta OpenAI está sem créditos** (HTTP 429 "You have no credits remaining", 23/08).
+  Enquanto durar: sem TTS, sem Whisper-OpenAI, sem imagens OpenAI, sem busca na web e sem a
+  repescagem de `aiTextSeguro`/`aiJSON` — cada falha aparece como um erro genérico diferente.
+- O teste da temperatura no chat (abaixo) não pôde ser confirmado ao vivo por causa disso
+  (o 429 de billing responde antes da validação de parâmetros).
+
+### Os graves, por área (o detalhe pleno está no Artifact)
+- **Dados:** `clearAllData` empurra com merge (`_fbMesclarLista`) e a nuvem ressuscita tudo —
+  `fbWipeCloud` (firebase.js:1685) existe e tem **zero** call sites; `importData`
+  (settings.js:319-371) só lê words/kindleSeen/podShows; desmarcações de conhecidas/ignoradas/
+  kindleSeen sincronizam por união SEM lápide e voltam sozinhas; mudança nos últimos 1,2s
+  antes de fechar a aba é revertida no boot (snapshot substitui sem merge); o batch atômico de
+  `fbPushData` para INTEIRO no dia em que um doc passar de 1 MB; `flushPendingCloudCards`
+  roda fora da trava e cards não têm timestamp (`_fbQuando` = 0 → local sempre vence).
+- **IA:** 6 chamadas com `model: AI_DEFAULT_MODEL` indo ao endpoint do fornecedor ativo
+  (audio.js:1052/1102/1237/1310, add.js:652/710); `temperature: 0.7` fixo no streaming
+  (consulta.js:366) que a família gpt-5 recusa; `_aiRaciocina` só cobre gpt-5/o* e os Gemini
+  Flash 3.x pensam dentro do mesmo teto (respostas vazias no fornecedor ATUAL dele);
+  `same_as` não é copiado em `freshMeanings` (review.js:205-270) e o reencontro por id da
+  Fase 3 está morto; `aiConfirmBatch` dentro do `tasks.map` em reanalyzeAll/fillMissingAll/
+  markBoldAll (audio.js:1131/1222/1339) — modais em cascata com promises penduradas.
+- **Leitura/áudio:** troca de capítulo no ouvir-junto não soma `cap.ini` do m4b e não grava
+  `_sincMapa.cap` (sinc.js:817) — erro de horas; `_abTeclas` fica no document ao sair da
+  seção (Espaço/setas duplas no leitor); `obraMontarEco(null, …)` retorna null sempre
+  (ler.js:2335) — o eco da obra nunca rodou; capítulo corrompido trava `_lerRestaurando`.
+- **Captura:** análise do Kindle roda 2-4× (add.js:136/453 e laço sem filtro de `analisado`);
+  `deleteSelected` não remove srsCards órfãos (review.js:1750); `escA` em onclick mata clique
+  com apóstrofo (known.js:139-144, review.js:1892, audio.js:1711, video-study.js:608).
+- **Infra:** o install do SW pré-cacheia do cache HTTP (GH Pages max-age=600) — `c.add(new
+  Request(url, {cache:'reload'}))` conserta; server.js serve `_dados-de-teste/` na rede local;
+  regras Firebase aceitam qualquer conta Google (cota); export JSON leva as 3 chaves de API.
+
+### As 5 causas-raiz (consertar o padrão fecha a família)
+1. Texto em atributo onclick (`escA` + apóstrofo) → data-attribute + delegação, e regra no guia.
+2. Operação longa sem trava de contexto → capturar o alvo no início, abortar se mudou.
+3. União sem lápide → toda desmarcação que sincroniza por união precisa de lápide com timestamp.
+4. Código que assume OpenAI como único fornecedor → passada única "o que assume OpenAI?".
+5. Rede de segurança nunca ensaiada → depois de consertar, ensaio real exportar→apagar→restaurar.
+
+### O que foi conferido e está SÓLIDO (não mexer por susto)
+Gateway de IA (freio/retry/teto), regras lexicais centralizadas, ficha técnica + melhor-vence
+(usa `f.forca` GRAVADA — modelo removido do catálogo não rebaixa análise antiga), lápides de
+exclusão de words/cards, parsers de m4b e SQLite, o leitor de mangá, o motor de sincronia,
+histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/Storage.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -15320,6 +15403,48 @@ mensagem alheia. Nada se perdeu, mas o histórico ficou impreciso — e a liçã
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da auditoria de ponta a ponta (§8.99, 2026-08-23) — as 6 rodadas de conserto
+
+> A lista completa (74 achados com arquivo:linha) está no Artifact "Raio-X do Language Lab" e
+> resumida em §8.99. Aqui, só as rodadas — cada uma é um bloco coeso para fazer e testar junto.
+
+- [ ] **RODADA 1 — redes de segurança de dados:** clearAllData chama fbWipeCloud (estendido a
+      `gerado` + Storage); importData restaura tudo que o export grava; export inclui
+      livros/audiolivros/known e SAI as chaves de API; lápide para desmarcações
+      (known/ignored/kindleSeen); boot empurra mudança local não-enviada antes do 1º snapshot;
+      flush de sessão dentro da trava; `card.at = Date.now()` em rateSrsCard. Fecha com ensaio
+      real exportar→apagar→restaurar conferido por `tools/acervo.mjs`.
+- [ ] **RODADA 2 — IA no mundo real (Gemini ativo, OpenAI sem crédito):** remover os 6
+      `model: AI_DEFAULT_MODEL`; temperature condicional no streaming do Assistente + timeout
+      de inatividade no stream; folga de raciocínio para Gemini Flash 3.x; aiConfirmBatch
+      ANTES do runPool (3 fluxos); copiar `same_as` em freshMeanings; schema na repetição da
+      rede gramatical; aviso claro de "conta sem créditos" por fornecedor.
+- [ ] **RODADA 3 — varredura do apóstrofo e escapes:** data-attribute + delegação em
+      known.js/review.js:1892/audio.js:1711/video-study.js:608/video-podcast.js:133; esc em
+      add.js:435/874 (expr da IA), dossie.js:1198 (Produza: `lexaInline(esc(...))`),
+      video.js:339 (`escA(src)`); registrar a regra no CLAUDE.md do projeto.
+- [ ] **RODADA 4 — leitura e audiolivro:** sinc.js:817 (`_sincParaAudio` + gravar
+      `_sincMapa.cap`); `_abTeclas` só com a seção visível; religar `obraMontarEco` no
+      Explicar; try/finally em `lerIrParaCapitulo` (capítulo corrompido); regra do número de
+      página não pega headings; recuo do epub.js lê a unidade; re-indexar frases do
+      ouvir-junto após `_lerRaioXPintar`/`_lerRepintar`.
+- [ ] **RODADA 5 — vídeo, Kindle e travas de contexto:** trava de alvo em
+      `_vidAutoSub`/`videoTranscribeFull`/`mangaRepintarPagina`/lote do Kindle (resposta por
+      id, não por índice); Kindle sem análise dupla (filtro de `analisado`); download de
+      podcast confere `got < total`; charset no import local de .srt; transcript da Netflix
+      sem re-render por fala; ← nos créditos = última fala; manifest da extensão no domínio
+      exato da Vercel.
+- [ ] **RODADA 6 — crescimento e infra:** guarda de tamanho (~900KB) nos docs principais do
+      sync com aviso do culpado (fatiamento depois); `cache:'reload'` no install do sw.js;
+      regras Firebase travadas no e-mail dele; server.js em 127.0.0.1 + negar
+      `_dados-de-teste`; streak no fuso local (srs.js:491); try/catch de quota nos saves;
+      duplicata de card com exampleIdx -1 vs 0 (srs.js:512).
+- [ ] **MELHORIAS PROPOSTAS (fazer quando ele pedir):** painel "quanto a IA custou" (persistir
+      `aiUso` por dia); semáforo de fornecedor em Configurações → IA; Media Session no
+      podcast; comando de ensaio de backup no terminal; schema nas chamadas restantes
+      (extractSrsItems, lote Kindle, pré-estudo); cache em disco da tradução de seleção;
+      bateria Gemini no teste-ia.mjs.
 
 ### Da rodada da formatação do livro (§8.98, 2026-08-22)
 
