@@ -21,7 +21,7 @@
 > ⚠️ **Uma armadilha pega a tempo:** apagar a linha do número de página desalinharia o "ler
 > ouvindo" — passou a esconder, não apagar. Medido no app com 4 EPUBs reais: **659 parágrafos
 > remontados**, **57 itálicos recuperados** num capítulo, mangá intacto.
-> `sw.js` → **englab-v402**. **Detalhes em §8.98.**
+> `sw.js` → **englab-v403**. **Detalhes em §8.98.**
 >
 > Última atualização anterior: 2026-08-22 (41ª) — **A FICHA CHEGA AO PRÉ-ESTUDO E À QUEBRA**. Os dois
 > últimos materiais pagos que ainda decidiam por quantidade e recência. ⚠️ **E eles expuseram um
@@ -15191,6 +15191,47 @@ E **o que já foi consertado não volta no laudo**: revisar de novo o mesmo livr
 `0 emendas, 0 nomes, 0 ocultos` — só os defeitos de texto, que são corrigidos a cada leitura e
 não têm o que gravar. Sem isso ele leria "3 capítulos partidos em dois" de novo e concluiria
 que não funcionou.
+
+### "Mandei pro Preparar e a cor continua forte" — e o defeito era pior que a frase
+
+Print dele: *"acabei de mandar pro preparar e a cor deveria tá mais fraca querendo dizer que eu
+já interagi ali, mas tá forte ainda"*. O termo era **"reliably reported"**, sublinhado em roxo —
+ou seja, uma **colocação** do raio-X (`.ler-dif-collocation`, `--cor:#7B4BC9`), não uma palavra
+em estudo.
+
+E ele estava apontando para uma regra que **o app já tinha**: `.ler-dif-ja` — *"o que já é dele
+tem traço fraco"*, criada quando ele viu `cellar` acesa e leu "voltou a ficar desconhecida".
+Só que ela valia apenas para o **"Já sei"**.
+
+⚠️ **O defeito real era o dobro do relatado.** Mandar para o Preparar:
+
+| Quando | O que acontecia | O que devia |
+|---|---|---|
+| na hora | traço **cheio** — nada repintava | traço fraco |
+| ao recarregar | o item era **descartado** e sumia de vez | traço fraco |
+
+Forte agora, invisível depois — o pior dos dois. O descarte vinha de `aiRevalidarAchados`, que
+filtrava `fila-mesmo` junto com `sentido`.
+
+**A correção separa as três coisas**, e a do meio não existia:
+
+- `sentido` — a análise terminou e o significado está registrado → **sai** (como antes)
+- `fila-mesmo` — está na sua fila, vindo desta mesma passagem → **fica, com traço fraco**
+- nada — novidade → **traço cheio**
+
+Vale para o leitor **e para o audiolivro**, que dividem a mesma peça (`aiRevalidarAchados`,
+`difChipLigar`) — o `abChipPreparar` ganhou a mesma marca.
+
+**Testado ao vivo** (a análise por IA não foi refeita: o pacote do raio-X foi montado com a
+forma real, porque o que mudou é a pintura, não a análise):
+
+| Momento | "reliably reported" | "downspout" (não tocado) |
+|---|---|---|
+| antes | 1,6px sólido, opacidade 1 | 1,6px sólido, opacidade 1 |
+| ao mandar ao Preparar | **0,8px pontilhado, 0,72** | inalterado |
+| depois de recarregar | **0,8px pontilhado, 0,72** — e `ja=fila-mesmo feito=1` | inalterado |
+
+Console limpo.
 
 ### ⚠️ Outra sessão commitou por cima no meio da rodada
 

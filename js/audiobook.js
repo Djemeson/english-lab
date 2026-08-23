@@ -1913,7 +1913,7 @@ function _abFalaPintada(txt, achados) {
   if (!achados || !achados.length) return esc(txt)
   const marcas = []
   achados.forEach((x, idx) => {
-    for (const oc of aiAcharNoTexto(txt, x.t)) marcas.push({ ...oc, idx, tipo: x.tipo, ja: x.ja })
+    for (const oc of aiAcharNoTexto(txt, x.t)) marcas.push({ ...oc, idx, tipo: x.tipo, ja: x.ja, feito: x.feito })
   })
   if (!marcas.length) return esc(txt)
   marcas.sort((p, q) => p.i - q.i)
@@ -1934,7 +1934,7 @@ function _abFalaPintada(txt, achados) {
     // em js/ai.js. Com dois nomes, o chip do audiolivro abria vazio.
     // Traço fraco no que já é dele, cheio no que é novidade — a mesma regra do
     // leitor. Sem isto, palavra já conhecida era sublinhada como descoberta.
-    saida += `<mark class="ab-dif ab-dif-${m.tipo}${m.ja ? ' ab-dif-ja' : ''}" data-i="${m.idx}">${esc(txt.slice(m.i, m.fim))}</mark>`
+    saida += `<mark class="ab-dif ab-dif-${m.tipo}${(m.ja || m.feito) ? ' ab-dif-ja' : ''}" data-i="${m.idx}">${esc(txt.slice(m.i, m.fim))}</mark>`
     de = m.fim
   }
   return saida + esc(txt.slice(de))
@@ -1990,6 +1990,12 @@ function abChipPreparar(mk) {
     { contexto: fala.t, lang: (a.lang || 'en').slice(0, 2),
       source_type: 'audiobook', source_title: a.title || '',
       source_context: cap.titulo ? `audiolivro · ${cap.titulo}` : 'audiolivro' })
+  // Mesma regra do leitor: mandar para o Preparar esmaece o traço. Sem isto o
+  // audiolivro continuaria dizendo "isto aqui é novidade" no que ele já pegou.
+  item.feito = 1
+  a.updatedAt = Date.now()
+  saveAudiolivros()
+  abAba('texto')
 }
 
 // Ligar o menu de seleção é o que faz "ouvir virar card": o mesmo gesto do

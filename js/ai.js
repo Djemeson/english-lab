@@ -1804,10 +1804,24 @@ function _aiMesmaPassagem(item, origem) {
 // "já sei", ou a análise do Preparar termina e o item ganha significados.
 // Sem esta passada, o capítulo continuaria dizendo "outro sentido" até ele
 // mandar reanalisar; com 35 capítulos, isso é trabalho que ninguém faz.
+// ⚠️ "JÁ MANDEI PARA O PREPARAR" NÃO É "SUMIR" — É TRAÇO FRACO. Relato dele:
+// *"acabei de mandar pro preparar e a cor deveria tá mais fraca querendo dizer
+// que eu já interagi ali, mas tá forte ainda"*. E o defeito era pior do que a
+// frase: na sessão a marca ficava CHEIA (nada repintava) e, ao recarregar, o
+// item era DESCARTADO aqui — sumia de vez. Forte agora, invisível depois: o
+// pior dos dois.
+//
+// `fila-mesmo` quer dizer "este termo já está na sua fila, vindo desta mesma
+// passagem". Isso não é desconhecido nem conhecido: é **já lidei com isto**, e
+// o lugar disso na tela é o traço fraco que o app já usa para o que é dele.
+// Some de vez só quando vira `sentido` — ou seja, quando a análise terminou e
+// o significado está registrado.
 function aiRevalidarAchados(itens, origem) {
   if (!Array.isArray(itens)) return []
-  const saida = itens.map(x => ({ ...x, ja: aiJaConhecido(x, origem) }))
-                     .filter(x => x.ja !== 'sentido' && x.ja !== 'fila-mesmo')
+  const saida = itens.map(x => {
+    const ja = aiJaConhecido(x, origem)
+    return { ...x, ja, feito: (ja === 'fila-mesmo' ? 1 : (x.feito || 0)) }
+  }).filter(x => x.ja !== 'sentido')
   saida.incompleto = itens.incompleto
   return saida
 }

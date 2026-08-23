@@ -3774,7 +3774,7 @@ function _lerRaioXPintar() {
       // é mais a forma de ver isto. Agora o traço do que já é dele é fraco, e o
       // do que é novidade é cheio.
       mk.className = 'ler-dif ler-dif-' + ((achado && achado.tipo) || 'word') +
-        (achado && achado.ja ? ' ler-dif-ja' : '')
+        (achado && (achado.ja || achado.feito) ? ' ler-dif-ja' : '')
       mk.dataset.i = achado ? achado.i : ''
       // Sem `title`: o tooltip nativo competia com o chip do hover e piscava por
       // cima dele. Quem mostra a glosa (e as ações) agora é `_lerDifAbrir`.
@@ -3985,14 +3985,25 @@ async function lerRaioXJaSei(i) {
   toast(`"${x.t}" (${x.pt}) marcado como conhecido`, 'success')
 }
 
-function lerRaioXPreparar(i) {
+async function lerRaioXPreparar(i) {
   const x = _lerRaioX && (_lerRaioX.itens || [])[i]
   if (!x || typeof lexaChipParaPreparar !== 'function') return
   lexaChipParaPreparar(
     { expr: x.t, gloss: x.pt || '', type: x.tipo === 'word' ? 'word' : x.tipo },
     { contexto: x.frase || '', lang: (_lerLivro.lang || 'en').slice(0, 2),
       source_type: 'kindle', source_title: _lerLivro.title || '',
-      source_context: (_lerLivro.chapters[_lerCap] || {}).titulo || '' })
+      source_context: lerCapNome(_lerCap) })
+  // ⚠️ O TRAÇO TEM DE ESMAECER AQUI TAMBÉM. A regra "o que já é seu tem traço
+  // fraco" existia só para o "Já sei" — mandar para o Preparar deixava o
+  // realce CHEIO, e ele leu isso, com razão, como "não registrou". Marcar como
+  // conhecido e mandar estudar são coisas diferentes, mas as duas significam
+  // *já lidei com isto*, e é o que o olho precisa ver ao reler a página.
+  x.feito = 1
+  try {
+    const pacote = { itens: _lerRaioX.itens, nivel: cefrNivelAluno(), at: Date.now() }
+    await _lerGuardar(_lerChaveRaioX(_lerCap), JSON.stringify(pacote), 'raiox', _lerCap, _lerRaioX.itens.length)
+  } catch (e) {}
+  _lerRaioXPintar()
 }
 
 function _lerPreBlocoHTML() {
