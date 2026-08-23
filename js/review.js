@@ -2936,9 +2936,15 @@ async function _quebraDoDisco(trecho, lang) {
   try {
     // ⚠️ Procura aqui e, faltando, na nuvem. Esta quebra é uma chamada de IA:
     // o mesmo trecho aberto no telefone e no computador cobrava duas vezes.
-    const b = typeof geradoLer === 'function'
-      ? await geradoLer(_quebraChave(trecho, lang))
-      : await BookDB.get(_quebraChave(trecho, lang))
+    let b = null
+    if (typeof geradoLerMelhor === 'function') {
+      const r = await geradoLerMelhor(_quebraChave(trecho, lang), { tipo: 'quebra', lang })
+      b = r.texto
+    } else {
+      b = typeof geradoLer === 'function'
+        ? await geradoLer(_quebraChave(trecho, lang))
+        : await BookDB.get(_quebraChave(trecho, lang))
+    }
     if (!b) return null
     const d = JSON.parse(typeof b.text === 'function' ? await b.text() : String(b))
     if (!d || !Array.isArray(d.items) || Number(d.v || 0) < QUEBRA_VER) return null
@@ -3052,7 +3058,14 @@ ${promptRegrasLexicais(lang, 'glosa')}
   // condenaria a frase a nunca mais ser quebrada. Na memória tudo bem — morre
   // com a sessão.
   if (items.length && typeof BookDB !== 'undefined') {
-    const pacote = JSON.stringify({ v: QUEBRA_VER, items, trad: saida.trad, at: Date.now() })
+    // Ficha técnica, como o raio-X e o pré-estudo (§8.95/§8.97): sem saber qual
+    // modelo quebrou a frase, duas versões da mesma frase não têm como ser
+    // comparadas — e é essa comparação que impede o aparelho com o modelo mais
+    // fraco de impor a versão dele ao outro.
+    const pacote = JSON.stringify({
+      v: QUEBRA_VER, items, trad: saida.trad, at: Date.now(),
+      ficha: typeof aiFicha === 'function' ? aiFicha({ pedacos: items.length, lang }) : undefined
+    })
     // Aqui E na nuvem: o trecho quebrado no computador não precisa ser pago de
     // novo no telefone. `tipo` marca o que é; não tem livro nem capítulo — a
     // quebra nasce de um trecho solto.

@@ -449,7 +449,12 @@ function geradoNota(bruto, nivelHoje) {
   const p = _geradoPacote(bruto)
   if (!p) return null
   const f = p.ficha || {}
-  const itens = Array.isArray(p.itens) ? p.itens.length : (Array.isArray(p) ? p.length : 0)
+  // ⚠️ CADA MATERIAL CHAMA A SUA LISTA DE UM JEITO — `itens` no raio-X e no
+  // pré-estudo, `items` na quebra de frase, `ancoras` no mapa de sincronia.
+  // Contar só `itens` faria os outros três empatarem em zero e o desempate
+  // cair inteiro na data, que é justamente o critério mais fraco.
+  const lista = [p.itens, p.items, p.ancoras, Array.isArray(p) ? p : null].find(Array.isArray)
+  const itens = lista ? lista.length : 0
   return {
     temFicha: !!p.ficha,
     fixado: Number(f.fixadoEm) || 0,       // quando ELE escolheu esta à mão

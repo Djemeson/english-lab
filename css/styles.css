@@ -5850,6 +5850,39 @@ body.lendo .sb-nav:hover,body.lendo .sb-foot:hover{opacity:1}
 .ler-sum-item.on{background:rgba(128,128,128,.2);font-weight:600}
 .ler-sum-item i{font-style:normal;font-size:var(--fs-3xs);color:var(--ler-fg2);flex-shrink:0}
 
+/* ---- sumario organizado: grupo, numero e busca ---- */
+/* A NUMERACAO E DO LIVRO, NAO DO ARQUIVO. Capa, creditos e dedicatoria nao
+   sao capitulo 1, 2 e 3 — por isso a coluna do numero so recebe numero no
+   miolo, e fica vazia (mas ocupando o mesmo espaco) no resto. */
+.ler-sum-num{
+  flex:0 0 24px;text-align:right;font-variant-numeric:tabular-nums;
+  color:var(--ler-fg2);font-size:var(--fs-3xs);opacity:.7;
+}
+.ler-sum-nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* segunda metade do mesmo texto: recuada, para nao competir com o capitulo */
+.ler-sum-item.cont .ler-sum-nome{padding-left:14px;opacity:.75}
+.ler-sum-grupo+.ler-sum-grupo{margin-top:6px}
+.ler-sum-cab{
+  display:flex;align-items:center;gap:8px;width:100%;
+  background:transparent;border:0;cursor:pointer;font-family:inherit;
+  padding:6px 10px;color:var(--ler-fg2);font-size:var(--fs-3xs);
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.ler-sum-cab:disabled{cursor:default;opacity:.75}
+.ler-sum-cab>span{flex:1;text-align:left}
+.ler-sum-cab>i{font-style:normal;opacity:.7}
+.ler-sum-cab .ic{transition:transform .15s}
+.ler-sum-grupo:not(.aberto) .ler-sum-corpo{display:none}
+.ler-sum-grupo.aberto .ler-sum-cab .ic{transform:rotate(180deg)}
+.ler-sum-corpo{display:flex;flex-direction:column;gap:1px}
+.ler-sum-busca{padding:0 0 8px}
+.ler-sum-busca input{
+  width:100%;padding:8px 10px;border-radius:6px;font-family:inherit;font-size:var(--fs-sm);
+  color:var(--ler-fg);background:rgba(128,128,128,.12);
+  border:1px solid rgba(128,128,128,.25);
+}
+.ler-sum-busca input:focus{outline:2px solid rgba(var(--primary-rgb),.5);outline-offset:1px}
+
 .ler-tip-linha{display:flex;align-items:center;gap:12px;padding:6px 0}
 .ler-tip-linha>span{width:88px;flex-shrink:0;color:var(--ler-fg2);font-size:var(--fs-xs)}
 .ler-tip-linha>div{display:flex;gap:6px;flex-wrap:wrap;align-items:center}

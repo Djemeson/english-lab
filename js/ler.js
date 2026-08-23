@@ -388,6 +388,12 @@ async function lerAbrir(id) {
     toast('Não consegui abrir: ' + e.message, 'error'); return
   }
   _lerLivro = l
+  // ⚠️ NOME DESCOBERTO É DE UM LIVRO SÓ. Sem zerar aqui, o "Rita Hayworth"
+  // achado no capítulo 9 de um livro apareceria no capítulo 9 do próximo —
+  // a chave do cache é o ÍNDICE, e índice todo livro tem.
+  _lerNomesAuto = {}
+  _lerSumarioBusca = ''
+  _lerSumarioAbre = {}
   _lerCap = Math.min(l.pos?.cap || 0, l.chapters.length - 1)
   if (typeof ondeEstavaSalvar === 'function') ondeEstavaSalvar()
   _lerInicioLeitura = Date.now()
@@ -1109,7 +1115,7 @@ async function lerIrParaCapitulo(i, frac = 0) {
     a.onclick = () => lerIrParaCapitulo(+a.dataset.cap, 0)
   })
   const nome = el('ler-cap-nome')
-  if (nome) nome.textContent = _lerLivro.chapters[i].titulo || `Parte ${i + 1}`
+  if (nome) nome.textContent = lerCapNome(i)
   if (_lerEpub.manga) {
     mangaLigarFluxo(_lerEpub.manga, _lerLivro)
     if (i > 0) mangaIrParaPagina(i, false)
@@ -1164,13 +1170,285 @@ async function lerIrParaCapitulo(i, frac = 0) {
 function lerCapituloProximo() { if (_lerCap + 1 < _lerLivro.chapters.length) lerIrParaCapitulo(_lerCap + 1, 0) }
 function lerCapituloAnterior() { if (_lerCap > 0) lerIrParaCapitulo(_lerCap - 1, 1) }
 
-function _lerRenderSumario() {
-  const p = el('ler-sumario')
-  p.innerHTML = `<div class="ler-sumario-lista">` + _lerLivro.chapters.map((c, i) => `
-    <button class="ler-sum-item${i === _lerCap ? ' on' : ''}" onclick="lerIrParaCapitulo(${i},0)">
-      <span>${esc(c.titulo || 'Parte ' + (i + 1))}</span>
-      <i>${c.words ? c.words.toLocaleString('pt-BR') + ' palavras' : ''}</i>
-    </button>`).join('') + `</div>`
+// ================================================================
+// O SUMÁRIO — a lista que diz ONDE ele está, não o que o arquivo tem
+// ================================================================
+// Relato dele: *"a seção que tem os capítulos não aparece organizada"*. E o
+// acervo dele explica: a lista era o índice CRU do EPUB, com tudo que vem
+// dentro dele. Medido nos 11 livros:
+//
+//   A Game of Thrones .. 105 entradas, 8 delas "Parte 1…Parte 8" antes do texto
+//   Different Seasons .. a novela de 40 mil palavras chamada "Parte 9", e o
+//                        título dela ("1. Hope Springs Eternal") numa entrada
+//                        separada de 13 palavras — porque o Calibre partiu o
+//                        arquivo em dois
+//   The Stand .......... 98 entradas, com "Conents" (o erro de digitação do
+//                        próprio editor) e sete peças de miolo editorial
+//
+// Três coisas resolvem isso, e nenhuma delas inventa nome:
+//   1. NOME — quando o índice não deu nome, o nome vem do capítulo (o
+//      cabeçalho dele) ou do arquivo (cover, copyright, dedication…).
+//   2. GRUPO — antes do texto / o livro / depois do texto. O miolo editorial
+//      não fica no meio dos capítulos: fica recolhido, e abre com um clique.
+//   3. EMENDA — capítulo de 13 palavras que só carrega o título do seguinte
+//      volta a ser uma coisa só.
+// Mais a busca, que num livro de 105 capítulos é o que faz a lista servir.
+
+const LER_PPM = 220              // palavras por minuto — leitura em língua estrangeira
+let _lerNomesAuto = {}           // índice → nome descoberto lendo o capítulo
+let _lerSumarioBusca = ''
+let _lerSumarioAbre = {}         // grupo → aberto?
+
+// Nome sem dono é nome que o índice do EPUB não soube dar.
+function _lerNomeVago(t) {
+  const s = String(t || '').trim()
+  if (!s) return true
+  if (/^(parte|part|se[cç][aã]o|section|item)\s*\d+$/i.test(s)) return true
+  if (/^(text|split|dummy|part)?\d+(\.x?html?)?$/i.test(s)) return true
+  if (/\.(x?html?|htm)$/i.test(s)) return true
+  return false
+}
+
+// O NOME QUE VAI PARA A TELA — um só, para as três listas que mostram
+// capítulo (sumário, raio-X e o título na barra). Sem isto, arrumar numa
+// deixava as outras duas com "Parte 9".
+function lerCapNome(i) {
+  const c = (_lerLivro && _lerLivro.chapters && _lerLivro.chapters[i]) || null
+  if (!c) return `Parte ${i + 1}`
+  if (_lerLivro.format === 'manga') return c.titulo || `Página ${i + 1}`
+  if (!_lerNomeVago(c.titulo)) return c.titulo
+  return _lerNomesAuto[i] || _lerNomePeloArquivo(c) || `Parte ${i + 1}`
+}
+
+// Miolo editorial se reconhece pelo NOME DO ARQUIVO, e isso não custa leitura
+// nenhuma: `cop`, `ded`, `toc`, `tp` são convenção de quase toda editora.
+const _LER_PECAS = [
+  [/cover|cvi/i,                                   'Capa'],
+  [/halftitle|htp/i,                               'Falsa folha de rosto'],
+  [/(^|[^a-z])(title|tp)([^a-z]|$)|titlepage/i,    'Folha de rosto'],
+  [/copyright|(^|[^a-z])cop([^a-z]|$)|imprint/i,   'Créditos'],
+  [/dedicat|(^|[^a-z])ded([^a-z]|$)/i,             'Dedicatória'],
+  [/epigraph|epig/i,                               'Epígrafe'],
+  [/praise|acclaim/i,                              'Elogios da crítica'],
+  [/contents|(^|[^a-z])toc([^a-z]|$)/i,            'Sumário do livro'],
+  [/acknowledg|(^|[^a-z])ack([^a-z]|$)/i,          'Agradecimentos'],
+  [/aboutauthor|about[-_]?the[-_]?author|(^|[^a-z])(ata|atr)([^a-z]|$)/i, 'Sobre o autor'],
+  [/authorsnote|author[-_]?s?[-_]?note|(^|[^a-z])atn([^a-z]|$)/i, 'Nota do autor'],
+  [/alsoby|adcard|(^|[^a-z])adc([^a-z]|$)|otherbooks/i, 'Outros livros do autor'],
+  [/newsletter|signup|ebookreg|regfront/i,         'Convite da editora'],
+  [/glossar/i,                                     'Glossário'],
+  [/appendix|apx/i,                                'Apêndice'],
+  [/(^|[^a-z])index([^a-z]|$)/i,                   'Índice remissivo'],
+  [/colophon/i,                                    'Colofão'],
+  [/teaser|excerpt|preview/i,                      'Trecho de outro livro'],
+  [/(^|[^a-z])map/i,                               'Mapas'],
+  [/prologue|prolog/i,                             'Prólogo'],
+  [/epilogue|epilog/i,                             'Epílogo'],
+  [/foreword/i,                                    'Prefácio'],
+  [/introduc|(^|[^a-z])intro([^a-z]|$)/i,          'Introdução'],
+  [/afterword/i,                                   'Posfácio']
+]
+function _lerNomePeloArquivo(c) {
+  const alvo = ((c.href || '') + ' ' + (c.id || '')).replace(/\d{6,}/g, '')
+  for (const [re, nome] of _LER_PECAS) if (re.test(alvo)) return nome
+  return ''
+}
+// A mesma pergunta, feita ao título que o índice deu. Serve só para CLASSIFICAR
+// (frente/corpo/fundo) — o nome na tela continua sendo o do livro.
+function _lerPecaPeloNome(titulo) {
+  const t = String(titulo || '').trim()
+  if (!t || t.length > 40) return ''
+  for (const [re, nome] of _LER_PECAS) if (re.test(t)) return nome
+  return ''
+}
+
+// O MAPA DA LISTA — uma passada só, e as três decisões saem juntas
+// (emendar, agrupar, numerar). Elas não podem ser tomadas separadas: a
+// primeira leitura errou exatamente aí, e o erro apareceu na tela — a novela
+// de 40 mil palavras foi parar em "antes do texto", porque o grupo foi
+// decidido pelo tamanho do PEDAÇO (13 palavras) em vez do tamanho da coisa
+// emendada. Quem decide grupo tem de ver o resultado da emenda.
+const LER_CORPO_MIN = 300        // palavras: abaixo disto não é capítulo, é peça
+const _LER_FUNDO = new Set([
+  'Sobre o autor', 'Outros livros do autor', 'Agradecimentos', 'Posfácio',
+  'Apêndice', 'Índice remissivo', 'Colofão', 'Glossário',
+  'Trecho de outro livro', 'Convite da editora'
+])
+
+function _lerMapaSumario() {
+  const caps = (_lerLivro && _lerLivro.chapters) || []
+
+  // 1. EMENDA — pedaço só com o título + pedaço só com o texto = um capítulo
+  const escondidos = new Set()
+  const palavras = caps.map(c => c.words || 0)
+  for (let i = 0; i < caps.length - 1; i++) {
+    if (escondidos.has(i)) continue
+    const a = caps[i], b = caps[i + 1]
+    if ((a.words || 0) > 30 || _lerNomeVago(a.titulo)) continue
+    if ((b.words || 0) < LER_CORPO_MIN || !_lerNomeVago(b.titulo)) continue
+    escondidos.add(i + 1)
+    palavras[i] = (a.words || 0) + (b.words || 0)
+  }
+
+  // 2. FAIXA DO CORPO — onde o livro de fato começa e acaba. Peça de trás
+  // (posfácio, sobre o autor) tem corpo e enganaria a conta pelo tamanho.
+  // ⚠️ O NOME TAMBÉM DENUNCIA A PEÇA. "Afterword" tem 3 mil palavras e passaria
+  // por capítulo pelo tamanho; o arquivo dele (`part0007.html`) não diz nada.
+  // Quem diz é o título, e ele estava sendo ignorado — o posfácio virava o
+  // "capítulo 5" de um livro de quatro novelas.
+  const peca = caps.map(c => _lerNomePeloArquivo(c) || _lerPecaPeloNome(c.titulo))
+  let ini = -1, fim = -1
+  caps.forEach((c, i) => {
+    if (escondidos.has(i) || palavras[i] < LER_CORPO_MIN) return
+    if (_LER_FUNDO.has(peca[i])) return
+    if (ini < 0) ini = i
+    fim = i
+  })
+  if (ini < 0) { ini = 0; fim = caps.length - 1 }
+
+  // 3. LINHAS — nome, grupo, número e continuação
+  const linhas = []
+  let n = 0, ultimoNome = ''
+  caps.forEach((c, i) => {
+    if (escondidos.has(i)) return
+    let grupo = i < ini ? 'frente' : (i > fim ? 'fundo' : 'corpo')
+    if (grupo === 'corpo' && _LER_FUNDO.has(peca[i])) grupo = 'fundo'
+    let nome = lerCapNome(i)
+    let cont = false
+    // Capítulo grande, sem nome nenhum, logo depois de outro capítulo grande:
+    // é a segunda metade do mesmo texto (o Calibre corta novela comprida em
+    // dois arquivos). Dizer "Parte 12" ali era o que não informava nada.
+    if (grupo === 'corpo' && palavras[i] >= LER_CORPO_MIN && ultimoNome &&
+        _lerNomeVago(c.titulo) && !_lerNomesAuto[i] && !peca[i]) {
+      nome = `${ultimoNome} — continuação`
+      cont = true
+    }
+    if (grupo === 'corpo' && palavras[i] >= LER_CORPO_MIN && !cont) { n++; ultimoNome = nome }
+    linhas.push({ i, nome, cont, palavras: palavras[i], grupo, num: (grupo === 'corpo' && !cont && palavras[i] >= LER_CORPO_MIN) ? n : 0 })
+  })
+  return { linhas, capitulos: n }
+}
+
+// O nome que estava DENTRO do capítulo. Só é lido quando o índice falhou, e
+// só uma vez por livro: 105 capítulos são 105 descompactações.
+async function _lerNomearPeloConteudo() {
+  const caps = (_lerLivro && _lerLivro.chapters) || []
+  if (_lerLivro.format === 'manga' || !_lerEpub || !_lerEpub.zip) return false
+  const visivel = new Set(_lerMapaSumario().linhas.map(l => l.i))
+  let achou = false
+  for (let i = 0; i < caps.length; i++) {
+    if (!visivel.has(i) || i in _lerNomesAuto) continue
+    const c = caps[i]
+    if (!_lerNomeVago(c.titulo) || !c.href) continue
+    if (_lerNomePeloArquivo(c)) continue
+    let html = ''
+    try { html = await _lerEpub.zip.texto(c.href) || '' } catch (e) { continue }
+    // ⚠️ SEM PALAVRA NENHUMA AINDA PODE SER ALGUMA COISA. O arquivo de zero
+    // palavras é uma página de imagem (mapa, ilustração) ou um resto de
+    // conversão que não tem nada dentro — e só olhando dá para saber qual.
+    // Adivinhar aqui esconderia os mapas de A Game of Thrones.
+    if (!(c.words > 0)) {
+      if (/<img[\s>]/i.test(html)) { _lerNomesAuto[i] = 'Ilustração'; achou = true }
+      else { _lerVazios.add(i); achou = true }
+      continue
+    }
+    const nome = _lerNomeNoHtml(html)
+    if (nome) { _lerNomesAuto[i] = nome; achou = true }
+  }
+  return achou
+}
+
+function _lerNomeNoHtml(html) {
+  let doc
+  try { doc = new DOMParser().parseFromString(html, 'text/html') } catch (e) { return '' }
+  doc.querySelectorAll('script,style').forEach(e => e.remove())
+  const h = doc.querySelector('h1,h2,h3,h4,h5,h6')
+  if (h) {
+    const t = h.textContent.replace(/\s+/g, ' ').trim()
+    if (t && t.length <= 80) return t
+  }
+  // Título composto como parágrafo (é o que sobra em livro convertido): linha
+  // curta, sem ponto final, entre as primeiras do capítulo.
+  for (const b of [...doc.querySelectorAll('p,div')].slice(0, 8)) {
+    const t = b.textContent.replace(/\s+/g, ' ').trim()
+    if (!t) continue
+    if (t.length <= 58 && !/[.!?;:,]$/.test(t) && /[a-zA-Zà-úÀ-Ú]/.test(t)) return t
+    break
+  }
+  return ''
+}
+
+function _lerMinutos(palavras) {
+  const m = Math.round((palavras || 0) / LER_PPM)
+  if (!m) return ''
+  if (m < 60) return `${m} min`
+  return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`
+}
+
+function lerSumarioBuscar(v) {
+  _lerSumarioBusca = String(v || '').toLowerCase().trim()
+  _lerRenderSumario(true)
+}
+function lerSumarioGrupo(g) {
+  _lerSumarioAbre[g] = !_lerSumarioAbre[g]
+  _lerRenderSumario(true)
+}
+
+function _lerRenderSumario(soRedesenha) {
+  const p = el('ler-sumario'); if (!p || !_lerLivro) return
+  const caps = _lerLivro.chapters || []
+  const { linhas, capitulos } = _lerMapaSumario()
+  const grupos = { frente: [], corpo: [], fundo: [] }
+  for (const l of linhas) grupos[l.grupo].push(l)
+
+  const busca = _lerSumarioBusca
+  const casa = it => !busca || it.nome.toLowerCase().includes(busca)
+  const item = it => `
+    <button class="ler-sum-item${it.i === _lerCap ? ' on' : ''}${it.cont ? ' cont' : ''}" onclick="lerIrParaCapitulo(${it.i},0)">
+      <span class="ler-sum-num">${it.num || ''}</span>
+      <span class="ler-sum-nome">${esc(it.nome)}</span>
+      <i>${it.palavras ? _lerMinutos(it.palavras) : ''}</i>
+    </button>`
+
+  // O miolo editorial nasce fechado: ele abre o sumário para achar CAPÍTULO,
+  // e oito linhas de "Créditos, Dedicatória, Elogios da crítica" antes do
+  // primeiro deles é exatamente o que ele chamou de desorganizado.
+  const bloco = (chave, rotulo, lista) => {
+    if (!lista.length) return ''
+    const vis = lista.filter(casa)
+    if (!vis.length) return ''
+    const aberto = chave === 'corpo' || !!_lerSumarioAbre[chave] || !!busca
+    return `
+      <div class="ler-sum-grupo${aberto ? ' aberto' : ''}">
+        ${chave === 'corpo' && !grupos.frente.length && !grupos.fundo.length ? '' : `
+          <button class="ler-sum-cab" ${chave === 'corpo' ? 'disabled' : `onclick="lerSumarioGrupo('${chave}')"`}>
+            <span>${rotulo}</span><i>${vis.length}</i>
+            ${chave === 'corpo' ? '' : ic('chevronDown', 'ic-3xs')}
+          </button>`}
+        <div class="ler-sum-corpo">${vis.map(item).join('')}</div>
+      </div>`
+  }
+
+  const total = capitulos
+  p.innerHTML = `
+    ${caps.length > 20 ? `<div class="ler-sum-busca">
+      <input type="search" placeholder="Procurar capítulo" value="${escA(_lerSumarioBusca)}"
+        oninput="lerSumarioBuscar(this.value)" aria-label="Procurar capítulo">
+    </div>` : ''}
+    <div class="ler-sumario-lista">
+      ${bloco('frente', 'Antes do texto', grupos.frente)}
+      ${bloco('corpo', total ? `${total} capítulos` : 'O livro', grupos.corpo)}
+      ${bloco('fundo', 'Depois do texto', grupos.fundo)}
+    </div>`
+
+  // Os nomes que só o conteúdo sabe chegam depois — a lista não espera por
+  // eles. Uma vez por livro; a segunda abertura já nasce com tudo.
+  if (!soRedesenha) {
+    _lerNomearPeloConteudo().then(mudou => {
+      if (mudou && !el('ler-sumario').classList.contains('hidden')) _lerRenderSumario(true)
+      if (mudou) { const nm = el('ler-cap-nome'); if (nm) nm.textContent = lerCapNome(_lerCap) }
+    }).catch(() => {})
+  }
 }
 
 // ================================================================
@@ -2581,8 +2859,16 @@ function _lerFrasesPara(txt, palavras) {
 
 async function _lerPreDoCache(cap) {
   try {
-    const b = typeof geradoLer === 'function' ? await geradoLer(_lerChavePre(cap))
-                                             : await BookDB.get(_lerChavePre(cap))
+    // Compara os dois lados, como o raio-X: sem isto, o pré-estudo feito no
+    // telefone e o feito aqui conviveriam para sempre, cada um no seu canto.
+    let b = null
+    if (typeof geradoLerMelhor === 'function') {
+      const r = await geradoLerMelhor(_lerChavePre(cap),
+        { tipo: 'pre', livroId: String(_lerLivro ? _lerLivro.id : ''), cap: Number(cap) })
+      b = r.texto
+    } else {
+      b = typeof geradoLer === 'function' ? await geradoLer(_lerChavePre(cap)) : await BookDB.get(_lerChavePre(cap))
+    }
     if (!b) return null
     const t = typeof b.text === 'function' ? await b.text() : String(b)
     const d = JSON.parse(t)
@@ -2791,8 +3077,17 @@ async function lerPreAnalisar(cap, refazer) {
     // ⚠️ O comentário acima ("o trabalho foi pago, guardar é o mínimo") estava
     // certo pela metade: guardava só NESTE aparelho, e abrir o mesmo capítulo
     // no telefone mandava pagar tudo de novo. Agora vai para a nuvem junto.
+    // A ficha entra aqui pelo mesmo motivo do raio-X (§8.95): sem saber QUEM
+    // leu o capítulo, duas leituras do mesmo texto são indistinguíveis, e a
+    // escolha entre elas vira sorteio. `ignorados` é o análogo de "falhas" —
+    // resposta que a IA devolveu fora do lote e teve de ser descartada.
     await _lerGuardar(_lerChavePre(cap),
-      JSON.stringify({ v: LER_PRE_VER, itens: saida, at: Date.now() }), 'pre', cap, saida.length)
+      JSON.stringify({
+        v: LER_PRE_VER, itens: saida, at: Date.now(),
+        ficha: typeof aiFicha === 'function'
+          ? aiFicha({ lotes: lotes.length, falhas: ignorados, pedidos: itens.length, entregues: saida.length })
+          : undefined
+      }), 'pre', cap, saida.length)
     if (_lerCap === cap) glossPreCarregar(_lerChavePre(cap), saida)
     const perdidos = itens.length - saida.length
 
@@ -3135,7 +3430,7 @@ function _lerRaioXPainelRender(msg) {
         return `<button class="ler-raiox-cap${i === _lerCap ? ' atual' : ''}${n ? ' feito' : ''}"
                   onclick="lerRaioXDoCapitulo(${i})">
           <span class="ler-raiox-spark">${n ? ic('sparkles','ic-sm') : ''}</span>
-          <span class="ler-raiox-nome">${esc(c.titulo || `Parte ${i + 1}`)}</span>
+          <span class="ler-raiox-nome">${esc(lerCapNome(i))}</span>
           <span class="ler-raiox-n">${n ? n : 'analisar'}</span>
         </button>`
       }).join('')}
@@ -4390,7 +4685,7 @@ async function obraBuscar(livro, termo, { ateCap, maxTrechos = 3 } = {}) {
     caps++; total += achadas.length
     for (const f of achadas) {
       if (trechos.length >= maxTrechos) break
-      trechos.push({ cap: i, titulo: (((livro.chapters || [])[i]) || {}).titulo || `Parte ${i + 1}`,
+      trechos.push({ cap: i, titulo: lerCapNome(i),
                      frase: f.slice(0, 300) })
     }
   }
