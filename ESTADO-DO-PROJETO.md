@@ -21,7 +21,7 @@
 > ⚠️ **Uma armadilha pega a tempo:** apagar a linha do número de página desalinharia o "ler
 > ouvindo" — passou a esconder, não apagar. Medido no app com 4 EPUBs reais: **659 parágrafos
 > remontados**, **57 itálicos recuperados** num capítulo, mangá intacto.
-> `sw.js` → **englab-v401**. **Detalhes em §8.98.**
+> `sw.js` → **englab-v402**. **Detalhes em §8.98.**
 >
 > Última atualização anterior: 2026-08-22 (41ª) — **A FICHA CHEGA AO PRÉ-ESTUDO E À QUEBRA**. Os dois
 > últimos materiais pagos que ainda decidiam por quantidade e recência. ⚠️ **E eles expuseram um
@@ -15162,6 +15162,35 @@ abrir nada. A entrada pelo sumário continua, para quem chegar por lá.
 **Testado ao vivo:** botão na barra na posição esperada, clique com o sumário fechado abre o
 laudo (*"Carrie · 16 capítulos lidos · O QUE EU ENCONTREI"*), abrir o `Aa` fecha o laudo,
 marca de revisado na cor do tema. Console limpo.
+
+### A pergunta dele: "não apertei, porque você já corrigiu o Carrie na mão, não é?"
+
+Não. E a distinção é a razão de o botão existir:
+
+| | conserto no CÓDIGO (§ acima) | apertar "Corrigir o livro" |
+|---|---|---|
+| onde vive | na regra, refeita a cada abertura | **gravado no livro**, e sobe para a nuvem |
+| quem enxerga | só o leitor (sumário, raio-X, barra) | **também a estante e as anotações** |
+| outro aparelho | recalcula tudo de novo | chega pronto |
+
+**Medido:** livro recém-importado, sem apertar nada, já mostra *"3 capítulos — Part One / Part
+Two / Part Three"*. Mas `chapters[7].titulo` continuava **"News item from the Westover. . ."** no
+armazenamento — e é esse campo que a **estante** e a **lista de anotações** leem, sem passar
+pelo resolvedor do leitor. Uma anotação feita na Parte Um apareceria com a frase de abertura
+para sempre.
+
+Por isso o "Corrigir" passou a **renomear o pedaço recolhido também**, não só marcá-lo:
+
+```
+6: "Part One"        7: "Part One" +6        (era "News item from the Westover. . .")
+8: "Part Two"        9: "Part Two" +8
+10: "Part Three"    11: "Part Three" +10
+```
+
+E **o que já foi consertado não volta no laudo**: revisar de novo o mesmo livro devolve
+`0 emendas, 0 nomes, 0 ocultos` — só os defeitos de texto, que são corrigidos a cada leitura e
+não têm o que gravar. Sem isso ele leria "3 capítulos partidos em dois" de novo e concluiria
+que não funcionou.
 
 ### ⚠️ Outra sessão commitou por cima no meio da rodada
 

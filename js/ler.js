@@ -1676,7 +1676,8 @@ async function _lerRevisarVarrer() {
     const c = caps[i]
     const html = corpo[i]
     if (!(c.words > 0) && html && !/<img[\s>]/i.test(html) && !_lerTextoDoHtml(html)) {
-      laudo.ocultos.push(i); continue
+      if (!c.oculto) laudo.ocultos.push(i)
+      continue
     }
     let novo = '', porque = ''
     if (_lerNomeVago(c.titulo)) {
@@ -1694,6 +1695,10 @@ async function _lerRevisarVarrer() {
   // ---- emendas (o caso do Carrie e do Different Seasons) ----
   for (let i = 0; i < caps.length - 1; i++) {
     const a = caps[i], b = caps[i + 1]
+    // ⚠️ O QUE JÁ FOI CONSERTADO NÃO VOLTA NO LAUDO. Sem isto, revisar de novo
+    // um livro já corrigido acusaria os MESMOS defeitos — e ele leria isso
+    // como "não funcionou", que é o oposto da verdade.
+    if (typeof b.juntoCom === 'number') continue
     if (!(a.words > 0) || (a.words || 0) > 30 || _lerNomeVago(a.titulo)) continue
     if (_lerNomePeloArquivo(a)) continue
     if ((b.words || 0) < LER_CORPO_MIN) continue
@@ -1762,6 +1767,11 @@ function _lerRevisarAplicar(laudo) {
     // ⚠️ O ÍNDICE NÃO SAI DA LISTA. Ele é MARCADO como continuação do anterior:
     // a posição de leitura, as anotações e o raio-X apontam para ele por número.
     caps[e.com].juntoCom = e.i
+    // E o nome ruim vai junto. A ESTANTE e a LISTA DE ANOTAÇÕES leem
+    // `chapters[].titulo` direto, sem passar pelo resolvedor do leitor — sem
+    // esta linha, uma anotação feita na Parte Um continuaria aparecendo como
+    // "News item from the Westover. . ." para sempre.
+    if (caps[e.i].titulo) caps[e.com].titulo = caps[e.i].titulo
   }
   _lerLivro.revisao = {
     em: Date.now(), versao: LER_REVISAO_VERSAO,
@@ -1819,17 +1829,18 @@ function _lerRevisaoRender() {
   if (!l) return
   const t = l.texto
   const achados = []
+  const n1 = (n, um, muitos) => (n === 1 ? um : muitos)
   const pl = (n, um, muitos) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : muitos}`
   if (l.emendas.length) achados.push([`${pl(l.emendas.length, 'capítulo partido', 'capítulos partidos')} em dois`, l.emendas.map(e => e.nome).slice(0, 3).join(', ')])
   if (l.nomes.length)   achados.push([`${pl(l.nomes.length, 'capítulo sem', 'capítulos sem')} nome de verdade`, l.nomes.slice(0, 3).map(n => `“${n.de}” → ${n.para}`).join(' · ')])
-  if (l.ocultos.length) achados.push([`${pl(l.ocultos.length, 'capítulo vazio', 'capítulos vazios')}`, 'saem da lista'])
+  if (l.ocultos.length) achados.push([`${pl(l.ocultos.length, 'capítulo vazio', 'capítulos vazios')}`, n1(l.ocultos.length, 'sai', 'saem') + ' da lista'])
   if (t.virados)  achados.push([`${pl(t.virados, 'parágrafo sem espaçamento', 'parágrafos sem espaçamento')}`, 'o arquivo não usou parágrafo de verdade'])
-  if (t.junta)    achados.push([`${pl(t.junta, 'parágrafo partido', 'parágrafos partidos')} no meio da frase`, 'emendados na leitura'])
-  if (t.hifen)    achados.push([`${pl(t.hifen, 'palavra cortada', 'palavras cortadas')} pela margem`, 'remendadas na leitura'])
-  if (t.vazios)   achados.push([`${pl(t.vazios, 'buraco em branco', 'buracos em branco')}`, 'fechados na leitura'])
+  if (t.junta)    achados.push([`${pl(t.junta, 'parágrafo partido', 'parágrafos partidos')} no meio da frase`, n1(t.junta, 'emendado', 'emendados') + ' na leitura'])
+  if (t.hifen)    achados.push([`${pl(t.hifen, 'palavra cortada', 'palavras cortadas')} pela margem`, n1(t.hifen, 'remendada', 'remendadas') + ' na leitura'])
+  if (t.vazios)   achados.push([`${pl(t.vazios, 'buraco em branco', 'buracos em branco')}`, n1(t.vazios, 'fechado', 'fechados') + ' na leitura'])
   if (t.nbsp)     achados.push([`${pl(t.nbsp, 'recuo falso', 'recuos falsos')}`, 'feitos com espaço duro'])
-  if (t.cena)     achados.push([`${pl(t.cena, 'quebra de cena torta', 'quebras de cena tortas')}`, 'endireitadas na leitura'])
-  if (t.ancora + t.pagina) achados.push([`${pl(t.ancora + t.pagina, 'marca de página', 'marcas de página')}`, 'escondidas na leitura'])
+  if (t.cena)     achados.push([`${pl(t.cena, 'quebra de cena torta', 'quebras de cena tortas')}`, n1(t.cena, 'endireitada', 'endireitadas') + ' na leitura'])
+  if (t.ancora + t.pagina) achados.push([`${pl(t.ancora + t.pagina, 'marca de página', 'marcas de página')}`, n1(t.ancora + t.pagina, 'escondida', 'escondidas') + ' na leitura'])
 
   const linha = ([o, det]) => `<li><b>${esc(o)}</b>${det ? `<span>${esc(det)}</span>` : ''}</li>`
   const jaRevisado = _lerLivro.revisao
