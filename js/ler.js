@@ -1259,7 +1259,7 @@ function _lerNomePeloArquivo(c) {
 // (frente/corpo/fundo) — o nome na tela continua sendo o do livro.
 function _lerPecaPeloNome(titulo) {
   const t = String(titulo || '').trim()
-  if (!t || t.length > 40) return ''
+  if (!t || t.length > 60) return ''
   for (const [re, nome] of _LER_PECAS) if (re.test(t)) return nome
   return ''
 }
@@ -1275,6 +1275,16 @@ const _LER_FUNDO = new Set([
   'Sobre o autor', 'Outros livros do autor', 'Agradecimentos', 'Posfácio',
   'Apêndice', 'Índice remissivo', 'Colofão', 'Glossário',
   'Trecho de outro livro', 'Convite da editora'
+])
+// Peça que NUNCA começa o livro. Sem esta lista, os "Elogios da crítica" de
+// Bag of Bones (328 palavras — mais que o mínimo de capítulo) abriam o corpo
+// no índice 1 e arrastavam folha de rosto, sumário e dedicatória para dentro
+// dele. ⚠️ Prefácio, prólogo, introdução e nota do autor ficam DE FORA desta
+// lista de propósito: são texto para ler, e ele lê.
+const _LER_FRENTE = new Set([
+  'Capa', 'Falsa folha de rosto', 'Folha de rosto', 'Créditos', 'Dedicatória',
+  'Epígrafe', 'Elogios da crítica', 'Sumário do livro', 'Convite da editora',
+  'Outros livros do autor', 'Mapas'
 ])
 
 function _lerMapaSumario() {
@@ -1304,11 +1314,11 @@ function _lerMapaSumario() {
   // por capítulo pelo tamanho; o arquivo dele (`part0007.html`) não diz nada.
   // Quem diz é o título, e ele estava sendo ignorado — o posfácio virava o
   // "capítulo 5" de um livro de quatro novelas.
-  const peca = caps.map(c => _lerNomePeloArquivo(c) || _lerPecaPeloNome(c.titulo))
+  const peca = caps.map((c, i) => _lerNomePeloArquivo(c) || _lerPecaPeloNome(lerCapNome(i)))
   let ini = -1, fim = -1
   caps.forEach((c, i) => {
     if (escondidos.has(i) || palavras[i] < LER_CORPO_MIN) return
-    if (_LER_FUNDO.has(peca[i])) return
+    if (_LER_FUNDO.has(peca[i]) || _LER_FRENTE.has(peca[i])) return
     if (ini < 0) ini = i
     fim = i
   })

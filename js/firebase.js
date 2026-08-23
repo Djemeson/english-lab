@@ -394,6 +394,12 @@ function _trChave(t) { return `${t.cap}|${Math.round(Number(t.ini) || 0)}` }
 function _trMelhor(a, b) {
   if (!a) return b
   if (!b) return a
+  // ⚠️ ESCOLHA HUMANA PRIMEIRO, igual ao material do leitor (§8.96). Aqui ela
+  // vale ainda mais: a comparação automática usa "mais falas", e uma
+  // transcrição pode ter mais falas por estar picotada, não por ser melhor.
+  // Entre dois carimbos, o mais recente — ele mudou de ideia.
+  const xa = Number(a.fixadoEm) || 0, xb = Number(b.fixadoEm) || 0
+  if (xa !== xb) return xa > xb ? a : b
   const fa = (a.segs || []).length, fb = (b.segs || []).length
   if (fa !== fb) return fa > fb ? a : b
   const aa = (a.achados || []).length, ab = (b.achados || []).length

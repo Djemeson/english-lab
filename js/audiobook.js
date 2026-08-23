@@ -452,6 +452,26 @@ function _abCorrigirDuracao(a, i, duracaoReal) {
   return true
 }
 
+// "Esta aqui é a boa" — para a transcrição e a análise deste trecho.
+// ⚠️ NÃO SOBE NADA SOZINHO: o carimbo entra no item e viaja no sync normal do
+// audiolivro, onde `_trMelhor` passa a preferi-lo. Aqui não há documento
+// separado como no material do leitor — a transcrição mora dentro do
+// audiolivro, e é lá que a decisão dele precisa ficar.
+function abFixarTranscricao() {
+  const a = _abLivro; if (!a) return
+  const au = _abAudio()
+  const cap = a.capitulos[_abCap]
+  const atual = Math.max(0, (au ? au.currentTime : 0) - (cap.ini || 0))
+  const tr = abTransDoPonto(a, _abCap, atual) || (a.transcricoes || []).find(x => x.cap === _abCap)
+  if (!tr) { toast('Não há transcrição aqui para fixar.', 'warning'); return }
+  tr.fixadoEm = Date.now()
+  a.updatedAt = Date.now()
+  saveAudiolivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  toast('Pronto — esta transcrição é a que vale nos seus aparelhos', 'success')
+  abAba('texto')
+}
+
 // ⚠️ ARQUIVO SEM `type` NÃO É ARQUIVO CONFIÁVEL PARA O `<audio>`, e isto é
 // consequência direta da correção de memória de §8.91: guardar o `File` sem
 // cópia trouxe junto o `type` dele — e o Windows entrega `.m4b` com type
@@ -1593,6 +1613,16 @@ function _abListaTexto() {
              data-tip="Acha o que está acima do seu nível, e todo phrasal verb e expressão">
              ${ic('eye','ic-3xs')} O que é difícil aqui</button>`}
       <button class="est-chip" onclick="abTranscrever()">${ic('plus','ic-3xs')} Outro trecho</button>
+      ${/* ⚠️ O MESMO BOTÃO DO LEITOR (§8.96), e aqui ele é ainda mais
+            necessário: a escolha automática entre duas transcrições usa "mais
+            falas", e uma transcrição pode ter mais falas por estar picotada em
+            pedaços curtos, não por ser melhor. Quando ele ouve as duas e sabe
+            qual presta, a mão dele manda. */''}
+      <button class="est-chip${tr.fixadoEm ? ' est-chip-forte' : ''}" onclick="abFixarTranscricao()"
+              data-tip="${escA(tr.fixadoEm
+                ? 'Esta é a versão que vale nos seus aparelhos — clique para carimbar de novo'
+                : 'Manda esta transcrição e análise para os outros aparelhos como a boa')}">
+        ${ic('cloud','ic-3xs')} ${tr.fixadoEm ? 'Vale em todos' : 'Usar em todos os aparelhos'}</button>
       <button class="est-chip est-chip-forte" id="ab-trans-btn" onclick="event.stopPropagation();abTransPainel()"
               data-tip="Ver os capítulos e o que já virou texto">${ic('captions','ic-3xs')} Transcrição</button>
       <button class="est-chip est-chip-forte" id="ab-raiox-btn2" onclick="event.stopPropagation();abRaioXPainel()"
