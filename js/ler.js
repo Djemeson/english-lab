@@ -1000,10 +1000,14 @@ function _lerArrumar(doc) {
     b.classList.add('ler-cena'); rel.cena++
   }
 
-  // linha que é só o número da página (herança de digitalização)
+  // Linha que é só o número da página (herança de digitalização).
+  // ⚠️ ESCONDIDA, NUNCA APAGADA. O "ler ouvindo" casa livro e narração
+  // contando PALAVRAS, e o mapa é feito sobre o arquivo cru — apagar um "246"
+  // daqui adiantaria a frase acesa em uma palavra a cada página, e o erro
+  // soma. Escondido, ele some da vista e continua contando igual dos dois lados.
   for (const b of blocos()) {
     const t = b.textContent.trim()
-    if (/^\d{1,4}$/.test(t) && !b.querySelector('img')) { b.remove(); rel.pagina++ }
+    if (/^\d{1,4}$/.test(t) && !b.querySelector('img')) { b.classList.add('ler-oculto'); rel.pagina++ }
   }
 
   // recuo feito com espaço-duro no começo do parágrafo: some, porque quem dá
@@ -1214,7 +1218,19 @@ function _lerNomeVago(t) {
 // O NOME QUE VAI PARA A TELA — um só, para as três listas que mostram
 // capítulo (sumário, raio-X e o título na barra). Sem isto, arrumar numa
 // deixava as outras duas com "Parte 9".
+//
+// ⚠️ SÃO DUAS FUNÇÕES, E A SEPARAÇÃO NÃO É ENFEITE. `_lerNomeBase` é o nome
+// isolado, olhando só aquele capítulo; `lerCapNome` é o nome DEPOIS de a lista
+// inteira ser lida (emenda de arquivo partido, continuação). A lista precisa
+// da primeira para se montar — se ela chamasse a segunda, uma chamaria a outra
+// para sempre. Quem mostra na tela usa a segunda.
 function lerCapNome(i) {
+  const m = _lerMapaSumario()
+  if (m.porIndice[i]) return m.porIndice[i]
+  return _lerNomeBase(i)
+}
+
+function _lerNomeBase(i) {
   const c = (_lerLivro && _lerLivro.chapters && _lerLivro.chapters[i]) || null
   if (!c) return `Parte ${i + 1}`
   if (_lerLivro.format === 'manga') return c.titulo || `Página ${i + 1}`

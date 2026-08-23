@@ -1467,6 +1467,18 @@ function _applyCloudDocs(docs) {
       if ((a.addedAt || 0) > carimbo || a.id === abertoId || comAudioAqui[a.id]) juntos.push(a)
     }
     audiolivros = juntos
+    // ⚠️ O REPRODUTOR FICAVA COM UM OBJETO ÓRFÃO. O merge SUBSTITUI o array, e
+    // `_abLivro` continuava apontando para o objeto de antes — a partir dali,
+    // o player e o acervo eram duas coisas diferentes com o mesmo id: o que ele
+    // marcasse no player não chegava ao que é salvo, e o que viesse da nuvem
+    // não aparecia na tela. Achado por acaso testando o botão de fixar (§8.98):
+    // o dado dizia `null` e o chip insistia em "Vale em todos".
+    // A estante de livros já fazia isto (`_lerLivro = livros.find(...)`) desde
+    // o merge por item; o audiolivro tinha ficado de fora.
+    if (typeof _abLivro !== 'undefined' && _abLivro) {
+      const novo = audiolivros.find(x => x.id === _abLivro.id)
+      if (novo) _abLivro = novo
+    }
     saveAudiolivros()
   }
   if (docs.known)    { knownWords = { ...knownWords, ...(docs.known.map || {}) }; saveKnownLocal()

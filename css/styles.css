@@ -5992,6 +5992,9 @@ body.lendo .sb-nav:hover,body.lendo .sb-foot:hover{opacity:1}
 }
 /* o unico buraco branco que sobrevive a faxina, com medida propria */
 .ler-conteudo .ler-respiro{margin:0;height:1.4em}
+/* numero de pagina solto: some da vista SEM sumir do texto — o "ler ouvindo"
+   conta palavras dos dois lados, e apagar uma aqui desalinharia a narracao */
+.ler-conteudo .ler-oculto{display:none}
 .ler-carregando{color:var(--ler-fg2);font-style:italic}
 /* selecionar e a acao principal aqui - nada de user-select:none */
 .ler-conteudo::selection,.ler-conteudo *::selection{background:rgba(var(--primary-rgb),.28)}
