@@ -1395,6 +1395,53 @@ function _aiDifOrcamento() {
     : { bloco: AI_DIF_BLOCO, tokens: AI_DIF_TOKENS, raciocina: false }
 }
 
+// ================================================================
+// A FICHA TÉCNICA DE UM MATERIAL GERADO
+// ================================================================
+// ⚠️ ISTO NASCEU DE UM SINTOMA QUE PARECIA MISTÉRIO: *"tem uma análise de IA
+// com as palavras destacadas em uma versão no telefone e outra, a mais precisa,
+// no navegador."* Não havia mistério — havia **dois modelos**. A conta da
+// OpenAI zerou no meio do caminho, ele passou para o Gemini Flash-Lite, e o que
+// foi analisado antes tinha sido feito com o GPT-5.6 Luna. O app guardava
+// `itens`, `nivel` e `at`: nada dizia QUEM tinha feito aquilo.
+// Sem ficha técnica não existe "melhor" — existe só "mais recente", e mais
+// recente costuma ser o pior, porque o modelo grande é o que fica sem crédito.
+//
+// ⚠️ E A MARCA DE "VEIO PELA METADE" MORRIA NO CAMINHO. `itens.incompleto` é
+// uma propriedade pendurada num ARRAY, e `JSON.stringify` não serializa isso —
+// medido: volta `undefined` do outro lado. Uma análise em que três blocos
+// falharam era guardada com cara de completa.
+const AI_FICHA_V = 1
+
+function aiForcaDoModelo(prov, modelo) {
+  const P = AI_PROVIDERS[prov]
+  const m = P && (P.modelos || []).find(x => x.id === modelo)
+  const t = m ? m.tier : ''
+  return t === 'alto' ? 3 : t === 'médio' ? 2 : t === 'baixo' ? 1 : 0
+}
+
+// A ficha do que ACABOU de ser gerado, para viajar junto do material.
+function aiFicha(extra) {
+  const c = typeof aiChatCfg === 'function' ? aiChatCfg() : {}
+  return {
+    v: AI_FICHA_V,
+    prov: c.prov || '',
+    modelo: c.model || '',
+    forca: aiForcaDoModelo(c.prov, c.model),
+    at: Date.now(),
+    ...(extra || {})
+  }
+}
+
+// Nome curto para a tela — "GPT-5.6 Luna", "Gemini Flash-Lite".
+function aiNomeDoModelo(prov, modelo) {
+  const P = AI_PROVIDERS[prov]
+  const m = P && (P.modelos || []).find(x => x.id === modelo)
+  if (!m) return modelo || 'modelo desconhecido'
+  const n = String(m.nota || '').split('—')[0].trim()
+  return n && n.length < 28 ? n : modelo
+}
+
 async function aiAnalisarDificuldade({ texto, lang = 'en', nivel, maxItens = 40, aoAndar, origem } = {}) {
   const t = String(texto || '').trim()
   if (!t) return []
@@ -1432,6 +1479,12 @@ async function aiAnalisarDificuldade({ texto, lang = 'en', nivel, maxItens = 40,
       return x.ja !== 'sentido' && x.ja !== 'fila-mesmo'
     })
   itens.incompleto = falhas > 0
+  // ⚠️ A FICHA VAI PENDURADA AQUI E TEM DE SER COPIADA ANTES DE SALVAR — é
+  // propriedade de array, e o `JSON.stringify` a deixa para trás. Quem guarda
+  // usa `aiFicha({...})` com estes números; ver `_lerGuardar` no leitor.
+  itens.blocos = blocos.length
+  itens.falhas = falhas
+  itens.ficha = aiFicha({ blocos: blocos.length, falhas, nivel: nv })
   return itens
 }
 

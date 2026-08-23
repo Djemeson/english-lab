@@ -1850,6 +1850,11 @@ async function abAnalisarPassagem() {
     })
     tr.achados = achados
     tr.achadosNivel = nivel
+    // A mesma ficha do raio-X do livro (§8.95): sem saber QUEM analisou, duas
+    // análises do mesmo capítulo são indistinguíveis — e o merge precisa
+    // escolher uma.
+    tr.achadosFicha = achados.ficha || (typeof aiFicha === 'function'
+      ? aiFicha({ blocos: achados.blocos, falhas: achados.falhas, nivel }) : undefined)
     a.updatedAt = Date.now()
     saveAudiolivros()
     if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()

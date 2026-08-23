@@ -32,6 +32,10 @@ async function initApp() {
     const sumiram = await censoConferir()
     if (sumiram.length && typeof avisarSumico === 'function') avisarSumico(sumiram)
   }
+  // Uma vez por aparelho, depois do login: o material gerado que nunca subiu
+  // vai para a nuvem. Medido no acervo dele — uma análise de 149 itens estava
+  // presa só aqui (§8.95). Roda solto, sem segurar o boot.
+  setTimeout(() => { if (typeof geradoRecuperar === 'function') geradoRecuperar() }, 8000)
   loadSrs()          // loads srsCfg, srsLog, decks
   await loadSrsAsync() // loads srsCards from IDB (migrates if needed)
   migrateLangFields()  // multi-idioma: words/cards antigos ganham lang:'en' (aditivo)

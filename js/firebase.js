@@ -357,6 +357,133 @@ async function geradoApagar(chave) {
   try { const r = _geradoRef(chave); if (r) await r.delete() } catch (e) {}
 }
 
+// ================================================================
+// QUAL DAS DUAS VERSÕES VALE
+// ================================================================
+// ⚠️ ATÉ AQUI A REGRA ERA "O LOCAL VENCE, SEMPRE" — e era ela que mantinha uma
+// análise no telefone e outra no navegador, cada aparelho lendo a própria
+// cópia para sempre. A regra parecia inofensiva porque material gerado parecia
+// estado; ele é ACERVO: custou dinheiro, acumula, e nunca deveria regredir.
+//
+// A ordem abaixo é a de quem paga a conta:
+//   1. **veio inteira** ganha de veio pela metade — três blocos que falharam
+//      não viram uma análise melhor por serem mais recentes;
+//   2. **o nível de hoje** ganha do nível de ontem — análise feita para B1 não
+//      serve a quem já está em B2;
+//   3. **o modelo mais forte** ganha — foi o que ele pediu com todas as
+//      letras, e é o que separava as duas versões dele (GPT-5.6 Luna contra
+//      Gemini Flash-Lite);
+//   4. mais itens, e por fim mais recente, só como desempate.
+//
+// ⚠️ MATERIAL SEM FICHA (feito antes desta versão) NÃO É TRATADO COMO RUIM. Ele
+// entra com força desconhecida e perde apenas para quem tem ficha comprovada —
+// senão a primeira análise feita com modelo pequeno derrubaria o acervo antigo
+// inteiro, que é o oposto do que se quer.
+// ================================================================
+// UNIR O QUE FOI PAGO — transcrições e marcadores do audiolivro
+// ================================================================
+// ⚠️ A CHAVE DE UMA TRANSCRIÇÃO É `cap` + `ini`: o app permite transcrever uma
+// JANELA dentro do capítulo (dez minutos em volta de onde ele está), então o
+// mesmo capítulo pode ter mais de um pedaço, e cada pedaço é um trabalho pago
+// à parte.
+function _trChave(t) { return `${t.cap}|${Math.round(Number(t.ini) || 0)}` }
+
+// Entre duas versões do MESMO pedaço, fica a mais completa: mais falas ganha;
+// com as falas empatadas, quem tem análise ganha de quem não tem; com as duas
+// analisadas, decide a ficha (modelo mais forte, análise inteira).
+function _trMelhor(a, b) {
+  if (!a) return b
+  if (!b) return a
+  const fa = (a.segs || []).length, fb = (b.segs || []).length
+  if (fa !== fb) return fa > fb ? a : b
+  const aa = (a.achados || []).length, ab = (b.achados || []).length
+  if (!!aa !== !!ab) return aa ? a : b
+  if (aa && ab) {
+    const A = a.achadosFicha || {}, B = b.achadosFicha || {}
+    if (!!A.falhas !== !!B.falhas) return A.falhas ? b : a
+    if ((A.forca || 0) !== (B.forca || 0)) return (A.forca || 0) > (B.forca || 0) ? a : b
+    if (aa !== ab) return aa > ab ? a : b
+  }
+  return (a.at || 0) >= (b.at || 0) ? a : b
+}
+
+function _unirTranscricoes(locais, remotas) {
+  const A = Array.isArray(locais) ? locais : []
+  const B = Array.isArray(remotas) ? remotas : []
+  if (!A.length && !B.length) return null
+  const mapa = new Map()
+  for (const t of [...B, ...A]) {
+    if (!t || t.cap == null) continue
+    const k = _trChave(t)
+    mapa.set(k, _trMelhor(mapa.get(k), t))
+  }
+  return [...mapa.values()].sort((x, y) => (x.cap - y.cap) || (x.ini - y.ini))
+}
+
+// Marcador é gesto humano: some só quando ELE apaga, e a marca de remoção é
+// quem carrega isso — aqui, união pura.
+function _unirMarcadores(locais, remotos) {
+  const A = Array.isArray(locais) ? locais : []
+  const B = Array.isArray(remotos) ? remotos : []
+  if (!A.length && !B.length) return null
+  const mapa = new Map()
+  for (const m of [...B, ...A]) {
+    if (!m || m.cap == null) continue
+    const k = `${m.cap}|${Math.round(Number(m.seg) || 0)}`
+    const ja = mapa.get(k)
+    // Entre dois iguais, fica o que tem nota escrita — e, em empate, o mais novo.
+    if (!ja || (!ja.nota && m.nota) || (m.at || 0) > (ja.at || 0)) mapa.set(k, m)
+  }
+  return [...mapa.values()].sort((x, y) => (x.cap - y.cap) || (x.seg - y.seg))
+}
+
+function _geradoPacote(bruto) {
+  try {
+    const o = typeof bruto === 'string' ? JSON.parse(bruto) : bruto
+    if (!o || typeof o !== 'object') return null
+    return o
+  } catch (e) { return null }
+}
+
+function geradoNota(bruto, nivelHoje) {
+  const p = _geradoPacote(bruto)
+  if (!p) return null
+  const f = p.ficha || {}
+  const itens = Array.isArray(p.itens) ? p.itens.length : (Array.isArray(p) ? p.length : 0)
+  return {
+    temFicha: !!p.ficha,
+    inteira: f.falhas ? 0 : 1,
+    nivelOk: nivelHoje && p.nivel ? (p.nivel === nivelHoje ? 1 : 0) : 1,
+    forca: f.forca || 0,
+    itens,
+    at: p.at || f.at || 0,
+    prov: f.prov || '', modelo: f.modelo || ''
+  }
+}
+
+// Devolve 1 se A é melhor, -1 se B é melhor, 0 se empatam.
+function geradoComparar(a, b, nivelHoje) {
+  const A = geradoNota(a, nivelHoje), B = geradoNota(b, nivelHoje)
+  if (!A) return B ? -1 : 0
+  if (!B) return 1
+  // A força só entra quando os DOIS têm ficha. Sem esta guarda, o material
+  // antigo (força 0, porque nasceu antes) perderia de qualquer análise nova,
+  // inclusive de uma feita com o modelo mais fraco da casa.
+  const comparaForca = A.temFicha && B.temFicha
+  const ordem = [
+    [A.inteira, B.inteira],
+    [A.nivelOk, B.nivelOk],
+    ...(comparaForca ? [[A.forca, B.forca]] : []),
+    [A.itens, B.itens],
+    [A.at, B.at]
+  ]
+  for (const [x, y] of ordem) {
+    if (x === y) continue
+    return x > y ? 1 : -1
+  }
+  return 0
+}
+
 // ---- os dois atalhos que quem chama realmente quer ----
 // Guardar aqui E lá, numa linha. E ler daqui, caindo para a nuvem quando falta.
 async function geradoGuardar(chave, valor, marcas) {
@@ -372,6 +499,78 @@ async function geradoLer(chave) {
   // Grava aqui para a próxima abertura não custar rede.
   try { await BookDB.set(chave, daNuvem) } catch (e) {}
   return daNuvem
+}
+
+// ⚠️ A LEITURA QUE OLHA OS DOIS LADOS. `geradoLer` devolve o local e vai
+// embora — é rápido e foi o que criou o problema: o aparelho nunca descobria
+// que existia coisa melhor na nuvem. Aqui os dois são lidos, comparados pela
+// ficha, e **o perdedor é corrigido na hora** — então a divergência morre no
+// primeiro capítulo aberto em vez de durar para sempre.
+// Custa um `get` de documento pequeno por capítulo aberto, e só quando há
+// login. Devolve `{ texto, trocou, ficha }`.
+async function geradoLerMelhor(chave, marcas) {
+  const nivelHoje = typeof cefrNivelAluno === 'function' ? cefrNivelAluno() : ''
+  let local = null
+  try { local = await BookDB.get(chave) } catch (e) {}
+  const localTxt = local == null ? null : (typeof local === 'string' ? local : (local instanceof Blob ? await local.text() : JSON.stringify(local)))
+  if (!_fbDb || !_fbUser) return { texto: localTxt, trocou: false, ficha: geradoNota(localTxt, nivelHoje) }
+
+  const nuvemTxt = await geradoBaixar(chave)
+  if (nuvemTxt == null && localTxt == null) return { texto: null, trocou: false, ficha: null }
+
+  // Só num dos lados: leva para o outro. É a recuperação acontecendo sozinha,
+  // um capítulo por vez.
+  if (nuvemTxt == null) { geradoSubir(chave, localTxt, marcas); return { texto: localTxt, trocou: false, ficha: geradoNota(localTxt, nivelHoje) } }
+  if (localTxt == null) {
+    try { await BookDB.set(chave, nuvemTxt) } catch (e) {}
+    return { texto: nuvemTxt, trocou: false, ficha: geradoNota(nuvemTxt, nivelHoje) }
+  }
+  if (localTxt === nuvemTxt) return { texto: localTxt, trocou: false, ficha: geradoNota(localTxt, nivelHoje) }
+
+  const cmp = geradoComparar(localTxt, nuvemTxt, nivelHoje)
+  if (cmp >= 0) {
+    // O daqui é melhor (ou empata): a nuvem passa a ter o bom.
+    geradoSubir(chave, localTxt, marcas)
+    return { texto: localTxt, trocou: false, ficha: geradoNota(localTxt, nivelHoje) }
+  }
+  try { await BookDB.set(chave, nuvemTxt) } catch (e) {}
+  return { texto: nuvemTxt, trocou: true, ficha: geradoNota(nuvemTxt, nivelHoje), antes: geradoNota(localTxt, nivelHoje) }
+}
+
+// ================================================================
+// RECUPERAÇÃO — o que nunca subiu
+// ================================================================
+// ⚠️ MEDIDO NO APARELHO DELE: a análise do capítulo 5 de *Billy Summers*, com
+// **149 itens**, existia só aqui — a nuvem tinha dois registros e nenhum era
+// ela. Material gerado antes de §8.71 nunca teve para onde subir, e o que
+// falhou na subida por qualquer motivo também ficou preso.
+// Uma varredura, uma vez por aparelho: o que está aqui e não lá, sobe.
+const SK_GERADO_RECUP = 'el-gerado-recuperado'
+const GERADO_PREFIXOS = ['raiox:', 'pre:', 'niv:', 'nivmarca:', 'quebra:', 'sinc:']
+
+async function geradoRecuperar(forcar) {
+  try {
+    if (!_fbDb || !_fbUser) return { subiu: 0, olhou: 0 }
+    if (!forcar && localStorage.getItem(SK_GERADO_RECUP)) return { subiu: 0, olhou: 0, jaFeito: true }
+    const chaves = (await BookDB.keys()).map(String).filter(k => GERADO_PREFIXOS.some(p => k.startsWith(p)))
+    let subiu = 0
+    for (const k of chaves) {
+      const d = _geradoRef(k)
+      if (!d) continue
+      const doc = await d.get()
+      if (doc.exists) continue
+      const v = await BookDB.get(k)
+      const txt = v == null ? null : (typeof v === 'string' ? v : (v instanceof Blob ? await v.text() : JSON.stringify(v)))
+      if (!txt) continue
+      // As marcas saem da própria chave: `tipo:livroId:cap`.
+      const p = k.split(':')
+      const marcas = { tipo: p[0], livroId: p[1] || '', cap: Number(p[2]) }
+      if (await geradoSubir(k, txt, marcas)) subiu++
+    }
+    try { localStorage.setItem(SK_GERADO_RECUP, String(Date.now())) } catch (e) {}
+    if (subiu) console.log('[gerado] recuperados para a nuvem:', subiu)
+    return { subiu, olhou: chaves.length }
+  } catch (e) { return { subiu: 0, olhou: 0, erro: e.message } }
 }
 
 // ================================================================
@@ -1188,12 +1387,30 @@ function _applyCloudDocs(docs) {
       if (!local) return remoto
       const vencedor = local.id === abertoId ? local   // tocando aqui: manda quem toca
         : (local.updatedAt || 0) > (remoto.updatedAt || 0) ? local : remoto
+      // ⚠️ TRANSCRIÇÃO E ANÁLISE NÃO PODEM VIAJAR NA CARONA DO VENCEDOR. O
+      // `updatedAt` de um audiolivro muda a cada meio minuto de escuta — quem
+      // está só OUVINDO no celular vence o computador que acabou de transcrever
+      // um capítulo, e leva junto o que foi pago. Medido no acervo dele: um
+      // único capítulo carrega **438 falas e 154 pontos analisados**.
+      // Mesma exceção que o `historico` dos livros já tinha: isto se UNE, nunca
+      // se escolhe.
+      const trans = _unirTranscricoes(local.transcricoes, remoto.transcricoes)
       // ⚠️ `nuvem` NÃO obedece ao vencedor: ela descreve o que está no Storage,
       // um fato do mundo, não uma preferência deste aparelho. Se o celular subiu
       // o áudio e o computador salvou a posição depois, o registro da subida não
       // pode sumir junto — senão o computador acha que nunca subiu e sobe de novo.
       const nv = _abNuvemMaisCompleta(local.nuvem, remoto.nuvem)
-      return nv ? { ...vencedor, nuvem: nv } : vencedor
+      // Marcadores também se unem: cada um é um gesto dele, e gesto não se
+      // desfaz porque o outro aparelho salvou depois.
+      const marc = _unirMarcadores(local.marcadores, remoto.marcadores)
+      const capMapa = { ...(remoto.capMapa || {}), ...(local.capMapa || {}) }
+      return {
+        ...vencedor,
+        ...(trans ? { transcricoes: trans } : {}),
+        ...(marc ? { marcadores: marc } : {}),
+        ...(Object.keys(capMapa).length ? { capMapa } : {}),
+        ...(nv ? { nuvem: nv } : {})
+      }
     })
     // ⚠️ ITEM CUJO ÁUDIO ESTÁ NESTE APARELHO NUNCA É DESCARTADO — e esta linha
     // nasceu de um achado no acervo real dele: 202 MB guardados sob

@@ -2661,11 +2661,23 @@ function _lerOrigemDoCap(cap) {
 async function lerRaioXCarregar(cap) {
   if (!_lerLivro) return null
   try {
-    // `geradoLer` procura aqui e, se faltar, na nuvem — é assim que a análise
-    // feita no telefone aparece no computador sem ser paga de novo.
-    const g = typeof geradoLer === 'function'
-      ? await geradoLer(_lerChaveRaioX(cap))
-      : await BookDB.get(_lerChaveRaioX(cap))
+    // ⚠️ AQUI OS DOIS LADOS SÃO COMPARADOS, e não só o daqui. Era esta linha
+    // que mantinha *"uma versão no telefone e outra no navegador"*: `geradoLer`
+    // devolvia o local e nunca perguntava à nuvem se havia coisa melhor.
+    // `geradoLerMelhor` escolhe pela ficha (inteira > nível de hoje > modelo
+    // mais forte) e corrige o lado perdedor na hora.
+    let g = null
+    if (typeof geradoLerMelhor === 'function') {
+      const r = await geradoLerMelhor(_lerChaveRaioX(cap),
+        { tipo: 'raiox', livroId: String(_lerLivro.id), cap: Number(cap) })
+      g = r.texto
+      if (r.trocou && r.ficha) {
+        const nome = typeof aiNomeDoModelo === 'function' ? aiNomeDoModelo(r.ficha.prov, r.ficha.modelo) : r.ficha.modelo
+        toast(`Usei a análise do outro aparelho — feita com ${nome}`, 'info')
+      }
+    } else {
+      g = typeof geradoLer === 'function' ? await geradoLer(_lerChaveRaioX(cap)) : await BookDB.get(_lerChaveRaioX(cap))
+    }
     if (!g) return null
     const dados = typeof g === 'string' ? JSON.parse(g) : (g instanceof Blob ? JSON.parse(await g.text()) : g)
     const itens = Array.isArray(dados) ? dados : (dados.itens || null)
@@ -2712,7 +2724,16 @@ async function lerRaioXAnalisar() {
     // o texto do capítulo está em mãos; lá seria preciso lê-lo do zip de novo.
     for (const x of itens) x.frase = aiFraseDoTermo(texto, x.t)
     if (_lerCap !== cap) { _lerRaioXCarregando = false; return }   // trocou de capítulo no meio
-    const pacote = { itens, nivel, at: Date.now() }
+    // ⚠️ A FICHA É COPIADA AQUI, e não pode ser esquecida: ela vem pendurada no
+    // array (`itens.ficha`) e o `JSON.stringify` abaixo a deixaria para trás,
+    // junto com a marca de análise incompleta. Foi assim que uma análise com
+    // blocos falhados virava indistinguível de uma inteira.
+    const pacote = {
+      itens, nivel, at: Date.now(),
+      ficha: itens.ficha || (typeof aiFicha === 'function'
+        ? aiFicha({ blocos: itens.blocos, falhas: itens.falhas, nivel })
+        : undefined)
+    }
     // Guarda aqui E na nuvem: análise custa dinheiro, e o outro aparelho não
     // pode ser obrigado a pagar de novo pelo mesmo capítulo.
     await _lerGuardar(_lerChaveRaioX(cap), JSON.stringify(pacote), 'raiox', cap, itens.length)
