@@ -1550,6 +1550,12 @@ REGRAS:
   Exemplo do erro a evitar: em "Macintosh holds out his hand. Billy rises and shakes it",
   "shakes it" é APERTAR A MÃO. Traduzir por "treme de medo" ignora a frase anterior.
 - Use as frases vizinhas para decidir o sentido: o trecho recebido é contínuo.
+- QUANDO A EXPRESSÃO É UMA IMAGEM, O "pt" GUARDA A IMAGEM. Trocá-la pela explicação tira do
+  aluno exatamente o que ele parou para ver — e cabe nas 4 palavras, quase sempre.
+  "left-handed monkey wrenches" (ferramenta que não existe: o trote que se prega no novato)
+  ⇒ "chave inglesa canhota". ERRADO: "absurdos impossíveis" (explicação do que significa).
+  ERRADO: "papai noel" (outra imagem, de outra cultura). Se a imagem não couber em 4 palavras,
+  fique com a imagem e corte o resto.
 - Inclua vocabulário acima de ${nv} (nivel B2, C1 ou C2 para um aluno ${nv}).
 - Inclua phrasal verb, idiom e collocation SÓ quando o sentido ali NÃO for literal — é o caso de
   "put up with" e "call it a day". Verbo comum com objeto comum ("open the door", "take the bus")

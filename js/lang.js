@@ -202,20 +202,21 @@ function promptRegrasLexicais(langCode, modo) {
 1. ANTI-LITERAL: translate what the ${L.nameEn} DOES in this scene, the way a Brazilian would say it — never word by word. "we'll get you in" (hotel desk) → "a gente te encaixa", NEVER "colocar você dentro".
 2. DOMAIN CHECK: decide WHAT the thing IS in this sentence, then pick the Portuguese word for THAT thing — never the most frequent dictionary equivalent. "a bayonet mounted on the tip of its barrel" → barrel is a RIFLE's barrel: "cano", NEVER "barril" (container). Never hedge between two domains ("de armas ou recipientes") — the sentence already decided.
 3. SUBSTITUTION TEST: put your Portuguese back into the sentence. If the sentence stops saying what the ${L.nameEn} says, it is wrong. "we began to tire of the mud" + "perder o interesse" → "começamos a perder o interesse na lama" is NOT what it says; "cansar-se de" is.
-4. SELF-CHECK: if your own examples/definition describe one domain and your Portuguese uses a word from another, the translation is WRONG — fix it before returning.`
+4. SELF-CHECK: if your own examples/definition describe one domain and your Portuguese uses a word from another, the translation is WRONG — fix it before returning.
+5. KEEP THE AUTHOR'S IMAGE — rules 1-3 push you away from the literal; this one says where to STOP. When the text uses a concrete image, an invented object, a joke or a culture-bound reference, translate THE IMAGE. Never swap it for a different familiar image, and never replace it with an explanation of what it means: he is reading the AUTHOR, not a summary of the author. "believer in left-handed monkey wrenches" (a tool that does not exist — the errand a workshop sends the new guy on) → "de quem acredita em chave inglesa canhota". WRONG: "de quem acredita em papai noel" (a different image). WRONG: "de quem se deixa enganar" (an explanation). Swap ONLY when Portuguese has a fixed expression carrying the SAME picture ("raining cats and dogs" → "chovendo canivete"); in doubt, keep his. The same discipline applies to a precise word: "perpetual foul-up" is someone who always RUINS things ("trapalhona crônica"), not merely a fool ("mané").`
 
   if (modo === 'traducao') return nucleo
 
   const glosa = `${nucleo}
-5. CITATION FORM: verbs in the infinitive ("began" → "começar", NEVER "começamos"), nouns in the singular, adjectives masculine singular. The gloss NAMES the unit; it does not re-translate the sentence.
-6. DETERMINER + NOUN IS NEVER A UNIT: "the mud", "a house", "his hand" are grammar, not vocabulary — return the noun alone or nothing.`
+6. CITATION FORM: verbs in the infinitive ("began" → "começar", NEVER "começamos"), nouns in the singular, adjectives masculine singular. The gloss NAMES the unit; it does not re-translate the sentence.
+7. DETERMINER + NOUN IS NEVER A UNIT: "the mud", "a house", "his hand" are grammar, not vocabulary — return the noun alone or nothing.`
 
   if (modo === 'glosa') return glosa
 
   // 'analise' — tudo acima + a regra de gramática, que só faz sentido quando
   // há objeto "meanings" com context_match para apontar
   return `${glosa}
-7. GRAMMAR BEFORE DICTIONARY: look at what the item is DOING in the context sentence. If it works as a STRUCTURAL element — emphatic/interrogative/negative auxiliary (do/does/did), perfect auxiliary (have/has/had), modal, copula or progressive/passive "be", infinitive marker "to", complementizer "that", dummy "it/there" — the FIRST meaning MUST describe that GRAMMATICAL FUNCTION (with "gramatical": true and "context_match": true); the lexical sense may come after, with context_match false.
+8. GRAMMAR BEFORE DICTIONARY: look at what the item is DOING in the context sentence. If it works as a STRUCTURAL element — emphatic/interrogative/negative auxiliary (do/does/did), perfect auxiliary (have/has/had), modal, copula or progressive/passive "be", infinitive marker "to", complementizer "that", dummy "it/there" — the FIRST meaning MUST describe that GRAMMATICAL FUNCTION (with "gramatical": true and "context_match": true); the lexical sense may come after, with context_match false.
    WORKED EXAMPLE — "does" in "The boat ride does add time to the trip":
    WRONG: meaning "fazer, executar", examples "She does the laundry" (lexical verb — not what "does" is doing here).
    RIGHT: first meaning "de fato, realmente (ênfase)" [gramatical:true, context_match:true], examples like "I do like it" / "She did tell me"; only then "fazer, executar" [context_match:false].
