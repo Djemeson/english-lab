@@ -21,7 +21,7 @@
 > ⚠️ **Uma armadilha pega a tempo:** apagar a linha do número de página desalinharia o "ler
 > ouvindo" — passou a esconder, não apagar. Medido no app com 4 EPUBs reais: **659 parágrafos
 > remontados**, **57 itálicos recuperados** num capítulo, mangá intacto.
-> `sw.js` → **englab-v398**. **Detalhes em §8.98.**
+> `sw.js` → **englab-v399**. **Detalhes em §8.98.**
 >
 > Última atualização anterior: 2026-08-22 (41ª) — **A FICHA CHEGA AO PRÉ-ESTUDO E À QUEBRA**. Os dois
 > últimos materiais pagos que ainda decidiam por quantidade e recência. ⚠️ **E eles expuseram um
@@ -15067,6 +15067,40 @@ judaicas"*, *"cristaos e **muculmanos** de todas"*.
 arquivo nao tem marca nenhuma, desmontar tabela usada como diagramacao, consertar acento
 quebrado, tirar cabecalho de pagina repetido, e dividir livro que veio inteiro num capitulo so.
 Erro de OCR dentro da palavra e dano no original — so IA resolveria, e ai ja e outra coisa.
+
+### O *Carrie* dele: quando o índice do EDITOR é que mente
+
+Ele subiu *Carrie* e mandou o print: **"3 capítulos"** que eram *"News item from the
+Westover. . ."*, *"She put the dress on for the first. . ."* e *"Westover Mercy
+Hospital/Report of Decease"*, com *"Part Two"* e *"Part Three"* soltos no meio, sem número.
+
+O `toc.ncx` do próprio editor batiza os corpos de texto com a **primeira frase deles**:
+
+```
+"Part One"                                  -> part0005.xhtml   (4 palavras)
+"News item from the Westover. . ."          -> part0006.xhtml   (29.298 palavras)
+"Part Two"                                  -> part0007.xhtml   (4 palavras)
+"She put the dress on for the first. . ."   -> part0008.xhtml   (29.533 palavras)
+```
+
+A emenda não disparava porque ela exigia que o pedaço grande estivesse **sem** nome — e ali ele
+tinha um. Um nome que não é título.
+
+**O que separa "Chapter 1" de "News item from the Westover…" não é o texto do nome: é o
+ARQUIVO.** Capítulo de verdade traz o próprio cabeçalho (`<h1>`–`<h6>`) dentro; corpo de parte,
+não. Conferido nos livros dele **antes** de escrever a regra:
+
+| Livro | Corpo depois da página de parte | Decisão |
+|---|---|---|
+| *The Green Mile* | `part1_ch01.html` tem `<h?>1</h?>` | **não mexe** |
+| *Bag of Bones*, *The Stand* | `CHAPTER n` em `<h2>` | **não mexe** |
+| *Carrie* | sem cabeçalho nenhum | emenda |
+| *Different Seasons* | sem cabeçalho nenhum | emenda (já emendava pelo nome vago) |
+
+**Testado ao vivo nos quatro:** *Carrie* virou **"3 capítulos — Part One / Part Two / Part
+Three"**; *The Green Mile* manteve **"Part One: The Two Dead Girls"** como divisor e o
+**"Chapter 1"** com o nome dele; *Different Seasons* seguiu com as 4 novelas; *Bag of Bones*
+com os 32 capítulos. Console limpo.
 
 ### ⚠️ Outra sessão commitou por cima no meio da rodada
 

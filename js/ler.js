@@ -393,6 +393,7 @@ async function lerAbrir(id) {
   // a chave do cache é o ÍNDICE, e índice todo livro tem.
   _lerNomesAuto = {}
   _lerVazios = new Set()
+  _lerSemCabecalho = new Set()
   _lerMapaCache = null
   _lerSumarioBusca = ''
   _lerSumarioAbre = {}
@@ -1341,7 +1342,8 @@ const _LER_FRENTE = new Set([
 let _lerMapaCache = null
 function _lerMapaSumario() {
   const caps = (_lerLivro && _lerLivro.chapters) || []
-  const chave = (_lerLivro ? _lerLivro.id : '') + '|' + Object.keys(_lerNomesAuto).length + '|' + _lerVazios.size
+  const chave = (_lerLivro ? _lerLivro.id : '') + '|' + Object.keys(_lerNomesAuto).length +
+                '|' + _lerVazios.size + '|' + _lerSemCabecalho.size
   if (_lerMapaCache && _lerMapaCache.chave === chave) return _lerMapaCache
 
   // 1. EMENDA — pedaço só com o título + pedaço só com o texto = um capítulo
@@ -1351,7 +1353,8 @@ function _lerMapaSumario() {
     if (escondidos.has(i)) continue
     const a = caps[i], b = caps[i + 1]
     if ((a.words || 0) > 30 || _lerNomeVago(a.titulo)) continue
-    if ((b.words || 0) < LER_CORPO_MIN || !_lerNomeVago(b.titulo)) continue
+    if ((b.words || 0) < LER_CORPO_MIN) continue
+    if (!_lerNomeVago(b.titulo) && !_lerSemCabecalho.has(i + 1)) continue
     // ⚠️ CAPA NÃO É TÍTULO DE CAPÍTULO. Sem esta linha o "Cover" de Bag of
     // Bones (zero palavras) emendou com o texto de trás e virou o capítulo 1 —
     // e, sendo o índice 0, arrastou TODO o miolo editorial para dentro do
@@ -1414,13 +1417,45 @@ function _lerMapaSumario() {
   return _lerMapaCache
 }
 
+// ⚠️ TÍTULO QUE O ÍNDICE DEU TAMBÉM PODE SER MENTIRA. Foi o *Carrie* dele que
+// mostrou: o sumário do próprio editor batiza os corpos de texto com a PRIMEIRA
+// FRASE deles — *"News item from the Westover. . ."*, *"She put the dress on for
+// the first. . ."*. A emenda não disparava porque ela só juntava quando o pedaço
+// grande estava SEM nome, e ali ele tinha um — um nome que não é título.
+//
+// O que separa "Chapter 1" (título de verdade) de "News item from the
+// Westover…" (frase de abertura) não é o texto do nome: é o ARQUIVO. Capítulo
+// de verdade traz o próprio cabeçalho dentro; corpo de parte, não. Conferido
+// nos livros dele antes de escrever: *The Green Mile* (`<h?>1</h?>`), *Bag of
+// Bones* e *The Stand* (`CHAPTER n`) têm cabeçalho e **não são tocados**;
+// *Carrie* e *Different Seasons* não têm, e emendam.
+let _lerSemCabecalho = new Set()
+
+async function _lerAcharCorpoSemNome() {
+  const caps = (_lerLivro && _lerLivro.chapters) || []
+  let achou = false
+  for (let i = 0; i < caps.length - 1; i++) {
+    const a = caps[i], b = caps[i + 1]
+    if (_lerSemCabecalho.has(i + 1)) continue
+    if (!(a.words > 0) || (a.words || 0) > 30 || _lerNomeVago(a.titulo)) continue
+    if (_lerNomePeloArquivo(a)) continue
+    if ((b.words || 0) < LER_CORPO_MIN || _lerNomeVago(b.titulo)) continue
+    if (!b.href) continue
+    let html = ''
+    try { html = await _lerEpub.zip.texto(b.href) || '' } catch (e) { continue }
+    if (/<h[1-6][\s>]/i.test(html)) continue        // tem cabeçalho próprio: é capítulo mesmo
+    _lerSemCabecalho.add(i + 1); achou = true
+  }
+  return achou
+}
+
 // O nome que estava DENTRO do capítulo. Só é lido quando o índice falhou, e
 // só uma vez por livro: 105 capítulos são 105 descompactações.
 async function _lerNomearPeloConteudo() {
   const caps = (_lerLivro && _lerLivro.chapters) || []
   if (_lerLivro.format === 'manga' || !_lerEpub || !_lerEpub.zip) return false
+  let achou = await _lerAcharCorpoSemNome() || false
   const visivel = new Set(_lerMapaSumario().linhas.map(l => l.i))
-  let achou = false
   for (let i = 0; i < caps.length; i++) {
     if (!visivel.has(i) || i in _lerNomesAuto) continue
     const c = caps[i]
