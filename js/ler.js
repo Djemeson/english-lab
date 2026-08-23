@@ -393,6 +393,7 @@ async function lerAbrir(id) {
   // a chave do cache é o ÍNDICE, e índice todo livro tem.
   _lerNomesAuto = {}
   _lerVazios = new Set()
+  _lerMapaCache = null
   _lerSumarioBusca = ''
   _lerSumarioAbre = {}
   _lerCap = Math.min(l.pos?.cap || 0, l.chapters.length - 1)
@@ -742,11 +743,11 @@ function _lerRenderTipografia() {
     ${linha('Largura', passo('largura', -2, '−') + `<b class="ler-val">${c.largura}em</b>` + passo('largura', 2, '+'))}
     ${linha('Leitura', ['pag', 'rolagem'].map(m =>
       `<button class="ler-btn ler-pill${m === c.modo ? ' on' : ''}" onclick="lerAjustar('modo','${m}')">${m === 'pag' ? 'Virar página' : 'Rolagem'}</button>`).join(''))}
-    ${linha('Texto do livro', [['sim', 'Arrumado'], ['nao', 'Como veio']].map(([v, r]) =>
+    ${linha('Texto do livro', [['sim', 'Arrumado'], ['nao', 'Sem faxina']].map(([v, r]) =>
       `<button class="ler-btn ler-pill${v === c.arrumar ? ' on' : ''}" onclick="lerAjustar('arrumar','${v}')"
         data-tip="${v === 'sim'
           ? 'Fecha os buracos em branco, tira o recuo feito com espaço, junta parágrafo partido no meio e endireita a quebra de cena'
-          : 'Mostra o capítulo exatamente como o arquivo veio — serve para comparar'}">${r}</button>`).join('')
+          : 'Desliga a faxina, para comparar. O itálico, o parágrafo e a centralização continuam: isso o app conserta na entrada, e não é palpite'}">${r}</button>`).join('')
       + `<span class="ler-arrumou">${_lerArrumouTexto()}</span>`)}
     ${linha('Destacar', [['nada', 'Nada'], ['minhas', 'O que estou estudando']].map(([v, r]) =>
       `<button class="ler-btn ler-pill${v === c.pintar ? ' on' : ''}" onclick="lerAjustar('pintar','${v}')">${r}</button>`).join(''))}
@@ -1303,8 +1304,15 @@ const _LER_FRENTE = new Set([
   'Outros livros do autor', 'Mapas'
 ])
 
+// O mapa é guardado: ele é lido pelo sumário, pelo raio-X e pelo nome na
+// barra — a cada troca de capítulo. Refazê-lo toda vez seria varrer 105
+// capítulos para escrever um título. A chave inclui o que pode mudar debaixo
+// dele (os nomes descobertos lendo o livro), então nunca envelhece calado.
+let _lerMapaCache = null
 function _lerMapaSumario() {
   const caps = (_lerLivro && _lerLivro.chapters) || []
+  const chave = (_lerLivro ? _lerLivro.id : '') + '|' + Object.keys(_lerNomesAuto).length + '|' + _lerVazios.size
+  if (_lerMapaCache && _lerMapaCache.chave === chave) return _lerMapaCache
 
   // 1. EMENDA — pedaço só com o título + pedaço só com o texto = um capítulo
   const escondidos = new Set()
@@ -1347,7 +1355,7 @@ function _lerMapaSumario() {
     if (escondidos.has(i) || _lerVazios.has(i)) return
     let grupo = i < ini ? 'frente' : (i > fim ? 'fundo' : 'corpo')
     if (grupo === 'corpo' && _LER_FUNDO.has(peca[i])) grupo = 'fundo'
-    let nome = lerCapNome(i)
+    let nome = _lerNomeBase(i)
     let cont = false
     // Capítulo grande, sem nome nenhum, logo depois de outro capítulo grande:
     // é a segunda metade do mesmo texto (o Calibre corta novela comprida em
@@ -1360,7 +1368,20 @@ function _lerMapaSumario() {
     if (grupo === 'corpo' && palavras[i] >= LER_CORPO_MIN && !cont) { n++; ultimoNome = nome }
     linhas.push({ i, nome, cont, palavras: palavras[i], grupo, num: (grupo === 'corpo' && !cont && palavras[i] >= LER_CORPO_MIN) ? n : 0 })
   })
-  return { linhas, capitulos: n }
+
+  // O NOME POR ÍNDICE INCLUI O PEDAÇO ESCONDIDO. Sem isto a barra dizia
+  // "Parte 9" enquanto ele lia *Rita Hayworth*: o índice aberto é o do texto,
+  // e o nome estava no pedaço de 13 palavras que a emenda recolheu.
+  const porIndice = {}
+  for (const l of linhas) porIndice[l.i] = l.nome
+  for (let i = 0; i < caps.length; i++) {
+    if (!escondidos.has(i)) continue
+    let d = i - 1
+    while (d >= 0 && escondidos.has(d)) d--
+    if (d >= 0 && porIndice[d]) porIndice[i] = porIndice[d]
+  }
+  _lerMapaCache = { chave, linhas, capitulos: n, porIndice }
+  return _lerMapaCache
 }
 
 // O nome que estava DENTRO do capítulo. Só é lido quando o índice falhou, e

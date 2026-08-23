@@ -7,7 +7,23 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (41ª) — **A FICHA CHEGA AO PRÉ-ESTUDO E À QUEBRA**. Os dois
+> Última atualização: 2026-08-22 (42ª) — **O LIVRO NÃO VINHA FEIO; O APP É QUE O ACHATAVA**.
+> *"os livros vêm com a formatação muito feia e bagunçada"* — e a medição nos 10 livros dele
+> apontou para dentro de casa: o sanitizador tira `class` (e tem de tirar), mas a classe
+> carregava **sentido**. **380 `<span class="txit">` de *Bag of Bones*** — todo o pensamento
+> interno do King — chegavam como texto comum, e ***Different Seasons*, composto inteiro em
+> `<div>`, chegava como um tijolo sem uma linha em branco** (4,2 por mil chars, o pior do
+> acervo). Agora são **duas camadas**: a folha do livro é LIDA e o sentido volta em marcação
+> nossa (sempre, sem botão), e a **faxina** do que é sujeira mesmo ganhou botão no painel `Aa`
+> — que ele pediu para manter *"pq ainda terão livros bagunçados"*. O sumário virou lista de
+> gente: **20 entradas cruas → 4 capítulos** em Different Seasons, com miolo editorial
+> recolhido, emenda do arquivo partido pelo Calibre e busca acima de 20 capítulos.
+> ⚠️ **Uma armadilha pega a tempo:** apagar a linha do número de página desalinharia o "ler
+> ouvindo" — passou a esconder, não apagar. Medido no app com 4 EPUBs reais: **659 parágrafos
+> remontados**, **57 itálicos recuperados** num capítulo, mangá intacto.
+> `sw.js` → **englab-v397**. **Detalhes em §8.98.**
+>
+> Última atualização anterior: 2026-08-22 (41ª) — **A FICHA CHEGA AO PRÉ-ESTUDO E À QUEBRA**. Os dois
 > últimos materiais pagos que ainda decidiam por quantidade e recência. ⚠️ **E eles expuseram um
 > defeito no comparador:** cada material chama a sua lista de um jeito (`itens`, `items`,
 > `ancoras`) e o comparador contava só `itens` — os outros três empatavam em **zero** e o
@@ -14913,6 +14929,122 @@ todos. Uma quebra de duas palavras feita hoje ganharia de uma boa feita ontem.
 
 Material de teste apagado do aparelho e da nuvem ao fim. Console limpo.
 
+## 8.98 O livro não vinha feio — o app é que o achatava (2026-08-22, 42ª)
+
+**O pedido:** *"os livros que tenho disponível muitas vezes vêm com a formatação, ou diagramação
+muito feios e bagunçados. podemos corrigir isso com algum botão? pegue o livro mais ruim nesse
+sentido e trabalhe em cima dele. e o mesmo vale pra seção que tem os capítulos, que não aparece
+organizado."* No meio da rodada, ao ver o diagnóstico: *"apesar de ser o app que bagunça, quero
+que mesmo depois de arrumarmos isso ainda haja essa função que pedi pq ainda terão livros
+bagunçados."* — e ele está certo: são duas coisas, e as duas ficaram.
+
+### ⚠️ A causa raiz: `class` levava SENTIDO, e o sanitizador jogava tudo fora
+
+`_lerSanitizar` remove `class`, `style` e `id` de todo elemento — e tem de remover mesmo: a
+tipografia é nossa e CSS de terceiro na página é buraco de segurança. Só que a classe não
+carregava só aparência. **O editor dizia "isto é itálico" pela classe**, e o itálico morria com
+ela. Medido nos 10 livros de texto do acervo dele (5 maiores capítulos de cada, `tools/` local
+com leitor de ZIP próprio):
+
+| Livro | Perdas por mil chars | O que sumia |
+|---|---|---|
+| **Different Seasons** | **4,2 parágrafos-`<div>`** | o livro inteiro em `<div class="pi">` — e `.ler-conteudo` só dá margem a `p`. Chegava como **um tijolo de texto sem uma linha em branco** |
+| Bag of Bones | 1,4 itálicos + 0,2 outros | **380 `<span class="txit">`** = todo o pensamento interno do narrador, lido como texto comum |
+| A Game of Thrones Enhanced | 0,9 | 168 `<span class="italic">` (conversão de Calibre) |
+| The Green Mile | 0,8 | 112 itálicos |
+| The Stand | 0,4 | 69 quebras de cena centralizadas |
+| Billy Summers, On Writing, Dying of the Light, Fevre Dream, Sandkings | ≤ 0,2 | só centralização de título |
+
+**Different Seasons é o pior por uma margem larga** — foi nele que a rodada trabalhou.
+
+### O que foi feito — DUAS camadas, e a separação é o ponto
+
+**1. RECUPERAR (sempre ligado, sem botão).** `epubEstilos(ep)` em `js/epub.js` lê as folhas de
+estilo declaradas no manifesto e devolve `classe → { it, neg, centro, dir, vs, rec }` — só o
+punhado de propriedades que carrega significado (`font-style`, `font-weight`, `text-align`,
+`font-variant`, `text-transform`, `margin-left`). Nada de cor, fonte ou tamanho: isso é decisão
+do leitor. `_lerSanitizar` lê o sentido **antes** de apagar a classe e reescreve com marcação
+nossa (`.ler-it`, `.ler-neg`, `.ler-vs`, `.ler-centro`, `.ler-dir`, `.ler-bloco`). Junto veio o
+conserto do pior caso: **`<div>` que é parágrafo vira `<p>`**, e o CSS passou a dar margem a
+`div` também (exceto em mangá, onde `div` é página e balão).
+
+Três recusas importam: não repetir o que a etiqueta já diz (negrito em `<h2>`, itálico em
+`<em>`), não deixar `body.calibre { margin-left }` empurrar o livro inteiro, e não copiar
+recuo abaixo de 1em (ajuste fino de composição deixaria o texto trêmulo).
+
+**2. ARRUMAR (o botão — painel `Aa`, "Texto do livro: Arrumado / Sem faxina", nasce ligado).**
+`_lerArrumar(doc)` é a faxina do que é sujeira mesmo: âncora de número de página que sobrou
+vazia, rajada de três ou mais `<br>`, recuo feito com `&nbsp;`, bloco vazio (o primeiro de uma
+sequência vira um respiro medido, os demais saem), separador de cena escrito à mão (`* * *`)
+que ganha forma de separador, linha que é só o número da página, e parágrafo partido no meio da
+frase (o anterior termina em letra ou vírgula, o seguinte começa em minúscula). **Cada regra
+conta quanto mexeu e a conta aparece no painel** — sem isso o botão seria fé.
+
+Isto é palpite bem-informado, não verdade; por isso tem botão, e por isso ele continua
+existindo depois do conserto de entrada.
+
+### ⚠️ A armadilha que quase entrou: apagar texto desalinha o audiolivro
+
+A regra do número de página **apagava** o bloco. O "ler ouvindo" (§8.92) casa livro e narração
+**contando palavras**, e o mapa é feito sobre o arquivo CRU (`epubTextoLimpo`) enquanto o
+realce é posicionado no DOM montado. Apagar um `"246"` daqui adiantaria a frase acesa em uma
+palavra a cada página, e o erro soma. **Passou a esconder (`display:none`) em vez de apagar** —
+some da vista e continua contando igual dos dois lados. Nenhuma outra regra da faxina remove
+texto: junção de parágrafo insere um nó de espaço que o caminhador do `sinc.js` já rejeita, e
+`&nbsp;` colapsado não muda contagem de palavras.
+
+### O sumário: nome, grupo e emenda
+
+A lista era o índice cru do EPUB. `_lerMapaSumario()` faz as três decisões **numa passada só**
+— e isso não é elegância, é necessidade: a primeira versão decidia o grupo pelo tamanho do
+PEDAÇO e mandou a novela de 40 mil palavras para "antes do texto".
+
+1. **Emenda** — pedaço de ≤30 palavras com título de verdade + pedaço grande sem nome = um
+   capítulo (corte do Calibre). Peça editorial nunca dá nome: sem essa guarda, o `Cover` de Bag
+   of Bones (zero palavras) emendou com o texto de trás, virou o capítulo 1 e, sendo o índice 0,
+   arrastou todo o miolo editorial para dentro do livro.
+2. **Grupo** — *Antes do texto / O livro / Depois do texto*, os dois de fora recolhidos. A faixa
+   do corpo sai do TAMANHO (≥300 palavras), ignorando peças conhecidas pelo nome do arquivo
+   (`cop`, `ded`, `toc`, `tp`…) **e pelo título** — "Afterword" tem 3 mil palavras e virava o
+   "capítulo 5" de um livro de quatro novelas. Prefácio, prólogo, introdução e nota do autor
+   ficam de fora dessa exclusão de propósito: são texto para ler.
+3. **Nome** — do índice; senão do arquivo (Capa, Créditos, Dedicatória…); senão lendo o
+   capítulo (primeiro cabeçalho, ou primeira linha curta sem ponto final). Arquivo de zero
+   palavras é olhado antes de sumir: com `<img>` vira "Ilustração" (são os mapas de *A Game of
+   Thrones*), sem nada é escondido. Capítulo grande, sem nome, logo depois de outro capítulo
+   grande vira "*nome anterior* — continuação".
+
+Mais: numeração só do miolo, tempo de leitura a 220 ppm, e **busca** quando passa de 20
+capítulos. `lerCapNome(i)` virou a fonte única — sumário, raio-X e o nome na barra. Ela é
+separada de `_lerNomeBase(i)` porque o mapa precisa da segunda para se montar; se chamasse a
+primeira, uma chamaria a outra para sempre.
+
+### Testado ao vivo (regra nº 5)
+
+App rodando em `localhost:8765`, quatro EPUBs REAIS dele importados pelo próprio caminho de
+importação do app (`_lerImportarUm`) e abertos no leitor. Console limpo em todas as passadas.
+
+| Teste | Resultado |
+|---|---|
+| **Different Seasons**, cap. de *Rita Hayworth* | **659 parágrafos remontados** de `div` para `p`; margem medida **16,15px** (era 0); 44 buracos fechados, 44 recuos de `&nbsp;` |
+| Mesmo capítulo, largura total do texto | **141.474px** contra **126.616px** sem espaçamento — o respiro é real, +11,7% |
+| **Bag of Bones**, Chapter 12 | **57 itálicos recuperados** (`font-style: italic` computado, conferido), incluindo *"Yes, but maybe this is a magic place now."*; 7 quebras de cena centralizadas; 15 âncoras invisíveis removidas |
+| Botão "Sem faxina" → "Arrumado" | 143 → 128 âncoras, painel escrevendo *"neste capítulo: 9 recuos, 7 quebras de cena, 15 marcas invisíveis"*; os 57 itálicos **ficam nos dois** (é a camada 1) |
+| Sumário de **Different Seasons** | de 20 entradas cruas para **4 capítulos** (as 4 novelas, com as continuações recuadas), 7 peças à frente e 3 atrás, recolhidas |
+| Sumário de **A Game of Thrones** | **81 capítulos** com nome de POV, 9 peças à frente (3 delas viraram "Ilustração"), 11 atrás |
+| Sumário de **Bag of Bones** | **32 capítulos** começando no Chapter 1 — antes o "Praise" de 328 palavras abria o corpo |
+| Sumário de **The Stand** | **79 capítulos**, "Acknowledgements" no fim, dividores de parte sem número |
+| Nome na barra, cap. 8 de Different Seasons | **"1. Hope Springs Eternal"** — era "Parte 9" |
+| **Mangá** (CBZ de teste) | margem de `div` **0px**, nomes "Página 1…3", imagens no lugar — nada mudou |
+
+### ⚠️ Outra sessão commitou por cima no meio da rodada
+
+Durante esta rodada, **outra sessão de Claude Code trabalhando no mesmo repositório** commitou
+os arquivos deste trabalho a meio caminho, dentro de commits sobre outro assunto (`a04b333`,
+`6f33497`). `js/epub.js`, `css/styles.css` e a maior parte de `js/ler.js` estão em HEAD sob
+mensagem alheia. Nada se perdeu, mas o histórico ficou impreciso — e a lição é a de sempre:
+**duas sessões no mesmo repositório precisam de `git worktree`.**
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -14921,6 +15053,25 @@ Material de teste apagado do aparelho e da nuvem ao fim. Console limpo.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada da formatação do livro (§8.98, 2026-08-22)
+
+- [ ] **A LISTA DE CAPÍTULOS DO AUDIOLIVRO NÃO GANHOU O MESMO TRATAMENTO** — `audiobook.js`
+      mostra `titulo || 'Capítulo N'` em quatro lugares. Os nomes vêm do átomo `moov` do `.m4b`
+      e costumam ser de verdade, então não é o mesmo tamanho de problema; mas quando o arquivo
+      vem sem nome, a lista repete "Capítulo 1…40" e o agrupamento/busca de `_lerMapaSumario`
+      resolveria. Não foi feito nesta rodada para não misturar dois módulos.
+- [ ] **A ESTANTE MOSTRA O NOME CRU NAS ANOTAÇÕES** — `estante.js` usa
+      `chapters[n.cap].titulo` na lista de marcações, e ali ainda aparece "Parte 9".
+      `lerCapNome` depende do livro ABERTO (`_lerLivro`), então usá-la ali exigiria uma versão
+      que receba o livro por parâmetro.
+- [ ] **A JUNÇÃO DE PARÁGRAFO NUNCA DISPAROU NO ACERVO DELE** — a regra existe (`rel.junta`) e
+      foi escrita para o dano clássico de PDF→EPUB, mas nos 4 livros testados deu zero. Ou seja:
+      **está sem prova de fogo**. Quando entrar um livro assim, conferir se ela emenda o certo
+      e não colou duas falas de diálogo.
+- [ ] **VERSALETE SÓ É RECONHECIDO QUANDO O CSS DIZ `font-variant: small-caps`** — Bag of Bones
+      usa `.smallcaps { font-size: 0.8em }`, que é versalete na intenção e tamanho na letra. Não
+      dá para inferir sem heurística de nome de classe, e heurística de nome erra. Fica assim.
 
 ### Da rodada do material gerado (§8.95, 2026-08-22)
 
