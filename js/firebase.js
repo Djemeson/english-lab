@@ -452,6 +452,7 @@ function geradoNota(bruto, nivelHoje) {
   const itens = Array.isArray(p.itens) ? p.itens.length : (Array.isArray(p) ? p.length : 0)
   return {
     temFicha: !!p.ficha,
+    fixado: Number(f.fixadoEm) || 0,       // quando ELE escolheu esta à mão
     inteira: f.falhas ? 0 : 1,
     nivelOk: nivelHoje && p.nivel ? (p.nivel === nivelHoje ? 1 : 0) : 1,
     forca: f.forca || 0,
@@ -466,6 +467,13 @@ function geradoComparar(a, b, nivelHoje) {
   const A = geradoNota(a, nivelHoje), B = geradoNota(b, nivelHoje)
   if (!A) return B ? -1 : 0
   if (!B) return 1
+  // ⚠️ ESCOLHA HUMANA VENCE HEURÍSTICA, e vem antes de tudo. Entre duas
+  // análises antigas (sem ficha) o desempate cairia em "mais itens" — e mais
+  // itens não é sinônimo de melhor: um modelo tagarela devolve quarenta
+  // apontamentos ruins e ganha de quinze bons. Quando ele olha as duas e
+  // aponta a que presta, nenhuma regra automática tem o direito de discordar.
+  // Entre duas escolhas humanas, a mais recente — ele mudou de ideia.
+  if (A.fixado !== B.fixado) return A.fixado > B.fixado ? 1 : -1
   // A força só entra quando os DOIS têm ficha. Sem esta guarda, o material
   // antigo (força 0, porque nasceu antes) perderia de qualquer análise nova,
   // inclusive de uma feita com o modelo mais fraco da casa.
@@ -535,6 +543,25 @@ async function geradoLerMelhor(chave, marcas) {
   }
   try { await BookDB.set(chave, nuvemTxt) } catch (e) {}
   return { texto: nuvemTxt, trocou: true, ficha: geradoNota(nuvemTxt, nivelHoje), antes: geradoNota(localTxt, nivelHoje) }
+}
+
+// "Esta aqui é a boa": carimba a escolha dele no material LOCAL e manda para a
+// nuvem. O carimbo é o que faz os outros aparelhos adotarem esta versão na
+// próxima vez que abrirem o capítulo — sem ele, a heurística poderia preferir
+// a que já estava lá.
+async function geradoFixar(chave, marcas) {
+  try {
+    if (!_fbDb || !_fbUser) return false
+    const v = await BookDB.get(chave)
+    if (v == null) return false
+    const txt = typeof v === 'string' ? v : (v instanceof Blob ? await v.text() : JSON.stringify(v))
+    const p = _geradoPacote(txt)
+    if (!p) return false
+    p.ficha = { ...(p.ficha || {}), fixadoEm: Date.now() }
+    const novo = JSON.stringify(p)
+    try { await BookDB.set(chave, novo) } catch (e) {}
+    return await geradoSubir(chave, novo, marcas)
+  } catch (e) { console.warn('[gerado] fixar:', e && e.message); return false }
 }
 
 // ================================================================

@@ -37,7 +37,11 @@ const LER_DEF = {
   // `traduzir`: o que acontece no instante em que a seleção termina.
   //   'auto' — a frase inteira já vem traduzida dentro do popup (padrão)
   //   'menu' — só o menu de sempre, tradução nenhuma (para quem não quer gastar)
-  traduzir: 'auto'
+  traduzir: 'auto',
+  // `arrumar`: a faxina do texto do livro (ver `_lerArrumar`). Nasce LIGADA
+  // porque o livro torto é a regra, não a exceção — mas é desligável, e
+  // desligada mostra o arquivo como ele veio, para comparar.
+  arrumar: 'sim'
 }
 function lerCfg() { return { ...LER_DEF, ...(cfg.ler || {}) } }
 function lerSetCfg(chave, valor) {
@@ -367,6 +371,14 @@ async function lerAbrir(id) {
       _lerEpub = (l.format === 'manga' || mangaEhCbz(zipCru))
         ? { manga: await mangaAbrir(buf) }
         : await epubAbrir(buf)
+      // A FOLHA DO LIVRO É LIDA UMA VEZ, NA ABERTURA. É dela que sai o
+      // itálico que o app jogava fora a cada capítulo (ver `_lerSanitizar`).
+      // Falhar aqui não pode impedir a leitura: sem mapa, o texto entra como
+      // entrava antes.
+      if (!_lerEpub.manga) {
+        try { _lerEpub.estilos = await epubEstilos(_lerEpub) }
+        catch (e) { console.warn('[ler] folha do livro:', e && e.message) }
+      }
     } else {
       const txt = new TextDecoder('utf-8').decode(buf)
       const ehHtml = /^\s*(<!doctype html|<html)/i.test(txt)
@@ -723,6 +735,12 @@ function _lerRenderTipografia() {
     ${linha('Largura', passo('largura', -2, '−') + `<b class="ler-val">${c.largura}em</b>` + passo('largura', 2, '+'))}
     ${linha('Leitura', ['pag', 'rolagem'].map(m =>
       `<button class="ler-btn ler-pill${m === c.modo ? ' on' : ''}" onclick="lerAjustar('modo','${m}')">${m === 'pag' ? 'Virar página' : 'Rolagem'}</button>`).join(''))}
+    ${linha('Texto do livro', [['sim', 'Arrumado'], ['nao', 'Como veio']].map(([v, r]) =>
+      `<button class="ler-btn ler-pill${v === c.arrumar ? ' on' : ''}" onclick="lerAjustar('arrumar','${v}')"
+        data-tip="${v === 'sim'
+          ? 'Fecha os buracos em branco, tira o recuo feito com espaço, junta parágrafo partido no meio e endireita a quebra de cena'
+          : 'Mostra o capítulo exatamente como o arquivo veio — serve para comparar'}">${r}</button>`).join('')
+      + `<span class="ler-arrumou">${_lerArrumouTexto()}</span>`)}
     ${linha('Destacar', [['nada', 'Nada'], ['minhas', 'O que estou estudando']].map(([v, r]) =>
       `<button class="ler-btn ler-pill${v === c.pintar ? ' on' : ''}" onclick="lerAjustar('pintar','${v}')">${r}</button>`).join(''))}
     ${linha('Ao selecionar', [['auto', 'Traduzir na hora'], ['menu', 'Só o menu']].map(([v, r]) =>
@@ -733,6 +751,24 @@ function _lerRenderTipografia() {
     <div class="ler-tip-nota">Dica: <b>duplo-clique</b> numa palavra manda ela para o Preparar com a frase.
       Selecione um trecho e a frase já aparece traduzida ali mesmo — o menu continua abrindo para
       explicar, ouvir em voz alta, salvar para estudo ou procurar na Wikipédia.</div>`
+}
+
+// O QUE O BOTÃO FEZ NESTE CAPÍTULO, em número. Sem isto o "Arrumado" seria um
+// ato de fé: ele clica e não tem como saber se mudou alguma coisa.
+function _lerArrumouTexto() {
+  const r = _lerArrumouRel
+  if (!r) return ''
+  if (!r.ligado) return 'mostrando o original'
+  const partes = []
+  if (r.virados) partes.push(`${r.virados} parágrafos remontados`)
+  if (r.vazios)  partes.push(`${r.vazios} buracos`)
+  if (r.junta)   partes.push(`${r.junta} emendas`)
+  if (r.nbsp)    partes.push(`${r.nbsp} recuos`)
+  if (r.cena)    partes.push(`${r.cena} quebras de cena`)
+  if (r.br)      partes.push(`${r.br} rajadas de linha`)
+  if (r.pagina)  partes.push(`${r.pagina} números de página`)
+  if (r.ancora)  partes.push(`${r.ancora} marcas invisíveis`)
+  return partes.length ? 'neste capítulo: ' + partes.join(', ') : 'este capítulo já estava limpo'
 }
 
 function lerAjustar(chave, valor) {
@@ -750,6 +786,14 @@ function lerAjustar(chave, valor) {
   _lerAplicarTipografia()
   _lerRenderTipografia()
   if (chave === 'pintar') { _lerRepintar() }
+  // ⚠️ ARRUMAR NÃO É TIPOGRAFIA: não basta repintar, o capítulo tem de ser
+  // MONTADO de novo — a limpeza acontece no HTML, antes de chegar à tela. Como
+  // a remontagem já leva a fração junto, ela sai por aqui e não cai no
+  // reposicionamento comum lá embaixo.
+  if (chave === 'arrumar') {
+    lerIrParaCapitulo(_lerCap, frac).then(() => _lerRenderTipografia())
+    return
+  }
   // Mudou o corpo do texto: a "página 12" de antes não é a mesma agora —
   // por isso a posição é guardada como FRAÇÃO e reaplicada.
   requestAnimationFrame(() => _lerIrParaFrac(frac))
@@ -789,17 +833,76 @@ async function _lerHtmlDoCapitulo(i) {
 // O HTML vem de um arquivo de terceiro: entra na página SEM script, sem
 // folha de estilo do editor (a tipografia é NOSSA — é o ponto do módulo) e
 // sem handler inline. As imagens viram blob: do próprio zip.
+//
+// ⚠️ MAS TIRAR A CLASSE TIRAVA O SENTIDO JUNTO, E ERA ISSO QUE DEIXAVA LIVRO
+// FEIO. Relato dele: *"os livros muitas vezes vêm com a formatação muito feia
+// e bagunçada"*. Medido nos 10 livros dele, não era o arquivo:
+//
+//   Different Seasons . 4,2 parágrafos-`<div>` por mil chars → o app não dá
+//                       espaço a `div`, e o livro virava um TIJOLO de texto
+//   Bag of Bones ...... 380 `<span class="txit">` = todo o itálico do King
+//   A Game of Thrones .. 168 itálicos, The Green Mile 112
+//   The Stand ..........  69 quebras de cena centralizadas
+//
+// Então são DUAS camadas, e elas são coisas diferentes:
+//
+//   1. RECUPERAR (sempre) — ler a folha do livro, traduzir o punhado de
+//      classes que carregam sentido (itálico, negrito, centro, recuo) para
+//      marcação NOSSA, e só então descartar a do editor. Conserto de entrada:
+//      não tem botão porque não tem por que estar errado.
+//   2. ARRUMAR (botão) — a limpeza do que é sujeira mesmo: buraco vazio,
+//      rajada de <br>, recuo feito com &nbsp;, parágrafo partido no meio,
+//      âncora de número de página. Isto é palpite bem-informado, não verdade,
+//      então é ligável e desligável — e continua existindo depois do conserto
+//      acima, porque sempre vai chegar livro torto.
 async function _lerSanitizar(html, capHref) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   doc.querySelectorAll('script,style,link,meta,title,iframe,object,embed,form,input,button,video,audio,svg').forEach(e => e.remove())
   const base = _dir(capHref)
 
+  // ---- 1. o sentido é lido ANTES de a classe morrer ----
+  const guardado = new Map()   // elemento → classes nossas
+  const estilos = (_lerEpub && _lerEpub.estilos) || new Map()
+  for (const e of doc.body.querySelectorAll('[class],[style]')) {
+    const sem = {}
+    for (const cl of (e.getAttribute('class') || '').split(/\s+/)) {
+      const d = estilos.get(cl)
+      if (d) Object.assign(sem, d)
+    }
+    const st = (e.getAttribute('style') || '').toLowerCase()
+    if (st) Object.assign(sem, _cssSentido(_cssDeclaracoes(st)) || {})
+    const nossas = _lerClassesDoSentido(e, sem)
+    if (nossas.length) guardado.set(e, nossas)
+  }
+
+  // ---- 2. agora sim, fora tudo que veio de fora ----
   for (const e of [...doc.body.querySelectorAll('*')]) {
     for (const at of [...e.attributes]) {
       const n = at.name.toLowerCase()
       if (n.startsWith('on') || n === 'style' || n === 'class' || n === 'id') e.removeAttribute(at.name)
     }
   }
+  for (const [e, cls] of guardado) if (e.isConnected) e.classList.add(...cls)
+
+  // ---- 3. parágrafo que se disfarçou de <div> vira parágrafo ----
+  // ⚠️ ESTE É O CONSERTO DO PIOR LIVRO DELE. `.ler-conteudo p` tem margem;
+  // `div` não tem nenhuma — e um livro inteiro composto em `<div class="pi">`
+  // (Different Seasons) chegava sem UMA linha em branco entre parágrafos.
+  let virados = 0
+  for (const d of [...doc.body.querySelectorAll('div')]) {
+    if (d.querySelector('p,div,h1,h2,h3,h4,h5,h6,ul,ol,table,blockquote')) continue
+    if (!d.textContent.trim()) continue
+    const p = doc.createElement('p')
+    for (const at of [...d.attributes]) p.setAttribute(at.name, at.value)
+    while (d.firstChild) p.appendChild(d.firstChild)
+    d.replaceWith(p)
+    virados++
+  }
+
+  // ---- 4. a limpeza opcional ----
+  const rel = (lerCfg().arrumar !== 'nao') ? _lerArrumar(doc) : null
+  _lerArrumouRel = { virados, ...(rel || {}), ligado: lerCfg().arrumar !== 'nao' }
+
   for (const img of [...doc.body.querySelectorAll('img')]) {
     const src = img.getAttribute('src')
     const alvo = src && _resolver(base, src)
@@ -821,6 +924,120 @@ async function _lerSanitizar(html, capHref) {
     if (idx >= 0) { a.setAttribute('data-cap', String(idx)); a.classList.add('ler-link-int') }
   }
   return doc.body.innerHTML
+}
+
+// O que o livro dizia → o que NÓS escrevemos. Duas recusas importam aqui:
+// não repetir o que a etiqueta já diz (negrito num `<h2>`, itálico num `<em>`)
+// e não deixar `body`/`html` empurrarem o texto inteiro para a direita — o
+// `body.calibre { margin-left }` de conversão de Calibre faria exatamente isso.
+const _LER_BLOCO = /^(p|div|h[1-6]|blockquote|li|td|th|section|article|figcaption)$/i
+function _lerClassesDoSentido(e, sem) {
+  const tag = e.tagName.toLowerCase()
+  if (tag === 'body' || tag === 'html') return []
+  const out = []
+  const cabecalho = /^h[1-6]$/.test(tag)
+  if (sem.it && !/^(i|em)$/.test(tag)) out.push('ler-it')
+  if (sem.neg && !/^(b|strong)$/.test(tag) && !cabecalho) out.push('ler-neg')
+  if (sem.vs) out.push('ler-vs')
+  if (_LER_BLOCO.test(tag)) {
+    if (sem.centro) out.push('ler-centro')
+    else if (sem.dir) out.push('ler-dir')
+    if (sem.rec && !cabecalho) out.push('ler-bloco')
+  }
+  return out
+}
+
+// ---------------------------------------------------------------
+// ARRUMAR — a faxina que o botão liga e desliga
+// ---------------------------------------------------------------
+// Cada regra aqui é um palpite sobre INTENÇÃO, e é por isso que existe botão:
+// palpite tem de poder ser desligado. Todas contam quanto mexeram, e a conta
+// aparece no painel Aa — sem isso o botão seria fé.
+let _lerArrumouRel = null
+
+function _lerArrumar(doc) {
+  const rel = { vazios: 0, cena: 0, br: 0, nbsp: 0, junta: 0, ancora: 0, pagina: 0 }
+  const corpo = doc.body
+
+  // âncoras de número de página: `<a id="page_246"/>` já perdeu o id acima e
+  // sobrou como elemento vazio no meio da frase
+  for (const a of [...corpo.querySelectorAll('a')]) {
+    if (a.textContent.trim() || a.querySelector('img') || a.getAttribute('href')) continue
+    a.remove(); rel.ancora++
+  }
+  for (const s of [...corpo.querySelectorAll('span,font,small,big,u,tt')]) {
+    if (!s.attributes.length && !s.textContent.trim() && !s.querySelector('img')) s.remove()
+  }
+
+  // rajada de <br>: três ou mais é alguém pedindo espaço, não quebra de linha
+  for (const br of [...corpo.querySelectorAll('br')]) {
+    if (!br.isConnected) continue
+    let n = 1, p = br.nextSibling
+    const fila = [br]
+    while (p) {
+      if (p.nodeType === 3 && !p.nodeValue.trim()) { p = p.nextSibling; continue }
+      if (p.nodeType === 1 && p.tagName === 'BR') { fila.push(p); n++; p = p.nextSibling; continue }
+      break
+    }
+    if (n >= 3) { fila.forEach(x => x.remove()); rel.br++ }
+  }
+
+  const blocos = () => [...corpo.querySelectorAll('p,div,h1,h2,h3,h4,h5,h6,blockquote')]
+
+  // separador de cena escrito à mão (* * *, # # #, ~~~) ganha forma de
+  // separador em vez de virar uma linha solta e torta no meio da coluna
+  for (const b of blocos()) {
+    const t = b.textContent.replace(/[\s\u00a0]+/g, '')
+    if (!t || t.length > 12 || b.querySelector('img')) continue
+    if (!/^[*#~•·°◆■□—––—•⁂✱-]+$/.test(t)) continue
+    b.classList.add('ler-cena'); rel.cena++
+  }
+
+  // linha que é só o número da página (herança de digitalização)
+  for (const b of blocos()) {
+    const t = b.textContent.trim()
+    if (/^\d{1,4}$/.test(t) && !b.querySelector('img')) { b.remove(); rel.pagina++ }
+  }
+
+  // recuo feito com espaço-duro no começo do parágrafo: some, porque quem dá
+  // o recuo aqui é o CSS do leitor
+  const cam = doc.createTreeWalker(corpo, NodeFilter.SHOW_TEXT)
+  const textos = []
+  for (let n = cam.nextNode(); n; n = cam.nextNode()) textos.push(n)
+  for (const n of textos) {
+    if (n.nodeValue.indexOf('\u00a0') < 0) continue
+    const novo = n.nodeValue.replace(/\u00a0{2,}/g, ' ').replace(/^[\s\u00a0]+/, m => m.includes('\u00a0') ? '' : m)
+    if (novo !== n.nodeValue) { n.nodeValue = novo; rel.nbsp++ }
+  }
+
+  // bloco vazio: buraco branco no meio da leitura. O primeiro de uma sequência
+  // vira um respiro medido; os seguintes saem.
+  let anterior = null
+  for (const b of blocos()) {
+    if (b.textContent.trim() || b.querySelector('img')) { anterior = null; continue }
+    if (anterior || !b.previousElementSibling || !b.nextElementSibling) { b.remove(); rel.vazios++; continue }
+    b.textContent = ''
+    b.classList.add('ler-respiro')
+    anterior = b; rel.vazios++
+  }
+
+  // parágrafo partido no meio da frase (dano clássico de PDF virando EPUB):
+  // o anterior termina sem pontuação e o seguinte começa em minúscula
+  const ps = [...corpo.querySelectorAll('p')]
+  for (let i = ps.length - 1; i > 0; i--) {
+    const a = ps[i - 1], b = ps[i]
+    if (!a.isConnected || !b.isConnected) continue
+    if (a.querySelector('img') || b.querySelector('img')) continue
+    if (a.className || b.className) continue
+    const ta = a.textContent.trim(), tb = b.textContent.trim()
+    if (ta.length < 40 || tb.length < 2) continue
+    if (!/[a-zà-ú,;]$/.test(ta)) continue          // terminou em letra ou vírgula
+    if (!/^[a-zà-ú]/.test(tb)) continue            // e o seguinte começa em minúscula
+    a.appendChild(doc.createTextNode(' '))
+    while (b.firstChild) a.appendChild(b.firstChild)
+    b.remove(); rel.junta++
+  }
+  return rel
 }
 
 // Enquanto o capítulo está sendo montado e posicionado, NADA grava posição.
@@ -2978,7 +3195,30 @@ function _lerRaioXBlocoHTML() {
                 data-tip="Já sei esta palavra COM ESTE sentido — não aparece mais">${ic('check','ic-3xs')}</button>
       </span>`).join('')}</div>` : ''}
     <button class="btn btn-ghost btn-sm" onclick="lerRaioXApagar()">${ic('refresh','ic-sm')} Analisar de novo</button>
+    <button class="btn btn-ghost btn-sm" onclick="lerRaioXFixar()"
+            data-tip="Manda esta análise para a nuvem como a boa — os outros aparelhos passam a usar ela">
+      ${ic('cloud','ic-sm')} Usar esta em todos os aparelhos</button>
   </div>`
+}
+
+// ⚠️ ESTE BOTÃO EXISTE PORQUE A REGRA AUTOMÁTICA TEM UM PONTO CEGO, e ele
+// aparece justamente no acervo dele: entre duas análises ANTIGAS (feitas antes
+// da ficha técnica), o desempate cai em "mais itens" — e mais itens não é
+// sinônimo de melhor. Um modelo tagarela pode devolver quarenta apontamentos
+// ruins e ganhar de quinze bons.
+// Quando ELE olha as duas e sabe qual presta, a escolha humana tem de valer
+// mais que qualquer heurística — mesmo desenho do status "Parado" na estante
+// (§8.54), o único que o app nunca atribui sozinho.
+async function lerRaioXFixar() {
+  if (!_lerLivro || !_lerRaioX) return
+  const chave = _lerChaveRaioX(_lerCap)
+  const bruto = await BookDB.get(chave)
+  if (!bruto) { toast('Não achei esta análise guardada aqui.', 'error'); return }
+  if (typeof geradoFixar !== 'function') { toast('Entre na sua conta para mandar para os outros aparelhos.', 'warning'); return }
+  const ok = await geradoFixar(chave, { tipo: 'raiox', livroId: String(_lerLivro.id), cap: Number(_lerCap) })
+  toast(ok
+    ? 'Pronto — esta é a análise que vale nos seus aparelhos'
+    : 'Não consegui mandar agora. Confira a conexão e a sua conta.', ok ? 'success' : 'error')
 }
 
 // "Já sei este sentido": tira do texto, tira da lista e ensina o filtro para as
