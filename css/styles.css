@@ -5555,6 +5555,16 @@ body.ab-full .ab-fala-t{color:color-mix(in srgb, var(--ler-fg) 45%, transparent)
    vai FAZER — a lista precisa responder as duas coisas de uma olhada. */
 .ler-raiox-n{font-size:var(--fs-3xs);color:var(--text3);white-space:nowrap}
 .ler-raiox-cap.feito .ler-raiox-n{color:var(--role-dominio)}
+/* "refazer": so aparece no capitulo ja analisado, e discreto ate a hora — a
+   acao custa uma chamada de IA, entao ela nao pode competir com o clique
+   normal, que so leva ate o capitulo. */
+.ler-raiox-refaz{
+  font-size:var(--fs-3xs);color:var(--text3);white-space:nowrap;cursor:pointer;
+  padding:2px 6px;border-radius:5px;border:1px solid transparent;opacity:.55;
+}
+.ler-raiox-cap:hover .ler-raiox-refaz{opacity:1;border-color:rgba(128,128,128,.35)}
+.ler-raiox-refaz:hover{background:rgba(128,128,128,.18);color:var(--text)}
+.ler-raiox-refaz:focus-visible{outline:2px solid rgba(var(--primary-rgb),.6);opacity:1}
 .est-chip-forte{
   background:rgba(var(--primary-rgb),.18);border-color:rgba(var(--primary-rgb),.5);
   color:var(--text);

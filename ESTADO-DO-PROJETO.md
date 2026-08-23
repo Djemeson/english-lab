@@ -21,7 +21,7 @@
 > ⚠️ **Uma armadilha pega a tempo:** apagar a linha do número de página desalinharia o "ler
 > ouvindo" — passou a esconder, não apagar. Medido no app com 4 EPUBs reais: **659 parágrafos
 > remontados**, **57 itálicos recuperados** num capítulo, mangá intacto.
-> `sw.js` → **englab-v404**. **Detalhes em §8.98.**
+> `sw.js` → **englab-v405**. **Detalhes em §8.98.**
 >
 > Última atualização anterior: 2026-08-22 (41ª) — **A FICHA CHEGA AO PRÉ-ESTUDO E À QUEBRA**. Os dois
 > últimos materiais pagos que ainda decidiam por quantidade e recência. ⚠️ **E eles expuseram um
@@ -15274,6 +15274,35 @@ o raio-X do livro e do audiolivro.
 rodei a IA de verdade**: a chave dele vive no navegador dele e o `.env` do projeto tem só um
 marcador. Quem fecha isto é ele, remarcando a mesma frase — e o teste é objetivo: se voltar
 *"papai noel"*, a regra não pegou.
+
+### "Não tem a opção de reanalisar" — e não tinha mesmo
+
+Print do painel do raio-X: capítulo com a marca só levava até ele; a única forma de refazer era
+apagar pelo painel de ferramentas, que fica noutro lugar. Sem isso ele não tinha como conferir a
+regra da imagem que acabara de entrar.
+
+**Entrou "refazer"** na linha do capítulo já analisado — discreto (a ação custa uma chamada de
+IA e não pode competir com o clique normal, que só navega), com confirmação nomeando o capítulo.
+
+⚠️ **E REFAZER PRECISOU DE CARIMBO, senão desfaria sozinho.** `geradoLerMelhor` escolhe entre a
+análise daqui e a da nuvem por heurística, e um dos critérios é **mais itens ganha**. Uma
+análise nova e melhor — a regra da imagem tende a produzir glosas mais precisas, não mais
+numerosas — perderia para a antiga guardada no outro aparelho e **voltaria sozinha na próxima
+abertura**. O projeto já tinha a saída: `geradoFixar`, o carimbo de escolha humana que vence a
+heurística por desenho (§8.96). Refazer é escolha humana; agora carimba.
+
+### ⚠️ E o painel dependia de ele ter aberto o sumário antes
+
+Descoberto no teste: aberto **antes** do sumário, o raio-X mostrava *"News item from the
+Westover. . ."* em vez de *"Part One"* — a descoberta de nome e a emenda do arquivo partido
+rodavam só na renderização do sumário. É a mesma lista de capítulos; tem de dizer a mesma coisa
+qualquer que seja a porta. Agora o painel resolve os nomes antes de pintar.
+
+**Testado ao vivo:** painel aberto direto (sem passar pelo sumário) → *"Part One · 2 · refazer /
+Part Two · analisar / Part Three · analisar"*; "refazer" só na linha analisada; o clique não
+navega (`stopPropagation` conferido) e a confirmação nomeia o capítulo certo; **recusando, nada
+acontece** — análise intacta, painel aberto. ⚠️ **A reanálise em si não foi executada**: precisa
+da chave de IA dele.
 
 ### ⚠️ Outra sessão commitou por cima no meio da rodada
 

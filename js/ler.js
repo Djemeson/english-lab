@@ -3826,6 +3826,11 @@ let _lerRaioXMapa = null      // { [cap]: quantidade }
 async function lerRaioXPainel() {
   const p = el('ler-raiox-painel')
   if (p && p.classList.contains('aberto')) { p.classList.remove('aberto'); return }
+  // ⚠️ O NOME BOM NÃO PODE DEPENDER DE ELE TER ABERTO O SUMÁRIO ANTES. A
+  // descoberta de nome (e a emenda do arquivo partido) morava só lá — quem
+  // abrisse este painel primeiro via "News item from the Westover. . ." em vez
+  // de "Part One". É a mesma lista de capítulos; tem de dizer a mesma coisa.
+  try { await _lerNomearPeloConteudo() } catch (e) {}
   await _lerRaioXMapear()
   _lerRaioXPainelRender()
   el('ler-raiox-painel').classList.add('aberto')
@@ -3883,6 +3888,10 @@ function _lerRaioXPainelRender(msg) {
           <span class="ler-raiox-spark">${n ? ic('sparkles','ic-sm') : ''}</span>
           <span class="ler-raiox-nome">${esc(nome)}</span>
           <span class="ler-raiox-n">${n ? n : 'analisar'}</span>
+          ${n ? `<span class="ler-raiox-refaz" role="button" tabindex="0"
+                   onclick="event.stopPropagation();lerRaioXRefazer(${i})"
+                   data-tip="Analisar este capítulo de novo, do zero — descarta a análise atual e gasta uma chamada de IA"
+                   >refazer</span>` : ''}
         </button>`
       }).join('')}
     </div>
@@ -3894,6 +3903,34 @@ function _lerRaioXPainelRender(msg) {
     p.style.top = Math.round(r.bottom + 8) + 'px'
     p.style.left = Math.round(Math.max(8, Math.min(r.left - 120, innerWidth - 340))) + 'px'
   }
+}
+
+// REFAZER A ANÁLISE — pedido dele ao ver o painel: *"não tem a opção de
+// reanalisar"*. E não tinha mesmo: capítulo com a marca só levava até ele, e a
+// única saída era apagar pelo painel de ferramentas, que fica noutro lugar.
+//
+// ⚠️ REFAZER É ESCOLHA HUMANA, E PRECISA DE CARIMBO. `geradoLerMelhor` escolhe
+// entre o daqui e o da nuvem por heurística, e **mais itens ganha**. Uma
+// análise nova e melhor com MENOS apontamentos perderia para a antiga guardada
+// no outro aparelho — e voltaria sozinha na próxima abertura. `geradoFixar`
+// carimba "esta é a boa", e o carimbo vence a heurística por desenho.
+async function lerRaioXRefazer(i) {
+  if (!_lerLivro || _lerRaioXCarregando) return
+  const nome = lerCapNome(i)
+  if (!confirm(`Analisar "${nome}" de novo?
+
+A análise atual é descartada e uma nova chamada de IA é feita.`)) return
+  if (i !== _lerCap) await lerIrParaCapitulo(i, 0)
+  try { await BookDB.del(_lerChaveRaioX(i)) } catch (e) {}
+  _lerRaioX = null
+  _lerRaioXDespintar()
+  await lerRaioXAnalisar()
+  if (typeof geradoFixar === 'function') {
+    try { await geradoFixar(_lerChaveRaioX(i), { tipo: 'raiox', livroId: String(_lerLivro.id), cap: Number(i) }) } catch (e) {}
+  }
+  await _lerRaioXMapear()
+  _lerRaioXPainelRender()
+  el('ler-raiox-painel')?.classList.add('aberto')
 }
 
 // Clique num capítulo: vai até ele e, se ainda não tiver análise, manda fazer.
