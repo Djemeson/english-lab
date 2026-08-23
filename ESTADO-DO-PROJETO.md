@@ -7,7 +7,15 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (39ª) — **MATERIAL GERADO DEIXA DE SER ESTADO E PASSA A SER
+> Última atualização: 2026-08-22 (40ª) — **"USAR ESTA EM TODOS OS APARELHOS"**. A pergunta
+> *"tem como fazer essa de agora do navegador ir por telefone?"* já tinha resposta automática em
+> §8.95 — mas expôs um ponto cego: entre duas análises **antigas**, o desempate cai em *mais
+> itens*, e mais itens não é melhor. Agora existe o carimbo da escolha dele, e ele é o
+> **primeiro critério de todos**. **Testado:** a análise que ele fixa vence uma de **300 itens**
+> mais recente, e o "telefone" com 300 locais adota a dele ao abrir o capítulo.
+> `sw.js` → **englab-v393**. **Detalhes em §8.96.**
+>
+> Última atualização anterior: 2026-08-22 (39ª) — **MATERIAL GERADO DEIXA DE SER ESTADO E PASSA A SER
 > ACERVO**. *"uma versão no telefone e outra, a mais precisa, no navegador"* — e não havia
 > mistério: **eram dois modelos**. A OpenAI ficou sem crédito, ele passou ao Gemini Flash-Lite, e
 > o que fora analisado antes tinha saído do GPT-5.6 Luna. O app guardava `itens`, `nivel` e `at`:
@@ -14830,6 +14838,39 @@ inventar um nome ali seria pior que não dizer nada: o aviso então fala do que 
 
 Ao fim, local e nuvem com **149 itens cada**, acervo intacto (11 livros, 5 audiolivros com as
 transcrições no lugar), console limpo.
+
+## 8.96 "Usar esta em todos os aparelhos" — escolha humana vence heurística (2026-08-22, 40ª)
+
+**A pergunta:** *"tem como fazer essa de agora do navegador ir por telefone?"*
+
+A resposta automática já era **sim**: a reconciliação de §8.95 leva a melhor para os dois lados
+assim que o capítulo abre no outro aparelho. Mas a pergunta expôs um **ponto cego**, e ele
+aparece justamente no acervo dele: entre duas análises **antigas** (feitas antes da ficha
+técnica), o desempate cai em *mais itens* — e mais itens não é sinônimo de melhor. Um modelo
+tagarela devolve quarenta apontamentos ruins e ganha de quinze bons.
+
+### O carimbo
+
+`geradoFixar` grava `ficha.fixadoEm` no material local e o manda para a nuvem. No comparador,
+`fixado` passou a ser o **primeiro critério, antes de tudo** — inclusive antes de "veio
+inteira". Entre duas escolhas humanas, vence a mais recente: ele mudou de ideia.
+
+⚠️ **Mesmo desenho do status "Parado" da estante (§8.54)**, o único que o app nunca atribui
+sozinho. Quando ele olha as duas versões e aponta a que presta, nenhuma regra automática tem o
+direito de discordar.
+
+O botão fica no painel de ferramentas do leitor, ao lado de *"Analisar de novo"*.
+
+### Testado ao vivo (regra nº 5)
+
+| Teste | Resultado |
+|---|---|
+| Fixar a análise atual | carimbo gravado e subido; **149 itens** na nuvem |
+| Ela vence uma de **300 itens**, mais recente | **sim** — a escolha dele passa na frente da quantidade |
+| Entre duas escolhas dele | ganha a **mais recente** |
+| "Telefone" com 300 itens locais abre o capítulo | **adota a de 149** e corrige o próprio armazenamento |
+
+Console limpo.
 
 ## 9. Pendências / a verificar
 

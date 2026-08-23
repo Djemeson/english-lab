@@ -5854,6 +5854,8 @@ body.lendo .sb-nav:hover,body.lendo .sb-foot:hover{opacity:1}
 .ler-tip-linha>span{width:88px;flex-shrink:0;color:var(--ler-fg2);font-size:var(--fs-xs)}
 .ler-tip-linha>div{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .ler-val{min-width:52px;text-align:center;color:var(--ler-fg);font-size:var(--fs-xs)}
+/* o que a faxina fez neste capitulo, em numero — sem isto o botao seria fe */
+.ler-arrumou{color:var(--ler-fg2);font-size:var(--fs-3xs);opacity:.85;flex-basis:100%}
 .ler-tema{
   width:34px;height:30px;border-radius:6px;cursor:pointer;
   border:2px solid transparent;font-family:Georgia,serif;font-size:13px;line-height:1;
@@ -5929,6 +5931,34 @@ body.lendo .sb-nav:hover,body.lendo .sb-foot:hover{opacity:1}
 .ler-conteudo hr{border:0;border-top:1px solid rgba(128,128,128,.3);margin:2em auto;width:40%}
 .ler-conteudo ul,.ler-conteudo ol{margin:0 0 .9em 1.3em}
 .ler-conteudo table{max-width:100%;display:block;overflow-x:auto}
+/* PARAGRAFO QUE VEIO COMO <div>. Livro convertido por Calibre compoe o texto
+   inteiro em <div class="pi"> — sem esta linha o livro chega como um tijolo
+   unico, sem uma linha em branco entre paragrafos. O sanitizador ja converte
+   os que sao folha; esta regra cobre o que sobrar (div dentro de div).
+   ⚠️ MANGA FICA DE FORA. La o div nao e paragrafo — e pagina, balao, camada;
+   dar margem de paragrafo a eles abriria um vao entre cada pagina do volume. */
+.ler-leitor:not([data-obra="manga"]) .ler-conteudo div{margin:0 0 .85em}
+.ler-leitor:not([data-obra="manga"]) .ler-conteudo div:empty{margin:0}
+
+/* ---- o sentido recuperado da folha do proprio livro ---- */
+/* O editor dizia "isto e italico" pela CLASSE; o leitor apagava a classe e o
+   italico sumia junto. Aqui ele volta, com marcacao nossa. */
+.ler-conteudo .ler-it{font-style:italic}
+.ler-conteudo .ler-neg{font-weight:700}
+.ler-conteudo .ler-vs{font-variant:small-caps;letter-spacing:.02em}
+.ler-conteudo .ler-centro{text-align:center;hyphens:none}
+.ler-conteudo .ler-dir{text-align:right;hyphens:none}
+.ler-conteudo .ler-bloco{
+  margin-left:1.8em;margin-right:.4em;color:var(--ler-fg2);
+  font-size:.96em;hyphens:none;
+}
+/* quebra de cena: o "* * *" solto na margem esquerda vira separador */
+.ler-conteudo .ler-cena{
+  text-align:center;letter-spacing:.55em;text-indent:.55em;
+  margin:1.5em 0;color:var(--ler-fg2);opacity:.75;
+}
+/* o unico buraco branco que sobrevive a faxina, com medida propria */
+.ler-conteudo .ler-respiro{margin:0;height:1.4em}
 .ler-carregando{color:var(--ler-fg2);font-style:italic}
 /* selecionar e a acao principal aqui - nada de user-select:none */
 .ler-conteudo::selection,.ler-conteudo *::selection{background:rgba(var(--primary-rgb),.28)}
