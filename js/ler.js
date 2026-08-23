@@ -2672,8 +2672,14 @@ async function lerRaioXCarregar(cap) {
         { tipo: 'raiox', livroId: String(_lerLivro.id), cap: Number(cap) })
       g = r.texto
       if (r.trocou && r.ficha) {
-        const nome = typeof aiNomeDoModelo === 'function' ? aiNomeDoModelo(r.ficha.prov, r.ficha.modelo) : r.ficha.modelo
-        toast(`Usei a análise do outro aparelho — feita com ${nome}`, 'info')
+        // ⚠️ ANÁLISE ANTIGA NÃO TEM MODELO PARA CITAR — e inventar um nome
+        // ali seria pior que não dizer nada. Nesse caso o aviso fala do que
+        // dá para afirmar: ela tem mais pontos que a daqui.
+        const nome = r.ficha.modelo && typeof aiNomeDoModelo === 'function'
+          ? aiNomeDoModelo(r.ficha.prov, r.ficha.modelo) : ''
+        toast(nome
+          ? `Usei a análise do outro aparelho — feita com ${nome}`
+          : `Usei a análise do outro aparelho — ${r.ficha.itens} pontos, contra ${(r.antes || {}).itens || 0} daqui`, 'info')
       }
     } else {
       g = typeof geradoLer === 'function' ? await geradoLer(_lerChaveRaioX(cap)) : await BookDB.get(_lerChaveRaioX(cap))
