@@ -1330,7 +1330,7 @@ function _lerMapaSumario() {
   // por capítulo pelo tamanho; o arquivo dele (`part0007.html`) não diz nada.
   // Quem diz é o título, e ele estava sendo ignorado — o posfácio virava o
   // "capítulo 5" de um livro de quatro novelas.
-  const peca = caps.map((c, i) => _lerNomePeloArquivo(c) || _lerPecaPeloNome(lerCapNome(i)))
+  const peca = caps.map((c, i) => _lerNomePeloArquivo(c) || _lerPecaPeloNome(_lerNomeBase(i)))
   let ini = -1, fim = -1
   caps.forEach((c, i) => {
     if (escondidos.has(i) || palavras[i] < LER_CORPO_MIN) return
