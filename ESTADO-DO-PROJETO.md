@@ -7,7 +7,15 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (40ª) — **"USAR ESTA EM TODOS OS APARELHOS"**. A pergunta
+> Última atualização: 2026-08-22 (41ª) — **A FICHA CHEGA AO PRÉ-ESTUDO E À QUEBRA**. Os dois
+> últimos materiais pagos que ainda decidiam por quantidade e recência. ⚠️ **E eles expuseram um
+> defeito no comparador:** cada material chama a sua lista de um jeito (`itens`, `items`,
+> `ancoras`) e o comparador contava só `itens` — os outros três empatavam em **zero** e o
+> desempate caía na data, o critério mais fraco. **Testado com uma quebra real:** nasceu com
+> ficha e perde para uma do `gpt-5`, como deve. `sw.js` → **englab-v394**.
+> **Detalhes em §8.97.**
+>
+> Última atualização anterior: 2026-08-22 (40ª) — **"USAR ESTA EM TODOS OS APARELHOS"**. A pergunta
 > *"tem como fazer essa de agora do navegador ir por telefone?"* já tinha resposta automática em
 > §8.95 — mas expôs um ponto cego: entre duas análises **antigas**, o desempate cai em *mais
 > itens*, e mais itens não é melhor. Agora existe o carimbo da escolha dele, e ele é o
@@ -14872,6 +14880,39 @@ O botão fica no painel de ferramentas do leitor, ao lado de *"Analisar de novo"
 
 Console limpo.
 
+## 8.97 A ficha chega ao pré-estudo e à quebra de frase (2026-08-22, 41ª)
+
+**O pedido:** *"faz a ficha do pré-estudo e da quebra também"* — fechando a pendência aberta em
+§8.95. Eram os dois últimos materiais pagos que ainda entravam na comparação como "antigos",
+decidindo por quantidade e recência.
+
+| Material | O que a ficha passou a registrar |
+|---|---|
+| **Pré-estudo** | provedor, modelo, força, **lotes**, **ignorados** (o análogo de "falhas": resposta que a IA devolveu fora do lote e teve de ser descartada), pedidos e entregues |
+| **Quebra de frase** | provedor, modelo, força, pedaços e idioma |
+
+Os dois passaram também a **ler pelos dois lados** (`geradoLerMelhor`): sem isso, o pré-estudo
+feito no telefone e o feito no navegador conviveriam para sempre, cada um no seu canto — que era
+exatamente o sintoma original.
+
+### ⚠️ O defeito que os dois expuseram no comparador
+
+**Cada material chama a sua lista de um jeito**: `itens` no raio-X e no pré-estudo, `items` na
+quebra, `ancoras` no mapa de sincronia. O `geradoNota` contava só `itens` — então os outros
+três empatavam em **zero** e o desempate caía inteiro na data, que é o critério mais fraco de
+todos. Uma quebra de duas palavras feita hoje ganharia de uma boa feita ontem.
+
+### Testado ao vivo (regra nº 5)
+
+| Teste | Resultado |
+|---|---|
+| Comparador com as três formas de lista | `itens`, `items` e `ancoras`: **a maior vence nas três** |
+| Quebra REAL disparada (IA de verdade, 3,5 s) | nasceu **com ficha** — `gemini-flash-lite-latest`, força 1 — e subiu para a nuvem |
+| Essa quebra contra uma "do outro aparelho" com `gpt-5` | **vence a do modelo forte**, mesmo sendo mais antiga |
+| Quebras antigas, sem ficha | lidas normalmente pelo caminho novo, sem troca — compatibilidade preservada |
+
+Material de teste apagado do aparelho e da nuvem ao fim. Console limpo.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -14883,7 +14924,9 @@ Console limpo.
 
 ### Da rodada do material gerado (§8.95, 2026-08-22)
 
-- [ ] **O PRÉ-ESTUDO E A QUEBRA AINDA NÃO GUARDAM FICHA** — o raio-X do livro e o do audiolivro
+- [x] ~~**O PRÉ-ESTUDO E A QUEBRA AINDA NÃO GUARDAM FICHA**~~ — **feito em 2026-08-22** (§8.97),
+      junto com a correção do comparador, que contava só `itens` e zerava `items` e `ancoras`.
+      Texto original: — o raio-X do livro e o do audiolivro
       guardam; os outros dois materiais pagos passam pelo mesmo `geradoGuardar`, mas seus pacotes
       não carregam `ficha`. Sem ela, entram na comparação como "antigo" e decidem por quantidade
       e recência. Barato de fechar, e vale.

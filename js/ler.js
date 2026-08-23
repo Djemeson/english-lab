@@ -392,6 +392,7 @@ async function lerAbrir(id) {
   // achado no capítulo 9 de um livro apareceria no capítulo 9 do próximo —
   // a chave do cache é o ÍNDICE, e índice todo livro tem.
   _lerNomesAuto = {}
+  _lerVazios = new Set()
   _lerSumarioBusca = ''
   _lerSumarioAbre = {}
   _lerCap = Math.min(l.pos?.cap || 0, l.chapters.length - 1)
@@ -1196,6 +1197,7 @@ function lerCapituloAnterior() { if (_lerCap > 0) lerIrParaCapitulo(_lerCap - 1,
 
 const LER_PPM = 220              // palavras por minuto — leitura em língua estrangeira
 let _lerNomesAuto = {}           // índice → nome descoberto lendo o capítulo
+let _lerVazios = new Set()       // índice → arquivo sem uma palavra e sem imagem
 let _lerSumarioBusca = ''
 let _lerSumarioAbre = {}         // grupo → aberto?
 
@@ -1286,6 +1288,12 @@ function _lerMapaSumario() {
     const a = caps[i], b = caps[i + 1]
     if ((a.words || 0) > 30 || _lerNomeVago(a.titulo)) continue
     if ((b.words || 0) < LER_CORPO_MIN || !_lerNomeVago(b.titulo)) continue
+    // ⚠️ CAPA NÃO É TÍTULO DE CAPÍTULO. Sem esta linha o "Cover" de Bag of
+    // Bones (zero palavras) emendou com o texto de trás e virou o capítulo 1 —
+    // e, sendo o índice 0, arrastou TODO o miolo editorial para dentro do
+    // livro. Peça editorial nunca dá nome a capítulo, e título de verdade tem
+    // pelo menos uma palavra.
+    if (!(a.words > 0) || _lerNomePeloArquivo(a)) continue
     escondidos.add(i + 1)
     palavras[i] = (a.words || 0) + (b.words || 0)
   }
@@ -1310,7 +1318,7 @@ function _lerMapaSumario() {
   const linhas = []
   let n = 0, ultimoNome = ''
   caps.forEach((c, i) => {
-    if (escondidos.has(i)) return
+    if (escondidos.has(i) || _lerVazios.has(i)) return
     let grupo = i < ini ? 'frente' : (i > fim ? 'fundo' : 'corpo')
     if (grupo === 'corpo' && _LER_FUNDO.has(peca[i])) grupo = 'fundo'
     let nome = lerCapNome(i)
