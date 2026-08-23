@@ -235,6 +235,79 @@ function epubTextoLimpo(html) {
 }
 
 // ---------------------------------------------------------------
+// A FOLHA DE ESTILO DO LIVRO — o que ela DIZ, não como ela pinta
+// ---------------------------------------------------------------
+// ⚠️ ESTA FUNÇÃO EXISTE PORQUE JOGAR FORA A CLASSE JOGAVA FORA O SENTIDO.
+// O leitor tira `class` e `style` do HTML do editor — e tem de tirar mesmo:
+// a tipografia é nossa, e CSS de terceiro entrando na página é buraco de
+// segurança. Só que a classe não carregava só aparência; carregava
+// SIGNIFICADO. Medido no acervo dele (5 maiores capítulos de cada livro):
+//
+//   Bag of Bones ...... 380 <span class="txit"> — TODO o itálico do King
+//   A Game of Thrones .. 168 <span class="italic">
+//   The Green Mile ..... 112 <span class="txit">
+//   The Stand ..........  69 quebras de cena centralizadas
+//
+// Ou seja: o pensamento do narrador, que no livro é itálico, chegava aqui
+// como texto comum. Não era o arquivo que vinha feio — era o app que
+// achatava. A saída não é confiar no CSS do editor, é LER o CSS e traduzir
+// o punhado de coisas que importam para marcação NOSSA, própria e segura.
+//
+// Sai um mapa `classe → { it, neg, centro, dir, vs, rec }`. Nada de cor,
+// fonte, tamanho ou margem: isso é decisão do leitor, não do editor.
+async function epubEstilos(ep) {
+  const mapa = new Map()
+  if (!ep || !ep.itens || !ep.zip) return mapa
+  const folhas = [...ep.itens.values()].filter(i => /text\/css/i.test(i.tipo) || /\.css$/i.test(i.href))
+  for (const f of folhas) {
+    let css = ''
+    try { css = await ep.zip.texto(f.href) || '' } catch (e) { continue }
+    _cssDentro(css, mapa)
+  }
+  return mapa
+}
+
+// Um seletor por vez. Só interessa o que termina em `.classe` — `.x p` fala
+// do parágrafo dentro de `.x`, e cascata não se resolve por regex.
+function _cssDentro(css, mapa) {
+  css = String(css).replace(/\/\*[\s\S]*?\*\//g, '')
+  for (const bloco of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const d = _cssDeclaracoes(bloco[2])
+    const sem = _cssSentido(d)
+    if (!sem) continue
+    for (const sel of bloco[1].split(',')) {
+      const c = sel.trim().match(/\.([A-Za-z0-9_-]+)\s*$/)
+      if (!c) continue
+      mapa.set(c[1], { ...(mapa.get(c[1]) || {}), ...sem })
+    }
+  }
+}
+
+function _cssDeclaracoes(corpo) {
+  const d = {}
+  for (const dec of String(corpo).split(';')) {
+    const i = dec.indexOf(':')
+    if (i < 0) continue
+    d[dec.slice(0, i).trim().toLowerCase()] = dec.slice(i + 1).trim().toLowerCase()
+  }
+  return d
+}
+
+function _cssSentido(d) {
+  const s = {}
+  if (/italic|oblique/.test(d['font-style'] || '')) s.it = 1
+  if (/bold|^[6-9]00$/.test(d['font-weight'] || '')) s.neg = 1
+  if (/center/.test(d['text-align'] || '')) s.centro = 1
+  if (/right/.test(d['text-align'] || '')) s.dir = 1
+  if (/small-caps/.test(d['font-variant'] || '') || /uppercase/.test(d['text-transform'] || '')) s.vs = 1
+  // Recuo de bloco (carta, poema, citação) só a partir de 1em: abaixo disso é
+  // ajuste fino de composição, e replicar isso deixaria o texto trêmulo.
+  const rec = parseFloat(d['margin-left'] || d['padding-left'] || '0')
+  if (rec >= 1) s.rec = 1
+  return Object.keys(s).length ? s : null
+}
+
+// ---------------------------------------------------------------
 // TXT e HTML soltos entram pelo MESMO caminho do EPUB
 // ---------------------------------------------------------------
 // Um .txt de 400 KB numa página só trava o navegador na hora de paginar,
@@ -277,5 +350,5 @@ function textoParaCapitulos(txt, nomeArquivo) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { zipAbrir, epubAbrir, epubTextoLimpo, textoParaCapitulos }
+  module.exports = { zipAbrir, epubAbrir, epubTextoLimpo, textoParaCapitulos, epubEstilos, _cssDentro }
 }

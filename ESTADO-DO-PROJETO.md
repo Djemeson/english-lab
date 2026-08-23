@@ -7,7 +7,21 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-22 (38ª) — **O REALCE EXISTIA; A PÁGINA É QUE NÃO IA ATÉ ELE**.
+> Última atualização: 2026-08-22 (39ª) — **MATERIAL GERADO DEIXA DE SER ESTADO E PASSA A SER
+> ACERVO**. *"uma versão no telefone e outra, a mais precisa, no navegador"* — e não havia
+> mistério: **eram dois modelos**. A OpenAI ficou sem crédito, ele passou ao Gemini Flash-Lite, e
+> o que fora analisado antes tinha saído do GPT-5.6 Luna. O app guardava `itens`, `nivel` e `at`:
+> nada dizia **quem** tinha feito aquilo. Quatro peças: **ficha técnica** em tudo que a IA gera;
+> **melhor vence** (inteira › nível de hoje › **modelo mais forte** › mais itens › mais recente),
+> com a leitura corrigindo o lado perdedor na hora; **transcrição e análise do audiolivro param
+> de viajar na carona** do item — quem só OUVIA no celular apagava o que o computador tinha
+> transcrito; e uma **varredura de recuperação** para o que nunca subiu (medido: uma análise de
+> **149 itens** estava presa só neste aparelho). ⚠️ **E a marca de "análise veio pela metade"
+> morria ao salvar** — era propriedade de array, e `JSON.stringify` a descartava.
+> **Testado:** o cenário que apagava **438 falas e 154 achados** agora preserva tudo.
+> `sw.js` → **englab-v392**. **Detalhes em §8.95.**
+>
+> Última atualização anterior: 2026-08-22 (38ª) — **O REALCE EXISTIA; A PÁGINA É QUE NÃO IA ATÉ ELE**.
 > *"no livro não acende a frase"* — e o realce estava certo o tempo todo: medido, `CSS.highlights`
 > continha o trecho certo em quatro instantes seguidos, só que **3.780px acima da viewport**.
 > Duas causas somadas: seguir a voz **só ia para a frente** (e o caso normal é voltar, porque o
@@ -1916,6 +1930,13 @@ Já corrigimos vários casos assim (movendo para arquivos não-lazy):
     `minutos`, `duracao`, `formato`, `status` (`quero | ouvindo | ouvido`).
   - **Merge na nuvem**: por item, pelo `updatedAt`, como os livros — e o aparelho que está
     TOCANDO manda sobre o snapshot.
+
+### Material gerado pela IA — a regra desde §8.95
+> ⚠️ **Não é estado, é ACERVO.** Custou dinheiro, acumula e **nunca deve regredir**. Três regras:
+> (1) tudo o que a IA gera leva **ficha técnica** (provedor, modelo, força, blocos, falhas, nível);
+> (2) entre duas versões, **a melhor vence** — inteira › nível de hoje › modelo mais forte › mais
+> itens › mais recente —, e a leitura **corrige o lado perdedor**; (3) o que é caro **se une**, não
+> se escolhe: transcrições e marcadores do audiolivro, como o `historico` dos livros.
 
 ### Onde cada coisa é persistida
 > ⚠️ **NADA DISTO É GARANTIDO SE A PROTEÇÃO NÃO FOR PEDIDA** (§8.89). Por padrão o navegador
@@ -14742,6 +14763,74 @@ acima da viewport.
 Config devolvida como estava (rolagem), modo desligado sem deixar barra nem áudio órfão, console
 limpo.
 
+## 8.95 Material gerado deixa de ser estado e passa a ser acervo (2026-08-22, 39ª)
+
+**O relato:** *"atualmente tem uma análise de IA com as palavras destacadas em uma versão no
+telefone e outra, a mais precisa, no navegador. analise como resolver esse caso e os demais."*
+
+Não havia mistério: **eram dois modelos.** A conta da OpenAI zerou no meio do caminho, ele passou
+para o **Gemini Flash-Lite**, e o que tinha sido analisado antes fora feito com o **GPT-5.6
+Luna**. O app guardava `itens`, `nivel` e `at` — **nada dizia quem tinha feito aquilo**.
+
+### O que a medição mostrou, antes de escrever qualquer linha
+
+| Achado | Evidência |
+|---|---|
+| A análise do cap. 5 de *Billy Summers* (**149 itens**) nunca subiu | existia só no aparelho; a nuvem tinha 2 registros e nenhum era ela |
+| O pacote não guarda o modelo | campos: `itens`, `nivel`, `at` |
+| ⚠️ A marca "veio pela metade" **morria ao salvar** | `itens.incompleto` é propriedade de ARRAY, e `JSON.stringify` a descarta — conferido: volta `undefined` |
+| Dois provedores configurados | `gpt-5.6-luna` e `gemini-flash-lite-latest` |
+| Um capítulo de audiolivro carrega muito trabalho pago | **438 falas** transcritas e **154 pontos** analisados, dentro do item |
+
+### A raiz, e ela é uma só
+
+O app tratava material gerado como **estado**: o mais recente vence, o local vence, o objeto
+inteiro viaja. Mas ele é **acervo** — custou dinheiro, acumula, e nunca deveria regredir.
+
+### As quatro peças
+
+**1. Ficha técnica** (`aiFicha`, `aiForcaDoModelo`). Todo material passa a levar provedor,
+modelo, **força** (do `tier` que já existia na lista de modelos), blocos, falhas e nível. Sem
+ficha não existe "melhor" — existe só "mais recente", e mais recente costuma ser o pior, porque
+**o modelo grande é justamente o que fica sem crédito**.
+
+**2. Melhor vence** (`geradoComparar`, `geradoLerMelhor`). A leitura passa a olhar os **dois**
+lados e a corrigir o perdedor na hora — a divergência morre no primeiro capítulo aberto, em vez
+de durar para sempre. A ordem é a de quem paga a conta:
+
+> veio inteira › nível de hoje › **modelo mais forte** › mais itens › mais recente
+
+⚠️ **A força só entra quando os dois têm ficha.** Sem essa guarda, o acervo antigo (força 0,
+porque nasceu antes) perderia até para o modelo mais fraco da casa — o oposto do que se quer.
+
+**3. Transcrição e análise do audiolivro param de viajar na carona.** O `updatedAt` de um
+audiolivro muda a cada meio minuto de escuta: quem está **só ouvindo** no celular vencia o
+computador que acabou de transcrever, e levava junto o que foi pago. `_unirTranscricoes` une por
+`cap+ini` (a janela transcrita é a unidade paga) e fica com a mais completa; `_unirMarcadores`
+une por `cap+seg`; o `capMapa` (o casamento com o livro) também se une. **Mesma exceção que o
+`historico` dos livros já tinha: isto se UNE, nunca se escolhe.**
+
+**4. Recuperação** (`geradoRecuperar`). Uma varredura por aparelho, 8 s depois do boot: o que
+está aqui e não lá, sobe.
+
+E quando a nuvem ganha, **ele é avisado de quem fez a análise que passou a valer** — escolher em
+silêncio foi o que criou a confusão. ⚠️ Análise anterior à ficha não tem modelo para citar, e
+inventar um nome ali seria pior que não dizer nada: o aviso então fala do que dá para afirmar
+(*"149 pontos, contra 1 daqui"*).
+
+### Testado ao vivo (regra nº 5)
+
+| Teste | Resultado |
+|---|---|
+| **O cenário que apagava trabalho pago** — "celular" só ouvindo, com `updatedAt` 60 s mais novo | **438 falas e 154 achados sobreviveram**; `capMapa` preservado |
+| Comparador, cinco casos | inteira vence a metade mais nova e mais forte; nível de hoje vence; **modelo forte vence o fraco mais recente**; mais itens desempata; **antigo sem ficha vence o novo fraco** |
+| Nuvem com versão pior plantada | ficou com a boa (149) **e corrigiu a nuvem** |
+| Fraca aqui, boa na nuvem | passou a usar a de 149, **corrigiu o local**, `trocou: true` |
+| Fluxo real no leitor | *Chapter 1* abriu com **135 palavras destacadas** e o aviso *"Usei a análise do outro aparelho — 149 pontos, contra 1 daqui"* |
+
+Ao fim, local e nuvem com **149 itens cada**, acervo intacto (11 livros, 5 audiolivros com as
+transcrições no lugar), console limpo.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -14750,6 +14839,21 @@ limpo.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da rodada do material gerado (§8.95, 2026-08-22)
+
+- [ ] **O PRÉ-ESTUDO E A QUEBRA AINDA NÃO GUARDAM FICHA** — o raio-X do livro e o do audiolivro
+      guardam; os outros dois materiais pagos passam pelo mesmo `geradoGuardar`, mas seus pacotes
+      não carregam `ficha`. Sem ela, entram na comparação como "antigo" e decidem por quantidade
+      e recência. Barato de fechar, e vale.
+- [ ] **A RECONCILIAÇÃO CUSTA UM `get` POR CAPÍTULO ABERTO** — documento pequeno e só com login,
+      mas é rede a cada troca de capítulo. Se pesar no celular, o caminho é reconciliar em
+      segundo plano e repintar depois, em vez de esperar.
+- [ ] **NADA RECUPERA O QUE JÁ FOI SOBRESCRITO** na nuvem antes desta versão. Daqui para a frente
+      para de acontecer; o que se perdeu, se perdeu.
+- [ ] **A FORÇA VEM DO `tier` ESCRITO À MÃO** na lista de modelos. É um julgamento humano
+      registrado em 2026-08, não uma medição — modelo novo entra sem tier e vale 0 até alguém
+      classificá-lo.
 
 ### Da rodada da sincronia (§8.92, 2026-08-22)
 
