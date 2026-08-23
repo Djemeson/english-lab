@@ -967,7 +967,7 @@ let _lerArrumouRel = null
 
 // O último nó de texto de um elemento — é nele que mora o hífen da margem.
 function _lerUltimoTexto(e) {
-  const c = document.createTreeWalker(e, NodeFilter.SHOW_TEXT)
+  const c = (e.ownerDocument || document).createTreeWalker(e, NodeFilter.SHOW_TEXT)
   let ultimo = null, n
   while ((n = c.nextNode())) if (n.nodeValue.trim()) ultimo = n
   return ultimo
@@ -1349,7 +1349,19 @@ function _lerMapaSumario() {
   // 1. EMENDA — pedaço só com o título + pedaço só com o texto = um capítulo
   const escondidos = new Set()
   const palavras = caps.map(c => c.words || 0)
+  // ⚠️ O QUE A REVISÃO JÁ DECIDIU VALE MAIS QUE O PALPITE DE AGORA. Se ele
+  // apertou "Corrigir o livro", a emenda e o capítulo vazio estão GRAVADOS no
+  // livro — e voltar a adivinhar por cima seria desfazer a escolha dele.
+  const ocultos = new Set(_lerVazios)
+  caps.forEach((c, i) => {
+    if (c.oculto) ocultos.add(i)
+    if (typeof c.juntoCom === 'number' && caps[c.juntoCom]) {
+      escondidos.add(i)
+      palavras[c.juntoCom] = (palavras[c.juntoCom] || 0) + (c.words || 0)
+    }
+  })
   for (let i = 0; i < caps.length - 1; i++) {
+    if (escondidos.has(i + 1)) continue
     if (escondidos.has(i)) continue
     const a = caps[i], b = caps[i + 1]
     if ((a.words || 0) > 30 || _lerNomeVago(a.titulo)) continue
@@ -1385,7 +1397,7 @@ function _lerMapaSumario() {
   const linhas = []
   let n = 0, ultimoNome = ''
   caps.forEach((c, i) => {
-    if (escondidos.has(i) || _lerVazios.has(i)) return
+    if (escondidos.has(i) || ocultos.has(i)) return
     let grupo = i < ini ? 'frente' : (i > fim ? 'fundo' : 'corpo')
     if (grupo === 'corpo' && _LER_FUNDO.has(peca[i])) grupo = 'fundo'
     let nome = _lerNomeBase(i)
@@ -1407,13 +1419,25 @@ function _lerMapaSumario() {
   // e o nome estava no pedaço de 13 palavras que a emenda recolheu.
   const porIndice = {}
   for (const l of linhas) porIndice[l.i] = l.nome
+  // ONDE MORA O TEXTO DE CADA LINHA. Numa emenda, a linha visível é a PÁGINA DE
+  // TÍTULO (4 palavras) e o texto está no pedaço recolhido. Quem lê segue a
+  // linha; quem ANALISA precisa do texto — e o raio-X estava listando os dois,
+  // com o mesmo nome, duas vezes ("Part One, Part One, Part Two, Part Two…").
+  const conteudoDe = {}
+  for (const l of linhas) conteudoDe[l.i] = l.i
+  for (let i = 0; i < caps.length; i++) {
+    if (!escondidos.has(i)) continue
+    let d = i - 1
+    while (d >= 0 && escondidos.has(d)) d--
+    if (d >= 0 && (caps[i].words || 0) > (caps[d].words || 0)) conteudoDe[d] = i
+  }
   for (let i = 0; i < caps.length; i++) {
     if (!escondidos.has(i)) continue
     let d = i - 1
     while (d >= 0 && escondidos.has(d)) d--
     if (d >= 0 && porIndice[d]) porIndice[i] = porIndice[d]
   }
-  _lerMapaCache = { chave, linhas, capitulos: n, porIndice }
+  _lerMapaCache = { chave, linhas, capitulos: n, porIndice, conteudoDe }
   return _lerMapaCache
 }
 
@@ -1551,6 +1575,12 @@ function _lerRenderSumario(soRedesenha) {
 
   const total = capitulos
   p.innerHTML = `
+    <div class="ler-sum-topo">
+      <button class="ler-btn ler-pill" onclick="lerRevisar()"
+        data-tip="Lê o livro inteiro, mostra os defeitos que achou e conserta o sumário — o que não der para consertar, ele diz">
+        ${ic('sparkles', 'ic-sm')} Revisar o livro</button>
+      ${_lerLivro.revisao ? `<i>revisado em ${esc(new Date(_lerLivro.revisao.em).toLocaleDateString('pt-BR'))}</i>` : ''}
+    </div>
     ${caps.length > 20 ? `<div class="ler-sum-busca">
       <input type="search" placeholder="Procurar capítulo" value="${escA(_lerSumarioBusca)}"
         oninput="lerSumarioBuscar(this.value)" aria-label="Procurar capítulo">
@@ -1569,6 +1599,256 @@ function _lerRenderSumario(soRedesenha) {
       if (mudou) { const nm = el('ler-cap-nome'); if (nm) nm.textContent = lerCapNome(_lerCap) }
     }).catch(() => {})
   }
+}
+
+// ================================================================
+// REVISAR O LIVRO — varrer, dar o laudo, consertar o que dá
+// ================================================================
+// Pedido dele, com todas as letras: *"um botão que processa o livro e vê os
+// defeitos e corrige, igual você fez agora com a Carrie"*. E ele tinha razão
+// na crítica: o que existia era faxina de CAPÍTULO, feita na hora de abrir, e
+// o conserto do *Carrie* eu tinha feito na mão, no código.
+//
+// A diferença entre as duas coisas é o ALCANCE, e ela é real:
+//
+//   a faxina  vê um capítulo por vez, não guarda nada, e refaz tudo a cada
+//             abertura — não tem como saber que o índice do livro inteiro é
+//             mentira, porque isso só aparece comparando capítulos
+//   a revisão  lê o livro TODO uma vez, compara os capítulos entre si, escreve
+//             o conserto no livro (e ele sobe para a nuvem) e diz na cara o que
+//             NÃO conseguiu consertar
+//
+// ⚠️ REGRA DE OURO DAQUI: ÍNDICE DE CAPÍTULO NUNCA MUDA. A posição de leitura
+// (`pos.cap`), cada anotação (`notes[].cap`), as chaves do raio-X
+// (`raiox:<id>:<n>`) e o mapa da sincronia com o audiolivro são todos pelo
+// ÍNDICE. Remover ou reordenar um capítulo aqui apagaria o lugar onde ele
+// parou em TODOS os livros já lidos. Então a revisão só RENOMEIA e ACRESCENTA
+// campos — nunca tira, nunca troca de lugar.
+
+const LER_REVISAO_VERSAO = 1
+let _lerRevisando = false
+let _lerRevisaoLaudo = null
+
+// ---- 1. O DIAGNÓSTICO: lê o livro inteiro, uma vez ----------------
+async function _lerRevisarVarrer() {
+  const caps = (_lerLivro && _lerLivro.chapters) || []
+  const zip = _lerEpub && _lerEpub.zip
+  if (!zip) return null
+
+  const laudo = {
+    total: caps.length,
+    nomes: [],            // { i, de, para, porque }
+    ocultos: [],          // capítulos sem uma palavra e sem imagem
+    emendas: [],          // { i, com, nome }
+    texto: { virados: 0, vazios: 0, junta: 0, hifen: 0, nbsp: 0, cena: 0, br: 0, ancora: 0, pagina: 0 },
+    naoDaPara: [],        // o que a revisão VIU e não sabe consertar
+    lidos: 0
+  }
+
+  // Uma leitura por capítulo, guardada: as três análises abaixo usam o mesmo
+  // texto, e descomprimir 105 capítulos três vezes seria desperdício puro.
+  const corpo = new Array(caps.length).fill(null)
+  for (let i = 0; i < caps.length; i++) {
+    const c = caps[i]
+    if (!c.href) continue
+    try { corpo[i] = await zip.texto(c.href) || '' } catch (e) { corpo[i] = '' }
+    laudo.lidos++
+    if (i % 12 === 0) await new Promise(r => setTimeout(r, 0))   // não trava a tela
+  }
+
+  // ---- nomes ----
+  for (let i = 0; i < caps.length; i++) {
+    const c = caps[i]
+    const html = corpo[i]
+    if (!(c.words > 0) && html && !/<img[\s>]/i.test(html) && !_lerTextoDoHtml(html)) {
+      laudo.ocultos.push(i); continue
+    }
+    let novo = '', porque = ''
+    if (_lerNomeVago(c.titulo)) {
+      novo = _lerNomePeloArquivo(c)
+      porque = novo ? 'reconhecido pelo arquivo' : ''
+      if (!novo && html) {
+        novo = _lerNomeNoHtml(html)
+        porque = novo ? 'lido dentro do capítulo' : ''
+      }
+      if (!novo && html && /<img[\s>]/i.test(html)) { novo = 'Ilustração'; porque = 'só tem imagem' }
+    }
+    if (novo && novo !== c.titulo) laudo.nomes.push({ i, de: c.titulo, para: novo, porque })
+  }
+
+  // ---- emendas (o caso do Carrie e do Different Seasons) ----
+  for (let i = 0; i < caps.length - 1; i++) {
+    const a = caps[i], b = caps[i + 1]
+    if (!(a.words > 0) || (a.words || 0) > 30 || _lerNomeVago(a.titulo)) continue
+    if (_lerNomePeloArquivo(a)) continue
+    if ((b.words || 0) < LER_CORPO_MIN) continue
+    const semNome = _lerNomeVago(b.titulo)
+    const semCabecalho = corpo[i + 1] && !/<h[1-6][\s>]/i.test(corpo[i + 1])
+    if (!semNome && !semCabecalho) continue
+    laudo.emendas.push({
+      i, com: i + 1, nome: a.titulo,
+      porque: semNome ? 'a segunda parte veio sem nome' : 'o índice batizou o texto com a frase de abertura'
+    })
+  }
+
+  // ---- defeitos de texto: a faxina rodada no livro inteiro ----
+  for (let i = 0; i < caps.length; i++) {
+    if (!corpo[i]) continue
+    const r = _lerMedirDefeitos(corpo[i])
+    for (const k of Object.keys(laudo.texto)) laudo.texto[k] += r[k] || 0
+    if (r.semParagrafo) laudo.naoDaPara.push({ i, o: 'texto sem divisão de parágrafo' })
+    if (r.mojibake >= 6) laudo.naoDaPara.push({ i, o: 'acentuação quebrada no arquivo' })
+    if (r.tabela) laudo.naoDaPara.push({ i, o: 'tabela usada como diagramação' })
+  }
+  // Livro inteiro num capítulo só: só um passe global enxerga.
+  const grandes = caps.filter(c => (c.words || 0) >= 8000)
+  if (grandes.length === 1 && caps.filter(c => (c.words || 0) >= LER_CORPO_MIN).length <= 2) {
+    laudo.naoDaPara.push({ i: caps.indexOf(grandes[0]), o: `o livro veio inteiro num capítulo só (${grandes[0].words.toLocaleString('pt-BR')} palavras)` })
+  }
+  // um aviso por tipo — a lista serve para ele decidir, não para assustar
+  const vistos = new Set()
+  laudo.naoDaPara = laudo.naoDaPara.filter(x => (vistos.has(x.o) ? false : vistos.add(x.o)))
+  return laudo
+}
+
+function _lerTextoDoHtml(html) {
+  try { return epubTextoLimpo(html) } catch (e) { return '' }
+}
+
+// Conta os defeitos SEM tocar na tela — é o mesmo `_lerArrumar`, rodado sobre
+// uma cópia solta. Assim o laudo diz exatamente o que a leitura já conserta.
+function _lerMedirDefeitos(html) {
+  let doc
+  try { doc = new DOMParser().parseFromString(html, 'text/html') } catch (e) { return {} }
+  doc.querySelectorAll('script,style,link,meta,title').forEach(e => e.remove())
+  const r = { virados: 0, semParagrafo: false, mojibake: 0, tabela: 0 }
+  for (const d of [...doc.body.querySelectorAll('div')]) {
+    if (d.querySelector('p,div,h1,h2,h3,h4,h5,h6,ul,ol,table,blockquote')) continue
+    if (!d.textContent.trim()) continue
+    const p = doc.createElement('p')
+    while (d.firstChild) p.appendChild(d.firstChild)
+    d.replaceWith(p); r.virados++
+  }
+  const texto = doc.body.textContent || ''
+  r.mojibake = (texto.match(/â€|Ã[©¡§µ£]|ï»¿/g) || []).length
+  r.tabela = doc.body.querySelectorAll('table').length
+  const blocos = doc.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li')
+  r.semParagrafo = texto.trim().length > 12000 && blocos.length <= 2
+  return { ...r, ..._lerArrumar(doc) }
+}
+
+// ---- 2. O CONSERTO: escrito no livro, não só na tela --------------
+function _lerRevisarAplicar(laudo) {
+  const caps = _lerLivro.chapters
+  for (const n of laudo.nomes) if (caps[n.i]) caps[n.i].titulo = n.para
+  for (const i of laudo.ocultos) if (caps[i]) caps[i].oculto = 1
+  for (const e of laudo.emendas) {
+    if (!caps[e.com] || !caps[e.i]) continue
+    // ⚠️ O ÍNDICE NÃO SAI DA LISTA. Ele é MARCADO como continuação do anterior:
+    // a posição de leitura, as anotações e o raio-X apontam para ele por número.
+    caps[e.com].juntoCom = e.i
+  }
+  _lerLivro.revisao = {
+    em: Date.now(), versao: LER_REVISAO_VERSAO,
+    nomes: laudo.nomes.length, emendas: laudo.emendas.length,
+    ocultos: laudo.ocultos.length, texto: { ...laudo.texto },
+    pendentes: laudo.naoDaPara.map(x => x.o)
+  }
+  _lerLivro.updatedAt = Date.now()
+  saveLivros()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  _lerMapaCache = null
+  _lerNomesAuto = {}
+  _lerVazios = new Set(laudo.ocultos)
+}
+
+// ---- 3. A TELA ----------------------------------------------------
+async function lerRevisar() {
+  if (_lerRevisando || !_lerLivro) return
+  if (_lerLivro.format === 'manga') { toast('A revisão é para livro de texto — o mangá é imagem.', 'info'); return }
+  _lerRevisando = true
+  _lerRevisaoPintar('<div class="ler-carregando">lendo o livro inteiro…</div>')
+  try {
+    _lerRevisaoLaudo = await _lerRevisarVarrer()
+  } catch (e) {
+    _lerRevisando = false
+    _lerRevisaoPintar(`<div class="ler-rev-msg">não consegui ler o livro: ${esc(e.message || 'erro')}</div>`)
+    return
+  }
+  _lerRevisando = false
+  _lerRevisaoRender()
+}
+
+function _lerRevisaoPintar(html) {
+  let p = el('ler-revisao')
+  if (!p) {
+    p = document.createElement('div')
+    p.id = 'ler-revisao'
+    p.className = 'ler-painel ler-revisao'
+    const alvo = el('ler-sumario')
+    if (alvo && alvo.parentNode) alvo.parentNode.insertBefore(p, alvo.nextSibling)
+    else document.body.appendChild(p)
+  }
+  p.classList.remove('hidden')
+  p.innerHTML = html
+}
+
+function lerRevisaoFechar() { const p = el('ler-revisao'); if (p) p.classList.add('hidden') }
+
+function _lerRevisaoRender() {
+  const l = _lerRevisaoLaudo
+  if (!l) return
+  const t = l.texto
+  const achados = []
+  const pl = (n, um, muitos) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : muitos}`
+  if (l.emendas.length) achados.push([`${pl(l.emendas.length, 'capítulo partido', 'capítulos partidos')} em dois`, l.emendas.map(e => e.nome).slice(0, 3).join(', ')])
+  if (l.nomes.length)   achados.push([`${pl(l.nomes.length, 'capítulo sem', 'capítulos sem')} nome de verdade`, l.nomes.slice(0, 3).map(n => `“${n.de}” → ${n.para}`).join(' · ')])
+  if (l.ocultos.length) achados.push([`${pl(l.ocultos.length, 'capítulo vazio', 'capítulos vazios')}`, 'saem da lista'])
+  if (t.virados)  achados.push([`${pl(t.virados, 'parágrafo sem espaçamento', 'parágrafos sem espaçamento')}`, 'o arquivo não usou parágrafo de verdade'])
+  if (t.junta)    achados.push([`${pl(t.junta, 'parágrafo partido', 'parágrafos partidos')} no meio da frase`, 'emendados na leitura'])
+  if (t.hifen)    achados.push([`${pl(t.hifen, 'palavra cortada', 'palavras cortadas')} pela margem`, 'remendadas na leitura'])
+  if (t.vazios)   achados.push([`${pl(t.vazios, 'buraco em branco', 'buracos em branco')}`, 'fechados na leitura'])
+  if (t.nbsp)     achados.push([`${pl(t.nbsp, 'recuo falso', 'recuos falsos')}`, 'feitos com espaço duro'])
+  if (t.cena)     achados.push([`${pl(t.cena, 'quebra de cena torta', 'quebras de cena tortas')}`, 'endireitadas na leitura'])
+  if (t.ancora + t.pagina) achados.push([`${pl(t.ancora + t.pagina, 'marca de página', 'marcas de página')}`, 'escondidas na leitura'])
+
+  const linha = ([o, det]) => `<li><b>${esc(o)}</b>${det ? `<span>${esc(det)}</span>` : ''}</li>`
+  const jaRevisado = _lerLivro.revisao
+
+  _lerRevisaoPintar(`
+    <div class="ler-rev-topo">
+      <b>${esc(_lerLivro.title)}</b>
+      <span>${l.lidos} capítulos lidos</span>
+      <button class="ler-btn" onclick="lerRevisaoFechar()">${ic('x', 'ic-sm')}</button>
+    </div>
+    ${achados.length ? `
+      <p class="ler-rev-sub">O que eu encontrei</p>
+      <ul class="ler-rev-lista">${achados.map(linha).join('')}</ul>` : `
+      <p class="ler-rev-msg">Este livro está limpo — não achei nada para consertar.</p>`}
+    ${l.naoDaPara.length ? `
+      <p class="ler-rev-sub">O que eu <b>não</b> sei consertar</p>
+      <ul class="ler-rev-lista ler-rev-nao">${l.naoDaPara.map(x => `<li><b>${esc(x.o)}</b></li>`).join('')}</ul>` : ''}
+    ${(l.nomes.length || l.emendas.length || l.ocultos.length) ? `
+      <div class="ler-rev-acao">
+        <button class="btn btn-primary" onclick="lerRevisaoConfirmar()">Corrigir o livro</button>
+        <i>o sumário é reescrito e vai junto para os seus outros aparelhos. A posição de
+           leitura, as anotações e as análises não se mexem — nenhum capítulo muda de número.</i>
+      </div>` : `
+      <div class="ler-rev-acao">
+        <i>Os defeitos de texto acima já são corrigidos toda vez que você abre um capítulo,
+           com o botão <b>Arrumado</b> ligado — não há o que gravar.</i>
+      </div>`}
+    ${jaRevisado ? `<p class="ler-rev-msg">Revisado pela última vez em ${esc(new Date(jaRevisado.em).toLocaleDateString('pt-BR'))}.</p>` : ''}`)
+}
+
+function lerRevisaoConfirmar() {
+  if (!_lerRevisaoLaudo) return
+  _lerRevisarAplicar(_lerRevisaoLaudo)
+  const l = _lerRevisaoLaudo
+  toast(`Livro corrigido — ${l.nomes.length + l.emendas.length + l.ocultos.length} ajustes no sumário`, 'success')
+  lerRevisaoFechar()
+  _lerRenderSumario()
+  const nm = el('ler-cap-nome'); if (nm) nm.textContent = lerCapNome(_lerCap)
 }
 
 // ================================================================
@@ -3478,6 +3758,27 @@ function _lerRaioXPintar() {
   }
 }
 
+// OS CAPÍTULOS QUE VALE ANALISAR — e é uma lista diferente da do sumário.
+// O sumário responde "onde eu leio"; esta responde "onde há texto para a IA
+// olhar". Página de rosto, dedicatória e página de parte não têm o que
+// analisar, e o par emendado tem de aparecer UMA vez, apontando para o pedaço
+// que carrega o texto. Sem isto o painel mostrava "Part One, Part One, Part
+// Two, Part Two, Part Three, Part Three" — foi o que ele viu no Carrie.
+const LER_ANALISE_MIN = 50      // palavras: abaixo disto não há o que medir
+function _lerCapsAnalisaveis() {
+  const caps = (_lerLivro && _lerLivro.chapters) || []
+  const m = _lerMapaSumario()
+  const out = []
+  for (const l of m.linhas) {
+    if (l.grupo !== 'corpo') continue      // créditos e "outros livros" não têm o que analisar
+    const i = (m.conteudoDe && m.conteudoDe[l.i] !== undefined) ? m.conteudoDe[l.i] : l.i
+    const c = caps[i]
+    if (!c || (c.words || 0) < LER_ANALISE_MIN) continue
+    out.push({ i, nome: l.nome })
+  }
+  return out
+}
+
 // ---- O PAINEL DO RAIO-X: os capítulos, e o que já foi analisado ----
 // Pedido dele: *"quero que essa nova função fique bem evidente em um botão seu,
 // e que ao clicar apareçam os capítulos do livro, mostre o spark nos capítulos
@@ -3536,8 +3837,8 @@ function _lerRaioXPainelRender(msg) {
     document.body.appendChild(p)
     setTimeout(() => document.addEventListener('click', () => p.classList.remove('aberto')), 0)
   }
-  const caps = (_lerLivro && _lerLivro.chapters) || []
-  const feitos = Object.keys(_lerRaioXMapa || {}).length
+  const caps = _lerCapsAnalisaveis()
+  const feitos = caps.filter(x => (_lerRaioXMapa || {})[x.i]).length
   p.innerHTML = `
     <div class="ler-raiox-topo">
       <b>${ic('eye','ic-sm')} O que é difícil aqui</b>
@@ -3545,12 +3846,12 @@ function _lerRaioXPainelRender(msg) {
     </div>
     ${msg ? `<div class="ler-raiox-msg">${esc(msg)}</div>` : ''}
     <div class="ler-raiox-lista">
-      ${caps.map((c, i) => {
+      ${_lerCapsAnalisaveis().map(({ i, nome }) => {
         const n = (_lerRaioXMapa || {})[i]
         return `<button class="ler-raiox-cap${i === _lerCap ? ' atual' : ''}${n ? ' feito' : ''}"
                   onclick="lerRaioXDoCapitulo(${i})">
           <span class="ler-raiox-spark">${n ? ic('sparkles','ic-sm') : ''}</span>
-          <span class="ler-raiox-nome">${esc(lerCapNome(i))}</span>
+          <span class="ler-raiox-nome">${esc(nome)}</span>
           <span class="ler-raiox-n">${n ? n : 'analisar'}</span>
         </button>`
       }).join('')}

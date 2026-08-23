@@ -5875,6 +5875,30 @@ body.lendo .sb-nav:hover,body.lendo .sb-foot:hover{opacity:1}
 .ler-sum-grupo:not(.aberto) .ler-sum-corpo{display:none}
 .ler-sum-grupo.aberto .ler-sum-cab .ic{transform:rotate(180deg)}
 .ler-sum-corpo{display:flex;flex-direction:column;gap:1px}
+/* a chamada da revisao mora no topo do sumario — e la que o defeito aparece */
+.ler-sum-topo{display:flex;align-items:center;gap:10px;padding:0 0 10px;flex-wrap:wrap}
+.ler-sum-topo>i{font-style:normal;font-size:var(--fs-3xs);color:var(--ler-fg2);opacity:.8}
+
+/* ---- o laudo da revisao ---- */
+.ler-revisao{max-height:min(70vh,560px);overflow-y:auto}
+.ler-rev-topo{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.ler-rev-topo>b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ler-rev-topo>span{font-size:var(--fs-3xs);color:var(--ler-fg2);flex-shrink:0}
+.ler-rev-sub{
+  margin:14px 0 6px;font-size:var(--fs-3xs);color:var(--ler-fg2);
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.ler-rev-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.ler-rev-lista li{
+  display:flex;flex-direction:column;gap:2px;
+  padding:8px 10px;border-radius:6px;background:rgba(128,128,128,.1);
+  font-size:var(--fs-sm);color:var(--ler-fg);
+}
+.ler-rev-lista li>span{font-size:var(--fs-3xs);color:var(--ler-fg2)}
+.ler-rev-nao li{background:transparent;border:1px dashed rgba(128,128,128,.35);opacity:.85}
+.ler-rev-acao{margin-top:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.ler-rev-acao>i{font-style:normal;font-size:var(--fs-3xs);color:var(--ler-fg2);line-height:1.5}
+.ler-rev-msg{margin:10px 0 0;font-size:var(--fs-3xs);color:var(--ler-fg2)}
 .ler-sum-busca{padding:0 0 8px}
 .ler-sum-busca input{
   width:100%;padding:8px 10px;border-radius:6px;font-family:inherit;font-size:var(--fs-sm);

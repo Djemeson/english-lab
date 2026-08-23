@@ -21,7 +21,7 @@
 > ⚠️ **Uma armadilha pega a tempo:** apagar a linha do número de página desalinharia o "ler
 > ouvindo" — passou a esconder, não apagar. Medido no app com 4 EPUBs reais: **659 parágrafos
 > remontados**, **57 itálicos recuperados** num capítulo, mangá intacto.
-> `sw.js` → **englab-v399**. **Detalhes em §8.98.**
+> `sw.js` → **englab-v400**. **Detalhes em §8.98.**
 >
 > Última atualização anterior: 2026-08-22 (41ª) — **A FICHA CHEGA AO PRÉ-ESTUDO E À QUEBRA**. Os dois
 > últimos materiais pagos que ainda decidiam por quantidade e recência. ⚠️ **E eles expuseram um
@@ -15101,6 +15101,49 @@ não. Conferido nos livros dele **antes** de escrever a regra:
 Three"**; *The Green Mile* manteve **"Part One: The Two Dead Girls"** como divisor e o
 **"Chapter 1"** com o nome dele; *Different Seasons* seguiu com as 4 novelas; *Bag of Bones*
 com os 32 capítulos. Console limpo.
+
+### "Revisar o livro": o botão que ele estava pedindo desde o começo
+
+Crítica dele, direta: *"o que esse botão faz é só mostrar o texto sem a formatação. me refiro a
+um botão que processa o livro e vê os defeitos e corrige, igual você fez agora com a Carrie"*.
+Ele tinha razão — e a distinção é real:
+
+| | faxina (§8.98) | revisão (esta) |
+|---|---|---|
+| alcance | **um capítulo**, ao abrir | **o livro inteiro**, uma vez |
+| memória | nenhuma, refaz sempre | **grava no livro** e sobe para a nuvem |
+| enxerga | o que há naquele capítulo | o que só aparece **comparando** capítulos |
+| diz o que não sabe | não | **sim, em seção própria** |
+
+Só um passe global vê que o índice do editor é mentira — foi por isso que o *Carrie* precisou
+de mim no código.
+
+**⚠️ REGRA DE OURO: ÍNDICE DE CAPÍTULO NUNCA MUDA.** `pos.cap`, `notes[].cap`, as chaves
+`raiox:<id>:<n>` e o mapa da sincronia são todos pelo ÍNDICE. Remover ou reordenar um capítulo
+aqui apagaria o lugar onde ele parou em todos os livros já lidos. A revisão só **renomeia** e
+**acrescenta campos** (`oculto`, `juntoCom`, `revisao`) — nunca tira, nunca troca de lugar.
+
+**Onde fica:** no topo do sumário, que é onde o defeito aparece.
+
+**Testado ao vivo nos três livros que importam:**
+
+| Livro | Laudo | Depois de "Corrigir" |
+|---|---|---|
+| *Carrie* | 3 capítulos partidos em dois, 3 sem nome, 1 vazio, 42 recuos falsos, 9 quebras de cena | sumário com **3 capítulos**, gravado e sobrevivendo ao recarregar |
+| *The Green Mile* | 5 sem nome, 228 marcas de página, 60 linhas de número — **zero emendas** | o caso de risco: "Part One" **não** foi colado no "Chapter 1" |
+| *Israel, De Herodes a Dayan* (OCR) | **54 parágrafos partidos, 20 palavras cortadas pela margem**, 12 recuos, 33 marcas | e diz o que não sabe: *"tabela usada como diagramação"* |
+
+### ⚠️ E o print dele achou um defeito que eu tinha criado
+
+Ele mandou o painel do raio-X do *Carrie*: **"Part One, Part One, Part Two, Part Two, Part
+Three, Part Three"**. A emenda dá o mesmo nome aos dois pedaços do par, e o raio-X listava os
+16 capítulos crus — o sumário escondia o pedaço recolhido, ele não.
+
+E a correção não é "esconder igual ao sumário": **as duas listas respondem perguntas
+diferentes**. O sumário diz *onde eu leio* (a página de título, que é onde a parte começa); o
+raio-X diz *onde há texto para a IA olhar* (o pedaço grande). Então o mapa passou a devolver
+`conteudoDe`, e o raio-X lista **uma linha por capítulo do miolo, apontando para onde o texto
+está** — 3 linhas no *Carrie*, sem créditos nem "outros livros do autor".
 
 ### ⚠️ Outra sessão commitou por cima no meio da rodada
 
