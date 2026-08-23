@@ -5880,6 +5880,13 @@ body.lendo .sb-nav:hover,body.lendo .sb-foot:hover{opacity:1}
 .ler-sum-topo>i{font-style:normal;font-size:var(--fs-3xs);color:var(--ler-fg2);opacity:.8}
 
 /* ---- o laudo da revisao ---- */
+/* livro ja revisado: a propria barra responde "isto aqui ja foi feito" */
+.ler-btn-feito{color:var(--primary)}
+.ler-btn-feito::after{
+  content:'';position:absolute;top:5px;right:5px;width:5px;height:5px;
+  border-radius:50%;background:var(--primary);
+}
+.ler-btn{position:relative}
 .ler-revisao{max-height:min(70vh,560px);overflow-y:auto}
 .ler-rev-topo{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .ler-rev-topo>b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

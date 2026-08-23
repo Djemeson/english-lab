@@ -480,6 +480,18 @@ function renderLeitor() {
   const c_raiox = (_lerLivro && _lerLivro.format === 'manga') ? ''
     : `<button class="ler-btn" id="ler-raiox-btn" onclick="event.stopPropagation();lerRaioXPainel()"
          data-tip="O que é difícil aqui: acima do seu nível, phrasal verbs e expressões">${ic('eye','ic-sm')}</button>`
+  // ⚠️ PORTA PRÓPRIA, PORQUE ELE PERGUNTOU TRÊS VEZES ONDE ELA FICAVA. A revisão
+  // estava no topo do sumário — que é o lugar CERTO pela lógica (é ali que o
+  // defeito aparece) e o lugar ERRADO na prática: ninguém abre o sumário
+  // procurando conserto, abre procurando capítulo. Três "cadê o botão?" não é
+  // desatenção dele, é resposta sobre o desenho. Livro já revisado mostra a
+  // marca, então a barra também responde "isto aqui já foi feito".
+  const c_revisar = (_lerLivro && _lerLivro.format === 'manga') ? ''
+    : `<button class="ler-btn${(_lerLivro && _lerLivro.revisao) ? ' ler-btn-feito' : ''}" id="ler-revisar-btn"
+         onclick="event.stopPropagation();lerRevisar()"
+         data-tip="${(_lerLivro && _lerLivro.revisao)
+           ? 'Livro já revisado — clique para revisar de novo'
+           : 'Revisar o livro: lê tudo, mostra os defeitos que achou e conserta o sumário'}">${ic('wrench','ic-sm')}</button>`
   // OUVIR JUNTO (§8.92): só faz sentido em livro de texto, e a porta existe
   // mesmo antes de haver audiolivro ligado — é por ela que se liga.
   const c_ouvir = (_lerLivro && _lerLivro.format === 'manga') ? ''
@@ -502,7 +514,7 @@ function renderLeitor() {
         <div class="ler-barra-dir">
           ${c_manga}
           <button class="ler-btn" onclick="lerToggle('conversa')" data-tip="Conversar com a ${escA(lexaNome())} sobre este livro — quem é quem, onde se passa, o que está acontecendo">${ic('message','ic-sm')}</button>
-          ${c_ferramentas}${c_raiox}${c_ouvir}
+          ${c_ferramentas}${c_raiox}${c_ouvir}${c_revisar}
           <button class="ler-btn" onclick="lerToggle('tipografia')" data-tip="Tamanho, fonte, tema e largura da coluna"><b style="font-size:15px">Aa</b></button>
           <button class="ler-btn" id="ler-btn-full" onclick="lerAlternarFull()" data-tip="Modo tela cheia (F) — só o texto">${ic('expand','ic-sm')}</button>
         </div>
@@ -703,6 +715,9 @@ function _lerSelecaoMudou() {
 }
 
 function lerToggle(qual) {
+  // O laudo da revisão é painel como os outros: abrir qualquer um fecha ele.
+  // Sem esta linha ele ficava por cima do que fosse aberto depois.
+  const rev = el('ler-revisao'); if (rev) rev.classList.add('hidden')
   const alvos = { sumario: _lerRenderSumario, tipografia: _lerRenderTipografia,
                   ferramentas: _lerRenderFerramentas, conversa: _lerRenderConversa }
   for (const k of Object.keys(alvos)) {
@@ -1788,6 +1803,10 @@ function _lerRevisaoPintar(html) {
     const alvo = el('ler-sumario')
     if (alvo && alvo.parentNode) alvo.parentNode.insertBefore(p, alvo.nextSibling)
     else document.body.appendChild(p)
+  }
+  // O laudo é uma tela por si: abrir por ele NÃO exige o sumário aberto.
+  for (const k of ['sumario', 'tipografia', 'ferramentas', 'conversa']) {
+    const outro = el('ler-' + k); if (outro) outro.classList.add('hidden')
   }
   p.classList.remove('hidden')
   p.innerHTML = html

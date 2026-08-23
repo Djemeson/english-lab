@@ -21,7 +21,7 @@
 > ⚠️ **Uma armadilha pega a tempo:** apagar a linha do número de página desalinharia o "ler
 > ouvindo" — passou a esconder, não apagar. Medido no app com 4 EPUBs reais: **659 parágrafos
 > remontados**, **57 itálicos recuperados** num capítulo, mangá intacto.
-> `sw.js` → **englab-v400**. **Detalhes em §8.98.**
+> `sw.js` → **englab-v401**. **Detalhes em §8.98.**
 >
 > Última atualização anterior: 2026-08-22 (41ª) — **A FICHA CHEGA AO PRÉ-ESTUDO E À QUEBRA**. Os dois
 > últimos materiais pagos que ainda decidiam por quantidade e recência. ⚠️ **E eles expuseram um
@@ -15144,6 +15144,24 @@ diferentes**. O sumário diz *onde eu leio* (a página de título, que é onde a
 raio-X diz *onde há texto para a IA olhar* (o pedaço grande). Então o mapa passou a devolver
 `conteudoDe`, e o raio-X lista **uma linha por capítulo do miolo, apontando para onde o texto
 está** — 3 linhas no *Carrie*, sem créditos nem "outros livros do autor".
+
+### ⚠️ "Pelo amor de Deus, cadê esse botão?" — porta própria na barra
+
+Ele perguntou **três vezes** onde ficava o botão. Na terceira, com essa frase. Medido antes de
+mexer: o botão **estava lá e funcionando**, primeira linha do painel do sumário.
+
+**Três "cadê o botão?" não é desatenção dele — é resposta sobre o desenho.** O topo do sumário é
+o lugar certo pela lógica (é ali que o defeito aparece) e o lugar errado na prática: ninguém
+abre o sumário procurando conserto, abre procurando capítulo.
+
+Então a revisão ganhou **porta própria na barra do leitor** (ícone de chave inglesa, entre o
+fone e o `Aa`), e o laudo passou a ser tela por si — abre com o sumário fechado. Livro já
+revisado mostra a marca no próprio botão, então a barra responde *"isto aqui já foi feito"* sem
+abrir nada. A entrada pelo sumário continua, para quem chegar por lá.
+
+**Testado ao vivo:** botão na barra na posição esperada, clique com o sumário fechado abre o
+laudo (*"Carrie · 16 capítulos lidos · O QUE EU ENCONTREI"*), abrir o `Aa` fecha o laudo,
+marca de revisado na cor do tema. Console limpo.
 
 ### ⚠️ Outra sessão commitou por cima no meio da rodada
 
