@@ -145,6 +145,60 @@ async function renderCustoIA() {
     <p class="cost-note">Tokens medidos chamada a chamada, ao preço do modelo que respondeu; áudio, imagem e transcrição entram pela tabela (marcados como estimativa). Cotação de hoje: US$ 1 ≈ R$ ${rate.toFixed(2).replace('.', ',')}. Cada aparelho tem o próprio registro.</p>`
 }
 
+// ================================================================
+// O SEMÁFORO DE FORNECEDOR (melhoria 2, rodada 44)
+// ================================================================
+// Uma linha por fornecedor: sem chave (cinza), de pé (verde), chave inválida
+// (vermelho, com o motivo) e — o caso que motivou isto — SEM CRÉDITOS
+// (vermelho, nomeado). O teste de chave é o GET /models, que não custa token;
+// billing o /models não vê, então o "sem créditos" vem do uso real da sessão
+// (aiSemCreditoVisto). Cada chave só é testada uma vez por sessão, a menos
+// que ele clique em "testar de novo".
+const _semaforoMemo = new Map()   // prov + chave → { ok, msg }
+
+async function renderSemaforoIA(forcar) {
+  const box = el('ia-semaforo'); if (!box) return
+  if (typeof AI_PROVIDERS === 'undefined') return
+  const provAtivo = aiProviderAtual()
+  const linhas = []
+  for (const [id, P] of Object.entries(AI_PROVIDERS)) {
+    const chave = (cfg[P.keyCfg] || '').trim()
+    linhas.push({ id, P, chave })
+  }
+  const pinta = estados => {
+    box.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        ${estados.map(e => `
+          <span style="display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:var(--fs-xs);background:var(--surface2)"
+                data-tip="${escA(e.tip || '')}">
+            <i style="width:9px;height:9px;border-radius:50%;background:${e.cor};display:inline-block"></i>
+            <b>${esc(e.P.nome)}</b>${e.ativo ? '<span style="color:var(--text3)">· em uso</span>' : ''}
+            <span style="color:${e.corTxt || 'var(--text2)'}">${esc(e.txt)}</span>
+          </span>`).join('')}
+        <button class="btn btn-ghost btn-sm" onclick="renderSemaforoIA(true)" data-tip="Refaz o teste das chaves (GET /models — não gasta token)">testar de novo</button>
+      </div>`
+  }
+  // Primeiro desenho, sem esperar rede: o que já se sabe.
+  const estados = linhas.map(({ id, P, chave }) => {
+    const semCredito = typeof aiSemCreditoVisto === 'function' && aiSemCreditoVisto(P.nome)
+    if (!chave) return { P, ativo: id === provAtivo, cor: 'var(--text3)', txt: 'sem chave', tip: 'Guarde a chave logo abaixo para este fornecedor existir para o app' }
+    if (semCredito) return { P, ativo: id === provAtivo, cor: 'var(--error)', corTxt: 'var(--error)', txt: 'SEM CRÉDITOS', tip: 'O fornecedor respondeu "sem créditos" nesta sessão. Recarregue a conta ou troque de fornecedor.' }
+    const memo = _semaforoMemo.get(id + '|' + chave)
+    if (memo && !forcar) return { P, ativo: id === provAtivo, cor: memo.ok ? 'var(--success)' : 'var(--error)', corTxt: memo.ok ? '' : 'var(--error)', txt: memo.ok ? 'de pé' : 'chave recusada', tip: memo.ok ? 'A chave respondeu — o fornecedor está acessível' : (memo.msg || '') }
+    return { P, ativo: id === provAtivo, cor: 'var(--warning)', txt: 'testando…', chave, id }
+  })
+  pinta(estados)
+  // Agora os que faltam testar, em paralelo — e repinta quando todos voltarem.
+  const pendentes = estados.filter(e => e.txt === 'testando…')
+  if (!pendentes.length) return
+  await Promise.all(pendentes.map(async e => {
+    let r = { ok: false, msg: 'sem resposta' }
+    try { r = await aiTestKeyProv(e.id, e.chave) } catch (err) { r = { ok: false, msg: err.message } }
+    _semaforoMemo.set(e.id + '|' + e.chave, r)
+  }))
+  if (el('ia-semaforo')) renderSemaforoIA()
+}
+
 function fillSettings() {
   const provSel = el('cfg-ai-provider')
   if (provSel) {
@@ -156,6 +210,7 @@ function fillSettings() {
   updateImgProviderOptions()
   updateImgQualityOptions()
   renderCustoIA()
+  renderSemaforoIA()
   const nv = el('cfg-nivel-aluno')
   if (nv) {
     nv.innerHTML = CEFR.map(c =>

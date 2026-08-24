@@ -15527,7 +15527,14 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
             início, em reais pela cotação do dia, com a parcela "em estimativas" separada.
             Testado ao vivo: 9/9 (soma exata por preço de modelo, marca de estimativa,
             painel renderizado com valores, vazio limpo). `sw.js` → v412.
-      - [ ] 2 · Semáforo de fornecedor em Configurações → IA.
+      - [x] **2 · Semáforo de fornecedor** — FEITA (44ª). Pílulas em Configurações → IA
+            (`renderSemaforoIA`, acima do cofre de chaves): sem chave (cinza) / de pé
+            (verde) / chave recusada (vermelho, motivo no tooltip) / **SEM CRÉDITOS**
+            (vermelho, domina — vem de `aiSemCreditoVisto`, porque o GET /models grátis não
+            enxerga billing; quem enxerga é o uso real da sessão). Marca "em uso" no
+            fornecedor ativo; teste 1×/sessão por chave, botão "testar de novo". Testado ao
+            vivo: 6/6 (três sem-chave, chave inválida contra a API real, SEM CRÉDITOS
+            dominando). `sw.js` → v413.
       - [ ] 3 · Media Session no player de vídeo/podcast.
       - [ ] 4 · Comando de ensaio de backup no terminal.
       - [ ] 5 · Schema nas chamadas restantes (extractSrsItems, lote Kindle, pré-estudo).

@@ -1278,6 +1278,11 @@ const _aiSemCreditoAvisado = new Set()
 function _aiEhSemCredito(msg) {
   return /no credits|insufficient[_ ]quota|exceeded your (current )?quota|check your plan and billing/i.test(String(msg || ''))
 }
+// O semáforo das Configurações pergunta por aqui: "este fornecedor já
+// respondeu 'sem créditos' nesta sessão?" — o teste de chave (GET /models) é
+// grátis e por isso NÃO enxerga billing; quem enxerga é o uso real.
+function aiSemCreditoVisto(nomeProv) { return _aiSemCreditoAvisado.has(nomeProv) }
+
 function _aiAvisarSemCredito(url, msg) {
   const nome = /openai\.com/.test(url) ? 'OpenAI'
     : /googleapis\.com/.test(url) ? 'Google Gemini'
