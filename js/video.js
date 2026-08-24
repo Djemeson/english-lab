@@ -410,18 +410,33 @@ async function videoOpenPlayer(v) {
           data-tip="Régua de falas: cada bloco é uma fala e o vão é silêncio. Clique para ir até lá."></div>
         <div id="vid-audiofix-banner"></div>
         <div id="vid-sync-panel" class="hidden"></div>
+        <!-- A ARRUMAÇÃO DA TOOLBAR (rodada 47): 9 botões soltos viravam duas
+             linhas sem hierarquia. Agora são TRÊS grupos por categoria, com
+             separador visual: ASSISTIR (repetir/marcar) · TRADUÇÃO (os dois
+             modos como controle segmentado — a exclusividade fica visível —
+             + névoa e "traduzir tudo" contextuais) · TELA (legenda no vídeo,
+             sync, tela cheia). "Seguir" mudou para o cabeçalho do transcript,
+             que é a coisa que ele rola. Nenhum handler mudou de nome. -->
         <div class="vid-toolbar">
           <span class="vid-title" data-tip="${escA(ehPod ? (v.podcast.showTitle || v.fileName) : v.fileName)}">${esc(v.title)}</span>
           <span style="flex:1"></span>
-          <button class="btn btn-ghost btn-sm" onclick="videoReplayCue()" data-tip="A frase passou? Volta ao início da fala atual/última (tecla R)">${ic('undo','ic-sm')}Repetir fala</button>
-          <button class="btn btn-ghost btn-sm" id="vid-mark-btn" onclick="videoAddMarker()" data-tip="Marca o INÍCIO do trecho; o 2º clique (ou tecla M) fecha e abre o estudo focado">${ic('flame','ic-sm')}Marcar</button>
-          <button class="btn btn-ghost btn-sm" id="vid-sync-btn" onclick="videoSyncToggle()" data-tip="Legenda fora de sincronia? Ajuste manual ou automático com IA">${ic('clock','ic-sm')}Sync</button>
-          <button class="btn btn-ghost btn-sm ${_vidOverlayOn ? 'vid-on' : ''}" id="vid-ov-toggle" onclick="videoToggleOverlay()" data-tip="Legenda sobre o vídeo, em tempo real">${ic('message','ic-sm')}Legenda</button>
-          <button class="btn btn-ghost btn-sm ${_vidPTmode === 'sub' ? 'vid-on' : ''}" id="vid-pt-sub" onclick="videoSetPT('sub')" data-tip="Tradução da LEGENDA PT-BR oficial, sob a original"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M10.5 10.3a2.4 2.4 0 1 0 0 3.4M17.2 10.3a2.4 2.4 0 1 0 0 3.4"/></svg>PT legenda</button>
-          <button class="btn btn-ghost btn-sm ${_vidPTmode === 'ia' ? 'vid-on' : ''}" id="vid-pt-ia" onclick="videoSetPT('ia')" data-tip="Tradução LITERAL pela IA em tempo real — só o que você está vendo (+5s)">${ic('sparkles','ic-sm')}PT IA</button>
-          <button class="btn btn-ghost btn-sm ${_vidPTfog ? 'vid-on' : ''}" id="vid-fog-toggle" onclick="videoToggleFog()" style="${_vidPTmode === 'off' ? 'display:none' : ''}" data-tip="Névoa: a tradução fica borrada até passar o mouse (treino de recall). Clique para mostrar sempre.">${ic('eye','ic-sm')}Névoa</button>
-          <button class="btn btn-ghost btn-sm ${_vidAutoScroll ? 'vid-on' : ''}" id="vid-scroll-toggle" onclick="videoToggleScroll()" data-tip="Rolagem automática do transcript">${ic('arrowRight','ic-sm')}Seguir</button>
-          <button class="btn btn-ghost btn-sm" onclick="videoToggleFullscreen()" data-tip="Tela cheia COM a legenda interativa (o botão do player usa a legenda nativa)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>Tela cheia</button>
+          <div class="vid-tb-group">
+            <button class="btn btn-ghost btn-sm" onclick="videoReplayCue()" data-tip="A frase passou? Volta ao início da fala atual/última (tecla R)">${ic('undo','ic-sm')}Repetir fala</button>
+            <button class="btn btn-ghost btn-sm" id="vid-mark-btn" onclick="videoAddMarker()" data-tip="Marca o INÍCIO do trecho; o 2º clique (ou tecla M) fecha e abre o estudo focado">${ic('flame','ic-sm')}Marcar</button>
+          </div>
+          <div class="vid-tb-group">
+            <div class="vid-seg" data-tip="Tradução sob a legenda — um modo por vez; clicar de novo desliga">
+              <button class="btn btn-ghost btn-sm ${_vidPTmode === 'sub' ? 'vid-on' : ''}" id="vid-pt-sub" onclick="videoSetPT('sub')" data-tip="Tradução da LEGENDA PT-BR oficial, sob a original"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M10.5 10.3a2.4 2.4 0 1 0 0 3.4M17.2 10.3a2.4 2.4 0 1 0 0 3.4"/></svg>PT legenda</button>
+              <button class="btn btn-ghost btn-sm ${_vidPTmode === 'ia' ? 'vid-on' : ''}" id="vid-pt-ia" onclick="videoSetPT('ia')" data-tip="Tradução LITERAL pela IA em tempo real — só o que você está vendo (+5s)">${ic('sparkles','ic-sm')}PT IA</button>
+            </div>
+            <button class="btn btn-ghost btn-sm ${_vidPTfog ? 'vid-on' : ''}" id="vid-fog-toggle" onclick="videoToggleFog()" style="${_vidPTmode === 'off' ? 'display:none' : ''}" data-tip="Névoa: a tradução fica borrada até passar o mouse (treino de recall). Clique para mostrar sempre.">${ic('eye','ic-sm')}Névoa</button>
+            <button class="btn btn-ghost btn-sm" id="vid-pt-full" onclick="videoTranslateFull()" style="${_vidCues.length && !_vidCues.every(c => c.pt) ? '' : 'display:none'}" data-tip="A IA traduz a legenda INTEIRA de uma vez (centavos). Depois a tradução aparece na hora, sem os +5s do tempo real">${ic('sparkles','ic-sm')}Traduzir tudo</button>
+          </div>
+          <div class="vid-tb-group">
+            <button class="btn btn-ghost btn-sm ${_vidOverlayOn ? 'vid-on' : ''}" id="vid-ov-toggle" onclick="videoToggleOverlay()" data-tip="Legenda sobre o vídeo, em tempo real">${ic('message','ic-sm')}Legenda</button>
+            <button class="btn btn-ghost btn-sm" id="vid-sync-btn" onclick="videoSyncToggle()" data-tip="Legenda fora de sincronia? Ajuste manual ou automático com IA">${ic('clock','ic-sm')}Sync${(v.subShift || 0) ? ` <span class="vid-sync-shift">${v.subShift > 0 ? '+' : ''}${(+v.subShift).toFixed(1)}s</span>` : ''}</button>
+            <button class="btn btn-ghost btn-sm" onclick="videoToggleFullscreen()" data-tip="Tela cheia COM a legenda interativa (o botão do player usa a legenda nativa)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>Tela cheia</button>
+          </div>
         </div>
         <div id="vid-sel-panel"></div>
         <div id="vid-markers"></div>
@@ -430,6 +445,8 @@ async function videoOpenPlayer(v) {
         <div class="vid-transcript-head">
           <span>Transcript</span>
           <span id="vid-raiox-slot"></span>
+          <span style="flex:1"></span>
+          <button class="vid-th-btn ${_vidAutoScroll ? 'vid-on' : ''}" id="vid-scroll-toggle" onclick="videoToggleScroll()" data-tip="Rolagem automática: o transcript acompanha a fala atual">${ic('arrowRight','ic-sm')}Seguir</button>
           <span id="vid-cue-count">${_vidCues.length ? _vidCues.length + ' falas' : ''}</span>
         </div>
         <div class="vid-transcript" id="vid-transcript" ondragover="event.preventDefault()" ondrop="videoDropSub(event)"></div>

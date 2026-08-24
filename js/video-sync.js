@@ -21,6 +21,11 @@ function _vidSyncRender(msg) {
   const siTxt = si
     ? `${ic('checkCircle','ic-sm')} Sincronizada em ${new Date(si.at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${new Date(si.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} — ${esc((typeof _VID_SYNC_MODOS !== 'undefined' && _VID_SYNC_MODOS[si.modo]) || si.modo)}. Fica guardada aqui e na sua nuvem.`
     : `Esta legenda ainda não foi sincronizada neste app.`
+  // A ARRUMAÇÃO DO PAINEL (rodada 47): eram 7 fileiras misturando aviso,
+  // instrução, botão e assunto alheio. Agora são TRÊS caminhos NOMEADOS, na
+  // ordem da confiança (fonte exata → IA → dedo), e cada instrução virou
+  // data-tip do controle onde ela age. "Traduzir legenda inteira" saiu daqui —
+  // tradução não é sincronia; mora na toolbar, no grupo de tradução.
   panel.innerHTML = `
     <div class="vid-sync">
       <div class="vid-sync-row">
@@ -31,44 +36,41 @@ function _vidSyncRender(msg) {
       </div>
       <div class="vid-sync-row"><span class="vid-sync-hint">${siTxt}</span></div>
       <div class="vid-sync-row">
-        <span class="vid-sync-hint">Legenda ATRASADA (fala vem antes do texto)? Use −. Adiantada? Use +.</span>
-      </div>
-      <!-- Antes de ajustar no dedo, vale tentar a legenda do PRÓPRIO arquivo:
-           quando existe, ela dispensa alinhamento — o tempo já é o do vídeo. -->
-      <div class="vid-sync-row">
+        <span class="vid-sync-sec" data-tip="Se o arquivo já traz a legenda oficial, ela é a fonte mais exata: mesma segmentação e mesmo tempo do vídeo">Da fonte</span>
         <button class="btn btn-secondary btn-sm" onclick="videoUsarFaixaEmbutida()"
-          data-tip="Se o arquivo já traz a legenda oficial, ela é a fonte mais exata: mesma segmentação e mesmo tempo do vídeo">
+          data-tip="Troca para a legenda que veio DENTRO do arquivo — quando existe, dispensa qualquer ajuste">
           ${ic('message','ic-sm')}Usar a legenda do próprio arquivo</button>
       </div>
       <div class="vid-sync-row">
+        <span class="vid-sync-sec" data-tip="A IA escuta o áudio e alinha a legenda sozinha">Com IA</span>
+        <button class="btn btn-primary btn-sm" ${_vidSyncing ? 'disabled' : ''} onclick="videoSyncAuto()"
+          data-tip="A IA acha sozinha o trecho mais falado do episódio, escuta ~45s, transcreve com timestamps e alinha a legenda (~R$ 0,03)">
+          ${ic('sparkles','ic-sm')}Sincronizar com IA</button>
+        <button class="btn btn-ghost btn-sm" ${_vidSyncing ? 'disabled' : ''} onclick="videoSyncAutoAqui()"
+          data-tip="Último recurso: leva o vídeo até um diálogo, pausa ali e a IA analisa DESSE ponto em diante">
+          ${ic('play','ic-sm')}IA do ponto atual</button>
+      </div>
+      <div class="vid-sync-row">
+        <span class="vid-sync-sec" data-tip="Legenda ATRASADA (a fala vem antes do texto)? Use −. Adiantada? Use +.">No dedo</span>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(-5)">−5s</button>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(-0.5)">−0,5s</button>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(-0.1)">−0,1s</button>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(0.1)">+0,1s</button>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(0.5)">+0,5s</button>
         <button class="btn btn-ghost btn-sm" onclick="videoSubShift(5)">+5s</button>
-        <span style="flex:1"></span>
-        <button class="btn btn-ghost btn-sm" ${_vidSyncing ? 'disabled' : ''} onclick="videoSyncAutoAqui()"
-          data-tip="Último recurso: leva o vídeo até um diálogo, pausa ali e a IA analisa DESSE ponto em diante">
-          ${ic('play','ic-sm')}IA do ponto atual</button>
-        <button class="btn btn-primary btn-sm" ${_vidSyncing ? 'disabled' : ''} onclick="videoSyncAuto()"
-          data-tip="A IA acha sozinha o trecho mais falado do episódio, escuta ~45s, transcreve com timestamps e alinha a legenda (~R$ 0,03)">
-          ${ic('sparkles','ic-sm')}Sincronizar com IA</button>
       </div>
       <div class="vid-sync-row">
-        <span class="vid-sync-hint">Tradução:</span>
-        <button class="btn btn-secondary btn-sm" ${_vidPTfullRodando ? 'disabled' : ''} onclick="videoTranslateFull()"
-          data-tip="A IA traduz a legenda INTEIRA para PT-BR de uma vez (centavos). Depois disso a tradução aparece na hora, sem esperar o tempo real">
-          ${ic('sparkles','ic-sm')}Traduzir legenda inteira</button>
-      </div>
-      <div class="vid-sync-row">
-        <span class="vid-sync-hint">Leve a sincronização com você:</span>
+        <span class="vid-sync-sec" data-tip="Baixe o .srt já sincronizado para usar em qualquer player">Levar com você</span>
         <button class="btn btn-ghost btn-sm" onclick="videoSubExport()" data-tip="Baixa o .srt COM a sincronização aplicada, com o mesmo nome do vídeo — na mesma pasta, qualquer player carrega sozinho">${ic('download','ic-sm')}Baixar .srt</button>
         ${_vidCuesPT.length ? `<button class="btn btn-ghost btn-sm" onclick="videoSubExport('pt')" data-tip="Baixa a trilha PT-BR alinhada">${ic('download','ic-sm')}.srt PT-BR</button>` : ''}
         ${_vidCues.some(c => c.pt) ? `<button class="btn btn-ghost btn-sm" onclick="videoSubExport('ia')" data-tip="Baixa a tradução criada pela IA como .srt, nos mesmos tempos da legenda em inglês — funciona em qualquer player">${ic('download','ic-sm')}.srt PT-BR (IA)</button>` : ''}
       </div>
       ${msg ? `<div class="vid-sync-status">${msg}</div>` : ''}
     </div>`
+  // O botão Sync da toolbar carrega o deslocamento como crachá — quem olha
+  // sabe que há ajuste aplicado sem abrir o painel. Refresca junto.
+  const btn = el('vid-sync-btn')
+  if (btn) btn.innerHTML = `${ic('clock','ic-sm')}Sync${shift ? ` <span class="vid-sync-shift">${shift > 0 ? '+' : ''}${shift.toFixed(1)}s</span>` : ''}`
 }
 
 // Acha a janela de `dur` segundos com MAIS FALA, medida pela própria

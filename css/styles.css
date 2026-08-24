@@ -3937,6 +3937,27 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .vid-toolbar{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .vid-title{font-weight:600;font-size:var(--fs-sm);color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40%}
 .vid-on{color:var(--primary);border-color:rgba(var(--primary-rgb),.4)}
+/* Toolbar arrumada (rodada 47): grupos por categoria, com divisor fino.
+   O grupo quebra de linha INTEIRO — botão irmão não se separa do seu. */
+.vid-tb-group{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap}
+.vid-tb-group + .vid-tb-group{padding-left:12px;border-left:1px solid var(--border)}
+/* Os dois modos de tradução como controle segmentado: um liga, o outro
+   desliga — colados, a exclusividade fica visível sem precisar explicar. */
+.vid-seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-pill);overflow:hidden}
+.vid-seg .btn{border:0;border-radius:0}
+.vid-seg .btn + .btn{border-left:1px solid var(--border)}
+.vid-seg .btn.vid-on{background:rgba(var(--primary-rgb),.12)}
+/* Botão pequeno do cabeçalho do transcript (Seguir mora com o que ele rola) */
+.vid-th-btn{
+  display:inline-flex;align-items:center;gap:4px;margin-right:10px;
+  background:none;border:1px solid transparent;border-radius:var(--radius-pill);
+  padding:2px 8px;cursor:pointer;color:var(--text3);
+  font:inherit;letter-spacing:inherit;text-transform:inherit;
+}
+.vid-th-btn:hover{border-color:var(--border);color:var(--text2)}
+.vid-th-btn.vid-on{color:var(--primary);border-color:rgba(var(--primary-rgb),.4)}
+/* O crachá de deslocamento dentro do botão Sync */
+.vid-toolbar .vid-sync-shift{padding:1px 6px;margin-left:2px}
 
 .vid-transcript-wrap{
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
@@ -4164,6 +4185,14 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   background:color-mix(in srgb, var(--primary) 14%, transparent);color:var(--primary);
 }
 .vid-sync-hint{font-size:var(--fs-2xs);color:var(--text3)}
+/* Etiqueta de seção do painel de sincronia (rodada 47): três caminhos
+   nomeados — Da fonte, Com IA, No dedo — em vez de fileiras anônimas.
+   O pontilhado avisa que a etiqueta carrega uma dica no hover. */
+.vid-sync-sec{
+  font-size:var(--fs-3xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text3);min-width:92px;flex:0 0 auto;
+  border-bottom:1px dotted var(--border);padding-bottom:1px;cursor:help;
+}
 .vid-sync-status{font-size:var(--fs-sm);color:var(--text2);display:flex;align-items:center;gap:7px}
 .vid-sync-status .ic{color:var(--success)}
 /* Ciclo de marcacao aberto: o botao pulsa para lembrar que falta fechar */

@@ -733,6 +733,22 @@ async function _vidPTRecusadas(pend) {
 // do tempo real. Depois disso o modo "PT IA" mostra tudo na hora.
 // ================================================================
 let _vidPTfullRodando = false
+// O progresso vive no PRÓPRIO botão (rodada 47): ele mudou do painel de
+// sincronia para a toolbar — tradução não é sincronia —, então escrever o
+// andamento no painel deixaria o clique sem resposta visível quando o
+// painel está fechado. null = repouso (e o botão se aposenta quando não
+// sobra nada por traduzir).
+function _vidPTfullStatus(txt) {
+  const b = el('vid-pt-full'); if (!b) return
+  if (txt == null) {
+    b.disabled = false
+    b.innerHTML = `${ic('sparkles','ic-sm')}Traduzir tudo`
+    b.style.display = (_vidCues.length && !_vidCues.every(c => c.pt)) ? '' : 'none'
+    return
+  }
+  b.disabled = true
+  b.innerHTML = `<span class="gen-spinner"></span> ${esc(txt)}`
+}
 async function videoTranslateFull() {
   if (_vidPTfullRodando) return
   if (!_vidCues.length) { toast('Sem legenda para traduzir', 'warning'); return }
@@ -740,7 +756,7 @@ async function videoTranslateFull() {
   const pend = _vidCues.map((c, k) => (!c.pt ? k : -1)).filter(k => k >= 0)
   if (!pend.length) { toast('A legenda já está toda traduzida', 'info'); return }
   _vidPTfullRodando = true
-  _vidSyncRender(`Traduzindo a legenda inteira… 0/${pend.length} falas`)
+  _vidPTfullStatus(`Traduzindo… 0/${pend.length}`)
   try {
     // Até 3 PASSADAS: uma só deixava para trás o que o modelo pulou ou o
     // truncamento engoliu (caso real: 130 falas de fora). A 1ª cobre quase
@@ -763,7 +779,7 @@ async function videoTranslateFull() {
         }))
         await Promise.all(grupo.map(b => _vidPTlote(b)))
         const feitas = pend.filter(k => _vidCues[k].pt).length
-        _vidSyncRender(`Traduzindo a legenda inteira${passada > 1 ? ` (${passada}ª passada)` : ''}… ${feitas}/${pend.length} falas`)
+        _vidPTfullStatus(`Traduzindo${passada > 1 ? ` (${passada}ª)` : ''}… ${feitas}/${pend.length}`)
       }
     }
     // os fallbacks das recusadas rodam em segundo plano — espera terminarem
@@ -783,9 +799,8 @@ async function videoTranslateFull() {
     toast(faltam ? `Tradução concluída — ${faltam} fala(s) ficaram pendentes` : 'Legenda inteira traduzida para PT-BR', 'success')
   } finally {
     _vidPTfullRodando = false
-    _vidSyncRender(pend.some(k => !_vidCues[k].pt)
-      ? 'Tradução concluída com pendências — falas recusadas tentam de novo durante a exibição.'
-      : 'Legenda inteira traduzida. O modo "PT IA" agora mostra tudo na hora.')
+    _vidPTfullStatus(null)   // repouso: reabilita, ou se aposenta se acabou o serviço
+    _vidSyncRender()         // o painel (se aberto) e o crachá do Sync se atualizam
   }
 }
 

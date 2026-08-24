@@ -15421,6 +15421,34 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada da arrumação do painel do vídeo (2026-08-24, 47ª — método Kondo)
+
+- [x] **A TOOLBAR DO PLAYER GANHOU CATEGORIAS.** Eram 9 botões soltos quebrando em duas
+      linhas sem hierarquia. Agora: 3 grupos com divisor (`.vid-tb-group`) — ASSISTIR
+      (Repetir fala, Marcar) · TRADUÇÃO (PT legenda + PT IA como controle SEGMENTADO
+      `.vid-seg`, a exclusividade visível; Névoa e "Traduzir tudo" contextuais) · TELA
+      (Legenda, Sync, Tela cheia). Nenhum handler mudou de nome.
+- [x] **"Seguir" mudou para o cabeçalho do transcript** (`.vid-th-btn`) — mora com a coisa
+      que ele rola. Mesmo id `vid-scroll-toggle`; `videoToggleScroll` intocado.
+- [x] **O botão Sync carrega o deslocamento como crachá** ("Sync +5,0s") — refresca em
+      `_vidSyncRender` a cada ajuste; quem olha sabe que há ajuste sem abrir o painel.
+- [x] **O painel de sincronia virou 3 caminhos NOMEADOS** na ordem da confiança:
+      "Da fonte" (faixa embutida) → "Com IA" (Sincronizar primeiro, "do ponto atual"
+      depois) → "No dedo" (±s). As duas fileiras de texto-instrução viraram data-tip
+      das etiquetas (`.vid-sync-sec`, pontilhado = tem dica). Registro da 45ª
+      ("Sincronizada em…") continua no topo. 7 fileiras → 6, sem perder função.
+- [x] **"Traduzir legenda inteira" SAIU do painel de sincronia** — tradução não é
+      sincronia. Virou "Traduzir tudo" no grupo de tradução da toolbar (`#vid-pt-full`),
+      com o progresso NO PRÓPRIO botão (`_vidPTfullStatus`: spinner + n/N; painel
+      fechado não engole mais o andamento). Se aposenta quando tudo está traduzido e
+      volta quando há serviço.
+- [x] sw v415 (ai.js da 46ª + styles.css são shell).
+      **Testado ao vivo: 15/15** — player montado com vídeo fake: 3 grupos, segmentado,
+      crachá "Sync +5.0s" e "+5.5s" após ajuste, Seguir fora da toolbar e funcionando no
+      transcript, seções "Da fonte | Com IA | No dedo | Levar com você", tradução fora do
+      painel, progresso no botão, aposentadoria/volta do Traduzir tudo. Console sem erros.
+      Medição visual de overflow NÃO feita (painel do navegador sem exibição — largura 0).
+
 ### Da rodada do raio-X na legenda do vídeo (2026-08-24, 46ª)
 
 - [x] **O RAIO-X CHEGOU AO VÍDEO — terceiro pouso da mesma peça.** Pedido dele. Motor:
