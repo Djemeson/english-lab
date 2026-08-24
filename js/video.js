@@ -419,6 +419,12 @@ async function videoOpenPlayer(v) {
   player.addEventListener('pause', _vidSavePos)
   player.addEventListener('ended', () => { v.position = 0; saveVideos() })
 
+  // Fone, tela de bloqueio e botão do carro — o mesmo bloco do audiolivro
+  // (melhoria 3, rodada 44). Podcast com a tela apagada é o caso de uso
+  // inteiro: sem isto, a notificação de mídia do sistema não tinha título,
+  // capa, barra nem botões — e as setas do fone não pulavam de fala.
+  _vidMediaSession(v, player)
+
   // Streaming com crossorigin: se o servidor NÃO manda CORS, o elemento nem
   // carrega. Recarrega sem o atributo (toca, mas sem captureStream) em vez de
   // deixar o player mudo e sem explicação.
@@ -964,6 +970,56 @@ function videoSkip(d) {
 //   Shift+←/→  → ±5s (o pulo bruto continua disponível)
 // ================================================================
 // Índice da fala corrente, ou da ÚLTIMA que começou antes de t
+// ================================================================
+// MEDIA SESSION — fone, tela de bloqueio, botão do carro (melhoria 3)
+// ================================================================
+// O mesmo desenho do audiolivro, com as mesmas lições: play/pause do sistema
+// são DOIS botões (nunca alternar), e `setPositionState` rejeita número
+// impossível e derruba a chamada — cada valor conferido antes. As setas de
+// faixa viram FALA anterior/próxima: aqui a unidade de escuta é a fala.
+function _vidMediaEstado(player) {
+  if (!('mediaSession' in navigator)) return
+  try { navigator.mediaSession.playbackState = (player && !player.paused) ? 'playing' : 'paused' } catch (e) {}
+  if (!navigator.mediaSession.setPositionState || !player) return
+  const dur = Number(player.duration)
+  if (!isFinite(dur) || dur <= 0) return
+  const pos = Math.min(Math.max(0, Number(player.currentTime) || 0), dur)
+  const vel = Number(player.playbackRate) || 1
+  try { navigator.mediaSession.setPositionState({ duration: dur, position: pos, playbackRate: vel }) } catch (e) {}
+}
+
+function _vidMediaSession(v, player) {
+  if (!('mediaSession' in navigator) || !player) return
+  const ehPod = !!v.podcast
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: v.title || v.fileName || 'Episódio',
+      artist: ehPod ? (v.podcast.showTitle || '') : '',
+      album: ehPod ? (v.podcast.showTitle || '') : 'Language Lab',
+      artwork: (ehPod && v.podcast.artwork)
+        ? [{ src: v.podcast.artwork, sizes: '512x512', type: 'image/jpeg' }] : []
+    })
+    navigator.mediaSession.setActionHandler('play', () => { player.play().catch(() => {}); _vidMediaEstado(player) })
+    navigator.mediaSession.setActionHandler('pause', () => { player.pause(); _vidMediaEstado(player) })
+    navigator.mediaSession.setActionHandler('seekbackward', () => videoSkip(-5))
+    navigator.mediaSession.setActionHandler('seekforward', () => videoSkip(5))
+    navigator.mediaSession.setActionHandler('previoustrack', () => { try { videoCueNav(-1) } catch (e) {} })
+    navigator.mediaSession.setActionHandler('nexttrack', () => { try { videoCueNav(1) } catch (e) {} })
+    navigator.mediaSession.setActionHandler('seekto', d => {
+      if (d.seekTime == null) return
+      if (d.fastSeek && player.fastSeek) player.fastSeek(d.seekTime)
+      else player.currentTime = d.seekTime
+      _vidMediaEstado(player)
+    })
+  } catch (e) {}
+  const estado = () => _vidMediaEstado(player)
+  player.addEventListener('play', estado)
+  player.addEventListener('pause', estado)
+  player.addEventListener('ratechange', estado)
+  player.addEventListener('durationchange', estado)
+  estado()
+}
+
 function _vidCueIndexAt(t) {
   let idx = -1
   for (let i = 0; i < _vidCues.length; i++) {

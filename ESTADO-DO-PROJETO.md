@@ -15535,7 +15535,13 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
             fornecedor ativo; teste 1×/sessão por chave, botão "testar de novo". Testado ao
             vivo: 6/6 (três sem-chave, chave inválida contra a API real, SEM CRÉDITOS
             dominando). `sw.js` → v413.
-      - [ ] 3 · Media Session no player de vídeo/podcast.
+      - [x] **3 · Media Session no vídeo/podcast** — FEITA (44ª). `_vidMediaSession` +
+            `_vidMediaEstado` (video.js, ligados na montagem do player): título/programa/
+            capa na tela de bloqueio, play/pause distintos (nunca alternar — lição do
+            audiolivro), ±5s, setas de faixa = FALA anterior/próxima (`videoCueNav`),
+            arrastar na notificação (`seekto` com fastSeek) e `setPositionState` com as
+            mesmas guardas anti-NaN do audiolivro. Testado ao vivo com \<video\> sintético:
+            metadata/artist corretos, estado seguro com duração NaN.
       - [ ] 4 · Comando de ensaio de backup no terminal.
       - [ ] 5 · Schema nas chamadas restantes (extractSrsItems, lote Kindle, pré-estudo).
       - [ ] 6 · Cache em disco da tradução de seleção.
