@@ -336,7 +336,10 @@ async function videoOpenPlayer(v) {
       <div class="vid-main">
         <div class="vid-stage${ehPod || /\.(mp3|m4a|aac|ogg|opus|wav|flac)$/i.test(_vidCur.fileName || '') ? ' vid-audio' : ''}">
           ${ehPod && v.podcast.artwork ? `<img class="vid-pod-art" src="${escA(v.podcast.artwork)}" alt="">` : ''}
-          <video id="vid-player" src="${src}" controls preload="metadata"${_vidStream ? ' crossorigin="anonymous"' : ''}></video>
+          <!-- ⚠️ escA no src (rodada 44): em podcast por streaming a URL vem
+               crua do enclosure do RSS — uma aspa no feed fechava o atributo e
+               injetava o que quisesse na origem do app, onde vivem as chaves. -->
+          <video id="vid-player" src="${escA(src)}" controls preload="metadata"${_vidStream ? ' crossorigin="anonymous"' : ''}></video>
           <div class="vid-ov" id="vid-ov">
             <span class="vid-ov-en" id="vid-ov-en" title="Arraste para selecionar um trecho; clique duplo seleciona a palavra"></span>
             <span class="vid-ov-pt" id="vid-ov-pt"></span>

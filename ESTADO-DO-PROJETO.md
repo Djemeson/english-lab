@@ -15448,10 +15448,18 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       toast na tela, fontes das 3 funções sem AI_DEFAULT_MODEL, confirmação chamada
       exatamente 1× num lote de 3 com pool, `same_as` casando sentido re-redigido no
       applyAiResult real (1 sentido, id preservado, campo não vaza). Console limpo.
-- [ ] **RODADA 3 — varredura do apóstrofo e escapes:** data-attribute + delegação em
-      known.js/review.js:1892/audio.js:1711/video-study.js:608/video-podcast.js:133; esc em
-      add.js:435/874 (expr da IA), dossie.js:1198 (Produza: `lexaInline(esc(...))`),
-      video.js:339 (`escA(src)`); registrar a regra no CLAUDE.md do projeto.
+- [x] **RODADA 3 — varredura do apóstrofo e escapes — FEITA em 2026-08-23 (44ª).** Seis
+      telas (a auditoria dizia cinco; a varredura achou a sexta: o Ouvir do glossário da
+      Biblioteca, audio.js:976, cujo `escA(x).replace(/'/g,"\\'")` era ordem errada — o escA
+      já tinha convertido o apóstrofo e o replace não achava nada). Padrão novo em todas:
+      `data-x="${escA(v)}"` + `onclick="f(this.dataset.x)"` (Palavras virou delegação no
+      grid). `esc()` nas expr/type da IA nos dois renders do add.js; `lexaInline(esc(...))`
+      no Produza; `escA(src)` no player de vídeo (URL crua do enclosure do RSS). Regra
+      registrada nas "Regras rápidas" do CLAUDE.md — `escA(JSON.stringify(v))` também vale.
+      `sw.js` → v408. **Testado ao vivo:** chip "don't" da seção Palavras marcando/ignorando
+      de verdade (lazy carregado via showSection), padrão data-txt devolvendo a string
+      intacta, aspa em URL não escapando do atributo, HTML da IA não virando tag. Console
+      limpo.
 - [ ] **RODADA 4 — leitura e audiolivro:** sinc.js:817 (`_sincParaAudio` + gravar
       `_sincMapa.cap`); `_abTeclas` só com a seção visível; religar `obraMontarEco` no
       Explicar; try/finally em `lerIrParaCapitulo` (capítulo corrompido); regra do número de

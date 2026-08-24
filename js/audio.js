@@ -972,8 +972,11 @@ function glossWordHtml(g, TYPE) {
       <div class="gloss-word-title">
         <span class="gloss-word-en">${esc(g.word)}</span>
         ${g.ipa ? `<span class="gloss-word-ipa">${esc(g.ipa)}</span>` : ''}
+        <!-- ⚠️ O "escape" antigo era ordem errada: escA já tinha trocado ' por
+             &#39; e o replace não achava nada — o navegador decodificava de
+             volta e playSrsTTS('don't') quebrava mudo (rodada 44). -->
         <button class="btn btn-ghost btn-xs gloss-word-audio" title="Ouvir"
-          onclick="playSrsTTS('${escA(g.word).replace(/'/g, "\\'")}')">${ic('volume', 'ic-sm')}</button>
+          data-txt="${escA(g.word)}" onclick="playSrsTTS(this.dataset.txt)">${ic('volume', 'ic-sm')}</button>
       </div>
       <div class="gloss-word-meta">
         ${typeLabel ? `<span class="gloss-type-chip">${typeLabel}</span>` : ''}
@@ -1726,8 +1729,13 @@ async function showBrowserCardPreview(cardId) {
         <div class="bpp-label">Frente</div>
         <div style="font-size:var(--fs-lg);font-weight:700;margin-bottom:6px">${esc(card.word)}</div>
         ${frente ? `<div style="font-size:var(--fs-md);color:var(--text2)">${frente}</div>` : ''}
+        <!-- ⚠️ data-atributo, nunca o texto dentro do onclick (rodada 44): o
+             replace antigo ("\'" é só "'" em fonte JS) não escapava NADA, e
+             qualquer frase com apóstrofo — "don't", "it's" — matava o botão
+             com SyntaxError mudo. -->
         <button class="btn btn-ghost btn-xs" style="margin-top:8px"
-          onclick="playSrsTTS('${(card.example_en||card.word||'').replace(/'/g,"\'")}')">${ic('volume','ic-sm')}</button>
+          data-txt="${escA(card.example_en || card.word || '')}"
+          onclick="playSrsTTS(this.dataset.txt)">${ic('volume','ic-sm')}</button>
       </div>
       <div class="bpp-card-back" style="margin-top:10px">
         <div class="bpp-label">Verso</div>

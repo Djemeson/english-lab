@@ -130,7 +130,7 @@ function _podRender() {
             ${_podArt(s.artwork, s.title)}
             <span class="pod-show-name">${esc(s.title)}</span>
             <span class="pod-show-meta">${esc(s.artist || '')}</span>
-            <span class="pod-show-x" onclick="event.stopPropagation();podcastForgetShow('${escA(s.feedUrl)}')" data-tip="Tirar da lista">${ic('x','ic-sm')}</span>
+            <span class="pod-show-x" data-feed="${escA(s.feedUrl)}" onclick="event.stopPropagation();podcastForgetShow(this.dataset.feed)" data-tip="Tirar da lista">${ic('x','ic-sm')}</span>
           </button>`).join('')}</div>` : ''}
       ${!st.buscou ? `
         <div class="pod-sec">Sugestões</div>

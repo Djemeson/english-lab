@@ -605,7 +605,7 @@ function _vidRenderFocus(panel) {
       <div class="vid-dit-res">
         <div class="vid-dit-score">Ditado: <b>${r.pct}%</b> do trecho reconhecido de ouvido</div>
         <div class="vid-dit-marks">${r.ref.map((w, k) =>
-          `<span class="vid-word ${r.okRef[k] ? 'dit-ok' : 'dit-bad'}"${r.okRef[k] ? '' : ` onclick="videoDitAddRevisar('${escA(w)}')" data-tip="Não pegou de ouvido — clique para mandar ao Preparar"`}>${esc(w)}</span>`).join(' ')}</div>
+          `<span class="vid-word ${r.okRef[k] ? 'dit-ok' : 'dit-bad'}"${r.okRef[k] ? '' : ` data-w="${escA(w)}" onclick="videoDitAddRevisar(this.dataset.w)" data-tip="Não pegou de ouvido — clique para mandar ao Preparar"`}>${esc(w)}</span>`).join(' ')}</div>
         ${r.extras.length ? `<div class="vid-dit-extras">Você escreveu a mais: ${r.extras.map(esc).join(', ')}</div>` : ''}
       </div>`
   }

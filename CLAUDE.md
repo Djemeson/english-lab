@@ -80,6 +80,12 @@ segundos olhando o real teriam evitado o erro.
 
 ## Regras rápidas do projeto
 
+- **Texto NUNCA vai dentro de `onclick="f('${...}')"`.** O navegador decodifica as
+  entidades do `escA` ANTES de executar o atributo: `f('don&#39;t')` vira `f('don't')`
+  — SyntaxError mudo, e quase toda frase em inglês tem apóstrofo. Use
+  `data-x="${escA(v)}"` + `onclick="f(this.dataset.x)"` (ou delegação). A alternativa
+  `escA(JSON.stringify(v))` também é segura. Cinco telas quebraram por isso (rodada 44).
+
 - **Trabalhe sempre na pasta `english-lab`** (é o repositório clonado; o deploy é automático
   via GitHub Pages — não precisa commitar à mão).
 - **Sem emojis na interface** — use o helper `ic('nome')` (ícones SVG em `js/core.js`).

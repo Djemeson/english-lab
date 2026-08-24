@@ -136,12 +136,12 @@ function _knPintar() {
 
     ${total ? `<div class="kn-grid">
       ${visiveis.map(it => `
-        <div class="kn-chip ${it.status}" onclick="knToggleConhecida('${escA(it.w)}')" data-tip="${escA(it.ex ? it.ex.slice(0, 120) : '')}">
+        <div class="kn-chip ${it.status}" data-w="${escA(it.w)}" data-tip="${escA(it.ex ? it.ex.slice(0, 120) : '')}">
           <span class="kn-w">${esc(it.w)}</span>
           ${it.freq ? `<span class="kn-f">${it.freq}</span>` : ''}
           <span class="kn-acts">
-            <button onclick="event.stopPropagation();knEstudar('${escA(it.w)}')" data-tip="Mandar para o Preparar (a IA analisa)">${ic('arrowRight','ic-sm')}</button>
-            <button onclick="event.stopPropagation();knIgnorar('${escA(it.w)}')" data-tip="Nunca mais sugerir">${ic('x','ic-sm')}</button>
+            <button data-acao="estudar" data-tip="Mandar para o Preparar (a IA analisa)">${ic('arrowRight','ic-sm')}</button>
+            <button data-acao="ignorar" data-tip="Nunca mais sugerir">${ic('x','ic-sm')}</button>
           </span>
         </div>`).join('')}
     </div>
@@ -149,6 +149,28 @@ function _knPintar() {
     : `<div class="kn-empty">${ic('search','ic-lg')}<p>Nada aqui com esses filtros.</p>
        <p class="kn-empty-sub">Abra um episódio com legenda no módulo Vídeo — o inventário se monta sozinho a partir do que você assiste.</p></div>`}
   `
+  // ⚠️ DELEGAÇÃO, NUNCA onclick COM A PALAVRA DENTRO (rodada 44). O caminho
+  // antigo — onclick="knToggleConhecida('${escA(it.w)}')" — morria em TODA
+  // palavra com apóstrofo: o navegador decodifica o &#39; de volta ANTES de
+  // executar o atributo, e knToggleConhecida('don't') é SyntaxError mudo.
+  // "don't", "he'll", "we're" vêm de legenda o tempo todo — e nem marcar, nem
+  // estudar, nem ignorar funcionava nelas. A palavra viaja em data-w.
+  const grid = area.querySelector('.kn-grid')
+  if (grid && !grid._knDeleg) {
+    grid._knDeleg = true
+    grid.addEventListener('click', ev => {
+      const chip = ev.target.closest('.kn-chip'); if (!chip) return
+      const w = chip.dataset.w; if (!w) return
+      const btn = ev.target.closest('[data-acao]')
+      if (btn) {
+        ev.stopPropagation()
+        if (btn.dataset.acao === 'estudar') knEstudar(w)
+        else if (btn.dataset.acao === 'ignorar') knIgnorar(w)
+        return
+      }
+      knToggleConhecida(w)
+    })
+  }
 }
 
 // ---------------------------------------------------------------

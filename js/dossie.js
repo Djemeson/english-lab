@@ -1195,7 +1195,10 @@ Return ONLY this JSON:
 }`
     const r = await aiJSON(PROMPT, { maxTokens: 700, schema: ESQ.produzir, schemaNome: 'produzir' })
     if (!r || typeof r !== 'object') throw new Error('resposta vazia')
-    const fmt = t => (typeof lexaInline === 'function') ? lexaInline(String(t || '')) : esc(String(t || ''))
+    // ⚠️ esc ANTES do lexaInline (rodada 44): lexaInline não escapa — ele só
+    // reativa ênfase JÁ escapada (quem escapa é o lexaFormatar). Sem o esc, o
+    // comentário e a nota de registro da IA entravam CRUS no innerHTML.
+    const fmt = t => (typeof lexaInline === 'function') ? lexaInline(esc(String(t || ''))) : esc(String(t || ''))
     const ok = (r.ok === true || /^(true|sim|yes|1)$/i.test(String(r.ok || '')))
     const corr = String(r.corrigida || '').trim()
     let html = `<div class="dosf-veredito ${ok ? 'ok' : 'ajuste'}">${
