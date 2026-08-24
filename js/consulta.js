@@ -286,7 +286,9 @@ Retorne JSON: {"items":[ ... ]}`
 // gateway de propósito: SSE tem ciclo de vida próprio e um retry automático
 // no meio do stream duplicaria a resposta na tela.
 async function _consultaOpenAIJSON(messages, maxTokens) {
-  return aiJSON(messages, { maxTokens })
+  // Contrato de forma (melhoria 5): o extrator devolvia `type: "colocação"`
+  // e afins conforme o humor do modelo — com o esquema, a API recusa.
+  return aiJSON(messages, { maxTokens, schema: ESQ.assistente, schemaNome: 'assistente' })
 }
 
 async function extractSrsItems(question, answer) {

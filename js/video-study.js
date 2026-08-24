@@ -242,7 +242,7 @@ Responda:
  "type_label":"nome da categoria em PT",
  "level":"A1|A2|B1|B2|C1|C2",
  "frase_pt":"tradução natural da fala inteira, com o equivalente do termo entre <b></b>"}` }
-    ], { maxTokens: 400 })
+    ], { maxTokens: 400, schema: ESQ.videoCard, schemaNome: 'videoCard' })
 
     // 3) Monta a palavra no formato do app. O item PARA NO PREPARAR, como
     //    tudo o mais — ver o bloco "O vídeo entra na fila" abaixo.

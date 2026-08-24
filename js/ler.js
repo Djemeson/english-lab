@@ -3465,7 +3465,7 @@ async function lerPreAnalisar(cap, refazer) {
       const j = await aiJSON([
         { role: 'system', content: sistema },
         { role: 'user', content: lote.map(it => it.w + ' :: ' + it.f).join('\n') }
-      ], { maxTokens: Math.min(4000, lote.length * 26 + 400) })
+      ], { maxTokens: Math.min(4000, lote.length * 26 + 400), schema: ESQ.preGlosa, schemaNome: 'preGlosa' })
 
       // O CASAMENTO É PELA PALAVRA, e só entre as palavras DESTE lote. Resposta
       // com palavra que não foi perguntada é descartada — sem isso, um modelo
@@ -4425,7 +4425,7 @@ async function lerClassificar(cap, refazer) {
       const j = await aiJSON([
         { role: 'system', content: sistema },
         { role: 'user', content: lotes[n].map(x => x.w + (x.f ? ' :: ' + x.f : '')).join('\n') }
-      ], { maxTokens: Math.min(4000, lotes[n].length * 14 + 300) })
+      ], { maxTokens: Math.min(4000, lotes[n].length * 14 + 300), schema: ESQ.preNivel, schemaNome: 'preNivel' })
 
       // Casamento PELA PALAVRA, como na glosa — nunca por índice/ordem.
       const pedidas = new Map(lotes[n].map(x => [knownNorm(x.w), x]))

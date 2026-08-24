@@ -15550,7 +15550,12 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
             contra a nuvem dele: apontou corretamente as 9 lacunas de um backup-esqueleto
             (126 palavras, 45 cards, 12 livros, 1.237 conhecidas na nuvem). Transforma o
             backup de promessa em coisa conferível — rode depois de cada export importante.
-      - [ ] 5 · Schema nas chamadas restantes (extractSrsItems, lote Kindle, pré-estudo).
+      - [x] **5 · Schema nas chamadas restantes** — FEITA (44ª). Seis esquemas novos em
+            `ESQ` (ai.js): `assistente` (extrator de termos do chat), `kindle` (lote de
+            tradução), `preGlosa` e `preNivel` (leitura/triagem do capítulo), `checagem`
+            (aiChecarAqui) e `videoCard` (captura da cena) — ligados nos seis call sites.
+            Forma, não conteúdo, como os demais; validados ao vivo contra as 3 regras do
+            modo estrito e contra os moldes dos prompts via `_esqConfere` (9/9).
       - [ ] 6 · Cache em disco da tradução de seleção.
       - [ ] 7 · Bateria Gemini no teste-ia.mjs.
 

@@ -519,7 +519,7 @@ Return ONLY valid JSON:
         { role: 'user', content: `${lines}
 
 Return JSON for ALL ${batch.length} items.` }
-      ], { maxTokens: Math.max(800, batch.length * 60) })
+      ], { maxTokens: Math.max(800, batch.length * 60), schema: ESQ.kindle, schemaNome: 'kindle' })
       if (Array.isArray(result.items)) {
         result.items.forEach(({ i, vocab, item, trans }) => {
           const j = Number(i)

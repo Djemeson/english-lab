@@ -825,7 +825,7 @@ Return ONLY this JSON:
   const r = await aiJSON([
     { role: 'system', content: `You analyze ${L.nameEn} for a Brazilian Portuguese-speaking learner. Return only valid JSON.` },
     { role: 'user', content: PROMPT }
-  ], { maxTokens: 300 })
+  ], { maxTokens: 300, schema: ESQ.checagem, schemaNome: 'checagem' })
 
   const expr = String(r && r.expr || termo).replace(/\s+/g, ' ').trim() || termo
   // COESÃO: quando a IA diz que é um sentido que ele já tem, quem manda é o
@@ -2233,6 +2233,46 @@ ESQ.obras = S.obj({
 // A CORREÇÃO DA FRASE QUE ELE ESCREVEU (bloco "Produza", no Estudar).
 ESQ.produzir = S.obj({
   ok: S.bool(), corrigida: S.txt(), comentario: S.txt(), registro: S.txt()
+})
+
+// ---- Os que faltavam (melhoria 5, rodada 44) -------------------
+// O EXTRATOR DO ASSISTENTE — os termos da resposta que viram botão.
+ESQ.assistente = S.obj({
+  items: S.lista(S.obj({
+    word: S.txt(), type: S.ou(['word', 'phrasal_verb', 'idiom', 'collocation']),
+    type_label: S.txt(), variety: S.txt(),
+    register: S.ou(['neutral','formal','informal','colloquial','slang','technical','literary','archaic','vulgar']),
+    meaning_pt: S.txt(), ipa: S.txt(), definition_pt: S.txt(), origin_pt: S.txt(),
+    examples: S.lista(S.obj({ en: S.txt(), pt: S.txt() }))
+  }))
+})
+
+// O LOTE DO KINDLE — tradução + expressões por destaque, casadas por número.
+ESQ.kindle = S.obj({
+  items: S.lista(S.obj({ i: S.num(), vocab: S.lista(S.txt()), trans: S.txt() }))
+})
+
+// A LEITURA DO CAPÍTULO (pré-estudo) — a glosa de cada palavra na frase dela.
+ESQ.preGlosa = S.obj({
+  itens: S.lista(S.obj({ w: S.txt(), expr: S.txt(), tipo: S.txt(), pt: S.txt(), g: S.bool() }))
+})
+
+// A TRIAGEM POR NÍVEL do leitor.
+ESQ.preNivel = S.obj({
+  itens: S.lista(S.obj({ w: S.txt(), n: S.txt(), expr: S.txt(), nx: S.txt() }))
+})
+
+// A CHECAGEM "o que é aqui?" (glossário/leitor).
+ESQ.checagem = S.obj({
+  expr: S.txt(), tipo: S.ou(['word', 'phrasal_verb', 'idiom', 'collocation']),
+  gloss: S.txt(), nivel: S.txt(), mesma: S.bool(), same_as: S.txtOuNulo()
+})
+
+// O CARD RÁPIDO DO VÍDEO (captura da cena).
+ESQ.videoCard = S.obj({
+  meaning_pt: S.txt(), definition_pt: S.txt(), ipa: S.txt(),
+  type: S.ou(['word', 'phrasal_verb', 'idiom', 'collocation']),
+  type_label: S.txt(), level: S.txt(), frase_pt: S.txt()
 })
 
 // ⚠️ A REDE CONTRA O ESQUECIMENTO. Compara as chaves citadas no prompt com as
