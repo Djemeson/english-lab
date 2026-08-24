@@ -13,6 +13,14 @@ function videoSyncToggle() {
 function _vidSyncRender(msg) {
   const panel = el('vid-sync-panel'); if (!panel) return
   const shift = (_vidCur && _vidCur.subShift) || 0
+  // O REGISTRO da sincronização (rodada 45): quando e como este pacote foi
+  // sincronizado. É o que responde "eu já não tinha acertado isto?" — e a
+  // resposta agora fica escrita, viaja com a legenda e sobrevive à troca de
+  // aparelho.
+  const si = (typeof _vidSyncInfo !== 'undefined' && _vidSyncInfo) ? _vidSyncInfo : null
+  const siTxt = si
+    ? `${ic('checkCircle','ic-sm')} Sincronizada em ${new Date(si.at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${new Date(si.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} — ${esc((typeof _VID_SYNC_MODOS !== 'undefined' && _VID_SYNC_MODOS[si.modo]) || si.modo)}. Fica guardada aqui e na sua nuvem.`
+    : `Esta legenda ainda não foi sincronizada neste app.`
   panel.innerHTML = `
     <div class="vid-sync">
       <div class="vid-sync-row">
@@ -21,6 +29,7 @@ function _vidSyncRender(msg) {
         <span style="flex:1"></span>
         <button class="vid-fix-close" onclick="el('vid-sync-panel').classList.add('hidden')" aria-label="Fechar">${ic('x','ic-sm')}</button>
       </div>
+      <div class="vid-sync-row"><span class="vid-sync-hint">${siTxt}</span></div>
       <div class="vid-sync-row">
         <span class="vid-sync-hint">Legenda ATRASADA (fala vem antes do texto)? Use −. Adiantada? Use +.</span>
       </div>
@@ -98,6 +107,8 @@ function videoSubShift(delta) {
   _vidCuesPT.forEach(c => { c.s = Math.max(0, c.s + delta); c.e = Math.max(0.3, c.e + delta) })
   _vidCur.subShift = +(((_vidCur.subShift || 0) + delta).toFixed(2))
   _vidCur.updated_at = new Date().toISOString()
+  // O ajuste é sincronização: fica registrado e o pacote sobe com urgência.
+  if (typeof _vidSyncMarcar === 'function') _vidSyncMarcar('ajuste')
   saveVideos(); autoSyncAfterChange()
   _vidSaveSubs()
   _vidCueIdx = -1            // força recomputar a fala corrente
@@ -142,9 +153,13 @@ async function videoSyncAuto(dur, t0Manual) {
       // Offset constante: caso bom — aplica e encerra
       const pontosOk = aval.medianas.length
       if (Math.abs(aval.mediana) < 0.15) {
+        // Verificada e aprovada TAMBÉM é sincronização — o registro guarda a
+        // prova, e o pacote sobe com o carimbo.
+        if (typeof _vidSyncMarcar === 'function') { _vidSyncMarcar('ia'); _vidSaveSubs() }
         msgFinal = `${ic('checkCircle','ic-sm')} Em sincronia de ponta a ponta (${aval.matched} falas casadas em ${pontosOk} ponto${pontosOk > 1 ? 's' : ''}).`
       } else {
         videoSubShift(+(-aval.mediana).toFixed(2))
+        if (typeof _vidSyncMarcar === 'function') { _vidSyncMarcar('ia'); _vidSaveSubs() }
         msgFinal = `${ic('checkCircle','ic-sm')} Sincronizado: legenda ${aval.mediana > 0 ? 'atrasada' : 'adiantada'} ${Math.abs(aval.mediana).toFixed(1)}s — verificado em ${pontosOk} ponto${pontosOk > 1 ? 's' : ''} (${aval.matched} falas)${janelas.length > pontosOk ? ' — a outra amostra não teve fala casável' : ''}.`
         toast('Legenda sincronizada pela IA', 'success')
       }
@@ -178,6 +193,7 @@ async function videoSyncAuto(dur, t0Manual) {
         if (pos.matched >= 3 && ruindade(pos) <= 1.0) {
           _vidCur.subShift = 0
           _vidCur.updated_at = new Date().toISOString()
+          if (typeof _vidSyncMarcar === 'function') _vidSyncMarcar('progressiva')
           saveVideos(); autoSyncAfterChange(); _vidSaveSubs()
           _vidCueIdx = -1; renderVidTranscript(); _vidUpdateOverlay()
           msgFinal = `${ic('checkCircle','ic-sm')} Esta legenda DERIVA (desvio de ${off1.toFixed(1)}s no início e ${off2.toFixed(1)}s adiante) — apliquei correção PROGRESSIVA ao longo do episódio inteiro (${aval.matched} falas medidas, ${pos.matched} confirmadas depois).`
@@ -244,7 +260,10 @@ function _vidAdoptSub(cand, cues, offset) {
   _vidCur.subShift = 0
   if (_vidCuesPT.length) _vidAlignPTTrack()
   if (Math.abs(offset) >= 0.15) videoSubShift(+(-offset).toFixed(2))
-  else { _vidSaveSubs(); _vidCueIdx = -1; renderVidTranscript(); _vidUpdateOverlay() }
+  // A troca já nasce verificada contra o áudio: o registro diz isso.
+  if (typeof _vidSyncMarcar === 'function') _vidSyncMarcar('troca')
+  _vidSaveSubs()
+  if (Math.abs(offset) < 0.15) { _vidCueIdx = -1; renderVidTranscript(); _vidUpdateOverlay() }
   _vidCur.cueCount = _vidCues.length
   saveVideos(); autoSyncAfterChange()
 }
@@ -423,13 +442,23 @@ async function videoUsarFaixaEmbutida() {
   _vidCues = escolhida.cues
   _vidCuesPT = []
   _vidCueIdx = -1
+  // A faixa embutida substitui TUDO da legenda anterior (rodada 45): a URL
+  // aplicada e as candidatas eram da baixada — mantê-las faria o "Sincronizar
+  // com IA" seguinte tratar a legenda velha como a atual e oferecer as
+  // alternativas erradas. E a contagem da biblioteca acompanhava a antiga.
+  _vidAppliedSubUrl = null
+  _vidSubCandidates = []
+  if (typeof _vidSyncMarcar === 'function') _vidSyncMarcar('faixa')   // já está no tempo do vídeo
   if (_vidCur) {
     // Zera o deslocamento: ele existia para consertar a legenda BAIXADA. A do
     // próprio arquivo já está no tempo do vídeo — manter o shift antigo
     // introduziria o erro que ele corrigia.
     _vidCur.subShift = 0
     _vidCur.subFonte = 'embutida:' + (escolhida.lang || escolhida.nome)
+    _vidCur.cueCount = escolhida.cues.length
+    _vidCur.updated_at = new Date().toISOString()
     saveVideos()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   }
   // Mesmos passos do videoSubShift, que é quem já sabia repintar tudo:
   // persiste as falas, redesenha a lista e o overlay, atualiza o painel Sync.

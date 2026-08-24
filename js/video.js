@@ -285,25 +285,65 @@ async function videoOpenPlayer(v) {
   _videoView = 'player'
   _vidSel = null; _vidSelWords = new Set(); _vidLoop = false; _vidPlayStop = null; _vidCueIdx = -1
 
-  // A legenda vem da nuvem quando não está aqui — é o que evita pagar Whisper
-  // de novo só porque ele trocou de aparelho.
+  // ================================================================
+  // LOCAL × NUVEM: O MAIS NOVO VENCE (rodada 45)
+  // ================================================================
+  // Antes a nuvem só era consultada com o local VAZIO — e nunca era corrigida
+  // quando ficava para trás. Foi assim que uma sincronização feita aqui se
+  // perdeu: o upload dela falhou calado, o local sumiu depois, e a nuvem
+  // devolveu a versão pré-sincronização como se fosse a boa. Agora o pacote
+  // tem carimbo (`at`), o vídeo guarda nos metadados sincronizados o carimbo
+  // do que a nuvem TEM (`legendaAt`, barato de comparar sem baixar nada), e a
+  // abertura corrige o lado perdedor — nos dois sentidos.
+  const temCues = d => !!(d && (d.cues || []).length)
   let stored = await VideoDB.get('subs', v.id)
-  if ((!stored || !(stored.cues || []).length) && typeof legendaBaixar === 'function') {
+  // LEGADO: pacote local sem carimbo é a verdade DESTE aparelho (inclui a
+  // sincronização que ele fez e vê funcionar). Carimba uma vez; a autocura
+  // abaixo o torna a versão canônica da nuvem.
+  if (temCues(stored) && !stored.at) {
+    stored.at = Date.now(); stored.v = 2
+    try { await VideoDB.set('subs', v.id, stored) } catch (e) {}
+  }
+  const localAt = temCues(stored) ? (Number(stored.at) || 0) : 0
+  const nuvemAt = Number(v.legendaAt) || 0
+  if (typeof legendaBaixar === 'function' && (!temCues(stored) || nuvemAt > localAt)) {
     const daNuvem = await legendaBaixar(v.id)
-    if (daNuvem && (daNuvem.cues || []).length) {
+    if (temCues(daNuvem) && (Number(daNuvem.at) || 0) >= localAt) {
+      const recuperou = !temCues(stored)
       stored = daNuvem
       try { await VideoDB.set('subs', v.id, daNuvem) } catch (e) {}
-      toast('Legenda recuperada da sua nuvem', 'success')
+      toast(recuperou
+        ? 'Legenda recuperada da sua nuvem' + (daNuvem.sync ? ' — com a sincronização que você fez' : '')
+        : 'Legenda atualizada: a sua nuvem tinha uma versão mais nova (sincronizada no outro aparelho)', 'success')
     }
   }
   _vidCues = (stored && stored.cues) || []
   _vidCuesPT = (stored && stored.cuesPT) || []
   _vidSubCandidates = (stored && stored.candidates) || []
   _vidAppliedSubUrl = (stored && stored.appliedUrl) || null
+  if (typeof _vidSyncInfo !== 'undefined') _vidSyncInfo = (stored && stored.sync) || null
+  // AUTOCURA DO OUTRO LADO: o local é mais novo do que a nuvem conhece — um
+  // upload falhou um dia. Re-sobe agora, e o carimbo só avança se confirmar.
+  if (temCues(stored) && (Number(stored.at) || 0) > nuvemAt && typeof legendaSubir === 'function') {
+    const pacote = stored, alvo = v
+    legendaSubir(alvo.id, pacote).then(ok => {
+      if (!ok) return
+      alvo.legendaAt = Number(pacote.at) || 0
+      alvo.updated_at = new Date().toISOString()
+      saveVideos()
+      if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+      console.info('[video] legenda local mais nova re-enviada à nuvem (autocura)')
+    }).catch(() => {})
+  }
   _vidFocus = null
   // Realinha a trilha PT a cada abertura: é barato (<50ms) e corrige dados
   // salvos por versões antigas do alinhador (sem estimativa de offset).
-  if (_vidCues.length && _vidCuesPT.length) { _vidAlignPTTrack(); _vidSaveSubs() }
+  // O carimbo é PRESERVADO: abrir não é mudar, e um `at` novo aqui faria
+  // conteúdo velho vencer a comparação só por ter sido aberto por último.
+  if (_vidCues.length && _vidCuesPT.length) {
+    if (typeof _vidSubsPreservaAt !== 'undefined') _vidSubsPreservaAt = (stored && Number(stored.at)) || 0
+    _vidAlignPTTrack(); _vidSaveSubs()
+  }
   _vidRestaurarPT()
   // trocar de vídeo tem de zerar a régua (senão ela desliza com os tempos
   // do vídeo anterior — o mesmo problema que a extensão tinha na Netflix)

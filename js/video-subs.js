@@ -44,6 +44,7 @@ function _vidReadSubFile(file) {
       toast(`Tradução importada: ${cues.length} falas — já ligada sob a legenda`, 'success')
       return
     }
+    _vidSyncLimpar(true)       // legenda nova = sincronização anterior descartada
     _vidCues = cues
     _vidSaveSubsNow()          // preserva trilha PT/candidatas já salvas
     _vidCur.cueCount = cues.length; _vidCur.updated_at = new Date().toISOString()
@@ -321,6 +322,7 @@ async function _vidApplySubUrl(sub) {
   if (!cues.length) throw new Error('arquivo não parece uma legenda válida')
   _vidAppliedSubUrl = sub.url
   _vidCur.subShift = 0
+  _vidSyncLimpar(true)   // legenda nova = sincronização anterior descartada, com aviso
   await _vidApplyCues(cues, `online (${VID_LANGS[sub.lang] || sub.lang})`)
   if (sub.lang !== 'pob' && sub.lang !== 'por') _vidAutoFetchPT()
 }
@@ -508,6 +510,47 @@ function _vidAlignPTTrack() {
   return alinhadas
 }
 
+// ================================================================
+// A SINCRONIZAÇÃO É PATRIMÔNIO (rodada 45)
+// ================================================================
+// O relato que motivou isto: ele sincronizou a legenda com a fala, e dias
+// depois ela voltou DESSINCRONIZADA. As brechas eram três, somadas: o pacote
+// não tinha carimbo de tempo (local × nuvem incomparáveis), a nuvem só era
+// consultada com o local VAZIO (e nunca corrigida quando ficava para trás), e
+// o upload falhava em silêncio, sem retentativa — a nuvem guardava para
+// sempre a versão pré-sincronização, e era ELA que voltava quando o local se
+// perdia. Agora: pacote v2 com `at` + registro `sync` (quando e como foi
+// sincronizada), comparação local×nuvem na abertura com o mais novo vencendo
+// e o perdedor corrigido — o mesmo "melhor vence" do material gerado.
+let _vidSyncInfo = null          // { at, modo } — a sincronização deste pacote
+let _vidSubsMetaUltimo = 0       // último bump de metadados (throttle do gotejo)
+let _vidSubsMetaUrgente = false  // mudança estrutural: bump imediato
+// ⚠️ O CARIMBO SÓ AVANÇA QUANDO O CONTEÚDO MUDA. O realinhamento automático da
+// abertura re-salva o pacote sem mudar nada que importe — se ele ganhasse
+// `at` novo, conteúdo VELHO venceria a comparação local×nuvem só por ter sido
+// aberto por último. Quem re-salva sem mudança seta este flag com o carimbo a
+// preservar; consumido no próximo save.
+let _vidSubsPreservaAt = 0
+
+const _VID_SYNC_MODOS = {
+  ajuste: 'ajuste manual', ia: 'verificada pela IA', progressiva: 'correção progressiva pela IA',
+  troca: 'legenda trocada e sincronizada pela IA', faixa: 'faixa do próprio arquivo',
+  transcricao: 'transcrita do áudio (nasce em sincronia)'
+}
+function _vidSyncMarcar(modo) {
+  _vidSyncInfo = { at: Date.now(), modo }
+  _vidSubsMetaUrgente = true
+}
+// Legenda NOVA descarta a sincronização da anterior — e isso tem de ser dito,
+// não descoberto: era exatamente o "voltou fora de sincronia" do relato.
+function _vidSyncLimpar(avisar) {
+  if (_vidSyncInfo && avisar && typeof toast === 'function') {
+    toast('A legenda anterior tinha sincronização feita — a nova começa do zero. O painel Sync refaz em um clique.', 'info')
+  }
+  _vidSyncInfo = null
+  _vidSubsMetaUrgente = true
+}
+
 // Salva as legendas no IDB (debounced; limpa campos transitórios como _rev)
 function _vidSaveSubs() {
   clearTimeout(_vidSubsSaveTimer)
@@ -517,17 +560,44 @@ function _vidSaveSubsNow() {
   clearTimeout(_vidSubsSaveTimer); _vidSubsSaveTimer = null
   if (!_vidCur) return
   const limpa = c => { const o = { s: c.s, e: c.e, t: c.t }; if (c.pt) o.pt = c.pt; if (c.pts) o.pts = c.pts; return o }
+  const carimbo = _vidSubsPreservaAt || Date.now()
+  _vidSubsPreservaAt = 0
   const dados = {
+    v: 2, at: carimbo,
     cues: _vidCues.map(limpa),
     cuesPT: _vidCuesPT.map(c => ({ s: c.s, e: c.e, t: c.t })),
     candidates: _vidSubCandidates,
-    appliedUrl: _vidAppliedSubUrl
+    appliedUrl: _vidAppliedSubUrl,
+    sync: _vidSyncInfo || null
   }
   VideoDB.set('subs', _vidCur.id, dados)
   // ⚠️ A LEGENDA VALE MAIS QUE O ÁUDIO. O mp3 se baixa de novo do feed; a
-  // transcrição custou Whisper — dinheiro dele. Sem subir, continuar em outro
-  // aparelho significaria pagar a mesma transcrição outra vez. São poucos KB.
-  if (typeof legendaSubir === 'function') legendaSubir(_vidCur.id, dados)
+  // transcrição custou Whisper e a sincronização custou o TEMPO dele. Sem
+  // subir, continuar em outro aparelho pagaria tudo de novo. São poucos KB.
+  // O carimbo `legendaAt` só é gravado quando o upload CONFIRMA: é ele que os
+  // outros aparelhos comparam — apontar para uma versão que a nuvem não tem
+  // faria a comparação mentir. Upload falhado fica para a autocura da próxima
+  // abertura (local mais novo que legendaAt ⇒ re-sobe).
+  const alvo = _vidCur
+  // Carimbo igual ao que a nuvem já tem = nada mudou de verdade (foi o
+  // re-salvamento da abertura): o IDB atualiza, o PUT é dispensado.
+  if (dados.at === (Number(alvo.legendaAt) || -1)) return
+  if (typeof legendaSubir === 'function') {
+    legendaSubir(alvo.id, dados).then(ok => {
+      if (!ok) return
+      alvo.legendaAt = dados.at
+      // O gotejo da tradução em tempo real salva a cada ~1,5s — empurrar os
+      // metadados para a nuvem a cada gota seria tráfego à toa. Estrutural
+      // (sincronização, legenda nova) sobe na hora; gota, no máx. 1×/min.
+      const urgente = _vidSubsMetaUrgente
+      _vidSubsMetaUrgente = false
+      if (!urgente && Date.now() - _vidSubsMetaUltimo < 60000) return
+      _vidSubsMetaUltimo = Date.now()
+      alvo.updated_at = new Date().toISOString()
+      if (typeof saveVideos === 'function') saveVideos()
+      if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+    }).catch(() => {})
+  }
 }
 
 // Garante tradução IA das falas [i .. i+n). `sinc` espera terminar.
@@ -899,6 +969,7 @@ async function videoTranscribeFull() {
     }
     _vidAppliedSubUrl = null
     _vidCur.subShift = 0
+    _vidSyncMarcar('transcricao')   // veio do próprio áudio: nasce em sincronia
     await _vidApplyCues(cues, 'criada pela IA (transcrição do áudio)')
     if (box) box.innerHTML = ''
     toast(`Legenda criada pela IA: ${cues.length} falas — já nasce sincronizada (veio do próprio áudio)`, 'success')

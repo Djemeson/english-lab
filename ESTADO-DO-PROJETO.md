@@ -15421,6 +15421,33 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada da sincronização permanente da legenda (2026-08-24, 45ª)
+
+- [x] **A SINCRONIZAÇÃO DA LEGENDA VIROU PATRIMÔNIO.** Relato dele: sincronizou a legenda
+      com a fala e, tempos depois, ela voltou dessincronizada junto com a trilha de IA. As
+      três brechas somadas: pacote de legenda SEM carimbo (local×nuvem incomparáveis), a
+      nuvem só consultada com o local VAZIO (e nunca corrigida quando ficava para trás), e
+      `legendaSubir` falhando calado sem retentativa — a nuvem guardava para sempre a
+      versão pré-sincronização, e era ELA que voltava quando o local se perdia (eviction/
+      limpeza). Agora: **pacote v2** `{v, at, cues, cuesPT, candidates, appliedUrl, sync}`
+      com registro de COMO/QUANDO foi sincronizada (ajuste/ia/progressiva/troca/faixa/
+      transcrição — marcado nos 6 caminhos); `v.legendaAt` nos metadados sincronizados =
+      carimbo do que a nuvem TEM, gravado **só após upload confirmado**; na abertura,
+      **melhor vence**: nuvem mais nova baixa e corrige o local, local mais novo re-sobe
+      (autocura da falha antiga de upload); pacote legado sem carimbo ganha `at` e vira o
+      canônico (é a versão que ele vê e confia). O carimbo SÓ avança quando o conteúdo
+      muda (`_vidSubsPreservaAt` no re-salvamento da abertura; PUT dispensado quando o
+      `at` é o que a nuvem já tem); gotejo da tradução em tempo real sobe metadados no máx
+      1×/min, estrutural sobe na hora. Legenda NOVA sobre uma sincronizada AVISA que a
+      sincronização foi descartada; painel Sync mostra "Sincronizada em dd/mm hh:mm —
+      modo". De brinde: `videoUsarFaixaEmbutida` agora zera appliedUrl/candidatas/
+      cueCount (a pendência da rodada 5 do vídeo). EN + trilha PT + tradução IA viajam
+      SEMPRE juntos no mesmo pacote — recuperar da nuvem traz tudo de uma vez.
+      **Testado ao vivo: 12/12** (pacote v2 com sync, carimbo preservado na abertura,
+      recuperação com sincronização, nuvem-nova vence local-velho, autocura re-subindo e
+      avançando `legendaAt` só no OK, legado carimbado e canonizado, painel com e sem
+      registro). Console limpo.
+
 ### Da análise de UX "Onde os Botões Vivem" (2026-08-24) — as 5 rodadas de reforma
 
 > Análise a pedido dele ("onde os botões vivem? duplicados? enterrados? hovers?"). Três
