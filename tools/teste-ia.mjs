@@ -7,9 +7,11 @@
 // verdade cada chamada, e como ela se sai contra o modelo antigo nos MESMOS
 // prompts.
 //
-//   node tools/teste-ia.mjs esquemas     # barato: só valida os 7 contratos
+//   node tools/teste-ia.mjs esquemas     # barato: só valida os contratos
 //   node tools/teste-ia.mjs analise      # a análise completa, Luna × 4o-mini
 //   node tools/teste-ia.mjs chips        # a quebra do trecho (vazamento/enum)
+//   node tools/teste-ia.mjs gemini       # a MESMA análise/quebra no Gemini,
+//                                        # como o app chama (GEMINI_API_KEY)
 //   node tools/teste-ia.mjs tudo
 //
 // A CHAVE VEM DO AMBIENTE, nunca do código e nunca da linha de comando (o
@@ -50,7 +52,20 @@ function doEnv(nome) {
 }
 
 const CHAVE = doEnv('OPENAI_API_KEY')
+// A bateria do Gemini (melhoria 7, rodada 44): os prompts do app rodavam só
+// contra a OpenAI — e a família inteira de defeitos da troca de fornecedor
+// (modelo cravado, folga de raciocínio, JSON sem contrato de forma) passou
+// batida até doer em produção. Com GEMINI_API_KEY no .env, o modo `gemini`
+// roda a análise e a quebra contra a camada compatível do Google, do jeito
+// que o APP chama (json_object, nunca json_schema; folga via max_tokens).
+const CHAVE_GEMINI = doEnv('GEMINI_API_KEY')
 const COTACAO = Number(doEnv('USD_BRL') || 5.40)   // só para a estimativa em reais
+
+const PROVS = {
+  openai: { url: 'https://api.openai.com/v1/chat/completions', chave: () => CHAVE, json: 'schema' },
+  gemini: { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+            chave: () => CHAVE_GEMINI, json: 'objeto' }
+}
 
 const fonte = f => fs.readFileSync(path.join(RAIZ, f), 'utf8')
 
@@ -133,7 +148,8 @@ function carregarPrecos() {
   const b = src.indexOf('function aiProviderAtual')
   const tabela = avaliar(src.slice(a, b) + '\nreturn AI_PROVIDERS;')
   const p = {}
-  for (const m of tabela.openai.modelos) p[m.id] = m.preco
+  // Todos os fornecedores (melhoria 7): a conta do Gemini sai da mesma tabela.
+  for (const prov of Object.values(tabela)) for (const m of (prov.modelos || [])) p[m.id] = m.preco
   return p
 }
 
@@ -202,19 +218,23 @@ function promptDaQuebra() {
 // ---------------------------------------------------------------
 // 3. A CHAMADA
 // ---------------------------------------------------------------
-async function chamar({ modelo, prompt, schema, schemaNome, maxTokens = 5000 }) {
+async function chamar({ modelo, prompt, schema, schemaNome, maxTokens = 5000, prov = 'openai' }) {
+  const P = PROVS[prov]
+  // Espelha o app: fornecedor sem `json_schema` fica no `json_object` — o
+  // teste tem de exercitar exatamente o caminho que o app percorre lá.
+  const usaEsquema = schema && P.json === 'schema'
   const corpo = {
     model: modelo,
     messages: [{ role: 'user', content: prompt }],
     ...tokenParam(modelo, maxTokens),
-    ...(schema
+    ...(usaEsquema
       ? { response_format: { type: 'json_schema', json_schema: { name: schemaNome, strict: true, schema } } }
       : { response_format: { type: 'json_object' } })
   }
   const t0 = Date.now()
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetch(P.url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${CHAVE}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${P.chave()}` },
     body: JSON.stringify(corpo)
   })
   const dados = await res.json()
@@ -437,13 +457,58 @@ function testeSeco() {
 }
 
 // ---------------------------------------------------------------
+// A BATERIA DO GEMINI (melhoria 7): os mesmos prompts de verdade, contra a
+// camada compatível do Google, do jeito que o app chama. É o teste que teria
+// pego a família inteira de defeitos da troca de fornecedor antes de doer.
+async function testeGemini() {
+  const modelo = 'gemini-flash-lite-latest'   // o padrão do app no Gemini
+  console.log(`\n=== A BATERIA DO GEMINI — ${modelo}, json_object + folga (como o app) ===`)
+  // 1) análise completa
+  const prompt = promptDaAnalise({ comReencontro: false })
+  const r = await chamar({ prov: 'gemini', modelo, prompt, maxTokens: 5000 })
+  if (r.erro) console.log(`  ✗ análise  ERRO: ${r.erro}`)
+  else if (!r.json) console.log(`  ✗ análise  não voltou JSON legível (fim: ${r.fim}) — é o sintoma da falta de folga`)
+  else {
+    const m = (r.json.meanings || [])[0] || {}
+    const p = preenchimento(m)
+    console.log(`  ✓ análise  ${r.entrada}→${r.saida} tokens${r.raciocinio ? ` (${r.raciocinio} pensando)` : ''} · ${(r.ms / 1000).toFixed(1)}s · ${money(r)}`)
+    console.log(`      word="${r.json.word}" type=${r.json.type} · sentidos: ${(r.json.meanings || []).length} · campos preenchidos: ${p.cheios.length}/${p.cheios.length + p.vazios.length}`)
+  }
+  // 2) quebra do trecho (o vazamento)
+  const pq = promptDaQuebra()
+  const DENTRO = 'looks lower middle-class to billy'
+  const r2 = await chamar({ prov: 'gemini', modelo, prompt: pq, maxTokens: 800 })
+  if (r2.erro || !r2.json) console.log(`  ✗ quebra   ${r2.erro || `sem JSON (fim: ${r2.fim})`}`)
+  else {
+    const items = r2.json.items || []
+    const vazando = items.filter(it => !DENTRO.includes(String(it.expr || '').toLowerCase()))
+    const tipoTorto = items.filter(it => !['word','phrasal_verb','idiom','collocation','chunk'].includes(it.type))
+    console.log(`  ✓ quebra   ${items.length} unidades · ${r2.saida} tokens · ${money(r2)}`)
+    console.log(`      vazou do contexto: ${vazando.length ? vazando.map(i => i.expr).join(', ') : 'nada ✓'}` +
+      ` · tipo fora do enum: ${tipoTorto.length ? tipoTorto.map(i => i.type).join(', ') : 'nenhum ✓'}`)
+  }
+  console.log('  (sem contrato de forma aqui de propósito: o Gemini fica no json_object, como no app —')
+  console.log('   tipo fora do enum é o que as camadas tolerantes do app existem para segurar)')
+}
+
+// ---------------------------------------------------------------
 const qual = (process.argv[2] || 'seco').toLowerCase()
 const tudo = qual === 'tudo'
 try {
   if (qual === 'seco') { testeSeco(); process.exit(0) }
+  if (qual === 'gemini') {
+    if (!CHAVE_GEMINI) {
+      console.error('Falta GEMINI_API_KEY no .env (mesmo formato da OPENAI_API_KEY).')
+      process.exit(1)
+    }
+    console.log(`chave Gemini: ...${CHAVE_GEMINI.slice(-4)} · cotação R$ ${COTACAO.toFixed(2)}/US$`)
+    await testeGemini()
+    process.exit(0)
+  }
   if (!CHAVE) {
     console.error('Falta OPENAI_API_KEY no ambiente. Veja o cabeçalho deste arquivo.')
     console.error('Sem chave, só o modo "seco" roda:  node tools/teste-ia.mjs seco')
+    console.error('(o modo "gemini" usa GEMINI_API_KEY e roda sem a da OpenAI)')
     process.exit(1)
   }
   console.log(`chave: ...${CHAVE.slice(-4)} · cotação R$ ${COTACAO.toFixed(2)}/US$`)
@@ -453,6 +518,7 @@ try {
   if (tudo || qual === 'chips')    await testeChips()
   if (tudo || qual === 'web')      await testeWeb()
   if (tudo || qual === 'webcusto') await testeWebCusto()
+  if (tudo && CHAVE_GEMINI)        await testeGemini()
 } catch (e) {
   console.error('\nfalhou:', e.message)
   process.exit(1)

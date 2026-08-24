@@ -15564,7 +15564,15 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
             telefone. Guarda o texto CRU; cada tela repinta o próprio HTML. Testado ao
             vivo: 3/3 (ida-e-volta pelo BookDB real, sem colisão, versão velha descartada).
             `sw.js` → v414.
-      - [ ] 7 · Bateria Gemini no teste-ia.mjs.
+      - [x] **7 · Bateria Gemini no teste-ia.mjs** — FEITA (44ª). Modo `gemini`
+            (GEMINI_API_KEY no .env): roda a análise completa e a quebra do trecho contra a
+            camada compatível do Google DO JEITO QUE O APP CHAMA (json_object, nunca
+            json_schema; folga via `_aiTokenParam` extraído do próprio ai.js — o teste
+            acompanha o app sozinho). Preços agora lidos de TODOS os fornecedores (18
+            modelos). `tudo` inclui o Gemini quando a chave existe. Verificado: modo seco
+            lê os 14 esquemas (com os 6 novos), e o caminho sem chave avisa certo. ⚠️ A
+            RODADA COMPLETA no Gemini precisa da chave DELE no .env (GEMINI_API_KEY=...) —
+            é a pendência que teria pego a família inteira da Rodada 2 antes de doer.
 
 ### Da rodada da formatação do livro (§8.98, 2026-08-22)
 
