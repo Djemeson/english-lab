@@ -453,8 +453,22 @@ function renderKindleList(skipped, total) {
   analyzeKindleItems()
 }
 
+// Uma passada por vez, e só o que falta (rodada 44). O laço antigo tinha três
+// defeitos somados: (1) rodava sobre a lista INTEIRA sem pular `analisado` —
+// e como a importação E o render disparavam a análise, cada importação pagava
+// 2×, e cada descarte/adição pagava de novo os restantes; (2) sem trava de
+// reentrância, duas passadas corriam juntas; (3) o resultado voltava por
+// ÍNDICE GLOBAL da lista viva — descartar um item no meio deslocava todos os
+// índices e a tradução caía no destaque vizinho. Agora: trava, fila só com os
+// pendentes, numeração LOCAL do lote e identidade por OBJETO (o snapshot
+// segura a referência mesmo que kindleItems seja refiltrado no meio).
+let _kindleAnalisando = false
 async function analyzeKindleItems() {
   if (!aiChatCfg().key || !kindleItems.length) return
+  if (_kindleAnalisando) return
+  const fila = kindleItems.filter(it => it && !it.analisado)
+  if (!fila.length) return
+  _kindleAnalisando = true
 
   const BATCH = 20  // menor para mais precisão e menos falhas
 
@@ -480,23 +494,23 @@ For short inputs (1-3 words), return vocab [] and word meaning as trans (in cita
 Return ONLY valid JSON:
 {"items":[{"i":<n>,"vocab":["expression1","expression2"],"trans":"<full Portuguese translation>"}]}`
 
-  for (let start = 0; start < kindleItems.length; start += BATCH) {
-    const batch = kindleItems.slice(start, start + BATCH)
+  try {
+  for (let start = 0; start < fila.length; start += BATCH) {
+    const batch = fila.slice(start, start + BATCH)
     const cEl = el('kindle-count')
-    if (cEl) cEl.textContent = `Traduzindo ${Math.min(start + BATCH, kindleItems.length)}/${kindleItems.length} destaques...`
+    if (cEl) cEl.textContent = `Traduzindo ${Math.min(start + BATCH, fila.length)}/${fila.length} destaques...`
 
     // Separa itens com frase de itens com só palavra
     const lines = batch.map((item, j) => {
-      const idx = start + j
       // Item que só tem a palavra (destaque curto, vocab.db sem frase) manda a
       // PALAVRA — antes ia uma string vazia e a IA respondia qualquer coisa.
       const ctx = (item.context || item.word || '').replace(/"/g, "'").trim()
       const hasWord = item.word && item.word !== ctx
       if (ctx.split(/\s+/).length <= 2) {
         // Highlight de palavra única ou dupla — não tem frase
-        return `${idx}. WORD: "${ctx}"`
+        return `${j}. WORD: "${ctx}"`
       }
-      return `${idx}. "${ctx}"${hasWord ? ` [known: ${item.word}]` : ''}`
+      return `${j}. "${ctx}"${hasWord ? ` [known: ${item.word}]` : ''}`
     }).join('\n')
 
     try {
@@ -508,17 +522,13 @@ Return JSON for ALL ${batch.length} items.` }
       ], { maxTokens: Math.max(800, batch.length * 60) })
       if (Array.isArray(result.items)) {
         result.items.forEach(({ i, vocab, item, trans }) => {
-          const idx = Number(i)
-          if (isNaN(idx) || idx < 0 || idx >= kindleItems.length) return
-          const alvo = kindleItems[idx]
+          const j = Number(i)
+          if (isNaN(j) || j < 0 || j >= batch.length) return
+          const alvo = batch[j]          // identidade por objeto, não por posição
           alvo.analisado = true
           const ptStr = String(trans || '').trim()
           const isInstructionLeak = /global.?index|cada item|utiliza|return|json|vocabulary/i.test(ptStr)
-          if (ptStr && !isInstructionLeak) {
-            alvo.context_pt = ptStr
-            const ptEl = document.getElementById(`ks-pt-${idx}`)
-            if (ptEl) ptEl.textContent = ptStr
-          }
+          if (ptStr && !isInstructionLeak) alvo.context_pt = ptStr
           // O prompt pede `vocab` (lista de expressões). O código lia `item`,
           // que nunca vinha — os chips ficavam em "analisando..." para sempre.
           // `item` fica aceito como apelido para não quebrar respostas antigas.
@@ -531,13 +541,22 @@ Return JSON for ALL ${batch.length} items.` }
             alvo.words = [...new Set(achados)]
             alvo.word = alvo.words[0]   // compat
           }
-          updateKindleWordsDisplay(idx)
+          // A tela usa a posição ATUAL do item — que pode ter mudado se algo
+          // foi descartado no meio. Item que já saiu da fila: só o dado fica.
+          const idxAtual = kindleItems.indexOf(alvo)
+          if (idxAtual >= 0) {
+            const ptEl = document.getElementById(`ks-pt-${idxAtual}`)
+            if (ptEl && alvo.context_pt) ptEl.textContent = alvo.context_pt
+            updateKindleWordsDisplay(idxAtual)
+          }
         })
       }
     } catch(e) {
       console.warn(`[Kindle] Lote ${start}-${start+BATCH} falhou:`, e.message)
     }
   }
+  if (typeof saveKindleQueue === 'function') { try { saveKindleQueue() } catch (e) {} }
+  } finally { _kindleAnalisando = false }
   const cFim = el('kindle-count')
   if (cFim) cFim.textContent = `${kindleItems.length} destaque${kindleItems.length!==1?'s':''} · tradução concluída`
 }

@@ -15479,12 +15479,28 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       capítulo em m4b real (exige o acervo dele) e o capítulo corrompido de verdade — a
       lógica espelha o caminho já testado do ligar, mas vale um ouvido na primeira sessão
       de ouvir-junto.
-- [ ] **RODADA 5 — vídeo, Kindle e travas de contexto:** trava de alvo em
-      `_vidAutoSub`/`videoTranscribeFull`/`mangaRepintarPagina`/lote do Kindle (resposta por
-      id, não por índice); Kindle sem análise dupla (filtro de `analisado`); download de
-      podcast confere `got < total`; charset no import local de .srt; transcript da Netflix
-      sem re-render por fala; ← nos créditos = última fala; manifest da extensão no domínio
-      exato da Vercel.
+- [x] **RODADA 5 — vídeo, Kindle e travas de contexto — FEITA em 2026-08-23 (44ª).**
+      Travas de alvo: `_vidAutoSub` (alvo capturado + `vivo()` antes de aplicar),
+      `videoTranscribeFull` (`alvoTr`, com aviso honesto se trocou de vídeo — a transcrição
+      pronta é descartada), `_vidApplyCues` barra sem vídeo aberto, `mangaRepintarPagina`
+      confere `_mgMontado === livro.id`. **Kindle reescrito**: `_kindleAnalisando` (trava de
+      reentrância), fila só com `!analisado` (a análise rodava 2–4×, paga), numeração LOCAL
+      do lote e **identidade por objeto** (descartar item no meio deslocava os índices e a
+      tradução caía no vizinho); DOM atualizado pela posição atual via `indexOf`. Podcast:
+      `got < total*0.99` vira erro "download incompleto" (fim limpo de conexão caída salvava
+      arquivo cortado e ainda o subia como "a cópia boa"). Import local de .srt lê BYTES e
+      decide UTF-8×1252 por evidência (`_vidDecodeSubBuf`), como o download já fazia.
+      Netflix: tick move só a marcação (`transcriptMarcarAtual`) em vez de reconstruir o
+      painel (a busca digitada era apagada a cada fala); modo DOM só re-renderiza quando o
+      painel não está em uso (`_trOcupado`); ← depois da última legenda vai à ÚLTIMA fala,
+      não ao início; `escapar` cobre aspas (title da régua). Extensão 3.21.0: hosts no
+      domínio EXATO da Vercel (era `*.vercel.app` inteiro — sequestro de destino das
+      capturas), `ehLab` do popup idem, host/espelho do DeepSeek removidos. `sw.js` → v410.
+      **Testado: 19/19 em node sobre o código real extraído** (falaAnterior nos créditos,
+      escapar, decoder com bytes Latin-1 de verdade, análise do Kindle com stub de IA —
+      1 chamada para 2 pendentes, resultado no objeto certo, segunda passada grátis) +
+      lazy carregados no navegador sem erro. ⚠️ A extensão precisa ser **recarregada** em
+      chrome://extensions para o manifest novo valer.
 - [ ] **RODADA 6 — crescimento e infra:** guarda de tamanho (~900KB) nos docs principais do
       sync com aviso do culpado (fatiamento depois); `cache:'reload'` no install do sw.js;
       regras Firebase travadas no e-mail dele; server.js em 127.0.0.1 + negar

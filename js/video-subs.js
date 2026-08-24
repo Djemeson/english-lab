@@ -15,9 +15,20 @@ function videoDropSub(ev) {
   if (f) _vidReadSubFile(f)
 }
 function _vidReadSubFile(file) {
+  // Vídeo fechado entre o clique e a leitura: não há onde aplicar (rodada 44).
+  if (!_vidCur) return
   const reader = new FileReader()
   reader.onload = async e => {
-    const cues = parseSubtitle(String(e.target.result || ''))
+    if (!_vidCur) return
+    // ⚠️ PELOS BYTES, NÃO POR readAsText (rodada 44): o caminho de download já
+    // decidia UTF-8 × windows-1252 por evidência (_vidDecodeSubBuf), e o
+    // import local decodificava tudo como UTF-8 — um .srt PT-BR em Latin-1 (o
+    // formato mais comum em legenda antiga) entrava como "nÃ£o" em toda fala.
+    const buf = e.target.result
+    const texto = (typeof _vidDecodeSubBuf === 'function' && buf instanceof ArrayBuffer)
+      ? _vidDecodeSubBuf(buf)
+      : new TextDecoder('utf-8').decode(buf)
+    const cues = parseSubtitle(String(texto || ''))
     if (!cues.length) { toast('Não reconheci falas nesse arquivo — é um .srt/.vtt válido?', 'error'); return }
     // Arquivo de TRADUÇÃO (o .pt-BR.ia.srt que o próprio app exporta, ou
     // qualquer legenda PT) entra como trilha de tradução — não substitui a
@@ -41,7 +52,7 @@ function _vidReadSubFile(file) {
     const cc = el('vid-cue-count'); if (cc) cc.textContent = cues.length + ' falas'
     toast(`Legenda importada: ${cues.length} falas`, 'success')
   }
-  reader.readAsText(file)
+  reader.readAsArrayBuffer(file)
 }
 
 // Parser tolerante: SRT e VTT, CRLF/BOM, tags <i>/{...} removidas.
@@ -339,6 +350,12 @@ const VID_LANG3 = { en: 'eng', es: 'spa', fr: 'fre', de: 'ger', it: 'ita', pt: '
 async function _vidAutoSub() {
   if (!_vidCur || _vidCues.length) return
   if (_vidCur.podcast) return          // addon de legenda não indexa podcast
+  // ⚠️ A TRAVA DE ALVO (rodada 44). A busca corre em segundo plano e o usuário
+  // continua vivendo: fecha o vídeo, abre OUTRO. Quando o resultado chegava,
+  // era aplicado no "vídeo atual" — que já era o vizinho: a legenda do episódio
+  // A gravada no B (e, de volta à biblioteca, um crash em _vidCur.cueCount).
+  const alvo = _vidCur
+  const vivo = () => _vidCur === alvo
   const query = _vidCleanQuery(_vidCur.fileName)
   if (!query || query.length < 3) return
   const guess = _vidGuessEpisode(_vidCur.fileName)
@@ -360,11 +377,13 @@ async function _vidAutoSub() {
       toast('Não deduzi o episódio pelo nome do arquivo — use "Buscar legenda"', 'info'); return
     }
     const subs = await _vidFetchSubs(top, guess ? guess.s : 1, guess ? guess.e : 1)
+    if (!vivo()) return                  // trocou de vídeo no meio: o achado é do outro
     if (_vidCues.length) return          // usuário importou algo enquanto buscava
     const alvoLang = VID_LANG3[_vidCur.lang || 'en'] || 'eng'
     const sub = subs.find(sb => sb.lang === alvoLang) || subs[0]
     if (!sub) { toast('Nenhuma legenda nos addons para este episódio', 'info'); return }
     await _vidApplySubUrl(sub)
+    if (!vivo()) return
     toast(`Legenda encontrada sozinha: ${top.name}${top.type === 'series' ? ` S${String(guess.s).padStart(2,'0')}E${String(guess.e).padStart(2,'0')}` : ''} — se escorregar, use o Sync`, 'success')
   } catch (e) {
     console.warn('[video] autoSub:', e)
@@ -393,6 +412,9 @@ function _vidFixMojibake(txt) {
 
 // Caminho único de gravação de legenda (arquivo local e busca online)
 async function _vidApplyCues(cues, origem) {
+  // Sem vídeo aberto não há onde aplicar — o resultado tardio de uma busca ou
+  // transcrição chegava com a biblioteca na tela e quebrava em _vidCur.cueCount.
+  if (!_vidCur) { console.warn('[video] legenda chegou sem vídeo aberto — descartada'); return }
   _vidCues = cues
   if (_vidCuesPT.length) _vidAlignPTTrack()   // realinha a trilha PT à legenda nova
   _vidSaveSubs()
@@ -815,6 +837,9 @@ async function videoTranscribeFull() {
       Cotação de hoje: US$ 1 ≈ R$ ${rate.toFixed(2).replace('.', ',')}.</p>` }))) return
 
   _vidTranscrevendo = true
+  // A transcrição leva MINUTOS — a trava de alvo aqui é obrigatória (rodada 44):
+  // no fim ela gravava no "vídeo atual", que podia já ser outro (ou nenhum).
+  const alvoTr = _vidCur
   const box = el('vid-audiofix-banner')
   const setMsg = (m, pct) => { if (box) box.innerHTML = `
     <div class="vid-fix-banner"><div><b>${m}</b>${pct != null ? `
@@ -868,6 +893,10 @@ async function videoTranscribeFull() {
     }
     if (cues.length < 5) throw new Error('a transcrição voltou quase vazia — o arquivo tem fala?')
 
+    if (_vidCur !== alvoTr) {
+      toast('Você trocou de vídeo no meio — a transcrição pronta era do anterior e foi descartada. Reabra-o e rode de novo (a extração é local, só a chamada de IA se repete).', 'warning')
+      return
+    }
     _vidAppliedSubUrl = null
     _vidCur.subShift = 0
     await _vidApplyCues(cues, 'criada pela IA (transcrição do áudio)')

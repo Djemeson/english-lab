@@ -516,6 +516,15 @@ async function podcastBaixarEpisodio(v, titulo) {
         partes.push(value); got += value.length
         set('Baixando o áudio para o seu aparelho...', total ? Math.min(1, got / total) : null, got, total)
       }
+      // ⚠️ FIM LIMPO NÃO É FIM CERTO (rodada 44). Conexão que cai no meio pode
+      // encerrar o stream SEM erro — e o pedaço ia para o IndexedDB como
+      // episódio completo, o fileSize era sobrescrito com o tamanho truncado e
+      // a cópia CORTADA ainda subia para a nuvem como "a boa". Se o servidor
+      // disse o tamanho, o que chegou tem de bater (1% de folga para
+      // transfer-encoding esquisito).
+      if (total && got < total * 0.99) {
+        throw new Error(`download incompleto (${Math.round(got / 1048576)} de ${Math.round(total / 1048576)} MB)`)
+      }
       blob = new Blob(partes, { type: r.headers.get('content-type') || 'audio/mpeg' })
     }
     set('Guardando...', 1, blob.size, blob.size)

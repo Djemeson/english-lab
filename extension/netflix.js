@@ -302,7 +302,14 @@ function falaAnterior() {
     return
   }
   const i = cueEm(v.currentTime)
-  let alvo = i < 0 ? cues.findIndex(c => c.s > v.currentTime) - 1 : grupoIni(i)
+  let alvo
+  if (i >= 0) alvo = grupoIni(i)
+  else {
+    // Depois da ÚLTIMA legenda (créditos), findIndex dava -1 e o -1 extra
+    // clampava para 0: rever a última frase virava recomeçar o episódio.
+    const prox = cues.findIndex(c => c.s > v.currentTime)
+    alvo = prox < 0 ? cues.length - 1 : prox - 1
+  }
   if (alvo < 0) alvo = 0
   if (v.currentTime - cues[alvo].s <= 0.8) alvo = grupoIni(Math.max(0, alvo - 1))
   _irAteAFala(cues[alvo].s - 0.2)
@@ -1041,7 +1048,26 @@ function renderTranscript() {
   if (cur) cur.scrollIntoView({ block: 'center' })
 }
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
-const escapar = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+// `"` também (rodada 44): diálogo com aspas fechava o title="" da régua no
+// meio e o resto virava atributo-lixo.
+const escapar = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+// Só move a marcação de fala atual — SEM reconstruir o painel (rodada 44).
+// O re-render a cada fala recriava o campo de busca vazio no meio da
+// digitação, perdia o filtro aplicado e roubava a rolagem de volta ao centro.
+function transcriptMarcarAtual() {
+  if (!painel) return
+  const antiga = painel.querySelector('.englab-tr-line.cur')
+  if (antiga) antiga.classList.remove('cur')
+  const nova = painel.querySelector(`.englab-tr-line[data-i="${idxAtual}"]`)
+  if (!nova) return
+  nova.classList.add('cur')
+  // A rolagem acompanha a fala SÓ quando ele não está mexendo no painel:
+  // busca ativa ou mouse em cima = a rolagem é dele.
+  const busca = painel.querySelector('#englab-tr-busca')
+  if ((busca && busca.value) || painel.matches(':hover')) return
+  nova.scrollIntoView({ block: 'center' })
+}
 
 // ================================================================
 // A MARCACAO DA LEXA, TAMBEM AQUI
@@ -1118,7 +1144,16 @@ function renderAtual() {
   renderFala(t)
   aplicarNativa()
   if (cfgUI.pt && t && !ptCache.has(chavePT(t))) traduzirAvulsa(t)
-  if (cfgUI.transcript) renderTranscript()
+  // No modo DOM o transcript cresce com o histórico e precisa do render cheio
+  // — mas nunca POR CIMA de quem está usando o painel (busca digitada ou mouse
+  // em cima): o re-render apagava a busca no meio e roubava a rolagem.
+  if (cfgUI.transcript && !_trOcupado()) renderTranscript()
+}
+
+function _trOcupado() {
+  if (!painel) return false
+  const busca = painel.querySelector('#englab-tr-busca')
+  return !!(busca && (busca.value || busca === document.activeElement)) || painel.matches(':hover')
 }
 
 setInterval(() => {
@@ -1139,7 +1174,7 @@ setInterval(() => {
   const v = vid(); if (!v) return
   if (cues.length) {
     const i = cueEm(v.currentTime)
-    if (i !== idxAtual) { idxAtual = i; if (cfgUI.transcript) renderTranscript() }
+    if (i !== idxAtual) { idxAtual = i; if (cfgUI.transcript) transcriptMarcarAtual() }
     if (cfgUI.pt) traduzirJanela(v.currentTime)
     if (ruleIni == null) montarRegua(v.currentTime)
   }

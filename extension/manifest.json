@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Language Lab — Netflix e Kindle",
-  "version": "3.20.0",
+  "version": "3.21.0",
   "description": "Captura vocabulário para o Language Lab direto da Netflix (legendas clicáveis, tradução por IA, transcript) e do Kindle Cloud Reader (palavra selecionada + a frase da página).",
   "permissions": [
     "storage",
@@ -10,11 +10,10 @@
   ],
   "host_permissions": [
     "https://api.openai.com/*",
-    "https://api.deepseek.com/*",
     "https://generativelanguage.googleapis.com/*",
     "https://api.groq.com/*",
     "https://djemeson.github.io/*",
-    "https://*.vercel.app/*",
+    "https://english-lab-seven.vercel.app/*",
     "http://localhost:8765/*"
   ],
   "background": {
@@ -61,7 +60,7 @@
     {
       "matches": [
         "https://djemeson.github.io/*",
-        "https://*.vercel.app/*",
+        "https://english-lab-seven.vercel.app/*",
         "http://localhost:8765/*"
       ],
       "js": [

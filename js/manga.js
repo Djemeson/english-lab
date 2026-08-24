@@ -1198,6 +1198,10 @@ function _mgSeloEstado(i, lida, erro) {
 // Depois de ler os balões, remontar o fluxo inteiro jogaria você para o
 // começo do volume — e é exatamente o momento em que você está lendo ali.
 function mangaRepintarPagina(livro, i) {
+  // ⚠️ SÓ NO VOLUME CERTO (rodada 44). A leitura de uma página fica em voo por
+  // até 2 min; trocando de volume nesse meio, o seletor por data-pg achava a
+  // página `i` do volume NOVO e pintava nela os balões do antigo.
+  if (_mgMontado && livro && _mgMontado !== livro.id) return false
   const div = document.querySelector('#ler-conteudo .mg-pagina[data-pg="' + i + '"]')
   if (!div) return false
   const camada = div.querySelector('.mg-camada')

@@ -55,7 +55,6 @@ function espelharConfig() {
       aiProvider: cfg.aiProvider || 'openai',
       aiModelProv: cfg.aiModelProv || {},
       openaiKey: cfg.openaiKey || '',
-      deepseekKey: cfg.deepseekKey || '',
       geminiKey: cfg.geminiKey || '',
       groqKey: cfg.groqKey || ''
     }

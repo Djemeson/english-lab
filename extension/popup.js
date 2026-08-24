@@ -1,6 +1,8 @@
 'use strict'
 const APP_FALLBACK = 'https://english-lab-seven.vercel.app/'
-const ehLab = u => /english-lab|djemeson\.github\.io|localhost:8765/.test(String(u || ''))
+// Domínios EXATOS do app (rodada 44): "qualquer URL contendo english-lab"
+// casava com sites de estranhos e podia sequestrar o destino das capturas.
+const ehLab = u => /^https:\/\/(english-lab-seven\.vercel\.app|djemeson\.github\.io)\/|^http:\/\/localhost:8765\//.test(String(u || ''))
 
 function status(txt) { const e = document.getElementById('status'); if (e) e.textContent = txt || '' }
 
