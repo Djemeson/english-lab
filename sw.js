@@ -9,7 +9,7 @@
 // novos na hora; o shell é cache-first. Sem o bump, um deploy pode juntar
 // ler.js NOVO com ai.js VELHO — e "LEXA_NOME is not defined" na primeira
 // visita. O `activate` apaga os caches antigos, então o bump resolve.
-const CACHE = 'englab-v410'
+const CACHE = 'englab-v411'
 // Cache separado e PERMANENTE para o ffmpeg.wasm (31 MB): não pode ser
 // apagado a cada versão do shell, senão cada deploy custaria 31 MB de novo.
 const CACHE_FFMPEG = 'englab-ffmpeg-v1'
@@ -65,10 +65,16 @@ function _cacheavel(url) {
 // ── Install: pré-cacheia o shell ────────────────────────────────
 // Cacheia um por um em vez de addAll(): com addAll, UM único 404 rejeita a Promise
 // inteira e o service worker nunca instala (era o que acontecia no GitHub Pages).
+// ⚠️ `cache: 'reload'` (rodada 44): sem ele, o pré-cache vinha do cache HTTP do
+// navegador — e o GitHub Pages serve os .js com max-age de 10 minutos. O SW
+// NOVO instalava com JS de 10 minutos ATRÁS: index fresco + core velho, o
+// exato mismatch de "símbolo não definido" que o bump da versão existe para
+// evitar — e que ele não cobria por este caminho.
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c => Promise.all(
-      SHELL.map(url => c.add(url).catch(err => console.warn('[SW] não cacheou', url, err)))
+      SHELL.map(url => c.add(new Request(url, { cache: 'reload' }))
+        .catch(err => console.warn('[SW] não cacheou', url, err)))
     )).then(() => self.skipWaiting())
   )
 })
@@ -111,7 +117,9 @@ self.addEventListener('fetch', e => {
   if (url.includes('/js/add.js') || url.includes('/js/study.js') || url.includes('/js/dossie.js') || url.includes('/js/known.js') || url.includes('/js/kindle-db.js') || url.includes('/js/epub.js') || url.includes('/js/ler.js') || url.includes('/js/estante.js') || url.includes('/js/sinc.js') || url.includes('/js/audiobook.js') || url.includes('/js/manga.js') || url.includes('/js/video')) {
     e.respondWith(
       fetch(e.request)
-        .then(r => { caches.open(CACHE).then(c => c.put(e.request, r.clone())); return r })
+        // Só resposta BOA entra no cache (rodada 44): um 404 de deploy no meio
+        // ficava gravado e era servido offline no lugar do módulo.
+        .then(r => { if (r.ok) caches.open(CACHE).then(c => c.put(e.request, r.clone())); return r })
         .catch(() => caches.match(e.request))
     )
     return

@@ -9,9 +9,9 @@ const SK = { settings: 'englab_cfg', words: 'englab_words', srsCards: 'el-srs-ca
 let videos = []   // [{id,title,source_type,lang,duration,coverage,markers[],created_at,updated_at}]
 let clips  = []   // [{id,videoId,start,end,text,wordId,created_at}]
 function loadVideos() { try { videos = JSON.parse(localStorage.getItem(SK.videos) || '[]') } catch { videos = [] } }
-function saveVideos() { marcarSumidos('videos', SK.videos, videos); localStorage.setItem(SK.videos, JSON.stringify(videos)) }
+function saveVideos() { marcarSumidos('videos', SK.videos, videos); try { localStorage.setItem(SK.videos, JSON.stringify(videos)) } catch (e) { console.warn('[storage] gravacao falhou (cota?):', e && e.message); if (typeof avisarQuotaCheia === 'function') avisarQuotaCheia() } }
 function loadClips()  { try { clips = JSON.parse(localStorage.getItem(SK.clips) || '[]') } catch { clips = [] } }
-function saveClips()  { marcarSumidos('clips', SK.clips, clips); localStorage.setItem(SK.clips, JSON.stringify(clips)) }
+function saveClips()  { marcarSumidos('clips', SK.clips, clips); try { localStorage.setItem(SK.clips, JSON.stringify(clips)) } catch (e) { console.warn('[storage] gravacao falhou (cota?):', e && e.message); if (typeof avisarQuotaCheia === 'function') avisarQuotaCheia() } }
 
 // ── LEITOR DE EBOOKS: metadados dos livros da estante.
 //    Mesma regra de videos/clips: o ARQUIVO do livro nunca entra aqui (fica
@@ -299,7 +299,7 @@ function abChaveArquivo(id, n) { return `ab:${id}:${n}` }
 //    São só ponteiros (nome, capa, URL do feed) — nenhum áudio.
 let podShows = []   // [{title, artist, artwork, feedUrl, collectionId, addedAt}]
 function loadPodShows() { try { podShows = JSON.parse(localStorage.getItem(SK.podShows) || '[]') } catch { podShows = [] } }
-function savePodShows() { marcarSumidos('podShows', SK.podShows, podShows, 'collectionId'); localStorage.setItem(SK.podShows, JSON.stringify(podShows)) }
+function savePodShows() { marcarSumidos('podShows', SK.podShows, podShows, 'collectionId'); try { localStorage.setItem(SK.podShows, JSON.stringify(podShows)) } catch (e) { console.warn('[storage] gravacao falhou (cota?):', e && e.message); if (typeof avisarQuotaCheia === 'function') avisarQuotaCheia() } }
 
 // "Rever a cena" a partir do estudo: study.js (lazy) não pode chamar funções
 // de video.js (lazy) — este handoff vive no core: guarda o clipe pedido e
@@ -1529,8 +1529,18 @@ function updateDossieBadge() {
 // glossário morre. Sem isto, corrigir a tradução de uma palavra deixaria o
 // balão do hover mostrando a versão velha para sempre — e o erro seria
 // invisível, porque o card na tela já estaria certo.
+// Gravar sem rede de cota derrubava o CHAMADOR inteiro (rodada 44) — um
+// QuotaExceededError aqui no meio da aplicacao de um snapshot deixava os docs
+// seguintes sem aplicar. A palavra continua em memoria e na nuvem; o aviso
+// existe para o sumico nao ser mudo.
+let _quotaAvisada = false
+function avisarQuotaCheia() {
+  if (_quotaAvisada) return
+  _quotaAvisada = true
+  if (typeof toast === 'function') toast('O armazenamento local encheu: a ultima alteracao ficou so na memoria e na nuvem. Libere espaco em Configuracoes (audio/imagens) para voltar a gravar aqui.', 'error')
+}
 function saveWords() {
-  localStorage.setItem(SK.words, JSON.stringify(words))
+  try { localStorage.setItem(SK.words, JSON.stringify(words)) } catch (e) { console.warn('[storage] gravacao falhou (cota?):', e && e.message); if (typeof avisarQuotaCheia === 'function') avisarQuotaCheia() }
   if (typeof glossInvalidar === 'function') glossInvalidar()
   // Mesmo raciocínio do glossário: TODO caminho que muda um item passa aqui,
   // então é aqui que o contador de "para estudar" deixa de mentir — inclusive
@@ -2204,7 +2214,7 @@ function loadSrsDecks() {
   if (!srsDecks.length) srsDecks = JSON.parse(JSON.stringify(DEFAULT_DECKS))
   saveSrsDecks()
 }
-function saveSrsDecks() { marcarSumidos('srsDecks', SK.srsDecks, srsDecks); localStorage.setItem(SK.srsDecks, JSON.stringify(srsDecks)) }
+function saveSrsDecks() { marcarSumidos('srsDecks', SK.srsDecks, srsDecks); try { localStorage.setItem(SK.srsDecks, JSON.stringify(srsDecks)) } catch (e) { console.warn('[storage] gravacao falhou (cota?):', e && e.message); if (typeof avisarQuotaCheia === 'function') avisarQuotaCheia() } }
 function getDeckById(id) { return srsDecks.find(d => d.id === id) }
 function getSrsDeckPath(id) {
   const deck = getDeckById(id); if (!deck) return ''

@@ -199,7 +199,10 @@ function buildSessionQueue(filterDeckId = null) {
   // veio. O mapa é montado uma vez — `find` por card seria quadrático.
   const fonte = typeof srsFonteAtiva === 'function' ? srsFonteAtiva() : ''
   const mapa = fonte ? _srsMapaFontes() : null
-  const inDeck = c => inDeckSo(c) && (!fonte || mapa.get(c.wordId) === fonte)
+  // O MESMO fallback do cartão de fontes (rodada 44): card cujo item morreu
+  // vive em "Sem fonte" lá — e aqui o `undefined` nunca casava com a chave,
+  // então o cartão prometia N cards e a sessão abria vazia.
+  const inDeck = c => inDeckSo(c) && (!fonte || (mapa.get(c.wordId) || 'sem|Sem fonte') === fonte)
 
   // 1. Due reviews (review + relearning)
   let reviews = srsCards.filter(c => inDeck(c) && c.due <= now && (c.state === 'review' || c.state === 'relearning'))

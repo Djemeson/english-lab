@@ -21,6 +21,13 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // ⚠️ TRAVADO NA CONTA DO DONO (rodada 44) — mesmo motivo do Firestore:
+    // qualquer conta Google podia logar e subir 2 GB por arquivo até estourar
+    // a cota. App de uma pessoa, regra de uma pessoa.
+    function ehODono() {
+      return request.auth != null && request.auth.token.email == 'djemesongentedigital@gmail.com';
+    }
+
     // ---- O ÁUDIO DO AUDIOLIVRO ----
     // Faixa própria porque a escala é outra: um EPUB tem 4 MB, um episódio de
     // vídeo algumas centenas — um `.m4b` de audiolivro vai de 100 MB a mais de
@@ -33,20 +40,20 @@ service firebase.storage {
     // isso que a ordem aqui não importa — e é por isso que o bloco de baixo
     // NÃO precisa abrir exceção nenhuma.
     match /users/{uid}/audiolivros/{allPaths=**} {
-      allow read:           if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null && request.auth.uid == uid
+      allow read:           if ehODono() && request.auth.uid == uid;
+      allow create, update: if ehODono() && request.auth.uid == uid
                             && request.resource.size < 2147483648;   // 2 GB
-      allow delete:         if request.auth != null && request.auth.uid == uid;
+      allow delete:         if ehODono() && request.auth.uid == uid;
     }
 
     // ---- TODO O RESTO ----
     // EPUB do leitor, episódio de vídeo, legenda, capa. 500 MB cobre com folga
     // e continua sendo um freio de verdade.
     match /users/{uid}/{allPaths=**} {
-      allow read:           if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null && request.auth.uid == uid
+      allow read:           if ehODono() && request.auth.uid == uid;
+      allow create, update: if ehODono() && request.auth.uid == uid
                             && request.resource.size < 524288000;    // 500 MB
-      allow delete:         if request.auth != null && request.auth.uid == uid;
+      allow delete:         if ehODono() && request.auth.uid == uid;
     }
   }
 }

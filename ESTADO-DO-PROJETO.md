@@ -15501,11 +15501,24 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       1 chamada para 2 pendentes, resultado no objeto certo, segunda passada grátis) +
       lazy carregados no navegador sem erro. ⚠️ A extensão precisa ser **recarregada** em
       chrome://extensions para o manifest novo valer.
-- [ ] **RODADA 6 — crescimento e infra:** guarda de tamanho (~900KB) nos docs principais do
-      sync com aviso do culpado (fatiamento depois); `cache:'reload'` no install do sw.js;
-      regras Firebase travadas no e-mail dele; server.js em 127.0.0.1 + negar
-      `_dados-de-teste`; streak no fuso local (srs.js:491); try/catch de quota nos saves;
-      duplicata de card com exampleIdx -1 vs 0 (srs.js:512).
+- [x] **RODADA 6 — crescimento e infra — FEITA em 2026-08-23 (44ª).** `fbPushData` agora
+      MEDE cada doc antes do batch (`_fbDocCabe`): >800 KB avisa nomeando a lista (1×/sessão),
+      >950 KB fica FORA do envio com erro claro — o resto sincroniza (o batch atômico não
+      derruba mais tudo; o fatiamento de words/srsCards continua como pendência futura).
+      sw.js: install com `cache:'reload'` (o pré-cache vinha do cache HTTP de 10 min do
+      GH Pages — o SW novo instalava com JS velho) e lazy só cacheia resposta `ok`. Regras
+      Firestore/Storage travadas no e-mail dele (`ehODono()`) — ⚠️ **precisam de
+      `firebase deploy` manual para valer** (o modo automático barra; pendência dele).
+      server.js: 127.0.0.1 + 404 para `/_dados-de-teste` e `/.env` (servia a credencial
+      admin na rede local; obs.: express nem está instalado neste checkout — o dev real é o
+      python do launch.json). Streak no fuso local (zerava toda noite a partir das 21h,
+      `toISOString` era UTC). Duplicata de card sem exemplos consertada nos TRÊS caminhos
+      (srs.js `saveToSrs` + review.js `saveAllToSrs`/`saveSelectedToSrs`: procurava com -1 e
+      gravava com 0). try/catch de cota em saveWords/Videos/Clips/PodShows/SrsDecks/SrsLog/
+      SrsCfg com `avisarQuotaCheia()` (1 toast/sessão). Sessão por fonte: card órfão usa o
+      mesmo fallback "Sem fonte" do cartão (abria sessão vazia). `sw.js` → v411.
+      **Testado ao vivo: 9/9 no navegador** (streak hoje/ontem, reenvio sem duplicar com
+      exampleIdx 0, doc gigante barrado com aviso na tela) + regex do bloqueio 6/6 em node.
 - [ ] **MELHORIAS PROPOSTAS (fazer quando ele pedir):** painel "quanto a IA custou" (persistir
       `aiUso` por dia); semáforo de fornecedor em Configurações → IA; Media Session no
       podcast; comando de ensaio de backup no terminal; schema nas chamadas restantes

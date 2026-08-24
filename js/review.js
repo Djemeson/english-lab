@@ -1113,10 +1113,12 @@ async function saveAllToSrs() {
       const mi = w.meanings.indexOf(m)
       const examples = m.examples?.length ? m.examples : [null]
       examples.forEach((ex, ei) => {
-        const exIdx = ex ? ei : -1
+        // Mesma conta nos dois lados (rodada 44): procurar com -1 e gravar com 0
+        // fazia a duplicata nunca ser achada — cada reenvio criava card novo.
+        const exIdx = ex ? ei : 0
         const exists = srsCards.find(c => c.wordId === w.id && c.meaningIdx === mi && c.exampleIdx === exIdx)
         if (exists) return
-        const card = createSrsCard(w.id, mi, exIdx < 0 ? 0 : exIdx)
+        const card = createSrsCard(w.id, mi, exIdx)
         if (card) { srsCards.push(card); added++; totalCards++ }
       })
     })
@@ -1742,10 +1744,12 @@ async function saveSelectedToSrs() {
       const mi = w.meanings.indexOf(m)
       const examples = m.examples?.length ? m.examples : [null]
       examples.forEach((ex, ei) => {
-        const exIdx = ex ? ei : -1
+        // Mesma conta nos dois lados (rodada 44): procurar com -1 e gravar com 0
+        // fazia a duplicata nunca ser achada — cada reenvio criava card novo.
+        const exIdx = ex ? ei : 0
         const exists = srsCards.find(c => c.wordId === w.id && c.meaningIdx === mi && c.exampleIdx === exIdx)
         if (exists) return
-        const card = createSrsCard(w.id, mi, exIdx < 0 ? 0 : exIdx)
+        const card = createSrsCard(w.id, mi, exIdx)
         if (card) { srsCards.push(card); totalCards++ }
       })
     })

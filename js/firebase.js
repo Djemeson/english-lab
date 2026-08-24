@@ -1022,6 +1022,34 @@ function _fbDiaMaior(a, b) {
 const SK_SYNC_PENDENTE = 'el-sync-pendente'
 let _fbDirtySeq = 0
 
+// ---- O TETO DE 1 MB POR DOCUMENTO (rodada 44) ----
+// O Firestore rejeita documento acima de 1 MB — e o push era um batch ATÔMICO:
+// no dia em que UMA lista estourasse, o commit inteiro falharia, o sync
+// pararia de vez e nada apontaria o culpado. Agora cada doc é medido antes:
+// perto do teto avisa (uma vez por sessão), estourado sai DESTE envio com um
+// erro nomeado — o resto do acervo continua sincronizando. O material gerado
+// já tinha guarda própria (geradoSubir, 900 KB); as listas principais não.
+const _FB_DOC_AVISO = 800000     // ~80% do teto: hora de saber
+const _FB_DOC_TETO  = 950000     // margem sobre o 1 MB real (índices contam)
+const _fbTamAvisado = new Set()
+function _fbDocCabe(nome, payload) {
+  let bytes = 0
+  try { bytes = JSON.stringify(payload).length } catch (e) { return true }
+  if (bytes > _FB_DOC_TETO) {
+    if (!_fbTamAvisado.has(nome + '!') && typeof toast === 'function') {
+      _fbTamAvisado.add(nome + '!')
+      toast(`A lista "${nome}" passou do limite de 1 MB da nuvem e ficou FORA deste envio — o resto sincroniza normal. Este é o aviso para particionarmos essa lista.`, 'error')
+    }
+    console.warn(`[Firebase] doc "${nome}" com ${bytes} bytes — acima do teto, fora do batch`)
+    return false
+  }
+  if (bytes > _FB_DOC_AVISO && !_fbTamAvisado.has(nome) && typeof toast === 'function') {
+    _fbTamAvisado.add(nome)
+    toast(`A lista "${nome}" está em ${Math.round(bytes / 1024)} KB — chegando perto do teto de 1 MB da nuvem. Nada quebrou ainda; é o aviso com antecedência.`, 'warning')
+  }
+  return true
+}
+
 async function fbPushData() {
   if (!_fbUser || !_fbDb) return false
   const seqAntes = _fbDirtySeq
@@ -1079,11 +1107,16 @@ async function fbPushData() {
     // pronta: `kindleSeen`, o histórico do que passou. Ele é o tombstone
     // natural desta lista, e o filtro abaixo é o mesmo que a descida usa.
     const batch = _fbDb.batch()
-    batch.set(base.collection('data').doc('words'),    { list: mWords,    updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('srsCards'), { list: mCards,    updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('srsCfg'),   { ...srsCfg,       updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('srsLog'),   { list: mLog,      updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('srsDecks'), { list: mDecks,    updatedAt: Date.now() })
+    const poe = (nome, payload, opts) => {
+      if (!_fbDocCabe(nome, payload)) return
+      if (opts) batch.set(base.collection('data').doc(nome), payload, opts)
+      else batch.set(base.collection('data').doc(nome), payload)
+    }
+    poe('words',    { list: mWords,    updatedAt: Date.now() })
+    poe('srsCards', { list: mCards,    updatedAt: Date.now() })
+    poe('srsCfg',   { ...srsCfg,       updatedAt: Date.now() })
+    poe('srsLog',   { list: mLog,      updatedAt: Date.now() })
+    poe('srsDecks', { list: mDecks,    updatedAt: Date.now() })
     // Configurações da conta (chave OpenAI, tema, providers).
     // IMPORTANTE: usamos merge:true e SÓ incluímos a chave quando NÃO está vazia.
     // Assim, um dispositivo sem a chave nunca apaga o valor já salvo na nuvem.
@@ -1113,13 +1146,13 @@ async function fbPushData() {
     if (cfg.googleBooksKey) cfgPayload.googleBooksKey = cfg.googleBooksKey
     if (cfg.estante) cfgPayload.estante = cfg.estante
     if (cfg.imgQuality) cfgPayload.imgQuality = cfg.imgQuality
-    batch.set(base.collection('data').doc('cfg'), cfgPayload, { merge: true })
+    poe('cfg', cfgPayload, { merge: true })
     if (kindleItems.length > 0) {
       const vistos = loadKindleSeen()
       const mFila = (await _fbMesclarLista(D.doc('kindleQueue'), kindleItems, 'kindleQueue', { chave: '_k' }))
         .filter(it => !kindleItemVisto(it, vistos))
         .map(it => { const c = { ...it }; delete c._k; return c })
-      batch.set(base.collection('data').doc('kindleQueue'), { list: mFila, updatedAt: Date.now() })
+      poe('kindleQueue', { list: mFila, updatedAt: Date.now() })
     }
     // Histórico do Kindle: sem ele na nuvem, importar o vocab.db no PC e depois
     // abrir o Lab no celular traria TUDO de novo — o "só o novo entra" só vale
@@ -1134,26 +1167,26 @@ async function fbPushData() {
     if (dKindle && Array.isArray(dKindle.list) && (Number(dKindle.resetAt) || 0) >= epocaLocal) {
       dKindle.list.forEach(h => ksLocal.add(h))
     }
-    batch.set(base.collection('data').doc('kindleSeen'), {
+    poe('kindleSeen', {
       list: [...ksLocal].slice(-30000),
       resetAt: (typeof kindleResetAt === 'function' ? kindleResetAt() : 0),
       updatedAt: Date.now()
     })
-    batch.set(base.collection('data').doc('conversas'), { list: mConv, updatedAt: Date.now() })
+    poe('conversas', { list: mConv, updatedAt: Date.now() })
     // Vídeo: só METADADOS (títulos, marcadores, cortes) — o arquivo de vídeo
     // nunca sobe (300MB–2GB × limite de 1MB/doc). Legendas ficam locais (IDB).
-    batch.set(base.collection('data').doc('videos'), { list: mVideos, updatedAt: Date.now() })
+    poe('videos', { list: mVideos, updatedAt: Date.now() })
     // Ebooks: metadados, sumário, ONDE VOCÊ PAROU e os destaques. O arquivo
     // (MBs) fica no IndexedDB de cada aparelho — mesma regra do vídeo.
-    batch.set(base.collection('data').doc('livros'), { list: mLivros, updatedAt: Date.now() })
+    poe('livros', { list: mLivros, updatedAt: Date.now() })
     // Audiolivros: SÓ METADADOS. O áudio (centenas de MB) fica no aparelho —
     // aqui viaja título, capa reduzida, capítulos, posição e marcadores.
-    batch.set(base.collection('data').doc('audiolivros'), { list: mAudio, updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('known'), { ...pacoteKnown, updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('clips'),  { list: mClips,  updatedAt: Date.now() })
+    poe('audiolivros', { list: mAudio, updatedAt: Date.now() })
+    poe('known', { ...pacoteKnown, updatedAt: Date.now() })
+    poe('clips',  { list: mClips,  updatedAt: Date.now() })
     // Podcasts: só a lista de programas visitados (ponteiros). O episódio em si
     // já viaja em `videos` e o mp3 nunca sobe.
-    batch.set(base.collection('data').doc('podShows'), { list: mPods, updatedAt: Date.now() })
+    poe('podShows', { list: mPods, updatedAt: Date.now() })
     await batch.commit()
     // Só dá a pendência por quitada se nada mudou DURANTE o push — uma mudança
     // no meio já reagendou outro envio, e é ele que vai quitar.

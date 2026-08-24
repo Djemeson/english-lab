@@ -155,8 +155,8 @@ function saveSrsCards() {
   if (typeof marcarSumidosCards === 'function') marcarSumidosCards(srsCards)
   CardsDB.save(srsCards)
 }
-function persistSrsCfg(){ localStorage.setItem(SK.srsCfg, JSON.stringify(srsCfg)) }
-function saveSrsLog()   { localStorage.setItem(SK.srsLog, JSON.stringify(srsLog)) }
+function persistSrsCfg(){ try { localStorage.setItem(SK.srsCfg, JSON.stringify(srsCfg)) } catch (e) { if (typeof avisarQuotaCheia === 'function') avisarQuotaCheia() } }
+function saveSrsLog()   { try { localStorage.setItem(SK.srsLog, JSON.stringify(srsLog)) } catch (e) { if (typeof avisarQuotaCheia === 'function') avisarQuotaCheia() } }
 
 // ================================================================
 // O DIÁRIO CONTA POR APARELHO
@@ -492,8 +492,14 @@ function srsStreak() {
   let streak = 0
   const today = todayStr()
   let d = new Date()
+  // ⚠️ FUSO LOCAL, como todo o resto do diário (rodada 44). `toISOString` é
+  // UTC: em UTC−3, a partir das 21h a data "de hoje" virava a de amanhã, a
+  // primeira volta do laço não casava com nada e a sequência zerava na tela
+  // toda noite — mesmo com o estudo feito. O comentário do próprio arquivo
+  // (linha ~249) já explicava por que UTC é errado aqui; faltava esta linha.
+  const dataLocal = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
   while (true) {
-    const ds = d.toISOString().slice(0,10)
+    const ds = dataLocal(d)
     if (ds === today && !srsLog.find(l => l.date === ds)) { d.setDate(d.getDate()-1); continue }
     if (srsLog.find(l => l.date === ds && l.reviewed > 0)) { streak++; d.setDate(d.getDate()-1) }
     else break
@@ -518,11 +524,13 @@ function saveToSrs(wordId, meaningId) {
     const mi = w.meanings.indexOf(m)
     const examples = m.examples && m.examples.length ? m.examples : [null]
     examples.forEach((ex, ei) => {
-      const exIdx = ex ? ei : -1
-      // Check duplicate
+      // ⚠️ A MESMA CONTA NOS DOIS LADOS (rodada 44). Sentido sem exemplos era
+      // procurado com exampleIdx -1 e GRAVADO com 0: a duplicata nunca era
+      // achada, e cada reenvio criava um card novo do mesmo sentido.
+      const exIdx = ex ? ei : 0
       const exists = srsCards.find(c => c.wordId === wordId && c.meaningIdx === mi && c.exampleIdx === exIdx)
       if (exists) { skipped++; return }
-      const card = createSrsCard(wordId, mi, exIdx < 0 ? 0 : exIdx)
+      const card = createSrsCard(wordId, mi, exIdx)
       if (card) { srsCards.push(card); added++ }
     })
   })
