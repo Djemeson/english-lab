@@ -15542,7 +15542,14 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
             arrastar na notificação (`seekto` com fastSeek) e `setPositionState` com as
             mesmas guardas anti-NaN do audiolivro. Testado ao vivo com \<video\> sintético:
             metadata/artist corretos, estado seguro com duração NaN.
-      - [ ] 4 · Comando de ensaio de backup no terminal.
+      - [x] **4 · Ensaio de backup no terminal** — FEITA (44ª). `tools/ensaio-backup.mjs
+            <arquivo.json>`: compara um backup exportado com o Firestore REAL (mesma
+            credencial só-leitura do acervo.mjs, zero dependências) e lista, lista por
+            lista, o que ficaria de fora se ele fosse restaurado hoje — com aviso para
+            backup antigo que carrega chave de API. Sai 1 quando há lacuna. Testado ao vivo
+            contra a nuvem dele: apontou corretamente as 9 lacunas de um backup-esqueleto
+            (126 palavras, 45 cards, 12 livros, 1.237 conhecidas na nuvem). Transforma o
+            backup de promessa em coisa conferível — rode depois de cada export importante.
       - [ ] 5 · Schema nas chamadas restantes (extractSrsItems, lote Kindle, pré-estudo).
       - [ ] 6 · Cache em disco da tradução de seleção.
       - [ ] 7 · Bateria Gemini no teste-ia.mjs.
