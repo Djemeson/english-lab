@@ -1727,16 +1727,16 @@ function difChipLigar(container, cfgChip) {
   container._difChip = cfgChip
   const abrir = mk => _difChipAbrir(mk, container._difChip)
   container.addEventListener('mouseover', ev => {
-    const mk = ev.target.closest && ev.target.closest('mark.ler-dif, mark.ab-dif')
+    const mk = ev.target.closest && ev.target.closest('mark.ler-dif, mark.ab-dif, mark.vid-dif')
     if (mk) { clearTimeout(_difPopTimer); abrir(mk) }
   })
   container.addEventListener('mouseout', ev => {
-    if (ev.target.closest && ev.target.closest('mark.ler-dif, mark.ab-dif')) {
+    if (ev.target.closest && ev.target.closest('mark.ler-dif, mark.ab-dif, mark.vid-dif')) {
       _difPopTimer = setTimeout(difChipFechar, 260)
     }
   })
   container.addEventListener('click', ev => {
-    const mk = ev.target.closest && ev.target.closest('mark.ler-dif, mark.ab-dif')
+    const mk = ev.target.closest && ev.target.closest('mark.ler-dif, mark.ab-dif, mark.vid-dif')
     if (!mk) { difChipFechar(); return }
     // No celular não há hover: o toque é o que abre.
     ev.preventDefault(); ev.stopPropagation()

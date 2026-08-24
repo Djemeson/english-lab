@@ -33,6 +33,10 @@ let _vidMarkOpen = null         // marcador em ciclo: tempo de início aguardand
 let _vidSyncing = false
 let _vidSubCandidates = []      // legendas da última busca (para a IA testar alternativas)
 let _vidAppliedSubUrl = null    // URL da legenda aplicada (para não retestar a mesma)
+// O raio-X da legenda (rodada 46): os pontos difíceis achados pela MESMA peça
+// do leitor e do audiolivro (aiAnalisarDificuldade). Vive DENTRO do pacote de
+// legenda — viaja com ela para o disco e a nuvem, com o mesmo "melhor vence".
+let _vidRaioX = null            // { itens, nivel, at, ficha }
 let _vidStream = false          // podcast tocando direto da internet (sem arquivo local)
 
 // ---- IndexedDB próprio: handles de arquivo + legendas ----
@@ -322,6 +326,13 @@ async function videoOpenPlayer(v) {
   _vidSubCandidates = (stored && stored.candidates) || []
   _vidAppliedSubUrl = (stored && stored.appliedUrl) || null
   if (typeof _vidSyncInfo !== 'undefined') _vidSyncInfo = (stored && stored.sync) || null
+  // O raio-X vem no MESMO pacote — e o rótulo guardado envelhece (ele estuda a
+  // palavra, marca "já sei"): a revalidação de sempre, a mesma do leitor.
+  _vidRaioX = (stored && stored.raiox) || null
+  if (_vidRaioX && Array.isArray(_vidRaioX.itens) && typeof aiRevalidarAchados === 'function') {
+    _vidRaioX.itens = aiRevalidarAchados(_vidRaioX.itens,
+      { source_title: v.title || '', source_context: '' })
+  }
   // AUTOCURA DO OUTRO LADO: o local é mais novo do que a nuvem conhece — um
   // upload falhou um dia. Re-sobe agora, e o carimbo só avança se confirmar.
   if (temCues(stored) && (Number(stored.at) || 0) > nuvemAt && typeof legendaSubir === 'function') {
@@ -418,6 +429,7 @@ async function videoOpenPlayer(v) {
       <div class="vid-transcript-wrap">
         <div class="vid-transcript-head">
           <span>Transcript</span>
+          <span id="vid-raiox-slot"></span>
           <span id="vid-cue-count">${_vidCues.length ? _vidCues.length + ' falas' : ''}</span>
         </div>
         <div class="vid-transcript" id="vid-transcript" ondragover="event.preventDefault()" ondrop="videoDropSub(event)"></div>
@@ -444,6 +456,17 @@ async function videoOpenPlayer(v) {
     const ov = el('vid-ov'), tr = el('vid-transcript')
     if (ov) glossAtivar(ov)
     if (tr) glossAtivar(tr)
+  }
+  // O chip do raio-X — a MESMA peça do leitor e do audiolivro (difChipLigar,
+  // em ai.js), com as mesmas duas saídas: Preparar e "já sei este sentido".
+  if (typeof difChipLigar === 'function') {
+    const tr2 = el('vid-transcript')
+    if (tr2) difChipLigar(tr2, {
+      classe: 'dif-pop-app',
+      item: mk => (_vidRaioX && Array.isArray(_vidRaioX.itens)) ? _vidRaioX.itens[Number(mk.dataset.i)] : null,
+      preparar: mk => { if (typeof videoRaioXPreparar === 'function') videoRaioXPreparar(mk) },
+      jaSei: mk => { if (typeof videoRaioXJaSei === 'function') videoRaioXJaSei(mk) }
+    })
   }
 
   // ---- Retomar de onde parou ----
@@ -773,21 +796,26 @@ function renderVidTranscript() {
       </div>`
     return
   }
+  // Os achados do raio-X acendem DENTRO das falas — a mesma pintura do
+  // audiolivro (posição, não regex; sublinhado, não fundo).
+  const raioItens = (_vidRaioX && Array.isArray(_vidRaioX.itens)) ? _vidRaioX.itens : null
   box.innerHTML = _vidCues.map((c, i) => {
     const pt = _vidPTshow(c) || (c._rev ? _vidPTof(c) : '')
     // Fusão PT (um cue PT cobrindo duas falas EN): mostra o texto só na
     // primeira; a seguinte ganha a seta de continuação em vez de repetir.
     const repetida = pt && i > 0 && _vidPTof(_vidCues[i - 1]) === pt
     const fonte = c.pt ? 'traduzido por IA' : (c.pts ? 'da legenda PT-BR (alinhada)' : '')
+    const txt = (raioItens && typeof _vidFalaPintada === 'function') ? _vidFalaPintada(c.t, raioItens) : esc(c.t)
     return `
     <div class="vid-cue${_vidSel && i >= _vidSel.ci && i <= _vidSel.cj ? ' insel' : ''}" data-i="${i}">
       <button class="vid-cue-time" onclick="videoPlayCue(${i})" data-tip="Tocar esta fala">${_vidFmtTime(c.s)}</button>
       <div class="vid-cue-body">
-        <div class="vid-cue-text" onclick="videoSelectCue(${i})">${esc(c.t)}</div>
+        <div class="vid-cue-text" onclick="videoSelectCue(${i})">${txt}</div>
         <div class="vid-cue-pt${_vidShowPT || c._rev ? '' : ' hid'}${c._rev ? ' show' : ''}" id="vid-cue-pt-${i}" title="${escA(fonte)}">${repetida ? '⤷ (mesma tradução da fala acima)' : esc(pt)}</div>
       </div>
       <button class="vid-cue-ptbtn" onclick="videoCuePT(${i})" data-tip="Traduzir esta fala">pt</button>
     </div>`}).join('')
+  if (typeof _vidRaioXPintarBotao === 'function') _vidRaioXPintarBotao()
 }
 
 // Tradução de UMA fala do transcript: usa a trilha PT alinhada se houver;

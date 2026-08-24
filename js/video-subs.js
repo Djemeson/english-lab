@@ -568,7 +568,10 @@ function _vidSaveSubsNow() {
     cuesPT: _vidCuesPT.map(c => ({ s: c.s, e: c.e, t: c.t })),
     candidates: _vidSubCandidates,
     appliedUrl: _vidAppliedSubUrl,
-    sync: _vidSyncInfo || null
+    sync: _vidSyncInfo || null,
+    // O raio-X viaja NO pacote: análise paga uma vez, válida no telefone e
+    // depois de qualquer limpeza — a mesma regra de tudo que a IA gera.
+    raiox: (typeof _vidRaioX !== 'undefined' && _vidRaioX) ? _vidRaioX : null
   }
   VideoDB.set('subs', _vidCur.id, dados)
   // ⚠️ A LEGENDA VALE MAIS QUE O ÁUDIO. O mp3 se baixa de novo do feed; a
@@ -978,4 +981,150 @@ async function videoTranscribeFull() {
     if (box) box.innerHTML = ''
     toast('Transcrição falhou: ' + e.message, 'error')
   } finally { _vidTranscrevendo = false }
+}
+
+// ================================================================
+// O RAIO-X DA LEGENDA — "o que é difícil aqui", agora também no vídeo
+// ================================================================
+// Pedido dele, e é o terceiro pouso da MESMA peça: `aiAnalisarDificuldade`
+// (nível do aluno + todo phrasal/idiom/collocation, filtrado POR SENTIDO pelo
+// que ele já sabe) e `difChipLigar` (o chip que vai até o mouse, com Preparar
+// e "já sei"). O que muda aqui é só a tela: os achados acendem nas falas do
+// transcript, e o resultado vive DENTRO do pacote de legenda — viaja com ela
+// para o disco e a nuvem, com o "melhor vence" da rodada 45 de graça.
+let _vidRaioXRodando = false
+
+function _vidRaioXPintarBotao() {
+  const slot = el('vid-raiox-slot'); if (!slot) return
+  if (!_vidCues.length) { slot.innerHTML = ''; return }
+  const n = (_vidRaioX && (_vidRaioX.itens || []).length) || 0
+  if (_vidRaioXRodando) {
+    slot.innerHTML = `<span class="vid-raiox-chip"><span class="gen-spinner"></span> analisando…</span>`
+    return
+  }
+  slot.innerHTML = _vidRaioX
+    ? `<button class="btn btn-ghost btn-sm" onclick="videoRaioXAnalisar(true)"
+         data-tip="${n ? n + ' pontos acima do seu nível acesos nas falas — clique para refazer a análise' : 'Nada acima do seu nível — clique para refazer'}">
+         ${ic('eye','ic-sm')}${n ? n + ' difíceis' : 'nada difícil'}</button>`
+    : `<button class="btn btn-ghost btn-sm" onclick="videoRaioXAnalisar()"
+         data-tip="A IA aponta o que neste episódio está acima do seu nível — phrasal verbs, idioms e vocabulário — e acende nas falas. Fica guardado com a legenda.">
+         ${ic('eye','ic-sm')}O que é difícil</button>`
+}
+
+// A mesma pintura do audiolivro: por POSIÇÃO (nunca regex montada com o termo,
+// que quebraria em "don't"), sobreposição fica com a mais longa, traço fraco
+// no que já é dele.
+function _vidFalaPintada(txt, achados) {
+  if (!achados || !achados.length || typeof aiAcharNoTexto !== 'function') return esc(txt)
+  const marcas = []
+  achados.forEach((x, idx) => {
+    for (const oc of aiAcharNoTexto(txt, x.t)) marcas.push({ ...oc, idx, tipo: x.tipo, ja: x.ja, feito: x.feito })
+  })
+  if (!marcas.length) return esc(txt)
+  marcas.sort((p, q) => p.i - q.i)
+  const limpas = []
+  for (const m of marcas) {
+    const ultima = limpas[limpas.length - 1]
+    if (ultima && m.i < ultima.fim) {
+      if (m.fim - m.i > ultima.fim - ultima.i) limpas[limpas.length - 1] = m
+      continue
+    }
+    limpas.push(m)
+  }
+  let saida = '', de = 0
+  for (const m of limpas) {
+    saida += esc(txt.slice(de, m.i))
+    saida += `<mark class="vid-dif vid-dif-${m.tipo}${(m.ja || m.feito) ? ' vid-dif-ja' : ''}" data-i="${m.idx}">${esc(txt.slice(m.i, m.fim))}</mark>`
+    de = m.fim
+  }
+  return saida + esc(txt.slice(de))
+}
+
+function _vidRaioXOrigem() {
+  return { source_title: (_vidCur && _vidCur.title) || '', source_context: '' }
+}
+
+async function videoRaioXAnalisar(refazer) {
+  if (_vidRaioXRodando || !_vidCur) return
+  if (!_vidCues.length) { toast('Este vídeo ainda não tem legenda — o raio-X lê as falas dela', 'info'); return }
+  if (typeof aiChatCfg !== 'function' || !aiChatCfg().key) {
+    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return
+  }
+  if (refazer && _vidRaioX && !(await confirmModal({
+    title: 'Refazer o raio-X deste episódio', icon: 'eye', confirmText: 'Refazer',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">A análise atual (${(_vidRaioX.itens || []).length} pontos) é descartada e a legenda inteira é lida de novo pela IA — algumas chamadas, como no leitor.</p>` }))) return
+  const alvo = _vidCur
+  _vidRaioXRodando = true
+  _vidRaioXPintarBotao()
+  try {
+    const nivel = (typeof cefrNivelAluno === 'function') ? cefrNivelAluno() : 'B1'
+    const itens = await aiAnalisarDificuldade({
+      texto: _vidCues.map(c => c.t).join('\n'),
+      lang: (alvo.lang || 'en').slice(0, 2), nivel,
+      origem: _vidRaioXOrigem(),
+      aoAndar: (i, n) => {
+        const slot = el('vid-raiox-slot')
+        if (slot && n > 1) slot.innerHTML = `<span class="vid-raiox-chip"><span class="gen-spinner"></span> ${i} de ${n}…</span>`
+      }
+    })
+    // Trocou de vídeo durante a análise: o achado é do outro — mesma trava de
+    // alvo da legenda automática e da transcrição.
+    if (_vidCur !== alvo) { _vidRaioXRodando = false; return }
+    _vidRaioX = {
+      itens, nivel, at: Date.now(),
+      ficha: itens.ficha || (typeof aiFicha === 'function'
+        ? aiFicha({ blocos: itens.blocos, falhas: itens.falhas, nivel }) : undefined)
+    }
+    _vidSubsMetaUrgente = true
+    _vidSaveSubs()
+    renderVidTranscript()
+    toast(itens.length
+      ? `${itens.length} ${itens.length === 1 ? 'ponto difícil' : 'pontos difíceis'} para o seu ${nivel} — acesos nas falas`
+      : (itens.incompleto ? 'Parte da análise não voltou legível — vale rodar de novo'
+                          : `Nada acima do seu ${nivel} neste episódio`),
+      itens.length ? 'success' : (itens.incompleto ? 'warning' : 'info'))
+  } catch (e) {
+    console.warn('[video] raio-x:', e)
+    toast('Não consegui analisar: ' + e.message, 'error')
+  }
+  _vidRaioXRodando = false
+  _vidRaioXPintarBotao()
+}
+
+// O chip vai ao Preparar com a FALA como contexto — o mesmo caminho da
+// captura, então o item nasce igual ao que ele criaria selecionando à mão.
+function videoRaioXPreparar(mk) {
+  if (!_vidCur || !mk || !_vidRaioX) return
+  const item = (_vidRaioX.itens || [])[Number(mk.dataset.i)]
+  const linha = mk.closest('.vid-cue')
+  const fala = linha ? _vidCues[Number(linha.dataset.i)] : null
+  if (!item || !fala) return
+  if (typeof lexaChipParaPreparar !== 'function') return
+  lexaChipParaPreparar(
+    { expr: item.t, gloss: item.pt || '', type: item.tipo === 'word' ? 'word' : item.tipo },
+    { contexto: fala.t, lang: (_vidCur.lang || 'en').slice(0, 2),
+      source_type: _vidCur.podcast ? 'podcast' : (_vidCur.source_type || 'series'),
+      source_title: _vidCur.title || '' })
+  // Mesma regra do leitor e do audiolivro: mandado ao Preparar, o traço esmaece.
+  item.feito = 1
+  _vidSubsMetaUrgente = true
+  _vidSaveSubs()
+  renderVidTranscript()
+}
+
+// "Já sei ESTE sentido": o par termo+glosa sai daqui e das próximas análises —
+// nunca só a palavra, que esconderia a passagem em que ela significa outra coisa.
+function videoRaioXJaSei(mk) {
+  if (!_vidCur || !mk || !_vidRaioX) return
+  const idx = Number(mk.dataset.i)
+  const item = (_vidRaioX.itens || [])[idx]
+  if (!item) return
+  if (typeof markKnownSense !== 'function' || !markKnownSense(item.t, item.pt)) {
+    toast('Não consegui marcar este sentido.', 'error'); return
+  }
+  _vidRaioX.itens = (_vidRaioX.itens || []).filter((_, i) => i !== idx)
+  _vidSubsMetaUrgente = true
+  _vidSaveSubs()
+  renderVidTranscript()
+  toast(`"${item.t}" (${item.pt}) marcado como conhecido`, 'success')
 }

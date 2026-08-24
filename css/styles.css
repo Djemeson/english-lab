@@ -5611,14 +5611,17 @@ body.ab-full .ab-chips{max-width:34em}
 /* O realce é SUBLINHADO, não fundo colorido: fundo em cinco palavras de uma
    frase vira mancha e o texto deixa de ser lido. O sublinhado marca sem tirar
    a frase do lugar, e a cor diz o tipo. */
-.ab-dif{
+.ab-dif, .vid-dif{
   background:none;color:inherit;padding:0 1px;
   border-bottom:2px solid var(--cor,var(--role-novo));border-radius:1px;
+  cursor:pointer;
 }
-.ab-dif-word{--cor:var(--role-novo)}
-.ab-dif-phrasal_verb{--cor:var(--role-fonte)}
-.ab-dif-idiom{--cor:var(--role-urgente)}
-.ab-dif-collocation{--cor:var(--role-ia)}
+.ab-dif-word, .vid-dif-word{--cor:var(--role-novo)}
+.ab-dif-phrasal_verb, .vid-dif-phrasal_verb{--cor:var(--role-fonte)}
+.ab-dif-idiom, .vid-dif-idiom{--cor:var(--role-urgente)}
+.ab-dif-collocation, .vid-dif-collocation{--cor:var(--role-ia)}
+.vid-raiox-chip{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--text3)}
+#vid-raiox-slot{display:inline-flex;align-items:center}
 .ab-chips{display:flex;flex-wrap:wrap;gap:6px}
 .ab-chip{
   display:inline-flex;align-items:baseline;gap:6px;cursor:pointer;
@@ -5746,10 +5749,10 @@ body.ab-full .ab-chips{max-width:34em}
    ficar desconhecida". Pontilhado e fino: continua clicável e continua achável,
    mas o olho passa por cima dele e para no que é novo, que é a razão de existir
    o raio-X. O hover devolve o traço cheio, para não sumir com a área de clique. */
-.ler-dif-ja, .ab-dif-ja{
+.ler-dif-ja, .ab-dif-ja, .vid-dif-ja{
   border-bottom-width:1px; border-bottom-style:dotted; opacity:.72;
 }
-.ler-dif-ja:hover, .ab-dif-ja:hover{ border-bottom-style:solid; opacity:1 }
+.ler-dif-ja:hover, .ab-dif-ja:hover, .vid-dif-ja:hover{ border-bottom-style:solid; opacity:1 }
 /* O CHIP QUE VEM ATÉ O MOUSE. Vive no `body` (fora do texto paginado) para não
    entrar na conta das colunas: qualquer elemento dentro do fluxo mudaria a
    paginação e faria o livro pular de página. */

@@ -15421,6 +15421,27 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do raio-X na legenda do vídeo (2026-08-24, 46ª)
+
+- [x] **O RAIO-X CHEGOU AO VÍDEO — terceiro pouso da mesma peça.** Pedido dele. Motor:
+      `aiAnalisarDificuldade` + `difChipLigar` (seletor do chip ganhou `mark.vid-dif`;
+      3 lugares em ai.js). Botão "O que é difícil" no cabeçalho do transcript
+      (`#vid-raiox-slot`, `_vidRaioXPintarBotao`), achados ACESOS nas falas
+      (`_vidFalaPintada`, cópia da pintura do audiolivro: posição, sobreposição fica a
+      mais longa, traço fraco no que já é dele), chip com Preparar (fala = contexto, via
+      `lexaChipParaPreparar`, `feito=1` esmaece) e "já sei ESTE sentido" (`markKnownSense`,
+      item sai da lista). O resultado vive DENTRO do pacote de legenda v2 (`raiox: {itens,
+      nivel, at, ficha}`) — viaja com ela para disco e nuvem com o melhor-vence da 45ª de
+      graça; revalidação (`aiRevalidarAchados`) na abertura. Trava de alvo na análise
+      (trocar de vídeo no meio descarta). Refazer pede confirmação. CSS: variantes
+      `.vid-dif*` nas mesmas regras do `.ab-dif`.
+      **Testado ao vivo: 17/17** — pintura com apóstrofo/sobreposição, transcript real com
+      marcas e contagem no botão, chip compartilhado abrindo na marca, "já sei" gravando o
+      PAR termo+glosa e tirando da lista, Preparar criando item com a fala como contexto e
+      fonte do episódio, raio-X viajando no pacote salvo. (Duas falhas iniciais eram
+      artefato do fixture: glosa "não" é curta demais para a chave de sentido — regra
+      correta do senseKey.)
+
 ### Da rodada da sincronização permanente da legenda (2026-08-24, 45ª)
 
 - [x] **A SINCRONIZAÇÃO DA LEGENDA VIROU PATRIMÔNIO.** Relato dele: sincronizou a legenda
