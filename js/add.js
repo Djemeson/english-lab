@@ -649,7 +649,7 @@ function attachPicker(idx) {
     try {
       const context = kindleItems[i]?.context || ''
       const resposta = await aiText(`Sentence (${promptLangName(activeLang())}): "${context}"\nThe user clicked on the word: "${clickedWord}"\n\nIs "${clickedWord}" part of a multi-word verbal expression (phrasal/pronominal/separable verb), idiom, or fixed multi-word expression in this sentence? If yes, return the complete expression as it appears in the sentence. If no, return just "${clickedWord}". Return ONLY the word or expression, lowercase, no punctuation, no explanation.`,
-        { model: AI_DEFAULT_MODEL, maxTokens: 15, retries: 0, timeoutMs: 20000 })
+        { maxTokens: 15, retries: 0, timeoutMs: 20000 })
       const detected = resposta.toLowerCase().replace(/[^a-zà-ü' -]/g, '').trim()
       if (detected && detected !== clickedWord) {
         setKindleWord(i, detected)
@@ -707,7 +707,7 @@ async function detectKindleWord(i) {
   if (btn) { btn.disabled = true; btn.textContent = '...' }
   try {
     const resposta = await aiText(`Context (${promptLangName(activeLang())}): "${item.context}"\n\nIdentify the single most interesting vocabulary item to study from this sentence. It can be a word, a multi-word verbal expression (phrasal/pronominal/separable verb), an idiom, or another multi-word expression. Return ONLY the vocabulary item itself, nothing else, no punctuation, no explanation.`,
-      { model: AI_DEFAULT_MODEL, maxTokens: 30, retries: 0, timeoutMs: 20000 })
+      { maxTokens: 30, retries: 0, timeoutMs: 20000 })
     const detected = resposta.toLowerCase().replace(/[^a-zà-ü' -]/g, '').trim()
     if (detected) {
       setKindleWord(i, detected)

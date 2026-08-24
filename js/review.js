@@ -34,10 +34,13 @@ async function _redeGramatical(target, ctx, PROMPT, result) {
   if (temGram) return result
   console.warn(`[ia] "${t}" é palavra-função e a análise veio sem significado gramatical — repetindo com correção`)
   try {
+    // Com o MESMO contrato de forma da primeira chamada (rodada 44): a
+    // repetição — justamente com o modelo que acabou de errar — vinha sem o
+    // esquema estrito, e campo fora do lugar passava batido.
     const r2 = await aiJSON([
       { role: 'system', content: `Your previous analysis of "${target}" was WRONG: in the context sentence it works as a GRAMMATICAL FUNCTION (auxiliary/marker), and you returned only lexical dictionary senses. Redo the analysis now. The FIRST meaning MUST describe the grammatical function used in the context (with "gramatical": true and "context_match": true) and its examples MUST show that function. Follow the original instructions below.` },
       { role: 'user', content: PROMPT }
-    ], { maxTokens: 5000 })
+    ], { maxTokens: 5000, schema: ESQ.analise, schemaNome: 'analise' })
     if ((r2.meanings || []).some(m => _ehSim(m.gramatical))) return r2
   } catch (e) { /* fica com a primeira resposta */ }
   console.warn(`[ia] a repetição também veio sem função gramatical — mantendo a resposta original`)
@@ -220,6 +223,11 @@ function applyAiResult(w, result) {
     // esquema), booleano volta como `true`, `"true"`, `"sim"` ou `1` conforme
     // o humor do modelo.
     gramatical:    _ehSim(m.gramatical),
+    // ⚠️ O ELO DO REENCONTRO (rodada 44). A IA devolve `same_as` dizendo "este
+    // é o sentido que ele já tem" — e este normalizador o DEIXAVA CAIR: o
+    // merge lia `nm.same_as`, recebia sempre undefined, e o casamento por id
+    // da Fase 3 nunca aconteceu. Sentido igual com outra redação duplicava.
+    same_as:       String(m.same_as || '').trim() || null,
     // Declaração da própria IA de que este sentido só existe com material fixo
     // ("in love"). É a fonte primária; o detector do código (unidadeFixaDoSentido)
     // é o suspensório para quando o modelo barato ignora a regra.
@@ -367,6 +375,9 @@ function applyAiResult(w, result) {
   const sobraram = oldMeanings.filter(om =>
     om && !usedOld.has(om.id) && (om.moved_to || om.fundido_em || !w._refazer))
   w.meanings = [...mapeados, ...sobraram]
+  // `same_as` é insumo do merge, não dado do sentido: já cumpriu o papel e não
+  // deve viajar para o disco/nuvem pendurado em cada significado.
+  w.meanings.forEach(m => { if (m && 'same_as' in m) delete m.same_as })
   w.ai_processed = true
   w.updated_at = new Date().toISOString()
   // Sentido novo nasce sem `estado` (= 'pronto'), então o item cai sozinho em

@@ -363,7 +363,11 @@ async function sendConsulta() {
       body: JSON.stringify({
         model: _chat.model,
         messages: [{ role: 'system', content: consultaSystem() }, ...apiHistory],
-        temperature: 0.7,
+        // ⚠️ SÓ PARA QUEM ACEITA (rodada 44). A família gpt-5 RECUSA temperatura
+        // diferente de 1 — o gateway sabe disso desde sempre, mas o chat não
+        // passa por ele: com a OpenAI ativa e o modelo padrão (Luna), TODA
+        // mensagem do Assistente voltava como erro. O Gemini aceita e segue com.
+        ...(typeof _aiRaciocina === 'function' && _aiRaciocina(_chat.model) ? {} : { temperature: 0.7 }),
         stream: true
       })
     })
@@ -374,8 +378,24 @@ async function sendConsulta() {
     const decoder = new TextDecoder()
     let buffer = ''
     const bubble = el(streamId)
+    // ⚠️ O RELÓGIO NÃO PARA NO PRIMEIRO BYTE (rodada 44). Um stream que
+    // congela no meio deixava o `read()` pendurado para sempre — e o campo de
+    // digitação desabilitado até o F5. 60s sem chegar NADA é conexão morta:
+    // aborta, e o que já veio é preservado pelo catch como resposta parcial.
+    const lerComPrazo = async () => {
+      let timer = null
+      try {
+        return await Promise.race([
+          reader.read(),
+          new Promise((_, rej) => { timer = setTimeout(() => {
+            try { ctl.abort() } catch (e2) {}
+            rej(new Error('a conexão parou de responder no meio da resposta'))
+          }, 60000) })
+        ])
+      } finally { clearTimeout(timer) }
+    }
     while (true) {
-      const { done, value } = await reader.read()
+      const { done, value } = await lerComPrazo()
       if (done) break
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
@@ -417,10 +437,21 @@ async function sendConsulta() {
 
   } catch (e) {
     el(streamId)?.remove()
-    // Remove a pergunta órfã do histórico de API? Mantemos a pergunta visível e mostramos erro.
-    msgs.insertAdjacentHTML('beforeend',
-      `<div class="consulta-msg ai">${ic('alert','ic-sm')} Erro: ${esc(e.message)}</div>`)
-    msgs.scrollTop = msgs.scrollHeight
+    // O que JÁ CHEGOU não se joga fora (rodada 44): stream que morre no meio
+    // deixava a resposta parcial sumir junto com o erro. Se veio texto, ele é
+    // gravado como resposta (com o aviso) — melhor meia explicação que nenhuma.
+    const parcial = cleanConsultaReply(full)
+    if (parcial) {
+      const aiMsg = { role: 'assistant', content: parcial, srsItems: [], truncada: true }
+      c.messages.push(aiMsg)
+      touchConversa(c)
+      renderActiveConversa()
+      toast('A conexão caiu no meio — guardei o que já tinha chegado. (' + e.message + ')', 'warning')
+    } else {
+      msgs.insertAdjacentHTML('beforeend',
+        `<div class="consulta-msg ai">${ic('alert','ic-sm')} Erro: ${esc(e.message)}</div>`)
+      msgs.scrollTop = msgs.scrollHeight
+    }
   } finally {
     if (input) { input.disabled = false; input.focus() }
     if (sendBtn) sendBtn.disabled = false

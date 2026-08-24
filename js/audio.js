@@ -1060,7 +1060,7 @@ ${varietyRules}
 Always fill BOTH for every item. Match each result to the item "id".
 Return: {"results":[{"id":0,"variety":"general","register":"neutral"}]}
 Items: ${JSON.stringify(items)}`
-  const parsed = await aiJSON(PROMPT, { model: AI_DEFAULT_MODEL, maxTokens: 2200 })
+  const parsed = await aiJSON(PROMPT, { maxTokens: 2200 })
   return Array.isArray(parsed.results) ? parsed.results : []
 }
 
@@ -1110,7 +1110,7 @@ ${promptUnidadeDoSentido(it.word, 'curto')}
   - If the target appears more than once in a sentence, bold ONLY the main occurrence.
   - Exactly ONE bold span per side. Do not bold anything else.
 - Translate the Portuguese naturally (not word-for-word). LITERAL-TRANSLATION TRAP — avoid it explicitly: translate what the sentence DOES, the way a Brazilian would say it ("we'll get you in" → "a gente te encaixa", never "colocar você dentro"). If a translation reads like word-by-word substitution, redo it.`
-  return aiJSON(PROMPT, { model: AI_DEFAULT_MODEL, maxTokens: 900 })
+  return aiJSON(PROMPT, { maxTokens: 900 })
 }
 
 // Botão universal da Biblioteca: corrige frases (que não batiam com o significado)
@@ -1139,8 +1139,11 @@ async function reanalyzeAll() {
   let updated = 0, failed = 0, audioGen = 0
   const genAudio = cfg.ttsProvider !== 'none' && !!cfg.openaiKey
 
+  // ⚠️ A CONFIRMAÇÃO VEM ANTES DO LOTE (rodada 44): dentro do map, com o pool
+  // de 4, eram 4 modais concorrentes se destruindo — promessas penduradas,
+  // lote travado, um Enter aprovando vários. Uma pergunta, com o total, antes.
+  if (!(await aiConfirmBatch('chat', items.length, 'Reanalisar tudo (corrigir)', { sempre: true, detalhe: ['Corrige as frases para baterem com o significado', 'Preenche variedade e registro', 'Gera o áudio das novas frases', 'Mantém o agendamento de estudo intacto'] }))) { if (btn) btn.disabled = false; return }
   const tasks = items.map(it => async () => {
-  if (!(await aiConfirmBatch('chat', tasks.length, 'Reanalisar tudo (corrigir)', { sempre: true, detalhe: ['Corrige as frases para baterem com o significado', 'Preenche variedade e registro', 'Gera o áudio das novas frases', 'Mantém o agendamento de estudo intacto'] }))) return
     try {
       const r = await regenerateMeaning(it)
       const variety = _normVariety(r && r.variety, it.lang)
@@ -1230,8 +1233,9 @@ async function fillMissingAll() {
   const total = items.length
   let updated = 0, skipped = 0, failed = 0, wordsTouched = false
 
+  // ⚠️ A CONFIRMAÇÃO VEM ANTES DO LOTE (rodada 44) — mesmo defeito dos vizinhos.
+  if (!(await aiConfirmBatch('chat', items.length, 'Completar dados (IA)', { detalhe: ['Só preenche o que estiver vazio: IPA, categoria, nível, origem', 'Não mexe em significado, frases nem agendamento'] }))) { if (btn) btn.disabled = false; return }
   const tasks = items.map(it => async () => {
-  if (!(await aiConfirmBatch('chat', tasks.length, 'Completar dados (IA)', { detalhe: ['Só preenche o que estiver vazio: IPA, categoria, nível, origem', 'Não mexe em significado, frases nem agendamento'] }))) return
     const PROMPT = `You fill in MISSING metadata for a ${promptLangName(it.lang)} vocabulary flashcard, for a Brazilian learner. Return ONLY valid JSON.
 Word/expression (${promptLangName(it.lang)}): "${it.word}"${it.type ? ` (type: ${it.type})` : ''}
 Meaning (PT): "${it.meaning_pt || '(most common sense)'}"
@@ -1245,7 +1249,7 @@ Return ONLY this JSON:
   "origin_pt": "1-2 sentences in PT-BR on the ORIGIN/history behind this expression — the image, metaphor or etymology. Fill ONLY for idioms, multi-word verbal expressions, metaphors and words with a genuinely interesting or non-obvious etymology (e.g. 'sitting duck', 'on the chopping block', 'flagship'). Empty string for ordinary words with no notable story. NEVER invent folk etymology — if unsure, return empty."
 }`
     try {
-      const r = await aiJSON(PROMPT, { model: AI_DEFAULT_MODEL, maxTokens: 260 })
+      const r = await aiJSON(PROMPT, { maxTokens: 260 })
 
       // Monta o "patch" só com os campos que estavam VAZIOS — nunca sobrescreve o
       // que já existia (mesmo que a IA tenha devolvido algo diferente pra esse campo).
@@ -1318,7 +1322,7 @@ Return the SAME two sentences, byte-for-byte identical EXCEPT that the study tar
 - If the Portuguese sentence is empty, return "pt":"".
 
 Return: {"en":"...","pt":"..."}`
-  return aiJSON(PROMPT, { model: AI_DEFAULT_MODEL, maxTokens: 400 })
+  return aiJSON(PROMPT, { maxTokens: 400 })
 }
 
 async function markBoldAll() {
@@ -1347,8 +1351,12 @@ async function markBoldAll() {
   let ok = 0, fail = 0
   const wordsTouched = new Set()
 
+  // ⚠️ A CONFIRMAÇÃO VEM ANTES DO LOTE (rodada 44): ela estava DENTRO de cada
+  // tarefa, e com 4 rodando em paralelo nasciam 4 modais em cascata — cada um
+  // destruindo o anterior sem encerrá-lo, promessas penduradas travando o
+  // lote, e um Enter respondendo por vários. Uma pergunta, com o total, antes.
+  if (!(await aiConfirmBatch('chat', items.length, 'Negrito perfeito (IA)', { sempre: true, detalhe: ['Negrito do objeto de estudo nos dois idiomas', 'Não altera significados nem o progresso'] }))) { if (btn) { btn.disabled = false; btn.innerHTML = orig } return }
   const tasks = items.map(it => async () => {
-  if (!(await aiConfirmBatch('chat', tasks.length, 'Negrito perfeito (IA)', { sempre: true, detalhe: ['Negrito do objeto de estudo nos dois idiomas', 'Não altera significados nem o progresso'] }))) return
     try {
       const r = await markBoldOne(it)
       const en = (r && r.en && boldSpanOk(r.en)) ? r.en : it.en

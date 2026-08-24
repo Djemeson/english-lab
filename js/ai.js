@@ -1008,6 +1008,12 @@ document.addEventListener('keydown', e => {
 
 // O modelo do app quando ninguém escolheu — e o da REDE DE SEGURANÇA (a
 // repescagem na OpenAI quando o fornecedor ativo falha). Luna desde 2026-08-08.
+// ⚠️ NUNCA passe isto como `model:` numa chamada normal (rodada 44): o gateway
+// fala com o endereço do fornecedor ATIVO, e um id da OpenAI indo para o
+// Gemini/Groq é 404 em toda chamada — foi o que quebrou "Reanalisar tudo",
+// "Completar dados", "Negrito perfeito" e a detecção do Kindle quando ele
+// trocou de fornecedor. `model:` explícito só nos DOIS lugares que também
+// fixam a URL e a chave da OpenAI (a repescagem daqui e a do vídeo).
 const AI_DEFAULT_MODEL = 'gpt-5.6-luna'
 // O padrão ANTIGO. Serve a uma coisa só: reconhecer quem nunca escolheu
 // modelo de verdade (tinha o default salvo) para migrá-lo junto. Sem isto,
@@ -1185,11 +1191,19 @@ function _aiRaciocina(model) { return /^(gpt-5|o\d)/.test(model || '') }
 // app, e não só para a pré-análise: `add.js` pedia 800, `review.js` 600,
 // `ler.js` 600 — todas correndo o mesmo risco em modelo que pensa.
 const AI_FOLGA_RACIOCINIO = 25000
+// ⚠️ O GEMINI TAMBÉM PENSA (rodada 44). Os Flash 3.x gastam raciocínio dentro
+// do MESMO maxOutputTokens, igualzinho à família gpt-5 — e a folga era dada só
+// a ela. Com os tetos apertados do app (quebra 800, checagem 300, glosa ~26
+// por palavra), a resposta do Gemini voltava VAZIA e virava "a análise não
+// voltou legível" — no fornecedor que ele usa hoje. O nome do parâmetro é o
+// que muda: a camada compatível do Google fala `max_tokens`; a folga é a mesma
+// e continua de graça (teto é limite, não reserva).
+function _aiPensa(model) { return _aiRaciocina(model) || /^gemini/.test(model || '') }
 function _aiTokenParam(model, maxTokens) {
   if (!maxTokens) return {}
-  return _aiRaciocina(model)
-    ? { max_completion_tokens: maxTokens + AI_FOLGA_RACIOCINIO }
-    : { max_tokens: maxTokens }
+  if (_aiRaciocina(model)) return { max_completion_tokens: maxTokens + AI_FOLGA_RACIOCINIO }
+  if (_aiPensa(model))     return { max_tokens: maxTokens + AI_FOLGA_RACIOCINIO }
+  return { max_tokens: maxTokens }
 }
 
 // fetch com timeout + retry.
@@ -1254,6 +1268,28 @@ async function _aiFetch(url, body, { timeoutMs = 90000, retries = 2, key } = {})
   }
 }
 
+// ---- CONTA SEM CRÉDITO: é billing, não taxa (rodada 44) ----
+// O 429 de "sem créditos" chegava mascarado de limite de taxa: o app retentava
+// duas vezes, acionava o freio GLOBAL (segurando chamadas que nem eram da
+// OpenAI) e no fim cada tela mostrava um erro genérico diferente. Repetir não
+// enche a conta de ninguém: é erro terminal, e o aviso tem de dizer o nome do
+// problema — uma vez por sessão por fornecedor, não a cada chamada.
+const _aiSemCreditoAvisado = new Set()
+function _aiEhSemCredito(msg) {
+  return /no credits|insufficient[_ ]quota|exceeded your (current )?quota|check your plan and billing/i.test(String(msg || ''))
+}
+function _aiAvisarSemCredito(url, msg) {
+  const nome = /openai\.com/.test(url) ? 'OpenAI'
+    : /googleapis\.com/.test(url) ? 'Google Gemini'
+    : /groq\.com/.test(url) ? 'Groq' : 'o fornecedor de IA'
+  if (_aiSemCreditoAvisado.has(nome)) return
+  _aiSemCreditoAvisado.add(nome)
+  if (typeof toast === 'function') {
+    toast(`A conta da ${nome} está sem créditos — recarregue-a ou troque de fornecedor em Configurações → IA. Até lá, o que depende dela vai falhar.`, 'error')
+  }
+  console.warn(`[ai] ${nome} sem créditos:`, String(msg || '').slice(0, 160))
+}
+
 async function _aiFetchBruto(url, body, { timeoutMs = 90000, retries = 2, key } = {}) {
   let lastErr = null
   for (let tent = 0; tent <= retries; tent++) {
@@ -1270,6 +1306,14 @@ async function _aiFetchBruto(url, body, { timeoutMs = 90000, retries = 2, key } 
       if (res.ok) return res
       let msg = 'HTTP ' + res.status
       try { const e = await res.json(); if (e.error?.message) msg = e.error.message } catch {}
+      // Sem créditos é terminal: nem retry, nem freio global — e o aviso certo.
+      if ((res.status === 429 || res.status === 402) && _aiEhSemCredito(msg)) {
+        _aiAvisarSemCredito(url, msg)
+        lastErr = new Error(msg)
+        lastErr.status = res.status
+        lastErr.semCredito = true
+        throw lastErr
+      }
       const retryavel = res.status === 429 || res.status >= 500
       lastErr = new Error(msg)
       lastErr.status = res.status
@@ -1389,8 +1433,10 @@ const AI_DIF_TOKENS = 2600
 // chamada, e é o que evita o estouro em vez de só aumentar a fatura.
 function _aiDifOrcamento() {
   const modelo = (typeof aiChatCfg === 'function' ? aiChatCfg().model : '') || ''
-  const raciocina = typeof _aiRaciocina === 'function' ? _aiRaciocina(modelo) : /^(gpt-5|o\d)/.test(modelo)
-  return raciocina
+  // `_aiPensa`, não `_aiRaciocina` (rodada 44): os Flash do Gemini também
+  // gastam o orçamento pensando, e mereciam o mesmo bloco menor + teto maior.
+  const pensa = typeof _aiPensa === 'function' ? _aiPensa(modelo) : /^(gpt-5|o\d|gemini)/.test(modelo)
+  return pensa
     ? { bloco: 1500, tokens: 7000, raciocina: true }
     : { bloco: AI_DIF_BLOCO, tokens: AI_DIF_TOKENS, raciocina: false }
 }

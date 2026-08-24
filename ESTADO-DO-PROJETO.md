@@ -15431,11 +15431,23 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       CONTA REAL é destrutivo e só com ele presente; o wipe com outro aparelho carregando
       `el-sync-pendente` pode devolver as mudanças pendentes daquele aparelho (caso raro,
       documentado no código).
-- [ ] **RODADA 2 — IA no mundo real (Gemini ativo, OpenAI sem crédito):** remover os 6
-      `model: AI_DEFAULT_MODEL`; temperature condicional no streaming do Assistente + timeout
-      de inatividade no stream; folga de raciocínio para Gemini Flash 3.x; aiConfirmBatch
-      ANTES do runPool (3 fluxos); copiar `same_as` em freshMeanings; schema na repetição da
-      rede gramatical; aviso claro de "conta sem créditos" por fornecedor.
+- [x] **RODADA 2 — IA no mundo real — FEITA em 2026-08-23 (44ª).** Os 6 `model:
+      AI_DEFAULT_MODEL` saíram (audio.js ×4, add.js ×2; os 2 que ficam — repescagem do ai.js
+      e do vídeo — também fixam URL e chave da OpenAI, e o comentário no próprio
+      AI_DEFAULT_MODEL agora proíbe o uso como `model:`). Assistente: temperature só quando
+      `!_aiRaciocina(model)` + prazo de 60s de inatividade no stream (aborta e **preserva a
+      resposta parcial** como mensagem, com aviso). `_aiPensa()` = gpt-5/o* OU gemini-*: a
+      folga de 25k tokens agora vale para os Flash do Google (via `max_tokens`, que é o nome
+      que a camada compat fala) e o raio-X usa bloco 1500/teto 7000 neles. `aiConfirmBatch`
+      movido para ANTES do runPool nos 3 fluxos da Biblioteca (com btn reabilitado no
+      cancelar). `same_as` copiado em freshMeanings (e removido dos meanings após o merge —
+      é insumo, não dado). Retry da rede gramatical com `schema: ESQ.analise`. 429/402 de
+      billing (`_aiEhSemCredito`) virou erro TERMINAL: sem retry, sem freio global, e um
+      toast por sessão/fornecedor dizendo "conta sem créditos". `sw.js` → v407.
+      **Testado ao vivo (localhost): 14/14** — orçamentos por modelo, detector de billing +
+      toast na tela, fontes das 3 funções sem AI_DEFAULT_MODEL, confirmação chamada
+      exatamente 1× num lote de 3 com pool, `same_as` casando sentido re-redigido no
+      applyAiResult real (1 sentido, id preservado, campo não vaza). Console limpo.
 - [ ] **RODADA 3 — varredura do apóstrofo e escapes:** data-attribute + delegação em
       known.js/review.js:1892/audio.js:1711/video-study.js:608/video-podcast.js:133; esc em
       add.js:435/874 (expr da IA), dossie.js:1198 (Produza: `lexaInline(esc(...))`),
