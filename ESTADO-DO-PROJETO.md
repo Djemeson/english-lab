@@ -15460,11 +15460,25 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       de verdade (lazy carregado via showSection), padrão data-txt devolvendo a string
       intacta, aspa em URL não escapando do atributo, HTML da IA não virando tag. Console
       limpo.
-- [ ] **RODADA 4 — leitura e audiolivro:** sinc.js:817 (`_sincParaAudio` + gravar
-      `_sincMapa.cap`); `_abTeclas` só com a seção visível; religar `obraMontarEco` no
-      Explicar; try/finally em `lerIrParaCapitulo` (capítulo corrompido); regra do número de
-      página não pega headings; recuo do epub.js lê a unidade; re-indexar frases do
-      ouvir-junto após `_lerRaioXPintar`/`_lerRepintar`.
+- [x] **RODADA 4 — leitura e audiolivro — FEITA em 2026-08-23 (44ª).** `sincTrocouCapitulo`
+      agora espelha o caminho do ligar: pega o `cap` de volta, grava `_sincMapa.cap` e passa
+      o tempo por `_sincParaAudio` (era o erro de HORAS ao virar capítulo em m4b; faixas
+      soltas mascaravam). `_abTeclas` exige `section-audiobook.active` (Espaço/setas não
+      atropelam mais o leitor no ouvir-junto). `obraMontarEco` aceita `corpo` null (o único
+      chamador passa null e a exigência matava o eco da obra desde o nascimento) + guarda no
+      `corpo.isConnected`. `lerIrParaCapitulo` inteiro em try/catch/finally: capítulo
+      corrompido mostra erro na tela e solta `_lerRestaurando`/`ler-montando` — e as travas
+      só soltam se a navegação ainda for a dona (de brinde, mata a corrida do duplo clique
+      no sumário). Faxina: bloco só-número não esconde headings (The Green Mile). Recuo do
+      epub lê a unidade (em/rem≥1, px≥16, pt≥12, %-nunca; número puro = em). 
+      `sincReindexarSeAtivo()` no fim de `_lerRaioXPintar` e `_lerRepintar` (as pinturas
+      substituem os nós de texto e os Ranges do ouvir-junto ficavam órfãos). `sw.js` → v409.
+      **Testado ao vivo: 13/13** (lazy carregados no navegador) — unidades do recuo,
+      heading×página na `_lerArrumar` real, eco com corpo null entrando no prompt, teclas
+      barradas fora da seção e valendo dentro. ⚠️ **Não exercitado ao vivo:** a troca de
+      capítulo em m4b real (exige o acervo dele) e o capítulo corrompido de verdade — a
+      lógica espelha o caminho já testado do ligar, mas vale um ouvido na primeira sessão
+      de ouvir-junto.
 - [ ] **RODADA 5 — vídeo, Kindle e travas de contexto:** trava de alvo em
       `_vidAutoSub`/`videoTranscribeFull`/`mangaRepintarPagina`/lote do Kindle (resposta por
       id, não por índice); Kindle sem análise dupla (filtro de `analisado`); download de

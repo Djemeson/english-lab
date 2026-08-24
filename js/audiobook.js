@@ -3891,6 +3891,12 @@ function abBarraClique(ev) {
 
 function _abTeclas(e) {
   if (!_abLivro) return
+  // ⚠️ SÓ COM A SEÇÃO NA TELA (rodada 44). Sair da seção com o áudio tocando é
+  // o uso normal — e o handler ficava vivo no app inteiro: no "ouvir junto",
+  // Espaço virava a página E pausava o narrador, e as setas viravam a página E
+  // pulavam ±15/30s — desmanchando a sincronia que o modo existe para dar.
+  // Atalho de player só vale onde o player é a tela.
+  if (!document.getElementById('section-audiobook')?.classList.contains('active')) return
   if (/input|textarea|select/i.test((document.activeElement || {}).tagName || '')) return
   if (e.key === ' ') { e.preventDefault(); abTocarPausar() }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); abPular(-AB_PULO_VOLTAR) }

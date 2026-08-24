@@ -386,6 +386,14 @@ let _sincCapLivro = -1
 let _sincSeguir = true
 
 function sincAtivo() { return _sincOn }
+// Reindexa as frases quando alguma pintura reconstrói os nós de texto do
+// capítulo (raio-X, pintura de estudo): os Ranges antigos ficam órfãos e o
+// realce/virada de página morrem calados sem isto (rodada 44).
+function sincReindexarSeAtivo() {
+  if (!_sincOn) return
+  _sincFrases = sincIndexarFrases()
+  _sincAtual = -1
+}
 function sincTemRealce() { return typeof CSS !== 'undefined' && CSS.highlights && typeof Highlight === 'function' }
 
 // ---------------------------------------------------------------
@@ -814,9 +822,17 @@ async function sincTrocouCapitulo(capLivro) {
     if (!ok) return sincLeitorSair()
     _sincCapLivro = capLivro
     _sincFrases = sincIndexarFrases()
-    const { el } = await _sincCarregarAudio(audio, _sincMapa.capAudio)
+    // ⚠️ IGUAL AO LIGAR (rodada 44): o `cap` volta junto e o tempo passa por
+    // `_sincParaAudio`. Este caminho descartava o cap (o realce e o clique
+    // ficavam sem o deslocamento) e cravava o tempo RELATIVO direto no
+    // arquivo — num m4b de arquivo único, o capítulo 12 começa milhares de
+    // segundos adentro, e virar a página mandava o áudio para outro lugar
+    // do livro. Em faixas soltas (ini=0) nada aparecia, e foi por isso que o
+    // teste passou.
+    const { el, cap } = await _sincCarregarAudio(audio, _sincMapa.capAudio)
+    _sincMapa.cap = cap
     const t = sincTempoDe(_sincMapa, 0)
-    if (t != null) el.currentTime = t
+    if (t != null) el.currentTime = _sincParaAudio(cap, t)
     _sincPintarBarra()
   } catch (e) {
     toast(String(e.message || e), 'error')

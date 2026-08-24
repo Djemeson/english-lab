@@ -1031,7 +1031,11 @@ function _lerArrumar(doc) {
   // contando PALAVRAS, e o mapa é feito sobre o arquivo cru — apagar um "246"
   // daqui adiantaria a frase acesa em uma palavra a cada página, e o erro
   // soma. Escondido, ele some da vista e continua contando igual dos dois lados.
+  // ⚠️ CABEÇALHO NUNCA (rodada 44): capítulo titulado só com o número —
+  // The Green Mile usa <h?>1</h?> — é TÍTULO, não sobra de digitalização, e a
+  // regra o escondia (e inflava o laudo). Número de página vive em <p>/<div>.
   for (const b of blocos()) {
+    if (/^H[1-6]$/.test(b.tagName)) continue
     const t = b.textContent.trim()
     if (/^\d{1,4}$/.test(t) && !b.querySelector('img')) { b.classList.add('ler-oculto'); rel.pagina++ }
   }
@@ -1160,8 +1164,16 @@ async function lerIrParaCapitulo(i, frac = 0) {
   _lerMostrarTexto(false)
   _lerFracAlvo = frac
   cont.innerHTML = '<p class="ler-carregando">carregando…</p>'
+  // ⚠️ TRY/FINALLY EM VOLTA DE TUDO (rodada 44). Uma entrada corrompida no ZIP
+  // (ou imagem podre no meio da sanitização) lançava sem tratamento e deixava
+  // o leitor TRAVADO: `_lerRestaurando` preso em true (nenhuma posição era
+  // mais gravada) e o texto invisível em "carregando…" para sempre, sem uma
+  // linha de erro. Agora o erro aparece na tela e as travas sempre soltam —
+  // mas SÓ quando esta navegação ainda é a dona delas: se outra assumiu no
+  // meio (duplo clique no sumário), quem solta é ela, no fim dela.
+  try {
   const html = await _lerHtmlDoCapitulo(i)
-  if (!_lerLivro || _lerCap !== i) { _lerRestaurando = false; _lerMostrarTexto(true); return }   // trocou de capítulo no meio
+  if (!_lerLivro || _lerCap !== i) return   // trocou de capítulo no meio
   cont.innerHTML = html || '<p class="ler-carregando">(capítulo vazio)</p>'
   cont.querySelectorAll('.ler-link-int').forEach(a => {
     a.onclick = () => lerIrParaCapitulo(+a.dataset.cap, 0)
@@ -1188,7 +1200,7 @@ async function lerIrParaCapitulo(i, frac = 0) {
   lerPreAplicar(i).catch(() => {})
 
   await _lerEsperarLayout(cont)
-  if (!_lerLivro || _lerCap !== i) { _lerRestaurando = false; _lerMostrarTexto(true); return }
+  if (!_lerLivro || _lerCap !== i) return
   _lerMedirPaginas()          // remede já com a forma final
   _lerIrParaFrac(frac)
 
@@ -1214,9 +1226,17 @@ async function lerIrParaCapitulo(i, frac = 0) {
       _lerMedirPaginas(); _lerIrParaFrac(_lerFracAlvo)
     }, { once: true })
   })
-  _lerRestaurando = false
-  _lerMostrarTexto(true)
   const p = el('ler-sumario'); if (p) p.classList.add('hidden')
+  } catch (e) {
+    console.warn('[ler] capítulo não abriu:', e)
+    if (_lerCap === i && cont.isConnected) {
+      cont.innerHTML = `<p class="ler-carregando">Não consegui abrir este capítulo — o arquivo pode estar
+        corrompido neste trecho. Tente outro capítulo. <i>(${esc(e && e.message || 'erro')})</i></p>`
+    }
+  } finally {
+    // Solta as travas só se esta navegação ainda for a dona delas.
+    if (!_lerLivro || _lerCap === i) { _lerRestaurando = false; _lerMostrarTexto(true) }
+  }
 }
 
 function lerCapituloProximo() { if (_lerCap + 1 < _lerLivro.chapters.length) lerIrParaCapitulo(_lerCap + 1, 0) }
@@ -2783,6 +2803,9 @@ function _lerRepintar() {
     if (ultimo < no.nodeValue.length) frag.appendChild(document.createTextNode(no.nodeValue.slice(ultimo)))
     no.replaceWith(frag)
   }
+  // Mesmo cuidado do raio-X (rodada 44): a pintura trocou os nós de texto e as
+  // âncoras do ouvir-junto morreriam caladas sem a reindexação.
+  if (typeof sincReindexarSeAtivo === 'function') sincReindexarSeAtivo()
 }
 
 // ================================================================
@@ -3786,6 +3809,10 @@ function _lerRaioXPintar() {
     if (ultimo < no.nodeValue.length) frag.appendChild(document.createTextNode(no.nodeValue.slice(ultimo)))
     no.replaceWith(frag)
   }
+  // ⚠️ O OUVIR-JUNTO ANCORA EM NÓS DE TEXTO, e esta pintura acabou de
+  // substituí-los (rodada 44): os Ranges guardados ficavam órfãos, o realce da
+  // voz sumia e a página parava de virar sozinha — sem erro nenhum. Reindexa.
+  if (typeof sincReindexarSeAtivo === 'function') sincReindexarSeAtivo()
 }
 
 // OS CAPÍTULOS QUE VALE ANALISAR — e é uma lista diferente da do sumário.
@@ -5218,15 +5245,20 @@ function obraIrAoCapitulo(i) {
 // Busca e pinta, sem segurar a explicação: o eco entra quando chegar.
 // ⚠️ A frase ATUAL não conta como "já apareceu": ela é onde ele está agora, e
 // listá-la faria o bloco dizer que a palavra tem eco quando ela é estreia.
+// ⚠️ `corpo` é OPCIONAL (rodada 44): o único chamador passa null — ele mesmo
+// pinta o bloco depois, junto com a explicação — e a exigência de corpo aqui
+// fazia a função retornar null SEMPRE. O eco da obra ("aqui é o mesmo sentido
+// do capítulo 4") nunca tinha rodado nem uma vez desde que nasceu: nem os
+// trechos entravam no prompt, nem o bloco aparecia na tela.
 async function obraMontarEco(corpo, { livro, termo, atual, noLeitor }) {
-  if (!corpo || !livro || !termo) return null
+  if (!livro || !termo) return null
   let r = null
   try { r = await obraBuscar(livro, termo, { maxTrechos: 4 }) } catch (e) { return null }
   const agora = _repNorm(atual || '')
   r.trechos = r.trechos.filter(t => _repNorm(t.frase) !== agora)
   if (agora && r.total > 0) r.total = Math.max(0, r.total - 1)   // a atual sai da conta
   if (!r.total || !r.trechos.length) return r
-  if (corpo.isConnected) corpo.insertAdjacentHTML('beforeend', obraBlocoHTML(r, { noLeitor }))
+  if (corpo && corpo.isConnected) corpo.insertAdjacentHTML('beforeend', obraBlocoHTML(r, { noLeitor }))
   return r
 }
 

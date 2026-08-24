@@ -300,10 +300,19 @@ function _cssSentido(d) {
   if (/center/.test(d['text-align'] || '')) s.centro = 1
   if (/right/.test(d['text-align'] || '')) s.dir = 1
   if (/small-caps/.test(d['font-variant'] || '') || /uppercase/.test(d['text-transform'] || '')) s.vs = 1
-  // Recuo de bloco (carta, poema, citação) só a partir de 1em: abaixo disso é
-  // ajuste fino de composição, e replicar isso deixaria o texto trêmulo.
-  const rec = parseFloat(d['margin-left'] || d['padding-left'] || '0')
-  if (rec >= 1) s.rec = 1
+  // Recuo de bloco (carta, poema, citação) — e A UNIDADE DECIDE (rodada 44):
+  // `parseFloat` sozinho jogava a unidade fora, e `margin-left: 3px` (ajuste
+  // fino comum de conversão do Calibre) virava 3 >= 1 → parágrafo comum
+  // ganhando cara de citação. Em em/rem, 1 é recuo de verdade; em px/pt o
+  // limiar equivalente é 16/12; porcentagem não diz nada sobre intenção.
+  const recBruto = d['margin-left'] || d['padding-left'] || ''
+  const recM = /^(-?[\d.]+)(em|rem|px|pt|%)?/.exec(recBruto.trim())
+  if (recM) {
+    const v = parseFloat(recM[1])
+    const un = recM[2] || 'em'          // número puro em CSS de EPUB: trata como em
+    const minimo = { em: 1, rem: 1, px: 16, pt: 12 }[un]
+    if (minimo != null && v >= minimo) s.rec = 1
+  }
   return Object.keys(s).length ? s : null
 }
 
