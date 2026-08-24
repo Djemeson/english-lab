@@ -2438,6 +2438,7 @@ async function aiTTS(text, { voice, speed = 0.9, timeoutMs = 60000 } = {}) {
       model: AI_TTS_MODEL, input: text, voice: v,
       instructions: 'Speak clearly at a slightly slow pace, for a language learner.'
     }, { timeoutMs, retries: 0 })
+    _aiCustoAnotar(AI_COST.tts, { est: 1 })
     return blobToBase64(await res.blob())
   } catch (e) {
     // O tts-1 não conhece as vozes novas (ballad/verse/marin/cedar): mandar
@@ -2446,6 +2447,7 @@ async function aiTTS(text, { voice, speed = 0.9, timeoutMs = 60000 } = {}) {
     const res = await _aiFetch('https://api.openai.com/v1/audio/speech', {
       model: AI_TTS_FALLBACK, input: text, voice: vLegada, speed
     }, { timeoutMs, retries: 1 })
+    _aiCustoAnotar(AI_COST.tts, { est: 1 })
     return blobToBase64(await res.blob())
   }
 }
@@ -2509,9 +2511,11 @@ async function aiImage(prompt, { size = '1024x1024', quality, timeoutMs = 180000
   // Qual nível está REALMENTE valendo — o "gerei no baixo e veio caro" nasceu
   // de o app cair no médio em silêncio (imgQuality faltava no DEF_CFG).
   console.info(`[img] nível "${n.q}" · ${n.P.nome} · ${n.model || n.quality} · US$ ${n.usd}/imagem`)
-  return n.prov === 'gemini'
+  const img = await (n.prov === 'gemini'
     ? _aiImageGemini(prompt, n.model, key, timeoutMs, n)
-    : _aiImageOpenAI(prompt, n.quality, size, timeoutMs, n.model)
+    : _aiImageOpenAI(prompt, n.quality, size, timeoutMs, n.model))
+  _aiCustoAnotar(n.usd, { est: 1 })   // preço de tabela por imagem — o livro-caixa anota
+  return img
 }
 
 // ⚠️ O `model` vinha HARDCODED aqui, o que tornava o campo `model` do catálogo
@@ -2745,6 +2749,8 @@ async function aiTranscribe(blob, { nome = 'audio.webm', lang, granular = true, 
         try { const e = await res.json(); if (e.error?.message) m = e.error.message } catch {}
         throw new Error(`[${stt.nome}] ${m}`)
       }
+      // ~360 KB/min no AAC 48kbps mono que o app extrai — estimativa honesta.
+      _aiCustoAnotar((blob && blob.size ? blob.size / 360000 : 1) * stt.usdMin, { est: 1 })
       return await res.json()
     } finally { clearTimeout(timer) }
   }
@@ -2866,18 +2872,53 @@ let _aiUso = { in: 0, out: 0, raciocinio: 0, cache: 0, chamadas: 0, model: '' }
 function aiUsoZerar() { _aiUso = { in: 0, out: 0, raciocinio: 0, cache: 0, chamadas: 0, model: '' } }
 function aiUsoAcumulado() { return { ..._aiUso } }
 
+// ---- O LIVRO-CAIXA (melhoria 1, rodada 44) ----
+// O app já MEDIA cada chamada (`usage` é fato); o número morria no acumulador
+// da operação. Agora todo consumo é anotado por DIA em `el-ia-custo` — é o que
+// alimenta o painel "Quanto a IA custou" nas Configurações e fecha a pergunta
+// "para onde foi meu crédito". Por aparelho, de propósito: é a fatura de quem
+// gastou daqui. TTS/transcrição/imagem não devolvem tokens — entram como
+// estimativa, com a marca `est`.
+const SK_IA_CUSTO = 'el-ia-custo'
+function aiCustoLedger() { try { return JSON.parse(localStorage.getItem(SK_IA_CUSTO) || '{}') } catch (e) { return {} } }
+function _aiCustoAnotar(usd, extras) {
+  if (!isFinite(usd) || usd <= 0) return
+  try {
+    const l = aiCustoLedger()
+    const d = new Date()
+    const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const e = l[dia] || { usd: 0, chamadas: 0, in: 0, out: 0, est: 0 }
+    e.usd += usd
+    e.chamadas++
+    e.in += (extras && extras.in) || 0
+    e.out += (extras && extras.out) || 0
+    if (extras && extras.est) e.est += usd
+    l[dia] = e
+    // Poda: 90 dias de história bastam para qualquer conta que se queira ver.
+    const corte = new Date(Date.now() - 90 * 24 * 3600e3)
+    const corteStr = `${corte.getFullYear()}-${String(corte.getMonth() + 1).padStart(2, '0')}-${String(corte.getDate()).padStart(2, '0')}`
+    for (const k of Object.keys(l)) if (k < corteStr) delete l[k]
+    localStorage.setItem(SK_IA_CUSTO, JSON.stringify(l))
+  } catch (e) {}
+}
+
 function _aiGuardarUso(dados, model) {
   const u = dados && dados.usage
   if (!u) return
   const rac = u.completion_tokens_details?.reasoning_tokens
            || u.output_tokens_details?.reasoning_tokens || 0
   const cache = u.prompt_tokens_details?.cached_tokens || u.prompt_cache_hit_tokens || 0
-  _aiUso.in += Number(u.prompt_tokens || u.input_tokens || 0)
-  _aiUso.out += Number(u.completion_tokens || u.output_tokens || 0)
+  const cin = Number(u.prompt_tokens || u.input_tokens || 0)
+  const cout = Number(u.completion_tokens || u.output_tokens || 0)
+  _aiUso.in += cin
+  _aiUso.out += cout
   _aiUso.raciocinio += Number(rac)
   _aiUso.cache += Number(cache)
   _aiUso.chamadas++
   _aiUso.model = model || _aiUso.model
+  // O livro-caixa recebe TODA chamada medida, ao preço do modelo que respondeu.
+  const p = aiPrecoModelo(model)
+  _aiCustoAnotar((cin * p.in + cout * p.out) / 1e6, { in: cin, out: cout })
 }
 
 // Custo em dólar a partir do consumo MEDIDO. `completion_tokens` já inclui os

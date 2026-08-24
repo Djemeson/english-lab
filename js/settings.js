@@ -106,6 +106,45 @@ function imgProviderMudou() {
   }
 }
 
+// ================================================================
+// QUANTO A IA CUSTOU — o painel do livro-caixa (melhoria 1, rodada 44)
+// ================================================================
+// O app sempre MEDIU o consumo (`usage` de cada chamada); o número morria no
+// acumulador de uma operação. Agora `ai.js` anota tudo por dia em
+// `el-ia-custo`, e este painel responde a pergunta "para onde foi meu
+// crédito": hoje, 7 dias, 30 dias — em reais, pela cotação do dia.
+async function renderCustoIA() {
+  const box = el('ia-custo-painel'); if (!box) return
+  const l = (typeof aiCustoLedger === 'function') ? aiCustoLedger() : {}
+  const dias = Object.keys(l).sort()
+  if (!dias.length) {
+    box.innerHTML = `<p class="desc">Nada registrado ainda neste aparelho — o livro-caixa começa a contar a partir de agora, a cada chamada de IA.</p>`
+    return
+  }
+  const dl = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  const hoje = dl(new Date())
+  const desde = n => { const d = new Date(); d.setDate(d.getDate() - (n - 1)); return dl(d) }
+  const soma = de => dias.filter(k => k >= de).reduce((a, k) => {
+    const e = l[k]; a.usd += e.usd || 0; a.ch += e.chamadas || 0; a.est += e.est || 0; return a
+  }, { usd: 0, ch: 0, est: 0 })
+  const rate = await aiUsdBrl()
+  const brl = v => 'R$ ' + (v * rate).toFixed(2).replace('.', ',')
+  const linhas = [
+    ['Hoje', soma(hoje)],
+    ['Últimos 7 dias', soma(desde(7))],
+    ['Últimos 30 dias', soma(desde(30))],
+    [`Desde ${dias[0].split('-').reverse().join('/')}`, soma('0000')]
+  ]
+  box.innerHTML = `
+    <div class="cost-rows">
+      ${linhas.map(([rot, s]) => `
+        <div class="cost-row"><span>${esc(rot)}</span>
+          <b>${brl(s.usd)} <small style="color:var(--text3);font-weight:400">· ${s.ch} chamada${s.ch !== 1 ? 's' : ''}${s.est > 0.0005 ? ` · ${brl(s.est)} em estimativas` : ''}</small></b>
+        </div>`).join('')}
+    </div>
+    <p class="cost-note">Tokens medidos chamada a chamada, ao preço do modelo que respondeu; áudio, imagem e transcrição entram pela tabela (marcados como estimativa). Cotação de hoje: US$ 1 ≈ R$ ${rate.toFixed(2).replace('.', ',')}. Cada aparelho tem o próprio registro.</p>`
+}
+
 function fillSettings() {
   const provSel = el('cfg-ai-provider')
   if (provSel) {
@@ -116,6 +155,7 @@ function fillSettings() {
   renderKeyRows()
   updateImgProviderOptions()
   updateImgQualityOptions()
+  renderCustoIA()
   const nv = el('cfg-nivel-aluno')
   if (nv) {
     nv.innerHTML = CEFR.map(c =>

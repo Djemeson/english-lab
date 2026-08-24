@@ -15519,11 +15519,20 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       mesmo fallback "Sem fonte" do cartão (abria sessão vazia). `sw.js` → v411.
       **Testado ao vivo: 9/9 no navegador** (streak hoje/ontem, reenvio sem duplicar com
       exampleIdx 0, doc gigante barrado com aviso na tela) + regex do bloqueio 6/6 em node.
-- [ ] **MELHORIAS PROPOSTAS (fazer quando ele pedir):** painel "quanto a IA custou" (persistir
-      `aiUso` por dia); semáforo de fornecedor em Configurações → IA; Media Session no
-      podcast; comando de ensaio de backup no terminal; schema nas chamadas restantes
-      (extractSrsItems, lote Kindle, pré-estudo); cache em disco da tradução de seleção;
-      bateria Gemini no teste-ia.mjs.
+- [ ] **MELHORIAS (pedidas em 2026-08-23, uma por vez):**
+      - [x] **1 · Painel "quanto a IA custou"** — FEITA (44ª). `_aiCustoAnotar` anota cada
+            chamada medida (`_aiGuardarUso`, ao preço do modelo que respondeu) + TTS/imagem/
+            transcrição como estimativa marcada, por dia, em `el-ia-custo` (poda 90d, por
+            aparelho). Painel em Configurações → IA (`renderCustoIA`): hoje/7d/30d/desde o
+            início, em reais pela cotação do dia, com a parcela "em estimativas" separada.
+            Testado ao vivo: 9/9 (soma exata por preço de modelo, marca de estimativa,
+            painel renderizado com valores, vazio limpo). `sw.js` → v412.
+      - [ ] 2 · Semáforo de fornecedor em Configurações → IA.
+      - [ ] 3 · Media Session no player de vídeo/podcast.
+      - [ ] 4 · Comando de ensaio de backup no terminal.
+      - [ ] 5 · Schema nas chamadas restantes (extractSrsItems, lote Kindle, pré-estudo).
+      - [ ] 6 · Cache em disco da tradução de seleção.
+      - [ ] 7 · Bateria Gemini no teste-ia.mjs.
 
 ### Da rodada da formatação do livro (§8.98, 2026-08-22)
 
