@@ -326,6 +326,47 @@ function selMenuAtivar(container, obterContexto) {
 const _selTradCache = new Map()
 const SEL_TRAD_CURTO = 4          // até 4 palavras é vocabulário, não texto
 
+// ---- A TRADUÇÃO DE SELEÇÃO GANHA DISCO E NUVEM (melhoria 6, rodada 44) ----
+// A quebra de frase já guardava no aparelho e na nuvem; a tradução ao
+// arrastar era só memória de sessão — reler o mesmo trecho amanhã (ou no
+// telefone) pagava de novo. Mesmo desenho da quebra: quem PRODUZ o caro
+// guarda, e as duas telas (leitor e menu de seleção) consomem daqui.
+// Guarda o texto CRU; cada tela re-faz o próprio HTML ao pintar.
+const TRAD_VER = 1
+const _tradMem = new Map()
+function _tradChaveDisco(lang, chave) {
+  const k = (typeof audioKey === 'function') ? audioKey(String(chave)) : String(chave).slice(0, 80)
+  return 'trad:' + (lang || 'en') + ':' + k
+}
+async function tradDoDisco(lang, chave) {
+  const kd = _tradChaveDisco(lang, chave)
+  if (_tradMem.has(kd)) return _tradMem.get(kd)
+  if (typeof BookDB === 'undefined') return null
+  try {
+    const b = (typeof geradoLer === 'function') ? await geradoLer(kd) : await BookDB.get(kd)
+    if (!b) return null
+    const d = JSON.parse(typeof b.text === 'function' ? await b.text() : String(b))
+    if (!d || Number(d.v || 0) < TRAD_VER || !d.t) return null
+    _tradMem.set(kd, d.t)
+    return d.t
+  } catch (e) { return null }
+}
+function tradGuardar(lang, chave, texto) {
+  const t = String(texto || '').trim()
+  if (!t) return
+  const kd = _tradChaveDisco(lang, chave)
+  _tradMem.set(kd, t)
+  if (typeof BookDB === 'undefined') return
+  try {
+    const pacote = JSON.stringify({ v: TRAD_VER, t, at: Date.now(),
+      ficha: (typeof aiFicha === 'function') ? aiFicha({ lang }) : undefined })
+    const p = (typeof geradoGuardar === 'function')
+      ? geradoGuardar(kd, pacote, { tipo: 'trad', lang })
+      : BookDB.set(kd, pacote)
+    if (p && p.catch) p.catch(e => console.warn('[trad] não gravei:', e && e.message))
+  } catch (e) {}
+}
+
 async function _selMenuTraduzir(pop, c) {
   const caixa = pop && pop.querySelector('#sel-trad')
   if (!caixa || !c) return
@@ -338,6 +379,17 @@ async function _selMenuTraduzir(pop, c) {
   const chave = String(c.frase || '').toLowerCase().trim() + '\u0000' + texto.toLowerCase()
   const guardado = _selTradCache.get(chave)
   if (guardado) { caixa.innerHTML = guardado; _selMenuPor(pop); return }
+  // O disco antes da IA (melhoria 6): o mesmo par já traduzido — nesta sessão,
+  // ontem, ou no outro aparelho — volta de graça.
+  const doDisco = await tradDoDisco(c.lang || 'en', chave)
+  if (doDisco) {
+    if (!vivo()) return
+    const html = esc(doDisco)
+    _selTradCache.set(chave, html)
+    caixa.innerHTML = html
+    _selMenuPor(pop)
+    return
+  }
 
   if (!aiChatCfg().key) {
     caixa.innerHTML = '<i class="sel-trad-esperando">sem chave de IA</i>'
@@ -375,6 +427,7 @@ async function _selMenuTraduzir(pop, c) {
     const html = esc(t)
     _selTradCache.set(chave, html)
     if (_selTradCache.size > 300) _selTradCache.delete(_selTradCache.keys().next().value)
+    tradGuardar(c.lang || 'en', chave, t)   // foi pago: fica no disco e na nuvem
     caixa.innerHTML = html
     _selMenuPor(pop)
   } catch (e) {

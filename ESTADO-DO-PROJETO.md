@@ -15556,7 +15556,14 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
             (aiChecarAqui) e `videoCard` (captura da cena) — ligados nos seis call sites.
             Forma, não conteúdo, como os demais; validados ao vivo contra as 3 regras do
             modo estrito e contra os moldes dos prompts via `_esqConfere` (9/9).
-      - [ ] 6 · Cache em disco da tradução de seleção.
+      - [x] **6 · Tradução de seleção com disco e nuvem** — FEITA (44ª). `tradDoDisco`/
+            `tradGuardar` em ai.js (produtor único; chave `trad:<lang>:<audioKey(frase+
+            trecho)>`, versão, ficha técnica, via `geradoGuardar` → aparelho E nuvem, com
+            fallback BookDB sem login). Consumido pelo popup do leitor e pelo menu de
+            seleção: o mesmo par frase+trecho nunca é pago duas vezes — nem amanhã, nem no
+            telefone. Guarda o texto CRU; cada tela repinta o próprio HTML. Testado ao
+            vivo: 3/3 (ida-e-volta pelo BookDB real, sem colisão, versão velha descartada).
+            `sw.js` → v414.
       - [ ] 7 · Bateria Gemini no teste-ia.mjs.
 
 ### Da rodada da formatação do livro (§8.98, 2026-08-22)

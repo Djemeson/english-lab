@@ -2608,6 +2608,16 @@ async function _lerTraduzirAuto(pop, alvo, frase, bloco) {
   const chave = _lerTradChave(texto, frase)
   const guardado = _lerTradCache.get(chave)
   if (guardado) { caixa.innerHTML = guardado; _lerPopPor(pop); return }
+  // O disco antes da IA (melhoria 6): a mesma seleção já traduzida — ontem,
+  // ou no outro aparelho — volta sem pagar de novo. O produtor mora em ai.js.
+  if (typeof tradDoDisco === 'function') {
+    const doDisco = await tradDoDisco((_lerLivro && _lerLivro.lang) || 'en', chave)
+    if (doDisco) {
+      if (!vivo()) return
+      const html = _lerTradHTML(doDisco)
+      if (html) { _lerTradGuardar(chave, html); caixa.innerHTML = html; _lerPopPor(pop); return }
+    }
+  }
 
   if (typeof aiChatCfg !== 'function' || !aiChatCfg().key) {
     // Sem chave, um aviso DISCRETO e uma vez só — nada de toast: ele viria a
@@ -2670,6 +2680,8 @@ async function _lerTraduzirAuto(pop, alvo, frase, bloco) {
     const html = _lerTradHTML(bruto)
     if (!html) { caixa.innerHTML = '<i class="ler-pop-trad-esperando">a IA devolveu vazio</i>'; _lerPopPor(pop); return }
     _lerTradGuardar(chave, html)
+    // Foi pago: fica no disco e na nuvem (o cru, sem HTML — cada tela repinta).
+    if (typeof tradGuardar === 'function') tradGuardar((_lerLivro && _lerLivro.lang) || 'en', chave, bruto)
     caixa.innerHTML = html
     _lerPopPor(pop)
   } catch (e) {
