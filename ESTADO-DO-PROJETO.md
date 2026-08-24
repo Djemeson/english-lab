@@ -15421,6 +15421,48 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da análise de UX "Onde os Botões Vivem" (2026-08-24) — as 5 rodadas de reforma
+
+> Análise a pedido dele ("onde os botões vivem? duplicados? enterrados? hovers?"). Três
+> inventários paralelos mapearam ~180 ações em 14 telas; relatório completo no Artifact
+> **"Onde os Botões Vivem"**. NADA foi implementado ainda. Os 5 padrões-raiz: (1) ação
+> hover-only não existe no toque; (2) informação só em tooltip morre no celular; (3) o mesmo
+> gesto com cara/qualidade diferente; (4) o valioso escondido, o barato exposto; (5) código
+> morto (~700 linhas). Rodadas propostas, em ordem de ganho:
+
+- [ ] **UX-1 — celular de primeira classe:** `@media (hover:none)` para Palavras
+      (known.js/styles.css:4507 — estudar/ignorar impossíveis no toque), ações de deck
+      (styles.css:1266), nuvem do audiolivro (styles.css:5259), apagar-dia (styles.css:4917),
+      copiar resposta esmaecido; fila do Preparar como bottom-sheet no mobile (hoje
+      styles.css:911 remove busca/filtros/lote inteiros); rótulos nas barras só-ícone
+      (leitor 9, audiolivro 8, vídeo 9 — tooltips são mouseover-only, core.js:2163);
+      preview da Biblioteca no toque (styles.css:885).
+- [ ] **UX-2 — um menu de card, o mesmo em todo lugar:** o `estMenu` da estante
+      (estante.js:806) vira padrão; audiolivro (audiobook.js:160) e vídeo (video.js:147)
+      trocam a lixeira do canto por menu; "Editar card" do SRS (study.js:927) vira menu ⋯
+      unificado com a Biblioteca (gerar frase/imagem, rever cena, abrir no Estudar, mover,
+      excluir); card×linha da estante abrem a mesma coisa (estante.js:735/774).
+- [ ] **UX-3 — duplicados e destinos honestos:** speakWord→playSrsTTS no Preparar
+      (review.js:1911, 1 linha); Configurações tudo auto-salva (morre o 2º "Salvar",
+      index.html:614/775); "Para revisar hoje" inicia sessão (index.html:966); chips de
+      recentes → irParaItem (dashboard.js:643); header mobile 1 alvo de conta
+      (index.html:117-130); popup de seleção do Preparar migra p/ selMenuAtivar
+      (review.js:3385→ai.js:269); legenda do vídeo agrupada (video.js:362-374).
+- [ ] **UX-4 — promoções:** pré-estudo com painel por capítulo (molde do raio-X,
+      ler.js:3904); "Ouvir junto" com rótulo + na ficha do livro (ler.js:497);
+      ditado/shadowing anunciados (video-study.js:584); "Completar verbete" no Estudar e na
+      Biblioteca (review.js:1890); "Regenerar frase" nomeado (study.js:850); "Estudar de
+      novo" também no material (study.js:918); lotes pagos com aiConfirmBatch ("Completar
+      material do dossiê, N chamadas"); playlist anuncia escopo (index.html:1020); sono no
+      vídeo/podcast (abSonoMenu é portável); um motor de cobertura (o do leitor,
+      video-study.js:461 é o fraco).
+- [ ] **UX-5 — faxina e precisão:** remover o morto (quickAdd, analyzeAll, saveAllToSrs +
+      botão fantasma, reprocessMetaBulk, picker antigo do Kindle, .recent-item,
+      .kindle-override, ramo 'conheco') — ⚠️ ANTES: decisão DELE sobre a triagem por nível
+      (~500 linhas adormecidas, ler.js:4146-4790); geradoFixar no "Analisar de novo"
+      (ler.js:4019); linha "última limpeza" no painel de espaço (sumicoUltimo,
+      core.js:206); tecla E na pausa do erro.
+
 ### Da auditoria de ponta a ponta (§8.99, 2026-08-23) — as 6 rodadas de conserto
 
 > A lista completa (74 achados com arquivo:linha) está no Artifact "Raio-X do Language Lab" e
