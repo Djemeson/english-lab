@@ -7,7 +7,24 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-23 (43ª) — **AUDITORIA DE PONTA A PONTA — NADA FOI ALTERADO NO
+> Última atualização: 2026-08-23/24 (44ª) — **AS 6 RODADAS DE CONSERTO + AS 7 MELHORIAS,
+> TODAS FEITAS E NO AR** (13 commits, cada um com os detalhes; checkboxes com o resumo de
+> cada rodada na seção 9). As redes de segurança de dados funcionam de verdade (apagar-tudo
+> zera a nuvem esvaziando docs, backup restaura tudo, desmarcações têm lápide, boot empurra
+> pendência antes do 1º snapshot); a IA funciona no fornecedor ATIVO (6 modelos cravados
+> removidos, folga de raciocínio no Gemini, temperature condicional no chat, same_as vivo,
+> confirmação antes do lote, aviso claro de "sem créditos"); o apóstrofo não mata mais botão
+> (6 telas, padrão data-atributo registrado no CLAUDE.md); ouvir-junto certo em m4b; travas
+> de contexto em legenda/transcrição/mangá/Kindle; teto de 1 MB com aviso nomeado; SW
+> instala sem cache HTTP velho; regras travadas no e-mail dele (⚠️ deploy manual pendente);
+> streak no fuso local. Melhorias: painel "Quanto a IA custou", semáforo de fornecedor,
+> Media Session no vídeo/podcast, `tools/ensaio-backup.mjs` (testado contra a nuvem real),
+> 6 esquemas novos, tradução de seleção com disco+nuvem, bateria Gemini no teste-ia.
+> `sw.js` → **englab-v414**. Extensão 3.21.0 (recarregar em chrome://extensions).
+> ⚠️ Pendências dele: `firebase deploy` das regras; ensaio real exportar→apagar→restaurar;
+> GEMINI_API_KEY no .env + `node tools/teste-ia.mjs gemini`; recarregar a extensão.
+>
+> Última atualização anterior: 2026-08-23 (43ª) — **AUDITORIA DE PONTA A PONTA — NADA FOI ALTERADO NO
 > CÓDIGO**. Leitura fina das ~53 mil linhas em seis frentes (IA auditada à mão, linha a linha;
 > cinco varreduras paralelas para núcleo/sync, leitura/áudio, vídeo/extensão, captura/telas e
 > infra/segurança). **74 achados confirmados no código** (16 graves · 33 médios · 25 baixos),
