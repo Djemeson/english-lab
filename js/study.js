@@ -175,11 +175,11 @@ let _browserSort = { col: 'state', dir: 1 }
 let _browserSelected = new Set()
 let _browserCurrentCards = []
 // Cache de quais chaves de áudio existem no IndexedDB
-let _audioKeyCache = null
-async function refreshAudioKeyCache() {
-  const all = await AudioDB.getAll()
-  _audioKeyCache = new Set(Object.keys(all))
-}
+// `_audioKeyCache` e `refreshAudioKeyCache` MUDARAM DE CASA (rodada 44):
+// moram em audio.js, que não é lazy. Aqui eram a armadilha nº 1 ao vivo — os
+// botões de manutenção de áudio das Configurações (não-lazy) chamavam esta
+// função, e sem nunca ter aberto a Revisão o clique morria em
+// "refreshAudioKeyCache is not defined".
 
 
 // ================================================================

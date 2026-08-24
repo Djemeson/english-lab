@@ -604,9 +604,10 @@ async function _glossChecar(b, achado, pos, opts) {
       // de `cover` continua valendo: quem ele não conhecia era a expressão.
       if (r.mesma && (achado.fonte === 'known' || achado.fonte === 'ignored')) {
         if (typeof markKnownWord === 'function') markKnownWord(alvo, false)
+        // Pelo caminho oficial: é ele que grava a lápide da desmarcação, sem a
+        // qual o "conheço" errado voltaria da nuvem no próximo push.
         if (typeof ignoredWords === 'object' && ignoredWords && ignoredWords[knownNorm(alvo)]) {
-          delete ignoredWords[knownNorm(alvo)]
-          if (typeof saveIgnoredLocal === 'function') saveIgnoredLocal()
+          markIgnoredWord(alvo, false)
         }
         glossInvalidar()
       }

@@ -95,6 +95,17 @@ function audioKey(text) {
   return 'a' + Math.abs(h).toString(36)
 }
 
+// O cache das chaves de áudio já geradas. Morava em study.js (LAZY) e era a
+// armadilha nº 1 ao vivo (rodada 44): os botões "Verificar/Gerar áudio" das
+// Configurações — que não são lazy — chamavam a função e, sem a Revisão ter
+// sido aberta alguma vez, o clique morria em "is not defined". Mora aqui,
+// junto do AudioDB de quem ele é o índice.
+let _audioKeyCache = null
+async function refreshAudioKeyCache() {
+  const all = await AudioDB.getAll()
+  _audioKeyCache = new Set(Object.keys(all))
+}
+
 // Converte Blob para data URL base64
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {

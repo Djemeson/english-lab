@@ -15409,12 +15409,28 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > A lista completa (74 achados com arquivo:linha) está no Artifact "Raio-X do Language Lab" e
 > resumida em §8.99. Aqui, só as rodadas — cada uma é um bloco coeso para fazer e testar junto.
 
-- [ ] **RODADA 1 — redes de segurança de dados:** clearAllData chama fbWipeCloud (estendido a
-      `gerado` + Storage); importData restaura tudo que o export grava; export inclui
-      livros/audiolivros/known e SAI as chaves de API; lápide para desmarcações
-      (known/ignored/kindleSeen); boot empurra mudança local não-enviada antes do 1º snapshot;
-      flush de sessão dentro da trava; `card.at = Date.now()` em rateSrsCard. Fecha com ensaio
-      real exportar→apagar→restaurar conferido por `tools/acervo.mjs`.
+- [x] **RODADA 1 — redes de segurança de dados — FEITA em 2026-08-23 (44ª).** Tudo do plano,
+      com uma correção de desenho no meio: apagar os DOCS da nuvem não propagaria (a descida
+      ignora doc ausente, de propósito) — então `fbWipeCloud` passou a ESVAZIAR os docs de
+      `data` (documento presente com lista vazia é o caminho oficial de exclusão) e a apagar
+      de verdade só `gerado`/`audio`/`images` + Storage inteiro (recursivo, 6 pastas).
+      `known` e `kindleSeen` (que sincronizam por união) ganharam ÉPOCA de reset no doc.
+      Desmarcações ganharam lápide (`el-desmarcados`, mapa `tipo\u0000termo`→ts, poda 90d)
+      com merge único (`mesclarConhecidasComNuvem`) usado na subida E na descida — e a subida
+      agora LÊ known/kindleSeen antes de gravar (antes sobrescrevia às cegas). Export sem as
+      3 chaves de API e com livros/audiolivros/known/obrasNome; import restaura TUDO (merge:
+      local vence empate, diário por dia via `_fbDiaMaior`, histórico de livro une por dia).
+      clearAllData limpa localStorage POR PREFIXO (el-/englab). Boot com `el-sync-pendente`
+      empurra antes de adotar o 1º snapshot. `flushPendingCloudCards` dentro da trava.
+      `card.at` em rateSrsCard. `refreshAudioKeyCache` mudou para audio.js (armadilha nº 1
+      viva nos botões de manutenção). `sw.js` → v406.
+      **Testado ao vivo (localhost, sem login):** 10/10 cenários de merge com lápide em node
+      sobre o código real + 14/14 no navegador (export sem segredo no blob capturado, import
+      round-trip com modal confirmado por clique, união de histórico, época do Kindle,
+      carimbo do card). ⚠️ **Pendência que ficou:** o ensaio exportar→apagar→restaurar na
+      CONTA REAL é destrutivo e só com ele presente; o wipe com outro aparelho carregando
+      `el-sync-pendente` pode devolver as mudanças pendentes daquele aparelho (caso raro,
+      documentado no código).
 - [ ] **RODADA 2 — IA no mundo real (Gemini ativo, OpenAI sem crédito):** remover os 6
       `model: AI_DEFAULT_MODEL`; temperature condicional no streaming do Assistente + timeout
       de inatividade no stream; folga de raciocínio para Gemini Flash 3.x; aiConfirmBatch

@@ -328,6 +328,11 @@ function rateSrsCard(cardId, rating) {
   if (!card) return
 
   const now = nowTs()
+  // O carimbo de hora do card (rodada 44). Sem ele, todo conflito de subida
+  // era "o local vence" — um aparelho com estado velho que empurrasse antes
+  // de receber o snapshot regredia o agendamento na nuvem. Com o carimbo, o
+  // merge escolhe a avaliação mais recente, que é a verdade.
+  card.at = now
   const learnSteps   = (srsCfg.steps && srsCfg.steps.length)        ? srsCfg.steps        : [1, 10]
   const relearnSteps = (srsCfg.relearnSteps && srsCfg.relearnSteps.length) ? srsCfg.relearnSteps : [10]
   const easeMin = srsCfg.easeMin ?? 1.3

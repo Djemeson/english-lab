@@ -1011,15 +1011,32 @@ function _fbDiaMaior(a, b) {
     newSeen:  n(a.newSeen,  b.newSeen) }
 }
 
+// ---- A MUDANÇA QUE AINDA NÃO SUBIU (rodada 44) ----
+// O debounce de 1,2s morre com a aba: o dado ficava salvo aqui, mas no boot
+// seguinte o PRIMEIRO snapshot substituía o local sem merge — apagando o que
+// nunca subiu (as capturas da extensão eram o caso mais provável, porque a
+// extensão já tinha limpado a fila dela ao entregar).
+// A bandeira marca "há mudança local não empurrada"; quem a vê no boot empurra
+// ANTES de adotar a nuvem (o push mescla, então nada se perde). O contador
+// garante que uma mudança feita NO MEIO de um push não seja dada por enviada.
+const SK_SYNC_PENDENTE = 'el-sync-pendente'
+let _fbDirtySeq = 0
+
 async function fbPushData() {
   if (!_fbUser || !_fbDb) return false
+  const seqAntes = _fbDirtySeq
   updateSyncNav('syncing')
   try {
     const base = _fbDb.collection('users').doc(_fbUser.uid)
     // ⚠️ AS LEITURAS VÊM ANTES DO BATCH. Mesclar exige saber o que já está lá,
     // e o batch é escrita pura — ler dentro dele não existe.
     const D = base.collection('data')
-    const [mWords, mLivros, mAudio, mVideos, mClips, mCards, mDecks, mConv, mPods, mLog] = await Promise.all([
+    // ⚠️ `known` e `kindleSeen` também são LIDOS antes de gravar (rodada 44).
+    // Antes o batch os sobrescrevia às cegas com o estado local — e como eles
+    // sincronizam por união na DESCIDA, um aparelho atrasado que empurrasse
+    // primeiro apagava da nuvem a desmarcação/reset feita no outro.
+    const lerDoc = async ref => { try { const s = await ref.get(); return s.exists ? (s.data() || {}) : {} } catch (e) { return null } }
+    const [mWords, mLivros, mAudio, mVideos, mClips, mCards, mDecks, mConv, mPods, mLog, dKnown, dKindle] = await Promise.all([
       _fbMesclarLista(D.doc('words'), words, 'words'),
       _fbMesclarLista(D.doc('livros'), livros, 'livros'),
       _fbMesclarLista(D.doc('audiolivros'), audiolivros, 'audiolivros'),
@@ -1031,8 +1048,24 @@ async function fbPushData() {
       // ⚠️ Podcast não tem `id`: a identidade é o programa no catálogo.
       _fbMesclarLista(D.doc('podShows'), podShows || [], 'podShows', { chave: 'collectionId' }),
       // ⚠️ O diário é por DIA e SOMA — ver `_fbSomarDia`.
-      _fbMesclarLista(D.doc('srsLog'), srsLog, 'srsLog', { chave: 'date', combinar: _fbDiaMaior })
+      _fbMesclarLista(D.doc('srsLog'), srsLog, 'srsLog', { chave: 'date', combinar: _fbDiaMaior }),
+      lerDoc(D.doc('known')),
+      lerDoc(D.doc('kindleSeen'))
     ])
+    // Conhecidas/ignoradas/sentidos: o MESMO merge da descida (lápides de
+    // desmarcação incluídas). `null` = não conseguiu ler a nuvem: sobe o local
+    // com as lápides, que é o comportamento seguro (nada é apagado às cegas).
+    const pacoteKnown = (dKnown !== null && typeof mesclarConhecidasComNuvem === 'function')
+      ? mesclarConhecidasComNuvem(dKnown)
+      : { map: knownWords || {}, ignored: ignoredWords || {},
+          senses: (typeof knownSenses !== 'undefined' ? knownSenses : {}) || {},
+          unmarked: (typeof unmarks !== 'undefined' ? unmarks : {}) || {},
+          resetAt: (typeof knownResetAt === 'function' ? knownResetAt() : 0) }
+    // Histórico do Kindle: se a nuvem tem uma ÉPOCA de reset mais nova que a
+    // daqui, o histórico local é pré-reset — adota o da nuvem antes de subir.
+    if (dKindle && typeof kindleAdotarReset === 'function') {
+      kindleAdotarReset(dKindle.resetAt, dKindle.list)
+    }
     // ⚠️ `srsCards` entrou depois dos outros: os cards moram no IndexedDB, e a
     // marca de remoção compara com o localStorage. A saída foi um espelho só
     // com os IDS (`marcarSumidosCards`) — barato, e o bastante para saber o
@@ -1072,6 +1105,14 @@ async function fbPushData() {
     cfgPayload.vidPT = cfg.vidPT || ''
     cfgPayload.sttProvider = cfg.sttProvider || 'auto'
     cfgPayload.imgProvider = cfg.imgProvider || 'openai'
+    // Campos que mudavam num aparelho e não chegavam ao outro (rodada 44):
+    // uns nem entravam no pacote, outros entravam e a descida os ignorava.
+    cfgPayload.activeLang = cfg.activeLang || 'en'
+    if (cfg.autoMeta    !== undefined) cfgPayload.autoMeta    = cfg.autoMeta
+    if (cfg.catalogoIA  !== undefined) cfgPayload.catalogoIA  = cfg.catalogoIA
+    if (cfg.googleBooksKey) cfgPayload.googleBooksKey = cfg.googleBooksKey
+    if (cfg.estante) cfgPayload.estante = cfg.estante
+    if (cfg.imgQuality) cfgPayload.imgQuality = cfg.imgQuality
     batch.set(base.collection('data').doc('cfg'), cfgPayload, { merge: true })
     if (kindleItems.length > 0) {
       const vistos = loadKindleSeen()
@@ -1083,7 +1124,21 @@ async function fbPushData() {
     // Histórico do Kindle: sem ele na nuvem, importar o vocab.db no PC e depois
     // abrir o Lab no celular traria TUDO de novo — o "só o novo entra" só vale
     // se o "já entrou" for o mesmo em todo aparelho.
-    batch.set(base.collection('data').doc('kindleSeen'), { list: [...loadKindleSeen()], updatedAt: Date.now() })
+    // União com o que já está lá (mesma época): gravar só o local apagaria da
+    // nuvem os hashes que este aparelho ainda não baixou. A época do reset
+    // viaja junto — é ela que faz o "Resetar histórico" valer em todo lugar.
+    // (a adoção de época já rodou lá em cima, então aqui "não anterior" basta:
+    // nuvem mais velha que o meu reset = hashes pré-reset, ficam de fora)
+    const ksLocal = loadKindleSeen()
+    const epocaLocal = (typeof kindleResetAt === 'function') ? kindleResetAt() : 0
+    if (dKindle && Array.isArray(dKindle.list) && (Number(dKindle.resetAt) || 0) >= epocaLocal) {
+      dKindle.list.forEach(h => ksLocal.add(h))
+    }
+    batch.set(base.collection('data').doc('kindleSeen'), {
+      list: [...ksLocal].slice(-30000),
+      resetAt: (typeof kindleResetAt === 'function' ? kindleResetAt() : 0),
+      updatedAt: Date.now()
+    })
     batch.set(base.collection('data').doc('conversas'), { list: mConv, updatedAt: Date.now() })
     // Vídeo: só METADADOS (títulos, marcadores, cortes) — o arquivo de vídeo
     // nunca sobe (300MB–2GB × limite de 1MB/doc). Legendas ficam locais (IDB).
@@ -1094,12 +1149,15 @@ async function fbPushData() {
     // Audiolivros: SÓ METADADOS. O áudio (centenas de MB) fica no aparelho —
     // aqui viaja título, capa reduzida, capítulos, posição e marcadores.
     batch.set(base.collection('data').doc('audiolivros'), { list: mAudio, updatedAt: Date.now() })
-    batch.set(base.collection('data').doc('known'), { map: knownWords || {}, ignored: ignoredWords || {}, senses: knownSenses || {}, updatedAt: Date.now() })
+    batch.set(base.collection('data').doc('known'), { ...pacoteKnown, updatedAt: Date.now() })
     batch.set(base.collection('data').doc('clips'),  { list: mClips,  updatedAt: Date.now() })
     // Podcasts: só a lista de programas visitados (ponteiros). O episódio em si
     // já viaja em `videos` e o mp3 nunca sobe.
     batch.set(base.collection('data').doc('podShows'), { list: mPods, updatedAt: Date.now() })
     await batch.commit()
+    // Só dá a pendência por quitada se nada mudou DURANTE o push — uma mudança
+    // no meio já reagendou outro envio, e é ele que vai quitar.
+    if (_fbDirtySeq === seqAntes) { try { localStorage.removeItem(SK_SYNC_PENDENTE) } catch (e) {} }
     updateSyncNav('ok')
     return true
   } catch(e) {
@@ -1318,6 +1376,16 @@ function attachRealtimeSync() {
     // Ignora o eco das nossas próprias escritas (exceto a 1ª carga inicial)
     const fromServer = snap.docChanges().some(ch => !ch.doc.metadata.hasPendingWrites)
     if (!_rtFirst && !fromServer) return
+    // ⚠️ MUDANÇA LOCAL QUE NUNCA SUBIU (a aba fechou dentro do debounce):
+    // empurra ANTES de adotar a nuvem. O push mescla, então nada daqui se
+    // perde — e o commit dele dispara um novo snapshot, já com os dois lados
+    // casados, que é o que este listener aplica em seguida.
+    if (_rtFirst && localStorage.getItem(SK_SYNC_PENDENTE) === '1') {
+      _rtFirst = false
+      console.info('[Firebase] mudança local pendente do boot anterior — empurrando antes de adotar a nuvem')
+      fbPushData().then(() => fbPullMedia().catch(() => {})).catch(() => {})
+      return
+    }
     const docs = {}
     snap.forEach(d => { docs[d.id] = d.data() })
     applyCloudDocs(docs)
@@ -1481,12 +1549,17 @@ function _applyCloudDocs(docs) {
     }
     saveAudiolivros()
   }
-  if (docs.known)    { knownWords = { ...knownWords, ...(docs.known.map || {}) }; saveKnownLocal()
-                       ignoredWords = { ...ignoredWords, ...(docs.known.ignored || {}) }; saveIgnoredLocal()
-                       // Sentidos sabidos: UNIÃO, como o resto deste doc — marcar
-                       // no celular tem de valer no computador, e o que um
-                       // aparelho marcou nunca pode ser apagado pelo outro.
-                       knownSenses = { ...knownSenses, ...(docs.known.senses || {}) }; saveKnownSenses() }
+  if (docs.known) {
+    // União COM LÁPIDE (rodada 44): marcar no celular vale no computador, e
+    // agora DESMARCAR também — a lápide de desmarcação viaja no mesmo doc e o
+    // merge é o mesmo da subida (uma regra, dois usuários).
+    if (typeof mesclarConhecidasComNuvem === 'function') mesclarConhecidasComNuvem(docs.known)
+    else {
+      knownWords = { ...knownWords, ...(docs.known.map || {}) }; saveKnownLocal()
+      ignoredWords = { ...ignoredWords, ...(docs.known.ignored || {}) }; saveIgnoredLocal()
+      knownSenses = { ...knownSenses, ...(docs.known.senses || {}) }; saveKnownSenses()
+    }
+  }
   if (docs.clips)    { clips  = docs.clips.list  || []; saveClips() }
   // Programas de podcast: adota a nuvem (como videos/clips) para que tirar um
   // programa da lista num aparelho valha em todos. São só ponteiros (nome,
@@ -1496,9 +1569,15 @@ function _applyCloudDocs(docs) {
   // Marca de "já importei" nunca deve ser desfeita por um aparelho atrasado —
   // desfazê-la faria a importação seguinte ressuscitar centenas de itens.
   if (docs.kindleSeen && Array.isArray(docs.kindleSeen.list)) {
-    const uniao = loadKindleSeen()
-    docs.kindleSeen.list.forEach(h => uniao.add(h))
-    saveKindleSeen(uniao)
+    // Época do reset primeiro (rodada 44): nuvem resetada depois de mim =
+    // meu histórico é pré-reset e sai; só então vale a união de sempre.
+    const adotou = typeof kindleAdotarReset === 'function' &&
+      kindleAdotarReset(docs.kindleSeen.resetAt, docs.kindleSeen.list)
+    if (!adotou && (Number(docs.kindleSeen.resetAt) || 0) >= (typeof kindleResetAt === 'function' ? kindleResetAt() : 0)) {
+      const uniao = loadKindleSeen()
+      docs.kindleSeen.list.forEach(h => uniao.add(h))
+      saveKindleSeen(uniao)
+    }
   }
   if (docs.kindleQueue) {
     const seen = loadKindleSeen()
@@ -1534,6 +1613,17 @@ function _applyCloudDocs(docs) {
     if (c.aiModel)     cfg.aiModel     = c.aiModel
     if (c.ttsProvider) cfg.ttsProvider = c.ttsProvider
     if (c.subAddons != null) cfg.subAddons = c.subAddons
+    // Os que o push sempre mandou e a descida ignorava (rodada 44): mudar o
+    // nível do aluno no celular passava a valer no computador só pelo botão
+    // manual "Baixar" — o caminho normal (snapshot) os deixava para trás.
+    if (c.accent != null)     cfg.accent     = c.accent
+    if (c.imgQuality)         cfg.imgQuality = c.imgQuality
+    if (c.nivelAluno)         cfg.nivelAluno = c.nivelAluno
+    if (c.activeLang)         cfg.activeLang = c.activeLang
+    if (c.autoMeta   !== undefined) cfg.autoMeta   = c.autoMeta
+    if (c.catalogoIA !== undefined) cfg.catalogoIA = c.catalogoIA
+    if (c.googleBooksKey)     cfg.googleBooksKey = c.googleBooksKey
+    if (c.estante)            cfg.estante = c.estante
     saveCfg()
     if (typeof applyTheme === 'function') applyTheme(cfg.theme)
   }
@@ -1541,11 +1631,18 @@ function _applyCloudDocs(docs) {
 }
 
 // Aplica cards que chegaram da nuvem durante uma sessão (chamado ao encerrar)
+// ⚠️ DENTRO DA TRAVA (rodada 44): isto substitui a lista por uma foto guardada
+// da nuvem, e sem a trava o `marcarSumidosCards` do save carimbaria como
+// "removido" todo card local ausente da foto — lápide errada que o próximo
+// push levaria à nuvem. Mesma guarda do applyCloudDocs, pelo mesmo motivo.
 function flushPendingCloudCards() {
-  if (_pendingCloudCards) {
-    srsCards = _pendingCloudCards; _pendingCloudCards = null
-    saveSrsCards(); _refreshActiveViews()
-  }
+  if (!_pendingCloudCards) return
+  const cards = _pendingCloudCards
+  _pendingCloudCards = null
+  const temTrava = typeof fbAplicandoNuvem !== 'undefined'
+  if (temTrava) fbAplicandoNuvem = true
+  try { srsCards = cards; saveSrsCards() } finally { if (temTrava) fbAplicandoNuvem = false }
+  _refreshActiveViews()
 }
 
 // Re-renderiza a tela ativa após adotar dados da nuvem
@@ -1639,6 +1736,11 @@ async function migrarMidiaParaStorage(aoAndar) {
 // ---- Auto-sync com debounce ----
 async function autoSyncAfterChange() {
   if (!_fbUser) return
+  // A bandeira nasce ANTES do debounce: se a aba fechar dentro dos 1,2s, o
+  // próximo boot sabe que há mudança presa aqui e empurra antes de adotar a
+  // nuvem (ver attachRealtimeSync).
+  _fbDirtySeq++
+  try { localStorage.setItem(SK_SYNC_PENDENTE, '1') } catch (e) {}
   clearTimeout(_fbSyncTimer)
   // Usa só fbPushData (sem áudio/imagem) — rápido e não esgota cota
   _fbSyncTimer = setTimeout(async () => {
@@ -1680,8 +1782,16 @@ async function fbForcePull() {
   if (ok) toast('Dados sincronizados com a nuvem', 'success')
 }
 
-// Apaga TODOS os dados do usuário no Firestore (data + audio + images).
-// Usado pelo "Limpar tudo" — sem isso, ao reconectar a nuvem restaura tudo.
+// Zera TODOS os dados do usuário na nuvem. Usado pelo "Apagar tudo".
+// ⚠️ OS DOCS DE `data` SÃO ESVAZIADOS, NÃO APAGADOS (rodada 44) — e a
+// diferença é o que faz o zerar PROPAGAR: a descida ignora documento ausente
+// (de propósito, para não zerar aparelho que nunca sincronizou), então
+// deletar os docs deixaria cada outro aparelho intacto, e o primeiro push
+// deles re-encheria a nuvem. Documento presente com lista vazia é adotado —
+// é o caminho oficial de uma exclusão. As épocas de reset vão junto, porque
+// `known` e `kindleSeen` sincronizam por união e só uma época os zera.
+// `gerado`, `audio` e `images` (documentos avulsos) são apagados de verdade,
+// e o Storage inteiro também.
 async function fbWipeCloud() {
   if (!_fbDb || !_fbUser) return false
   // Cancela syncs pendentes para não re-enviar dados depois de apagar
@@ -1690,12 +1800,29 @@ async function fbWipeCloud() {
   updateSyncNav('syncing')
   try {
     const base = _fbDb.collection('users').doc(_fbUser.uid)
-    const [dataDocs, audioDocs, imageDocs] = await Promise.all([
-      base.collection('data').get(),
+    const agora = Date.now()
+    const zera = _fbDb.batch()
+    for (const nome of ['words', 'srsCards', 'srsLog', 'srsDecks', 'conversas',
+                        'videos', 'clips', 'podShows', 'livros', 'audiolivros', 'kindleQueue']) {
+      zera.set(base.collection('data').doc(nome), { list: [], updatedAt: agora })
+    }
+    zera.set(base.collection('data').doc('kindleSeen'),
+      { list: [], resetAt: agora, updatedAt: agora })
+    zera.set(base.collection('data').doc('known'),
+      { map: {}, ignored: {}, senses: {}, unmarked: {}, resetAt: agora, updatedAt: agora })
+    zera.set(base.collection('data').doc('srsCfg'), { updatedAt: agora })
+    zera.set(base.collection('data').doc('cfg'), { updatedAt: agora })
+    await zera.commit()
+    // `gerado` (análises pagas de capítulo — raio-X, pré-estudo, quebras,
+    // mapas de sincronia), áudio e imagens: documentos avulsos, sem lista —
+    // estes sim são apagados. A descida não os escuta, então não há o que
+    // propagar por aqui.
+    const [audioDocs, imageDocs, geradoDocs] = await Promise.all([
       base.collection('audio').get(),
-      base.collection('images').get()
+      base.collection('images').get(),
+      base.collection('gerado').get()
     ])
-    const refs = [...dataDocs.docs, ...audioDocs.docs, ...imageDocs.docs].map(d => d.ref)
+    const refs = [...audioDocs.docs, ...imageDocs.docs, ...geradoDocs.docs].map(d => d.ref)
     // Firestore: máximo de 500 operações por batch
     for (let i = 0; i < refs.length; i += 450) {
       const batch = _fbDb.batch()
@@ -1704,14 +1831,17 @@ async function fbWipeCloud() {
     }
     // A mídia agora vive FORA do banco: apagar só os documentos deixaria os
     // arquivos na nuvem depois de ele mandar apagar tudo — a pior forma de
-    // errar, porque ele sai achando que limpou.
+    // errar, porque ele sai achando que limpou. A lista cobre TODAS as pastas
+    // que o app grava (audiolivros têm subpasta por item — um nível a mais).
     let arquivos = 0
-    for (const tipo of ['audio', 'images', 'livros']) {
+    const apagarPasta = async ref => {
+      const r = await ref.listAll()
+      for (const it of r.items) { try { await it.delete(); arquivos++ } catch (e) {} }
+      for (const sub of r.prefixes) { try { await apagarPasta(sub) } catch (e) {} }
+    }
+    for (const tipo of ['audio', 'images', 'livros', 'audiolivros', 'midia', 'subs']) {
       if (!_fbStore) break
-      try {
-        const r = await _fbStore.ref(`users/${_fbUser.uid}/${tipo}`).listAll()
-        for (const it of r.items) { try { await it.delete(); arquivos++ } catch (e) {} }
-      } catch (e) {}
+      try { await apagarPasta(_fbStore.ref(`users/${_fbUser.uid}/${tipo}`)) } catch (e) {}
     }
     console.log(`[Firebase] nuvem apagada: ${refs.length} documentos, ${arquivos} arquivos`)
     updateSyncNav('off')

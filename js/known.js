@@ -199,7 +199,14 @@ async function knMarcarVisiveis() {
     confirmText: `Marcar ${alvos.length}`,
     html: `<p style="font-size:var(--fs-sm);color:var(--text2)">As <b>${alvos.length}</b> sugestões visíveis passam a contar como vocabulário seu.
       Isso melhora a cobertura dos episódios e tira essas palavras das próximas triagens. Dá para desfazer clicando de novo em cada uma.</p>` }))) return
-  alvos.forEach(it => { knownWords[knownNorm(it.w)] = Date.now(); it.status = 'conhecidas' })
+  alvos.forEach(it => {
+    const k = knownNorm(it.w)
+    knownWords[k] = Date.now()
+    // Marcar de novo caduca a lápide de uma desmarcação anterior — senão o
+    // merge apagaria a marca recém-feita.
+    if (typeof limparDesmarcacao === 'function') limparDesmarcacao('k', k)
+    it.status = 'conhecidas'
+  })
   saveKnownLocal(); autoSyncAfterChange()
   _knPintar()
   toast(`${alvos.length} palavras marcadas como conhecidas`, 'success')

@@ -481,13 +481,94 @@ function isKnownWord(s) {
 }
 function markKnownWord(s, on = true) {
   const k = knownNorm(s); if (!k) return
-  if (on) knownWords[k] = Date.now(); else delete knownWords[k]
+  if (on) { knownWords[k] = Date.now(); limparDesmarcacao('k', k) }
+  else { delete knownWords[k]; registrarDesmarcacao('k', k) }
   saveKnownLocal()
   if (typeof glossInvalidar === 'function') glossInvalidar()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
 }
 function saveKnownLocal() {
   try { localStorage.setItem('el-known', JSON.stringify(knownWords)) } catch (e) {}
+}
+
+// ---- DESMARCAÇÕES COM LÁPIDE (rodada 44) ----
+// Os mapas de conhecidas/ignoradas/sentidos sincronizam por UNIÃO — e união
+// sem lápide não sabe esquecer: desmarcar aqui durava até o próximo push de
+// QUALQUER outro aparelho, que devolvia a marca à nuvem e ela voltava calada.
+// Era o que desfazia o "Não lembro" inteiro. A lápide guarda QUANDO ele
+// desmarcou; no merge, marca mais nova que a lápide vence (re-marcar vale) e
+// lápide mais nova que a marca apaga — nos dois lados, sempre.
+// Chave: tipo ('k' conhecida | 'i' ignorada | 's' sentido) + \u0000 + termo.
+const SK_UNMARKS = 'el-desmarcados'
+let unmarks = {}
+try {
+  unmarks = JSON.parse(localStorage.getItem(SK_UNMARKS) || '{}')
+  // Poda no boot, como as lápides de exclusão: 90 dias depois, todo aparelho
+  // vivo já viu a desmarcação — guardar mais é só peso no doc da nuvem.
+  const corteUm = Date.now() - 90 * 24 * 3600e3
+  let podou = false
+  for (const k of Object.keys(unmarks)) if ((unmarks[k] || 0) < corteUm) { delete unmarks[k]; podou = true }
+  if (podou) localStorage.setItem(SK_UNMARKS, JSON.stringify(unmarks))
+} catch (e) { unmarks = {} }
+function saveUnmarks() { try { localStorage.setItem(SK_UNMARKS, JSON.stringify(unmarks)) } catch (e) {} }
+function _unmarkKey(tipo, k) { return tipo + '\u0000' + k }
+function registrarDesmarcacao(tipo, k) { unmarks[_unmarkKey(tipo, k)] = Date.now(); saveUnmarks() }
+function limparDesmarcacao(tipo, k) {
+  if (unmarks[_unmarkKey(tipo, k)]) { delete unmarks[_unmarkKey(tipo, k)]; saveUnmarks() }
+}
+
+// O MERGE do doc `known` da nuvem com o estado local — usado pela DESCIDA
+// (applyCloudDocs) e pela SUBIDA (fbPushData), de propósito a mesma função:
+// duas cópias da mesma regra viram duas regras. Atualiza os globais, salva e
+// devolve o pacote pronto para gravar na nuvem.
+// ⚠️ Marca antiga pode valer `true` em vez de timestamp (dado legado): o
+// `|| 1` a trata como "muito antiga", e qualquer lápide ganha dela — que é o
+// certo, porque a desmarcação veio depois.
+// A ÉPOCA DO "APAGAR TUDO" para as conhecidas — mesmo desenho do reset do
+// Kindle: como estes mapas se unem, só uma época consegue propagar um zerar.
+const SK_KNOWN_RESET = 'el-known-reset'
+function knownResetAt() { return Number(localStorage.getItem(SK_KNOWN_RESET) || 0) }
+function knownMarcarReset(ts) { try { localStorage.setItem(SK_KNOWN_RESET, String(ts)) } catch (e) {} }
+
+function mesclarConhecidasComNuvem(docNuvem) {
+  const d = docNuvem || {}
+  // Nuvem zerada DEPOIS da minha última época: minhas marcas são pré-reset e
+  // saem antes da união — senão este aparelho re-subiria tudo que o "apagar
+  // tudo" do outro acabou de limpar.
+  if ((Number(d.resetAt) || 0) > knownResetAt()) {
+    knownMarcarReset(Number(d.resetAt))
+    knownWords = {}; ignoredWords = {}; knownSenses = {}; unmarks = {}
+  }
+  const ts = v => (typeof v === 'number' && isFinite(v)) ? v : 1
+  // 1) une as lápides dos dois lados (a mais nova de cada chave) e poda
+  const uni = {}
+  for (const [k, v] of [...Object.entries(d.unmarked || {}), ...Object.entries(unmarks)]) {
+    uni[k] = Math.max(uni[k] || 0, ts(v))
+  }
+  const corte = Date.now() - 90 * 24 * 3600e3
+  for (const k of Object.keys(uni)) if (uni[k] < corte) delete uni[k]
+  // 2) une cada mapa (marca mais nova de cada chave) e aplica as lápides
+  const junta = (tipo, local, nuvem) => {
+    const m = {}
+    for (const [k, v] of [...Object.entries(nuvem || {}), ...Object.entries(local || {})]) {
+      m[k] = Math.max(m[k] || 0, ts(v))
+    }
+    for (const k of Object.keys(m)) {
+      const lap = uni[_unmarkKey(tipo, k)]
+      if (!lap) continue
+      if (lap >= m[k]) delete m[k]                    // desmarcada depois: some
+      else delete uni[_unmarkKey(tipo, k)]            // re-marcada depois: a lápide caduca
+    }
+    return m
+  }
+  knownWords   = junta('k', knownWords,   d.map)
+  ignoredWords = junta('i', ignoredWords, d.ignored)
+  knownSenses  = junta('s', knownSenses,  d.senses)
+  unmarks = uni
+  saveKnownLocal(); saveIgnoredLocal(); saveKnownSenses(); saveUnmarks()
+  if (typeof glossInvalidar === 'function') { try { glossInvalidar() } catch (e) {} }
+  return { map: knownWords, ignored: ignoredWords, senses: knownSenses, unmarked: unmarks,
+           resetAt: knownResetAt() }
 }
 
 // ---- SENTIDOS QUE ELE JÁ SABE (2026-08-21) ----
@@ -545,7 +626,8 @@ function isKnownSense(termo, glosa) {
 function markKnownSense(termo, glosa, on = true) {
   const k = senseKey(termo, glosa)
   if (!k) return false
-  if (on) knownSenses[k] = Date.now(); else delete knownSenses[k]
+  if (on) { knownSenses[k] = Date.now(); limparDesmarcacao('s', k) }
+  else { delete knownSenses[k]; registrarDesmarcacao('s', k) }
   try { localStorage.setItem('el-known-senses', JSON.stringify(knownSenses)) } catch (e) {}
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
   return true
@@ -559,7 +641,8 @@ let ignoredWords = {}
 try { ignoredWords = JSON.parse(localStorage.getItem('el-ignored') || '{}') } catch (e) {}
 function markIgnoredWord(s, on = true) {
   const k = knownNorm(s); if (!k) return
-  if (on) ignoredWords[k] = Date.now(); else delete ignoredWords[k]
+  if (on) { ignoredWords[k] = Date.now(); limparDesmarcacao('i', k) }
+  else { delete ignoredWords[k]; registrarDesmarcacao('i', k) }
   saveIgnoredLocal()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
 }
@@ -624,6 +707,25 @@ function kindleItemVisto(item, seen) {
 }
 function loadKindleSeen() {
   try { return new Set(JSON.parse(localStorage.getItem(SK.kindleSeen) || '[]')) } catch { return new Set() }
+}
+// ---- A ÉPOCA DO RESET (rodada 44) ----
+// O histórico sincroniza por UNIÃO, e união não sabe esquecer: "Resetar
+// histórico" zerava aqui e o push de qualquer outro aparelho devolvia tudo.
+// Os hashes não têm data, então a lápide individual não existe — o que existe
+// é a ÉPOCA: o instante do último reset viaja no doc da nuvem, e todo aparelho
+// que vir uma época mais nova que a sua descarta o histórico local e adota o
+// da nuvem (que é o pós-reset). O que ele marcou entre o reset alheio e este
+// sync se perde — raro, e o custo é só o destaque reaparecer na importação.
+const SK_KINDLE_RESET = 'el-kindle-reset'
+function kindleResetAt() { return Number(localStorage.getItem(SK_KINDLE_RESET) || 0) }
+function kindleMarcarReset(ts) { try { localStorage.setItem(SK_KINDLE_RESET, String(ts)) } catch (e) {} }
+// Devolve true quando adotou a época da nuvem (e o histórico local foi trocado).
+function kindleAdotarReset(tsNuvem, listaNuvem) {
+  const t = Number(tsNuvem) || 0
+  if (t <= kindleResetAt()) return false
+  kindleMarcarReset(t)
+  saveKindleSeen(new Set(Array.isArray(listaNuvem) ? listaNuvem : []))
+  return true
 }
 // Teto para o histórico não virar um documento gigante na nuvem: guardamos as
 // últimas 30 mil marcas (ordem de inserção = as mais antigas saem primeiro).
@@ -2214,9 +2316,10 @@ function estudoNaoLembro(alvo, ctx, origem) {
   // 1) sai do limbo
   if (typeof markKnownWord === 'function') markKnownWord(termo, false)
   const k = typeof knownNorm === 'function' ? knownNorm(termo) : termo.toLowerCase()
+  // Pelo caminho oficial: é ele que grava a lápide da desmarcação — sem ela,
+  // o "não lembro" era desfeito pelo próximo push de outro aparelho.
   if (typeof ignoredWords === 'object' && ignoredWords && ignoredWords[k]) {
-    delete ignoredWords[k]
-    if (typeof saveIgnoredLocal === 'function') saveIgnoredLocal()
+    markIgnoredWord(termo, false)
   }
   if (typeof glossInvalidar === 'function') glossInvalidar()
 

@@ -317,39 +317,174 @@ async function liberarEspacoAudioFix() {
 }
 
 function exportData() {
-  // Backup COMPLETO (2026-08-01): antes só words+cfg saíam — nem o agendamento
-  // SRS entrava, então "restaurar do backup" perdia todo o progresso de estudo.
+  // Backup COMPLETO (2026-08-01; completado de verdade na rodada 44): antes
+  // livros, audiolivros e as palavras conhecidas ficavam de fora — e o
+  // importador só lia três campos, então "restaurar do backup" perdia o
+  // progresso que o arquivo prometia guardar.
   // Áudio/imagens ficam de fora (são MBs e regeneráveis via TTS/IA).
+  // ⚠️ AS CHAVES DE API NÃO ENTRAM: elas já vivem em três lugares (local,
+  // IndexedDB e a nuvem da conta) — e um backup é um arquivo que se manda por
+  // e-mail, se anexa, se compartilha. Chave dentro dele é chave vazada.
+  const { openaiKey, geminiKey, groqKey, ...cfgSemChaves } = cfg || {}
   const payload = {
-    words, cfg, srsCards, srsLog, srsDecks, srsCfg,
+    words, cfg: cfgSemChaves, srsCards, srsLog, srsDecks, srsCfg,
     conversas: (typeof conversas !== 'undefined') ? conversas : [],
     videos:    (typeof videos    !== 'undefined') ? videos    : [],
     clips:     (typeof clips     !== 'undefined') ? clips     : [],
     podShows:  (typeof podShows  !== 'undefined') ? podShows  : [],
+    livros:      (typeof livros      !== 'undefined') ? livros      : [],
+    audiolivros: (typeof audiolivros !== 'undefined') ? audiolivros : [],
+    obrasNome:   (typeof obrasNome   !== 'undefined') ? obrasNome   : {},
+    known: {
+      map:      (typeof knownWords   !== 'undefined') ? knownWords   : {},
+      ignored:  (typeof ignoredWords !== 'undefined') ? ignoredWords : {},
+      senses:   (typeof knownSenses  !== 'undefined') ? knownSenses  : {},
+      unmarked: (typeof unmarks      !== 'undefined') ? unmarks      : {}
+    },
     // Histórico do Kindle: sem ele, restaurar um backup faria a importação
     // seguinte ressuscitar todas as palavras já estudadas.
     kindleSeen: (typeof loadKindleSeen === 'function') ? [...loadKindleSeen()] : [],
+    kindleResetAt: (typeof kindleResetAt === 'function') ? kindleResetAt() : 0,
     exported_at: new Date().toISOString()
   }
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' })
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
   a.download = `english-lab-${new Date().toISOString().slice(0,10)}.json`
-  a.click(); toast('Backup completo exportado (palavras, cards, progresso, config)', 'success')
+  a.click(); toast('Backup completo exportado (palavras, cards, progresso, acervo, config — sem as chaves de API)', 'success')
 }
 
+// A RESTAURAÇÃO LÊ TUDO QUE O EXPORT GRAVA (rodada 44). Antes só três campos
+// eram lidos (words, kindleSeen, podShows): restaurar o backup "completo"
+// jogava fora o agendamento SRS, os baralhos, o acervo e a config que ele
+// prometia guardar — e o backup é a rede de segurança de todos os fluxos
+// perigosos do app. Regra geral: MESCLAR, nunca substituir — o que já está no
+// aparelho vence o empate, porque o backup é, por definição, mais velho.
 function importData(input) {
   const file = input.files[0]; if (!file) return
   const reader = new FileReader()
   reader.onload = async e => {
     try {
       const d = JSON.parse(e.target.result)
-      if (d.words) {
-        if (!(await confirmModal({ title: 'Importar backup', icon: 'upload', confirmText: 'Importar',
-          html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Importar <b>${d.words.length} palavras</b>? Elas serão <b>mescladas</b> com os dados existentes — nada é apagado.</p>` }))) return
-        const ids = new Set(words.map(w => w.id))
-        words = [...words, ...d.words.filter(w => !ids.has(w.id))]
-        saveWords(); renderDashboard()
-        toast(`${d.words.length} palavras importadas!`, 'success')
+      if (!d || typeof d !== 'object') throw new Error('formato')
+      const resumo = []
+      const nBackup = {
+        palavras: Array.isArray(d.words) ? d.words.length : 0,
+        cards: Array.isArray(d.srsCards) ? d.srsCards.length : 0,
+        livros: Array.isArray(d.livros) ? d.livros.length : 0,
+        audiolivros: Array.isArray(d.audiolivros) ? d.audiolivros.length : 0
+      }
+      if (!(await confirmModal({ title: 'Importar backup', icon: 'upload', confirmText: 'Importar',
+        html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Backup de <b>${esc(String(d.exported_at || 'data desconhecida').slice(0, 10))}</b>:
+            ${nBackup.palavras} palavras · ${nBackup.cards} cards · ${nBackup.livros} livros · ${nBackup.audiolivros} audiolivros.</p>
+          <p style="font-size:var(--fs-sm);color:var(--text2);margin-top:8px">Tudo será <b>mesclado</b> com o que já está aqui — nada do aparelho é apagado, e no empate o que está aqui vence.</p>` }))) return
+
+      // Mescla por id: entra do backup só o que este aparelho não tem.
+      const porId = (locais, doBackup, chave = 'id') => {
+        const ids = new Set((locais || []).map(x => x && x[chave]).filter(Boolean))
+        const novos = (doBackup || []).filter(x => x && x[chave] && !ids.has(x[chave]))
+        return { lista: [...(locais || []), ...novos], n: novos.length }
+      }
+
+      if (Array.isArray(d.words)) {
+        const r = porId(words, d.words)
+        words = r.lista; saveWords()
+        if (r.n) resumo.push(`${r.n} palavras`)
+      }
+      if (Array.isArray(d.srsCards) && typeof srsCards !== 'undefined') {
+        const r = porId(srsCards, d.srsCards)
+        srsCards = r.lista; saveSrsCards()
+        if (r.n) resumo.push(`${r.n} cards`)
+      }
+      if (Array.isArray(d.srsDecks) && typeof srsDecks !== 'undefined') {
+        const r = porId(srsDecks, d.srsDecks)
+        srsDecks = r.lista; saveSrsDecks()
+      }
+      // Diário: por dia, ficando com o registro maior (o mesmo juiz do sync,
+      // quando ele está carregado; sem ele, o maior `reviewed` decide).
+      if (Array.isArray(d.srsLog) && typeof srsLog !== 'undefined') {
+        const porDia = new Map(srsLog.map(x => [x.date, x]))
+        let n = 0
+        for (const x of d.srsLog) {
+          if (!x || !x.date) continue
+          const ja = porDia.get(x.date)
+          if (!ja) { porDia.set(x.date, x); n++ }
+          else if (typeof _fbDiaMaior === 'function') porDia.set(x.date, _fbDiaMaior(ja, x))
+          else if ((x.reviewed || 0) > (ja.reviewed || 0)) porDia.set(x.date, x)
+        }
+        srsLog = [...porDia.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)))
+        saveSrsLog()
+        if (n) resumo.push(`${n} dias de diário`)
+      }
+      if (d.srsCfg && typeof srsCfg !== 'undefined') {
+        srsCfg = { ...SRS_DEF_CFG, ...srsCfg, ...d.srsCfg }
+        persistSrsCfg()
+      }
+      // Config: o backup só PREENCHE o que está vazio aqui — restaurar num
+      // aparelho já configurado não pode rebaixar a configuração dele.
+      // (Backups antigos ainda trazem as chaves de API; valem pelo mesmo
+      // critério: só entram se o campo local estiver vazio.)
+      if (d.cfg && typeof d.cfg === 'object') {
+        for (const [k, v] of Object.entries(d.cfg)) {
+          if (v === '' || v == null) continue
+          const atual = cfg[k]
+          if (atual === '' || atual == null || atual === undefined) cfg[k] = v
+        }
+        saveCfg()
+        if (typeof applyTheme === 'function') applyTheme(cfg.theme)
+      }
+      if (Array.isArray(d.conversas) && typeof conversas !== 'undefined') {
+        const porIdC = new Map(conversas.map(c => [c.id, c]))
+        for (const c of d.conversas) {
+          if (!c || !c.id) continue
+          const ja = porIdC.get(c.id)
+          if (!ja || (c.updated_at || 0) > (ja.updated_at || 0)) porIdC.set(c.id, c)
+        }
+        conversas = [...porIdC.values()].sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0))
+        saveConversas()
+      }
+      if (Array.isArray(d.videos) && typeof videos !== 'undefined') { videos = porId(videos, d.videos).lista; saveVideos() }
+      if (Array.isArray(d.clips) && typeof clips !== 'undefined') { clips = porId(clips, d.clips).lista; saveClips() }
+      // Acervo: por item, o `updatedAt` decide — e o histórico de leitura se
+      // UNE por dia (a mesma regra do sync: um dia lido nunca some).
+      const mesclarAcervo = (locais, doBackup) => {
+        const porIdA = new Map((locais || []).map(l => [l.id, l]))
+        let n = 0
+        for (const b of (doBackup || [])) {
+          if (!b || !b.id) continue
+          const ja = porIdA.get(b.id)
+          if (!ja) { porIdA.set(b.id, b); n++; continue }
+          const vence = (b.updatedAt || 0) > (ja.updatedAt || 0) ? b : ja
+          const perde = vence === b ? ja : b
+          if (Array.isArray(ja.historico) || Array.isArray(b.historico)) {
+            const dias = new Map()
+            for (const h of [...(perde.historico || []), ...(vence.historico || [])]) {
+              if (!h || !h.d) continue
+              const jaDia = dias.get(h.d)
+              if (!jaDia || (h.pct || 0) > (jaDia.pct || 0)) dias.set(h.d, h)
+            }
+            vence.historico = [...dias.values()].sort((a, b2) => String(a.d).localeCompare(String(b2.d)))
+          }
+          porIdA.set(b.id, vence)
+        }
+        return { lista: [...porIdA.values()], n }
+      }
+      if (Array.isArray(d.livros) && typeof livros !== 'undefined') {
+        const r = mesclarAcervo(livros, d.livros)
+        livros = r.lista; saveLivros()
+        if (r.n) resumo.push(`${r.n} livros`)
+      }
+      if (Array.isArray(d.audiolivros) && typeof audiolivros !== 'undefined') {
+        const r = mesclarAcervo(audiolivros, d.audiolivros)
+        audiolivros = r.lista; saveAudiolivros()
+        if (r.n) resumo.push(`${r.n} audiolivros`)
+      }
+      if (d.obrasNome && typeof obrasNome !== 'undefined') {
+        obrasNome = { ...d.obrasNome, ...obrasNome }
+        saveObrasNome()
+      }
+      // Conhecidas/ignoradas/sentidos: o mesmo merge do sync, lápides incluídas.
+      if (d.known && typeof mesclarConhecidasComNuvem === 'function') {
+        mesclarConhecidasComNuvem(d.known)
       }
       // União com o histórico local (nunca substituição): o backup pode ser de
       // um aparelho que importou menos coisa do que este.
@@ -357,6 +492,9 @@ function importData(input) {
         const uniao = loadKindleSeen()
         d.kindleSeen.forEach(h => uniao.add(h))
         saveKindleSeen(uniao)
+        if (typeof kindleMarcarReset === 'function' && (Number(d.kindleResetAt) || 0) > kindleResetAt()) {
+          kindleMarcarReset(Number(d.kindleResetAt))
+        }
       }
       // Programas de podcast: união por feedUrl (a lista é atalho, não dado de
       // estudo — mesclar é sempre melhor que substituir).
@@ -365,6 +503,16 @@ function importData(input) {
         podShows = [...podShows, ...d.podShows.filter(s => s && s.feedUrl && !vistos.has(s.feedUrl))].slice(0, 24)
         savePodShows()
       }
+
+      if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+      if (typeof glossInvalidar === 'function') { try { glossInvalidar() } catch (e2) {} }
+      renderDashboard()
+      if (typeof renderSidebar === 'function') { try { renderSidebar() } catch (e2) {} }
+      if (typeof updateSrsBadge === 'function') { try { updateSrsBadge() } catch (e2) {} }
+      fillSettings()
+      toast(resumo.length
+        ? `Backup restaurado: ${resumo.join(' · ')} entraram — o resto já estava aqui`
+        : 'Backup lido — este aparelho já tinha tudo o que há nele', 'success')
     } catch { toast('Arquivo JSON inválido', 'error') }
   }
   reader.readAsText(file); input.value = ''
@@ -374,8 +522,11 @@ async function clearKindleSeen() {
   if (!(await confirmModal({ title: 'Resetar histórico do Kindle', icon: 'refresh', confirmText: 'Resetar',
     html: '<p style="font-size:var(--fs-sm);color:var(--text2)">Tudo o que já foi importado do Kindle (palavras do <b>vocab.db</b> e destaques) <b>volta a aparecer</b> na próxima importação. Nenhum card de estudo é afetado.</p>' }))) return
   localStorage.setItem(SK.kindleSeen, '[]')
-  // O histórico agora também vive na nuvem, e lá o merge é por UNIÃO: se não
-  // empurrarmos a lista vazia AGORA, o próximo snapshot devolveria tudo.
+  // A ÉPOCA DO RESET (rodada 44): o merge é por UNIÃO e união não esquece —
+  // empurrar a lista vazia não bastava, porque o push de qualquer outro
+  // aparelho devolvia o histórico dele. O carimbo viaja no doc da nuvem e
+  // manda todo aparelho descartar o histórico pré-reset.
+  if (typeof kindleMarcarReset === 'function') kindleMarcarReset(Date.now())
   if (typeof fbPushData === 'function') { try { await fbPushData() } catch (e) {} }
   toast('Histórico Kindle resetado. Próxima importação mostrará tudo de novo.', 'info')
 }
@@ -773,23 +924,25 @@ async function devolverTudoParaPreparar() {
 
 async function clearAllData() {
   const loggedIn = !!(typeof _fbUser !== 'undefined' && _fbUser)
-  const cloudWarn = loggedIn ? '\n• TUDO na nuvem (Firebase) também será apagado' : ''
-  const itens = ['Palavras e revisões', 'Cards SRS e progresso de estudo', 'Áudios e imagens gerados', 'Configurações']
+  const itens = ['Palavras, revisões e o acervo (livros, audiolivros, vídeos)',
+    'Cards SRS e progresso de estudo', 'Áudios, imagens e análises geradas', 'Configurações']
   if (loggedIn) itens.push('TUDO na nuvem (Firebase) — propaga para os outros aparelhos')
   if (!(await confirmModal({ title: 'Apagar todos os dados', icon: 'alert', danger: true, confirmText: 'Apagar tudo',
     html: `<ul class="cost-bullets danger">${itens.map(x => `<li>${x}</li>`).join('')}</ul>
       <p class="cost-note"><b>Esta ação é irreversível.</b> Faça um backup antes (Exportar JSON, logo acima).</p>` }))) return
 
-  // 1) localStorage
-  Object.values(SK).forEach(k => localStorage.removeItem(k))
-  localStorage.removeItem('el-kindle-seen')
-  localStorage.removeItem(SK.kindleQueue)
-  localStorage.removeItem('englab_cfg')
-  // Chaves soltas, fora do SK — ficavam para trás e o "zerado" não era zerado:
-  // o app reabria no dossiê antigo, com o filtro de fonte de antes e as
-  // preferências de tela de um projeto que não existe mais.
-  ;['el-ui-prefs', 'el-srs-backup', 'el-dossie-aberto', 'el-srs-fonte',
-    'el-login-skipped', 'el-lex-cache'].forEach(k => localStorage.removeItem(k))
+  // ⚠️ O LISTENER SAI DE CENA PRIMEIRO (rodada 44): apagar a nuvem dispara um
+  // snapshot por documento removido, e aplicá-los no meio da limpeza seria
+  // trabalho inútil na melhor hipótese e corrida na pior.
+  if (loggedIn && typeof detachRealtimeSync === 'function') { try { detachRealtimeSync() } catch (e) {} }
+
+  // 1) localStorage — POR PREFIXO, não por lista (rodada 44). A lista de
+  // chaves soltas ficava para trás a cada recurso novo ('el-known',
+  // 'el-obras-nome', o censo…) e o "zerado" nunca era zerado de verdade.
+  // Tudo que o app grava começa com 'el-' ou 'englab'.
+  for (const k of Object.keys(localStorage)) {
+    if (k.startsWith('el-') || k.startsWith('englab')) { try { localStorage.removeItem(k) } catch (e) {} }
+  }
 
   // 2) IndexedDB — áudio, imagens, cards e backup de configurações
   try { await AudioDB.setAll({}) } catch {}
@@ -830,25 +983,36 @@ async function clearAllData() {
   if (typeof kindleItems !== 'undefined') kindleItems = []
   if (typeof knownWords  !== 'undefined') knownWords  = {}
   if (typeof ignoredWords !== 'undefined') ignoredWords = {}
+  if (typeof knownSenses !== 'undefined') knownSenses = {}
+  if (typeof unmarks     !== 'undefined') unmarks     = {}
+  if (typeof livros      !== 'undefined') livros      = []
+  if (typeof audiolivros !== 'undefined') audiolivros = []
+  if (typeof obrasNome   !== 'undefined') obrasNome   = {}
   srsDecks = (typeof DEFAULT_DECKS !== 'undefined') ? JSON.parse(JSON.stringify(DEFAULT_DECKS)) : []
   cfg = { ...DEF_CFG }
   srsCfg = { ...SRS_DEF_CFG }
   _audioKeyCache = null; _imageKeyCache = null
   if (typeof srsSession !== 'undefined') srsSession = null
 
-  // 4) Zera a NUVEM continuando logado: grava listas vazias (propaga a exclusão
-  //    em tempo real para todos os dispositivos) e apaga áudios/imagens da nuvem.
+  // 4) Zera a NUVEM de verdade (rodada 44). Antes este passo chamava
+  //    `fbPushData` esperando gravar listas vazias — mas o push MESCLA com a
+  //    nuvem antes de escrever: local vazio + nuvem cheia = a nuvem inteira
+  //    re-enviada intacta, e o recarregamento trazia tudo de volta. Ele saía
+  //    achando que limpou — a pior forma de errar. `fbWipeCloud` apaga os
+  //    documentos (data + gerado + mídia) e os arquivos do Storage.
   if (loggedIn) {
     toast('Zerando a nuvem em todos os dispositivos...', 'info')
-    if (typeof clearTimeout === 'function' && typeof _fbSyncTimer !== 'undefined') clearTimeout(_fbSyncTimer)
-    try { if (typeof fbPushData === 'function') await fbPushData() } catch {}
-    try { if (typeof fbWipeMedia === 'function') await fbWipeMedia() } catch {}
+    let nuvemOk = false
+    try { if (typeof fbWipeCloud === 'function') nuvemOk = await fbWipeCloud() } catch {}
+    if (!nuvemOk) {
+      toast('Não consegui apagar a nuvem — o local foi zerado, mas a conta ainda tem os dados. Tente de novo com internet.', 'error')
+    }
   }
 
   renderDashboard()
   fillSettings()
   updateSrsBadge()
-  toast('Tudo zerado — local e nuvem, em todos os dispositivos.', 'success')
+  toast(loggedIn ? 'Tudo zerado — local e nuvem, em todos os dispositivos.' : 'Tudo zerado neste aparelho.', 'success')
   // RECARREGA de propósito. Zerar deixa muita coisa viva na memória que não é
   // estado de dados: índice do glossário, caches de áudio/imagem, o livro
   // aberto no leitor, a pré-análise do capítulo, o handle do arquivo de vídeo.
