@@ -1793,7 +1793,10 @@ function _difChipAbrir(mk, cfgChip) {
       if (valor) p.style.setProperty(v, valor.trim())
     }
   }
-  document.body.appendChild(p)
+  // Em tela cheia só o elemento fullscreen aparece — um chip pendurado no body
+  // ficaria invisível. Como .dif-pop é position:fixed, as coordenadas de
+  // viewport valem igual dentro do palco em tela cheia (caso: legenda do vídeo).
+  ;(document.fullscreenElement || document.body).appendChild(p)
   _difPop = p
 
   const r = mk.getBoundingClientRect()

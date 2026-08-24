@@ -476,14 +476,19 @@ async function videoOpenPlayer(v) {
   }
   // O chip do raio-X — a MESMA peça do leitor e do audiolivro (difChipLigar,
   // em ai.js), com as mesmas duas saídas: Preparar e "já sei este sentido".
+  // Ligado nas DUAS superfícies de texto, como o glossário logo acima: o
+  // transcript e a legenda sobre o vídeo.
   if (typeof difChipLigar === 'function') {
-    const tr2 = el('vid-transcript')
-    if (tr2) difChipLigar(tr2, {
+    const cfgChip = {
       classe: 'dif-pop-app',
       item: mk => (_vidRaioX && Array.isArray(_vidRaioX.itens)) ? _vidRaioX.itens[Number(mk.dataset.i)] : null,
       preparar: mk => { if (typeof videoRaioXPreparar === 'function') videoRaioXPreparar(mk) },
       jaSei: mk => { if (typeof videoRaioXJaSei === 'function') videoRaioXJaSei(mk) }
-    })
+    }
+    const tr2 = el('vid-transcript')
+    if (tr2) difChipLigar(tr2, cfgChip)
+    const ov2 = el('vid-ov')
+    if (ov2) difChipLigar(ov2, cfgChip)
   }
 
   // ---- Retomar de onde parou ----
@@ -695,9 +700,19 @@ function _vidUpdateOverlay() {
   // quebra é a FRASE mudar debaixo de um balão aberto: a glosa continua na
   // tela descrevendo uma palavra que já saiu dali.
   if (typeof glossAberto === 'function' && glossAberto()) return
+  // O chip do raio-X congela a legenda pelo MESMO motivo do glossário: a fala
+  // não pode trocar debaixo de um balão aberto descrevendo o que já saiu.
+  if (typeof _difPop !== 'undefined' && _difPop && document.body.contains(_difPop)) return
   const cue = _vidCueIdx >= 0 ? _vidCues[_vidCueIdx] : null
   const showEN = _vidOverlayOn && cue
-  en.textContent = showEN ? cue.t : ''
+  // O raio-X acende TAMBÉM aqui: a legenda sobre o vídeo é onde ele passa a
+  // maior parte do tempo — deixar as marcas só no transcript escondia o achado
+  // exatamente na hora em que a expressão é dita. Mesma pintura, mesmos índices.
+  if (showEN) {
+    const ritens = (_vidRaioX && Array.isArray(_vidRaioX.itens)) ? _vidRaioX.itens : null
+    en.innerHTML = (ritens && typeof _vidFalaPintada === 'function')
+      ? _vidFalaPintada(cue.t, ritens) : esc(cue.t)
+  } else en.textContent = ''
   en.style.display = showEN ? '' : 'none'
   const ptTxt = showEN ? _vidPTshow(cue) : ''
   pt.className = 'vid-ov-pt' + (_vidPTfog ? ' fog' : '')

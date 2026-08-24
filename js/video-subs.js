@@ -1091,8 +1091,12 @@ async function videoRaioXAnalisar(refazer) {
         ? aiFicha({ blocos: itens.blocos, falhas: itens.falhas, nivel }) : undefined)
     }
     _vidSubsMetaUrgente = true
-    _vidSaveSubs()
+    // Salva NA HORA, sem o debounce de 1,5s: a análise custou dinheiro e fechar
+    // a aba dentro desse vão perderia tudo. Vai para o disco e para a nuvem —
+    // amanhã, em outro aparelho, os achados abrem junto com a legenda.
+    _vidSaveSubsNow()
     renderVidTranscript()
+    if (typeof _vidUpdateOverlay === 'function') _vidUpdateOverlay()
     toast(itens.length
       ? `${itens.length} ${itens.length === 1 ? 'ponto difícil' : 'pontos difíceis'} para o seu ${nivel} — acesos nas falas`
       : (itens.incompleto ? 'Parte da análise não voltou legível — vale rodar de novo'
@@ -1111,8 +1115,11 @@ async function videoRaioXAnalisar(refazer) {
 function videoRaioXPreparar(mk) {
   if (!_vidCur || !mk || !_vidRaioX) return
   const item = (_vidRaioX.itens || [])[Number(mk.dataset.i)]
+  // A marca pode estar no transcript (dentro de uma .vid-cue) OU na legenda
+  // sobre o vídeo — lá não há linha, mas a fala é sempre a que está na tela.
   const linha = mk.closest('.vid-cue')
-  const fala = linha ? _vidCues[Number(linha.dataset.i)] : null
+  const fala = linha ? _vidCues[Number(linha.dataset.i)]
+    : (typeof _vidCueIdx !== 'undefined' && _vidCueIdx >= 0 ? _vidCues[_vidCueIdx] : null)
   if (!item || !fala) return
   if (typeof lexaChipParaPreparar !== 'function') return
   lexaChipParaPreparar(
@@ -1125,6 +1132,7 @@ function videoRaioXPreparar(mk) {
   _vidSubsMetaUrgente = true
   _vidSaveSubs()
   renderVidTranscript()
+  if (typeof _vidUpdateOverlay === 'function') _vidUpdateOverlay()
 }
 
 // "Já sei ESTE sentido": o par termo+glosa sai daqui e das próximas análises —
@@ -1141,5 +1149,6 @@ function videoRaioXJaSei(mk) {
   _vidSubsMetaUrgente = true
   _vidSaveSubs()
   renderVidTranscript()
+  if (typeof _vidUpdateOverlay === 'function') _vidUpdateOverlay()
   toast(`"${item.t}" (${item.pt}) marcado como conhecido`, 'success')
 }

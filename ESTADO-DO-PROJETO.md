@@ -15421,6 +15421,31 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do raio-X na legenda sobre o vídeo (2026-08-24, 48ª)
+
+- [x] **O RAIO-X ACENDE TAMBÉM NA LEGENDA SOBRE O VÍDEO** (pedido dele: "apareceu no
+      painel de transcrição somente"). `_vidUpdateOverlay` pinta a fala atual com
+      `_vidFalaPintada` (mesmos índices do transcript); `difChipLigar` ligado no
+      `#vid-ov` com a MESMA cfg do transcript. `videoRaioXPreparar` ganhou fallback:
+      marca sem `.vid-cue` (overlay) usa a fala ATUAL (`_vidCueIdx`) como contexto.
+      A legenda CONGELA sob o chip aberto (mesma regra do glossário). CSS: nada a
+      fazer — `.vid-dif` já é só sublinhado com cor herdada, texto continua branco.
+- [x] **Chip funciona em tela cheia**: `_difChipAbrir` (ai.js) agora pendura o chip em
+      `document.fullscreenElement || document.body` — .dif-pop é position:fixed, as
+      coordenadas de viewport valem dentro do palco. (Vale de graça para leitor e
+      audiolivro se um dia tiverem fullscreen.) NÃO testado em fullscreen real
+      (exige gesto do usuário); caminho verificado por inspeção.
+- [x] **"Salva entre sessões" endurecido** (pedido dele): a análise agora salva NA HORA
+      (`_vidSaveSubsNow`) em vez do debounce de 1,5s — fechar a aba logo após a análise
+      não perde mais os achados pagos. Preparar/JaSei repintam a legenda do vídeo além
+      do transcript. Persistência já existia (pacote v2 → disco + nuvem, carimbo avança);
+      a janela de 1,5s era a única brecha real.
+- [x] sw v416 (ai.js é shell).
+      **Testado ao vivo: 9/9** — overlay acende a marca, chip abre nela, fala congela
+      sob o chip, Preparar da legenda cria card com a fala atual como contexto, traço
+      esmaece na hora, e o ciclo sair-e-voltar restaura raio-X + `feito` do disco com a
+      legenda voltando acesa. Console sem erros.
+
 ### Da rodada da arrumação do painel do vídeo (2026-08-24, 47ª — método Kondo)
 
 - [x] **A TOOLBAR DO PLAYER GANHOU CATEGORIAS.** Eram 9 botões soltos quebrando em duas
