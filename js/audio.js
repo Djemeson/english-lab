@@ -1838,7 +1838,8 @@ function playTranslationTTS(text, langCode = 'pt-BR') {
 }
 
 function openLibraryAudioPlayer() {
-  if (_libMode === 'cards' && _browserCurrentCards && _browserCurrentCards.length > 0) {
+  const doFiltro = _libMode === 'cards' && _browserCurrentCards && _browserCurrentCards.length > 0
+  if (doFiltro) {
     _playlistCards = [..._browserCurrentCards];
   } else {
     _playlistCards = [...srsCards];
@@ -1848,6 +1849,8 @@ function openLibraryAudioPlayer() {
     toast('Nenhum card disponível para ouvir!', 'warning');
     return;
   }
+  // UX-4: o escopo era segredo de tooltip — agora a playlist DIZ o que vai tocar.
+  toast(`Playlist: ${_playlistCards.length} card${_playlistCards.length !== 1 ? 's' : ''} — ${doFiltro ? 'do baralho/filtro aberto' : 'todos os cards'}`, 'info')
 
   _playlistIndex = 0;
   _playlistPlaying = false;

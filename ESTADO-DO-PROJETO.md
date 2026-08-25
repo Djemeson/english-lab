@@ -15421,6 +15421,28 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada Kondo V — os tesouros ganham porta (2026-08-25, 55ª = UX-4)
+
+- [x] **Timer de SONO no vídeo/podcast** — a peça do audiolivro, portada. Botão "Sono"
+      no grupo assistir da toolbar; menu (cardMenu da 52ª) com 10/20/30/45/60 min;
+      pausa o player e avisa; botão vira "N min" armado; 2º clique desarma; sair do
+      player desarma (`videoSonoCancelar` em videoBackToLib). Podcast na cama era O
+      caso de uso.
+- [x] **Ditado e Shadowing anunciados**: a dica de entrada do trecho de estudo agora
+      DIZ que eles existem lá dentro — moravam escondidos no estudo focado.
+- [x] **"Ouvir junto" na ficha do livro** (não-mangá, com arquivo): botão nomeado que
+      abre a leitura e liga a sincronização quando a barra do leitor montar
+      (`estOuvirJunto`, poll 250ms×40). Antes só existia como fone sem rótulo dentro
+      do leitor.
+- [x] **Playlist anuncia o escopo** ao abrir: "N cards — do baralho/filtro aberto" ou
+      "todos os cards" (toast; era segredo de tooltip).
+- [x] audio.js é shell → sw v419. **Testado ao vivo: 9/9.**
+- [x] **Nota da sobra UX-3 (transplante do popup do Preparar)**: investigado — o
+      Explicar do Preparar é o MAIS RICO dos quatro caminhos (cache `_revExplainCache`
+      compartilhado com o vídeo, figura da Wikipédia, procedência da web). Migrar hoje
+      REGREDIRIA custo/УХ. O caminho certo é enriquecer `_selExplicarPintar` (cache +
+      figura) antes de absorver o Preparar — rodada própria, com esse desenho.
+
 ### Da rodada Kondo IV — promoções de rótulo (2026-08-25, 54ª = UX-4 parcial)
 
 - [x] **"Nova frase" ganhou nome** (verso do card SRS): era um ícone a 45% de opacidade

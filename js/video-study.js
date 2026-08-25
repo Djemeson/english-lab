@@ -62,7 +62,9 @@ function renderVidSelPanel() {
   const panel = el('vid-sel-panel'); if (!panel) return
   if (_vidFocus) { _vidRenderFocus(panel); return }
   if (!_vidSel) {
-    panel.innerHTML = `<div class="vid-sel-hint">Clique numa fala do transcript para escolher o trecho de estudo.</div>`
+    // UX-4: o Ditado e o Shadowing moravam escondidos DENTRO do estudo focado —
+    // quem nunca entrou lá não sabia que existiam. A dica de entrada anuncia.
+    panel.innerHTML = `<div class="vid-sel-hint">Clique numa fala do transcript para escolher o trecho de estudo — lá dentro tem <b>Ditado</b> (escreva o que ouviu) e <b>Shadowing</b> (grave-se imitando a fala).</div>`
     return
   }
   const words = _vidSelText().split(/\s+/)

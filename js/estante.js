@@ -1836,6 +1836,12 @@ function _estRenderFicha() {
         ${temArquivo
           ? `<button class="btn btn-primary" style="width:100%" onclick="lerAbrir('${l.id}')">${ic('bookOpen','ic-sm')} ${pct > 0 ? 'Continuar lendo' : 'Começar a ler'}</button>`
           : `<button class="btn btn-primary" style="width:100%" onclick="estProgressoModal('${l.id}')">${ic('pencil','ic-sm')} Registrar progresso</button>`}
+        ${temArquivo && l.format !== 'manga' ? `
+        <!-- UX-4: "Ouvir junto" só existia como ícone de fone dentro do leitor.
+             A ficha é onde se decide COMO ler — a opção nomeada mora aqui também. -->
+        <button class="btn btn-secondary" style="width:100%" onclick="estOuvirJunto('${l.id}')"
+                data-tip="Abre a leitura com o narrador junto: o áudio toca e o texto do autor acompanha">
+          ${ic('headphones','ic-sm')} Ouvir junto</button>` : ''}
         ${l.kind === 'fisico' ? `<p class="est-dica" style="text-align:center">Sem arquivo aqui dentro — leitura no papel ou em outro aparelho.</p>` : ''}
         <div class="est-ficha-status">
           ${Object.entries(EST_STATUS).map(([k, v]) =>
@@ -1879,6 +1885,19 @@ function _estRenderFicha() {
         <div id="est-ficha-aba">${_estFichaAbaHTML(l, caps)}</div>
       </div>
     </div>`
+}
+
+// "Ouvir junto" da ficha: abre a leitura e liga a sincronização assim que a
+// barra do leitor existir (a abertura é assíncrona — capítulo, paginação).
+function estOuvirJunto(id) {
+  lerAbrir(id)
+  let tent = 0
+  const t = setInterval(() => {
+    tent++
+    if (el('ler-btn-ouvir') && typeof sincLeitorAlternar === 'function') {
+      clearInterval(t); sincLeitorAlternar()
+    } else if (tent > 40) clearInterval(t)   // ~10s: desiste em silêncio, o livro fica aberto
+  }, 250)
 }
 
 function estFichaAba(a) {

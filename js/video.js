@@ -435,6 +435,7 @@ async function videoOpenPlayer(v) {
           <div class="vid-tb-group">
             <button class="btn btn-ghost btn-sm" onclick="videoReplayCue()" data-tip="A frase passou? Volta ao início da fala atual/última (tecla R)">${ic('undo','ic-sm')}Repetir fala</button>
             <button class="btn btn-ghost btn-sm" id="vid-mark-btn" onclick="videoAddMarker()" data-tip="Marca o INÍCIO do trecho; o 2º clique (ou tecla M) fecha e abre o estudo focado">${ic('flame','ic-sm')}Marcar</button>
+            <button class="btn btn-ghost btn-sm" id="vid-sono" onclick="videoSonoMenu(event)" data-tip="Timer de sono: pausa sozinho depois do tempo escolhido — podcast na cama sem perder o fio">${ic('clock','ic-sm')}Sono</button>
           </div>
           <div class="vid-tb-group">
             <div class="vid-seg" data-tip="Tradução sob a legenda — um modo por vez; clicar de novo desliga">
@@ -617,6 +618,7 @@ function videoBackToLib() {
   // sair rápido do player perdia a última mudança de legenda (bug real).
   if (_vidSubsSaveTimer) _vidSaveSubsNow()
   const p = el('vid-player'); if (p) p.pause()
+  if (typeof videoSonoCancelar === 'function') videoSonoCancelar()
   if (_vidURL) { URL.revokeObjectURL(_vidURL); _vidURL = null }
   _vidCur = null; _vidFile = null; _vidStream = false
   renderVideoLib()
@@ -782,6 +784,33 @@ function _vidPTof(cue) { return (cue && (cue.pt || cue.pts)) || '' }
 function videoToggleScroll() {
   _vidAutoScroll = !_vidAutoScroll
   el('vid-scroll-toggle')?.classList.toggle('vid-on', _vidAutoScroll)
+}
+
+// ---- Timer de sono (UX-4, rodada 55) — a peça do audiolivro, portada. ----
+// Quem ouve PODCAST ouve deitado; dormir sem isto custa quarenta minutos de
+// episódio para reencontrar amanhã. O menu é o cardMenu único da casa (52ª).
+let _vidSono = null            // { fim, timer }
+function videoSonoMenu(ev) {
+  if (_vidSono) { videoSonoCancelar(); toast('Timer de sono desligado', 'info'); return }
+  cardMenu(ev, 'vid-sono', `
+    <div class="est-menu-sep">Parar em</div>
+    ${[10, 20, 30, 45, 60].map(min => `<button onclick="cardMenuFechar();videoSonoLigar(${min})">${min} minutos</button>`).join('')}`)
+}
+function videoSonoLigar(min) {
+  videoSonoCancelar()
+  _vidSono = { fim: Date.now() + min * 60000 }
+  _vidSono.timer = setTimeout(() => {
+    el('vid-player')?.pause()
+    videoSonoCancelar()
+    toast('Timer de sono: pausado', 'info')
+  }, min * 60000)
+  toast(`Vou pausar em ${min} minutos`, 'info')
+  const b = el('vid-sono'); if (b) { b.classList.add('vid-on'); b.innerHTML = `${ic('clock','ic-sm')}${min} min` }
+}
+function videoSonoCancelar() {
+  if (_vidSono && _vidSono.timer) clearTimeout(_vidSono.timer)
+  _vidSono = null
+  const b = el('vid-sono'); if (b) { b.classList.remove('vid-on'); b.innerHTML = `${ic('clock','ic-sm')}Sono` }
 }
 function videoToggleOverlay() {
   _vidOverlayOn = !_vidOverlayOn
