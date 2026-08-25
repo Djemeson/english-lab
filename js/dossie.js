@@ -521,6 +521,10 @@ function _dossiePintarCorpo() {
   // Não estudados primeiro: é o que ele veio fazer.
   const visiveis = [...falta, ...feitos].filter(_dosItemCasa)
   _dosVisiveis = visiveis
+  // O capítulo inteiro (sem filtro): é o alvo do completar-tudo (rodada 59).
+  _dosAbertoItens = aberto.itens
+  const semMaterial = (typeof completarMaterial === 'function')
+    ? aberto.itens.filter(s => !_dosTemMaterial(s.m)) : []
   const filtrando = !!_dosBusca || _dosFiltro !== 'todos'
   corpo.innerHTML = `
     <div class="dos-topo">
@@ -530,6 +534,8 @@ function _dossiePintarCorpo() {
       </div>
       ${visiveis.length ? `<button class="btn btn-secondary btn-sm" onclick="dossieFoco()"
         data-tip="Um item por vez, tela cheia — as setas do teclado andam">${ic('expand','ic-sm')} Modo foco</button>` : ''}
+      ${semMaterial.length > 1 ? `<button class="btn btn-ghost btn-sm" id="dos-completar-tudo" onclick="dossieCompletarTudo()"
+        data-tip="Uma chamada de IA por item: busca forma, padrão, colocações, régua, cuidado e curiosidade do que ainda não tem. Pergunta o custo antes.">${ic('sparkles','ic-sm')} Completar material (${semMaterial.length})</button>` : ''}
       <span class="dos-contagem">${feitos.length}/${aberto.itens.length} estudados${
         filtrando ? ` · <i>${visiveis.length} na tela</i>` : ''}</span>
     </div>
@@ -1221,6 +1227,45 @@ async function dossieCompletar(wordId, meaningId, refazer) {
   if (typeof completarMaterial !== 'function') return
   await completarMaterial(wordId, meaningId, refazer)
   _dosFocoPintar()
+}
+
+// ---- COMPLETAR-TUDO DO CAPÍTULO (UX-4, rodada 59) --------------------
+// O completar POR SENTIDO existia; num capítulo do acervo antigo eram 20
+// cliques e 20 esperas. Aqui é UM clique: pergunta o custo com aiConfirmBatch
+// (a régua da casa para lote pago), roda em série com progresso no próprio
+// botão, e para na hora se ele sair do dossiê no meio.
+function _dosTemMaterial(m) {
+  const temAlgo = ['forms','collocations','confusoes','armadilha','curiosidade']
+                    .some(c => _dosTem(m[c])) || m.grammar || m.registro_uso
+  return !!(temAlgo || m.material_at)
+}
+let _dosAbertoItens = []
+let _dosCompletandoTudo = false
+async function dossieCompletarTudo() {
+  if (_dosCompletandoTudo || typeof completarMaterial !== 'function') return
+  const alvos = _dosAbertoItens.filter(s => !_dosTemMaterial(s.m))
+  if (!alvos.length) { toast('Nada para completar aqui', 'info'); return }
+  if (!(await aiConfirmBatch('chat', alvos.length, 'Completar material do dossiê', {
+    detalhe: ['Uma chamada por item: forma, padrão, colocações, régua, cuidado e curiosidade',
+              'Significado, definição, exemplos e agendamento ficam intocados'] }))) return
+  _dosCompletandoTudo = true
+  const capitulo = _dossieAberto
+  let feito = 0, falhou = 0
+  try {
+    for (const s of alvos) {
+      if (_dossieAberto !== capitulo) break    // saiu do capítulo: para em silêncio
+      const b = el('dos-completar-tudo')       // re-busca: repinturas trocam o botão
+      if (b) { b.disabled = true; b.innerHTML = `<span class="spinner"></span> ${feito + falhou + 1}/${alvos.length}` }
+      try { await completarMaterial(s.w.id, s.m.id); feito++ }
+      catch (e) { falhou++; console.warn('[dossiê] completar falhou:', s.w.word, e && e.message) }
+    }
+  } finally {
+    _dosCompletandoTudo = false
+  }
+  toast(falhou
+    ? `Material completado em ${feito} item(ns) — ${falhou} falharam (rode de novo para tentar só eles)`
+    : `Material completado em ${feito} item(ns)`, falhou ? 'warning' : 'success')
+  renderDossieSection()
 }
 
 // A procedência vira UM CRÉDITO no topo: obra, capítulo, e um clique que rola

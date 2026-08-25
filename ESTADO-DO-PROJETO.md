@@ -15421,6 +15421,20 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do completar-tudo do dossiê (2026-08-25, 59ª = UX-4)
+
+- [x] **"Completar material (N)" no topo do capítulo aberto** do Estudar: um clique
+      completa TODOS os sentidos sem material do capítulo (o por-sentido continuava
+      existindo; num acervo antigo eram 20 cliques). `aiConfirmBatch` pergunta o custo
+      antes (régua da casa p/ lote pago); roda EM SÉRIE com progresso no próprio
+      botão (re-buscado a cada volta — repinturas trocam o elemento); sair do
+      capítulo no meio PARA o lote; falhas contam e avisam sem derrubar o resto.
+      `_dosTemMaterial` espelha a régua do convite por sentido (lista vazia não
+      conta — `[]` é truthy, armadilha conhecida). Botão só aparece com 2+ faltando.
+      dossie.js é lazy → sem bump. **Testado ao vivo: 10/10** (stubs de
+      completarMaterial/aiConfirmBatch: confirma N certo, pula quem tem, cancelar
+      não roda, sair para no meio).
+
 ### Da rodada do motor único de cobertura (2026-08-25, 58ª = UX-4)
 
 - [x] **UMA régua de cobertura para leitor e vídeo.** O motor do leitor mudou para
