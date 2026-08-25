@@ -15421,6 +15421,20 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do menu do card de Revisão (2026-08-25, 64ª = sobra da UX-2 — UX-2 completa)
+
+- [x] **Botão "Mais" no rodapé do verso do card SRS** (buildSrsVerso — vale na SESSÃO
+      e no preview da Biblioteca, os dois passam por ali): abre o cardMenu único da
+      casa com Gerar/refazer imagem, Rever a cena (se clipId), Abrir no Estudar (se
+      wordId), Mover de baralho e Excluir. **Excluir fica FORA durante a sessão**
+      (apagar o card no meio derruba a fila; no preview aparece, em perigo).
+- [x] O details "Editar card" virou **"Variedade e registro"** (só os selects — a
+      ação de imagem migrou para o menu; id `img-gen-btn-*` não tinha referência).
+      study.js é lazy → sem bump. **Testado ao vivo: 9/9** (sessão sem excluir,
+      preview com; condicionais somem sem clipId/wordId; details renomeado).
+      ⚠️ Nota de teste: 501 POST no preview = stub de aiChatCfg sem P.url fez os
+      chips (reais) postarem na origem local. Artefato de teste, não defeito.
+
 ### Da rodada do transplante do popup do Preparar (2026-08-25, 63ª = sobra da UX-3)
 
 - [x] **A peça comum cresceu primeiro** (o pré-requisito que a investigação da 55ª
@@ -15781,7 +15795,7 @@ antes); "picker antigo do Kindle" (não identificado com segurança).
       styles.css:911 remove busca/filtros/lote inteiros); rótulos nas barras só-ícone
       (leitor 9, audiolivro 8, vídeo 9 — tooltips são mouseover-only, core.js:2163);
       preview da Biblioteca no toque (styles.css:885).
-- [x] **UX-2 — um menu de card, o mesmo em todo lugar (52ª; sobra: menu do card SRS):** o `estMenu` da estante
+- [x] **UX-2 — um menu de card, o mesmo em todo lugar (52ª + 64ª — COMPLETA):** o `estMenu` da estante
       (estante.js:806) vira padrão; audiolivro (audiobook.js:160) e vídeo (video.js:147)
       trocam a lixeira do canto por menu; "Editar card" do SRS (study.js:927) vira menu ⋯
       unificado com a Biblioteca (gerar frase/imagem, rever cena, abrir no Estudar, mover,

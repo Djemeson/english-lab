@@ -930,9 +930,18 @@ function buildSrsVerso(card, imgData, imageBelow) {
   // Footer + configurações (sempre na coluna de texto)
   const SRC = {series:'série', movie:'filme', youtube:'YouTube', kindle:'Kindle', podcast:'podcast', website:'site', manual:'manual'}
   const deckLabel = card.deckId ? getSrsDeckPath(card.deckId) : ''
-  text += `<div class="srs-back-footer">${esc(SRC[card.source_type]||card.source_type||'')}${deckLabel ? ' · ' + esc(deckLabel) : ''}</div>`
+  // O MENU ÚNICO DO CARD (UX-2, rodada 64) — a mesma peça da estante, do
+  // audiolivro e do vídeo, no rodapé do verso. Vale na SESSÃO e no preview da
+  // Biblioteca (os dois passam por aqui): imagem, cena, Estudar, baralho e
+  // excluir num lugar só. Excluir fica de fora DURANTE a sessão — apagar o
+  // card no meio derruba a fila.
+  text += `<div class="srs-back-footer" style="display:flex;align-items:center;gap:10px">
+    <span style="flex:1">${esc(SRC[card.source_type]||card.source_type||'')}${deckLabel ? ' · ' + esc(deckLabel) : ''}</span>
+    <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();srsCardMenu(event,'${card.id}',${imageBelow ? 'false' : 'true'})"
+      data-tip="Mais ações deste card — imagem, cena, Estudar, baralho${imageBelow ? ', excluir' : ''}">${ic('chevronDown','ic-sm')} Mais</button>
+  </div>`
   text += `<details class="srs-card-settings" onclick="event.stopPropagation()">
-    <summary>${ic('pencil','ic-sm')} Editar card</summary>
+    <summary>${ic('pencil','ic-sm')} Variedade e registro</summary>
     <div class="srs-card-settings-body" style="flex-direction:column;gap:10px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <label style="font-size:var(--fs-xs);color:var(--text3);min-width:70px">Variedade</label>
@@ -957,11 +966,6 @@ function buildSrsVerso(card, imgData, imageBelow) {
           <option value="vulgar" ${card.register==='vulgar'?'selected':''}>Vulgar</option>
         </select>
       </div>
-      <button class="btn btn-ghost btn-sm" style="font-size:var(--fs-sm)"
-        id="img-gen-btn-${card.id}"
-        onclick="event.stopPropagation();generateCardImage('${card.id}',this)">
-        ${ic('palette','ic-sm')} ${imgData ? 'Regenerar imagem' : 'Gerar imagem'}
-      </button>
     </div>
   </details>`
 
@@ -1073,6 +1077,20 @@ document.addEventListener('keydown', e => {
 // ================================================================
 // REGENERATE EXAMPLE SENTENCE via AI
 // ================================================================
+// O MENU ÚNICO DO CARD (UX-2, rodada 64): cardMenu (core.js) — a mecânica da
+// estante — com as ações do card num lugar só. `emSessao` esconde Excluir:
+// apagar o card no meio da revisão derruba a fila da sessão.
+function srsCardMenu(ev, cardId, emSessao) {
+  const card = srsCards.find(c => c.id === cardId); if (!card) return
+  cardMenu(ev, cardId, `
+    <button onclick="cardMenuFechar();generateCardImage('${cardId}', null)">${ic('palette','ic-sm')} Gerar ou refazer a imagem</button>
+    ${card.clipId ? `<button onclick="cardMenuFechar();reverCena('${card.clipId}')">${ic('film','ic-sm')} Rever a cena</button>` : ''}
+    ${card.wordId ? `<button onclick="cardMenuFechar();srsAbrirNoEstudar('${card.wordId}','${card.meaningId || ''}')">${ic('bookOpen','ic-sm')} Abrir no Estudar</button>` : ''}
+    <button onclick="cardMenuFechar();moveSrsCardDeck('${cardId}')">${ic('layers','ic-sm')} Mover de baralho</button>
+    ${emSessao ? '' : `<div class="est-menu-sep"></div>
+    <button class="perigo" onclick="cardMenuFechar();deleteSrsCard('${cardId}')">${ic('trash','ic-sm')} Excluir card</button>`}`)
+}
+
 async function regenerateCardExample(cardId, btnEl) {
   if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
   const card = srsCards.find(c => c.id === cardId)
