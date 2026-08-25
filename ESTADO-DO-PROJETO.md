@@ -15421,6 +15421,20 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada da fila do Preparar no celular (2026-08-25, 60ª = UX-1)
+
+- [x] **A fila voltou ao celular como GAVETA.** Abaixo de 768px a barra lateral sumia
+      inteira (busca, filtros, seleção em lote — tudo). Agora: botão flutuante
+      "Fila (N)" (`.rev-fila-fab`, contagem espelhada do sidebar-count em
+      renderSidebar) abre a mesma barra como gaveta de baixo (`.review-sidebar.aberta`
+      fixed, 74dvh, raio em cima); escolher palavra FECHA sozinho (selectWord com
+      innerWidth<=768 — a gaveta cobriria o cartão pedido); X no cabeçalho fecha;
+      fora da seção o botão some (`.section:not(.active)`). Desktop: as regras vivem
+      TODAS dentro do @media — nada muda por construção.
+      sw v423 (index/review/styles são shell). **Testado ao vivo (emulação mobile):
+      10/10.** ⚠️ Painel escondido mede innerWidth 0 → o media query "mobile" CASA:
+      não dá para provar o desktop com o painel fechado; a prova é estrutural.
+
 ### Da rodada do completar-tudo do dossiê (2026-08-25, 59ª = UX-4)
 
 - [x] **"Completar material (N)" no topo do capítulo aberto** do Estudar: um clique
@@ -15728,7 +15742,7 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       recentes → irParaItem (dashboard.js:643); header mobile 1 alvo de conta
       (index.html:117-130); popup de seleção do Preparar migra p/ selMenuAtivar
       (review.js:3385→ai.js:269); legenda do vídeo agrupada (video.js:362-374).
-- [ ] **UX-4 — promoções (54ª: rótulos; 55ª: sono/anúncios/Ouvir junto/playlist; 58ª: motor de cobertura único; RESTAM):** completar-tudo do dossiê com aiConfirmBatch; bottom-sheet da fila do Preparar no mobile; preview da Biblioteca no toque; pré-estudo por capítulo (molde do raio-X). pré-estudo com painel por capítulo (molde do raio-X,
+- [ ] **UX-4 — promoções (54ª: rótulos; 55ª: sono/anúncios/Ouvir junto/playlist; 58ª: motor de cobertura; 59ª: completar-tudo do dossiê; 60ª: fila no celular; RESTAM):** preview da Biblioteca no toque; pré-estudo por capítulo (molde do raio-X). pré-estudo com painel por capítulo (molde do raio-X,
       ler.js:3904); "Ouvir junto" com rótulo + na ficha do livro (ler.js:497);
       ditado/shadowing anunciados (video-study.js:584); "Completar verbete" no Estudar e na
       Biblioteca (review.js:1890); "Regenerar frase" nomeado (study.js:850); "Estudar de

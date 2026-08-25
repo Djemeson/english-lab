@@ -1586,6 +1586,8 @@ function renderWcToolbarLeft() {
 function renderSidebar(filter = '') {
   const all = words.filter(w => ['pending_ai','pending_review'].includes(w.status))
   el('sidebar-count').textContent = all.length
+  // O botão flutuante do celular mostra a mesma contagem da fila.
+  const fabN = el('rev-fila-fab-n'); if (fabN) fabN.textContent = all.length
 
   // Update filter tab counts
   const pendingCount = all.filter(w => w.status === 'pending_ai').length
@@ -1648,6 +1650,18 @@ function selectWord(id) {
   activeWordId = id
   renderSidebar(el('sidebar-search').value)
   renderWordCard(id)
+  // No celular a fila é uma gaveta (rodada 60): escolher fecha sozinho —
+  // a gaveta aberta cobriria exatamente o cartão que ele acabou de pedir.
+  if (innerWidth <= 768) revFilaToggle(false)
+}
+
+// A gaveta da fila no celular (UX-1, rodada 60). No desktop a classe não
+// tem efeito — o CSS só a interpreta abaixo de 768px.
+function revFilaToggle(abrir) {
+  const sb = document.querySelector('#section-preparar .review-sidebar')
+  if (!sb) return
+  const alvo = (abrir !== undefined) ? abrir : !sb.classList.contains('aberta')
+  sb.classList.toggle('aberta', alvo)
 }
 
 // ---- Batch actions on selected items ----

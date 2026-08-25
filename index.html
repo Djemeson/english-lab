@@ -562,6 +562,8 @@
           <h3>Palavras <span class="badge" id="sidebar-count">0</span></h3>
           <div class="rsb-header-right">
             <span class="rsb-select-all" onclick="toggleSelectAll()" title="Selecionar ou limpar todas as palavras visíveis">Selecionar todas</span>
+            <!-- Fechar a gaveta da fila — só existe no celular (UX-1, rodada 60) -->
+            <button class="rev-fila-fechar" onclick="revFilaToggle(false)" aria-label="Fechar a fila"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
           </div>
         </div>
         <!-- Status filter tabs -->
@@ -588,6 +590,13 @@
 
     </div>
   </div>
+  <!-- A FILA NO CELULAR (UX-1, rodada 60): a barra lateral sumia inteira no
+       mobile — busca, filtros e lote junto. Este botão flutuante abre a mesma
+       fila como gaveta de baixo; escolher uma palavra fecha sozinho. -->
+  <button class="rev-fila-fab" onclick="revFilaToggle()" aria-label="Abrir a fila de palavras">
+    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>
+    Fila <span class="badge" id="rev-fila-fab-n">0</span>
+  </button>
 </section>
 
 <!-- =========== ESTUDAR (dossiês — js/dossie.js, LAZY) =========== -->

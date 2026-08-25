@@ -8102,3 +8102,38 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   .ler-raiox-refaz{opacity:1;border-color:rgba(128,128,128,.35)}
   .est-hist-x{opacity:1}
 }
+
+/* ================================================================
+   A FILA DO PREPARAR NO CELULAR (UX-1, rodada 60).
+   No desktop nada muda. Abaixo de 768px a barra lateral (que sumia
+   inteira, levando busca, filtros e lote) vira uma GAVETA de baixo:
+   o botão flutuante "Fila (N)" abre; escolher palavra ou o X fecham.
+   ================================================================ */
+.rev-fila-fab{display:none}
+.rev-fila-fechar{display:none}
+@media (max-width:768px){
+  .rev-fila-fab{
+    position:fixed;right:16px;bottom:104px;z-index:var(--z-modal);
+    display:inline-flex;align-items:center;gap:7px;
+    padding:11px 16px;border:1px solid var(--border-strong);border-radius:var(--radius-pill);
+    background:var(--surface);color:var(--text);font-size:var(--fs-sm);font-weight:600;
+    box-shadow:var(--shadow);cursor:pointer;
+  }
+  .rev-fila-fab .badge{background:rgba(var(--primary-rgb),.15);color:var(--primary)}
+  /* section escondida não pode deixar o botão flutuando órfão */
+  .section:not(.active) .rev-fila-fab{display:none}
+  .review-sidebar.aberta{
+    display:flex;flex-direction:column;
+    position:fixed;left:0;right:0;bottom:0;max-height:74vh;max-height:74dvh;
+    z-index:calc(var(--z-modal) + 1);
+    background:var(--surface);border-top:1px solid var(--border-strong);
+    border-radius:18px 18px 0 0;box-shadow:0 -14px 44px rgba(0,0,0,.5);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .review-sidebar.aberta .review-word-list{overflow-y:auto;flex:1}
+  .rev-fila-fechar{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:32px;height:32px;border:none;border-radius:50%;
+    background:var(--surface2);color:var(--text2);cursor:pointer;
+  }
+}
