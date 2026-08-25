@@ -15421,6 +15421,23 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada Kondo III — o toque é cidadão de primeira classe (2026-08-25, 53ª = UX-1)
+
+- [x] **Bloco `@media (hover:none)` no fim do styles.css**: tudo que só aparecia no
+      :hover fica visível de saída no toque (mais discreto via opacidade onde dá).
+      Cobertos: `.kn-acts` (estudar/ignorar das Palavras — o caso central),
+      `.srs-deck-actions`, `.cmsg-copy`, `.vid-cue-ptbtn`/`.vid-skipbtn`/`.vid-pt-minis`,
+      `.pod-show-x`, `.ler-card-x` (menus de card da 52ª!), `.ab-capa-play`,
+      `.ab-card-nuvem`, `.ab-cap-vazio`, `.ab-marca-x`, `.ler-raiox-refaz`,
+      `.est-hist-x`. Desktop intocado (hover:none não casa com mouse).
+      sw v418. **Testado ao vivo** com emulação mobile do painel (hover:none casou;
+      5 fixtures visíveis; desktop de volta esconde os mesmos). Nota de teste: o
+      computado de `.kn-acts` vem "flex" — compare com !== 'none', não com o valor.
+- [ ] **Sobras da UX-1** (construções, não CSS): fila do Preparar como bottom-sheet no
+      mobile (hoje `.review-sidebar{display:none}` a ≤768 esconde busca/filtros/lote);
+      preview da Biblioteca no toque (`.browser-preview-panel{display:none!important}`);
+      rótulos nas barras só-ícone do leitor/audiolivro/vídeo.
+
 ### Da rodada Kondo II — um menu de card, o mesmo em todo lugar (2026-08-25, 52ª = UX-2)
 
 - [x] **`cardMenu(ev, id, html, larg)` em core.js** (não-lazy): a mecânica do estMenu
@@ -15606,7 +15623,7 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > gesto com cara/qualidade diferente; (4) o valioso escondido, o barato exposto; (5) código
 > morto (~700 linhas). Rodadas propostas, em ordem de ganho:
 
-- [ ] **UX-1 — celular de primeira classe:** `@media (hover:none)` para Palavras
+- [x] **UX-1 — celular de primeira classe (53ª; sobras: bottom-sheet do Preparar, preview da Biblioteca no toque, rótulos nas barras só-ícone):** `@media (hover:none)` para Palavras
       (known.js/styles.css:4507 — estudar/ignorar impossíveis no toque), ações de deck
       (styles.css:1266), nuvem do audiolivro (styles.css:5259), apagar-dia (styles.css:4917),
       copiar resposta esmaecido; fila do Preparar como bottom-sheet no mobile (hoje

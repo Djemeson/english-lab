@@ -8210,3 +8210,35 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
   .sinc-frase{display:none}
   .sinc-barra{bottom:10px}
 }
+
+/* ================================================================
+   O TOQUE É CIDADÃO DE PRIMEIRA CLASSE (UX-1, rodada 53).
+   Tudo que só aparecia no :hover era INVISÍVEL no celular — o dedo não
+   paira. Onde não há hover, a ação fica visível de saída: mais discreta
+   que o estado-hover do desktop quando dá (opacidade), mas alcançável.
+   `hover:none` pega celular e tablet de verdade; um notebook com mouse
+   continua com a interface limpa de sempre.
+   ================================================================ */
+@media (hover:none){
+  /* Palavras: estudar/ignorar em cada chip — a razão desta rodada */
+  .kn-acts{display:inline-flex}
+  /* Revisar: mover/renomear/apagar deck */
+  .srs-deck-actions{display:flex}
+  /* Assistente: copiar a resposta */
+  .cmsg-copy{opacity:.65}
+  /* Vídeo: PT da fala, pulos e minis sobre o vídeo */
+  .vid-cue-ptbtn{opacity:.8}
+  .vid-skipbtn{opacity:.7}
+  .vid-pt-minis{opacity:1}
+  /* Podcast: tirar um programa da lista */
+  .pod-show-x{display:flex}
+  /* Estante e audiolivro: menu do card, play da capa, nuvem */
+  .ler-card-x{opacity:1}
+  .ab-capa-play{opacity:.9}
+  .ab-card-nuvem{opacity:1}
+  .ab-cap-vazio{opacity:.7}
+  .ab-marca-x{opacity:1}
+  /* Leitura: refazer o raio-X do capítulo; histórico: apagar o dia */
+  .ler-raiox-refaz{opacity:1;border-color:rgba(128,128,128,.35)}
+  .est-hist-x{opacity:1}
+}
