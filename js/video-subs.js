@@ -574,6 +574,9 @@ function _vidSaveSubsNow() {
     raiox: (typeof _vidRaioX !== 'undefined' && _vidRaioX) ? _vidRaioX : null
   }
   VideoDB.set('subs', _vidCur.id, dados)
+  // O estado da tradução pode ter mudado (gotejo completou, trilha chegou):
+  // o botão acompanha — exceto no meio da tradução inteira, que é dona dele.
+  if (!_vidPTfullRodando) _vidPTfullStatus(null)
   // ⚠️ A LEGENDA VALE MAIS QUE O ÁUDIO. O mp3 se baixa de novo do feed; a
   // transcrição custou Whisper e a sincronização custou o TEMPO dele. Sem
   // subir, continuar em outro aparelho pagaria tudo de novo. São poucos KB.
@@ -733,21 +736,55 @@ async function _vidPTRecusadas(pend) {
 // do tempo real. Depois disso o modo "PT IA" mostra tudo na hora.
 // ================================================================
 let _vidPTfullRodando = false
+// O estado REAL da tradução — contando TODAS as fontes (rodada 49): a IA
+// daqui (c.pt) e a trilha que veio de fora (c.pts, legenda PT oficial ou
+// gerada por IA e importada). Antes o botão só enxergava c.pt e oferecia
+// "Traduzir tudo" com a tradução já na tela — mentira de estado.
+function _vidTradEstado() {
+  if (!_vidCues.length) return 'sem-legenda'
+  return _vidCues.every(c => c.pt || c.pts) ? 'completa' : 'falta'
+}
 // O progresso vive no PRÓPRIO botão (rodada 47): ele mudou do painel de
 // sincronia para a toolbar — tradução não é sincronia —, então escrever o
 // andamento no painel deixaria o clique sem resposta visível quando o
-// painel está fechado. null = repouso (e o botão se aposenta quando não
-// sobra nada por traduzir).
+// painel está fechado. null = repouso, e o rótulo diz a verdade do estado:
+// falta → "Traduzir tudo" · tudo coberto → "Retraduzir" · sem legenda → some.
 function _vidPTfullStatus(txt) {
   const b = el('vid-pt-full'); if (!b) return
   if (txt == null) {
+    const st = _vidTradEstado()
     b.disabled = false
-    b.innerHTML = `${ic('sparkles','ic-sm')}Traduzir tudo`
-    b.style.display = (_vidCues.length && !_vidCues.every(c => c.pt)) ? '' : 'none'
+    if (st === 'sem-legenda') { b.style.display = 'none'; return }
+    b.style.display = ''
+    if (st === 'completa') {
+      b.innerHTML = `${ic('sparkles','ic-sm')}Retraduzir`
+      b.dataset.tip = 'A tradução já cobre todas as falas. Refazer apaga a tradução da IA atual e traduz de novo (centavos) — a trilha PT importada não é tocada.'
+    } else {
+      b.innerHTML = `${ic('sparkles','ic-sm')}Traduzir tudo`
+      b.dataset.tip = 'A IA traduz a legenda INTEIRA de uma vez (centavos). Depois a tradução aparece na hora, sem os +5s do tempo real'
+    }
     return
   }
   b.disabled = true
   b.innerHTML = `<span class="gen-spinner"></span> ${esc(txt)}`
+}
+// O clique decide pelo estado: completo → confirma e refaz do zero (apagar
+// tradução paga sem perguntar seria destruir patrimônio); faltando → completa.
+function videoTraduzirClick() {
+  if (_vidPTfullRodando) return
+  if (_vidTradEstado() !== 'completa') { videoTranslateFull(); return }
+  const temIA = _vidCues.some(c => c.pt)
+  const vai = () => {
+    _vidCues.forEach(c => { delete c.pt; delete c._ptReq; delete c._ptTent; delete c._ptDesisti })
+    videoTranslateFull()
+  }
+  if (temIA && typeof confirmModal === 'function') {
+    confirmModal({
+      title: 'Refazer a tradução?',
+      html: 'A tradução da IA atual será apagada e refeita do zero (centavos). A trilha PT importada não é tocada.',
+      confirmText: 'Refazer', danger: true
+    }).then(ok => { if (ok) vai() })
+  } else vai()
 }
 async function videoTranslateFull() {
   if (_vidPTfullRodando) return

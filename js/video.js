@@ -430,7 +430,7 @@ async function videoOpenPlayer(v) {
               <button class="btn btn-ghost btn-sm ${_vidPTmode === 'ia' ? 'vid-on' : ''}" id="vid-pt-ia" onclick="videoSetPT('ia')" data-tip="Tradução LITERAL pela IA em tempo real — só o que você está vendo (+5s)">${ic('sparkles','ic-sm')}PT IA</button>
             </div>
             <button class="btn btn-ghost btn-sm ${_vidPTfog ? 'vid-on' : ''}" id="vid-fog-toggle" onclick="videoToggleFog()" style="${_vidPTmode === 'off' ? 'display:none' : ''}" data-tip="Névoa: a tradução fica borrada até passar o mouse (treino de recall). Clique para mostrar sempre.">${ic('eye','ic-sm')}Névoa</button>
-            <button class="btn btn-ghost btn-sm" id="vid-pt-full" onclick="videoTranslateFull()" style="${_vidCues.length && !_vidCues.every(c => c.pt) ? '' : 'display:none'}" data-tip="A IA traduz a legenda INTEIRA de uma vez (centavos). Depois a tradução aparece na hora, sem os +5s do tempo real">${ic('sparkles','ic-sm')}Traduzir tudo</button>
+            <button class="btn btn-ghost btn-sm" id="vid-pt-full" onclick="videoTraduzirClick()" style="display:none" data-tip="">${ic('sparkles','ic-sm')}Traduzir tudo</button>
           </div>
           <div class="vid-tb-group">
             <button class="btn btn-ghost btn-sm ${_vidOverlayOn ? 'vid-on' : ''}" id="vid-ov-toggle" onclick="videoToggleOverlay()" data-tip="Legenda sobre o vídeo, em tempo real">${ic('message','ic-sm')}Legenda</button>
@@ -490,6 +490,9 @@ async function videoOpenPlayer(v) {
     const ov2 = el('vid-ov')
     if (ov2) difChipLigar(ov2, cfgChip)
   }
+  // O botão de tradução nasce dizendo a verdade do estado (rodada 49):
+  // falta → "Traduzir tudo" · coberta (IA ou trilha importada) → "Retraduzir".
+  if (typeof _vidPTfullStatus === 'function') _vidPTfullStatus(null)
 
   // ---- Retomar de onde parou ----
   // A posição é salva a cada ~5s de reprodução (e no pause/saída). Na volta,

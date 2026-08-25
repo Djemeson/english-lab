@@ -15421,6 +15421,21 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do botão de tradução honesto (2026-08-24, 49ª)
+
+- [x] **"Traduzir tudo" agora reconhece TODAS as fontes de tradução** (pedido dele: o
+      botão aparecia com a legenda de IA já carregada). `_vidTradEstado()`: sem legenda /
+      falta / completa — completa conta `c.pt` (IA daqui) E `c.pts` (trilha importada,
+      caso dele). Completa → botão vira **"Retraduzir"**; clique passa por
+      `videoTraduzirClick`: com tradução IA existente, confirmModal (danger) antes de
+      apagar e refazer; só trilha externa → refaz sem perguntar (nada a perder).
+      Estado refresca em `_vidSaveSubsNow` (gotejo/trilha mudam o estado) com guarda
+      `_vidPTfullRodando` (o progresso é dono do botão durante a tradução inteira) e na
+      montagem do player.
+      **Testado ao vivo: 8/8** — some sem legenda; "Traduzir tudo" quando falta; vira
+      "Retraduzir" coberto por trilha importada E por IA; clique pede confirmação;
+      cancelar preserva a tradução paga; parcial volta a "Traduzir tudo".
+
 ### Da rodada do raio-X na legenda sobre o vídeo (2026-08-24, 48ª)
 
 - [x] **O RAIO-X ACENDE TAMBÉM NA LEGENDA SOBRE O VÍDEO** (pedido dele: "apareceu no
