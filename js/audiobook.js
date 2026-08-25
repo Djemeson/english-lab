@@ -157,8 +157,10 @@ function _abRenderEstante() {
         <div class="ler-card-autor">${esc(a.author || '')}</div>
         <div class="ab-card-tempo">${semAudio ? 'anexar o áudio' : (pct > 0 && falta > 0 ? `faltam ${abTempoLongo(falta)}` : abTempoLongo(abDuracao(a)))}</div>
         <div class="ler-card-barra"><i style="width:${pct}%;background:var(--role-energia)"></i></div>
-        <button class="ler-card-x" data-tip="Remover"
-                onclick="event.stopPropagation();abExcluir('${a.id}')">${ic('trash','ic-sm')}</button>
+        <!-- Menu único de card (UX-2): a lixeira do canto virou o mesmo menu
+             da estante — remover deixa de estar a um clique nu da capa. -->
+        <button class="ler-card-x" data-tip="Opções"
+                onclick="abCardMenu(event,'${a.id}')">${ic('chevronDown','ic-sm')}</button>
         ${semAudio ? '' : `<button class="ab-card-nuvem${abNuvemCompleto(a) ? ' on' : ''}"
                 data-tip="${escA(abNuvemCompleto(a)
                   ? 'O áudio está na sua nuvem — toca em qualquer aparelho seu'
@@ -172,6 +174,19 @@ function _abRenderEstante() {
   // levava o aviso junto. Medido: o órfão era encontrado e a tela não mostrava
   // nada.
   area.innerHTML = `<div class="ler-estante ab-estante">${cards}</div>` + _abOrfaosAvisoHTML()
+}
+
+// O menu do card do audiolivro — a mesma peça da estante e do vídeo (UX-2).
+function abCardMenu(ev, id) {
+  const a = audiolivros.find(x => x.id === id); if (!a) return
+  const semAudio = !a.arquivos
+  cardMenu(ev, id, `
+    ${semAudio
+      ? `<button onclick="cardMenuFechar();abAnexarArquivo('${id}')">${ic('upload','ic-sm')} Anexar o áudio</button>`
+      : `<button onclick="cardMenuFechar();abAbrir('${id}')">${ic('play','ic-sm')} Ouvir agora</button>
+         <button onclick="cardMenuFechar();abNuvemPainel('${id}')">${ic('cloud','ic-sm')} ${abNuvemCompleto(a) ? 'Áudio na nuvem' : 'Guardar na nuvem'}</button>`}
+    <div class="est-menu-sep"></div>
+    <button class="perigo" onclick="cardMenuFechar();abExcluir('${id}')">${ic('trash','ic-sm')} Remover da lista</button>`)
 }
 
 // Quanto há de áudio sem dono, medido pela última varredura. `0` = nada (ou

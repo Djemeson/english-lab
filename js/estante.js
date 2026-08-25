@@ -770,8 +770,10 @@ function _estLinha(l) {
   const pgs = estPaginas(l)
   const st = EST_STATUS[l.status] || EST_STATUS.quero
   const temArquivo = l.kind !== 'fisico'
+  // Mesmo clique do CARD (UX-2): com arquivo abre a leitura, físico abre a
+  // ficha. Eram destinos diferentes para o mesmo livro conforme o visual.
   return `
-    <div class="est-linha" onclick="estIr('ficha','${l.id}')">
+    <div class="est-linha" onclick="${temArquivo ? `lerAbrir('${l.id}')` : `estIr('ficha','${l.id}')`}">
       <div class="est-linha-capa">${_estCapaHTML(l)}</div>
       <div class="est-linha-meio">
         <div class="est-linha-nome">${esc(obraNome(l.title) || 'Sem título')}
@@ -803,16 +805,12 @@ function _estLinha(l) {
 // e Parado?"* Ia pela ficha, e só por ela — dois cliques e uma tela de
 // distância para uma decisão que se toma olhando a capa. Pergunta sobre onde
 // fica uma função é resposta sobre onde ela DEVERIA estar.
+// A mecânica (posição, fechar por fora/Escape/2º clique) mudou para
+// `cardMenu` em core.js na rodada 52 — este menu virou o PADRÃO da casa e o
+// audiolivro e o vídeo usam a mesma peça. Aqui fica só o conteúdo do livro.
 function estMenu(ev, id) {
-  ev.stopPropagation(); ev.preventDefault()
-  const antigo = document.getElementById('est-menu')
-  document.getElementById('est-menu')?.remove()
-  if (antigo && antigo.dataset.de === id) return      // clicar de novo fecha
   const l = livroPorId(id); if (!l) return
-
-  const m = document.createElement('div')
-  m.id = 'est-menu'; m.className = 'est-menu'; m.dataset.de = id
-  m.innerHTML = `
+  cardMenu(ev, id, `
     <button onclick="estMenuFechar();estIr('ficha','${l.id}')">${ic('info','ic-sm')} Abrir a ficha</button>
     ${l.kind !== 'fisico'
       ? `<button onclick="estMenuFechar();lerAbrir('${l.id}')">${ic('bookOpen','ic-sm')} Ler agora</button>`
@@ -824,28 +822,9 @@ function estMenu(ev, id) {
     <div class="est-menu-sep">Nota</div>
     <div class="est-menu-nota">${_estEstrelas(l.nota, l.id)}</div>
     <div class="est-menu-sep"></div>
-    <button class="perigo" onclick="estMenuFechar();lerExcluir('${l.id}')">${ic('trash','ic-sm')} Remover da estante</button>`
-  document.body.appendChild(m)
-
-  // Posicionado à mão, e não em `position:absolute` dentro do card: o card tem
-  // `overflow:hidden` na capa e a grade rola — o menu ficaria cortado.
-  const r = ev.currentTarget.getBoundingClientRect()
-  const larg = 210, alt = m.offsetHeight || 300
-  let x = r.right - larg, y = r.bottom + 6
-  if (x < 8) x = 8
-  if (x + larg > innerWidth - 8) x = innerWidth - larg - 8
-  if (y + alt > innerHeight - 8) y = Math.max(8, r.top - alt - 6)
-  m.style.left = x + 'px'; m.style.top = y + 'px'
-  setTimeout(() => {
-    document.addEventListener('click', estMenuFechar, { once: true })
-    document.addEventListener('keydown', _estMenuTecla)
-  }, 0)
+    <button class="perigo" onclick="estMenuFechar();lerExcluir('${l.id}')">${ic('trash','ic-sm')} Remover da estante</button>`, 210)
 }
-function estMenuFechar() {
-  document.getElementById('est-menu')?.remove()
-  document.removeEventListener('keydown', _estMenuTecla)
-}
-function _estMenuTecla(e) { if (e.key === 'Escape') estMenuFechar() }
+function estMenuFechar() { cardMenuFechar() }
 
 // ---- handlers da barra ----
 let _estBuscaTimer = null

@@ -2056,6 +2056,41 @@ function selectAll(cls, val) {
   document.querySelectorAll(`.${cls}`).forEach(c => c.checked = val)
 }
 
+// ================================================================
+// O MENU DE CARD ÚNICO (UX-2, rodada 52). Nasceu na estante (estMenu) e virou
+// padrão da casa: estante, audiolivro e vídeo abrem O MESMO menu flutuante —
+// pendurado no body (card tem overflow e a grade rola), fechando por clique
+// fora, Escape ou segundo clique no gatilho. Visual: classe .est-menu.
+// Vive AQUI (não-lazy) porque cada tela lazy o chama do seu pacote.
+// ================================================================
+function cardMenu(ev, id, html, larg = 220) {
+  ev.stopPropagation(); ev.preventDefault()
+  const antigo = document.getElementById('el-card-menu')
+  const repetiu = antigo && antigo.dataset.de === String(id)
+  cardMenuFechar()
+  if (repetiu) return          // segundo clique no mesmo gatilho fecha
+  const m = document.createElement('div')
+  m.id = 'el-card-menu'; m.className = 'est-menu'; m.dataset.de = String(id)
+  m.innerHTML = html
+  document.body.appendChild(m)
+  const r = ev.currentTarget.getBoundingClientRect()
+  const alt = m.offsetHeight || 260
+  let x = r.right - larg, y = r.bottom + 6
+  if (x < 8) x = 8
+  if (x + larg > innerWidth - 8) x = innerWidth - larg - 8
+  if (y + alt > innerHeight - 8) y = Math.max(8, r.top - alt - 6)
+  m.style.left = x + 'px'; m.style.top = y + 'px'
+  setTimeout(() => {
+    document.addEventListener('click', cardMenuFechar, { once: true })
+    document.addEventListener('keydown', _cardMenuTecla)
+  }, 0)
+}
+function cardMenuFechar() {
+  document.getElementById('el-card-menu')?.remove()
+  document.removeEventListener('keydown', _cardMenuTecla)
+}
+function _cardMenuTecla(e) { if (e.key === 'Escape') cardMenuFechar() }
+
 function speakWord(word) {
   if (!window.speechSynthesis) return
   const u = new SpeechSynthesisUtterance(word); u.lang = 'en-US'; u.rate = 0.85

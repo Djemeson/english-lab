@@ -150,10 +150,20 @@ function renderVideoLib() {
               ${v.coverage != null ? `<span class="vid-cov">${v.coverage}% conhecido</span>` : ''}
             </div>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();videoDelete('${v.id}')" data-tip="Remover da lista (não apaga o arquivo nem os cards)">${ic('trash','ic-sm')}</button>
+          <!-- Menu único de card (UX-2): a lixeira solta no canto virou o
+               mesmo menu da estante — destrutivo não fica a um clique nu. -->
+          <button class="btn btn-ghost btn-sm" onclick="videoLibMenu(event,'${v.id}')" data-tip="Opções">${ic('chevronDown','ic-sm')}</button>
         </div>`
       }).join('')}
     </div>`
+}
+
+function videoLibMenu(ev, id) {
+  const v = videos.find(x => x.id === id); if (!v) return
+  cardMenu(ev, id, `
+    <button onclick="cardMenuFechar();videoOpen('${id}')">${ic('play','ic-sm')} ${v.podcast ? 'Ouvir agora' : 'Assistir agora'}</button>
+    <div class="est-menu-sep"></div>
+    <button class="perigo" onclick="cardMenuFechar();videoDelete('${id}')">${ic('trash','ic-sm')} Remover da lista</button>`)
 }
 
 async function videoDelete(id) {

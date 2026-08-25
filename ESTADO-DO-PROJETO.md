@@ -15421,6 +15421,27 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada Kondo II — um menu de card, o mesmo em todo lugar (2026-08-25, 52ª = UX-2)
+
+- [x] **`cardMenu(ev, id, html, larg)` em core.js** (não-lazy): a mecânica do estMenu
+      (pendurado no body, fecha por clique fora/Escape/2º clique no gatilho, classe
+      `.est-menu`) virou peça única — telas lazy chamam do seu pacote.
+- [x] **estMenu (estante) refatorado** para usar cardMenu — só conteúdo, zero mecânica
+      duplicada; `estMenuFechar` vira alias.
+- [x] **Vídeo**: lixeira nua da linha da biblioteca → menu (Assistir/Ouvir agora ·
+      Remover da lista em perigo). `videoLibMenu`.
+- [x] **Audiolivro**: lixeira do canto do card → menu (Ouvir agora/Anexar o áudio ·
+      Guardar na nuvem · Remover). `abCardMenu`; o botão-nuvem de STATUS continua no card.
+- [x] **Estante: card × linha com o MESMO clique** — linha com arquivo abre a leitura
+      (antes só a ficha); físico abre a ficha nos dois visuais.
+      **Testado ao vivo: 13/13** (menu abre/posiciona/fecha pelos 3 caminhos; estante,
+      vídeo e audiolivro com menu e sem lixeira nua; linha×card iguais; console limpo).
+      ⚠️ Escape/2º clique atacham num setTimeout(0) — teste tem de esperar um tick.
+- [ ] **Sobra da UX-2:** "Editar card" do SRS → menu ⋯ unificado com a Biblioteca
+      (gerar frase/imagem, rever cena, abrir no Estudar, mover, excluir) — o details
+      atual funciona; a unificação é redesign com selects em menu flutuante, rodada
+      própria.
+
 ### Da rodada do hover que pausa a legenda (2026-08-24, 51ª)
 
 - [x] **MOUSE NA LEGENDA SOBRE O VÍDEO = PAUSA** (pedido dele). Listeners no `#vid-ov`
@@ -15592,7 +15613,7 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       styles.css:911 remove busca/filtros/lote inteiros); rótulos nas barras só-ícone
       (leitor 9, audiolivro 8, vídeo 9 — tooltips são mouseover-only, core.js:2163);
       preview da Biblioteca no toque (styles.css:885).
-- [ ] **UX-2 — um menu de card, o mesmo em todo lugar:** o `estMenu` da estante
+- [x] **UX-2 — um menu de card, o mesmo em todo lugar (52ª; sobra: menu do card SRS):** o `estMenu` da estante
       (estante.js:806) vira padrão; audiolivro (audiobook.js:160) e vídeo (video.js:147)
       trocam a lixeira do canto por menu; "Editar card" do SRS (study.js:927) vira menu ⋯
       unificado com a Biblioteca (gerar frase/imagem, rever cena, abrir no Estudar, mover,
