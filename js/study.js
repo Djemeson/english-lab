@@ -847,8 +847,10 @@ function buildSrsVerso(card, imgData, imageBelow) {
     text += `<div class="srs-back-example">"${buildSrsFrente(card)}"</div>`
     text += `<div style="display:flex;align-items:center;gap:6px;margin:4px 0 10px">
       <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();playSrsTTS(window._srsCurrentCard?.example_en||window._srsCurrentCard?.word||'')">${ic('volume','ic-sm')} Repetir frase</button>
-      <button class="btn btn-ghost btn-sm" title="Gerar nova frase que reflita melhor a definição" style="opacity:0.45;padding:4px 7px;font-size:var(--fs-sm)"
-        onclick="event.stopPropagation();regenerateCardExample('${card.id}',this)">${ic('refresh','ic-sm')}</button>
+      <!-- UX-4: era um ícone apagado (opacity .45) sem nome — tesouro escondido.
+           Função paga e útil merece rótulo. -->
+      <button class="btn btn-ghost btn-sm" data-tip="A IA gera outra frase de exemplo, que reflita melhor a definição (centavos)"
+        onclick="event.stopPropagation();regenerateCardExample('${card.id}',this)">${ic('refresh','ic-sm')} Nova frase</button>
       ${card.clipId ? `<button class="btn btn-ghost btn-sm" title="Rever a cena de origem (no aparelho que tem o vídeo)"
         onclick="event.stopPropagation();reverCena('${card.clipId}')">${ic('film','ic-sm')} Rever a cena</button>` : ''}
     </div>`
@@ -901,9 +903,14 @@ function buildSrsVerso(card, imgData, imageBelow) {
       ant.length ? `<span class="ant">✕ ${ant.map(esc).join(', ')}</span>` : ''}</div>`
   }
   if (material) {
+    // "Estudar de novo" TAMBÉM aqui (UX-4): antes só existia na pausa do erro —
+    // mas é lendo o material que se percebe "isto não colou", sem ter errado.
     text += `<details class="srs-material${window._srsErrou ? ' erro' : ''}"${window._srsErrou ? ' open' : ''}>
       <summary>${ic('bookOpen','ic-sm')} ${window._srsErrou ? 'Reveja antes de seguir' : 'Ver o material'}</summary>
       <div class="srs-material-body">${material}</div>
+      ${card.wordId ? `<div style="padding:0 12px 10px"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();srsAbrirNoEstudar('${card.wordId}','${card.meaningId || ''}')"
+        data-tip="Abre o painel completo deste item — a revisão continua de onde parou">
+        ${ic('bookOpen','ic-sm')} Estudar de novo</button></div>` : ''}
     </details>`
   }
   // A saída da pausa do erro. Fora dela o botão não existe — o fluxo normal

@@ -15421,6 +15421,23 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada Kondo IV — promoções de rótulo (2026-08-25, 54ª = UX-4 parcial)
+
+- [x] **"Nova frase" ganhou nome** (verso do card SRS): era um ícone a 45% de opacidade
+      sem rótulo — função paga e útil escondida. Agora botão nomeado com data-tip do
+      custo. **"Estudar de novo" também no material**: antes só existia na pausa do
+      erro; é lendo o material que se percebe "não colou" sem ter errado — botão no pé
+      do details quando o card tem wordId. study.js é lazy → sem bump. Testado 4/4.
+- [ ] **UX-4 restante** (construções, aguardam sequenciamento dele): pré-estudo por
+      capítulo no leitor; "Ouvir junto" na ficha; ditado/shadowing anunciados;
+      "Completar verbete" no Estudar/Biblioteca; lotes pagos com aiConfirmBatch;
+      playlist anunciar escopo fora do tooltip; sono no vídeo/podcast; motor único de
+      cobertura.
+- [ ] **UX-5 — faxina: BLOQUEADA na decisão dele** sobre a triagem por nível (~500
+      linhas adormecidas em ler.js — aposentar ou reativar?). O resto da faxina
+      (quickAdd, analyzeAll, saveAllToSrs, reprocessMetaBulk, picker antigo do Kindle,
+      .recent-item, .kindle-override, ramo 'conheco') vai junto quando ele decidir.
+
 ### Da rodada Kondo III — o toque é cidadão de primeira classe (2026-08-25, 53ª = UX-1)
 
 - [x] **Bloco `@media (hover:none)` no fim do styles.css**: tudo que só aparecia no
@@ -15641,7 +15658,7 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       recentes → irParaItem (dashboard.js:643); header mobile 1 alvo de conta
       (index.html:117-130); popup de seleção do Preparar migra p/ selMenuAtivar
       (review.js:3385→ai.js:269); legenda do vídeo agrupada (video.js:362-374).
-- [ ] **UX-4 — promoções:** pré-estudo com painel por capítulo (molde do raio-X,
+- [ ] **UX-4 — promoções (54ª fez os rótulos: "Nova frase" nomeado e "Estudar de novo" no material; RESTAM as construções):** pré-estudo com painel por capítulo (molde do raio-X,
       ler.js:3904); "Ouvir junto" com rótulo + na ficha do livro (ler.js:497);
       ditado/shadowing anunciados (video-study.js:584); "Completar verbete" no Estudar e na
       Biblioteca (review.js:1890); "Regenerar frase" nomeado (study.js:850); "Estudar de
