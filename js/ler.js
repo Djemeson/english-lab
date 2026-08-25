@@ -4048,20 +4048,119 @@ async function lerRaioXPreparar(i) {
 function _lerPreBlocoHTML() {
   const carregado = typeof glossPreChave === 'function' &&
                     glossPreChave() === _lerChavePre(_lerCap)
+  // "Por capítulo" nos DOIS estados (UX-4, rodada 62): o mapa do que já foi
+  // lido não pode depender de o capítulo atual estar lido ou não.
+  const porCap = '<button class="btn btn-ghost btn-sm" id="ler-pre-cap-btn" ' +
+    'onclick="lerPrePainel()" data-tip="O mapa do livro: que capítulos já foram lidos pela IA, e ler os que faltam">' +
+    ic('layers', 'ic-sm') + ' Por capítulo</button>'
   if (carregado) {
     return '<div class="ler-pre">' +
       '<div class="ler-pre-ok">' + ic('check', 'ic-sm') +
       ' Este capítulo já foi lido: passe o mouse em qualquer palavra nova.</div>' +
       '<button class="btn btn-ghost btn-sm" onclick="lerPreApagar().then(()=>_lerRenderFerramentas())">' +
-      ic('refresh', 'ic-sm') + ' Ler de novo</button></div>'
+      ic('refresh', 'ic-sm') + ' Ler de novo</button>' + porCap + '</div>'
   }
   return '<div class="ler-pre" id="ler-pre-area">' +
     '<button class="btn btn-secondary btn-sm" id="ler-pre-btn" ' +
     'onclick="lerPreAnalisar().then(()=>_lerRenderFerramentas())">' +
-    ic('sparkles', 'ic-sm') + ' Ler este capítulo com a IA</button>' +
+    ic('sparkles', 'ic-sm') + ' Ler este capítulo com a IA</button>' + porCap +
     '<p class="ler-fer-nota">Manda as palavras novas <b>com a frase em que aparecem</b> ' +
     'numa chamada só, e guarda. Depois, passar o mouse em qualquer uma delas mostra o ' +
     'sentido <b>daquela passagem</b> — não o do dicionário. Mostro o custo antes.</p></div>'
+}
+
+// ---- O PAINEL DO PRÉ-ESTUDO POR CAPÍTULO (UX-4, rodada 62) ----------
+// O molde é o do raio-X — o desenho que ele aprovou lá: capítulos com spark
+// no que já foi feito, clique no que falta manda fazer. O pré-estudo só agia
+// no capítulo aberto; saber "o que já foi lido pela IA" exigia entrar em cada
+// um. As classes visuais são as do raio-X de propósito: mesma cara, zero CSS.
+let _lerPreMapa = null
+
+async function lerPrePainel() {
+  const p0 = el('ler-pre-painel')
+  if (p0 && p0.classList.contains('aberto')) { p0.classList.remove('aberto'); return }
+  try { await _lerNomearPeloConteudo() } catch (e) {}
+  await _lerPreMapear()
+  _lerPrePainelRender()
+  el('ler-pre-painel').classList.add('aberto')
+}
+
+// Uma varredura do IndexedDB (e a nuvem primeiro, como no raio-X: capítulo
+// lido no telefone não pode aparecer como "ler" no computador e cobrar de novo).
+async function _lerPreMapear() {
+  _lerPreMapa = {}
+  if (!_lerLivro) return
+  try {
+    if (typeof geradoDoLivro === 'function') _lerPreMapa = await geradoDoLivro(_lerLivro.id, 'pre')
+  } catch (e) {}
+  try {
+    const pre = `pre:${_lerLivro.id}:`
+    for (const k of await BookDB.keys()) {
+      if (typeof k !== 'string' || !k.startsWith(pre)) continue
+      const cap = Number(k.slice(pre.length))
+      const dados = await BookDB.get(k)
+      try {
+        const t = (dados && typeof dados.text === 'function') ? await dados.text() : String(dados)
+        const d = JSON.parse(t)
+        _lerPreMapa[cap] = Array.isArray(d && d.itens) ? d.itens.length : (_lerPreMapa[cap] || 1)
+      } catch (e2) { _lerPreMapa[cap] = _lerPreMapa[cap] || 1 }
+    }
+  } catch (e) { console.warn('[ler] mapa do pré-estudo:', e && e.message) }
+}
+
+function _lerPrePainelRender(msg) {
+  let p = el('ler-pre-painel')
+  if (!p) {
+    p = document.createElement('div')
+    p.id = 'ler-pre-painel'
+    p.className = 'ler-raiox-painel'
+    p.addEventListener('click', e => e.stopPropagation())
+    document.body.appendChild(p)
+    setTimeout(() => document.addEventListener('click', () => p.classList.remove('aberto')), 0)
+  }
+  const caps = _lerCapsAnalisaveis()
+  const feitos = caps.filter(x => (_lerPreMapa || {})[x.i]).length
+  p.innerHTML = `
+    <div class="ler-raiox-topo">
+      <b>${ic('sparkles','ic-sm')} Leitura com IA, por capítulo</b>
+      <span>${feitos} de ${caps.length} ${caps.length === 1 ? 'capítulo lido' : 'capítulos lidos'}</span>
+    </div>
+    ${msg ? `<div class="ler-raiox-msg">${esc(msg)}</div>` : ''}
+    <div class="ler-raiox-lista">
+      ${caps.map(({ i, nome }) => {
+        const n = (_lerPreMapa || {})[i]
+        return `<button class="ler-raiox-cap${i === _lerCap ? ' atual' : ''}${n ? ' feito' : ''}"
+                  onclick="lerPreDoCapitulo(${i})">
+          <span class="ler-raiox-spark">${n ? ic('sparkles','ic-sm') : ''}</span>
+          <span class="ler-raiox-nome">${esc(nome)}</span>
+          <span class="ler-raiox-n">${n ? n + ' glosas' : 'ler'}</span>
+        </button>`
+      }).join('')}
+    </div>
+    <p class="est-dica">Capítulo com <b>${ic('sparkles','ic-3xs')}</b> já foi lido — o clique leva
+      até ele com as glosas prontas. Sem a marca, o clique manda ler (o custo aparece antes).</p>`
+  const btn = el('ler-pre-cap-btn')
+  if (btn) {
+    const r = btn.getBoundingClientRect()
+    p.style.top = Math.round(r.bottom + 8) + 'px'
+    p.style.left = Math.round(Math.max(8, Math.min(r.left - 120, innerWidth - 340))) + 'px'
+  }
+}
+
+// Clique num capítulo: vai até ele; sem leitura ainda, manda ler (o próprio
+// lerPreAnalisar mostra o custo e pede confirmação antes de gastar).
+async function lerPreDoCapitulo(i) {
+  const jaTem = (_lerPreMapa || {})[i]
+  if (i !== _lerCap) await lerIrParaCapitulo(i, 0)
+  if (jaTem) {
+    el('ler-pre-painel')?.classList.remove('aberto')
+    try { await lerPreAplicar(i) } catch (e) {}
+    return
+  }
+  _lerPrePainelRender('Lendo este capítulo com a IA…')
+  await lerPreAnalisar(i)
+  await _lerPreMapear()
+  _lerPrePainelRender()
 }
 
 // PROGRESSO DA LEITURA. Sem isto o botão sumia e não acontecia nada visível

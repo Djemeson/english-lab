@@ -15421,6 +15421,25 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do pré-estudo por capítulo (2026-08-25, 62ª = UX-4 — a última construção)
+
+- [x] **"Por capítulo" no bloco da leitura com IA** (painel de ferramentas do leitor,
+      nos DOIS estados do bloco): abre um painel no MOLDE do raio-X — o desenho que
+      ele aprovou lá (spark no feito, clique no que falta manda fazer) — com as
+      MESMAS classes visuais (`ler-raiox-*`, zero CSS novo). `_lerPreMapear` varre
+      nuvem primeiro (`geradoDoLivro(id,'pre')` — capítulo lido no telefone não pode
+      cobrar de novo no PC) e o BookDB por cima (`pre:{id}:{cap}`, contagem de
+      glosas). `lerPreDoCapitulo`: feito → navega e aplica as glosas; não feito →
+      navega e roda `lerPreAnalisar(i)` (que já mostra o custo antes).
+      ler.js é lazy → sem bump. **Testado ao vivo: 9/9** (mapa {0:3,2:1} correto,
+      painel com 3 linhas, 2 sparks, "3 glosas"/"ler", "2 de 3" no topo). Console limpo.
+
+**Com esta, as 5 construções de UX estão TODAS entregues** (motor de cobertura 58ª,
+completar-tudo 59ª, fila no celular 60ª, preview no toque 61ª, pré-estudo por capítulo
+62ª) + faxina UX-5 (57ª). Fora do escopo executado (registrados, sem prazo): menu do
+card SRS unificado; transplante do popup do Preparar (exige enriquecer a peça comum
+antes); "picker antigo do Kindle" (não identificado com segurança).
+
 ### Da rodada do preview da Biblioteca no toque (2026-08-25, 61ª = UX-1)
 
 - [x] **Tocar num card da Biblioteca agora responde no celular.** O painel lateral de
@@ -15752,7 +15771,7 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       recentes → irParaItem (dashboard.js:643); header mobile 1 alvo de conta
       (index.html:117-130); popup de seleção do Preparar migra p/ selMenuAtivar
       (review.js:3385→ai.js:269); legenda do vídeo agrupada (video.js:362-374).
-- [ ] **UX-4 — promoções (54ª: rótulos; 55ª: sono/anúncios/Ouvir junto/playlist; 58ª: motor de cobertura; 59ª: completar-tudo do dossiê; 60ª: fila no celular; RESTAM):** preview da Biblioteca no toque; pré-estudo por capítulo (molde do raio-X). pré-estudo com painel por capítulo (molde do raio-X,
+- [ ] **UX-4 — promoções (54ª: rótulos; 55ª: sono/anúncios/Ouvir junto/playlist; TODAS FEITAS — 54ª a 62ª):** rótulos, sono, anúncios, Ouvir junto, playlist, motor de cobertura, completar-tudo, fila no celular, preview no toque, pré-estudo por capítulo.** pré-estudo com painel por capítulo (molde do raio-X,
       ler.js:3904); "Ouvir junto" com rótulo + na ficha do livro (ler.js:497);
       ditado/shadowing anunciados (video-study.js:584); "Completar verbete" no Estudar e na
       Biblioteca (review.js:1890); "Regenerar frase" nomeado (study.js:850); "Estudar de
