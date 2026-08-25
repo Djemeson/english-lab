@@ -4089,6 +4089,15 @@ palavra virar card no mesmo segundo em que você tropeça nela.
        o batch fecha a conta: nessa família batch é sempre metade do padrão (0,067→0,034;
        0,134→0,067; 0,039→0,0195), e o batch do Lite é 0,0168 → padrão **0,0336**, idêntico
        ao print. Método a repetir quando a doc vier ambígua.
+     - **⚠️ ARMADILHA DE VÍDEO — "mil imagens por 4 centavos" (reconferido em 2026-08-25)**:
+       vídeo visto pelo Djemeson afirma que o Nano Banana 2 Lite gera **1000 imagens por
+       US$ 0,04**. É falso por ~840×. A tabela oficial (ai.google.dev/gemini-api/docs/pricing,
+       reconferida nesta data) mantém **US$ 0,0336 por imagem 1K no padrão** e **US$ 0,0168 no
+       batch**, sem free tier — mil imagens custam **US$ 33,60** (US$ 16,80 no batch). A origem
+       provável do número é o próprio 0,0336 ≈ "3,4 centavos **por imagem**", reembalado como
+       "por mil". **E o Lite não é o mais barato do catálogo daqui**: o padrão do app segue
+       sendo `gpt-image-2` quality `low` a **US$ 0,006/imagem** — 5,6× mais barato que o Lite.
+       Trocar o fornecedor de imagens para o Gemini é decisão de QUALIDADE, nunca de preço.
      - **⚠️ ARMADILHA — Imagen 4 Fast, US$ 0,02**: é o preço mais baixo da tela inteira e é
        uma cilada. Os três Imagen 4 (`imagen-4.0-generate-001`, `-ultra-`, `-fast-`) estão
        **depreciados e desligam em 17/ago/2026** — 11 dias depois desta rodada. Adotar por
