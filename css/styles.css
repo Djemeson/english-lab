@@ -8137,3 +8137,30 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
     background:var(--surface2);color:var(--text2);cursor:pointer;
   }
 }
+
+/* ================================================================
+   PREVIEW DA BIBLIOTECA NO TOQUE (UX-1, rodada 61).
+   O painel lateral não cabe no celular (some com !important lá em
+   cima) — mas tocar num card ficava sem resposta nenhuma. Agora o
+   preview abre como gaveta de baixo; o X fecha. Desktop intocado
+   (.aberta só é interpretada dentro do @media).
+   ================================================================ */
+.bpp-fechar{display:none}
+@media (max-width:768px){
+  .browser-preview-panel.aberta{
+    display:flex!important;flex-direction:column;
+    position:fixed;left:0;right:0;bottom:0;max-height:76vh;max-height:76dvh;
+    z-index:calc(var(--z-modal) + 1);
+    background:var(--surface);border-top:1px solid var(--border-strong);
+    border-left:none;border-radius:18px 18px 0 0;
+    box-shadow:0 -14px 44px rgba(0,0,0,.5);
+    padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+    overflow-y:auto;
+  }
+  .browser-preview-panel.aberta .bpp-fechar{
+    display:inline-flex;align-items:center;justify-content:center;
+    position:sticky;top:0;margin-left:auto;flex-shrink:0;
+    width:32px;height:32px;border:none;border-radius:50%;
+    background:var(--surface2);color:var(--text2);cursor:pointer;z-index:2;
+  }
+}

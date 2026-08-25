@@ -1400,6 +1400,11 @@ async function markBoldAll() {
   toast(`Negrito marcado em ${ok} frase(s)${fail ? ` · ${fail} falharam (rode de novo)` : ''}`, ok ? 'success' : 'warning')
 }
 
+function browserPreviewFechar() {
+  el('browser-preview-panel')?.classList.remove('aberta')
+  document.querySelector('.srs-browser-row.preview-active')?.classList.remove('preview-active')
+}
+
 function toggleBrowserDeck(deckId) {
   _activeBrowserDeck = deckId
   clearLibraryFilterUI()
@@ -1660,7 +1665,11 @@ async function showBrowserCardPreview(cardId) {
   const SC = {new:'var(--success)', learning:'var(--warning)', review:'var(--primary)', relearning:'var(--error)'}
   const SL = {new:'Novo', learning:'Aprendendo', review:'Revisão', relearning:'Reaprendendo'}
 
+  // No celular o painel lateral não existe — o preview abre como GAVETA
+  // (UX-1, rodada 61) e o X fecha. No desktop a classe não tem efeito.
+  if (innerWidth > 0 && innerWidth <= 768) panel.classList.add('aberta')
   panel.innerHTML = `
+    <button class="bpp-fechar" onclick="browserPreviewFechar()" aria-label="Fechar o preview">${ic('x','ic-sm')}</button>
     <div>
       <div style="font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">
         <span style="color:${SC[card.state]}">${SL[card.state]}</span>

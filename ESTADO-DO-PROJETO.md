@@ -15421,6 +15421,16 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do preview da Biblioteca no toque (2026-08-25, 61ª = UX-1)
+
+- [x] **Tocar num card da Biblioteca agora responde no celular.** O painel lateral de
+      preview não cabe (continua display:none no mobile), mas o toque ficava MUDO.
+      `showBrowserCardPreview` adiciona `.aberta` quando innerWidth≤768 (e >0 — painel
+      oculto mede 0) e o preview abre como gaveta de baixo (76dvh, X fixo no topo
+      fecha e limpa o highlight da linha — `browserPreviewFechar`). Desktop intocado:
+      `.aberta` só é interpretada dentro do @media. sw v424 (audio.js/styles shell).
+      **Testado ao vivo (emulação mobile): 5/5.**
+
 ### Da rodada da fila do Preparar no celular (2026-08-25, 60ª = UX-1)
 
 - [x] **A fila voltou ao celular como GAVETA.** Abaixo de 768px a barra lateral sumia
