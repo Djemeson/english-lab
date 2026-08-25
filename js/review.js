@@ -1078,68 +1078,6 @@ async function analyzeWord(wordId) {
   await analyzeWordDirect(wordId)
 }
 
-async function analyzeAll() {
-  if (!aiChatCfg().key) {
-    toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error')
-    showSection('configuracoes')
-    return
-  }
-  const pending = words.filter(w => w.status === 'pending_ai')
-  if (!pending.length) { toast('Nenhuma palavra pendente de análise', 'info'); return }
-  toast(`Analisando ${pending.length} palavras...`)
-  for (const w of pending) {
-    await analyzeWord(w.id)
-    await sleep(300)
-  }
-  toast('Análise concluída!', 'success')
-}
-
-function updateSendAllBtn() { /* kept for compatibility — buttons moved to sidebar action bar */ }
-
-async function saveAllToSrs() {
-  const ready = words.filter(w => w.status === 'pending_review' && w.meanings?.some(m => m.selected !== false))
-  if (!ready.length) { toast('Nenhuma palavra analisada pronta para salvar', 'warning'); return }
-  const btn = el('btn-save-all-srs')
-  if (btn) { btn.disabled = true; btn.style.opacity = '.45'; btn.innerHTML = `<span class="spinner"></span> Salvando...` }
-  // Suprime toasts individuais durante o batch
-  const _toast = window._batchMode = true
-  let ok = 0, totalCards = 0
-  for (const w of ready) {
-    if (!w.meanings?.length) continue
-    const selected = w.meanings.filter(m => m.selected !== false)
-    if (!selected.length) continue
-    let added = 0
-    selected.forEach(m => {
-      const mi = w.meanings.indexOf(m)
-      const examples = m.examples?.length ? m.examples : [null]
-      examples.forEach((ex, ei) => {
-        // Mesma conta nos dois lados (rodada 44): procurar com -1 e gravar com 0
-        // fazia a duplicata nunca ser achada — cada reenvio criava card novo.
-        const exIdx = ex ? ei : 0
-        const exists = srsCards.find(c => c.wordId === w.id && c.meaningIdx === mi && c.exampleIdx === exIdx)
-        if (exists) return
-        const card = createSrsCard(w.id, mi, exIdx)
-        if (card) { srsCards.push(card); added++; totalCards++ }
-      })
-    })
-    // MESMO DEFEITO DA VOLTA QUEBRADA: cravar `w.status` sem mexer no SENTIDO
-    // deixa o item com card na Revisão e sentido ainda 'pronto' — a primeira
-    // re-derivação o jogaria de volta ao Preparar. Quem manda é o sentido.
-    if (added > 0) { selected.forEach(_marcarSentidoNaRevisao); sincronizarStatusItem(w); w.updated_at = new Date().toISOString(); ok++ }
-  }
-  window._batchMode = false
-  saveSrsCards(); saveWords(); autoSyncAfterChange()
-  if (btn) { btn.innerHTML = 'Salvar todos no site'; updateSendAllBtn() }
-  toast(`${ok} palavra${ok !== 1 ? 's' : ''} (${totalCards} cards) salvas no site`, ok > 0 ? 'success' : 'info')
-  renderReview(); renderDashboard(); renderSidebar(); updateSrsBadge()
-}
-
-// Os cards que o sentido separado já tinha na Revisão. Eles continuam válidos
-// como frase, mas ensinam a palavra ERRADA na frente ("fall", quando o que se
-// aprende ali é "fall in love"). Avisar e não oferecer saída seria empurrar o
-// problema; apagar sem perguntar destruiria agendamento (ease, intervalo,
-// lapsos) que ele levou semanas para construir. Então: pergunta, com o preço
-// escrito.
 async function _separarCuidarDosCards(w, mi, nome) {
   if (typeof srsCards === 'undefined') return
   const alvos = srsCards.filter(c => c.wordId === w.id && c.meaningIdx === mi)

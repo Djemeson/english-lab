@@ -1400,64 +1400,6 @@ async function markBoldAll() {
   toast(`Negrito marcado em ${ok} frase(s)${fail ? ` · ${fail} falharam (rode de novo)` : ''}`, ok ? 'success' : 'warning')
 }
 
-async function reprocessMetaBulk() {
-  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'error'); return }
-  if (!srsCards.length) { toast('Nenhum card na biblioteca', 'info'); return }
-
-  // Agrupa por significado (wordId|meaningIdx) — todos os cards do mesmo significado
-  // compartilham variedade/registro, então classificamos só 1 vez por significado.
-  const groups = new Map()
-  for (const c of srsCards) {
-    const key = `${c.wordId}|${c.meaningIdx}`
-    if (!groups.has(key)) groups.set(key, { word: c.word || '', meaning: c.meaning_pt || '', example: c.example_en || '', lang: cardLang(c), cards: [] })
-    groups.get(key).cards.push(c)
-  }
-  const items = [...groups.values()].filter(g => g.word)
-  if (!items.length) { toast('Nenhum significado para processar', 'info'); return }
-
-  if (!(await aiConfirmBatch('chat', items.length, 'Reprocessar variedade e registro', { sempre: true, detalhe: ['Reclassifica variedade (AmE/BrE…) e registro (formal, gíria…)', 'Não altera frases nem agendamento'] }))) return
-
-  const btn = document.getElementById('lib-reprocess-btn')
-  const origHtml = btn ? btn.innerHTML : ''
-  if (btn) btn.disabled = true
-
-  const BATCH = 25
-  let done = 0, updated = 0, failed = 0
-  for (let i = 0; i < items.length; i += BATCH) {
-    const batch = items.slice(i, i + BATCH)
-    if (btn) btn.innerHTML = `<span class="spinner"></span> ${done}/${items.length}`
-    try {
-      const payload = batch.map((it, j) => ({
-        id: j,
-        word: it.word,
-        lang: it.lang || 'en',
-        meaning: it.meaning,
-        example: (it.example || '').replace(/<[^>]+>/g, '').slice(0, 160)
-      }))
-      const results = await classifyMetaBatch(payload)
-      const byId = {}; results.forEach(r => { byId[r.id] = r })
-      batch.forEach((it, j) => {
-        const r = byId[j]; if (!r) return
-        const variety = _normVariety(r.variety, it.lang)
-        const register = _normRegister(r.register)
-        it.cards.forEach(c => { c.variety = variety; c.register = register })
-        updated += it.cards.length
-      })
-    } catch (e) {
-      console.warn('[reprocessMeta] batch falhou:', e.message)
-      failed += batch.length
-    }
-    done += batch.length
-    await sleep(350)
-  }
-
-  saveSrsCards(); autoSyncAfterChange()
-  if (btn) { btn.disabled = false; btn.innerHTML = origHtml }
-  if (_browserPreviewCardId) showBrowserCardPreview(_browserPreviewCardId)
-  if (_activeBrowserDeck) renderBrowserCardList(_activeBrowserDeck, el('srs-browser-search')?.value || '')
-  toast(`${updated} card(s) atualizados${failed ? ` · ${failed} falharam` : ''}`, updated ? 'success' : 'warning')
-}
-
 function toggleBrowserDeck(deckId) {
   _activeBrowserDeck = deckId
   clearLibraryFilterUI()

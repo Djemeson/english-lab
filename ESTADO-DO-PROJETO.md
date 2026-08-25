@@ -15467,10 +15467,19 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       "Completar verbete" no Estudar/Biblioteca; lotes pagos com aiConfirmBatch;
       playlist anunciar escopo fora do tooltip; sono no vídeo/podcast; motor único de
       cobertura.
-- [ ] **UX-5 — faxina: BLOQUEADA na decisão dele** sobre a triagem por nível (~500
-      linhas adormecidas em ler.js — aposentar ou reativar?). O resto da faxina
-      (quickAdd, analyzeAll, saveAllToSrs, reprocessMetaBulk, picker antigo do Kindle,
-      .recent-item, .kindle-override, ramo 'conheco') vai junto quando ele decidir.
+- [x] **UX-5 — faxina FEITA (57ª; ele decidiu: "aposenta a triagem")**: triagem por
+      nível removida (~600 linhas de ler.js + ~140 de CSS; `#ler-ferramentas` com a
+      altura própria FICOU — o painel vivo usa); ramos 'conheco' mortos do desfazer
+      simplificados (só 'ignorar' empilha hoje; 'estudo' não mexe em contador);
+      quickAdd (form q-word nem existe mais), analyzeAll, saveAllToSrs +
+      updateSendAllBtn (stub), reprocessMetaBulk, `.recent-item`, `.kindle-override`
+      — tudo sem nenhum chamador, removido. **"Picker antigo do Kindle" NÃO removido**:
+      não identifiquei com segurança qual código é (o `kp-*` de add.js parece vivo) —
+      não se apaga por palpite. Dados antigos da triagem no BookDB são inócuos.
+      **Testado ao vivo: 14/14** (mortos indefinidos, vivos funcionando, conta do
+      ignorar/desfazer certa, CSS da triagem fora e ferramentas com altura).
+      ⚠️ Cache HTTP do preview mostrou os mortos "vivos" no 1º teste — sempre
+      `fetch(cache:'reload')` nos arquivos tocados antes de testar.
 
 ### Da rodada Kondo III — o toque é cidadão de primeira classe (2026-08-25, 53ª = UX-1)
 

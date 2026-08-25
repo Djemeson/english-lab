@@ -766,14 +766,4 @@ function createWord(data) {
 // ================================================================
 // QUICK ADD
 // ================================================================
-function quickAdd() {
-  const word = el('q-word').value.trim()
-  const ctx = el('q-ctx').value.trim()
-  if (!word && !ctx) { toast('Digite ao menos uma palavra ou frase', 'warning'); return }
-  createWord({ word, context: ctx, source_type: 'manual' })
-  el('q-word').value = ''
-  el('q-ctx').value = ''
-  renderDashboard()
-  toast(`Adicionado! Vá em Preparar para analisar com IA.`, 'success')
-}
 
