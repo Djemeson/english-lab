@@ -24,6 +24,8 @@ let _vidAutoScroll = true
 let _vidShowPT = false          // mostrar TODAS as traduções no transcript
 let _vidCapturing = false
 let _vidOverlayOn = true        // legenda em tempo real sobre o vídeo
+let _vidHoverPausou = false     // foi o hover na legenda que pausou (rodada 51)
+let _vidHoverTimer = null       // retomada suave após sair da legenda
 let _vidPTmode = 'off'          // tradução no vídeo: off | sub (legenda PT) | ia (tempo real)
 let _vidPTfog = true            // névoa: tradução borrada até o hover (recall)
 let _vidCuesPT = []             // trilha PT-BR baixada dos addons (alinhada por tempo)
@@ -493,6 +495,41 @@ async function videoOpenPlayer(v) {
   // O botão de tradução nasce dizendo a verdade do estado (rodada 49):
   // falta → "Traduzir tudo" · coberta (IA ou trilha importada) → "Retraduzir".
   if (typeof _vidPTfullStatus === 'function') _vidPTfullStatus(null)
+  // MOUSE NA LEGENDA = PAUSA (rodada 51, pedido dele). Ler com calma, marcar,
+  // abrir o chip — tudo isso briga com o vídeo andando. Só a legenda recebe
+  // mouse (pointer-events fica nos spans), então hover em outra parte do vídeo
+  // não pausa nada. A retomada espera 250ms (pular do inglês para a tradução
+  // não faz o vídeo gaguejar) e segura enquanto houver balão aberto
+  // (glossário, chip do raio-X ou seleção). Play manual devolve o comando.
+  _vidHoverPausou = false
+  clearTimeout(_vidHoverTimer); _vidHoverTimer = null
+  {
+    const ov3 = el('vid-ov')
+    const balaoAberto = () =>
+      (typeof glossAberto === 'function' && glossAberto()) ||
+      (typeof _difPop !== 'undefined' && _difPop && document.body.contains(_difPop)) ||
+      (el('vid-ov-pop') && !el('vid-ov-pop').classList.contains('hidden'))
+    const retomar = () => {
+      _vidHoverTimer = null
+      if (!_vidHoverPausou) return
+      if (balaoAberto()) { _vidHoverTimer = setTimeout(retomar, 300); return }
+      const p = el('vid-player')
+      _vidHoverPausou = false
+      if (p && p.paused) p.play()
+    }
+    if (ov3) {
+      ov3.addEventListener('mouseenter', () => {
+        clearTimeout(_vidHoverTimer); _vidHoverTimer = null
+        const p = el('vid-player')
+        if (p && !p.paused) { p.pause(); _vidHoverPausou = true }
+      })
+      ov3.addEventListener('mouseleave', () => {
+        if (!_vidHoverPausou) return
+        clearTimeout(_vidHoverTimer)
+        _vidHoverTimer = setTimeout(retomar, 250)
+      })
+    }
+  }
 
   // ---- Retomar de onde parou ----
   // A posição é salva a cada ~5s de reprodução (e no pause/saída). Na volta,
@@ -506,6 +543,11 @@ async function videoOpenPlayer(v) {
   }, { once: true })
   player.addEventListener('pause', _vidSavePos)
   player.addEventListener('ended', () => { v.position = 0; saveVideos() })
+  // Play manual com o mouse ainda na legenda: o comando volta para ele —
+  // o hover não pode "devolver" uma pausa que já não é dele.
+  player.addEventListener('play', () => {
+    if (_vidHoverPausou) { _vidHoverPausou = false; clearTimeout(_vidHoverTimer); _vidHoverTimer = null }
+  })
 
   // Fone, tela de bloqueio e botão do carro — o mesmo bloco do audiolivro
   // (melhoria 3, rodada 44). Podcast com a tela apagada é o caso de uso

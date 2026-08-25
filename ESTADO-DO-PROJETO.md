@@ -15421,6 +15421,22 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do hover que pausa a legenda (2026-08-24, 51ª)
+
+- [x] **MOUSE NA LEGENDA SOBRE O VÍDEO = PAUSA** (pedido dele). Listeners no `#vid-ov`
+      (só os spans da legenda recebem mouse — hover no resto do vídeo não pausa nada):
+      entrar pausa e marca `_vidHoverPausou`; sair agenda a retomada com **respiro de
+      250ms** (pular do inglês para a tradução não gagueja o vídeo); balão aberto
+      (glossário, chip do raio-X, popup de seleção) SEGURA a pausa e a retomada vem
+      sozinha quando fecha (revalida a cada 300ms); pausa manual dele é respeitada
+      (só retoma o que o hover pausou); play manual devolve o comando (listener 'play'
+      derruba a flag). Estado zerado a cada montagem do player.
+      **Testado ao vivo (instrumentado): 8/8.** ⚠️ Playback REAL não anda com o painel
+      de preview escondido — o Chrome pausa vídeo em aba oculta para poupar energia
+      ("video-only background media paused"); a prova com vídeo de verdade é no Chrome
+      real. ⚠️ Armadilha de teste: `window._difPop = x` NÃO alcança o `let _difPop` do
+      ai.js (escopo léxico) — simular balão é pelo `window.glossAberto`.
+
 ### Da rodada Kondo I — duplicados e destinos honestos (2026-08-24, 50ª = UX-3)
 
 - [x] **Configurações AUTO-SALVAM.** `cfgAutoSalvar()` (settings.js) ligada no change de
