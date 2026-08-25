@@ -15421,6 +15421,29 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada Kondo I — duplicados e destinos honestos (2026-08-24, 50ª = UX-3)
+
+- [x] **Configurações AUTO-SALVAM.** `cfgAutoSalvar()` (settings.js) ligada no change de
+      fornecedor/modelo/nível/transcrição/qualidade de imagem e no blur de cada chave
+      (`cfgChaveMudou` escreve "salva" na linha). `providerMudou`/`imgProviderMudou`
+      também salvam. Os DOIS botões "Salvar" morreram (header + "Salvar chave");
+      subtítulo da tela avisa "tudo salva sozinho ao mudar". `saveSettings()` mantida
+      como casca (compat).
+- [x] **Ouvir do Preparar = playSrsTTS** (era speakWord/robô — mesmo botão, voz
+      diferente por tela; agora cache→IA→robô como no Estudar).
+- [x] **Chips de recentes → `irParaItem`** (dashboard, aba vocabulário): clicar em
+      "worried" abre o ITEM, não a lista genérica do Preparar.
+- [x] **"Para revisar hoje" INICIA a revisão** (destino honesto); "Novos" continua
+      abrindo a biblioteca.
+- [x] **Header mobile: 1 alvo de conta** — ponto de sync e avatar viraram status
+      (sem onclick); a engrenagem é a única porta para Configurações.
+      **Testado ao vivo: 10/10** (auto-save de nível/STT verificado no localStorage
+      `englab_cfg`; chave marca "salva"; chip navega ao item; botões mortos; console
+      limpo). ⚠️ Teste com SW: limpar caches antes — o shell cache-first serve arquivo
+      velho no preview e o teste reprova à toa.
+- [ ] **Sobra da UX-3:** popup de seleção do Preparar migrar para `selMenuAtivar`
+      (review.js:3385 → ai.js:269) — transplante maior, rodada própria.
+
 ### Da rodada do botão de tradução honesto (2026-08-24, 49ª)
 
 - [x] **"Traduzir tudo" agora reconhece TODAS as fontes de tradução** (pedido dele: o
@@ -15558,7 +15581,7 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       trocam a lixeira do canto por menu; "Editar card" do SRS (study.js:927) vira menu ⋯
       unificado com a Biblioteca (gerar frase/imagem, rever cena, abrir no Estudar, mover,
       excluir); card×linha da estante abrem a mesma coisa (estante.js:735/774).
-- [ ] **UX-3 — duplicados e destinos honestos:** speakWord→playSrsTTS no Preparar
+- [x] **UX-3 — duplicados e destinos honestos (50ª; resta só o popup de seleção):** speakWord→playSrsTTS no Preparar
       (review.js:1911, 1 linha); Configurações tudo auto-salva (morre o 2º "Salvar",
       index.html:614/775); "Para revisar hoje" inicia sessão (index.html:966); chips de
       recentes → irParaItem (dashboard.js:643); header mobile 1 alvo de conta

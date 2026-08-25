@@ -1908,7 +1908,11 @@ function renderWordCard(wordId) {
            decodifica o &#39; de volta antes de executar, e speakWord('don't')
            é SyntaxError mudo — quase toda frase de livro tem apóstrofo.
            data-atributo + this.dataset resolve sem delegação. -->
-      <button class="btn btn-ghost btn-sm" data-txt="${escA(w.word || w.context)}" onclick="speakWord(this.dataset.txt)" title="Ouvir">${ic('volume','ic-sm')}</button>
+      <!-- playSrsTTS, não speakWord (UX-3): mesma voz do Estudar — cache e voz
+           de IA quando há, robô só como último recurso. Ouvir no Preparar com
+           voz de robô e no Estudar com voz boa era o MESMO botão soando
+           diferente em cada tela. -->
+      <button class="btn btn-ghost btn-sm" data-txt="${escA(w.word || w.context)}" onclick="playSrsTTS(this.dataset.txt)" title="Ouvir">${ic('volume','ic-sm')}</button>
       <button class="btn btn-ghost btn-sm" onclick="skipWord('${w.id}')" title="Pular">${ic('arrowRight','ic-sm')}</button>
       <button class="btn btn-ghost btn-sm" onclick="deleteWord('${w.id}')" title="Excluir">${ic('trash','ic-sm')}</button>
     </div>

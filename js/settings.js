@@ -27,7 +27,7 @@ function updateModelOptions() {
   sel.innerHTML = P.modelos.map(m =>
     `<option value="${m.id}"${m.id === atual ? ' selected' : ''}>${m.id} — ${_tierLabel(m.tier)} · ${m.nota}</option>`).join('')
 }
-function providerMudou() { updateModelOptions() }
+function providerMudou() { updateModelOptions(); cfgAutoSalvar() }
 
 // Chaves organizadas: uma linha por fornecedor, com teste individual
 function renderKeyRows() {
@@ -38,7 +38,7 @@ function renderKeyRows() {
       <div class="cfg-key-row">
         <span class="cfg-key-nome">${P.nome}${id === 'openai' ? ' <i>· também áudio/imagens</i>' : ''}</span>
         <div class="cfg-key-campo">
-          <input type="password" id="cfg-key-${id}" aria-label="Chave de API — ${escA(P.nome)}" placeholder="${P.placeholder}" autocomplete="off">
+          <input type="password" id="cfg-key-${id}" aria-label="Chave de API — ${escA(P.nome)}" placeholder="${P.placeholder}" autocomplete="off" onchange="cfgChaveMudou('${id}')">
           <button type="button" class="cfg-key-eye" onclick="togglePasswordVisibility('cfg-key-${id}')" aria-label="Mostrar/ocultar">${olho}</button>
         </div>
         <button type="button" class="btn btn-ghost btn-sm" onclick="testarChaveProv('${id}', this)">Testar</button>
@@ -99,6 +99,7 @@ function imgProviderMudou() {
   cfg.imgProvider = AI_IMG[el('cfg-img-provider')?.value] ? el('cfg-img-provider').value : cfg.imgProvider
   updateImgProviderOptions()
   updateImgQualityOptions()
+  cfgAutoSalvar()
   const prov = el('cfg-img-provider')?.value
   const P = AI_IMG[prov]
   if (P && !(cfg[P.keyCfg] || '').trim()) {
@@ -228,7 +229,11 @@ function fillSettings() {
   if (_fbUser !== undefined) updateFirebaseUI(_fbUser)
 }
 
-function saveSettings() {
+// UX-3 (rodada 50): as Configurações AUTO-SALVAM. Tema, acento, dados de
+// livros e nuvem já salvavam sozinhos; IA e áudio eram os únicos exigindo um
+// "Salvar" no fim — quem mexia no modelo e saía perdia a escolha em silêncio.
+// Agora cada controle salva no change; o botão "Salvar" foi aposentado.
+function cfgAutoSalvar() {
   const prov = el('cfg-ai-provider')?.value || 'openai'
   cfg.aiProvider = AI_PROVIDERS[prov] ? prov : 'openai'
   const modelo = el('cfg-ai-model')?.value || AI_DEFAULT_MODEL
@@ -246,7 +251,15 @@ function saveSettings() {
   if (cefrIdx(nvSel) >= 0) cfg.nivelAluno = nvSel
   saveCfg()
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
-  toast('Configurações salvas!', 'success')
+}
+// Nome antigo mantido: qualquer chamador esquecido continua funcionando.
+function saveSettings() { cfgAutoSalvar(); toast('Configurações salvas!', 'success') }
+// Chave digitada: salva no blur e diz "salva" na própria linha — a resposta
+// que o botão "Salvar chave" dava, agora sem o botão.
+function cfgChaveMudou(id) {
+  cfgAutoSalvar()
+  const st = el('cfg-key-status-' + id)
+  if (st) { st.textContent = 'salva'; st.style.color = 'var(--text3)' }
 }
 
 

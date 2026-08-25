@@ -640,7 +640,7 @@ function dashRecentCard() {
       <span class="dash-metaval">${words.length} no total</span>
     </div>
     <div class="dash-recent-chips">
-      ${recent.map(w => `<span class="dash-recent-chip" onclick="showSection('preparar')" style="cursor:pointer"
+      ${recent.map(w => `<span class="dash-recent-chip" data-id="${escA(w.id)}" onclick="irParaItem(this.dataset.id)" style="cursor:pointer"
         title="${escA(w.context || '')}">${esc(w.word || '(frase)')}</span>`).join('')}
       <span class="dash-recent-chip" style="color:var(--text3);cursor:pointer" onclick="showSection('adicionar')">+ adicionar</span>
     </div>

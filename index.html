@@ -114,14 +114,17 @@
   </div>
   <div class="mob-header-actions">
     <!-- Cloud sync indicator for mobile -->
-    <div class="anki-indicator sync-indicator hidden" id="sync-indicator-mob" title="Firebase" onclick="showSection('configuracoes')" style="cursor:pointer">
+    <!-- UX-3: um alvo só de conta no header. O ponto de sync e o avatar são
+         STATUS — clicáveis, eram duas portas duplicadas para Configurações,
+         coladas na engrenagem que é a porta de verdade. -->
+    <div class="anki-indicator sync-indicator hidden" id="sync-indicator-mob" title="Firebase">
       <div class="sync-dot" id="sync-dot-mob"></div>
     </div>
     <!-- Profile picture / Login button for mobile -->
     <button id="fb-login-btn-mob" class="btn btn-secondary btn-sm" onclick="firebaseSignIn()" style="display:none; font-size:var(--fs-2xs); padding: 4px 8px;">
       Entrar
     </button>
-    <div id="fb-user-chip-mob" style="display:none; align-items:center; gap:6px" onclick="showSection('configuracoes')">
+    <div id="fb-user-chip-mob" style="display:none; align-items:center; gap:6px">
       <img id="fb-user-photo-mob" src="" style="width:26px;height:26px;border-radius:50%;object-fit:cover; border: 1px solid var(--border-strong);">
     </div>
     <!-- Settings button -->
@@ -608,10 +611,7 @@
   <div class="page-header">
     <div class="ph-left">
       <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações</h1>
-      <p>Aparência, IA, nuvem e dados locais</p>
-    </div>
-    <div class="ph-actions">
-      <button class="btn btn-primary btn-sm" onclick="saveSettings()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Salvar configurações</button>
+      <p>Aparência, IA, nuvem e dados locais — tudo salva sozinho ao mudar</p>
     </div>
   </div>
 
@@ -692,17 +692,17 @@
         </div>
         <div style="min-width:300px;flex:1">
           <label for="cfg-ai-model" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Modelo</label>
-          <select id="cfg-ai-model" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
+          <select id="cfg-ai-model" onchange="cfgAutoSalvar()" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
         </div>
         <div style="min-width:210px">
           <!-- A regua da triagem por nivel do leitor: palavra abaixo deste
                nivel ja entra marcada como conhecida. -->
           <label for="cfg-nivel-aluno" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Seu nível de leitura</label>
-          <select id="cfg-nivel-aluno" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
+          <select id="cfg-nivel-aluno" onchange="cfgAutoSalvar()" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
         </div>
         <div style="min-width:210px">
           <label for="cfg-stt-provider" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Transcrição (fala → texto)</label>
-          <select id="cfg-stt-provider" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)">
+          <select id="cfg-stt-provider" onchange="cfgAutoSalvar()" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)">
             <option value="auto">Automático (Groq se houver chave)</option>
             <option value="groq">Groq · whisper-large-v3-turbo (US$ 0,04/h)</option>
             <option value="openai">OpenAI · whisper-1 (US$ 0,36/h)</option>
@@ -719,7 +719,7 @@
         </div>
         <div style="min-width:230px">
           <label for="cfg-img-quality" style="display:block;margin-bottom:6px;font-weight:500;font-size:var(--fs-xs);color:var(--text2)">Qualidade das imagens</label>
-          <select id="cfg-img-quality" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
+          <select id="cfg-img-quality" onchange="cfgAutoSalvar()" style="width:100%;height:var(--control-h);border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:0 10px;font-size:var(--fs-sm)"></select>
         </div>
       </div>
 
@@ -770,9 +770,6 @@
         <button class="btn btn-primary btn-sm" id="btn-gen-missing-audio" style="display:none; align-items: center; gap: 6px;" onclick="generateMissingAudio()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width:15px; height:15px;"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>Gerar áudios em lote</button>
       </div>
     </div>
-    </div>
-    <div style="margin-top:20px">
-      <button class="btn btn-primary" onclick="saveSettings()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Salvar chave</button>
     </div>
   </div>
 
@@ -963,7 +960,9 @@
     <div class="panel-group">
       <div class="panel-eyebrow">Hoje</div>
     <div class="srs-dashboard">
-      <div class="srs-dash-card due clickable" onclick="openLibraryFiltered('due')" title="Ver na biblioteca">
+      <!-- UX-3, destino honesto: o cartão DIZ "para revisar hoje" — clicar
+           nele começa a revisão. Ver a lista continua no cartão "Novos". -->
+      <div class="srs-dash-card due clickable" onclick="typeof startSrsSession==='function'&&startSrsSession()" title="Começar a revisão de hoje">
         <div class="sdc-value" id="srs-due-count">0</div>
         <div class="sdc-label">Para revisar hoje</div>
       </div>
