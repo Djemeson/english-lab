@@ -15421,6 +15421,19 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do motor único de cobertura (2026-08-25, 58ª = UX-4)
+
+- [x] **UMA régua de cobertura para leitor e vídeo.** O motor do leitor mudou para
+      core.js (`COB_STOP`, `cobTokens`, `cobConjuntoEmEstudo`, `cobEhEmEstudo`,
+      `coberturaAnalisar`); ler.js delega com wrappers de mesmo nome (meia dúzia de
+      chamadores locais). O vídeo APOSENTOU a fita própria (`_VID_STOP`,
+      `_vidKnownSet`, `_vidIsKnown` — sufixos ad-hoc, sem lematizador, sem verbos
+      irregulares): `videoPrepare` usa `coberturaAnalisar` (primeira fala de cada nova
+      achada por  regex p/ contexto do card) e `videoPrepAdd` dedupa pela régua
+      (lemas + isKnownWord). **Prova ao vivo: o MESMO texto dá 57% nas duas telas, e
+      "began/beginning" contam como cobertas com "begin" marcada** (a fita antiga do
+      vídeo não cobria irregular). 9/9. core.js é shell → sw v422.
+
 ### Da rodada Kondo VI — a dica obedece ao dedo (2026-08-25, 56ª = UX-1)
 
 - [x] **Pressionar-e-segurar mostra a dica no toque** — no MOTOR global de tooltips
@@ -15701,7 +15714,7 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       recentes → irParaItem (dashboard.js:643); header mobile 1 alvo de conta
       (index.html:117-130); popup de seleção do Preparar migra p/ selMenuAtivar
       (review.js:3385→ai.js:269); legenda do vídeo agrupada (video.js:362-374).
-- [ ] **UX-4 — promoções (54ª: rótulos; 55ª: sono, anúncios, Ouvir junto, escopo da playlist; RESTAM 5 construções):** pré-estudo por capítulo (molde do raio-X); "Completar verbete"/completar-tudo do dossiê COM aiConfirmBatch (hoje só existe o completar POR SENTIDO, 1 chamada por clique — o lote é feature nova); motor único de cobertura (o do leitor; o do vídeo é o fraco); bottom-sheet da fila do Preparar no mobile; preview da Biblioteca no toque. pré-estudo com painel por capítulo (molde do raio-X,
+- [ ] **UX-4 — promoções (54ª: rótulos; 55ª: sono/anúncios/Ouvir junto/playlist; 58ª: motor de cobertura único; RESTAM):** completar-tudo do dossiê com aiConfirmBatch; bottom-sheet da fila do Preparar no mobile; preview da Biblioteca no toque; pré-estudo por capítulo (molde do raio-X). pré-estudo com painel por capítulo (molde do raio-X,
       ler.js:3904); "Ouvir junto" com rótulo + na ficha do livro (ler.js:497);
       ditado/shadowing anunciados (video-study.js:584); "Completar verbete" no Estudar e na
       Biblioteca (review.js:1890); "Regenerar frase" nomeado (study.js:850); "Estudar de

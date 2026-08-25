@@ -434,58 +434,28 @@ function videoDelMarker(i) {
 // ================================================================
 // PREPARAR PARA ASSISTIR — cruza a legenda com o vocabulário
 // ================================================================
-const _VID_STOP = new Set(('the a an and or but if of to in on at by for with from as is are was were be been being ' +
-  'am do does did done have has had having will would can could shall should may might must not no nor so than then ' +
-  'too very just also only even still yet again once here there when where why how what which who whom whose this that ' +
-  'these those it its they them their theirs he him his she her hers we us our ours you your yours i me my mine ' +
-  'all any both each few more most other some such own same s t don now up down out off over under about into onto ' +
-  'through during before after above below between because while until against oh yeah yes hey well okay ok right ' +
-  'gonna gotta wanna got get go going come came went let lets like know think see look one two three im dont didnt ' +
-  'cant wont youre hes shes were theyre ive youve weve thats whats isnt arent wasnt werent id youd hed shed wed ' +
-  'theyd ill youll hell shell well theyll mr mrs ms sir madam').split(/\s+/))
-
-function _vidKnownSet() {
-  const known = new Set()
-  words.forEach(w => { if (w.word) known.add(w.word.toLowerCase().trim()) })
-  return known
-}
-function _vidIsKnown(tok, known) {
-  if (known.has(tok)) return true
-  if (typeof isKnownWord === 'function' && isKnownWord(tok)) return true
-  // Flexões triviais: plural e passado/gerúndio simples
-  for (const suf of ['s', 'es', 'ed', 'd', 'ing']) {
-    if (tok.length > suf.length + 2 && tok.endsWith(suf) && known.has(tok.slice(0, -suf.length))) return true
-  }
-  if (tok.endsWith('ing') && known.has(tok.slice(0, -3) + 'e')) return true
-  return false
-}
-
 function videoPrepare() {
   if (!_vidCues.length) { toast('Importe a legenda primeiro — é ela que o app analisa', 'warning'); return }
   _videoView = 'prepare'
   const p = el('vid-player'); if (p) p.pause()
 
-  const known = _vidKnownSet()
-  const isEn = (_vidCur.lang || 'en') === 'en'
-  const freq = {}, firstCue = {}
-  let totalTok = 0, knownTok = 0
-  _vidCues.forEach(c => {
-    const toks = (c.t.toLowerCase().match(/[\p{L}']+/gu) || [])
-    toks.forEach(tk => {
-      const tok = tk.replace(/^'+|'+$/g, '')
-      if (tok.length < 3) return
-      totalTok++
-      const conhecida = _vidIsKnown(tok, known) || (isEn && _VID_STOP.has(tok))
-      if (conhecida) { knownTok++; return }
-      freq[tok] = (freq[tok] || 0) + 1
-      if (!firstCue[tok]) firstCue[tok] = c.t
-    })
-  })
-  const coverage = totalTok ? Math.round(knownTok / totalTok * 100) : 0
+  // MOTOR ÚNICO DE COBERTURA (rodada 58): a mesma régua do leitor — stop-list,
+  // lematizador com verbos irregulares e "capturada conta como coberta". A fita
+  // métrica própria daqui (sufixos ad-hoc) dizia outra porcentagem para o
+  // MESMO vocabulário; "67% conhecido" agora significa o mesmo nas três telas.
+  const analise = coberturaAnalisar(_vidCues.map(c => c.t).join('\n'))
+  const coverage = Math.round(analise.cobertura * 100)
   _vidCur.coverage = coverage; _vidCur.updated_at = new Date().toISOString()
   saveVideos(); autoSyncAfterChange()
 
-  const list = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 60)
+  const list = analise.novas.slice(0, 60).map(x => [x.w, x.n])
+  // A primeira fala em que cada palavra aparece — vira o contexto do card.
+  const firstCue = {}
+  for (const [tok] of list) {
+    const re = new RegExp('\\b' + tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i')
+    const cue = _vidCues.find(c => re.test(c.t))
+    firstCue[tok] = cue ? cue.t : ''
+  }
   const area = el('video-area'); if (!area) return
   area.innerHTML = `
     <div class="vid-prep">
@@ -521,14 +491,16 @@ function videoPrepToggleAll(on) {
 function videoPrepAdd() {
   const sel = [...document.querySelectorAll('.vid-prep-chk:checked')].map(c => c.value)
   if (!sel.length) { toast('Nenhuma palavra selecionada', 'warning'); return }
-  const known = _vidKnownSet()
+  // Régua única também no dedupe (rodada 58): já capturada (qualquer flexão,
+  // via lemas) ou já conhecida não vira item repetido.
+  const emEstudo = cobConjuntoEmEstudo()
   let added = 0
   const freqCue = {}
   _vidCues.forEach(c => sel.forEach(tok => {
     if (!freqCue[tok] && c.t.toLowerCase().includes(tok)) freqCue[tok] = c.t
   }))
   sel.forEach(tok => {
-    if (known.has(tok)) return
+    if (cobEhEmEstudo(emEstudo, tok) || isKnownWord(tok)) return
     createWord({ word: tok, context: freqCue[tok] || '', source_type: _vidCur.source_type || 'series', source_title: _vidCur.title, lang: _vidCur.lang })
     added++
   })

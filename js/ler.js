@@ -2755,28 +2755,15 @@ function lerFalar(txt) {
 //
 // Os lemas entram nos DOIS sentidos: aqui, para o card "began" cobrir o texto
 // "begin"; e em `_lerEhEmEstudo`, para o card "begin" cobrir o texto "began".
-function _lerConjuntoEmEstudo() {
-  const s = new Set()
-  for (const w of words) {
-    const k = knownNorm(w.word || '')
-    if (!k || k.length < 2 || /\s/.test(k)) continue
-    s.add(k)
-    if (typeof glossLemas === 'function') {
-      for (const l of glossLemas(k, { estrito: true })) s.add(l)
-    }
-  }
-  return s
-}
+// O corpo mudou para core.js na rodada 58 (motor único de cobertura —
+// `cobConjuntoEmEstudo`): o vídeo media com outra fita métrica. Os nomes
+// locais ficam porque meia dúzia de lugares deste arquivo os chamam.
+function _lerConjuntoEmEstudo() { return cobConjuntoEmEstudo() }
 
 // `estrito` de propósito, aqui e no conjunto: -er/-est derivam palavra nova
 // ("teacher" não é "teach"), e sumir com item legítimo da lista de estudo é
 // pior que mostrá-lo de novo.
-function _lerEhEmEstudo(conjunto, token) {
-  if (conjunto.has(token)) return true
-  if (typeof glossLemas !== 'function') return false
-  for (const l of glossLemas(token, { estrito: true })) if (conjunto.has(l)) return true
-  return false
-}
+function _lerEhEmEstudo(conjunto, token) { return cobEhEmEstudo(conjunto, token) }
 
 function _lerRepintar() {
   const cont = el('ler-conteudo'); if (!cont) return
@@ -2998,32 +2985,11 @@ function _lerFullMudou() {
 // ================================================================
 // FERRAMENTAS — o que só é possível porque o livro está AQUI DENTRO
 // ================================================================
-// Palavras vazias do inglês: entram em qualquer texto e não são objeto de
-// estudo. Sem esta lista, "the/of/and" ocupariam o topo de toda análise.
-const LER_STOP = new Set(`a an the and or but if of to in on at by for with from as is are was were be been being am do does did doing have has had having i you he she it we they me him her us them my your his its our their this that these those there here what which who whom whose when where why how all any both each few more most other some such no nor not only own same so than too very can will just should now would could may might must shall into over under again further then once about above below up down out off between through during before after not s t don ll re ve d m o y ain aren couldn didn doesn hadn hasn haven isn ma mightn mustn needn shan shouldn wasn weren won wouldn`.split(/\s+/))
-
-function _lerTokens(txt) {
-  const m = String(txt || '').toLowerCase().match(/[a-zà-ÿ][a-zà-ÿ'’-]{1,}/gi)
-  return m ? m.map(t => t.replace(/[’']s$/, '').replace(/^[’'-]+|[’'-]+$/g, '')) : []
-}
-
-// Devolve { total, unicas, conhecidas, cobertura, novas:[{w,n}] }
-function lerAnalisar(txt) {
-  const toks = _lerTokens(txt)
-  const freq = new Map()
-  let total = 0, conhecidas = 0
-  const emEstudo = _lerConjuntoEmEstudo()
-  for (const t of toks) {
-    if (!t || t.length < 2) continue
-    total++
-    if (LER_STOP.has(t)) { conhecidas++; continue }
-    if (isKnownWord(t)) { conhecidas++; continue }
-    if (_lerEhEmEstudo(emEstudo, t)) { conhecidas++; continue }
-    freq.set(t, (freq.get(t) || 0) + 1)
-  }
-  const novas = [...freq.entries()].map(([w, n]) => ({ w, n })).sort((a, b) => b.n - a.n || a.w.localeCompare(b.w))
-  return { total, unicas: new Set(toks).size, conhecidas, cobertura: total ? conhecidas / total : 0, novas }
-}
+// A análise inteira (stop-list, tokens e a régua) mudou para core.js na
+// rodada 58 — motor único de cobertura, o mesmo do vídeo. Ver COB_STOP,
+// cobTokens e coberturaAnalisar.
+function _lerTokens(txt) { return cobTokens(txt) }
+function lerAnalisar(txt) { return coberturaAnalisar(txt) }
 
 async function _lerTextoDoCapitulo(i) {
   if (_lerEpub.manga) return mangaTextoDaPagina(_lerLivro, i)

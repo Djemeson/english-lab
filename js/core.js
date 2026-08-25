@@ -479,6 +479,61 @@ function isKnownWord(s) {
   }
   return false
 }
+// ================================================================
+// MOTOR ÚNICO DE COBERTURA (UX-4, rodada 58)
+// ================================================================
+// Nasceu no leitor e virou a régua da casa. O vídeo media com a própria fita
+// métrica — sufixos ad-hoc, sem lematizador, stop-list divergente — e
+// "conhecer 67%" significava uma coisa em cada tela. Uma régua só: stop-list
+// do leitor, isKnownWord (lematizador com verbos irregulares) e o conjunto
+// em-estudo (capturada conta como coberta: você já está cuidando dela).
+// O leitor delega para cá; o Preparar-para-assistir do vídeo consome direto.
+const COB_STOP = new Set(`a an the and or but if of to in on at by for with from as is are was were be been being am do does did doing have has had having i you he she it we they me him her us them my your his its our their this that these those there here what which who whom whose when where why how all any both each few more most other some such no nor not only own same so than too very can will just should now would could may might must shall into over under again further then once about above below up down out off between through during before after not s t don ll re ve d m o y ain aren couldn didn doesn hadn hasn haven isn ma mightn mustn needn shan shouldn wasn weren won wouldn`.split(/\s+/))
+
+function cobTokens(txt) {
+  const m = String(txt || '').toLowerCase().match(/[a-zà-ÿ][a-zà-ÿ'’-]{1,}/gi)
+  return m ? m.map(t => t.replace(/[’']s$/, '').replace(/^[’'-]+|[’'-]+$/g, '')) : []
+}
+
+// `estrito` de propósito: -er/-est derivam palavra nova ("teacher" não é
+// "teach") e sumir com item legítimo da lista de estudo é pior que repeti-lo.
+function cobConjuntoEmEstudo() {
+  const s = new Set()
+  for (const w of words) {
+    const k = knownNorm(w.word || '')
+    if (!k || k.length < 2 || /\s/.test(k)) continue
+    s.add(k)
+    if (typeof glossLemas === 'function') {
+      for (const l of glossLemas(k, { estrito: true })) s.add(l)
+    }
+  }
+  return s
+}
+function cobEhEmEstudo(conjunto, token) {
+  if (conjunto.has(token)) return true
+  if (typeof glossLemas !== 'function') return false
+  for (const l of glossLemas(token, { estrito: true })) if (conjunto.has(l)) return true
+  return false
+}
+
+// Devolve { total, unicas, conhecidas, cobertura, novas:[{w,n}] }
+function coberturaAnalisar(txt) {
+  const toks = cobTokens(txt)
+  const freq = new Map()
+  let total = 0, conhecidas = 0
+  const emEstudo = cobConjuntoEmEstudo()
+  for (const t of toks) {
+    if (!t || t.length < 2) continue
+    total++
+    if (COB_STOP.has(t)) { conhecidas++; continue }
+    if (isKnownWord(t)) { conhecidas++; continue }
+    if (cobEhEmEstudo(emEstudo, t)) { conhecidas++; continue }
+    freq.set(t, (freq.get(t) || 0) + 1)
+  }
+  const novas = [...freq.entries()].map(([w, n]) => ({ w, n })).sort((a, b) => b.n - a.n || a.w.localeCompare(b.w))
+  return { total, unicas: new Set(toks).size, conhecidas, cobertura: total ? conhecidas / total : 0, novas }
+}
+
 function markKnownWord(s, on = true) {
   const k = knownNorm(s); if (!k) return
   if (on) { knownWords[k] = Date.now(); limparDesmarcacao('k', k) }
