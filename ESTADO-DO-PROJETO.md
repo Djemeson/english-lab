@@ -15421,6 +15421,27 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do transplante do popup do Preparar (2026-08-25, 63ª = sobra da UX-3)
+
+- [x] **A peça comum cresceu primeiro** (o pré-requisito que a investigação da 55ª
+      apontou): `_selExplicarPintar` (ai.js) ganhou **cache** (`_selExpCache`, chave
+      lang|txt|frase, guarda o contexto INTEIRO — html/sistema/pergunta/resposta/
+      buscou/fontes — remonta a tela completa com procedência, chips e conversa sem
+      pagar de novo; refazer-web limpa e re-busca) e **figura da Wikipédia** (corre em
+      paralelo com a IA, só entra se o verbete é do termo). Montagem virou UMA função
+      chamada dos dois caminhos (a lição do acerto de cache pela metade).
+- [x] **O Preparar migrou para o menu único** (`selMenuAtivar` no #review-main,
+      ativado em renderWordCard — idempotente): Explicar/Preparar/tradução ao
+      ARRASTAR (ganho novo na tela). `_revSelContexto` preserva o que o popup antigo
+      tinha de bom: frase via `_revFraseEmVolta`, idioma do item, origem honesta por
+      frase via `_revOrigemDaFrase`. REMOVIDOS: listeners globais, `_revShowSelPop`,
+      `revSelExplain`, `revSelMine` (~155 linhas). `_revExplainCache` FICA (o vídeo
+      usa); `_revFraseEmVolta`/`_revOrigemDaFrase` ficam (o contexto novo usa).
+      sw v425 (ai/review shell). **Testado ao vivo: 13/13** — seleção real abre o menu
+      único com tradução; Explicar pinta com procedência; cache evita a 2ª chamada;
+      contexto entrega frase/lang/origem certos; zero referência órfã.
+      Nota de teste: o balão é o PRÓPRIO #sel-menu com classe .sel-exp.
+
 ### Da rodada do pré-estudo por capítulo (2026-08-25, 62ª = UX-4 — a última construção)
 
 - [x] **"Por capítulo" no bloco da leitura com IA** (painel de ferramentas do leitor,

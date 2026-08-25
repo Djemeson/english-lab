@@ -548,14 +548,58 @@ function lexaWebRodape(corpo, { buscou, fontes, refazer }) {
   corpo.appendChild(b)
 }
 
+// CACHE DO EXPLICAR (rodada 63) — o pré-requisito do transplante do Preparar:
+// reabrir a MESMA seleção não paga de novo. Guarda o contexto INTEIRO
+// ({html, sistema, pergunta, resposta, buscou, fontes}), não só o HTML — a
+// lição do acerto de cache pela metade (§8.198): tela remontada do cache tem
+// de vir COMPLETA, com procedência da web, chips e conversa.
+const _selExpCache = new Map()
+
 async function _selExplicarPintar(corpo, c, forcarWeb) {
   if (!lexaBalaoVivo(corpo)) return
+  const chave = (c.lang || 'en') + '|' + c.txt + '|' + (c.frase || '')
+  // Os chips e a conversa montam-se do MESMO jeito vindo do cache ou da IA —
+  // uma função só, chamada dos dois caminhos (duplicá-la foi como o acerto de
+  // cache passou a dar tela pela metade no Preparar antigo).
+  const montar = g => {
+    if (!lexaBalaoVivo(corpo)) return
+    corpo.innerHTML = g.html
+    // O CONVITE VEM DEPOIS DA EXPLICAÇÃO, porque é ali que ele decide: primeiro
+    // entende o que a palavra quer dizer, e só então resolve se quer estudá-la.
+    // O botão do cabeçalho continua, para quem já decidiu antes de ler.
+    const pe = document.createElement('div')
+    pe.className = 'sel-exp-acoes'
+    pe.innerHTML = `<button class="btn btn-primary btn-sm" onclick="selMenuPreparar()">
+      ${ic('plus','ic-sm')} Mandar para o Preparar</button>`
+    corpo.appendChild(pe)
+    // O rodapé sai do que ficou GUARDADO — reabrir pelo cache sem ele perderia
+    // a procedência (a resposta apareceria sem dizer que veio da internet).
+    lexaWebRodape(corpo, { buscou: !!g.buscou, fontes: g.fontes || [],
+      refazer: () => { _selExpCache.delete(chave); _selExplicarPintar(corpo, c, true) } })
+    if (typeof lexaChipsMontar === 'function' && c.frase) {
+      lexaChipsMontar(corpo, { trecho: c.txt, contexto: c.frase, lang: c.lang || 'en',
+        fonte: c.fonte || '', origem: c.origem || {} })
+    }
+    if (typeof lexaChatMontar === 'function') {
+      // A conversa nasce sabendo a explicação, mas NÃO herda a conversa velha.
+      lexaChatMontar(corpo, { sistema: g.sistema, primeira: g.pergunta, resposta: g.resposta })
+    }
+  }
+  if (!forcarWeb && _selExpCache.has(chave)) { montar(_selExpCache.get(chave)); return }
   corpo.innerHTML = `<span class="gen-spinner"></span> ${esc(lexaNome())} está ${forcarWeb ? 'procurando na internet' : 'explicando'}…`
   const L = getLangDef(c.lang || 'en')
   const sistema = lexaExplicar()
   const pergunta = `${c.frase ? `A frase é: "${c.frase}".
 ` : ''}O aluno selecionou: "${c.txt}".
 Explique o que "${c.txt}" significa AQUI, em ${L.nameEn}. Se for gíria, marca, referência cultural ou nome próprio, diga o que é no mundo real.`
+  // A ilustração da Wikipédia (herdada do Preparar antigo, rodada 63): corre em
+  // paralelo com a IA e só entra quando o verbete é REALMENTE do termo.
+  let figura = ''
+  const pFig = (typeof wikiIlustracao === 'function')
+    ? wikiIlustracao(c.txt, c.lang || 'en')
+        .then(i => { figura = (typeof wikiFiguraHTML === 'function') ? wikiFiguraHTML(i) : '' })
+        .catch(() => {})
+    : Promise.resolve()
   let r
   try {
     r = await lexaExplicarTexto({ sistema, pergunta, termo: c.txt, frase: c.frase, forcarWeb, maxTokens: 600 })
@@ -563,24 +607,11 @@ Explique o que "${c.txt}" significa AQUI, em ${L.nameEn}. Se for gíria, marca, 
     if (lexaBalaoVivo(corpo)) corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)}</span>`
     return
   }
-  if (!lexaBalaoVivo(corpo)) return
-  corpo.innerHTML = lexaFormatar(r.texto)
-  // O CONVITE VEM DEPOIS DA EXPLICAÇÃO, porque é ali que ele decide: primeiro
-  // entende o que a palavra quer dizer, e só então resolve se quer estudá-la.
-  // O botão do cabeçalho continua, para quem já decidiu antes de ler.
-  const pe = document.createElement('div')
-  pe.className = 'sel-exp-acoes'
-  pe.innerHTML = `<button class="btn btn-primary btn-sm" onclick="selMenuPreparar()">
-    ${ic('plus','ic-sm')} Mandar para o Preparar</button>`
-  corpo.appendChild(pe)
-  lexaWebRodape(corpo, { ...r, refazer: () => _selExplicarPintar(corpo, c, true) })
-  if (typeof lexaChipsMontar === 'function' && c.frase) {
-    lexaChipsMontar(corpo, { trecho: c.txt, contexto: c.frase, lang: c.lang || 'en',
-      fonte: c.fonte || '', origem: c.origem || {} })
-  }
-  if (typeof lexaChatMontar === 'function') {
-    lexaChatMontar(corpo, { sistema, primeira: pergunta, resposta: r.texto })
-  }
+  await pFig   // a figura é mais rápida que a IA; aqui só junta
+  const g = { html: figura + lexaFormatar(r.texto), sistema, pergunta, resposta: r.texto,
+              buscou: r.buscou, fontes: r.fontes }
+  _selExpCache.set(chave, g)   // aiTextSeguro nunca devolve vazio: não cacheia silêncio
+  montar(g)
 }
 
 // O botão: quando a resposta veio vaga, ele força a busca. É a válvula que

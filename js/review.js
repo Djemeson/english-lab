@@ -1734,6 +1734,11 @@ function renderWordCard(wordId) {
   const w = words.find(x => x.id === wordId)
   if (!w) return
   const main = el('review-main')
+  // O MENU DE SELEÇÃO ÚNICO DA CASA (rodada 63): a mesma peça do leitor, do
+  // Estudar, do audiolivro e do vídeo — Explicar (com cache, figura e web),
+  // Preparar e tradução ao arrastar. Substitui o popup próprio que o Preparar
+  // tinha. O contêiner é persistente e o guard interno torna isto idempotente.
+  if (typeof selMenuAtivar === 'function') selMenuAtivar(main, _revSelContexto)
 
   // EM ANÁLISE: o estado vem do Set, não do DOM — então sobrevive a sair do
   // item e voltar, que era exatamente a queixa. Mostra a palavra e a frase
@@ -3338,60 +3343,22 @@ async function revExprAdotar(wordId, i) {
 // cache monta a tela COMPLETA sem gastar chamada nenhuma.
 const _revExplainCache = new Map()   // chave → { html, sistema, pergunta, resposta }
 
-if (!window._revSelBound) {
-  window._revSelBound = true
-  document.addEventListener('mouseup', (e) => {
-    setTimeout(() => {
-      const pop = el('rev-sel-pop')
-      // Clique DENTRO do popup (Explicar/Preparar) não pode fechá-lo: o
-      // mousedown no botão colapsa a seleção e este handler via "seleção
-      // vazia" e escondia o popup ANTES da explicação aparecer — o bug do
-      // "cliquei em Explicar e nada aconteceu".
-      if (pop && !pop.classList.contains('hidden') && e.target && pop.contains(e.target)) return
-      const sec = document.getElementById('section-preparar')
-      if (!sec || !sec.classList.contains('active')) { pop && pop.classList.add('hidden'); return }
-      const card = sec.querySelector('.word-card')
-      const sel = window.getSelection()
-      const bruto = (sel && sel.toString()) || ''
-      const txt = bruto.replace(/\s+/g, ' ').trim()
-        .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
-      if (!txt || txt.length < 2 || txt.length > 80 || !sel.anchorNode || !card || !card.contains(sel.anchorNode)) {
-        pop && pop.classList.add('hidden'); return
-      }
-      _revShowSelPop(txt, sel)
-    }, 10)
-  })
-  // clicar fora fecha
-  document.addEventListener('mousedown', e => {
-    const pop = el('rev-sel-pop')
-    if (pop && !pop.classList.contains('hidden') && !pop.contains(e.target)) pop.classList.add('hidden')
-  })
-}
-
-function _revShowSelPop(txt, sel) {
-  let pop = el('rev-sel-pop')
-  if (!pop) {
-    pop = document.createElement('div')
-    pop.id = 'rev-sel-pop'
-    pop.className = 'sel-pop hidden'
-    // preventDefault no mousedown: clicar nos botões NÃO colapsa a seleção
-    // do card (padrão de toolbar-sobre-seleção)
-    pop.addEventListener('mousedown', ev => ev.preventDefault())
-    document.body.appendChild(pop)
+// O CONTEXTO do menu de seleção único (rodada 63) — o que o transplante
+// preservou do popup antigo: a frase em volta via _revFraseEmVolta (não o
+// cartão inteiro), o idioma do item e a ORIGEM honesta por frase
+// (_revOrigemDaFrase: frase da obra herda a fonte da obra; frase de exemplo
+// gerado vira material de estudo — fonte de avô não vira fonte de neto).
+function _revSelContexto(no) {
+  const w = (typeof activeWordId !== 'undefined' && activeWordId) ? words.find(x => x.id === activeWordId) : null
+  const sel = String(window.getSelection() || '').replace(/\s+/g, ' ').trim()
+  const p = no && (no.nodeType === 1 ? no : no.parentElement)
+  const bloco = p && p.closest ? p.closest('div, p, blockquote, li, h1, h2, h3, span') : null
+  const frase = _revFraseEmVolta(bloco ? bloco.textContent : '', sel) || (w && w.context) || ''
+  return {
+    frase, lang: (w && wordLang(w)) || 'en', traduzir: true,
+    fonte: [(w && w.word) || '', obraNome((w && w.source_title) || '')].filter(Boolean).join(' · '),
+    origem: _revOrigemDaFrase(w, frase)
   }
-  window._revSelText = txt
-  // frase-contexto: o bloco de texto mais próximo de onde a seleção começou
-  const blocoEl = sel.anchorNode.parentElement && sel.anchorNode.parentElement.closest('div, p, blockquote, li, h1, h2, h3, span')
-  window._revSelCtx = _revFraseEmVolta(blocoEl ? blocoEl.textContent : '', txt)
-  pop.innerHTML = `
-    <b>"${esc(txt)}"</b>
-    <button class="btn btn-secondary btn-sm" onclick="revSelExplain()" data-tip="Mini-explicação da IA aqui mesmo — sentido, e o que é se for marca/gíria/referência">${ic('sparkles','ic-sm')}Explicar</button>
-    <button class="btn btn-ghost btn-sm" onclick="revSelMine()" data-tip="Vira um item novo na fila do Preparar">${ic('eye','ic-sm')}Preparar</button>`
-  pop.classList.remove('hidden')
-  const r = sel.getRangeAt(0).getBoundingClientRect()
-  const acima = r.top > 64
-  pop.style.left = Math.max(8, Math.min(window.innerWidth - 360, r.left + r.width / 2 - 170)) + 'px'
-  pop.style.top = (acima ? r.top - 52 : r.bottom + 10) + 'px'
 }
 
 // A FRASE em volta do que ele marcou, não o bloco inteiro.
@@ -3541,102 +3508,3 @@ function _revOrigemDaFrase(w, frase) {
     : { source_type: 'manual', source_title: OBRA_ESTUDO, source_context: (w && w.word) || '' }
 }
 
-async function revSelExplain() {
-  const txt = window._revSelText
-  const pop = el('rev-sel-pop')
-  if (!txt || !pop) return
-  const w = (typeof activeWordId !== 'undefined' && activeWordId) ? words.find(x => x.id === activeWordId) : null
-  const chave = (w ? w.word : '') + '|' + txt
-  if (!aiChatCfg().key) { toast(`Configure a chave da ${aiChatCfg().P.nome} em Configurações → IA`, 'warning'); return }
-  // Balão suspenso, como no leitor, no vídeo e no Estudar — é o mesmo em todo o
-  // projeto. O balãozinho da seleção não comporta explicação + chips de todas
-  // as unidades + conversa, mas o painel de tela cheia cobria justamente o
-  // cartão que gerou a dúvida. O balão fica por cima, ancorado onde ele clicou.
-  const onde = pop.getBoundingClientRect()
-  pop.classList.add('hidden')
-  const fraseDoItem = window._revSelCtx || (w && w.context) || txt
-  const corpo = lexaBalaoAbrir({
-    titulo: `"${txt}"`,
-    frase: fraseDoItem,
-    fonte: [(w && w.word) || '', obraNome((w && w.source_title) || '')].filter(Boolean).join(' · '),
-    alvo: onde,
-    reusar: !!window._revWebForcar
-  })
-  const vivo = () => lexaBalaoVivo(corpo)
-  // Os chips e a conversa se montam do mesmo jeito, tendo a explicação vindo
-  // do cache ou da IA — por isso a montagem é UMA função, chamada dos dois
-  // caminhos. Duplicá-la aqui é como o acerto de cache passou a dar tela pela
-  // metade em primeiro lugar.
-  const montar = ctx2 => {
-    if (!vivo()) return
-    corpo.innerHTML = ctx2.html
-    // O rodapé da web entra ANTES dos chips: selo, botão e a escolha. Sai do
-    // que ficou GUARDADO, senão reabrir pelo cache perderia a procedência —
-    // a resposta apareceria sem dizer que tinha vindo da internet.
-    if (typeof lexaWebRodape === 'function') {
-      lexaWebRodape(corpo, { buscou: !!ctx2.buscou, fontes: ctx2.fontes || [],
-        refazer: () => { _revExplainCache.delete(chave); window._revWebForcar = true; revSelExplain() } })
-    }
-    if (typeof lexaChipsMontar === 'function') {
-      // Os chips saem DO QUE ELE MARCOU; a frase entra só como contexto para a
-      // IA desambiguar. Saindo da frase inteira, vinham chips de palavras que
-      // ele não tinha marcado — foi o que ele pegou no leitor.
-      lexaChipsMontar(corpo, {
-        trecho: txt, contexto: fraseDoItem,
-        lang: (w && wordLang(w)) || 'en', fonte: (w && w.source_title) || '',
-        origem: _revOrigemDaFrase(w, fraseDoItem)
-      })
-    }
-    // A conversa nasce sabendo a explicação, mas NÃO herda a conversa velha:
-    // ela é da sessão, e reabrir tem de trazer a caixa vazia.
-    if (typeof lexaChatMontar === 'function') {
-      lexaChatMontar(corpo, { sistema: ctx2.sistema, primeira: ctx2.pergunta, resposta: ctx2.resposta })
-    }
-  }
-  if (_revExplainCache.has(chave)) { montar(_revExplainCache.get(chave)); return }
-  corpo.innerHTML = '<span class="gen-spinner"></span> a Lexa está explicando...'
-  // Mesma ilustração do leitor, mesma regra: só entra quando o verbete da
-  // Wikipédia é REALMENTE do que foi selecionado (ver wikiIlustracao).
-  let figura = ''
-  const pFig = (typeof wikiIlustracao === 'function')
-    ? wikiIlustracao(txt, (w && w.lang) || 'en').then(i => { figura = wikiFiguraHTML(i) }).catch(() => {})
-    : Promise.resolve()
-  try {
-    const sistema = lexaExplicar()
-    const pergunta =
-`No item de estudo "${w ? w.word : ''}" (contexto: "${window._revSelCtx || (w && w.context) || ''}"), o aluno selecionou: "${txt}".
-Explique o que "${txt}" significa AQUI. Se for marca, gíria, referência cultural ou nome próprio, diga o que é no mundo real. Se tiver sentido figurado nesta expressão, explique a imagem.`
-    // A WEB VALE AQUI TAMBÉM — uma peça só (`lexaExplicarTexto`) para os
-    // quatro caminhos de explicação. Teto folgado: 220 cortava no meio.
-    const forcar = !!window._revWebForcar; window._revWebForcar = false
-    const r = await lexaExplicarTexto({ sistema, pergunta, termo: txt, frase: fraseDoItem,
-                                        forcarWeb: forcar, maxTokens: 600 })
-    const resp = r.texto
-    await pFig   // a figura já veio (é mais rápida que a IA); só junta
-    const guardado = { html: figura + lexaFormatar(resp), sistema, pergunta, resposta: resp,
-                       buscou: r.buscou, fontes: r.fontes }
-    _revExplainCache.set(chave, guardado)   // aiTextSeguro nunca devolve vazio: não cacheia silêncio
-    montar(guardado)
-  } catch (e) {
-    if (vivo()) corpo.innerHTML = `<span style="color:var(--error)">Não deu: ${esc(e.message)} — feche e clique em Explicar para tentar de novo.</span>`
-  }
-}
-
-function revSelMine() {
-  const txt = window._revSelText
-  if (!txt) return
-  el('rev-sel-pop')?.classList.add('hidden')
-  try { window.getSelection().removeAllRanges() } catch (e) {}
-  const w = (typeof activeWordId !== 'undefined' && activeWordId) ? words.find(x => x.id === activeWordId) : null
-  createWord({
-    word: txt,
-    context: window._revSelCtx || (w && w.context) || '',
-    source_type: (w && w.source_type) || 'manual',
-    source_title: (w && w.source_title) || '',
-    lang: (w && w.lang) || undefined
-  })
-  // Sidebar e badges atualizam; o card aberto NÃO re-renderiza — o flow continua
-  if (typeof renderSidebar === 'function') renderSidebar()
-  renderDashboard()
-  toast(`"${txt}" virou um item novo na fila do Preparar`, 'success')
-}
