@@ -2211,6 +2211,34 @@ function inputModal({ title, label, value = '', placeholder = '', confirmText = 
   document.addEventListener('click', hide, true)
   window.addEventListener('scroll', hide, true)
   window.addEventListener('resize', hide)
+  // O DEDO TAMBÉM MERECE A DICA (UX-1, rodada 56): no toque não existe
+  // mouseover — as barras só-ícone (leitor, audiolivro, vídeo) eram mudas no
+  // celular. Pressionar e SEGURAR (~450ms) mostra a mesma dica sem disparar o
+  // clique (o toque curto continua sendo clique normal, sem dica no meio).
+  let pressTimer = null, pressFired = false
+  document.addEventListener('touchstart', e => {
+    clearTimeout(pressTimer); pressFired = false
+    const target = e.target.closest && e.target.closest('[data-tip],[title]')
+    if (!target) { hide(); return }
+    pressTimer = setTimeout(() => {
+      let txt = target.getAttribute('data-tip')
+      if (!txt) {
+        txt = target.getAttribute('title')
+        if (txt) { target.setAttribute('data-tip', txt); target.removeAttribute('title') }
+      }
+      if (txt) { pressFired = true; tipTarget = target; show(target, txt) }
+    }, 450)
+  }, { passive: true })
+  document.addEventListener('touchmove', () => clearTimeout(pressTimer), { passive: true })
+  document.addEventListener('touchend', e => {
+    clearTimeout(pressTimer)
+    if (pressFired) {
+      // Segurou para LER: o soltar não pode virar clique — senão pedir a dica
+      // de "Remover" removeria. A dica fica 1,2s para terminar de ler.
+      e.preventDefault(); pressFired = false
+      setTimeout(hide, 1200)
+    }
+  })
 })()
 
 // Drag & drop upload

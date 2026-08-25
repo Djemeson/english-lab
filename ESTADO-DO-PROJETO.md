@@ -15421,6 +15421,18 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada Kondo VI — a dica obedece ao dedo (2026-08-25, 56ª = UX-1)
+
+- [x] **Pressionar-e-segurar mostra a dica no toque** — no MOTOR global de tooltips
+      (core.js, setupTooltips): segurar ~450ms num elemento com `data-tip`/`title`
+      mostra a mesma dica do hover; soltar NÃO dispara o clique (preventDefault no
+      touchend — pedir a dica de "Remover" não pode remover); a dica fica 1,2s para
+      leitura; arrastar cancela; toque curto continua clique normal, sem dica.
+      Resolve de uma vez as ~26 barras só-ícone (leitor 9, audiolivro 8, vídeo 9) e
+      TODO data-tip futuro. core.js é shell → sw v420.
+      **Testado ao vivo (emulação mobile): 8/8** — curto clica sem dica, segurar
+      mostra, soltar bloqueia o clique e some após 1,2s, arrastar cancela.
+
 ### Da rodada Kondo V — os tesouros ganham porta (2026-08-25, 55ª = UX-4)
 
 - [x] **Timer de SONO no vídeo/podcast** — a peça do audiolivro, portada. Botão "Sono"
@@ -15440,7 +15452,7 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 - [x] **Nota da sobra UX-3 (transplante do popup do Preparar)**: investigado — o
       Explicar do Preparar é o MAIS RICO dos quatro caminhos (cache `_revExplainCache`
       compartilhado com o vídeo, figura da Wikipédia, procedência da web). Migrar hoje
-      REGREDIRIA custo/УХ. O caminho certo é enriquecer `_selExplicarPintar` (cache +
+      REGREDIRIA custo/UX. O caminho certo é enriquecer `_selExplicarPintar` (cache +
       figura) antes de absorver o Preparar — rodada própria, com esse desenho.
 
 ### Da rodada Kondo IV — promoções de rótulo (2026-08-25, 54ª = UX-4 parcial)
@@ -15680,7 +15692,7 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
       recentes → irParaItem (dashboard.js:643); header mobile 1 alvo de conta
       (index.html:117-130); popup de seleção do Preparar migra p/ selMenuAtivar
       (review.js:3385→ai.js:269); legenda do vídeo agrupada (video.js:362-374).
-- [ ] **UX-4 — promoções (54ª fez os rótulos: "Nova frase" nomeado e "Estudar de novo" no material; RESTAM as construções):** pré-estudo com painel por capítulo (molde do raio-X,
+- [ ] **UX-4 — promoções (54ª: rótulos; 55ª: sono, anúncios, Ouvir junto, escopo da playlist; RESTAM 5 construções):** pré-estudo por capítulo (molde do raio-X); "Completar verbete"/completar-tudo do dossiê COM aiConfirmBatch (hoje só existe o completar POR SENTIDO, 1 chamada por clique — o lote é feature nova); motor único de cobertura (o do leitor; o do vídeo é o fraco); bottom-sheet da fila do Preparar no mobile; preview da Biblioteca no toque. pré-estudo com painel por capítulo (molde do raio-X,
       ler.js:3904); "Ouvir junto" com rótulo + na ficha do livro (ler.js:497);
       ditado/shadowing anunciados (video-study.js:584); "Completar verbete" no Estudar e na
       Biblioteca (review.js:1890); "Regenerar frase" nomeado (study.js:850); "Estudar de
