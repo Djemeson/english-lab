@@ -15457,6 +15457,34 @@ como é com a Netflix. Conclusão do estudo:
 - [ ] **Decisão dele pendente**: fazer o addon de legendas + registro de
       "assistido" (rodada média), ou não fazer nada por ora.
 
+**2ª pergunta (mesmo dia): e o INVERSO — o Lab virar CLIENTE de addons**
+("colocar o Torrentio, buscar a série e as ferramentas de estudo aparecem,
+sem baixar o vídeo"). Análise:
+
+- **Metade já existe**: `videoSubSearchOpen` já fala o protocolo de addons
+  direto do navegador (manifest + `/subtitles/{tipo}/{id}.json`, busca de
+  título via **Cinemeta**, moviehash OpenSubtitles) — ver comentário em
+  `video.js` ~l.1110 —, e o player já toca **por URL** (caminho do podcast:
+  `src = audioUrl`, `_vidStream = true`). A camada de estudo é agnóstica de
+  origem. Falta: consultar `/stream/{tipo}/{id}.json`, tela de escolha de
+  fonte, e tocar o resultado.
+- **O muro é o formato, não o protocolo**: Torrentio puro devolve TORRENT
+  (infoHash) — navegador não toca torrent (no Stremio quem faz isso é o
+  serviço local). Com conta **debrid** (Real-Debrid etc.) configurada no
+  próprio Torrentio, vira link HTTPS direto; MKV não toca em `<video>`, mas a
+  API do Real-Debrid tem endpoints de *streaming/transcode* que devolvem HLS
+  (m3u8) → toca com hls.js. Addons de HTTP-stream (sem torrent) também
+  existem; CORS varia por host.
+- ⚠️ Fonte via Torrentio = conteúdo não licenciado (decisão/risco dele; a
+  mesma arquitetura serve para fontes legais — domínio público, servidor de
+  mídia próprio via addon Jellyfin/Plex).
+- ⚠️ Vídeo por streaming sem CORS quebra `captureStream` (capturar a cena);
+  estudo por legenda/transcript não depende do vídeo e já funciona hoje.
+- Custo estimado: rodada média-grande (cliente de streams + hls.js + escolha
+  de fonte + debrid opcional).
+- [ ] **Decisão dele pendente**: seguir com o Lab-cliente-de-addons e, se
+      sim, com quais fontes (debrid? http-stream? servidor próprio?).
+
 ### Do ESTUDO da imagem e a peça única em todas as frentes (2026-08-26, 69ª)
 
 **O estudo (pedido dele, com o caso morcego×barata na mão):** glosar expressão tem dois
