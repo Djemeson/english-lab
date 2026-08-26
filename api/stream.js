@@ -45,17 +45,28 @@ export default async function handler(req) {
   const refOk = !ref || ORIGENS_OK.some(h => { try { return new URL(ref).hostname.endsWith(h) } catch (e) { return false } })
   if (ref && !refOk) return new Response('origem não autorizada', { status: 403 })
 
+  // FATIAMENTO: o <video> pede com Range ABERTO ("bytes=0-"), e repassar os
+  // 505 MB de uma vez trava a função de borda (o player fica em "stalled").
+  // Limitamos cada pedido a uma JANELA (6 MB): a resposta 206 diz o total, e
+  // o player vai pedindo as janelas seguintes conforme assiste. É o
+  // byte-serving que todo CDN faz — só que aqui somos nós.
+  const JANELA = 6 * 1024 * 1024
+  const rangeIn = req.headers.get('range') || ''
+  const m = /bytes=(\d+)-(\d*)/i.exec(rangeIn)
+  const ini = m ? parseInt(m[1], 10) : 0
+  const fimPedido = m && m[2] ? parseInt(m[2], 10) : Infinity
+  const fim = Math.min(fimPedido, ini + JANELA - 1)
+  const rangeOut = 'bytes=' + ini + '-' + (isFinite(fim) ? fim : (ini + JANELA - 1))
+
   let upstream
   try {
     upstream = await fetch(alvo, {
       method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-      headers: (() => {
-        const h = {}
-        const range = req.headers.get('range'); if (range) h['Range'] = range
+      headers: {
+        Range: rangeOut,
         // alguns servidores de IPTV exigem um UA "de player"
-        h['User-Agent'] = req.headers.get('user-agent') || 'VLC/3.0 LibVLC/3.0'
-        return h
-      })(),
+        'User-Agent': req.headers.get('user-agent') || 'VLC/3.0 LibVLC/3.0'
+      },
       redirect: 'follow'
     })
   } catch (e) {
