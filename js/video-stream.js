@@ -82,10 +82,13 @@ function _asRender() {
         <button class="btn btn-primary btn-sm" onclick="assistirSearch(el('as-q').value)">${ic('search','ic-sm')}Buscar</button>
       </div>
       ${st.buscando ? `<div class="vid-sub-info"><span class="gen-spinner"></span> Buscando no catálogo...</div>` :
-        st.resultados.length ? `<div class="vid-sub-list">${st.resultados.map((r, i) => `
-          <button class="vid-sub-item" onclick="assistirPickTitle(${i})">
-            <span class="vid-sub-name">${esc(r.name)}</span>
-            <span class="vid-sub-meta">${r.type === 'series' ? 'série' : 'filme'}${r.year ? ' · ' + esc(String(r.year)) : ''}</span>
+        st.resultados.length ? `<div class="as-result-grid">${st.resultados.map((r, i) => `
+          <button class="as-result" onclick="assistirPickTitle(${i})" title="${escA(r.name)}">
+            <span class="as-result-capa">${r.poster
+              ? `<img src="${escA(r.poster)}" alt="" loading="lazy" onerror="this.parentNode.classList.add('as-sem-capa')">`
+              : ''}<span class="as-result-ph">${ic('film')}</span></span>
+            <span class="as-result-nome">${esc(r.name)}</span>
+            <span class="as-result-meta">${r.type === 'series' ? 'série' : 'filme'}${r.year ? ' · ' + esc(String(r.year)) : ''}</span>
           </button>`).join('')}</div>` :
         st.buscou ? `<div class="vid-sub-info">Nada encontrado — tente só o nome, sem números.</div>` : ''}`
   } else if (st.passo === 'episodio') {
@@ -111,7 +114,9 @@ function _asRender() {
 
 function _asFontesCorpo(st) {
   const cab = `
-    <div class="vid-sub-picked">${esc(st.meta.name)}${st.meta.type === 'series' ? ` <b>S${String(st.temporada).padStart(2,'0')}E${String(st.episodio).padStart(2,'0')}</b>` : ''}
+    <div class="vid-sub-picked">
+      ${st.meta.poster ? `<img class="as-picked-capa" src="${escA(st.meta.poster)}" alt="" onerror="this.style.display='none'">` : ''}
+      ${esc(st.meta.name)}${st.meta.type === 'series' ? ` <b>S${String(st.temporada).padStart(2,'0')}E${String(st.episodio).padStart(2,'0')}</b>` : ''}
       <button class="btn btn-ghost btn-sm" onclick="_asState.passo='${st.meta.type === 'series' ? 'episodio' : 'busca'}';_asRender()" style="margin-left:auto">trocar</button></div>`
   if (st.carregando) return cab + `<div class="vid-sub-info"><span class="gen-spinner"></span> Consultando ${_streamAddons().length} addon(s)...</div>`
   if (!st.fontes.length) return cab + `<div class="vid-sub-info">Nenhuma fonte nos addons configurados para este título.</div>`
@@ -178,7 +183,7 @@ async function assistirSearch(query) {
       fetch(`https://v3-cinemeta.strem.io/catalog/${t}/top/search=${enc}.json`)
         .then(r => r.json()).then(j => (j.metas || []).slice(0, 6)).catch(() => [])))
     st.resultados = [...se.map(m => ({ ...m, type: 'series' })), ...mo.map(m => ({ ...m, type: 'movie' }))]
-      .map(m => ({ id: m.imdb_id || m.id, name: m.name, year: (m.releaseInfo || '').slice(0, 4), type: m.type }))
+      .map(m => ({ id: m.imdb_id || m.id, name: m.name, year: (m.releaseInfo || '').slice(0, 4), type: m.type, poster: m.poster || '' }))
       .filter(m => /^tt/.test(m.id)).slice(0, 10)
   } catch (e) { st.resultados = []; toast('Busca falhou: ' + e.message, 'error') }
   st.buscando = false; _asRender()

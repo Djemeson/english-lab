@@ -4137,6 +4137,19 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .as-legenda-nota{font-size:var(--fs-2xs);color:var(--text3);margin-top:12px;text-align:center}
 .vid-lib-online{color:var(--primary);font-weight:700;font-size:var(--fs-2xs);
   background:rgba(var(--primary-rgb),.14);padding:1px 7px;border-radius:999px}
+/* resultados de busca com capa */
+.as-result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;margin-top:6px}
+.as-result{display:flex;flex-direction:column;gap:6px;text-align:left;padding:0;background:none;border:none;cursor:pointer}
+.as-result-capa{position:relative;display:block;width:100%;aspect-ratio:2/3;border-radius:var(--radius-sm);
+  overflow:hidden;background:var(--surface3);border:1px solid var(--border)}
+.as-result-capa img{width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:1}
+.as-result-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text3)}
+.as-result-ph .ic{width:34px;height:34px}
+.as-result:hover .as-result-capa{border-color:var(--primary);box-shadow:0 0 0 2px rgba(var(--primary-rgb),.25)}
+.as-result-nome{font-size:var(--fs-sm);font-weight:600;line-height:1.25;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.as-result-meta{font-size:var(--fs-2xs);color:var(--text3)}
+.as-picked-capa{width:34px;height:50px;object-fit:cover;border-radius:4px;flex-shrink:0}
 
 /* ---- VIDEO: legenda em tempo real sobre o video ---- */
 .vid-stage{position:relative}
