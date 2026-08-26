@@ -15430,6 +15430,55 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do reconhecimento de sentido e das unidades do Luna (2026-08-25, 66ª)
+
+**Relato dele:** item capturado e ESTUDADO voltou no raio-X como "outro sentido" sobre o
+MESMO trecho; e as "expressões" do Luna nas telas dele incluíam frases inteiras. *"Se for
+se basear nas palavras exatas isso não vai dar certo — significado não é tradução
+literal."* Ele está certo, e a arquitetura agora segue isso.
+
+**Parte 1 — o dedupe de sentido (4 brechas fechadas):**
+- [x] **A FRASE é a prova cabal** (`_aiMesmaFrase`, novo em aiJaConhecido, ANTES de
+      tudo): mesmo termo na mesma frase = mesma ocorrência, por definição. Compara a
+      `x.frase` do achado com context/_seedContext/examples do item (contida ou
+      contendo, normalizadas, mín. 20 chars). É o que pega o caso do CAPÍTULO
+      RENOMEADO: o sumário aprende nomes depois da captura ("Chapter 7"→"Part One") e
+      o capítulo-exato de `_aiMesmaPassagem` falhava para sempre — a raiz do relato.
+- [x] **O vídeo agora carimba `frase` nos achados** (aiFraseDoTermo sobre as cues),
+      como o leitor — o mesmo dedupe vale lá.
+- [x] **isKnownSense enxerga flexão**: "flailing" × marca gravada em "flail" falhava
+      por string; agora tenta as formas de `aiFormasDoTermo` (lemas com irregulares).
+- [x] **aiSentidoParecido ganhou sinônimos**: "aturar"×"tolerar" não têm letra em
+      comum; ~30 grupos de alta precisão do vocabulário real de GLOSA (radicais no
+      formato do `radical()` — ⚠️ verbo terminado em R fica inteiro: "toler" não casa
+      nunca, foi o 1º bug do próprio grupo). Não afrouxou: frase diferente + glosa
+      sem relação continua 'outro'.
+
+**Parte 2 — as unidades do Luna (as 4 imagens dele):**
+Diagnóstico honesto: 3 de 4 estavam erradas — "let a number of her girl friends in on
+this" (idiom real `let sb in on sth`, span inchado com objeto), "a charm had occurred
+to her mind" (arrastou o sujeito; núcleo é `occurred to`), "fission and explosion had
+finally been reached" (METÁFORA DO AUTOR rotulada de collocation — não é unidade da
+língua). Só "failure to menstruate" se defende.
+- [x] **Regras novas no prompt**: unidade tem de EXISTIR NA LÍNGUA (dicionário);
+      metáfora do autor não entra (aponte só a palavra difícil de dentro); "t" é a
+      unidade MÍNIMA, sem sujeito e sem objetos longos (>6 palavras = reduza); nível
+      é da unidade, não da frase.
+- [x] **Pós-filtro guarda-chuva** em `_aiDificuldadeBloco`: span de 8+ palavras cai
+      (warn no console); palavra solta rotulada de idiom vira 'word'.
+- [x] **Medido contra o Luna real, no trecho EXATO do Carrie das screenshots**:
+      prompt novo devolveu `occurred to` (B2) no lugar da frase-com-sujeito, só
+      `fission` no lugar da metáfora, e `in on this` (núcleo contíguo) no lugar do
+      idiom inchado. `failure to menstruate` mantida.
+- [x] ai.js e core.js são shell → sw v427. **Testado ao vivo: 19/19** (frase igual →
+      'sentido' com capítulo renomeado; frase contida casa; frase diferente continua
+      'outro'; sinônimos casam sem afrouxar; flexão no já-sei; filtro de span) +
+      2 chamadas reais A/B ao Luna. Console: o erro visto era resíduo de teste antigo
+      (a ferramenta guarda histórico entre reloads); ciclo limpo = zero rejeições.
+- [ ] **Fica para depois:** os grupos de sinônimos são semente — crescem quando um
+      caso real escapar; e o dedupe semântico definitivo (comparação por embedding ou
+      pela própria IA na revalidação) se os léxicos ainda deixarem passar.
+
 ### Da rodada do progresso e da conta do Luna (2026-08-25, 65ª)
 
 **Relato dele:** *"o site ta reanalisando o raio X e não tem nenhuma informação de

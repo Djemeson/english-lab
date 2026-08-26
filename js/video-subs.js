@@ -1122,6 +1122,12 @@ async function videoRaioXAnalisar(refazer) {
     // Trocou de vídeo durante a análise: o achado é do outro — mesma trava de
     // alvo da legenda automática e da transcrição.
     if (_vidCur !== alvo) { _vidRaioXRodando = false; return }
+    // A FRASE viaja no achado (rodada 66), como no leitor: é ela que permite
+    // ao dedupe dizer "mesma ocorrência" sem depender de glosa nem de capítulo.
+    if (typeof aiFraseDoTermo === 'function') {
+      const textoJunto = _vidCues.map(c => c.t).join('\n')
+      for (const x of itens) if (!x.frase) x.frase = aiFraseDoTermo(textoJunto, x.t)
+    }
     _vidRaioX = {
       itens, nivel, at: Date.now(),
       ficha: itens.ficha || (typeof aiFicha === 'function'

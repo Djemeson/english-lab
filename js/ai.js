@@ -1711,9 +1711,18 @@ REGRAS:
   ERRADO: "papai noel" (outra imagem, de outra cultura). Se a imagem não couber em 4 palavras,
   fique com a imagem e corte o resto.
 - Inclua vocabulário acima de ${nv} (nivel B2, C1 ou C2 para um aluno ${nv}).
-- Inclua phrasal verb, idiom e collocation SÓ quando o sentido ali NÃO for literal — é o caso de
-  "put up with" e "call it a day". Verbo comum com objeto comum ("open the door", "take the bus")
-  não é idiom.
+- Inclua phrasal verb, idiom e collocation SÓ quando a unidade EXISTE NA LÍNGUA (estaria num
+  dicionário) e o sentido ali NÃO for literal — é o caso de "put up with" e "call it a day".
+  Verbo comum com objeto comum ("open the door", "take the bus") não é idiom.
+- METÁFORA CRIADA PELO AUTOR NESTA CENA NÃO É idiom nem collocation: "fission and explosion had
+  finally been reached" é imagem do narrador, não unidade da língua — NÃO inclua. Se dentro dela
+  houver uma PALAVRA difícil (fission), aponte só a palavra.
+- "t" é a UNIDADE MÍNIMA, nunca a frase: sem o sujeito, sem objetos compridos. ERRADO:
+  "let a number of her girl friends in on this" (arrastou o objeto). Se a unidade fica
+  interrompida por um objeto, use a menor janela que a contenha com um objeto CURTO, ou aponte
+  só o pedaço contíguo que carrega o sentido. Regra prática: "t" com mais de 6 palavras quase
+  sempre está errado — reduza.
+- "nivel" é o nível da UNIDADE na língua, não da frase em volta.
 - NÃO inclua: nome próprio, número, palavra transparente com o português (hotel, doctor),
   nem vocabulário que um aluno ${nv} já domina.
 - Máximo ${maxItens} itens. Se não houver nada difícil, devolva {"itens":[]}.
@@ -1733,7 +1742,20 @@ REGRAS:
     tipo: AI_DIF_TIPOS[x.tipo] ? x.tipo : 'word',
     nivel: String(x.nivel || '').toUpperCase(),
     pt: String(x.pt || '').trim()
-  })).filter(x => x.t)
+  })).filter(x => {
+    if (!x.t) return false
+    // GUARDA-CHUVA DA UNIDADE MÍNIMA (rodada 66): mesmo com a regra no prompt,
+    // um "t" de 8+ palavras é frase, não unidade — foi o caso real de "let a
+    // number of her girl friends in on this" (idiom legítimo, span inchado) e
+    // de "fission and explosion had finally been reached" (metáfora do autor
+    // rotulada de collocation). Melhor perder um idiom raríssimo de 8 palavras
+    // do que acender frases inteiras e ensinar que "expressão" é qualquer coisa.
+    const n = x.t.split(/\s+/).length
+    if (n >= 8) { console.warn('[raio-x] descartei span-frase:', x.t); return false }
+    // Palavra solta rotulada de idiom/phrasal/collocation é rótulo errado.
+    if (n === 1 && x.tipo !== 'word') x.tipo = 'word'
+    return true
+  })
 }
 
 // ⚠️ RESGATE DE JSON CORTADO. Resposta que acaba no meio ("...\"tipo\": \"word")
@@ -1948,6 +1970,27 @@ function _aiItemDoAcervo(termo) {
 // mesmo capítulo — é raro, e o custo é assimétrico: esconder um item que ele
 // já tem incomoda muito menos do que gritar "outro sentido!" sobre a frase de
 // onde o item saiu.
+// O achado do raio-X carrega a FRASE em que apareceu (`x.frase`); o item do
+// acervo carrega a frase da captura (`context`), a semente do chip
+// (`_seedContext`) e os exemplos analisados. Se alguma dessas bate com a frase
+// do achado — contida ou contendo, normalizadas —, é a MESMA ocorrência do
+// livro. Mínimo de 20 caracteres: frase curta demais prova pouco ("Yes.").
+function _aiMesmaFrase(item, frase) {
+  const n = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+  const f = n(frase)
+  if (f.length < 20) return false
+  const candidatas = [item.context, item._seedContext]
+  for (const m of (item.meanings || [])) {
+    if (!m || m.moved_to || m.fundido_em) continue
+    for (const ex of (m.examples || [])) candidatas.push(ex && (ex.en || ex))
+  }
+  return candidatas.some(c => {
+    const cc = n(c)
+    return cc.length >= 20 && (cc.includes(f) || f.includes(cc))
+  })
+}
+
 function _aiMesmaPassagem(item, origem) {
   if (!item || !origem) return false
   const n = t => String(t || '').toLowerCase().normalize('NFD')
@@ -1997,9 +2040,18 @@ function aiJaConhecido(x, origem) {
   if (typeof isKnownSense === 'function' && isKnownSense(x.t, x.pt)) return 'sentido'
   const item = _aiItemDoAcervo(x.t)
   if (item) {
+    const temAnalise = (item.meanings || []).some(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em)
+    // A FRASE É A PROVA CABAL (rodada 66) — e vem ANTES de tudo: o mesmo termo
+    // NA MESMA FRASE é a mesma ocorrência, por definição. É o que a procedência
+    // deixa escapar: o sumário aprende nomes DEPOIS da captura ("Chapter 7"
+    // vira "Part One") e o capítulo-exato de _aiMesmaPassagem passa a falhar
+    // para sempre — daí o relato dele: item capturado e ESTUDADO voltando como
+    // "outro sentido" sobre o MESMO trecho. Glosa nem entra na conversa aqui.
+    if (x.frase && _aiMesmaFrase(item, x.frase)) {
+      return temAnalise ? 'sentido' : 'fila-mesmo'
+    }
     // A procedência responde antes de qualquer comparação de texto.
     if (_aiMesmaPassagem(item, origem)) {
-      const temAnalise = (item.meanings || []).some(m => m && m.meaning_pt && !m.moved_to && !m.fundido_em)
       return temAnalise ? 'sentido' : 'fila-mesmo'
     }
     const sentidos = (item.meanings || [])
@@ -2051,8 +2103,55 @@ function aiSentidoParecido(a, b) {
   // "tolerar/tolerância" e "canceladas/cancelar".
   const pref = (x, y) => x.length >= 4 && y.length >= 4 &&
     (x.startsWith(y.slice(0, 4)) || y.startsWith(x.slice(0, 4)))
-  return A.some(x => B.some(y => x === y || pref(x, y)))
+  if (A.some(x => B.some(y => x === y || pref(x, y)))) return true
+  // SINÔNIMOS (rodada 66): "aturar" e "tolerar" são o MESMO sentido escrito
+  // por duas chamadas de IA — e não têm letra em comum. A observação é dele:
+  // *"se for se basear nas palavras exatas isso não vai dar certo; significado
+  // não é tradução literal"*. Grupos pequenos e de alta precisão, do
+  // vocabulário que as GLOSAS realmente usam; radicais já sem desinência.
+  return A.some(x => B.some(y => {
+    const gx = _SENT_GRUPO[x], gy = _SENT_GRUPO[y]
+    return gx !== undefined && gx === gy
+  }))
 }
+
+// Cada linha é um grupo de sinônimos de GLOSA (pt). Entradas em radical (sem
+// desinência de gênero/número/verbo final), como `radical` acima produz.
+const _SENT_GRUPO = {}
+;[
+  ['aguentar', 'aturar', 'suportar', 'tolerar'],
+  ['pasm', 'atonit', 'perplex', 'estupefat', 'abismad', 'chocad', 'boquiabert'],
+  ['zombar', 'cacoar', 'debochar', 'gozar'],
+  ['brav', 'zangad', 'irritad', 'furios'],
+  ['med', 'pavor', 'terror', 'recei', 'susto'],
+  ['comecar', 'iniciar', 'principiar'],
+  ['terminar', 'acabar', 'concluir', 'encerrar'],
+  ['rapid', 'veloz', 'depress', 'ligeir'],
+  ['devagar', 'lent', 'vagaros'],
+  ['gritar', 'berrar', 'urrar'],
+  ['sussurrar', 'murmurar', 'cochichar'],
+  ['olhar', 'encarar', 'fitar', 'mirar'],
+  ['segurar', 'agarrar', 'prender', 'apertar'],
+  ['soltar', 'largar', 'liberar'],
+  ['esconder', 'ocultar'],
+  ['enganar', 'ludibriar', 'iludir', 'tapear', 'lograr'],
+  ['entender', 'compreender', 'perceber', 'sacar'],
+  ['trist', 'abatid', 'deprimid', 'desanimad'],
+  ['feliz', 'content', 'alegr'],
+  ['bonit', 'bel', 'formos'],
+  ['fei', 'horrend', 'horrivel'],
+  ['sujeir', 'imundici', 'porcari'],
+  ['cansad', 'exaust', 'esgotad'],
+  ['bebad', 'embriagad', 'alcoolizad'],
+  ['chorar', 'prantear', 'lacrimejar'],
+  ['jogar', 'atirar', 'arremessar', 'lancar'],
+  ['bater', 'golpear', 'espancar', 'surrar'],
+  ['quebrar', 'partir', 'despedacar'],
+  ['ocorrer', 'surgir', 'aparecer', 'despontar'],
+  ['casa', 'lar', 'moradi', 'residenci'],
+  ['barulh', 'ruid', 'estrond'],
+  ['cheir', 'odor', 'arom', 'fedor'],
+].forEach((grupo, i) => grupo.forEach(w => { if (_SENT_GRUPO[w] === undefined) _SENT_GRUPO[w] = i }))
 
 // Onde cada achado APARECE no texto. Casamento por posição, sem regex montada
 // com o termo — expressão com ponto, parêntese ou apóstrofo viraria um padrão

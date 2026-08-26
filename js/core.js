@@ -660,7 +660,7 @@ function senseKey(termo, glosa) {
   const g = senseNorm(glosa)
   return (t && g) ? (t + '\u0000' + g) : ''
 }
-function isKnownSense(termo, glosa) {
+function _isKnownSenseUm(termo, glosa) {
   const k = senseKey(termo, glosa)
   if (!k) return false
   if (knownSenses[k]) return true
@@ -675,6 +675,19 @@ function isKnownSense(termo, glosa) {
     if (!chave.startsWith(t)) continue
     const partes = chave.slice(t.length).split(' ')
     if (partes.some(x => alvo.some(y => x === y || (x.length >= 5 && y.startsWith(x.slice(0, 5)))))) return true
+  }
+  return false
+}
+function isKnownSense(termo, glosa) {
+  // O TERMO DO RAIO-X VEM FLEXIONADO e a marca "ja sei" pode ter sido gravada
+  // no lema — ou o contrario: "flailing" contra "flail" falhava por string, e
+  // o achado voltava como novo. Tenta o termo como veio E as formas
+  // lematizadas — a mesma peca (aiFormasDoTermo) que ja conserta isso no
+  // lookup do acervo. Rodada 66.
+  if (_isKnownSenseUm(termo, glosa)) return true
+  if (typeof aiFormasDoTermo !== 'function') return false
+  for (const f of aiFormasDoTermo(String(termo || '').toLowerCase().trim())) {
+    if (f !== termo && _isKnownSenseUm(f, glosa)) return true
   }
   return false
 }
