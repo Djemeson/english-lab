@@ -15480,6 +15480,42 @@ como é com a Netflix. Conclusão do estudo:
 - [ ] **Decisão dele pendente**: fazer o addon de legendas + registro de
       "assistido" (rodada média), ou não fazer nada por ora.
 
+### Conserto 70c — "nada acontece": conteúdo misto + fonte lenta (2026-08-26)
+
+Ele testou no Chrome real e "não acontecia nada". Diagnóstico ao vivo no app
+publicado (english-lab-seven.vercel.app):
+
+1. **Causa nº 1 — conteúdo misto.** O FrostStream devolve links **HTTP** (caixas
+   de IPTV na porta 80: `http://3xdglab.me:80/...mp4`). O app é **HTTPS**, e o
+   navegador **bloqueia mídia HTTP em página HTTPS em silêncio** (video error 4,
+   networkState NO_SOURCE). Upgrade para HTTPS dos servidores dele: **timeout**
+   (só atendem HTTP). Nada no cliente resolve — a fonte precisa vir por HTTPS.
+2. **Conserto — proxy HTTPS próprio.** `api/stream.js` (edge, Vercel): busca a
+   fonte HTTP pelo servidor e devolve por HTTPS na mesma origem (bônus:
+   captureStream volta). **Fatiamento**: o `<video>` pede Range aberto (`bytes=0-`)
+   e a função travava ao repassar 505 MB; agora limita cada pedido a 6 MB (206 +
+   Content-Range com o total; byte-serving). Guardas anti-proxy-aberto: só Referer
+   do app, só Content-Type de mídia. `_asPreparaUrl` reescreve http→proxy quando a
+   página é https. SW não cacheia `/api/`.
+3. **Causa nº 2 — a fonte é LENTA.** Medido pelo proxy: **256 KB em 5,1 s (~50 KB/s)**.
+   Nessa taxa um episódio de 505 MB levaria ~3 h — **nenhum player toca**. A Vercel
+   ainda corta streams lentos no meio (503/truncado em ~417 KB). O IPTV grátis do
+   FrostStream estrangula a banda; o proxy está correto, a **fonte** é o muro.
+4. **Vigia** (`_vidArmarVigia`): fonte que não responde em 22s deixa de emperrar
+   calada — avisa a verdade e aponta o caminho (outra fonte / debrid).
+
+**Conclusão honesta:** player, HLS e proxy estão certos e provados (206,
+range-cap, cabeçalhos, pedaços pequenos chegam inteiros). O que falha é o tipo de
+fonte: **HTTP-IPTV grátis é lento/instável demais para tocar no navegador**. O
+caminho que funciona de verdade é **debrid** (Real-Debrid: HTTPS rápido, mp4
+direto, sem proxy nem conteúdo misto) — a razão pela qual o pessoal do Stremio/
+Nuvio paga debrid — ou addons que já devolvem HTTPS rápido.
+
+- [ ] **Testar com debrid** (quando ele tiver conta): fonte HTTPS rápida deve
+      tocar direto, sem proxy. É o caminho recomendado.
+- [ ] **Proxy só ajuda fonte HTTP rápida**; para HTTP lento não há solução de
+      navegador. Eventual melhoria: detectar taxa baixa e sugerir debrid na hora.
+
 ### Da SEÇÃO "ASSISTIR" — o Lab como cliente de addons de vídeo (2026-08-26, 70ª) — FEITO
 
 Ele mandou fazer: *"o lab tocando os addons. deve aceitar vários addons,

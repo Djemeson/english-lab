@@ -652,8 +652,29 @@ function _vidDestruirHls() {
   if (_vidHls) { try { _vidHls.destroy() } catch (e) {} _vidHls = null }
 }
 
+// VIGIA DA FONTE — muitos addons de link direto apontam para servidores lentos
+// ou fora do ar (IPTV grátis costuma estrangular a banda). Sem isto o player
+// fica "carregando" para sempre, calado. Se em 22s não houver dados, desiste e
+// diz a verdade — apontando o caminho que funciona (fonte rápida / debrid).
+let _vidStreamVigia = null
+function _vidArmarVigia(player) {
+  _vidDesarmarVigia()
+  const ok = () => _vidDesarmarVigia()
+  player.addEventListener('loadeddata', ok, { once: true })
+  player.addEventListener('playing', ok, { once: true })
+  _vidStreamVigia = setTimeout(() => {
+    _vidStreamVigia = null
+    if (player.readyState >= 2) return   // já tocou: nada a fazer
+    _vidDestruirHls()
+    try { player.removeAttribute('src'); player.load() } catch (e) {}
+    toast('A fonte não respondeu a tempo (servidor lento ou fora do ar). Tente OUTRA fonte da lista — links de IPTV grátis costumam ser lentos demais; um debrid entrega links rápidos.', 'error')
+  }, 22000)
+}
+function _vidDesarmarVigia() { if (_vidStreamVigia) { clearTimeout(_vidStreamVigia); _vidStreamVigia = null } }
+
 async function _vidStreamAttach(player, url, v) {
   _vidDestruirHls()
+  _vidArmarVigia(player)   // fonte lenta/morta não pode deixar o player emperrado sem explicação
   const ext = (url.split('?')[0].match(/\.(\w{2,4})$/) || [])[1]
   const e = (ext || '').toLowerCase()
   // Extensão conhecida decide direto; sem extensão, fareja o conteúdo.
@@ -730,6 +751,7 @@ async function _vidPlayHls(player, url) {
 
 function _vidStreamFalhou(player, motivo) {
   _vidDestruirHls()
+  _vidDesarmarVigia()
   const cod = player && player.error ? player.error.code : 0
   const detalhe = motivo || (cod === 4 ? 'o navegador não decodifica este formato (provável MKV)'
     : cod === 2 ? 'falha de rede na fonte'
@@ -761,7 +783,7 @@ function videoBackToLib() {
   const p = el('vid-player'); if (p) p.pause()
   if (typeof videoSonoCancelar === 'function') videoSonoCancelar()
   if (_vidURL) { URL.revokeObjectURL(_vidURL); _vidURL = null }
-  _vidDestruirHls()
+  _vidDestruirHls(); _vidDesarmarVigia()
   _vidCur = null; _vidFile = null; _vidStream = false; _vidStreamSrc = null
   renderVideoLib()
 }
