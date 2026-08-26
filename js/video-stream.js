@@ -106,10 +106,10 @@ function _asFontesCorpo(st) {
   if (!st.fontes.length) return cab + `<div class="vid-sub-info">Nenhuma fonte nos addons configurados para este título.</div>`
 
   return cab + `<div class="as-list">${st.fontes.map((f, i) => {
-    const tocavel = f.kind === 'url' && f.nativo
+    const tocavel = f.kind === 'url' && (f.nativo || f.hls)
     const cls = tocavel ? 'as-ok' : (f.kind === 'url' ? 'as-warn' : (f.kind === 'magnet' && _asTemDebrid()) ? 'as-warn' : 'as-block')
-    const acao = tocavel ? 'toca aqui'
-      : f.kind === 'url' ? (f.hls ? 'HLS — ainda não' : 'formato que o navegador não abre')
+    const acao = tocavel ? (f.hls ? 'toca aqui (HLS)' : 'toca aqui')
+      : f.kind === 'url' ? 'formato que o navegador não abre'
       : f.kind === 'magnet' ? (_asTemDebrid() ? 'torrent · resolver com debrid' : 'torrent · precisa de debrid')
       : 'fonte externa'
     return `
@@ -212,8 +212,8 @@ async function _asFetchStreams(meta, temporada, episodio) {
   }))
   const qNum = q => ({ '2160p': 4, '4k': 4, '1080p': 3, '720p': 2, '480p': 1 }[String(q || '').toLowerCase()] || 0)
   fontes.sort((a, b) => {
-    const ta = (a.kind === 'url' && a.nativo) ? 0 : 1
-    const tb = (b.kind === 'url' && b.nativo) ? 0 : 1
+    const ta = (a.kind === 'url' && (a.nativo || a.hls)) ? 0 : 1
+    const tb = (b.kind === 'url' && (b.nativo || b.hls)) ? 0 : 1
     if (ta !== tb) return ta - tb
     if (qNum(b.quality) !== qNum(a.quality)) return qNum(b.quality) - qNum(a.quality)
     return (b.seeders || 0) - (a.seeders || 0)
@@ -283,9 +283,8 @@ async function assistirPlaySource(i) {
   if (f.kind === 'external') {
     toast('Esta fonte abre fora do app (YouTube ou página) — não dá para estudar por aqui', 'warning'); return
   }
-  if (f.kind === 'url' && !f.nativo) {
-    toast(f.hls ? 'Fonte HLS: o player ainda não abre esse formato (fica para a próxima rodada)'
-      : 'O navegador não decodifica esse formato (provável MKV). Escolha uma fonte mp4 ou use debrid com saída mp4', 'warning'); return
+  if (f.kind === 'url' && !f.nativo && !f.hls) {
+    toast('O navegador não decodifica esse formato (provável MKV). Escolha uma fonte mp4/HLS ou use debrid com saída mp4', 'warning'); return
   }
   if (f.kind === 'magnet' && !_asTemDebrid()) {
     toast('Isto é um torrent: o navegador não baixa torrent. Configure um debrid (campo abaixo) ou use um addon de link direto', 'warning'); return

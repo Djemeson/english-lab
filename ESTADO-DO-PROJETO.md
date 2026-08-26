@@ -7,6 +7,14 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
+> Conserto 70b (2026-08-26) — **O VÍDEO NÃO TOCAVA: ERA HLS, NÃO ÁUDIO**. Ele testou no
+> Chrome real (o cliente funcionou — FrostStream respondeu), mas nada tocava e o aviso de
+> "áudio" enganava. Addons de link direto servem **HLS**, que o `<video>` não abre nativo (e o
+> `canPlayType` do Chrome mente: readyState 4 sem tocar). Embutido **hls.js** local/offline e
+> reescrita a cascata de reprodução (fareja formato → hls.js primeiro → nativo de reserva →
+> aviso honesto). **Testado com HLS real: hls.js tocando, 1280×720, tempo andando.**
+> `sw.js` → **englab-v432**. Detalhes na §9 (bloco 70ª, item HLS).
+>
 > Última atualização: 2026-08-26 (70ª) — **NASCEU A SEÇÃO "ASSISTIR": O LAB COMO CLIENTE DE
 > ADDONS DE VÍDEO**. Pedido dele: *"o lab tocando os addons — vários addons, link direto,
 > debrid, tudo"* + seção própria. Feito e testado ao vivo. `js/video-stream.js` novo (no pacote
@@ -15522,8 +15530,20 @@ stream entra em `videos[]` sem URL persistida. Dados de teste limpos.
       usa fetch direto e funciona, então deve ir). Testar com um addon real + série.
 - [ ] **Real-Debrid no navegador**: confirmar se a API manda CORS; se não, o
       caminho é só via addon-com-chave (já funciona) ou um proxy nosso na Vercel.
-- [ ] **MKV/HLS não tocam**: fica para uma rodada futura embutir **hls.js** +
-      transcode do RD (aí o MKV vira HLS tocável). Hoje: fonte mp4 ou debrid-mp4.
+- [x] **HLS agora TOCA** (conserto 70b): ele testou no Chrome real, o FrostStream
+      respondeu (cliente ok ponta a ponta), mas o vídeo não subia — e o aviso de
+      "áudio" enganava. Causa: addons de link direto servem **HLS**, que o `<video>`
+      não abre nativo, e o `canPlayType` do Chrome MENTE (readyState 4 mas não toca).
+      Embutido **hls.js** (`js/vendor/hls/hls.light.min.js`, 296 KB, offline, lazy).
+      Cascata nova em `video.js`: extensão conhecida decide direto; sem extensão,
+      **fareja** o conteúdo (content-type / `#EXTM3U`); **hls.js primeiro** quando
+      suportado (a ordem que o próprio hls.js recomenda), nativo só de reserva
+      (iOS/Safari); mp4 nativo com cascata cors→nocors; e um **aviso honesto** com o
+      motivo real (formato ou CORS do servidor) no lugar da desculpa de áudio.
+      **Testado ao vivo com HLS real** (test-streams.mux.dev): hls.js ativo, 5
+      níveis, 1280×720, tempo andou 0→1,92s. `sw.js` → **englab-v432**.
+- [ ] **MKV ainda não toca** (formato que nem hls.js resolve): fica a fonte mp4/HLS
+      ou debrid com saída mp4. Transcode do RD (MKV→HLS) é a saída futura.
 - [ ] **`captureStream` (gravar a cena em card) exige CORS na fonte** — link de
       debrid/http sem CORS toca mas não grava áudio; legenda/transcript não dependem.
 

@@ -41,6 +41,7 @@ let _vidAppliedSubUrl = null    // URL da legenda aplicada (para não retestar a
 let _vidRaioX = null            // { itens, nivel, at, ficha }
 let _vidStream = false          // podcast tocando direto da internet (sem arquivo local)
 let _vidStreamSrc = null        // URL da fonte de addon (Assistir) — transitória, nunca persistida
+let _vidHls = null              // instância hls.js ativa (streams HLS), destruída ao trocar/sair
 
 // ---- IndexedDB próprio: handles de arquivo + legendas ----
 const VideoDB = {
@@ -313,6 +314,7 @@ async function videoOpen(id, { silencioso = false } = {}) {
 // PLAYER + TRANSCRIPT
 // ================================================================
 async function videoOpenPlayer(v) {
+  _vidDestruirHls()   // um HLS de um vídeo anterior não pode sobreviver à troca
   setTimeout(() => { if (typeof ondeEstavaSalvar === 'function') ondeEstavaSalvar() }, 0)
   if (_vidSubsSaveTimer) _vidSaveSubsNow()   // flush do vídeo anterior
   _vidCur = v
@@ -587,10 +589,12 @@ async function videoOpenPlayer(v) {
   // capa, barra nem botões — e as setas do fone não pulavam de fala.
   _vidMediaSession(v, player)
 
-  // Streaming com crossorigin: se o servidor NÃO manda CORS, o elemento nem
-  // carrega. Recarrega sem o atributo (toca, mas sem captureStream) em vez de
-  // deixar o player mudo e sem explicação.
-  if (_vidStream) {
+  // Streaming: a reprodução de fonte de addon (Assistir) passa pela CASCATA
+  // — nativo → nativo sem CORS → HLS (hls.js) → aviso honesto. Podcast fica
+  // no caminho simples de sempre (é mp3/m4a; nunca é HLS).
+  if (_vidStream && v.source_type === 'stream') {
+    _vidStreamAttach(player, src, v)
+  } else if (_vidStream) {
     player.addEventListener('error', () => {
       if (!player.crossOrigin) return
       player.crossOrigin = null
@@ -604,7 +608,7 @@ async function videoOpenPlayer(v) {
   // áudio mudo (MKV com Dolby/DTS: o Chrome toca o vídeo e cala o áudio).
   // Podcast é mp3/m4a: nada disso se aplica (e o ffmpeg não teria arquivo).
   _vidFixAudio = null
-  if (!ehPod) {
+  if (!ehPod && v.source_type !== 'stream') {
     const fixedBlob = await VideoDB.get('media', v.id)
     if (fixedBlob) _vidAttachFixedAudio(fixedBlob)
     else _vidArmSilentDetector(player)
@@ -633,6 +637,122 @@ async function videoOpenPlayer(v) {
   }
 }
 
+// ================================================================
+// CASCATA DE REPRODUÇÃO DE STREAM (fonte de addon)
+// Um <video src=url> só toca mp4/webm/mov. Muitos addons de link direto
+// servem HLS (.m3u8) OU escondem o formato numa URL sem extensão — e aí o
+// player falhava mudo (o aviso de "áudio" enganava: não era áudio, era o
+// vídeo inteiro que não subiu). A cascata tenta, em ordem:
+//   1) nativo COM crossorigin  (permite gravar a fala em card)
+//   2) nativo SEM crossorigin  (servidor sem CORS toca, mas sem captura)
+//   3) HLS via hls.js          (o caso comum dos addons de link direto)
+//   4) aviso honesto com o motivo real (formato ou CORS do servidor)
+// ================================================================
+function _vidDestruirHls() {
+  if (_vidHls) { try { _vidHls.destroy() } catch (e) {} _vidHls = null }
+}
+
+async function _vidStreamAttach(player, url, v) {
+  _vidDestruirHls()
+  const ext = (url.split('?')[0].match(/\.(\w{2,4})$/) || [])[1]
+  const e = (ext || '').toLowerCase()
+  // Extensão conhecida decide direto; sem extensão, fareja o conteúdo.
+  if (e === 'm3u8') return _vidPlayHls(player, url)
+  if (['mp4', 'm4v', 'webm', 'ogv', 'ogg', 'mov'].includes(e)) return _vidPlayNative(player, url, v, true)
+  const ehHls = await _sniffHls(url)
+  if (ehHls) return _vidPlayHls(player, url)
+  return _vidPlayNative(player, url, v, true)
+}
+
+// Fareja se a URL é uma playlist HLS quando a extensão não diz. Um fetch que
+// bate na trava de CORS volta 'não-HLS' — e mp4 cross-origin toca no <video>
+// mesmo sem CORS, então a reserva nativa cobre esse caso.
+async function _sniffHls(url) {
+  try {
+    const r = await fetch(url, { headers: { Range: 'bytes=0-1023' } })
+    const ct = (r.headers.get('content-type') || '').toLowerCase()
+    if (/mpegurl|m3u8/.test(ct)) return true
+    if (/^(video|audio)\//.test(ct)) return false
+    const txt = await r.text()
+    return /^\s*#EXTM3U/.test(txt)
+  } catch (e) { return false }
+}
+
+// Reprodução nativa (mp4/webm/mov): tenta COM crossorigin (permite gravar a
+// fala em card) e, se o servidor não manda CORS, SEM. Última reserva: hls.js,
+// caso o "arquivo" fosse HLS disfarçado que o farejador não pegou.
+function _vidPlayNative(player, url, v, permiteHlsReserva) {
+  let fase = 'cors'
+  let ok = false
+  player.addEventListener('loadeddata', () => { ok = true }, { once: true })
+  player.addEventListener('playing', () => {
+    if (fase === 'nocors') toast('Este servidor não libera a leitura do áudio: dá para ouvir, mas não para gravar a fala em card', 'warning')
+  }, { once: true })
+  player.addEventListener('error', function onErro() {
+    if (ok) return
+    if (fase === 'cors') { fase = 'nocors'; player.crossOrigin = null; player.src = url; player.load() }
+    else if (fase === 'nocors' && permiteHlsReserva) { fase = 'hls'; player.removeEventListener('error', onErro); _vidPlayHls(player, url) }
+    else if (fase !== 'fim') { fase = 'fim'; _vidStreamFalhou(player) }
+  })
+  if (player.getAttribute('src') !== url) { player.src = url; player.load() }
+}
+
+// Reprodução HLS: hls.js quando suportado (Chrome/Firefox/Android via MSE);
+// nativo só onde o hls.js não roda mas o navegador abre HLS (iOS/Safari).
+async function _vidPlayHls(player, url) {
+  const carregou = await _ensureHls()
+  if (carregou && window.Hls && window.Hls.isSupported()) {
+    _vidDestruirHls()
+    const hls = new window.Hls({ maxBufferLength: 30, enableWorker: true })
+    _vidHls = hls
+    let fatal = false
+    hls.on(window.Hls.Events.ERROR, (_ev, data) => {
+      if (!data || !data.fatal || fatal) return
+      fatal = true
+      _vidStreamFalhou(player, data.type === 'networkError'
+        ? 'o servidor não libera acesso pelo navegador (CORS) — precisaria de um proxy'
+        : 'formato de vídeo não suportado')
+    })
+    try { player.removeAttribute('src'); player.load() } catch (e) {}
+    hls.loadSource(url)
+    hls.attachMedia(player)
+    return
+  }
+  // Sem hls.js: só resta o HLS nativo (Safari/iOS). Em Chrome isso não toca,
+  // e o erro cai no aviso honesto.
+  if (player.canPlayType('application/vnd.apple.mpegurl')) {
+    player.addEventListener('error', () => _vidStreamFalhou(player), { once: true })
+    player.src = url; player.load()
+  } else {
+    _vidStreamFalhou(player, 'este navegador não abre HLS')
+  }
+}
+
+function _vidStreamFalhou(player, motivo) {
+  _vidDestruirHls()
+  const cod = player && player.error ? player.error.code : 0
+  const detalhe = motivo || (cod === 4 ? 'o navegador não decodifica este formato (provável MKV)'
+    : cod === 2 ? 'falha de rede na fonte'
+    : cod === 3 ? 'não foi possível decodificar o vídeo'
+    : 'a fonte não pôde ser tocada')
+  toast('Não deu para tocar esta fonte: ' + detalhe + '. Volte e tente OUTRA fonte da lista.', 'error')
+}
+
+// Carrega o hls.js sob demanda (embutido em js/vendor/hls, funciona offline).
+let _hlsPromise = null
+function _ensureHls() {
+  if (window.Hls) return Promise.resolve(true)
+  if (_hlsPromise) return _hlsPromise
+  _hlsPromise = new Promise(resolve => {
+    const s = document.createElement('script')
+    s.src = 'js/vendor/hls/hls.light.min.js'
+    s.onload = () => resolve(true)
+    s.onerror = () => { _hlsPromise = null; resolve(false) }
+    document.body.appendChild(s)
+  })
+  return _hlsPromise
+}
+
 function videoBackToLib() {
   _vidSavePos()
   // Flush ANTES de anular _vidCur: o save debounced (1,5s) aborta sem ele —
@@ -641,6 +761,7 @@ function videoBackToLib() {
   const p = el('vid-player'); if (p) p.pause()
   if (typeof videoSonoCancelar === 'function') videoSonoCancelar()
   if (_vidURL) { URL.revokeObjectURL(_vidURL); _vidURL = null }
+  _vidDestruirHls()
   _vidCur = null; _vidFile = null; _vidStream = false; _vidStreamSrc = null
   renderVideoLib()
 }
