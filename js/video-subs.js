@@ -930,11 +930,44 @@ function videoSubExport(qual) {
 // ~R$ 1,50 por episódio de 45min, uma vez só.
 // ================================================================
 let _vidTranscrevendo = false
+// Baixa o vídeo da fonte de addon (Assistir) para transcrever. Sempre pelo
+// nosso proxy (mesma origem = bytes LEGÍVEIS pelo ffmpeg; resposta cross-origin
+// sem CORS viria "opaca", com 0 bytes). Baixa em janelas de 6 MB (o proxy fatia
+// pedidos abertos) e junta num Blob. Guarda de tamanho: acima de ~2,2 GB o
+// navegador não aguenta — pede fonte menor.
+async function _vidBaixarStreamParaTranscrever(alvoTr, setMsg) {
+  const src = (typeof _vidStreamSrc !== 'undefined' && _vidStreamSrc) || ''
+  if (!src) throw new Error('não encontrei a fonte de vídeo aberta')
+  const proxied = src.startsWith('/api/stream') ? src : '/api/stream?u=' + encodeURIComponent(src)
+  const head = await fetch(proxied, { headers: { Range: 'bytes=0-1' } })
+  if (head.status !== 206 && head.status !== 200) throw new Error('a fonte não respondeu (HTTP ' + head.status + ')')
+  const cr = head.headers.get('content-range') || ''
+  const total = cr ? Number(cr.split('/')[1]) : Number(head.headers.get('content-length')) || 0
+  if (!total) throw new Error('a fonte não informou o tamanho do arquivo')
+  const GB = 1024 * 1024 * 1024
+  if (total > 2.2 * GB) throw new Error('o arquivo tem ' + (total / GB).toFixed(1) + ' GB — grande demais para transcrever no navegador. Escolha uma fonte de 720p.')
+  const JAN = 6 * 1024 * 1024
+  const partes = []
+  for (let ini = 0; ini < total; ini += JAN) {
+    if (_vidCur !== alvoTr) throw new Error('__trocou__')
+    const fim = Math.min(total - 1, ini + JAN - 1)
+    const r = await fetch(proxied, { headers: { Range: `bytes=${ini}-${fim}` } })
+    if (r.status !== 206 && r.status !== 200) throw new Error('falha ao baixar o vídeo (HTTP ' + r.status + ')')
+    partes.push(new Uint8Array(await r.arrayBuffer()))
+    if (setMsg) setMsg('Baixando o vídeo para a IA ouvir...', (fim + 1) / total)
+  }
+  return new File([new Blob(partes, { type: 'video/mp4' })], 'stream.mp4', { type: 'video/mp4' })
+}
+
 async function videoTranscribeFull() {
   if (_vidTranscrevendo) return
   if (!_vidCur) { toast('Abra o vídeo primeiro', 'warning'); return }
-  if (!_vidFile) {
-    // Podcast em streaming: sem os bytes aqui, não há o que mandar ao Whisper.
+  // Fonte de addon (Assistir): não há arquivo local, mas dá para BAIXAR os bytes
+  // pelo proxy e transcrever. Podcast em streaming (sem source_type stream) segue
+  // sem download — ali o CDN bloqueou de propósito.
+  const ehStreamAddon = !_vidFile && _vidStream && _vidCur.source_type === 'stream'
+    && typeof _vidStreamSrc !== 'undefined' && _vidStreamSrc
+  if (!_vidFile && !ehStreamAddon) {
     toast(_vidStream
       ? 'Este episódio está tocando direto da internet (o servidor não liberou o download), então não dá para transcrever. Baixe o arquivo e abra em "Abrir arquivo".'
       : 'Abra o vídeo primeiro', 'warning')
@@ -949,7 +982,9 @@ async function videoTranscribeFull() {
   if (!(await confirmModal({ title: 'Criar legenda com IA', icon: 'sparkles',
     confirmText: `Transcrever — ${_brl(durMin * stt.usdMin * rate)}`,
     html: `<p style="font-size:var(--fs-sm);color:var(--text2)">A IA vai OUVIR o episódio (~${durMin} min) e escrever a legenda inteira,
-      com os tempos certos. O áudio é extraído aqui no seu aparelho — só a transcrição vai para a ${esc(stt.nome)}.
+      com os tempos certos. ${ehStreamAddon
+        ? 'Como a fonte é online, o vídeo é <b>baixado primeiro</b> (uma vez) para extrair o áudio aqui no seu aparelho'
+        : 'O áudio é extraído aqui no seu aparelho'} — só a transcrição vai para a ${esc(stt.nome)}.
       Leva alguns minutos.</p>
       <div class="cost-rows" style="margin-top:10px">
         <div class="cost-row"><span>Modelo</span><b>${esc(stt.nome)} · ${esc(stt.model)}</b></div>
@@ -971,13 +1006,19 @@ async function videoTranscribeFull() {
       <span class="vid-fix-bar"><i style="width:${Math.round(pct * 100)}%"></i></span>` : ''}</div></div>` }
   try {
     if (p) p.pause()
+    // Fonte de addon: baixa os bytes primeiro (o resto é idêntico ao arquivo local).
+    let arquivo = _vidFile
+    if (!arquivo) {
+      arquivo = await _vidBaixarStreamParaTranscrever(alvoTr, setMsg)
+      if (_vidCur !== alvoTr) { toast('Você trocou de vídeo no meio — o download era do anterior e foi descartado.', 'warning'); return }
+    }
     setMsg('Preparando o conversor (a 1ª vez baixa ~31 MB)...')
     const ff = await _vidLoadFFmpeg(pr => setMsg('Extraindo o áudio do arquivo...', pr))
     try { await ff.unmount('/mnt') } catch (e) {}
     try { await ff.createDir('/mnt') } catch (e) {}
-    await ff.mount('WORKERFS', { files: [_vidFile] }, '/mnt')
+    await ff.mount('WORKERFS', { files: [arquivo] }, '/mnt')
     setMsg('Extraindo o áudio do arquivo...', 0)
-    const code = await ff.exec(['-i', '/mnt/' + _vidFile.name, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'aac', '-b:a', '48k', 'ep.m4a'])
+    const code = await ff.exec(['-i', '/mnt/' + arquivo.name, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'aac', '-b:a', '48k', 'ep.m4a'])
     if (code !== 0) throw new Error('extração de áudio falhou (código ' + code + ')')
     const data = await ff.readFile('ep.m4a')
     try { await ff.deleteFile('ep.m4a') } catch (e) {}
@@ -995,7 +1036,7 @@ async function videoTranscribeFull() {
       const passo = Math.ceil(durTotal / nP)
       for (let k = 0; k < nP; k++) {
         setMsg(`Extraindo parte ${k + 1}/${nP}...`)
-        const c2 = await ff.exec(['-ss', String(k * passo), '-t', String(passo), '-i', '/mnt/' + _vidFile.name, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'aac', '-b:a', '48k', 'p.m4a'])
+        const c2 = await ff.exec(['-ss', String(k * passo), '-t', String(passo), '-i', '/mnt/' + arquivo.name, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'aac', '-b:a', '48k', 'p.m4a'])
         if (c2 !== 0) continue
         const d2 = await ff.readFile('p.m4a')
         try { await ff.deleteFile('p.m4a') } catch (e) {}
@@ -1031,7 +1072,7 @@ async function videoTranscribeFull() {
   } catch (e) {
     console.warn('[video] transcribeFull:', e)
     if (box) box.innerHTML = ''
-    toast('Transcrição falhou: ' + e.message, 'error')
+    if (e.message !== '__trocou__') toast('Transcrição falhou: ' + e.message, 'error')
   } finally { _vidTranscrevendo = false }
 }
 
