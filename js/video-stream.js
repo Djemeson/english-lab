@@ -33,6 +33,17 @@ function _streamAddons() {
 
 let _asState = null
 
+// Fonte HTTP dentro de página HTTPS = bloqueio de conteúdo misto (o navegador
+// recusa em silêncio). Reescreve para o nosso proxy HTTPS (mesma origem, então
+// captureStream também volta a valer). Fonte já HTTPS toca direto.
+function _asPreparaUrl(url) {
+  if (!url) return url
+  if (location.protocol === 'https:' && /^http:\/\//i.test(url)) {
+    return '/api/stream?u=' + encodeURIComponent(url)
+  }
+  return url
+}
+
 // ================================================================
 // SEÇÃO — busca de título -> episódio -> lista de fontes
 // ================================================================
@@ -290,7 +301,7 @@ async function assistirPlaySource(i) {
     toast('Isto é um torrent: o navegador não baixa torrent. Configure um debrid (campo abaixo) ou use um addon de link direto', 'warning'); return
   }
 
-  let url = f.playUrl
+  let url = _asPreparaUrl(f.playUrl)
   if (f.kind === 'magnet') {
     const btnTxt = 'resolvendo no debrid...'
     toast(btnTxt, 'info')
