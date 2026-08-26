@@ -15430,6 +15430,33 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Do estudo Nuvio×addon (2026-08-26 — análise, nada implementado)
+
+Ele perguntou se dá para o Lab virar addon do **Nuvio** (app de streaming
+open-source, React Native/Expo, GPL-3.0 — github.com/paytonlowe/NuvioStreaming)
+como é com a Netflix. Conclusão do estudo:
+
+- O Nuvio usa **o protocolo de addons do Stremio**: addon = servidorzinho HTTP
+  que responde JSON em 4 recursos (catalog / meta / stream / **subtitles**).
+  **Addon NÃO toca o player** — sem legenda clicável, sem botões, sem eventos de
+  reprodução. A experiência da Netflix (extensão injetando no DOM do player web)
+  **não é replicável por addon**; no celular não há extensão.
+- O que **dá**: um **addon de legendas**. Quando ele dá play, o app chama nosso
+  endpoint com `type` + `id` (IMDb + temporada/episódio) — ou seja, o servidor
+  fica sabendo **o que ele está assistindo** e pode (a) devolver a legenda EN e
+  (b) gravar o evento no Firestore → o episódio aparece no módulo Vídeo do Lab
+  **pronto para estudar depois** (o app já importa .srt/.vtt — `video-subs.js`).
+  Precisa de: função serverless (Vercel já é nosso), fonte de legenda
+  (OpenSubtitles API) e token de usuário na URL do manifest (uso pessoal).
+- Addon de **catálogo** ("minhas séries de estudo" dentro do Nuvio) é possível e
+  barato, valor cosmético.
+- Caminho para ter a experiência COMPLETA no player: **fork do Nuvio** (é
+  open-source) com captura embutida — custo alto (manter fork + build Android).
+  Alternativa no computador: adaptar a extensão para o **Stremio Web**, mesmo
+  padrão da Netflix.
+- [ ] **Decisão dele pendente**: fazer o addon de legendas + registro de
+      "assistido" (rodada média), ou não fazer nada por ora.
+
 ### Da AUDITORIA da análise real e os dois consertos (2026-08-26, 68ª)
 
 Pedido dele: *"entra no chrome e verifica a análise que rodou"*. Auditados os **1000
