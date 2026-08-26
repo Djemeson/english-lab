@@ -194,6 +194,21 @@ function promptTypeRules(langCode) {
 //   'analise'  — análise completa de um item (review.js)
 //   'glosa'    — glosa curta em triagem/captura (raio-x, kindle, mídia, vídeo)
 //   'traducao' — tradução de frase/legenda inteira
+// A REGRA DA IMAGEM — fonte única, exportada em separado (rodada 69).
+// Por quê: o raio-X tinha uma CÓPIA CURTA desta regra no prompt próprio, e foi
+// por ela que "crazy as a bat in a henhouse" virou "louca como uma barata" —
+// compreensível, e ERRADO: o aluno está lendo o AUTOR, e a barata apaga o
+// morcego que o King escreveu. Abrasileirar é ofício de TRADUÇÃO de texto
+// corrido (legenda, fala); GLOSA DE ESTUDO é uma janela para a imagem
+// original — quem a troca ensina português, não inglês.
+function promptRegraImagem(langCode) {
+  return `KEEP THE AUTHOR'S IMAGE — anti-literal rules push you away from word-by-word; this one says where to STOP. When the text uses a concrete image, a simile, an invented object, a joke or a culture-bound reference, translate THE IMAGE. Never swap it for a different familiar image, and never replace it with an explanation of what it means: the learner is reading the AUTHOR, not a summary of the author.
+- "believer in left-handed monkey wrenches" (a tool that does not exist — the errand a workshop sends the new guy on) → "de quem acredita em chave inglesa canhota". WRONG: "de quem acredita em papai noel" (different image). WRONG: "de quem se deixa enganar" (an explanation).
+- SIMILES KEEP THEIR ANIMAL/OBJECT: "crazy as a bat in a henhouse" → "louca como morcego em galinheiro". WRONG: "louca como uma barata" (a Brazilian image that erases the author's picture).
+- Swap ONLY when Portuguese has a fixed expression carrying the SAME picture ("raining cats and dogs" → "chovendo canivete" keeps the falling-objects picture); in doubt, keep the author's.
+- The same discipline applies to a precise word: "perpetual foul-up" is someone who always RUINS things ("trapalhona crônica"), not merely a fool ("mané").`
+}
+
 function promptRegrasLexicais(langCode, modo) {
   const L = getLangDef(langCode)
   // O núcleo que TODO produtor de português precisa — 4 regras, cada uma com
@@ -203,7 +218,7 @@ function promptRegrasLexicais(langCode, modo) {
 2. DOMAIN CHECK: decide WHAT the thing IS in this sentence, then pick the Portuguese word for THAT thing — never the most frequent dictionary equivalent. "a bayonet mounted on the tip of its barrel" → barrel is a RIFLE's barrel: "cano", NEVER "barril" (container). Never hedge between two domains ("de armas ou recipientes") — the sentence already decided.
 3. SUBSTITUTION TEST: put your Portuguese back into the sentence. If the sentence stops saying what the ${L.nameEn} says, it is wrong. "we began to tire of the mud" + "perder o interesse" → "começamos a perder o interesse na lama" is NOT what it says; "cansar-se de" is.
 4. SELF-CHECK: if your own examples/definition describe one domain and your Portuguese uses a word from another, the translation is WRONG — fix it before returning.
-5. KEEP THE AUTHOR'S IMAGE — rules 1-3 push you away from the literal; this one says where to STOP. When the text uses a concrete image, an invented object, a joke or a culture-bound reference, translate THE IMAGE. Never swap it for a different familiar image, and never replace it with an explanation of what it means: he is reading the AUTHOR, not a summary of the author. "believer in left-handed monkey wrenches" (a tool that does not exist — the errand a workshop sends the new guy on) → "de quem acredita em chave inglesa canhota". WRONG: "de quem acredita em papai noel" (a different image). WRONG: "de quem se deixa enganar" (an explanation). Swap ONLY when Portuguese has a fixed expression carrying the SAME picture ("raining cats and dogs" → "chovendo canivete"); in doubt, keep his. The same discipline applies to a precise word: "perpetual foul-up" is someone who always RUINS things ("trapalhona crônica"), not merely a fool ("mané").`
+5. ${promptRegraImagem(langCode)}`
 
   if (modo === 'traducao') return nucleo
 

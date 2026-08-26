@@ -15457,6 +15457,41 @@ como é com a Netflix. Conclusão do estudo:
 - [ ] **Decisão dele pendente**: fazer o addon de legendas + registro de
       "assistido" (rodada média), ou não fazer nada por ora.
 
+### Do ESTUDO da imagem e a peça única em todas as frentes (2026-08-26, 69ª)
+
+**O estudo (pedido dele, com o caso morcego×barata na mão):** glosar expressão tem dois
+caminhos e eles NÃO se equivalem. **Abrasileirar** ("louca como uma barata") maximiza a
+compreensão imediata — e apaga o que o aluno parou para ver: a imagem que o AUTOR
+escreveu. **Preservar a imagem** ("louca como morcego em galinheiro") é o caminho de
+quem ensina a LÍNGUA (a pedagogia do mairovergara que ele citou: literal + sentido); a
+compreensão vem do contexto e da análise completa. A fronteira da casa, agora escrita:
+- **GLOSA DE ESTUDO** (raio-X, chips, pré-estudo, análise, família) → preserva a
+  imagem; troca SÓ quando o português tem expressão fixa com a MESMA figura
+  ("raining cats and dogs" → "chovendo canivete" mantém objetos caindo).
+- **TRADUÇÃO DE TEXTO CORRIDO** (legenda do vídeo, fala) → naturaliza; ali o objetivo
+  é acompanhar a cena, não estudar a unidade. (Regras 'traducao' já fazem isso.)
+
+**O que mudou:**
+- [x] **`promptRegraImagem(lang)` — fonte única em lang.js**, extraída da regra 5 (que
+      passa a interpolá-la) e ENRIQUECIDA com o caso real: "SIMILES KEEP THEIR
+      ANIMAL/OBJECT — crazy as a bat in a henhouse → louca como morcego em galinheiro;
+      WRONG: louca como uma barata". Os 13 consumidores de promptRegrasLexicais ganham
+      o exemplo de graça.
+- [x] **Raio-X** troca a cópia curta inline pela peça (era a cópia por onde o morcego
+      escapou — regra em cópia é regra que diverge, a lição de sempre).
+- [x] **`regenerateMeaning`/Reanalisar-tudo (audio.js)**: era a ÚNICA frente produzindo
+      frases PT sem regra NENHUMA (nem anti-literal completa) — e é a que REESCREVE o
+      acervo em lote. Agora usa `promptRegrasLexicais('traducao')`.
+- [x] **`expandirFamilia` (review.js)**: glosas da família ganham a regra da imagem.
+- [x] **Invisível (ZWSP) nas demais frentes**: chips (`quebrarTrecho` — o ZWSP passava
+      pelo normB, que só tira pontuação, e o chip legítimo era descartado mudo) e
+      família (`expr` alimenta busca e dedupe). Pré-estudo JÁ protegido por construção
+      (knownNorm só aceita letras — verificado: knownNorm('queas​ily')='queasily').
+- [x] sw v430. **A/B no Luna real com o símile**: SEM a regra → "completamente louca" e
+      "derreter de medo" (explicações, imagem apagada); COM → "louca como morcego em
+      galinheiro" e "derreter como manteiga na frigideira". 10/10 nas verificações de
+      montagem ao vivo; console limpo.
+
 ### Da AUDITORIA da análise real e os dois consertos (2026-08-26, 68ª)
 
 Pedido dele: *"entra no chrome e verifica a análise que rodou"*. Auditados os **1000

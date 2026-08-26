@@ -1112,7 +1112,11 @@ ${promptUnidadeDoSentido(it.word, 'curto')}
   - Portuguese: wrap the word or short phrase that is the Portuguese equivalent of the target IN THAT SENTENCE in <b></b>.
   - If the target appears more than once in a sentence, bold ONLY the main occurrence.
   - Exactly ONE bold span per side. Do not bold anything else.
-- Translate the Portuguese naturally (not word-for-word). LITERAL-TRANSLATION TRAP — avoid it explicitly: translate what the sentence DOES, the way a Brazilian would say it ("we'll get you in" → "a gente te encaixa", never "colocar você dentro"). If a translation reads like word-by-word substitution, redo it.`
+${typeof promptRegrasLexicais === 'function' ? promptRegrasLexicais(it.lang || 'en', 'traducao') : '- Translate the Portuguese naturally (not word-for-word).'}`
+  // ⚠️ A fonte única entra AQUI também (rodada 69): esta era a ÚNICA frente que
+  // produzia frases PT sem regra nenhuma — nem anti-literal completa, nem
+  // domínio, nem a regra da imagem. Reanalisar em lote reescreve o acervo
+  // inteiro; era justamente onde as regras mais faziam falta.
   return aiJSON(PROMPT, { maxTokens: 900 })
 }
 

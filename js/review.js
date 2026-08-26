@@ -735,6 +735,7 @@ Return ONLY this JSON:
 - Every "expr" must genuinely CONTAIN "${alvo}" or a form of it (or be derived from it, for "derivada").
 - Sort by usefulness: what a learner meets most often comes first.
 - "gloss" is what the expression means as a WHOLE, never the sum of the words.
+- ${typeof promptRegraImagem === 'function' ? promptRegraImagem(wordLang(w)) : ''}
 - Do not repeat the item itself as an entry.
 - Do not invent: if you are not sure the expression is real and current, leave it out.`
     const r = await aiJSON(PROMPT, { maxTokens: 3000, schema: ESQ.familia, schemaNome: 'familia' })
@@ -742,7 +743,9 @@ Return ONLY this JSON:
     const TIPOS = ['phrasal_verb', 'idiom', 'collocation', 'chunk', 'derivada']
     const familia = (Array.isArray(r.familia) ? r.familia : [])
       .map(it => ({
-        expr: String(it && it.expr || '').replace(/\s+/g, ' ').trim(),
+        // invisíveis fora (rodada 69): a expr da família alimenta busca e
+        // dedupe (lexaJaEhSeu/prepAcharItem) — ZWSP quebraria os dois.
+        expr: (typeof _aiLimpaInvisivel === 'function' ? _aiLimpaInvisivel(it && it.expr) : String(it && it.expr || '').replace(/\s+/g, ' ').trim()),
         tipo: TIPOS.includes(it && it.tipo) ? it.tipo : 'collocation',
         gloss: String(it && it.gloss || '').replace(/\s+/g, ' ').trim(),
         nivel: String(it && it.nivel || '').trim()
@@ -2998,9 +3001,13 @@ ${promptRegrasLexicais(lang, 'glosa')}
     })
   }
 
+  // _aiLimpaInvisivel (rodada 69): um ZWSP no meio de "expr" passa pelo normB
+  // (que só tira pontuação) e o casamento com o trecho falha — chip legítimo
+  // descartado em silêncio. Mesmo defeito pego no raio-X ("queas​ily").
+  const _limpa = s => (typeof _aiLimpaInvisivel === 'function' ? _aiLimpaInvisivel(s) : String(s || '').trim())
   const items = (Array.isArray(r.items) ? r.items : [])
-    .map(it => ({ expr: String(it.expr || '').trim(), type: _RVB_CATS.some(c => c[0] === it.type) ? it.type : 'word',
-                  gloss: String(it.gloss || '').trim(), nivel: String(it.nivel || '').trim() }))
+    .map(it => ({ expr: _limpa(it.expr), type: _RVB_CATS.some(c => c[0] === it.type) ? it.type : 'word',
+                  gloss: _limpa(it.gloss), nivel: String(it.nivel || '').trim() }))
     // dentro do objeto de estudo, mas nunca o objeto INTEIRO repetido como chip
     .filter(it => it.expr && dentro(it.expr) && normB(it.expr) !== normB(alvo))
     // NEM QUASE O TRECHO INTEIRO. A regra acima só barrava a cópia exata; numa
