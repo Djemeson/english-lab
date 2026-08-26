@@ -939,16 +939,32 @@ async function _vidBaixarStreamParaTranscrever(alvoTr, setMsg) {
   const src = (typeof _vidStreamSrc !== 'undefined' && _vidStreamSrc) || ''
   if (!src) throw new Error('não encontrei a fonte de vídeo aberta')
   const proxied = src.startsWith('/api/stream') ? src : '/api/stream?u=' + encodeURIComponent(src)
-  const head = await fetch(proxied, { headers: { Range: 'bytes=0-1' } })
-  if (head.status !== 206 && head.status !== 200) throw new Error('a fonte não respondeu (HTTP ' + head.status + ')')
-  const cr = head.headers.get('content-range') || ''
-  const total = cr ? Number(cr.split('/')[1]) : Number(head.headers.get('content-length')) || 0
-  if (!total) throw new Error('a fonte não informou o tamanho do arquivo')
   const GB = 1024 * 1024 * 1024
-  if (total > 2.2 * GB) throw new Error('o arquivo tem ' + (total / GB).toFixed(1) + ' GB — grande demais para transcrever no navegador. Escolha uma fonte de 720p.')
   const JAN = 6 * 1024 * 1024
-  const partes = []
-  for (let ini = 0; ini < total; ini += JAN) {
+  const grandeDemais = n => 'o arquivo tem ' + (n / GB).toFixed(1) + ' GB — grande demais para transcrever no navegador. Escolha uma fonte de 720p.'
+
+  // 1ª janela: revela se o servidor ACEITA Range (206 + Content-Range) ou
+  // ignora e manda o arquivo inteiro (200). São caminhos diferentes.
+  if (setMsg) setMsg('Baixando o vídeo para a IA ouvir...', 0)
+  const r0 = await fetch(proxied, { headers: { Range: `bytes=0-${JAN - 1}` } })
+  if (r0.status !== 206 && r0.status !== 200) throw new Error('a fonte não respondeu (HTTP ' + r0.status + ')')
+
+  // Servidor NÃO suporta Range: o corpo já é o arquivo todo — pega e pronto.
+  if (r0.status === 200) {
+    const cl = Number(r0.headers.get('content-length')) || 0
+    if (cl > 2.2 * GB) throw new Error(grandeDemais(cl))
+    const blob = await r0.blob()
+    if (_vidCur !== alvoTr) throw new Error('__trocou__')
+    if (blob.size > 2.2 * GB) throw new Error(grandeDemais(blob.size))
+    return new File([blob], 'stream.mp4', { type: 'video/mp4' })
+  }
+
+  // Servidor suporta Range: baixa em janelas de 6 MB até o total.
+  const total = Number((r0.headers.get('content-range') || '').split('/')[1]) || 0
+  if (!total) throw new Error('a fonte não informou o tamanho do arquivo')
+  if (total > 2.2 * GB) throw new Error(grandeDemais(total))
+  const partes = [new Uint8Array(await r0.arrayBuffer())]
+  for (let ini = JAN; ini < total; ini += JAN) {
     if (_vidCur !== alvoTr) throw new Error('__trocou__')
     const fim = Math.min(total - 1, ini + JAN - 1)
     const r = await fetch(proxied, { headers: { Range: `bytes=${ini}-${fim}` } })
