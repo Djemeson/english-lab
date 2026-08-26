@@ -131,13 +131,26 @@ function renderVideoLib() {
     return
   }
 
-  area.innerHTML = `
+  // O CONVITE DE RETOMADA (rodada 70): o app tentou reabrir sozinho e o
+  // navegador exige um gesto para liberar o arquivo. Em vez de silêncio (que
+  // parecia "o app esqueceu"), um clique — e sem caçar pasta nenhuma.
+  const pend = _vidPendente ? videos.find(x => x.id === _vidPendente) : null
+  const convite = pend ? `
+    <div class="vid-retomar">
+      <div class="vid-retomar-txt">
+        <b>${ic('play','ic-sm')} Continuar: ${esc(pend.title)}</b>
+        <span>O atalho para o arquivo está guardado. O navegador só precisa de um clique seu para liberar a leitura.</span>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="videoOpen('${pend.id}')">${ic('check','ic-sm')}Permitir acesso</button>
+    </div>` : ''
+
+  area.innerHTML = convite + `
     <div class="vid-lib">
       ${videos.map(v => {
         const nClips = clips.filter(c => c.videoId === v.id).length
         const dur = v.duration ? _vidFmtTime(v.duration) : '—'
         return `
-        <div class="vid-lib-row" onclick="videoOpen('${v.id}')">
+        <div class="vid-lib-row" data-id="${v.id}" onclick="videoOpen('${v.id}')">
           <div class="vid-lib-icon">${v.podcast && v.podcast.artwork
             ? `<img class="vid-lib-art" src="${escA(v.podcast.artwork)}" alt="" loading="lazy">`
             : srcIcon(v.source_type || 'series')}</div>
@@ -151,6 +164,7 @@ function renderVideoLib() {
               ${nClips ? `<span>${nClips} corte${nClips !== 1 ? 's' : ''}</span>` : ''}
               ${v.position > 15 ? `<span>parou em ${_vidFmtTime(v.position)}</span>` : ''}
               ${v.coverage != null ? `<span class="vid-cov">${v.coverage}% conhecido</span>` : ''}
+              <span class="vid-lib-atalho" data-tip="Carregando…"></span>
             </div>
           </div>
           <!-- Menu único de card (UX-2): a lixeira solta no canto virou o
@@ -159,6 +173,35 @@ function renderVideoLib() {
         </div>`
       }).join('')}
     </div>`
+  // A etiqueta do atalho é assíncrona (lê o IndexedDB e consulta a permissão),
+  // então entra DEPOIS da pintura — a lista não espera por ela.
+  _vidPintarAtalhos()
+}
+
+// Diz, para cada vídeo de arquivo, se o app ainda sabe onde o arquivo está.
+// Sem isto o estado era invisível: ele só descobria ao clicar e ver (ou não)
+// o seletor de pastas abrir.
+async function _vidPintarAtalhos() {
+  for (const linha of document.querySelectorAll('.vid-lib-row[data-id]')) {
+    const id = linha.dataset.id
+    const v = videos.find(x => x.id === id)
+    const alvo = linha.querySelector('.vid-lib-atalho')
+    if (!alvo) continue
+    // Podcast e stream não dependem de arquivo local: a etiqueta não se aplica.
+    if (!v || v.podcast || v.source_type === 'stream') { alvo.remove(); continue }
+    const est = await videoHandleEstado(id)
+    if (est === 'sem-atalho') {
+      alvo.textContent = 'vai pedir o arquivo'
+      alvo.dataset.tip = 'Este vídeo entrou sem atalho (ou o atalho se perdeu). Ao abrir, você escolhe o arquivo uma vez — daí em diante ele fica lembrado.'
+      alvo.classList.add('sem')
+    } else {
+      alvo.textContent = 'arquivo lembrado'
+      alvo.dataset.tip = est === 'pronto'
+        ? 'O app sabe onde este arquivo está e já tem permissão — abre direto.'
+        : 'O app sabe onde este arquivo está. O navegador pede um clique de permissão a cada sessão nova.'
+      alvo.classList.remove('sem')
+    }
+  }
 }
 
 function videoLibMenu(ev, id) {
@@ -253,6 +296,26 @@ async function videoOpenStream(v, url) {
 // seletor de arquivos do sistema — um diálogo brotando sozinho ao iniciar o
 // app, sem ele ter clicado em nada. No modo silencioso ela desiste e deixa a
 // biblioteca na tela, que é a resposta honesta.
+// ---- O ATALHO PARA O ARQUIVO (rodada 70) --------------------------------
+// ⚠️ O NAVEGADOR NÃO REABRE ARQUIVO DO DISCO SOZINHO depois de um reload —
+// é trava de segurança da plataforma, não limitação do app: um site que
+// pudesse ler `D:\...` sem gesto nenhum leria o disco inteiro. O que dá para
+// guardar é o ATALHO (FileSystemFileHandle no IndexedDB), e o ganho real é
+// trocar a CAÇADA PELA PASTA por UM clique de "Permitir".
+// Estados: 'pronto' (atalho + permissão viva) · 'precisa-permissao' (atalho
+// guardado, um clique resolve) · 'sem-atalho' (só o seletor de arquivos).
+async function videoHandleEstado(id) {
+  let h = null
+  try { h = await VideoDB.get('handles', id) } catch (e) {}
+  if (!h || typeof h.queryPermission !== 'function') return 'sem-atalho'
+  try {
+    return (await h.queryPermission({ mode: 'read' })) === 'granted' ? 'pronto' : 'precisa-permissao'
+  } catch (e) { return 'sem-atalho' }
+}
+// O vídeo que o app tentou reabrir sozinho e não pôde por falta de permissão:
+// a biblioteca oferece o convite de um clique em vez de ficar muda.
+let _vidPendente = null
+
 async function videoOpen(id, { silencioso = false } = {}) {
   const v = videos.find(x => x.id === id); if (!v) return
   // Entrada de STREAM (addon): a URL expira, então quem reabre é a seção
@@ -272,18 +335,34 @@ async function videoOpen(id, { silencioso = false } = {}) {
     return
   }
   const handle = await VideoDB.get('handles', id)
-  if (handle) {
+  if (handle && typeof handle.queryPermission === 'function') {
     try {
       let perm = await handle.queryPermission({ mode: 'read' })
-      // Pedir permissão abre uma caixa do navegador: só quando ELE mandou abrir.
-      if (perm !== 'granted' && silencioso) return
+      // Volta automática sem permissão viva: NÃO abre caixa nenhuma sozinha —
+      // marca o vídeo como pendente e deixa a biblioteca oferecer o clique.
+      if (perm !== 'granted' && silencioso) { _vidPendente = id; renderVideoLib(); return }
       if (perm !== 'granted') perm = await handle.requestPermission({ mode: 'read' })
       if (perm === 'granted') {
+        _vidPendente = null
         _vidFile = await handle.getFile()
         await videoOpenPlayer(v)
         return
       }
-    } catch (e) { console.warn('[video] handle inválido:', e.message) }
+      // Ele recusou a permissão: respeitar e parar aqui. Cair no seletor de
+      // pastas depois de um "não" é insistir com outra roupa.
+      toast('Sem permissão para ler o arquivo — clique de novo para autorizar', 'warning')
+      _vidPendente = id; renderVideoLib()
+      return
+    } catch (e) {
+      // SecurityError = o clique já "esfriou" (o navegador exige que o pedido
+      // saia de um gesto recente). O convite da biblioteca dá um gesto novo.
+      if (/user activation|gesture|SecurityError/i.test(e.name + ' ' + e.message)) {
+        _vidPendente = id; renderVideoLib()
+        toast('Clique em "Permitir acesso" para retomar este vídeo', 'info')
+        return
+      }
+      console.warn('[video] handle inválido:', e.message)
+    }
   }
   if (silencioso) return          // nada de seletor de arquivo sem ele pedir
   toast('Escolha o arquivo do vídeo (o navegador não o guarda — só o atalho)', 'info')

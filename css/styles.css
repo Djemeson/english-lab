@@ -8217,3 +8217,26 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 .ler-raiox-quando{
   display:block;font-style:normal;font-size:var(--fs-3xs);color:var(--text3);margin-top:1px;
 }
+
+/* ================================================================
+   O ATALHO PARA O ARQUIVO DE VÍDEO (rodada 70)
+   O navegador não reabre arquivo do disco sozinho depois de um reload
+   — o app guarda o ATALHO e troca a caçada pela pasta por um clique.
+   ================================================================ */
+.vid-retomar{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:rgba(var(--primary-rgb),.08);
+  border:1px solid rgba(var(--primary-rgb),.35);
+  border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;
+}
+.vid-retomar-txt{display:flex;flex-direction:column;gap:3px;flex:1;min-width:200px}
+.vid-retomar-txt b{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-sm)}
+.vid-retomar-txt span{font-size:var(--fs-2xs);color:var(--text2)}
+/* Etiqueta discreta: o estado do atalho deixa de ser invisível */
+.vid-lib-atalho{
+  font-size:var(--fs-3xs);color:var(--text3);
+  border:1px dotted var(--border-strong);border-radius:var(--radius-pill);
+  padding:0 7px;cursor:help;
+}
+.vid-lib-atalho:empty{display:none}
+.vid-lib-atalho.sem{color:var(--warning);border-color:color-mix(in srgb, var(--warning) 45%, transparent)}

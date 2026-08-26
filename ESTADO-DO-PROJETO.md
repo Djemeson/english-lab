@@ -15632,6 +15632,42 @@ stream entra em `videos[]` sem URL persistida. Dados de teste limpos.
 - [ ] **`captureStream` (gravar a cena em card) exige CORS na fonte** — link de
       debrid/http sem CORS toca mas não grava áudio; legenda/transcript não dependem.
 
+### Da rodada do atalho lembrado do vídeo (2026-08-26, 70ª)
+
+**Relato dele:** *"ao recarregar a página a informação do vídeo fica salva mas tenho que
+buscar o vídeo de novo no notebook — quero que o caminho seja lembrado."*
+
+**A verdade da plataforma, escrita para não se perder:** nenhum site reabre arquivo do
+disco sozinho depois de um reload. Não é limitação do app — é trava de segurança do
+navegador (um site que lesse `D:\...` sem gesto leria o disco inteiro). O que dá para
+guardar é o **atalho** (`FileSystemFileHandle` no IndexedDB, store `handles`), e o ganho
+possível é trocar a CAÇADA PELA PASTA por **um clique de "Permitir"**. O app já guardava
+o atalho; o que faltava era usar bem o que tinha.
+
+- [x] **Convite de retomada** (`.vid-retomar` no topo da biblioteca): a volta automática
+      (`ondeEstavaRestaurar` → `videoOpen(silencioso)`) achava o atalho, via a permissão
+      pendente e **desistia em silêncio** — indistinguível de "o app esqueceu". Agora
+      marca `_vidPendente` e a biblioteca oferece "Continuar: X · Permitir acesso".
+      Um clique → `requestPermission` → player. Zero navegação de pastas.
+- [x] **Etiqueta de estado por vídeo** (`_vidPintarAtalhos`, assíncrona, depois da
+      pintura): "arquivo lembrado" ou "vai pedir o arquivo". O estado era invisível —
+      só se descobria clicando e vendo (ou não) o seletor abrir. Podcast/stream não
+      recebem a etiqueta (não dependem de arquivo local).
+- [x] **Falha de gesto tratada**: `requestPermission` exige *transient user activation*;
+      quando o clique "esfria", o erro caía no `catch` genérico e o app pulava para o
+      seletor de pastas. Agora reconhece o SecurityError e oferece o convite (gesto novo).
+- [x] **Recusa respeitada**: negar a permissão parava em `showOpenFilePicker` — insistir
+      com outra roupa. Agora avisa e volta para o convite.
+- [x] sw v431. **Testado ao vivo: 15/15** (três estados de atalho; silencioso não abre
+      caixa; convite aparece; clique pede permissão, abre o player e NÃO abre seletor de
+      pastas; vídeo sem atalho continua oferecendo o seletor, que é o certo).
+      ⚠️ Descoberta de teste: `VideoDB.set` recusa objeto com funções
+      (DataCloneError) — só handle NATIVO é gravável. Prova que todo handle guardado é
+      real; para testar, intercepte `VideoDB.get`.
+- **Não se aplica a**: audiolivro e leitor guardam o arquivo INTEIRO no IndexedDB (não
+      dependem de atalho); `garantirArmazenamentoPersistente` já protege o banco de
+      despejo desde a rodada anterior — verificado, não assumido.
+
 ### Do ESTUDO da imagem e a peça única em todas as frentes (2026-08-26, 69ª)
 
 **O estudo (pedido dele, com o caso morcego×barata na mão):** glosar expressão tem dois
