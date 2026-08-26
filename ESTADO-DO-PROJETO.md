@@ -15489,9 +15489,33 @@ escolhido mostra a capa no cabeçalho das fontes. Sem `loading=lazy` (poucas
 imagens; lazy em container que já esteve oculto podia não disparar). CSS `.as-*`.
 `sw.js` → **englab-v434**. Testado no Chrome real: 7/8 capas na hora (250×367).
 
-### Transcrição de vídeo de stream/debrid — pergunta dele (2026-08-26, análise)
+### 70e — transcrição com IA para os vídeos da seção Assistir (2026-08-26) — FEITO
 
-"Daria pra transcrever os vídeos que vêm do debrid?" Avaliação:
+Ele mandou estender. O botão "Criar com IA" já aparecia para vídeo; o bloqueio
+era dentro de `videoTranscribeFull` (recusava sem arquivo local). Agora, fonte
+de addon sem arquivo → **baixa os bytes pelo proxy** e segue o MESMO caminho do
+podcast (ffmpeg extrai áudio → fatia ≤25 MB → Whisper → cues sincronizadas):
+- `_vidBaixarStreamParaTranscrever`: baixa pelo `/api/stream` (mesma origem =
+  bytes legíveis; cross-origin sem CORS viria opaco). Trata **206** (fatia em
+  janelas de 6 MB) e **200** (servidor ignora Range → pega o arquivo inteiro de
+  uma vez; sem isso o laço rebaixava o arquivo todo a cada janela e travava).
+  Guarda de **2,2 GB** (acima disso pede fonte 720p).
+- `videoTranscribeFull` usa `arquivo` local (o `_vidFile` OU o baixado); resto
+  idêntico. Diálogo avisa que baixa primeiro; "trocou de vídeo" não vira erro.
+- Bônus: ffmpeg extrai áudio até de MKV (transcrição independe de reproduzir).
+
+**Testado ao vivo no Chrome real** (english-lab-seven, chave Groq configurada):
+baixador montou `stream.mp4` de 2,85 MB (caso 200) do proxy; ffmpeg carregou,
+montou e **extraiu o áudio (exit 0, ep.m4a 33 KB)**. Só a chamada final ao
+Whisper não foi disparada (o sample de 5 s não tem fala) — é o mesmo código já
+provado no podcast. Ponta a ponta com um episódio real depende de fonte que
+toque (debrid) + a chave dele.
+
+- [ ] Rodar uma vez com episódio real quando ele tiver debrid (confirmar cues).
+
+### Transcrição de vídeo de stream/debrid — pergunta dele (2026-08-26, análise inicial)
+
+"Daria pra transcrever os vídeos que vêm do debrid?" Avaliação (agora FEITA acima):
 - **Quase nunca precisa**: o app já busca legenda pronta nos addons ao abrir
   (`_vidAutoSub`, OpenSubtitles). Popular quase sempre tem — melhor que
   transcrever (instantâneo, preciso, timing certo).
