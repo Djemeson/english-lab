@@ -15632,6 +15632,36 @@ stream entra em `videos[]` sem URL persistida. Dados de teste limpos.
 - [ ] **`captureStream` (gravar a cena em card) exige CORS na fonte** — link de
       debrid/http sem CORS toca mas não grava áudio; legenda/transcript não dependem.
 
+### Da rodada do atalho que se perdia em silêncio (2026-08-26, 71ª)
+
+**Relato dele:** *"fiz o teste 3 vezes e continua igual"* — a etiqueta seguia dizendo
+"vai pedir o arquivo" depois de escolher o arquivo três vezes.
+
+**Diagnóstico no Chrome dele, no app publicado** (e é por isso que essa passou a ser a
+regra de teste da casa — ver `~/.claude/CLAUDE.md`):
+- store `handles`: **VAZIO**, sem um único erro no console;
+- store `subs`: **vazio também**, embora o vídeo mostre "1120 falas" (vem da nuvem);
+- gravar/ler handle nesta origem: **funciona** (testado com handle real via OPFS);
+- `videoAcceptFile(file, handle)` e `videoOpen` com picker simulado: **salvam certo**.
+Ou seja: o código está correto e o handle NUNCA chegou ao ponto de gravação no uso real.
+
+**O que foi consertado — os três silêncios:**
+- [x] **Gravação verificada** (`_vidGuardarAtalho`): era `VideoDB.set(...)` solto, sem
+      `await` e sem conferência. Agora grava, RELÊ para confirmar, e registra o motivo
+      da falha em `v.atalhoNota`. Um erro no `videoOpenPlayer` (que vinha logo depois)
+      não pode mais levar o atalho junto.
+- [x] **O fallback deixou de ser mudo** (`videoPickFile`): QUALQUER erro que não fosse
+      cancelamento — inclusive um erro do próprio `videoAcceptFile`, já com o arquivo
+      em mãos — caía no `<input type="file">`, que devolve arquivo mas NUNCA atalho. O
+      vídeo abria normal e nada dizia que nascera sem memória do caminho. Agora avisa.
+- [x] **A etiqueta mostra o MOTIVO**, não só o sintoma: "entrou pelo seletor simples",
+      "não ficou no banco (espaço?)" ou o erro que o navegador deu.
+- [ ] **Causa raiz ainda não identificada** — e está registrado como tal. As três
+      hipóteses testadas e DESCARTADAS: `accept` com wildcard (o diálogo abre normal),
+      `saveVideos` lançando (tem try/catch), outra origem (GitHub Pages tem 2 MB e nem
+      os stores). A instrumentação agora vive no app: no próximo "vai pedir o arquivo",
+      a etiqueta diz por quê.
+
 ### Da rodada do atalho lembrado do vídeo (2026-08-26, 70ª)
 
 **Relato dele:** *"ao recarregar a página a informação do vídeo fica salva mas tenho que

@@ -192,7 +192,16 @@ async function _vidPintarAtalhos() {
     const est = await videoHandleEstado(id)
     if (est === 'sem-atalho') {
       alvo.textContent = 'vai pedir o arquivo'
-      alvo.dataset.tip = 'Este vídeo entrou sem atalho (ou o atalho se perdeu). Ao abrir, você escolhe o arquivo uma vez — daí em diante ele fica lembrado.'
+      // O MOTIVO, e não só o sintoma: sem isto, "vai pedir o arquivo" depois
+      // de escolher o arquivo três vezes é um mistério — foi o relato dele.
+      const M = {
+        'sem-api': 'Este vídeo entrou pelo seletor simples do navegador, que devolve o arquivo mas não um atalho. Abra pelo botão "Abrir arquivo" para o app poder guardar o caminho.',
+        'nao-gravou': 'O app tentou guardar o atalho e ele não ficou no banco. Pode ser falta de espaço — veja Configurações › Dados locais.',
+      }
+      const n = v.atalhoNota || ''
+      alvo.dataset.tip = M[n] || (n.startsWith('erro:')
+        ? `O navegador recusou guardar o atalho (${n.slice(5)}). Tente abrir de novo pelo botão "Abrir arquivo".`
+        : 'Este vídeo entrou sem atalho (ou o atalho se perdeu). Ao abrir, você escolhe o arquivo uma vez — daí em diante ele fica lembrado.')
       alvo.classList.add('sem')
     } else {
       alvo.textContent = 'arquivo lembrado'
@@ -244,9 +253,19 @@ async function videoPickFile() {
       const file = await handle.getFile()
       await videoAcceptFile(file, handle)
       return
-    } catch (e) { if (e.name === 'AbortError') return }
+    } catch (e) {
+      if (e.name === 'AbortError') return
+      // ⚠️ AQUI O ATALHO SE PERDIA EM SILÊNCIO (rodada 71). Qualquer erro que
+      // não fosse cancelamento — inclusive um erro do PRÓPRIO videoAcceptFile,
+      // já com o arquivo em mãos — caía no <input type="file"> abaixo, que
+      // devolve arquivo mas NUNCA atalho. O vídeo abria normalmente e nada
+      // dizia que ele acabara de nascer sem memória do caminho.
+      console.warn('[video] picker falhou (' + e.name + '): ' + e.message)
+      toast('O navegador não deixou guardar o atalho desta vez — vou abrir do jeito antigo', 'warning')
+    }
   }
-  // Fallback universal
+  // Fallback universal: funciona em qualquer navegador, mas o arquivo vem
+  // "solto" — sem atalho, este vídeo vai pedir o arquivo de novo na volta.
   const inp = document.createElement('input')
   inp.type = 'file'; inp.accept = 'video/*,audio/*,.mkv,.mp3,.m4a,.aac,.ogg,.opus,.wav,.flac'
   inp.onchange = () => { if (inp.files[0]) videoAcceptFile(inp.files[0], null) }
@@ -275,7 +294,9 @@ async function videoAcceptFile(file, handle) {
       resolverNomesDeObra([v.title]).catch(e => console.warn('[obra]', e && e.message))
     }
   }
-  if (handle) VideoDB.set('handles', v.id, handle)
+  // await de propósito: o player abre depois, e um erro NELE não pode mais
+  // levar o atalho junto (era o que acontecia com a gravação solta).
+  await _vidGuardarAtalho(v, handle)
   _vidFile = file
   await videoOpenPlayer(v)
 }
@@ -315,6 +336,37 @@ async function videoHandleEstado(id) {
 // O vídeo que o app tentou reabrir sozinho e não pôde por falta de permissão:
 // a biblioteca oferece o convite de um clique em vez de ficar muda.
 let _vidPendente = null
+
+// ⚠️ GUARDAR O ATALHO NÃO PODE SER UM TIRO NO ESCURO (rodada 71). Era
+// `VideoDB.set(...)` solto, sem await e sem conferência: se a gravação
+// falhasse — ou se o caminho percorrido nem trouxesse handle —, NADA avisava,
+// e o vídeo voltava a pedir o arquivo para sempre. Medido no aparelho dele: o
+// store `handles` estava VAZIO depois de três tentativas, sem um único erro
+// no console. Agora grava, CONFERE que ficou, e registra o motivo no próprio
+// vídeo — que é o que a etiqueta da biblioteca passa a mostrar.
+async function _vidGuardarAtalho(v, handle) {
+  if (!v) return false
+  if (!handle) {
+    // O <input type="file"> devolve o arquivo, nunca um atalho: é limitação
+    // da API, não erro. Vale registrar para a etiqueta poder explicar.
+    v.atalhoNota = 'sem-api'; saveVideos()
+    return false
+  }
+  try {
+    await VideoDB.set('handles', v.id, handle)
+    if (await VideoDB.get('handles', v.id)) {
+      if (v.atalhoNota) { delete v.atalhoNota; saveVideos() }
+      return true
+    }
+    v.atalhoNota = 'nao-gravou'
+    console.warn('[video] atalho não ficou gravado para', v.id)
+  } catch (e) {
+    v.atalhoNota = 'erro:' + (e.name || 'desconhecido')
+    console.warn('[video] atalho não gravou:', e)
+  }
+  saveVideos()
+  return false
+}
 
 async function videoOpen(id, { silencioso = false } = {}) {
   const v = videos.find(x => x.id === id); if (!v) return
@@ -372,7 +424,9 @@ async function videoOpen(id, { silencioso = false } = {}) {
       const file = await h.getFile()
       // Reaponta o registro existente para o arquivo escolhido
       v.fileName = file.name; v.fileSize = file.size; v.updated_at = new Date().toISOString()
-      saveVideos(); VideoDB.set('handles', v.id, h)
+      saveVideos()
+      const ok = await _vidGuardarAtalho(v, h)
+      if (ok) toast('Atalho guardado — na próxima vez abre com um clique', 'success')
       _vidFile = file
       await videoOpenPlayer(v)
     } catch (e) { if (e.name !== 'AbortError') console.warn(e) }
