@@ -15658,7 +15658,11 @@ o atalho; o que faltava era usar bem o que tinha.
       seletor de pastas. Agora reconhece o SecurityError e oferece o convite (gesto novo).
 - [x] **Recusa respeitada**: negar a permissão parava em `showOpenFilePicker` — insistir
       com outra roupa. Agora avisa e volta para o convite.
-- [x] sw v431. **Testado ao vivo: 15/15** (três estados de atalho; silencioso não abre
+- [x] sw bumpado por REGEX, não por string fixa: o `replace('v430'->'v431')` desta
+      rodada não encontrou nada (o projeto já estava em v434, vindo das rodadas 70a-70e
+      de outra sessão) e **falhou em silêncio** — o CSS novo não chegaria a quem tem o
+      shell em cache. Lição: bump é `re.search(r"englab-v(\d+)")` + 1, sempre.
+      **Testado ao vivo: 15/15** (três estados de atalho; silencioso não abre
       caixa; convite aparece; clique pede permissão, abre o player e NÃO abre seletor de
       pastas; vídeo sem atalho continua oferecendo o seletor, que é o certo).
       ⚠️ Descoberta de teste: `VideoDB.set` recusa objeto com funções
