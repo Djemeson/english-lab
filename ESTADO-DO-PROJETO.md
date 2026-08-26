@@ -15430,6 +15430,48 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da AUDITORIA da análise real e os dois consertos (2026-08-26, 68ª)
+
+Pedido dele: *"entra no chrome e verifica a análise que rodou"*. Auditados os **1000
+achados** do Carrie · Part One (42 blocos, 0 falhas, gpt-5.6-luna, 216 KB, na nuvem).
+
+**O A/B ficou pronto sozinho** — ele reanalisou com o prompt novo enquanto eu auditava
+a análise velha (mesma chave, sobrescrita; eu cheguei a supor "livro duplicado" e
+estava ERRADO — é o mesmo livro):
+
+| | 23/08 (prompt velho) | 26/08 (prompt novo) |
+|---|---|---|
+| itens | 1206 | 1000 |
+| spans de 8+ palavras | 2 | **0** |
+| spans de 6+ | 14 | 7 |
+| palavra solta com tipo composto | 31 | **0** |
+| multi-palavra rotulada 'word' | 16 | **1** |
+| termina em pontuação de frase | 2 | **0** |
+| C2 (nível inflado) | 223 | 73 |
+
+**Medição nova, a que mais importa: 990 de 1000 acendem no texto (99%).** Os 10 que
+falhavam tinham 3 causas — 7 por flexão/variação (aceitável), e duas consertadas:
+- [x] **CARACTERE INVISÍVEL** — o modelo devolveu `queas​ily` com um U+200B no
+      meio: idêntico na tela, impossível de achar. `_aiLimpaInvisivel` (ZWSP/ZWNJ/
+      ZWJ/word-joiner/BOM) no `t` E no `pt`.
+- [x] **ELIPSE** — "put ... up against the wall" é forma de dicionário e nunca acende.
+      `_aiCasarComElipse` procura no bloco a janela real (recheio ≤30 chars) e
+      reescreve com o texto do livro: "knock ... off its hinges" virou "knock the
+      closet door right off its hinges". Recheio grande demais (caso real: 50 chars)
+      cai para o maior PEDAÇO com 2+ palavras que exista no texto — "up against the
+      wall" acende e ensina. Sem nada disso, o item é descartado com warn.
+      O prompt também passou a proibir "..." e placeholders (sb/sth/one's).
+- [x] sw v429. **Testado contra o texto REAL do capítulo**: invisível 0→1 ocorrência;
+      as duas elipses viraram trechos que acendem; janela não incha (par distante
+      recusado). Auditoria de glosa por amostra (80 itens): qualidade alta —
+      "act of God"="caso fortuito", "taking in sewing", "bee in your bonnet",
+      "out of wedlock" corretos.
+- [ ] **Achados que ficam como observação** (não são defeito de código): glosa de
+      símile perdendo a imagem ("crazy as a bat in a henhouse" = "louca como uma
+      barata" — a regra do prompt pede preservar a imagem); e criações do autor ainda
+      escapando como idiom ("crazy as a bat in a henhouse", "a hell of a good shit").
+      São ~7 em 1000.
+
 ### Da rodada do dicionário de sinônimos de glosa (2026-08-25, 67ª)
 
 Pedido dele: *"já faz esse grupo de sinônimo que tu deixou pra depois"*. A semente de

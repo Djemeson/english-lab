@@ -1685,6 +1685,46 @@ function _aiFatiarTexto(texto, tamanho) {
   return blocos.length ? blocos : [texto]
 }
 
+// Tira o que é invisível na tela mas fatal na busca (rodada 68).
+function _aiLimpaInvisivel(s) {
+  return String(s || '')
+    .replace(/[​-‍⁠﻿]/g, '')   // ZWSP, ZWNJ, ZWJ, word-joiner, BOM
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// "put ... up against the wall" → o trecho REAL do texto ("put her up against
+// the wall"). Casa a ponta inicial, procura a final logo adiante e devolve o
+// que está entre elas — com teto de janela, senão uma ponta lá no fim do
+// parágrafo viraria um "termo" de trinta palavras.
+function _aiCasarComElipse(texto, termo) {
+  const partes = String(termo).split(/\s*(?:\.\.\.|…)\s*/).map(p => p.trim()).filter(Boolean)
+  if (partes.length !== 2) return null
+  const alvo = String(texto || '')
+  const baixo = alvo.toLowerCase()
+  const [a, b] = partes.map(p => p.toLowerCase())
+  let de = 0
+  while (true) {
+    const i = baixo.indexOf(a, de)
+    if (i < 0) break
+    const fimA = i + a.length
+    const j = baixo.indexOf(b, fimA)
+    // até ~30 caracteres de recheio: cabe "her" e "the closet door right", não
+    // cabe "all the believers of Jesus—even the Catholics—" (caso real do
+    // Carrie, 50 chars) — que é o span-frase que não queremos de volta.
+    if (j >= 0 && j - fimA <= 30) return alvo.slice(i, j + b.length).replace(/\s+/g, ' ').trim()
+    de = i + Math.max(1, a.length)
+  }
+  // Recheio grande demais: em vez de perder o achado, fica com o PEDAÇO que
+  // carrega o sentido e existe no texto — "up against the wall" acende e
+  // ensina; "put" sozinho não ensinaria nada (daí o mínimo de 2 palavras).
+  const candidatas = partes
+    .filter(p => p.split(/\s+/).length >= 2)
+    .sort((x, y) => y.length - x.length)
+  for (const p of candidatas) if (baixo.includes(p.toLowerCase())) return p
+  return null
+}
+
 async function _aiDificuldadeBloco(texto, lang, nv, maxItens, orc) {
   const o = orc || _aiDifOrcamento()
   const L = (typeof getLangDef === 'function') ? getLangDef(lang) : { nameEn: 'English' }
@@ -1723,6 +1763,8 @@ REGRAS:
   só o pedaço contíguo que carrega o sentido. Regra prática: "t" com mais de 6 palavras quase
   sempre está errado — reduza.
 - "nivel" é o nível da UNIDADE na língua, não da frase em volta.
+- NUNCA use "..." nem placeholder (sb/sth/one's) em "t": escreva o trecho como ele está
+  no texto ("put her up against the wall", não "put ... up against the wall").
 - NÃO inclua: nome próprio, número, palavra transparente com o português (hotel, doctor),
   nem vocabulário que um aluno ${nv} já domina.
 - Máximo ${maxItens} itens. Se não houver nada difícil, devolva {"itens":[]}.
@@ -1738,11 +1780,25 @@ REGRAS:
   if (!lista) lista = _aiResgatarItens(bruto)      // JSON cortado: salva o que deu
   if (!lista) return null                          // nem isso: o bloco falhou
   return lista.map(x => ({
-    t: String(x.t || '').trim(),
+    // ⚠️ CARACTERE INVISÍVEL MATA A MARCA (rodada 68, achado na auditoria do
+    // Carrie): o modelo devolveu "queas​ily" — zero-width space no meio
+    // da palavra. Idêntica na tela, impossível de achar no texto: o realce
+    // nunca acendia e o item virava dinheiro gasto sem uso. Some com todos os
+    // invisíveis (ZWSP/ZWNJ/ZWJ/BOM/word-joiner) e normaliza o espaço.
+    t: _aiLimpaInvisivel(x.t),
     tipo: AI_DIF_TIPOS[x.tipo] ? x.tipo : 'word',
     nivel: String(x.nivel || '').toUpperCase(),
-    pt: String(x.pt || '').trim()
-  })).filter(x => {
+    pt: _aiLimpaInvisivel(x.pt)
+  })).map(x => {
+    // ELIPSE: "put ... up against the wall" é a forma de DICIONÁRIO, não a do
+    // texto — e a busca é literal, então a marca nunca acende. Em vez de
+    // descartar (o idiom é bom), procura no bloco a janela real que casa as
+    // duas pontas e reescreve `t` com o trecho como ele está escrito no livro.
+    if (!/\.\.\.|…/.test(x.t)) return x
+    const real = _aiCasarComElipse(texto, x.t)
+    return real ? { ...x, t: real } : { ...x, _elipseSemCasar: true }
+  }).filter(x => {
+    if (x._elipseSemCasar) { console.warn('[raio-x] elipse sem casar no texto:', x.t); return false }
     if (!x.t) return false
     // GUARDA-CHUVA DA UNIDADE MÍNIMA (rodada 66): mesmo com a regra no prompt,
     // um "t" de 8+ palavras é frase, não unidade — foi o caso real de "let a
