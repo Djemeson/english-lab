@@ -4104,6 +4104,40 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .vid-sub-addons p{font-size:var(--fs-2xs);color:var(--text3);margin:8px 0 6px}
 .vid-sub-addons textarea{width:100%;font-size:var(--fs-xs);margin-bottom:6px}
 
+/* ---- ASSISTIR: cliente de addons de video ---- */
+.as-wrap{max-width:760px;margin:0 auto;padding:4px 2px}
+.as-rd-input{width:100%;font-size:var(--fs-xs);padding:8px 10px;border:1px solid var(--border);
+  border-radius:var(--radius-sm);background:var(--surface2);color:var(--text)}
+.as-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.as-item{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;width:100%;
+  border:1px solid var(--border);background:var(--surface2);border-radius:var(--radius-sm);
+  padding:10px 12px;cursor:pointer;
+  border-left:3px solid var(--border);
+}
+.as-item:hover{border-color:var(--border-strong);background:var(--surface3)}
+.as-item.as-ok{border-left-color:var(--success)}
+.as-item.as-warn{border-left-color:var(--warning)}
+.as-item.as-block{border-left-color:var(--text3);opacity:.72}
+.as-item.as-block:hover{opacity:.9}
+.as-item-main{min-width:0;flex:1}
+.as-badges{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px}
+.as-b{font-size:var(--fs-2xs);font-weight:700;padding:1px 7px;border-radius:999px;
+  background:var(--surface3);color:var(--text2);white-space:nowrap}
+.as-b-q{background:rgba(var(--primary-rgb),.16);color:var(--primary)}
+.as-b-s{display:inline-flex;align-items:center;gap:2px}
+.as-b-s .ic{width:11px;height:11px;transform:rotate(-90deg)}
+.as-name{font-size:var(--fs-sm);color:var(--text);display:block;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:100%}
+.as-item-side{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
+.as-addon{font-size:var(--fs-2xs);color:var(--text3);text-transform:lowercase}
+.as-acao{font-size:var(--fs-2xs);font-weight:700;color:var(--text2);white-space:nowrap}
+.as-ok .as-acao{color:var(--success)}
+.as-warn .as-acao{color:var(--warning)}
+.as-legenda-nota{font-size:var(--fs-2xs);color:var(--text3);margin-top:12px;text-align:center}
+.vid-lib-online{color:var(--primary);font-weight:700;font-size:var(--fs-2xs);
+  background:rgba(var(--primary-rgb),.14);padding:1px 7px;border-radius:999px}
+
 /* ---- VIDEO: legenda em tempo real sobre o video ---- */
 .vid-stage{position:relative}
 .vid-ov{

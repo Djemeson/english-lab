@@ -7,7 +7,22 @@
 > deixou de ser "em curso" e virou o registro de como ficou. **O mapa dos nomes de seção
 > mora em `js/core.js`, logo acima de `SECTIONS`** — leia-o antes de mexer em qualquer id.
 >
-> Última atualização: 2026-08-23/24 (44ª) — **AS 6 RODADAS DE CONSERTO + AS 7 MELHORIAS,
+> Última atualização: 2026-08-26 (70ª) — **NASCEU A SEÇÃO "ASSISTIR": O LAB COMO CLIENTE DE
+> ADDONS DE VÍDEO**. Pedido dele: *"o lab tocando os addons — vários addons, link direto,
+> debrid, tudo"* + seção própria. Feito e testado ao vivo. `js/video-stream.js` novo (no pacote
+> lazy `assistir`, que traz o player inteiro): busca título por Cinemeta, consulta
+> `/stream/{tipo}/{id}.json` em todos os `cfg.streamAddons` em paralelo, classifica cada fonte
+> (link direto tocável · MKV/HLS não-nativo · torrent → debrid · externa) com badges de
+> qualidade/HDR/codec/tamanho/semeadores, e toca no **player do Lab reaproveitado**
+> (`videoOpenStream` → mesmo caminho de streaming do podcast, com legenda auto, tradução,
+> marcar e cards por cima). Identidade estável (`contentId` = imdb+SxxExx) persiste
+> legenda/cards; a URL da fonte é transitória e nunca vai à nuvem. Debrid (Real-Debrid)
+> implementado mas **EXPERIMENTAL/não testado** — o caminho estável é a URL do addon já com a
+> chave. ⚠️ Torrentio não resolve no sandbox de teste (allowlist), então **falta conferir no
+> navegador real dele** (CORS do Torrentio) e a RD. `sw.js` → **englab-v431**. Detalhes e as 4
+> pendências em §9 (bloco 70ª). ⚠️ Fonte via Torrentio = conteúdo não licenciado (decisão dele).
+>
+> Última atualização anterior: 2026-08-23/24 (44ª) — **AS 6 RODADAS DE CONSERTO + AS 7 MELHORIAS,
 > TODAS FEITAS E NO AR** (13 commits, cada um com os detalhes; checkboxes com o resumo de
 > cada rodada na seção 9). As redes de segurança de dados funcionam de verdade (apagar-tudo
 > zera a nuvem esvaziando docs, backup restaura tudo, desmarcações têm lápide, boot empurra
@@ -15457,33 +15472,60 @@ como é com a Netflix. Conclusão do estudo:
 - [ ] **Decisão dele pendente**: fazer o addon de legendas + registro de
       "assistido" (rodada média), ou não fazer nada por ora.
 
-**2ª pergunta (mesmo dia): e o INVERSO — o Lab virar CLIENTE de addons**
-("colocar o Torrentio, buscar a série e as ferramentas de estudo aparecem,
-sem baixar o vídeo"). Análise:
+### Da SEÇÃO "ASSISTIR" — o Lab como cliente de addons de vídeo (2026-08-26, 70ª) — FEITO
 
-- **Metade já existe**: `videoSubSearchOpen` já fala o protocolo de addons
-  direto do navegador (manifest + `/subtitles/{tipo}/{id}.json`, busca de
-  título via **Cinemeta**, moviehash OpenSubtitles) — ver comentário em
-  `video.js` ~l.1110 —, e o player já toca **por URL** (caminho do podcast:
-  `src = audioUrl`, `_vidStream = true`). A camada de estudo é agnóstica de
-  origem. Falta: consultar `/stream/{tipo}/{id}.json`, tela de escolha de
-  fonte, e tocar o resultado.
-- **O muro é o formato, não o protocolo**: Torrentio puro devolve TORRENT
-  (infoHash) — navegador não toca torrent (no Stremio quem faz isso é o
-  serviço local). Com conta **debrid** (Real-Debrid etc.) configurada no
-  próprio Torrentio, vira link HTTPS direto; MKV não toca em `<video>`, mas a
-  API do Real-Debrid tem endpoints de *streaming/transcode* que devolvem HLS
-  (m3u8) → toca com hls.js. Addons de HTTP-stream (sem torrent) também
-  existem; CORS varia por host.
-- ⚠️ Fonte via Torrentio = conteúdo não licenciado (decisão/risco dele; a
-  mesma arquitetura serve para fontes legais — domínio público, servidor de
-  mídia próprio via addon Jellyfin/Plex).
-- ⚠️ Vídeo por streaming sem CORS quebra `captureStream` (capturar a cena);
-  estudo por legenda/transcript não depende do vídeo e já funciona hoje.
-- Custo estimado: rodada média-grande (cliente de streams + hls.js + escolha
-  de fonte + debrid opcional).
-- [ ] **Decisão dele pendente**: seguir com o Lab-cliente-de-addons e, se
-      sim, com quais fontes (debrid? http-stream? servidor próprio?).
+Ele mandou fazer: *"o lab tocando os addons. deve aceitar vários addons,
+link direto, debrid, tudo."* + "pode criar uma seção nova só pra isso".
+Construído e testado ao vivo (perfil isolado localhost:8766).
+
+**Arquitetura (reaproveita quase tudo):**
+- **`js/video-stream.js`** (novo, no pacote lazy `assistir` — o player inteiro
+  vem junto). Busca de título por **Cinemeta** (mesma fonte da busca de legenda);
+  consulta `/stream/{tipo}/{id}.json` em todos os `cfg.streamAddons` em paralelo;
+  classifica cada fonte e ordena (tocável › qualidade › semeadores).
+- **Player reaproveitado**: `videoOpenStream(v,url)` seta `_vidStreamSrc` e chama
+  `videoOpenPlayer`; o branch novo na escolha de origem toca por URL com o mesmo
+  `crossorigin`+fallback de CORS do podcast. Legenda auto, tradução, marcar, cards
+  com áudio real — tudo entra de graça (camada de estudo é agnóstica de origem).
+- **Identidade estável, URL transitória**: a entrada em `videos[]` é chaveada pelo
+  `contentId` (imdb + SxxExx) → legenda/marcadores/cards persistem e sincronizam.
+  A URL da fonte **nunca** é salva na nuvem (expira); reabrir da Biblioteca roteia
+  para `assistirReabrir` (re-resolve). Ícone `stream`→globo, badge "assistir online".
+- Seção registrada: `SECTIONS`, `_LAZY.assistir`, `_activateSection`, nav lateral +
+  gaveta do celular, `#section-assistir`. `sw.js` → **englab-v431**.
+
+**Classificação de fonte (testada com respostas reais do formato Torrentio):**
+- `url` http(s) + formato nativo (mp4/webm/mov) → **toca aqui**.
+- `url` MKV/AVI → marcada não-nativa ("navegador não abre"); HLS (.m3u8) idem.
+- `infoHash` → **torrent**: com debrid resolve; sem debrid, bloqueado com aviso.
+- `externalUrl`/`ytId` → externa (não embutível).
+- Extrai qualidade, HDR, codec, tamanho (do `videoSize` em bytes ou do 💾), semeadores.
+
+**Debrid (Real-Debrid) — EXPERIMENTAL, NÃO testado com conta real:**
+`_rdResolveMagnet` faz addMagnet→selectFiles→info→unrestrict. ⚠️ Depende de a RD
+liberar CORS no navegador; se barrar, avisa. O caminho **estável e recomendado** é
+colar a URL do addon **já com a chave de debrid configurada** (aí a fonte volta como
+`url` e o app só toca) — o jeito padrão do Stremio.
+
+**⚠️ Risco registrado:** fonte via Torrentio = conteúdo não licenciado (decisão dele).
+A mesma arquitetura serve para fontes legais (domínio público, Jellyfin/Plex próprio).
+
+**Testado ao vivo:** seção carrega e mostra o vazio correto; Cinemeta acha "Breaking
+Bad" (tt0903747); classificação dos 6 tipos de fonte correta (torrent/mp4/MKV-debrid/
+externa, com badges); lista renderiza com "toca aqui" e "torrent · precisa de debrid";
+`videoOpenStream` monta o player com src+crossorigin+`_vidStream`=true; entrada de
+stream entra em `videos[]` sem URL persistida. Dados de teste limpos.
+
+- [ ] **Não testável neste sandbox**: `torrentio.strem.io` não resolve aqui
+      (allowlist de rede do navegador embutido — Cinemeta/OpenSubtitles passam).
+      **Conferir no navegador real dele**: Torrentio devolve CORS? (a web.stremio
+      usa fetch direto e funciona, então deve ir). Testar com um addon real + série.
+- [ ] **Real-Debrid no navegador**: confirmar se a API manda CORS; se não, o
+      caminho é só via addon-com-chave (já funciona) ou um proxy nosso na Vercel.
+- [ ] **MKV/HLS não tocam**: fica para uma rodada futura embutir **hls.js** +
+      transcode do RD (aí o MKV vira HLS tocável). Hoje: fonte mp4 ou debrid-mp4.
+- [ ] **`captureStream` (gravar a cena em card) exige CORS na fonte** — link de
+      debrid/http sem CORS toca mas não grava áudio; legenda/transcript não dependem.
 
 ### Do ESTUDO da imagem e a peça única em todas as frentes (2026-08-26, 69ª)
 

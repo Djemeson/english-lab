@@ -40,6 +40,7 @@ let _vidAppliedSubUrl = null    // URL da legenda aplicada (para não retestar a
 // legenda — viaja com ela para o disco e a nuvem, com o mesmo "melhor vence".
 let _vidRaioX = null            // { itens, nivel, at, ficha }
 let _vidStream = false          // podcast tocando direto da internet (sem arquivo local)
+let _vidStreamSrc = null        // URL da fonte de addon (Assistir) — transitória, nunca persistida
 
 // ---- IndexedDB próprio: handles de arquivo + legendas ----
 const VideoDB = {
@@ -143,6 +144,7 @@ function renderVideoLib() {
             <div class="vid-lib-title">${esc(v.title)}</div>
             <div class="vid-lib-meta">
               ${v.podcast && v.podcast.showTitle ? `<span class="vid-lib-show">${esc(v.podcast.showTitle)}</span>` : ''}
+              ${v.source_type === 'stream' ? `<span class="vid-lib-online">assistir online</span>` : ''}
               <span>${dur}</span>
               <span>${v.cueCount ? v.cueCount + ' falas' : 'sem legenda'}</span>
               ${nClips ? `<span>${nClips} corte${nClips !== 1 ? 's' : ''}</span>` : ''}
@@ -234,6 +236,14 @@ async function videoAcceptFile(file, handle) {
   await videoOpenPlayer(v)
 }
 
+// Ponte da seção Assistir: abre o player com uma URL de fonte já resolvida.
+// A URL é transitória (expira) — vive só em runtime, nunca em videos[].
+async function videoOpenStream(v, url) {
+  _vidFile = null
+  _vidStreamSrc = url
+  await videoOpenPlayer(v)
+}
+
 // Reabre um vídeo da biblioteca (tenta o handle persistido primeiro).
 //
 // ⚠️ `silencioso` EXISTE POR CAUSA DA VOLTA AUTOMÁTICA. Quando o app reabre
@@ -244,6 +254,14 @@ async function videoAcceptFile(file, handle) {
 // biblioteca na tela, que é a resposta honesta.
 async function videoOpen(id, { silencioso = false } = {}) {
   const v = videos.find(x => x.id === id); if (!v) return
+  // Entrada de STREAM (addon): a URL expira, então quem reabre é a seção
+  // Assistir, que re-resolve a fonte. Nunca pede arquivo ao usuário.
+  if (v.source_type === 'stream') {
+    if (silencioso) return
+    if (typeof assistirReabrir === 'function') assistirReabrir(v)
+    else toast('Abra pela seção Assistir para tocar esta fonte de novo', 'info')
+    return
+  }
   // Podcast: o "arquivo" é o episódio baixado (ou baixável de novo pela URL
   // do feed). Nunca pede arquivo ao usuário — nem em outro aparelho.
   if (v.podcast && typeof podcastEnsureFile === 'function') {
@@ -382,6 +400,9 @@ async function videoOpenPlayer(v) {
   let src = ''
   if (_vidFile) { _vidURL = URL.createObjectURL(_vidFile); src = _vidURL }
   else if (ehPod && v.podcast.audioUrl) { src = v.podcast.audioUrl; _vidStream = true }
+  // Fonte de addon (Assistir): a URL foi resolvida agora e é transitória.
+  // O caminho de streaming (crossorigin + fallback de CORS) já existe abaixo.
+  else if (v.source_type === 'stream' && _vidStreamSrc) { src = _vidStreamSrc; _vidStream = true }
 
   const acts = el('video-ph-actions')
   if (acts) acts.innerHTML = `
@@ -620,7 +641,7 @@ function videoBackToLib() {
   const p = el('vid-player'); if (p) p.pause()
   if (typeof videoSonoCancelar === 'function') videoSonoCancelar()
   if (_vidURL) { URL.revokeObjectURL(_vidURL); _vidURL = null }
-  _vidCur = null; _vidFile = null; _vidStream = false
+  _vidCur = null; _vidFile = null; _vidStream = false; _vidStreamSrc = null
   renderVideoLib()
 }
 

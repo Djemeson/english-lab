@@ -192,6 +192,9 @@
       <button class="nav-item" id="nav-video" onclick="showSection('video')" data-tip="Estudar com séries, filmes e podcasts: legenda, cortes e cards com o áudio real da fala">
         <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><span>Vídeo</span>
       </button>
+      <button class="nav-item" id="nav-assistir" onclick="showSection('assistir')" data-tip="Assistir séries e filmes por addons (torrent, link direto ou debrid) — sem baixar — com todas as ferramentas de estudo do Lab por cima">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M2 12h20"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/></svg><span>Assistir</span>
+      </button>
       <button class="nav-item" id="nav-adicionar" onclick="showSection('adicionar')" data-tip="Capturar novas palavras (manual, Kindle, mídia, site)">
         <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span>Adicionar</span>
       </button>
@@ -1070,6 +1073,19 @@
   <div id="video-area"></div>
 </section>
 
+<!-- =========== ASSISTIR (cliente de addons de vídeo) =========== -->
+<section id="section-assistir" class="section">
+  <div class="page-header">
+    <div class="ph-left">
+      <h1><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M2 12h20"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/></svg>Assistir</h1>
+      <p>Toque séries e filmes pelos seus addons (torrent, link direto ou debrid) — sem baixar — e estude por cima</p>
+    </div>
+    <div class="ph-actions" id="assistir-ph-actions"></div>
+  </div>
+  <!-- Renderizado por js/video-stream.js (busca | episódio | fontes) -->
+  <div id="assistir-area"></div>
+</section>
+
 <!-- =========== LER (ebooks) =========== -->
 <section id="section-ler" class="section">
   <div class="page-header" id="ler-header">
@@ -1215,6 +1231,10 @@
     <button class="nmg-item" id="nav-video-mob" onclick="navMaisIr('video')">
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>
       <span>Vídeo</span>
+    </button>
+    <button class="nmg-item" id="nav-assistir-mob" onclick="navMaisIr('assistir')">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M2 12h20"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/></svg>
+      <span>Assistir</span>
     </button>
     <button class="nmg-item" id="nav-assistente-mob" onclick="navMaisIr('assistente')">
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 14l.7 1.8L21.5 16.5l-1.8.7L19 19l-.7-1.8L16.5 16.5l1.8-.7z"/></svg>

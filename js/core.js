@@ -1281,7 +1281,7 @@ function ic(name, extra) {
 }
 // Ícone por tipo de fonte (série, filme, etc.) — usado em Preparar, Adicionar e Estudar
 function srcIcon(t) {
-  const m = { series:'tv', movie:'film', youtube:'playCircle', kindle:'book', podcast:'mic', website:'globe', manual:'pencil', audiobook:'volume' }
+  const m = { series:'tv', movie:'film', youtube:'playCircle', kindle:'book', podcast:'mic', website:'globe', manual:'pencil', audiobook:'volume', stream:'globe' }
   return ic(m[t] || 'bookOpen', 'ic-sm')
 }
 function loadWords() {
@@ -1633,7 +1633,7 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 // Os ARQUIVOS mantiveram os nomes antigos de propósito: renomeá-los quebraria
 // o histórico do git e o cache do service worker sem ganhar nada. É aqui que
 // a tradução mora — não invente outra em nenhum outro arquivo.
-const SECTIONS = ['dashboard','assistente','adicionar','preparar','estudar','revisar','biblioteca','palavras','video','ler','audiobook','configuracoes']
+const SECTIONS = ['dashboard','assistente','adicionar','preparar','estudar','revisar','biblioteca','palavras','video','assistir','ler','audiobook','configuracoes']
 // Lazy-load map: section → arquivo JS carregado só na 1ª visita
 // biblioteca usa funções de study.js (buildSrsFrente/Verso/MetaChips/fmtDays)
 // (assistente NÃO é lazy — js/consulta.js é carregado sempre, pois firebase.js
@@ -1659,6 +1659,10 @@ const _LAZY = {
   estudar: 'js/dossie.js',
   palavras: 'js/known.js',
   video: ['js/video.js', 'js/video-subs.js', 'js/video-sync.js', 'js/video-study.js', 'js/video-podcast.js'],
+  // assistir = o pacote de vídeo INTEIRO (o player é reaproveitado) + o
+  // cliente de addons de fonte. video-stream.js vem por último: usa o
+  // player (videoOpenStream) e o estado videos[] que os anteriores montam.
+  assistir: ['js/video.js', 'js/video-subs.js', 'js/video-sync.js', 'js/video-study.js', 'js/video-podcast.js', 'js/video-stream.js'],
   // Audiobook é uma ilha de propósito: não depende do pacote de vídeo (que
   // carrega cinco arquivos e um player de legenda que aqui não serve).
   audiobook: ['js/epub.js', 'js/sinc.js', 'js/audiobook.js']
@@ -1751,6 +1755,7 @@ function _activateSection(name) {
   if (name === 'estudar') { if (typeof renderDossieSection === 'function') renderDossieSection() }
   if (name === 'biblioteca') openBiblioteca()
   if (name === 'video') { if (typeof renderVideoSection === 'function') renderVideoSection() }
+  if (name === 'assistir') { if (typeof renderAssistir === 'function') renderAssistir() }
   // O modo de leitura esconde o cabeçalho e a barra de baixo no celular:
   // sair da seção por qualquer outro caminho precisa devolvê-los, senão o
   // app fica sem navegação.
