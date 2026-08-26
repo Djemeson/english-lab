@@ -15480,6 +15480,31 @@ como é com a Netflix. Conclusão do estudo:
 - [ ] **Decisão dele pendente**: fazer o addon de legendas + registro de
       "assistido" (rodada média), ou não fazer nada por ora.
 
+### 70d — capa na busca da seção Assistir (2026-08-26) — FEITO
+
+Pedido: "atualmente só aparece o nome". O Cinemeta já devolve `poster`; era só
+aproveitar. Resultados viraram um **grid de cards com capa** (2:3, placeholder de
+filme quando falta, `onerror` esconde img quebrada) + título/tipo/ano; o título
+escolhido mostra a capa no cabeçalho das fontes. Sem `loading=lazy` (poucas
+imagens; lazy em container que já esteve oculto podia não disparar). CSS `.as-*`.
+`sw.js` → **englab-v434**. Testado no Chrome real: 7/8 capas na hora (250×367).
+
+### Transcrição de vídeo de stream/debrid — pergunta dele (2026-08-26, análise)
+
+"Daria pra transcrever os vídeos que vêm do debrid?" Avaliação:
+- **Quase nunca precisa**: o app já busca legenda pronta nos addons ao abrir
+  (`_vidAutoSub`, OpenSubtitles). Popular quase sempre tem — melhor que
+  transcrever (instantâneo, preciso, timing certo).
+- **Quando não tem, DÁ**: transcrever precisa do ÁUDIO. Link de debrid é arquivo
+  HTTPS real → dá para baixar o áudio (via proxy se faltar CORS), extrair/comprimir
+  com o **ffmpeg.wasm que já existe**, fatiar ≤25 MB e mandar ao Whisper — a MESMA
+  peça que já transcreve podcast (`videoTranscribeFull`, hoje só exposta p/ podcast).
+  Bônus: ffmpeg extrai áudio até de MKV (que o vídeo não toca) → legenda de estudo
+  mesmo de fonte que não reproduz.
+- **Custo**: baixar centenas de MB + tempo/uns centavos de IA por episódio.
+- [ ] **Não implementado p/ vídeo/stream** — botão "Criar legenda com IA" só
+      aparece para podcast. Estender é rodada média (peças existem). Decisão dele.
+
 ### Conserto 70c — "nada acontece": conteúdo misto + fonte lenta (2026-08-26)
 
 Ele testou no Chrome real e "não acontecia nada". Diagnóstico ao vivo no app
