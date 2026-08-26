@@ -15430,6 +15430,34 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do dicionário de sinônimos de glosa (2026-08-25, 67ª)
+
+Pedido dele: *"já faz esse grupo de sinônimo que tu deixou pra depois"*. A semente de
+~30 grupos virou dicionário de ~150 grupos — e ganhou a peça que faltava por baixo:
+
+- [x] **`_sentRaiz` — o radical DE GLOSA** (ai.js): tira superlativo, UMA desinência
+      verbal (gerúndio/particípio/imperfeito -ava/infinitivo/passado — a PRIMEIRA que
+      casar, com trava de 3 letras) e, só em palavra NOMINAL, a vogal final. Três bugs
+      pegos pelo teste, na ordem: (1) regras encadeadas — "tolerando"→"toler"→"tol"
+      nunca mais casava; (2) vogal final depois de desinência verbal — "caçoar"→"cac"
+      ROUBAVA a chave de "caçar" (zombar engolia caçar, tapear engolia tapar);
+      (3) "-ia" de imperfeito comia o feminino de -io ("esguia"→"esgu" ≠ "esguio").
+      Regra retirada: imperfeito -ia é raro em glosa e a família casa por prefixo.
+- [x] **~150 grupos por domínio** (sentir/falar/pensar/agir/qualidades/coisas), em
+      palavras INTEIRAS radicalizadas na construção pela MESMA `_sentRaiz` da consulta
+      — entradas radicalizadas à mão eram a fonte do bug "toler" da 66ª. Grupos
+      apertados; colisões de radical documentadas (medo×medir, luta×luto) — exigiriam
+      o mesmo termo com os dois sentidos.
+- [x] **`sentMesmoGrupo` pública** e usada TAMBÉM no `isKnownSense` (core.js): "já
+      sei" gravado com "aturar" reconhece a glosa nova "tolerando a bagunça".
+- [x] sw v428 (ai/core shell). **Testado ao vivo: 117/117 pares sinônimos (flexões
+      variadas: gerúndio, particípio, passado, superlativo, feminino) + 17/17
+      negativos (inclusive caçoar≠caçar e tapear≠tapar) + já-sei nos dois sentidos.**
+      ⚠️ Lição de teste: recarga interrompida deixou a página com o ai.js VELHO e a
+      bateria "reprovou" código certo — conferir a fonte carregada antes de diagnosticar.
+- [ ] Ainda de fora (registrado): dedupe semântico pela própria IA na revalidação,
+      se os léxicos deixarem passar casos reais.
+
 ### Da rodada do reconhecimento de sentido e das unidades do Luna (2026-08-25, 66ª)
 
 **Relato dele:** item capturado e ESTUDADO voltou no raio-X como "outro sentido" sobre o

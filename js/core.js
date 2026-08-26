@@ -675,6 +675,11 @@ function _isKnownSenseUm(termo, glosa) {
     if (!chave.startsWith(t)) continue
     const partes = chave.slice(t.length).split(' ')
     if (partes.some(x => alvo.some(y => x === y || (x.length >= 5 && y.startsWith(x.slice(0, 5)))))) return true
+    // A MESMA régua de sinônimos do raio-X (rodada 67): "já sei" gravado com
+    // "aturar" tem de reconhecer a glosa nova "tolerar" — senão o item que ele
+    // dispensou volta a cada análise, só porque a IA trocou a palavra.
+    if (typeof sentMesmoGrupo === 'function' &&
+        partes.some(x => alvo.some(y => sentMesmoGrupo(x, y)))) return true
   }
   return false
 }

@@ -2096,62 +2096,247 @@ function aiSentidoParecido(a, b) {
   // no 5º caractere, e o app anunciava "outro sentido" sobre o mesmo sentido.
   // Tirar a desinência antes de comparar resolve a família inteira —
   // farto/farta/fartos, avantajado/avantajada, curvilíneo/curvilínea.
+  const brutosA = limpa(a), brutosB = limpa(b)
   const radical = w => w.replace(/s$/, '').replace(/[oae]$/, '')
-  const A = limpa(a).map(radical), B = limpa(b).map(radical)
+  const A = brutosA.map(radical), B = brutosB.map(radical)
   if (!A.length || !B.length) return false
   // Uma palavra de peso em comum basta — inclusive por prefixo, para pegar
   // "tolerar/tolerância" e "canceladas/cancelar".
   const pref = (x, y) => x.length >= 4 && y.length >= 4 &&
     (x.startsWith(y.slice(0, 4)) || y.startsWith(x.slice(0, 4)))
   if (A.some(x => B.some(y => x === y || pref(x, y)))) return true
-  // SINÔNIMOS (rodada 66): "aturar" e "tolerar" são o MESMO sentido escrito
-  // por duas chamadas de IA — e não têm letra em comum. A observação é dele:
-  // *"se for se basear nas palavras exatas isso não vai dar certo; significado
-  // não é tradução literal"*. Grupos pequenos e de alta precisão, do
-  // vocabulário que as GLOSAS realmente usam; radicais já sem desinência.
-  return A.some(x => B.some(y => {
-    const gx = _SENT_GRUPO[x], gy = _SENT_GRUPO[y]
-    return gx !== undefined && gx === gy
-  }))
+  // SINÔNIMOS (rodadas 66–67): "aturar" e "tolerar" são o MESMO sentido
+  // escrito por duas chamadas de IA — e não têm letra em comum. A observação é
+  // dele: *"se for se basear nas palavras exatas isso não vai dar certo;
+  // significado não é tradução literal"*. A consulta radicaliza com a MESMA
+  // _sentRaiz que montou o mapa — na 66ª a entrada "toler", radicalizada à
+  // mão e errada, nunca casaria: peça única elimina a classe do erro.
+  return brutosA.some(x => brutosB.some(y => sentMesmoGrupo(x, y)))
 }
 
-// Cada linha é um grupo de sinônimos de GLOSA (pt). Entradas em radical (sem
-// desinência de gênero/número/verbo final), como `radical` acima produz.
+// ---- O RADICAL DE GLOSA (rodada 67) ------------------------------------
+// A glosa vem em qualquer flexão ("sacudindo", "sacudir", "sacudiu") e o
+// grupo tem de casar em todas. Este stemmer é FEITO PARA GLOSAS PT: tira
+// gerúndio, particípio, infinitivo, passado simples, plural e a vogal final —
+// sempre com trava de tamanho (mínimo 3 letras), senão "vida" viraria "v".
+function _sentRaiz(w) {
+  let x = String(w)
+  const corta = re => {
+    const y = x.replace(re, '')
+    if (y !== x && y.length >= 3) { x = y; return true }
+    return false
+  }
+  // Superlativo primeiro: "empolgadissimo" → "empolgad" (o resto sai abaixo).
+  corta(/(issimos|issimas|issimo|issima)$/)
+  // ⚠️ UMA desinência verbal só — a PRIMEIRA que casar. Encadear era o bug da
+  // primeira versão: "tolerando" perdia o gerúndio e depois um falso "er"
+  // ("toler" → "tol"), e nunca mais casava com "tolerar".
+  const verbal =
+    corta(/(ando|endo|indo)$/) ||        // sacudindo → sacud
+    corta(/(ados|adas|idos|idas)$/) ||   // chocados → choc
+    corta(/(ado|ada|ido|ida)$/) ||       // chocado → choc (vida fica: trava de 3)
+    corta(/(avam|eram|iram|iam)$/) ||    // partilhavam → partilh
+    // ⚠️ SÓ -ava, sem -ia: o imperfeito "residia" é raro em glosa e a família
+    // já casa por prefixo no cheque direto — enquanto "-ia" comeria o feminino
+    // de -io ("esguia", "sombria", "vazia") e quebraria o par com "esguio".
+    corta(/(ava)$/) ||                   // recordava → record
+    corta(/(ar|er|ir|ou|iu|eu)$/) ||     // aturar/aturou → atur
+    corta(/(ad|id)$/)                    // sobra do superlativo: empolgad → empolg
+  corta(/s$/)                            // braços → braço
+  // A vogal final só cai em palavra NOMINAL (pasmo → pasm, brisa → bris).
+  // Depois de desinência verbal ela é parte da RAIZ: "caçoar" → "caco" tem de
+  // ficar distinto de "caçar" → "cac" — cortá-la fazia zombar engolir caçar
+  // (e tapear engolir tapar), roubando a chave do grupo certo.
+  if (!verbal) corta(/[oae]$/)
+  return x
+}
+// Dois radicais pertencem ao mesmo grupo de sinônimos?
+// PÚBLICA de propósito: o isKnownSense (core.js) usa a mesma régua — a marca
+// "já sei" gravada com "aturar" tem de reconhecer a glosa nova "tolerar".
+function sentMesmoGrupo(a, b) {
+  const x = _SENT_GRUPO[_sentRaiz(a)]
+  return x !== undefined && x === _SENT_GRUPO[_sentRaiz(b)]
+}
+
+// Cada linha é um grupo de sinônimos de GLOSA (pt) — palavras INTEIRAS, sem
+// acento; o radical é aplicado na construção do mapa, pela MESMA _sentRaiz do
+// caminho de consulta (rodada 67: entradas radicalizadas à mão erravam — o
+// "toler" da primeira versão nunca casava com nada).
+// Grupos APERTADOS de propósito: isto compara duas glosas do MESMO termo, e o
+// custo de um falso "é o mesmo" é esconder um sentido novo. Colisões de
+// radical aceitas e documentadas: medo×medir, luta×luto, mata×matar, fera×ferir
+// — todas exigiriam o mesmo termo com os dois sentidos, o que não acontece.
 const _SENT_GRUPO = {}
 ;[
+  // sentir e reagir
   ['aguentar', 'aturar', 'suportar', 'tolerar'],
-  ['pasm', 'atonit', 'perplex', 'estupefat', 'abismad', 'chocad', 'boquiabert'],
-  ['zombar', 'cacoar', 'debochar', 'gozar'],
-  ['brav', 'zangad', 'irritad', 'furios'],
-  ['med', 'pavor', 'terror', 'recei', 'susto'],
+  ['pasmo', 'atonito', 'perplexo', 'estupefato', 'abismado', 'chocado', 'boquiaberto', 'estarrecido'],
+  ['atordoado', 'aturdido', 'zonzo', 'tonto', 'grogue'],
+  ['zombar', 'cacoar', 'debochar', 'gozar', 'escarnecer'],
+  ['bravo', 'zangado', 'irritado', 'furioso', 'enfurecido', 'colerico'],
+  ['medo', 'pavor', 'terror', 'receio', 'susto', 'temor'],
+  ['assustar', 'apavorar', 'aterrorizar', 'amedrontar', 'espantar'],
+  ['nervoso', 'ansioso', 'aflito', 'apreensivo', 'inquieto'],
+  ['calmo', 'tranquilo', 'sereno', 'sossegado'],
+  ['animado', 'empolgado', 'entusiasmado', 'euforico'],
+  ['entediado', 'enfadado', 'aborrecido'],
+  ['envergonhado', 'constrangido', 'encabulado', 'embaracado'],
+  ['arrogante', 'convencido', 'soberbo', 'presuncoso', 'prepotente'],
+  ['triste', 'abatido', 'deprimido', 'desanimado', 'desolado'],
+  ['feliz', 'contente', 'alegre', 'radiante'],
+  ['saudade', 'nostalgia'],
+  ['culpa', 'remorso'],
+  ['inveja', 'ciume'],
+  ['desprezar', 'desdenhar', 'menosprezar'],
+  ['odiar', 'detestar', 'abominar'],
+  ['cansado', 'exausto', 'esgotado', 'extenuado'],
+  ['bebado', 'embriagado', 'alcoolizado'],
+  // falar
+  ['gritar', 'berrar', 'urrar', 'esgoelar'],
+  ['sussurrar', 'murmurar', 'cochichar'],
+  ['gaguejar', 'balbuciar'],
+  ['reclamar', 'queixar', 'resmungar', 'lamuriar'],
+  ['implorar', 'suplicar', 'rogar'],
+  ['xingar', 'praguejar', 'maldizer'],
+  ['provocar', 'aticar', 'instigar', 'incitar'],
+  ['elogiar', 'louvar'],
+  ['confessar', 'admitir'],
+  ['negar', 'recusar'],
+  ['prometer', 'jurar'],
+  ['avisar', 'alertar', 'advertir'],
+  // pensar e perceber
+  ['entender', 'compreender', 'sacar'],
+  ['perceber', 'notar', 'reparar'],
+  ['lembrar', 'recordar'],
+  ['imaginar', 'supor', 'presumir'],
+  ['duvidar', 'desconfiar', 'suspeitar'],
+  ['decidir', 'resolver'],
+  ['avaliar', 'ponderar', 'considerar'],
+  ['olhar', 'encarar', 'fitar', 'mirar', 'contemplar'],
+  ['espiar', 'espreitar'],
+  ['enxergar', 'avistar'],
+  ['ouvir', 'escutar'],
+  ['tocar', 'apalpar', 'tatear'],
+  // agir
   ['comecar', 'iniciar', 'principiar'],
   ['terminar', 'acabar', 'concluir', 'encerrar'],
-  ['rapid', 'veloz', 'depress', 'ligeir'],
-  ['devagar', 'lent', 'vagaros'],
-  ['gritar', 'berrar', 'urrar'],
-  ['sussurrar', 'murmurar', 'cochichar'],
-  ['olhar', 'encarar', 'fitar', 'mirar'],
-  ['segurar', 'agarrar', 'prender', 'apertar'],
+  ['jogar', 'atirar', 'arremessar', 'lancar'],
+  ['pular', 'saltar'],
+  ['fugir', 'escapar'],
+  ['perseguir', 'cacar'],
+  ['empurrar', 'impelir'],
+  ['puxar', 'arrastar'],
+  ['sacudir', 'agitar', 'chacoalhar'],
+  ['balancar', 'oscilar'],
+  ['girar', 'rodar', 'rodopiar'],
+  ['deslizar', 'escorregar'],
+  ['mergulhar', 'afundar', 'submergir'],
+  ['levantar', 'erguer'],
+  ['abaixar', 'agachar'],
+  ['tropecar', 'cambalear'],
+  ['segurar', 'agarrar', 'prender'],
+  ['apertar', 'comprimir', 'espremer'],
   ['soltar', 'largar', 'liberar'],
   ['esconder', 'ocultar'],
   ['enganar', 'ludibriar', 'iludir', 'tapear', 'lograr'],
-  ['entender', 'compreender', 'perceber', 'sacar'],
-  ['trist', 'abatid', 'deprimid', 'desanimad'],
-  ['feliz', 'content', 'alegr'],
-  ['bonit', 'bel', 'formos'],
-  ['fei', 'horrend', 'horrivel'],
-  ['sujeir', 'imundici', 'porcari'],
-  ['cansad', 'exaust', 'esgotad'],
-  ['bebad', 'embriagad', 'alcoolizad'],
-  ['chorar', 'prantear', 'lacrimejar'],
-  ['jogar', 'atirar', 'arremessar', 'lancar'],
-  ['bater', 'golpear', 'espancar', 'surrar'],
-  ['quebrar', 'partir', 'despedacar'],
+  ['fingir', 'simular', 'dissimular'],
+  ['bater', 'golpear', 'espancar', 'surrar', 'socar', 'esbofetear'],
+  ['quebrar', 'despedacar', 'estilhacar', 'rachar'],
+  ['rasgar', 'dilacerar'],
+  ['esmagar', 'amassar'],
+  ['cavar', 'escavar'],
+  ['roubar', 'furtar', 'surrupiar'],
+  ['matar', 'assassinar'],
+  ['morrer', 'falecer', 'perecer'],
+  ['devorar', 'engolir', 'mastigar', 'comer'],
+  ['chorar', 'prantear', 'lacrimejar', 'solucar'],
+  ['rir', 'gargalhar', 'risada', 'riso'],
+  ['dormir', 'cochilar', 'adormecer'],
+  ['acordar', 'despertar'],
+  ['esperar', 'aguardar'],
+  ['procurar', 'buscar', 'vasculhar'],
+  ['encontrar', 'achar'],
+  ['perder', 'extraviar'],
+  ['ganhar', 'vencer', 'triunfar'],
+  ['construir', 'edificar'],
+  ['destruir', 'arruinar', 'devastar', 'arrasar'],
+  ['consertar', 'remendar'],
+  ['vestir', 'trajar'],
+  ['despir', 'desnudar'],
+  ['comprar', 'adquirir'],
+  ['ferir', 'machucar', 'lesionar'],
+  ['curar', 'sarar'],
+  ['ajudar', 'auxiliar', 'socorrer'],
+  ['atrapalhar', 'estorvar'],
+  ['tremer', 'estremecer', 'tiritar'],
+  ['ofegar', 'arquejar'],
+  ['cheirar', 'farejar', 'odor', 'aroma', 'fedor', 'cheiro'],
+  ['morar', 'residir', 'habitar'],
+  ['chegar', 'alcancar', 'atingir'],
+  ['voltar', 'retornar', 'regressar'],
+  ['ficar', 'permanecer'],
+  ['deitar', 'recostar'],
+  ['abracar', 'enlacar'],
+  ['acariciar', 'afagar'],
+  ['empilhar', 'amontoar'],
+  ['espalhar', 'dispersar'],
+  ['juntar', 'reunir', 'agrupar'],
+  ['misturar', 'mesclar'],
+  ['dividir', 'repartir', 'partilhar'],
+  ['cobrir', 'tapar', 'encobrir'],
+  ['abrir', 'escancarar'],
+  ['fechar', 'trancar', 'cerrar'],
+  ['apagar', 'extinguir'],
+  ['explodir', 'estourar', 'detonar'],
+  ['derreter', 'dissolver'],
+  ['congelar', 'gelar'],
+  ['afogar', 'sufocar', 'asfixiar'],
+  ['morder', 'abocanhar'],
   ['ocorrer', 'surgir', 'aparecer', 'despontar'],
-  ['casa', 'lar', 'moradi', 'residenci'],
-  ['barulh', 'ruid', 'estrond'],
-  ['cheir', 'odor', 'arom', 'fedor'],
-].forEach((grupo, i) => grupo.forEach(w => { if (_SENT_GRUPO[w] === undefined) _SENT_GRUPO[w] = i }))
+  ['andar', 'caminhar'],
+  // qualidades
+  ['rapido', 'veloz', 'depressa', 'ligeiro', 'celere'],
+  ['devagar', 'lento', 'vagaroso'],
+  ['bonito', 'belo', 'formoso', 'lindo', 'deslumbrante'],
+  ['feio', 'horrendo', 'horrivel', 'medonho'],
+  ['grande', 'enorme', 'imenso', 'gigantesco', 'colossal'],
+  ['pequeno', 'minusculo', 'diminuto'],
+  ['gordo', 'obeso', 'rechonchudo'],
+  ['magro', 'esqueletico', 'esguio'],
+  ['forte', 'robusto', 'vigoroso', 'musculoso'],
+  ['fraco', 'debil', 'franzino'],
+  ['velho', 'idoso', 'anciao'],
+  ['jovem', 'juvenil'],
+  ['sujo', 'imundo', 'encardido', 'sujeira', 'imundicie', 'porcaria'],
+  ['molhado', 'encharcado', 'ensopado'],
+  ['seco', 'ressecado'],
+  ['brilhar', 'reluzir', 'cintilar', 'resplandecer'],
+  ['escuro', 'sombrio', 'tenebroso'],
+  // coisas e lugares
+  ['casa', 'lar', 'moradia', 'residencia'],
+  ['barulho', 'ruido', 'estrondo', 'estrepito'],
+  ['briga', 'luta', 'combate'],
+  ['rosto', 'semblante'],
+  ['roupa', 'vestimenta'],
+  ['dinheiro', 'grana'],
+  ['trabalho', 'labuta', 'servico'],
+  ['trilha', 'percurso', 'rota'],
+  ['pedra', 'rocha'],
+  ['vento', 'brisa', 'ventania'],
+  ['chuva', 'aguaceiro', 'temporal'],
+  ['neblina', 'nevoeiro', 'bruma'],
+  ['barco', 'navio', 'embarcacao'],
+  ['crianca', 'garoto', 'menino'],
+  ['medico', 'doutor'],
+  ['ladrao', 'bandido', 'criminoso', 'marginal'],
+  ['fantasma', 'espectro', 'assombracao'],
+  ['tumulo', 'sepultura', 'cova'],
+  ['barriga', 'ventre', 'abdomen'],
+  ['bunda', 'traseiro', 'nadegas'],
+].forEach((grupo, i) => grupo.forEach(w => {
+  const k = _sentRaiz(w)
+  if (_SENT_GRUPO[k] === undefined) _SENT_GRUPO[k] = i
+}))
 
 // Onde cada achado APARECE no texto. Casamento por posição, sem regex montada
 // com o termo — expressão com ponto, parêntese ou apóstrofo viraria um padrão
