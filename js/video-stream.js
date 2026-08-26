@@ -85,7 +85,7 @@ function _asRender() {
         st.resultados.length ? `<div class="as-result-grid">${st.resultados.map((r, i) => `
           <button class="as-result" onclick="assistirPickTitle(${i})" title="${escA(r.name)}">
             <span class="as-result-capa">${r.poster
-              ? `<img src="${escA(r.poster)}" alt="" loading="lazy" onerror="this.parentNode.classList.add('as-sem-capa')">`
+              ? `<img src="${escA(r.poster)}" alt="" onerror="this.parentNode.classList.add('as-sem-capa')">`
               : ''}<span class="as-result-ph">${ic('film')}</span></span>
             <span class="as-result-nome">${esc(r.name)}</span>
             <span class="as-result-meta">${r.type === 'series' ? 'série' : 'filme'}${r.year ? ' · ' + esc(String(r.year)) : ''}</span>
