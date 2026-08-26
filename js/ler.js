@@ -3440,7 +3440,10 @@ async function lerPreAnalisar(cap, refazer) {
       const j = await aiJSON([
         { role: 'system', content: sistema },
         { role: 'user', content: lote.map(it => it.w + ' :: ' + it.f).join('\n') }
-      ], { maxTokens: Math.min(4000, lote.length * 26 + 400), schema: ESQ.preGlosa, schemaNome: 'preGlosa' })
+      // `esforco: 'low'` (rodada 65): glosar palavra com a frase ao lado é
+      // tarefa mecânica, e o raciocínio padrão do Luna era pago por lote sem
+      // mudar a resposta — a mesma medição que barateou o raio-X.
+      ], { maxTokens: Math.min(4000, lote.length * 26 + 400), schema: ESQ.preGlosa, schemaNome: 'preGlosa', esforco: 'low' })
 
       // O CASAMENTO É PELA PALAVRA, e só entre as palavras DESTE lote. Resposta
       // com palavra que não foi perguntada é descartada — sem isso, um modelo
@@ -3656,15 +3659,15 @@ async function lerRaioXAnalisar() {
   const texto = await _lerTextoDoCapitulo(cap)
   if (!texto || texto.length < 40) { toast('Não achei texto neste capítulo.', 'warning'); return }
   _lerRaioXCarregando = true
-  const area = () => el('ler-raiox-area')
-  const pinta = m => { const a = area(); if (a) a.innerHTML = `<div class="ler-carregando">${esc(m)}</div>` }
-  pinta('Lendo o capítulo…')
+  _lerRaioXProgresso('Lendo o capítulo…')
   try {
     const nivel = cefrNivelAluno()
     const itens = await aiAnalisarDificuldade({
       texto, lang: (_lerLivro.lang || 'en').slice(0, 2), nivel,
       origem: _lerOrigemDoCap(cap),
-      aoAndar: (i, n) => pinta(n > 1 ? `Analisando ${i} de ${n}…` : 'Analisando…')
+      // O capítulo grande vira dezenas de blocos: sem o "de n" o progresso não
+      // responde a pergunta que ele faz de verdade — "falta muito?".
+      aoAndar: (i, n) => _lerRaioXProgresso(n > 1 ? `Analisando o capítulo — bloco ${i} de ${n}` : 'Analisando o capítulo…', i, n)
     })
     // A frase entra AGORA, uma vez, e não na hora de mandar ao Preparar: aqui
     // o texto do capítulo está em mãos; lá seria preciso lê-lo do zip de novo.
@@ -3824,6 +3827,23 @@ function _lerCapsAnalisaveis() {
 // E a lista responde à pergunta que só ela responde: **o que já foi analisado
 // e o que falta**. Sem ela, descobrir isso exigiria entrar em cada capítulo.
 let _lerRaioXMapa = null      // { [cap]: quantidade }
+let _lerRaioXQuando = {}      // { [cap]: timestamp da análise }
+
+// "agora mesmo" / "há 5 min" / "ontem" / "12/08" — o suficiente para ele ver
+// que o número na tela é NOVO, sem virar uma coluna de data completa.
+function _lerQuandoCurto(ts) {
+  if (!ts) return ''
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000))
+  if (s < 90) return 'agora mesmo'
+  const min = Math.round(s / 60)
+  if (min < 60) return `há ${min} min`
+  const h = Math.round(min / 60)
+  if (h < 24) return `há ${h} h`
+  const d = Math.round(h / 24)
+  if (d === 1) return 'ontem'
+  if (d < 7) return `há ${d} dias`
+  return new Date(ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+}
 
 async function lerRaioXPainel() {
   const p = el('ler-raiox-painel')
@@ -3841,6 +3861,7 @@ async function lerRaioXPainel() {
 // Uma varredura só do IndexedDB: as chaves dizem quais capítulos têm análise.
 async function _lerRaioXMapear() {
   _lerRaioXMapa = {}
+  _lerRaioXQuando = {}          // senão o carimbo do livro anterior sobrevive
   if (!_lerLivro) return
   // ⚠️ A NUVEM ENTRA PRIMEIRO. Sem isto, um capítulo analisado no telefone
   // aparecia como "analisar" no computador — e o clique cobraria a análise de
@@ -3860,6 +3881,10 @@ async function _lerRaioXMapear() {
       const obj = typeof dados === 'string' ? JSON.parse(dados) : dados
       const itens = Array.isArray(obj) ? obj : (obj && obj.itens) || []
       _lerRaioXMapa[cap] = itens.length
+      // QUANDO — a resposta para "acabou, ou esse é o número velho?" (rodada
+      // 65, dele com todas as letras). Sem carimbo, refazer um capítulo que
+      // devolve a MESMA contagem é indistinguível de nada ter acontecido.
+      if (obj && obj.at) _lerRaioXQuando[cap] = obj.at
     }
   } catch (e) { console.warn('[ler] mapa do raio-x:', e && e.message) }
 }
@@ -3886,10 +3911,11 @@ function _lerRaioXPainelRender(msg) {
       ${_lerCapsAnalisaveis().map(({ i, nome }) => {
         const n = (_lerRaioXMapa || {})[i]
         return `<button class="ler-raiox-cap${i === _lerCap ? ' atual' : ''}${n ? ' feito' : ''}"
-                  onclick="lerRaioXDoCapitulo(${i})">
+                  data-cap="${i}" onclick="lerRaioXDoCapitulo(${i})">
           <span class="ler-raiox-spark">${n ? ic('sparkles','ic-sm') : ''}</span>
-          <span class="ler-raiox-nome">${esc(nome)}</span>
-          <span class="ler-raiox-n">${n ? n : 'analisar'}</span>
+          <span class="ler-raiox-nome">${esc(nome)}${
+            n && _lerRaioXQuando[i] ? `<i class="ler-raiox-quando">${esc(_lerQuandoCurto(_lerRaioXQuando[i]))}</i>` : ''}</span>
+          <span class="ler-raiox-n">${_lerRaioXCarregando && i === _lerCap ? 'analisando…' : (n ? n : 'analisar')}</span>
           ${n ? `<span class="ler-raiox-refaz" role="button" tabindex="0"
                    onclick="event.stopPropagation();lerRaioXRefazer(${i})"
                    data-tip="Analisar este capítulo de novo, do zero — descarta a análise atual e gasta uma chamada de IA"
@@ -3919,13 +3945,28 @@ function _lerRaioXPainelRender(msg) {
 async function lerRaioXRefazer(i) {
   if (!_lerLivro || _lerRaioXCarregando) return
   const nome = lerCapNome(i)
-  if (!confirm(`Analisar "${nome}" de novo?
-
-A análise atual é descartada e uma nova chamada de IA é feita.`)) return
-  if (i !== _lerCap) await lerIrParaCapitulo(i, 0)
-  try { await BookDB.del(_lerChaveRaioX(i)) } catch (e) {}
-  _lerRaioX = null
-  _lerRaioXDespintar()
+  const n = (_lerRaioXMapa || {})[i]
+  // confirmModal, não o confirm() do navegador: é o padrão da casa e diz o
+  // preço — capítulo grande vira dezenas de chamadas, não uma.
+  if (!(await confirmModal({
+    title: `Analisar "${nome}" de novo?`, icon: 'eye', confirmText: 'Refazer', danger: true,
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2)">A análise atual${n ? ` (${n} pontos)` : ''}
+      é descartada e o capítulo inteiro é lido de novo pela IA. Capítulo longo vira
+      <b>vários blocos</b> — o progresso aparece aqui no painel.</p>` }))) return
+  // O painel fica aberto e já DIZ que começou: o "preparando" cobre a espera
+  // da navegação e da leitura do arquivo, que num capítulo grande não é curta.
+  el('ler-raiox-painel')?.classList.add('aberto')
+  _lerRaioXCarregando = true      // trava o duplo clique durante a navegação
+  _lerPainelProgresso('ler-raiox-painel', 'Preparando o capítulo…', i)
+  try {
+    if (i !== _lerCap) await lerIrParaCapitulo(i, 0)
+    try { await BookDB.del(_lerChaveRaioX(i)) } catch (e) {}
+    _lerRaioX = null
+    _lerRaioXDespintar()
+  } finally {
+    // Solta a trava SEMPRE: presa em true, o raio-X ficaria morto até recarregar.
+    _lerRaioXCarregando = false   // lerRaioXAnalisar levanta de novo, logo abaixo
+  }
   await lerRaioXAnalisar()
   if (typeof geradoFixar === 'function') {
     try { await geradoFixar(_lerChaveRaioX(i), { tipo: 'raiox', livroId: String(_lerLivro.id), cap: Number(i) }) } catch (e) {}
@@ -3937,10 +3978,18 @@ A análise atual é descartada e uma nova chamada de IA é feita.`)) return
 
 // Clique num capítulo: vai até ele e, se ainda não tiver análise, manda fazer.
 async function lerRaioXDoCapitulo(i) {
+  // Análise rodando: um segundo clique não pode disparar outra (nem virar
+  // clique mudo). O painel já mostra em qual capítulo a IA está.
+  if (_lerRaioXCarregando) { toast('Já estou analisando um capítulo — o progresso está no painel', 'info'); return }
   const jaTem = (_lerRaioXMapa || {})[i]
+  if (jaTem) {
+    if (i !== _lerCap) await lerIrParaCapitulo(i, 0)
+    el('ler-raiox-painel')?.classList.remove('aberto'); return
+  }
+  // ANTES do await da navegação: ir para o capítulo já demora num livro
+  // grande, e é justamente aí que o clique parecia não ter acontecido.
+  _lerPainelProgresso('ler-raiox-painel', 'Preparando o capítulo…', i)
   if (i !== _lerCap) await lerIrParaCapitulo(i, 0)
-  if (jaTem) { el('ler-raiox-painel')?.classList.remove('aberto'); return }
-  _lerRaioXPainelRender('Analisando este capítulo…')
   await lerRaioXAnalisar()
   await _lerRaioXMapear()
   _lerRaioXPainelRender()
@@ -4130,10 +4179,10 @@ function _lerPrePainelRender(msg) {
       ${caps.map(({ i, nome }) => {
         const n = (_lerPreMapa || {})[i]
         return `<button class="ler-raiox-cap${i === _lerCap ? ' atual' : ''}${n ? ' feito' : ''}"
-                  onclick="lerPreDoCapitulo(${i})">
+                  data-cap="${i}" onclick="lerPreDoCapitulo(${i})">
           <span class="ler-raiox-spark">${n ? ic('sparkles','ic-sm') : ''}</span>
           <span class="ler-raiox-nome">${esc(nome)}</span>
-          <span class="ler-raiox-n">${n ? n + ' glosas' : 'ler'}</span>
+          <span class="ler-raiox-n">${_lerPreCarregando && i === _lerCap ? 'lendo…' : (n ? n + ' glosas' : 'ler')}</span>
         </button>`
       }).join('')}
     </div>
@@ -4149,16 +4198,26 @@ function _lerPrePainelRender(msg) {
 
 // Clique num capítulo: vai até ele; sem leitura ainda, manda ler (o próprio
 // lerPreAnalisar mostra o custo e pede confirmação antes de gastar).
+// Mesma trava e o mesmo progresso do raio-X (rodada 65): a leitura por IA de
+// um capítulo grande também demora, e o painel também ficava mudo.
+let _lerPreCarregando = false
 async function lerPreDoCapitulo(i) {
+  if (_lerPreCarregando) { toast('Já estou lendo um capítulo — o progresso está no painel', 'info'); return }
   const jaTem = (_lerPreMapa || {})[i]
-  if (i !== _lerCap) await lerIrParaCapitulo(i, 0)
   if (jaTem) {
+    if (i !== _lerCap) await lerIrParaCapitulo(i, 0)
     el('ler-pre-painel')?.classList.remove('aberto')
     try { await lerPreAplicar(i) } catch (e) {}
     return
   }
-  _lerPrePainelRender('Lendo este capítulo com a IA…')
-  await lerPreAnalisar(i)
+  _lerPreCarregando = true
+  _lerPainelProgresso('ler-pre-painel', 'Preparando o capítulo…', i)
+  try {
+    if (i !== _lerCap) await lerIrParaCapitulo(i, 0)
+    await lerPreAnalisar(i)
+  } finally {
+    _lerPreCarregando = false
+  }
   await _lerPreMapear()
   _lerPrePainelRender()
 }
@@ -4189,11 +4248,47 @@ function _lerProgresso(areaId, texto, feito, total, sub) {
     '</div>'
 }
 
+// ⚠️ O PROGRESSO ESTAVA INDO PARA O LIXO (rodada 65, relatado por ele:
+// "reanalisando o raio X e não tem nenhuma informação de progresso").
+// `_lerProgresso` escreve em `#ler-raiox-area`/`#ler-pre-area`, que vivem
+// DENTRO do painel de ferramentas — e o `if (!a) return` engolia tudo quando a
+// análise era disparada pelo PAINEL FLUTUANTE de capítulos, que é a porta que
+// ele usa. Resultado: clique mudo por minutos numa operação que custa dinheiro,
+// sem saber se rodava, travou ou acabou.
+// A regra agora: o progresso aparece ONDE O CLIQUE ACONTECEU.
+function _lerPainelProgresso(painelId, txt, cap, feito, total) {
+  const p = el(painelId)
+  if (!p || !p.classList.contains('aberto')) return
+  let m = p.querySelector('.ler-raiox-msg')
+  if (!m) {
+    m = document.createElement('div')
+    m.className = 'ler-raiox-msg'
+    const topo = p.querySelector('.ler-raiox-topo')
+    if (topo) topo.after(m); else p.prepend(m)
+  }
+  if (!txt) { m.remove(); return }
+  const pct = total > 1 ? Math.round((feito / total) * 100) : 0
+  m.innerHTML = `<span class="gen-spinner"></span> ${esc(txt)}` +
+    (total > 1 ? `<div class="ler-pre-barra" style="margin-top:6px"><i style="width:${pct}%"></i></div>` : '')
+  // E a LINHA do capítulo diz que é com ele que a IA está ocupada — senão o
+  // painel avisa "analisando" sem dizer o quê, com três capítulos na tela.
+  if (cap != null) {
+    const linha = p.querySelector(`.ler-raiox-cap[data-cap="${cap}"] .ler-raiox-n`)
+    if (linha) linha.textContent = 'analisando…'
+  }
+}
+
 // Atalhos por fluxo — cada um sabe a sua área. Assim nenhum ponto de chamada
 // precisa lembrar o id, que foi exatamente como o bug nasceu.
 function _lerPreProgresso(texto, feito, total, glosas) {
   _lerProgresso('ler-pre-area', texto, feito, total,
     glosas ? glosas + ' palavras lidas até agora' : '')
+  _lerPainelProgresso('ler-pre-painel', texto, _lerCap, feito, total)
+}
+function _lerRaioXProgresso(texto, feito, total) {
+  const a = el('ler-raiox-area')
+  if (a) a.innerHTML = `<div class="ler-carregando"><span class="gen-spinner"></span> ${esc(texto)}</div>`
+  _lerPainelProgresso('ler-raiox-painel', texto, _lerCap, feito, total)
 }
 
 // ---- CALIBRAÇÃO DO RACIOCÍNIO -----------------------------------

@@ -8164,3 +8164,9 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
     background:var(--surface2);color:var(--text2);cursor:pointer;z-index:2;
   }
 }
+
+/* Quando o capítulo foi analisado (rodada 65) — a resposta para "acabou, ou
+   esse número é o velho?". Discreto ao lado do nome, na mesma linha. */
+.ler-raiox-quando{
+  display:block;font-style:normal;font-size:var(--fs-3xs);color:var(--text3);margin-top:1px;
+}

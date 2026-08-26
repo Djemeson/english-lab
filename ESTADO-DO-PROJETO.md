@@ -15430,6 +15430,53 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Da rodada do progresso e da conta do Luna (2026-08-25, 65ª)
+
+**Relato dele:** *"o site ta reanalisando o raio X e não tem nenhuma informação de
+progresso"* e, depois, *"ta o mesmo valor de antes, 1206, não sei se acabou"*.
+
+- [x] **O PROGRESSO IA PARA O LIXO.** `_lerProgresso` escreve em `#ler-raiox-area` /
+      `#ler-pre-area`, que vivem DENTRO do painel de ferramentas — disparando pelo
+      PAINEL FLUTUANTE de capítulos (a porta que ele usa) o `if (!a) return` engolia
+      tudo. Agora `_lerPainelProgresso` pinta no painel que disparou: faixa com
+      spinner, barra e "bloco N de M", mais a LINHA do capítulo dizendo "analisando…".
+      Vale para o raio-X e para o pré-estudo. `lerRaioXRefazer` ganhou confirmModal
+      (era `confirm()` nativo) e mostra "Preparando…" ANTES do await da navegação;
+      trava de duplo clique nos dois fluxos (com `finally` — trava presa mataria o
+      recurso até recarregar).
+- [x] **"Acabou ou é o número velho?"** — o painel passa a carimbar QUANDO cada
+      capítulo foi analisado (`_lerRaioXQuando` lido do pacote; "agora mesmo", "há 5
+      min", "ontem", data). Reanálise que devolve a MESMA contagem agora é
+      distinguível de nada ter acontecido. Zera ao trocar de livro.
+- [x] **OTIMIZAÇÃO PARA O LUNA — medida contra a API real, não estimada:**
+      | mesmo trecho de 4500 caracteres | tempo | custo | itens |
+      |---|---|---|---|
+      | 3 blocos de 1500 (como era) | ~41 s | US$ 0,0051 | 33 |
+      | 1 bloco de 4500 | 10,5 s | US$ 0,0016 | 25 |
+      O bloco de 1500 repetia o prompt de sistema (~600 tokens) a cada ~375 tokens de
+      livro e pagava aquecimento de raciocínio POR CHAMADA. Mudanças: **bloco
+      1500→4000**, **`reasoning_effort:'low'`** (novo `_aiEsforco`, só para
+      `_aiRaciocina` — o Gemini tem outro contrato de "pensar" e chute em parâmetro
+      vira chamada recusada; medido: raciocínio 1024→512 tokens, 13,6s→7,7s, itens
+      11→10) e **3 blocos em PARALELO** em ondas, com ordem preservada e progresso
+      contando por conclusão (medido no navegador: 2,7× no mesmo ambiente).
+      O pré-estudo também recebeu `esforco:'low'` (aiJSON ganhou o parâmetro);
+      confirmado contra a API que convive com o `json_schema` estrito, mesma qualidade.
+      **Efeito esperado no "Part One" dele (~110 blocos):** de ~25 min e ~US$ 0,19
+      para **~2,5 min e ~US$ 0,07**.
+      ⚠️ **A contagem VAI CAIR** na próxima reanálise (bloco maior = modelo mais
+      seletivo: medido 5,5 itens/1000 chars contra 7,3). É ganho, não defeito — 1206
+      apontamentos num capítulo é lista que ninguém estuda —, mas precisa ser dito.
+- [x] sw v426. **Testado ao vivo: 28** (progresso no painel aberto/fechado, barra,
+      linha "analisando…", reabrir durante, duplo clique barrado, espelho no
+      pré-estudo, ciclo completo com IA simulada mostrando bloco 1→4 de 4, orçamento
+      do Luna, esforço só para quem raciocina, ondas de 3 com ordem e falha isolada,
+      relógio do carimbo nas 6 faixas, mesmo-número-carimbo-novo, troca de livro
+      limpa) + 6 chamadas reais à API do Luna.
+- [ ] **Fica para depois:** paralelizar também o pré-estudo (hoje sequencial, lotes de
+      40 com razão documentada — 120 fazia o Luna pular item); e um teto de itens por
+      capítulo no raio-X, se ele achar 1206 demais mesmo com a nova seletividade.
+
 ### Da rodada do menu do card de Revisão (2026-08-25, 64ª = sobra da UX-2 — UX-2 completa)
 
 - [x] **Botão "Mais" no rodapé do verso do card SRS** (buildSrsVerso — vale na SESSÃO

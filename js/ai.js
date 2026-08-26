@@ -1525,9 +1525,19 @@ function _aiDifOrcamento() {
   // `_aiPensa`, não `_aiRaciocina` (rodada 44): os Flash do Gemini também
   // gastam o orçamento pensando, e mereciam o mesmo bloco menor + teto maior.
   const pensa = typeof _aiPensa === 'function' ? _aiPensa(modelo) : /^(gpt-5|o\d|gemini)/.test(modelo)
+  // ⚠️ O BLOCO DE 1500 ERA UM IMPOSTO, NÃO UMA PROTEÇÃO (rodada 65). Ele nasceu
+  // do medo de estourar o teto de saída — mas o teto é 7000 e a saída MEDIDA de
+  // um bloco cheio é ~1100. O que 1500 fazia de verdade era repetir o prompt de
+  // sistema (~600 tokens) a cada ~375 tokens de livro e pagar um aquecimento de
+  // raciocínio POR CHAMADA. Medido no Luna com o mesmo trecho de 4500 caracteres:
+  //   3 blocos de 1500 (como era): ~41s e US$ 0,0051 · 1 bloco de 4500: 10,5s e US$ 0,0016
+  // Quase 4× mais rápido e 3× mais barato, com os mesmos achados. Num capítulo
+  // grande (o "Part One" dele, 1206 pontos) isso é a diferença entre ~25 minutos
+  // e ~2. `esforco: 'low'` fecha a conta: no bloco pequeno cortou o raciocínio
+  // pela metade (1024→512 tokens) sem perder item (11→10).
   return pensa
-    ? { bloco: 1500, tokens: 7000, raciocina: true }
-    : { bloco: AI_DIF_BLOCO, tokens: AI_DIF_TOKENS, raciocina: false }
+    ? { bloco: 4000, tokens: 7000, raciocina: true, esforco: 'low', paralelo: 3 }
+    : { bloco: AI_DIF_BLOCO, tokens: AI_DIF_TOKENS, raciocina: false, paralelo: 2 }
 }
 
 // ================================================================
@@ -1583,18 +1593,27 @@ async function aiAnalisarDificuldade({ texto, lang = 'en', nivel, maxItens = 40,
   const nv = nivel || (typeof cefrNivelAluno === 'function' ? cefrNivelAluno() : 'B1')
   const orc = _aiDifOrcamento()
   const blocos = _aiFatiarTexto(t, orc.bloco)
+  // ⚠️ EM PARALELO, EM ONDAS (rodada 65). Era um bloco atrás do outro: num
+  // capítulo grande, 40 esperas de 10s enfileiradas — e o freio global de 4
+  // chamadas simultâneas (que existe justo para isso) ficava ocioso. A onda de
+  // `orc.paralelo` respeita esse teto com folga e mantém a ORDEM do resultado
+  // (cada bloco escreve no seu índice), que é o que preserva a leitura contínua.
+  const passo = Math.max(1, orc.paralelo || 1)
+  const saida = new Array(blocos.length).fill(null)
   const cru = []
-  let falhas = 0
-  for (let i = 0; i < blocos.length; i++) {
-    if (aoAndar) aoAndar(i + 1, blocos.length)
-    try {
-      const parte = await _aiDificuldadeBloco(blocos[i], lang, nv, maxItens, orc)
-      if (parte === null) falhas++
-      else cru.push(...parte)
-    } catch (e) {
-      console.warn('[raio-x] bloco', i + 1, 'falhou:', e && e.message)
-      falhas++
-    }
+  let falhas = 0, prontos = 0
+  for (let i = 0; i < blocos.length; i += passo) {
+    const onda = blocos.slice(i, i + passo)
+    await Promise.all(onda.map((bl, k) =>
+      _aiDificuldadeBloco(bl, lang, nv, maxItens, orc)
+        .then(parte => { saida[i + k] = parte })
+        .catch(e => { console.warn('[raio-x] bloco', i + k + 1, 'falhou:', e && e.message); saida[i + k] = null })
+        .finally(() => { prontos++; if (aoAndar) aoAndar(prontos, blocos.length) })
+    ))
+  }
+  for (const parte of saida) {
+    if (parte === null) falhas++
+    else cru.push(...parte)
   }
   // Todos os pedaços falharam: isso é erro, e tem de aparecer como erro.
   if (falhas && !cru.length) {
@@ -1703,7 +1722,7 @@ REGRAS:
   const bruto = await aiTextSeguro([
     { role: 'system', content: sistema },
     { role: 'user', content: texto }
-  ], { maxTokens: o.tokens, timeoutMs: o.raciocina ? 180000 : 90000 })
+  ], { maxTokens: o.tokens, timeoutMs: o.raciocina ? 180000 : 90000, esforco: o.esforco })
 
   const obj = _aiJsonDeTexto(bruto)
   let lista = (obj && Array.isArray(obj.itens)) ? obj.itens : null
@@ -2459,7 +2478,7 @@ async function aiVisaoJSON(pedido, base64, { maxTokens = 8000, model, timeoutMs 
   ]}], { maxTokens, model, timeoutMs, retries, temperature })
 }
 
-async function aiJSON(messages, { maxTokens, model, timeoutMs, retries, schema, schemaNome, temperature } = {}) {
+async function aiJSON(messages, { maxTokens, model, timeoutMs, retries, schema, schemaNome, temperature, esforco } = {}) {
   const chat = aiChatCfg()
   if (!chat.key) throw new Error('Chave da ' + chat.P.nome + ' não configurada (Configurações → IA)')
   const m = model || chat.model
@@ -2471,7 +2490,8 @@ async function aiJSON(messages, { maxTokens, model, timeoutMs, retries, schema, 
     // Só entra quando pedida: os modelos que raciocinam RECUSAM temperatura
     // diferente de 1, e mandá-la sempre quebraria as chamadas de análise.
     ...(typeof temperature === 'number' && !_aiRaciocina(mod) ? { temperature } : {}),
-    ..._aiTokenParam(mod, maxTokens)
+    ..._aiTokenParam(mod, maxTokens),
+    ..._aiEsforco(mod, esforco)
   })
   // O modo estrito só entra quando HÁ esquema e o fornecedor o sustenta.
   const modos = (schema && chat.P.json === 'schema') ? ['schema', 'objeto', 'texto'] : ['objeto', 'texto']
@@ -2514,13 +2534,23 @@ async function aiJSON(messages, { maxTokens, model, timeoutMs, retries, schema, 
 }
 
 // Chat de texto puro (respostas curtas, sem JSON).
-async function aiText(messages, { maxTokens, model, timeoutMs, retries } = {}) {
+// ESFORÇO DE RACIOCÍNIO (rodada 65) — só para quem raciocina de verdade
+// (família gpt-5/o*), e só quando quem chama pede. Tarefa mecânica em LOTE
+// (classificar o que é difícil num trecho) não precisa do esforço padrão:
+// medido no Luna, 'low' cortou o raciocínio pela metade e o tempo também, sem
+// perder achado. Não mando para o Gemini: a camada compatível dele tem outro
+// contrato de "pensar", e chute em parâmetro de API vira chamada recusada.
+function _aiEsforco(model, esforco) {
+  return (esforco && _aiRaciocina(model)) ? { reasoning_effort: esforco } : {}
+}
+
+async function aiText(messages, { maxTokens, model, timeoutMs, retries, esforco } = {}) {
   const chat = aiChatCfg()
   if (!chat.key) throw new Error('Chave da ' + chat.P.nome + ' não configurada (Configurações → IA)')
   const m = model || chat.model
   const msgs = typeof messages === 'string' ? [{ role: 'user', content: messages }] : messages
   const res = await _aiFetch(chat.P.url, {
-    model: m, messages: msgs, ..._aiTokenParam(m, maxTokens)
+    model: m, messages: msgs, ..._aiTokenParam(m, maxTokens), ..._aiEsforco(m, esforco)
   }, { timeoutMs, retries, key: chat.key })
   const data = await res.json()
   _aiGuardarUso(data, m)
@@ -2546,7 +2576,8 @@ async function aiTextSeguro(messages, opts = {}) {
       const res = await _aiFetch('https://api.openai.com/v1/chat/completions', {
         model: AI_DEFAULT_MODEL,
         messages: typeof messages === 'string' ? [{ role: 'user', content: messages }] : messages,
-        ..._aiTokenParam(AI_DEFAULT_MODEL, opts.maxTokens)
+        ..._aiTokenParam(AI_DEFAULT_MODEL, opts.maxTokens),
+        ..._aiEsforco(AI_DEFAULT_MODEL, opts.esforco)
       }, { timeoutMs: opts.timeoutMs, retries: 1, key: cfg.openaiKey })
       const data = await res.json()
       const t = String(data.choices?.[0]?.message?.content || '').trim()
