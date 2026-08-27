@@ -1627,26 +1627,21 @@ function _abListaTexto() {
         : `<button class="est-chip" id="ab-raiox-btn" onclick="abAnalisarPassagem()"
              data-tip="Acha o que está acima do seu nível, e todo phrasal verb e expressão">
              ${ic('eye','ic-3xs')} O que é difícil aqui</button>`}
-      <button class="est-chip" onclick="abTranscrever()">${ic('plus','ic-3xs')} Outro trecho</button>
-      ${/* ⚠️ O MESMO BOTÃO DO LEITOR (§8.96), e aqui ele é ainda mais
-            necessário: a escolha automática entre duas transcrições usa "mais
-            falas", e uma transcrição pode ter mais falas por estar picotada em
-            pedaços curtos, não por ser melhor. Quando ele ouve as duas e sabe
-            qual presta, a mão dele manda. */''}
-      <button class="est-chip${tr.fixadoEm ? ' est-chip-forte' : ''}" onclick="abFixarTranscricao()"
-              data-tip="${escA(tr.fixadoEm
-                ? 'Esta é a versão que vale nos seus aparelhos — clique para carimbar de novo'
-                : 'Manda esta transcrição e análise para os outros aparelhos como a boa')}">
-        ${ic('cloud','ic-3xs')} ${tr.fixadoEm ? 'Vale em todos' : 'Usar em todos os aparelhos'}</button>
-      <button class="est-chip est-chip-forte" id="ab-trans-btn" onclick="event.stopPropagation();abTransPainel()"
-              data-tip="Ver os capítulos e o que já virou texto">${ic('captions','ic-3xs')} Transcrição</button>
-      <button class="est-chip est-chip-forte" id="ab-raiox-btn2" onclick="event.stopPropagation();abRaioXPainel()"
-              data-tip="Ver os capítulos e o que já foi analisado">${ic('eye','ic-3xs')} O que é difícil</button>
+      ${/* ⚠️ QUATRO BOTÕES SAÍRAM DAQUI E FORAM PARA O "MAIS" (rodada 78c). Eram
+            SETE chips nesta fileira, e mesmo com o player em duas colunas ela
+            quebrava em duas linhas — que é espaço de leitura virando barra de
+            ferramentas. Ficam à vista os três que se usam LENDO (o raio-X da
+            passagem, a tipografia e a tela cheia); os de manutenção
+            (transcrever outro trecho, carimbar a versão boa, os dois painéis
+            de capítulos) moram no menu, a um clique. */''}
       <button class="est-chip" id="ab-tipo-btn" onclick="event.stopPropagation();abTipografia()"
               data-tip="Tipografia e papel — a mesma configuração do leitor de livros">Aa</button>
       <button class="est-chip" onclick="abTextoFull()" id="ab-full-btn"
               data-tip="Ler em tela cheia, com a fala do momento no centro (Esc sai)">
         ${ic('expand','ic-3xs')} Tela cheia</button>
+      <button class="est-chip" id="ab-mais-btn" onclick="abTextoMais(event)"
+              data-tip="Transcrição, capítulos e o que vale em todos os aparelhos">
+        Mais ${ic('chevronDown','ic-3xs')}</button>
     </div>
     <div class="ab-trans${achados ? ' com-raiox' : ''}" id="ab-trans" tabindex="0">
       ${segs.map((s, i) => `
@@ -1663,6 +1658,39 @@ function _abListaTexto() {
       : `<p class="est-dica" style="margin-top:10px">
           Nada acima do seu <b>${esc(tr.achadosNivel || nivel)}</b> neste trecho — e nenhum phrasal
           verb ou expressão idiomática. Se ainda assim travou, marque a frase e peça o Explicar.</p>`) : ''}`
+}
+
+// ---- O "MAIS": o que não se usa lendo ----
+// ⚠️ O MENU É MONTADO NO CLIQUE, e não junto com a barra: os rótulos daqui
+// dependem de estado que muda enquanto a tela vive ("Vale em todos" só depois
+// de carimbar). Gerar no clique é o que garante que ele nunca minta.
+// ⚠️ E OS PAINÉIS PRECISAM DE UMA ÂNCORA QUE EXISTA: os dois se posicionam sob
+// o botão que os abriu, e esses botões saíram da barra. Agora abrem sob o
+// "Mais" — sem isso, nasceriam no canto da tela.
+function abTextoMais(ev) {
+  const a = _abLivro; if (!a) return
+  // ⚠️ O PONTO VAI RELATIVO AO CAPÍTULO, como em `abFixarTranscricao`: num m4b
+  // de arquivo único o relógio do `<audio>` está milhares de segundos adiante,
+  // e a busca não acharia a transcrição — o menu diria "usar" sobre uma versão
+  // já carimbada.
+  const _cap = (a.capitulos || [])[_abCap] || {}
+  const _atual = Math.max(0, ((_abAudio() || {}).currentTime || 0) - (_cap.ini || 0))
+  const tr = abTransDoPonto(a, _abCap, _atual)
+    || (a.transcricoes || []).find(x => x.cap === _abCap)
+  cardMenu(ev, 'ab-mais', `
+    <button onclick="cardMenuFechar();abTranscrever()">
+      ${ic('plus','ic-sm')} Transcrever outro trecho</button>
+    ${/* ⚠️ O MESMO BOTÃO DO LEITOR (§8.96): a escolha automática entre duas
+          transcrições usa "mais falas", e uma transcrição pode ter mais falas
+          por estar picotada em pedaços curtos, não por ser melhor. Quando ele
+          ouve as duas e sabe qual presta, a mão dele manda. */''}
+    ${tr ? `<button class="${tr.fixadoEm ? 'on' : ''}" onclick="cardMenuFechar();abFixarTranscricao()">
+      ${ic('cloud','ic-sm')} ${tr.fixadoEm ? 'Vale em todos os aparelhos' : 'Usar em todos os aparelhos'}</button>` : ''}
+    <div class="est-menu-sep">Ver por capítulo</div>
+    <button onclick="cardMenuFechar();abTransPainel('ab-mais-btn')">
+      ${ic('captions','ic-sm')} Transcrição</button>
+    <button onclick="cardMenuFechar();abRaioXPainel()">
+      ${ic('eye','ic-sm')} O que é difícil</button>`, 250)
 }
 
 // ---- O PAINEL DO RAIO-X: os capítulos, e o que já foi analisado ----
@@ -1737,7 +1765,7 @@ function _abTransPainelRender(msg) {
     <p class="est-dica">Com <b>${ic('captions','ic-3xs')}</b> o texto já existe — o clique leva até
       ele. Sem a marca, o clique <b>transcreve</b>, e o custo é mostrado antes. O botão acima
       <b>pula</b> os que já têm texto.</p>`
-  const btn = el(_abTransAncora) || el('ab-trans-btn')
+  const btn = el(_abTransAncora) || el('ab-trans-btn') || el('ab-mais-btn')
   if (btn) {
     const r = btn.getBoundingClientRect()
     // ⚠️ Preso à tela nos dois eixos: aberto por um botão lá embaixo, um painel
@@ -1826,7 +1854,9 @@ function _abRaioXPainelRender(msg) {
     </div>
     <p class="est-dica">Com <b>${ic('sparkles','ic-3xs')}</b> já está analisado. Sem texto ainda, o
       clique <b>transcreve e analisa</b> — a transcrição tem custo de IA e é mostrado antes.</p>`
-  const btn = el('ab-raiox-btn2')
+  // A âncora saiu da barra e virou item do "Mais" (rodada 78c); sem o segundo
+  // nome, o painel abriria no canto em vez de sob o botão clicado.
+  const btn = el('ab-raiox-btn2') || el('ab-mais-btn')
   if (btn) {
     const r = btn.getBoundingClientRect()
     p.style.top = Math.round(r.bottom + 8) + 'px'
