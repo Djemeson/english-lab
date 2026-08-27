@@ -5598,19 +5598,27 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
     gap:18px; margin-bottom:0;
     position:sticky; top:12px;
   }
-  .ab-capa-grande{width:210px; margin:0 auto}
+  /* ⚠️ A COLUNA INTEIRA TEM DE CABER NA TELA, senão o `sticky` prende o topo e
+     o play fica pendurado abaixo da dobra — foi o que a primeira medição
+     mostrou (botões de velocidade/marcador/sono cortados na borda de baixo).
+     A capa encolhe e os respiros fecham até o conjunto caber em ~470px. */
+  .ab-capa-grande{width:168px; margin:0 auto}
   .ab-info h2{font-size:var(--fs-lg)}
-  .ab-cap-nome{margin-top:12px}
-  .ab-controles{justify-content:center}
-  .ab-secundarios{justify-content:center}
+  .ab-cap-nome{margin-top:10px}
+  .ab-controles{justify-content:center; margin-top:14px}
+  .ab-secundarios{justify-content:center; margin-top:14px}
 
   .ab-abas{grid-column:2; grid-row:1; margin-bottom:14px}
   #ab-aba{grid-column:2; grid-row:2; min-width:0}
 
   /* Sem o player empurrando por cima, a coluna de leitura ganha a altura que
-     sobra — é o espaço que o pedido veio buscar. */
-  .ab-trans{max-height:min(72vh, 780px)}
-  .ab-caps{max-height:min(72vh, 780px)}
+     sobra — é o espaço que o pedido veio buscar.
+     ⚠️ Os seletores levam `.ab-player` na frente de propósito: as regras de
+     `.ab-trans` e `.ab-caps` moram MAIS ABAIXO neste arquivo e, com a mesma
+     especificidade, venceriam por ordem. Medido antes de subir o peso: o
+     texto continuava em 371px (58vh), não nos 72vh pedidos aqui. */
+  .ab-player .ab-trans{max-height:min(72vh, 780px)}
+  .ab-player .ab-caps{max-height:min(72vh, 780px)}
 }
 .ab-caps{display:flex;flex-direction:column;max-height:420px;overflow-y:auto}
 /* ⚠️ A LINHA VIROU DOIS BOTÕES. Antes o capítulo inteiro era um botão só; com
