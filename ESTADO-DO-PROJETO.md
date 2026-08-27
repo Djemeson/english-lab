@@ -15656,6 +15656,42 @@ especificidade `body.ab-full .ab-player` vence a media query).
 ⚠️ **Não medido:** janela real abaixo de 1200px (a janela dele está maximizada e recusou o
 redimensionamento) — mas fora do breakpoint o CSS é o de antes, sem uma linha nova.
 
+## 8.102 A fileira de sete chips virou quatro e um "Mais" (2026-08-27, 78c)
+
+Pedido dele: *"esconde os botões menos usados atrás de um 'mais'"* — a pendência que a 78b
+tinha registrado. Eram **sete chips** na barra da aba Texto e ela quebrava em duas linhas
+mesmo com o player em duas colunas: espaço de leitura virando barra de ferramentas.
+
+**O critério foi o uso, não o gosto.** Ficam à vista os três que se usam **lendo** — o raio-X
+da passagem, a tipografia (Aa) e a tela cheia. Vão para o menu os de **manutenção**:
+transcrever outro trecho, carimbar a versão que vale, e os dois painéis por capítulo
+(agrupados sob "Ver por capítulo"). Usa o `cardMenu()` de `core.js`, o menu flutuante padrão
+da casa (estante, audiolivro, vídeo), que já fecha por clique fora, Escape e segundo clique;
+gatilho com `chevronDown`, como os outros do app.
+
+**Três armadilhas que o código escondia:**
+1. **O menu tem de ser montado NO CLIQUE.** O rótulo "Vale em todos" depende de estado que
+   muda enquanto a tela vive; gerado junto com a barra, mentiria.
+2. **Os dois painéis se posicionam sob o botão que os abriu** — e esses botões saíram da
+   barra. `abTransPainel` recebe `'ab-mais-btn'` como âncora e `abRaioXPainel` ganhou o mesmo
+   nome como reserva; sem isso nasceriam no canto da tela.
+3. **O 4º argumento do `cardMenu` só POSICIONA** (`x = direita do gatilho − larg`): a largura
+   real é fixa em 210px no `.est-menu`. Passar 272 não alargou nada — empurrou o menu 62px
+   para a esquerda. Voltou para 210 e os rótulos encurtaram para caber numa linha
+   ("Outro trecho", "Usar em todos"), com o texto longo no `title` e um separador
+   "Esta transcrição" devolvendo o contexto.
+
+**E um defeito antigo apareceu no caminho:** o painel do raio-X **vazava pela base da tela**
+(topo em y=209 com a lista inteira abaixo da janela). O painel irmão, o da transcrição, já
+tinha o freio de "sobe quando não couber" desde a origem; este nasceu sem — mesmo defeito,
+vinte linhas de distância. Não era regressão do menu: a barra de chips ficava na mesma altura,
+então vazava antes também.
+
+**Conferido no Chrome dele, no ar:** barra de 90px→**62px** com os chips numa linha só; menu
+com os 4 itens a **33px cada** (nenhum quebrando), alinhado ao gatilho e dentro da tela;
+os dois painéis agora abrem em y=8, inteiros na tela; fecha por clique fora **e** por Escape;
+tela cheia mantém a barra com os quatro botões; **zero erro no console**.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -15669,8 +15705,9 @@ redimensionamento) — mas fora do breakpoint o CSS é o de antes, sem uma linha
 
 - [ ] **Duas colunas em janela real abaixo de 1200px** não foi medido (janela dele
       maximizada recusou o redimensionamento). Fora do breakpoint o CSS é o de antes.
-- [ ] A fileira de chips da aba Texto ocupa **duas linhas** mesmo na largura toda (sete
-      botões + a dica). Se incomodar, agrupar os menos usados atrás de um "mais".
+- [x] **FEITO na 78c** (ele pediu no mesmo dia): a fileira de sete chips virou quatro + um
+      menu "Mais". Ver §8.102 — e o painel do raio-X, que vazava pela base da tela desde
+      sempre, ganhou o freio que o painel irmão já tinha.
 
 - [ ] **Auto-continuação opcional**: hoje cada trecho novo pede confirmação (custo ~R$ 0,03
       por ~10 min na Groq). Um `cfg.sincAuto` ("continuar transcrevendo sozinho enquanto eu
