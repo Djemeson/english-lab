@@ -2395,7 +2395,9 @@ body.sb-collapsed #fb-user-photo{margin:0}
   .dash-action-card{flex-wrap:wrap;row-gap:16px}
 }
 
-.dash-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:18px;align-items:start;margin-top:20px}
+/* minmax(0,…) para a proporção ser PURA (fr cru respeita o min-content e o
+   gráfico empurrava a coluna): assim a costura casa com o bento do topo. */
+.dash-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:18px;align-items:start;margin-top:20px}
 .dash-col{display:flex;flex-direction:column;gap:18px;min-width:0}
 .dash-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);padding:20px 22px}
 .dash-card-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;gap:10px}
