@@ -7854,6 +7854,12 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
      elas virarem coluna no celular, sobe para 44. */
   .btn-sm{min-height:40px}
   .tab,.seg-tab{min-height:44px}
+  /* Os filtros de Palavras (`.kn-fil`) são pílulas que FILTRAM a lista —
+     mesmo papel de aba, e ficaram fora desta regra: medidos em 30px no
+     celular (rodada 77, varredura de 6 seções em 375px, único furo real
+     encontrado). 40px como o `.btn-sm`, pelo mesmo motivo: eles vivem numa
+     fileira de quatro e 44 quebraria a linha em duas. */
+  .kn-fil{min-height:40px}
   /* Botões só de ícone: sem texto para dar corpo, o alvo é o padding. */
   .mob-action-btn{min-width:44px;min-height:44px}
 }
