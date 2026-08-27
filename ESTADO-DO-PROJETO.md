@@ -50,6 +50,12 @@
 > na 74ª — item 10→8 e grupo 16→12 devolveram 60px. **Celular medido de verdade** (375×812,
 > `pointer:coarse` ativo, 6 seções): **zero overflow, zero fileira quebrada** — a pendência
 > da 74ª não se confirmou; o único furo real eram os 4 filtros de Palavras a 30px, agora 40.
+> ⚠️ **E esconder a barra criou um cego, visto na tela:** sem ela, nada avisava que o menu
+> continua abaixo (numa janela de 652px o "Revisar" sumia sem sinal — pior que a régua feia).
+> A lista passa a **esmaecer no pé quando há o que rolar** (`.tem-mais` + `mask-image`), com
+> quatro gatilhos; o que quase escapou foi abrir/fechar grupo, que muda a altura do CONTEÚDO
+> e não a da caixa — o `ResizeObserver` não vê, então há chamada explícita em
+> `navGruposAplicar()`.
 > ⚠️ **A extensão NÃO foi alinhada, e isso é a decisão certa:** o popup dela é um cartão
 > BRANCO, onde o roxo fechado dá 7,45:1 contra 5,70:1 do claro — a pendência que eu mesmo
 > registrei estava errada; aviso gravado no arquivo. `sw.js` → **englab-v447**.
