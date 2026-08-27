@@ -1038,6 +1038,10 @@ function navGruposAplicar() {
     }
   }
   navGruposBadges()
+  // Abrir/fechar grupo muda a ALTURA DO CONTEÚDO, e não a da caixa — o
+  // ResizeObserver da lista não vê isso. Sem esta chamada, o esmaecido de
+  // "tem mais abaixo" ficaria velho justamente na ação que mais mexe na lista.
+  if (typeof sbNavSombra === 'function') sbNavSombra()
   // Quem atualiza os badges são meia dúzia de funções espalhadas (SRS, dossiê,
   // Preparar) e cada uma tem seu próprio gatilho. Observar os elementos é o
   // único jeito de a soma do cabeçalho nunca ficar velha — inclusive para um
@@ -1197,6 +1201,28 @@ function sbThemeToggleSync() {
     m.setAttribute('aria-label', `Mudar para o tema ${nome}`)
   }
 }
+// Marca a lista do menu quando ainda há item abaixo da dobra. Existe porque a
+// barra de rolagem dela é invisível (ver o comentário no CSS): sem este sinal,
+// numa janela baixa o último grupo simplesmente sumia sem aviso.
+function sbNavSombra() {
+  const nav = document.querySelector('.sb-nav')
+  if (!nav) return
+  const falta = nav.scrollHeight - nav.clientHeight - nav.scrollTop
+  nav.classList.toggle('tem-mais', falta > 4)
+}
+// Um listener só, sem timer: rolagem da própria lista, mudança de tamanho da
+// janela, e os grupos abrindo/fechando (que mudam a altura sem disparar scroll).
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    const nav = document.querySelector('.sb-nav')
+    if (!nav) return
+    sbNavSombra()
+    nav.addEventListener('scroll', sbNavSombra, { passive: true })
+    window.addEventListener('resize', sbNavSombra, { passive: true })
+    if (typeof ResizeObserver === 'function') new ResizeObserver(sbNavSombra).observe(nav)
+  })
+}
+
 function toggleThemeMode() {
   const escuro = _temaEhEscuro(cfg.theme)
   applyTheme(escuro ? (cfg.themeLight || 'light') : (cfg.themeDark || 'midnight'))

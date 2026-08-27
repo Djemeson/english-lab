@@ -253,6 +253,16 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
    rola, e tudo bem: agora a barra é discreta e nada corta no meio. */
 .sb-nav .nav-item{padding-top:var(--sp-3);padding-bottom:var(--sp-3)}
 .sb-nav-label-2{margin-top:var(--sp-5)}
+/* ---- "Tem mais aqui embaixo" ----
+   Efeito colateral de esconder a barra: com ela invisível, NADA avisava que a
+   lista continua — numa janela baixa o "Revisar" ficava fora da vista sem
+   nenhum sinal, que é pior do que a régua feia. O esmaecido no pé é o sinal:
+   aparece só quando há o que rolar (classe posta por sbNavSombra) e some ao
+   chegar no fim, então o último item nunca fica apagado à toa. */
+.sb-nav.tem-mais{
+  -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 34px), transparent 100%);
+  mask-image:linear-gradient(to bottom, #000 calc(100% - 34px), transparent 100%);
+}
 
 /* ===== SIDEBAR LAYOUT ===== */
 .app-layout{display:flex;min-height:100vh}
