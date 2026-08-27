@@ -29,7 +29,9 @@
 > ele olhando (parágrafos colados "spread.Then" + frases-rio divididas na vírgula/travessão).
 > **Testado de ponta a ponta no Chrome dele, no ar, com 2 transcrições reais (~R$ 0,06):**
 > Chapter 2→Part One 87% ancorado, continuar→Chapter 3 mesclou (294 âncoras, palavras 0–2507),
-> AGoT v1 convertido na leitura segue vivo. Ver §8.100 e §9.
+> AGoT v1 convertido na leitura segue vivo. **E o reprodutor virou DUAS COLUNAS** (player à
+> esquerda, texto à direita, a partir de 1200px), usando a largura toda — o
+> `max-width:1180px` de seção sai só com o player aberto. Ver §8.100, §8.101 e §9.
 >
 > Anterior: 2026-08-26 (76ª–77ª) — **O ESTUDO DE COR CHEGA AOS SEIS TEMAS, NASCE O
 > GRAFITE, E O CLARO/ESCURO VIRA UM CLIQUE.** Ele: *"vc fez a mudança pra todos os outros
@@ -15620,6 +15622,40 @@ só 3 acima de 45.
   Texto do reprodutor com 412 frases do autor a partir de *"PROLOGUE 'We should start
   back'"*.
 
+## 8.101 O reprodutor em duas colunas, na largura toda (2026-08-27, 78b)
+
+Pedido dele com print, ainda na mesma sessão: *"coloca em duas colunas, em uma o player e no
+outro o texto"* e, depois de ver o resultado, *"tem espaço na margem direita, aproveita até a
+extensão máxima"* → *"na verdade nas duas margens tem espaço"*.
+
+**O desenho:** a partir de **1200px**, `.ab-player` vira grid com colocação EXPLÍCITA —
+coluna 1 = `.ab-topo` (capa em cima, controles embaixo, `position:sticky`), coluna 2 =
+`.ab-abas` + `#ab-aba`. A colocação explícita é obrigatória: no auto-fluxo os três filhos
+caem em L (abas na coluna 2 e o texto voltando para a 1, debaixo do player).
+
+**A largura:** o teto não era do player — é o `max-width:1180px` que **toda seção do app** tem
+(css:1756), com margem automática. `#section-audiobook:has(.ab-player){max-width:none}` dentro
+do breakpoint solta só o player; a **estante de capas continua em 1180** (conferido: 1374 com
+player aberto, 1180 na estante).
+
+**Três defeitos achados MEDINDO, não lendo:**
+1. `.ab-trans` continuava em **371px (58vh)** apesar da regra de 72vh — a regra base mora mais
+   abaixo no arquivo e vencia por ordem com a mesma especificidade. Seletores passaram a levar
+   `.ab-player` na frente. Depois: **460px**.
+2. A coluna do player **passava da tela** (velocidade/marcador/sono cortados) e com `sticky` o
+   pé fica inalcançável. Capa 210→168px e respiros 20→14px: **468px de altura, cabe em 639**.
+3. `.ab-trans-topo .est-dica` tinha `flex:1` sem base — com sete chips na fileira a dica ficava
+   com a largura do maior vocábulo (uma palavra por linha, a tira vertical do print dele).
+   Agora `flex:1 1 240px; min-width:200px`. Medido de 1374 a 380px de container: sempre 2–3
+   linhas, nunca coluna.
+
+**Conferido no Chrome dele, no ar:** duas colunas `360px 978px`, seção 1374 (era 1180; +194 de
+ganho, margens simétricas), zero overflow horizontal, 81 caracteres por linha na leitura,
+tela cheia intacta (`body.ab-full` continua flex-column com `.ab-topo` escondido — a
+especificidade `body.ab-full .ab-player` vence a media query).
+⚠️ **Não medido:** janela real abaixo de 1200px (a janela dele está maximizada e recusou o
+redimensionamento) — mas fora do breakpoint o CSS é o de antes, sem uma linha nova.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -15630,6 +15666,11 @@ só 3 acima de 45.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
 ### Da sincronia v2 (2026-08-27, 78ª)
+
+- [ ] **Duas colunas em janela real abaixo de 1200px** não foi medido (janela dele
+      maximizada recusou o redimensionamento). Fora do breakpoint o CSS é o de antes.
+- [ ] A fileira de chips da aba Texto ocupa **duas linhas** mesmo na largura toda (sete
+      botões + a dica). Se incomodar, agrupar os menos usados atrás de um "mais".
 
 - [ ] **Auto-continuação opcional**: hoje cada trecho novo pede confirmação (custo ~R$ 0,03
       por ~10 min na Groq). Um `cfg.sincAuto` ("continuar transcrevendo sozinho enquanto eu
