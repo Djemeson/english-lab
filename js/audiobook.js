@@ -1677,20 +1677,28 @@ function abTextoMais(ev) {
   const _atual = Math.max(0, ((_abAudio() || {}).currentTime || 0) - (_cap.ini || 0))
   const tr = abTransDoPonto(a, _abCap, _atual)
     || (a.transcricoes || []).find(x => x.cap === _abCap)
+  // ⚠️ A LARGURA DO MENU É FIXA (210px, `.est-menu`), e o quarto argumento do
+  // `cardMenu` só POSICIONA — passar um número maior não alarga nada, só
+  // empurra o menu para a esquerda do gatilho. Por isso os rótulos são curtos:
+  // é o que cabe numa linha sem mentir sobre a largura.
   cardMenu(ev, 'ab-mais', `
+    <div class="est-menu-sep">Esta transcrição</div>
     <button onclick="cardMenuFechar();abTranscrever()">
-      ${ic('plus','ic-sm')} Transcrever outro trecho</button>
+      ${ic('plus','ic-sm')} Outro trecho</button>
     ${/* ⚠️ O MESMO BOTÃO DO LEITOR (§8.96): a escolha automática entre duas
           transcrições usa "mais falas", e uma transcrição pode ter mais falas
           por estar picotada em pedaços curtos, não por ser melhor. Quando ele
           ouve as duas e sabe qual presta, a mão dele manda. */''}
-    ${tr ? `<button class="${tr.fixadoEm ? 'on' : ''}" onclick="cardMenuFechar();abFixarTranscricao()">
-      ${ic('cloud','ic-sm')} ${tr.fixadoEm ? 'Vale em todos os aparelhos' : 'Usar em todos os aparelhos'}</button>` : ''}
+    ${tr ? `<button class="${tr.fixadoEm ? 'on' : ''}" onclick="cardMenuFechar();abFixarTranscricao()"
+      title="${escA(tr.fixadoEm
+        ? 'Esta é a versão que vale nos seus aparelhos — clique para carimbar de novo'
+        : 'Manda esta transcrição e análise para os outros aparelhos como a boa')}">
+      ${ic('cloud','ic-sm')} ${tr.fixadoEm ? 'Vale em todos' : 'Usar em todos'}</button>` : ''}
     <div class="est-menu-sep">Ver por capítulo</div>
     <button onclick="cardMenuFechar();abTransPainel('ab-mais-btn')">
       ${ic('captions','ic-sm')} Transcrição</button>
     <button onclick="cardMenuFechar();abRaioXPainel()">
-      ${ic('eye','ic-sm')} O que é difícil</button>`, 272)
+      ${ic('eye','ic-sm')} O que é difícil</button>`, 210)
 }
 
 // ---- O PAINEL DO RAIO-X: os capítulos, e o que já foi analisado ----
