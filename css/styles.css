@@ -5564,6 +5564,54 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 .ab-secundarios{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap}
 
 .ab-abas{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px}
+
+/* ================================================================
+   DUAS COLUNAS — o player de um lado, o texto do outro
+   ================================================================
+   ⚠️ O PEDIDO NASCEU DA TELA CHEIA DE VAZIO: numa janela larga, o player
+   ocupava uma faixa no alto e o texto começava abaixo da dobra — para ler
+   acompanhando a voz era preciso rolar até perder o play de vista. Com o
+   texto ao lado, os dois cabem na mesma olhada: controle à esquerda, obra à
+   direita, que é como toda tela de escuta com letra é montada.
+
+   O corte é 1200px porque é onde a conta fecha de verdade: 340 da coluna do
+   player + 36 de intervalo + 560 mínimos de leitura + a barra lateral + as
+   margens. Abaixo disso, empilhado continua sendo melhor que espremido.
+
+   ⚠️ A COLOCAÇÃO É EXPLÍCITA (`grid-column`/`grid-row`), e tem de ser: com
+   auto-fluxo, os três filhos (topo, abas, conteúdo) cairiam em L — abas na
+   coluna 2 e o texto de volta na 1, debaixo do player. */
+@media (min-width: 1200px){
+  .ab-player{
+    max-width:1400px;
+    display:grid;
+    grid-template-columns:minmax(320px, 360px) minmax(0, 1fr);
+    grid-template-rows:auto minmax(0, 1fr);
+    column-gap:36px;
+    align-items:start;
+  }
+  /* A coluna do player acompanha a rolagem: o play e a barra de tempo nunca
+     saem da tela enquanto o texto corre ao lado. */
+  .ab-topo{
+    grid-column:1; grid-row:1 / span 2;
+    grid-template-columns:minmax(0,1fr);   /* capa em cima, controles embaixo */
+    gap:18px; margin-bottom:0;
+    position:sticky; top:12px;
+  }
+  .ab-capa-grande{width:210px; margin:0 auto}
+  .ab-info h2{font-size:var(--fs-lg)}
+  .ab-cap-nome{margin-top:12px}
+  .ab-controles{justify-content:center}
+  .ab-secundarios{justify-content:center}
+
+  .ab-abas{grid-column:2; grid-row:1; margin-bottom:14px}
+  #ab-aba{grid-column:2; grid-row:2; min-width:0}
+
+  /* Sem o player empurrando por cima, a coluna de leitura ganha a altura que
+     sobra — é o espaço que o pedido veio buscar. */
+  .ab-trans{max-height:min(72vh, 780px)}
+  .ab-caps{max-height:min(72vh, 780px)}
+}
 .ab-caps{display:flex;flex-direction:column;max-height:420px;overflow-y:auto}
 /* ⚠️ A LINHA VIROU DOIS BOTÕES. Antes o capítulo inteiro era um botão só; com
    a marca de seleção, um clique na caixinha não pode virar "tocar aqui". O
@@ -5620,7 +5668,12 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
   display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;
   font-size:var(--fs-3xs);color:var(--text3);
 }
-.ab-trans-topo .est-dica{flex:1}
+/* ⚠️ `flex:1` SOZINHO ESPREMIA A DICA ATÉ UMA PALAVRA POR LINHA, e ele viu na
+   tela: com sete chips na mesma fileira, sobrava para o texto a largura do
+   maior vocábulo — uma tira vertical no meio da barra. Base de 240px com piso
+   de 200 faz a dica ir para a própria linha quando não cabe, em vez de virar
+   coluna. */
+.ab-trans-topo .est-dica{flex:1 1 240px; min-width:200px}
 /* A caixa cresce junto com a letra: 420px fixos viravam uma fresta de três
    linhas assim que o tamanho subia. */
 .ab-trans{max-height:min(58vh, 640px);overflow-y:auto;padding-right:6px}
