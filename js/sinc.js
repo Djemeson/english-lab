@@ -13,21 +13,40 @@
 // texto do autor com o instante do narrador — que é o que o EPUB 3 chamaria de
 // "Media Overlay" e que nenhuma editora entrega.
 //
-// ⚠️ POR QUE NÃO O CAMINHO OFICIAL: o padrão existe (Media Overlays, SMIL),
-// mas conferido nos 10 EPUBs dele em 2026-08-22: **nenhum** traz `.smil` nem
-// áudio embutido. Editora comercial não publica assim; publica no formato
-// fechado da Amazon.
+// ================================================================
+// V2 — POR QUE A PRIMEIRA VERSÃO QUEBROU EM *CARRIE* (rodada 78)
+// ================================================================
+// A v1 assumia **1 capítulo do áudio = 1 capítulo do livro**. O acervo dele
+// desmentiu: o áudio de *Carrie* tem **60 capítulos de ~10 min**; o EPUB tem
+// **3 seções de ~30 mil palavras**. E o "Chapter 1" do áudio começa com
+// *"This is Audible…"* + a introdução do autor — um texto que **não existe**
+// no EPUB (melhor casamento medido: 6,5%, contra o corte de 25%). Resultado:
+// transcrição paga, erro seco, beco sem saída.
+// É a mesma tríade que reprova pares no Whispersync da Amazon (documentado):
+// front matter que só existe num formato, fronteiras de capítulo diferentes,
+// e texto normalizado diferente. A resposta deles — e a nossa — é a mesma:
+// **ancorar pelo TEXTO, ignorar a estrutura de arquivos.**
 //
-// COMO FUNCIONA, EM TRÊS PASSOS
-//   1. Casar CAPÍTULO: a transcrição de um capítulo do áudio é comparada com
-//      todos os capítulos do livro por trigramas de palavras. Medido com o
-//      acervo real: o Prologue do áudio casou com o PROLOGUE do EPUB a
-//      **88,7% contra 2,5%** do segundo colocado.
-//   2. Casar PALAVRA: 5-gramas que aparecem uma única vez dos dois lados viram
-//      âncoras. No mesmo capítulo real: **3.168 âncoras**, todas em ordem, uma
-//      a cada 1,2 palavras, em 37 ms.
-//   3. Entre duas âncoras, interpola. É o que dá instante a QUALQUER ponto do
-//      texto, inclusive palavra que a transcrição errou.
+// O QUE MUDOU NA V2:
+//   1. O tempo das âncoras é ABSOLUTO no arquivo de áudio (não relativo ao
+//      capítulo). Vários capítulos do áudio se emendam num mapa contínuo por
+//      seção do livro, e o realce atravessa a fronteira de faixa sem costura.
+//   2. O mapa de uma seção é PARCIAL e MESCLÁVEL: cada transcrição nova
+//      estende o que já existe (`trechos[]` registra o que cobre o quê).
+//   3. Capítulo do áudio que não casa com nada vira **`capMapa[cap] = -1`**
+//      ("fora do livro": créditos, introdução da gravação) — informação, não
+//      erro. O fluxo pula para o próximo em vez de morrer.
+//   4. Quem escolhe O QUE transcrever é um MODELO DE TEMPO global: posição no
+//      livro → segundo estimado no arquivo (interpola pelas âncoras que já
+//      existem; sem nenhuma, proporção palavras/duração). O palpite erra no
+//      máximo um capítulo de áudio e se corrige sozinho com o primeiro
+//      alinhamento — porque todo alinhamento DIZ onde caiu.
+//   5. A cobertura que valida um alinhamento é medida do lado da TRANSCRIÇÃO
+//      (quantas falas ancoraram), não do lado do livro — senão 10 min de
+//      áudio dentro de uma seção de 30 mil palavras nunca passariam.
+//   6. Âncoras monotônicas por LIS (maior subsequência crescente), não pelo
+//      guloso "primeiro que vier": um 5-grama repetido no começo não arrasta
+//      mais o alinhamento inteiro para o lugar errado.
 //
 // ⚠️ NADA DISTO USA IA. É contagem e comparação de texto — de graça, no
 // aparelho, em milissegundos. A IA já foi paga uma vez, na transcrição.
@@ -35,6 +54,7 @@
 
 const SINC_K = 5              // tamanho do n-grama que vira âncora
 const SINC_PASSO = 8          // guarda uma âncora a cada N palavras (o resto interpola)
+const SINC_FOLGA = 400        // palavras de folga para dizer que o mapa "cobre" um ponto
 
 // ---------------------------------------------------------------
 // NORMALIZAR — o denominador comum entre o livro e a transcrição
@@ -61,14 +81,18 @@ function _sincTrigramas(palavras) {
 }
 
 // ---------------------------------------------------------------
-// PASSO 1 — em qual capítulo do livro está esta transcrição?
+// PASSO 1 — em qual seção do livro está esta transcrição?
 // ---------------------------------------------------------------
 // ⚠️ NÃO DÁ PARA CASAR PELO TÍTULO, e o acervo dele mostra por quê: o áudio
-// tem "Prologue", "Bran I", "Catelyn I"; o EPUB tem 105 seções, várias sem
-// título legível ("Parte 1", "Title Page"), e o livro repete "JON" nove vezes.
-// Quem identifica um capítulo é o TEXTO dele.
-// A nota é a fração dos trigramas da transcrição que aparecem no capítulo —
-// e o campeão ganha por uma distância que não deixa dúvida.
+// tem "Prologue", "Bran I"; o EPUB tem seções sem título legível ("Parte 1",
+// "Title Page"), e *Carrie* chama duas seções de "Part One". Quem identifica
+// uma seção é o TEXTO dela.
+// A nota é a fração dos trigramas da transcrição que aparecem na seção.
+// ⚠️ V2: os cortes mudaram com o caso real na mão. Nota < 0,22 é "fora do
+// livro" (a introdução do narrador mediu 6,5%). E a margem sobre o segundo
+// colocado só derruba quando a nota do campeão é MEDIANA: com nota alta
+// (≥ 0,5), dois candidatos colados significam conteúdo duplicado no EPUB
+// (acontece — sumário que repete a seção), e qualquer um dos dois serve.
 function sincCasarCapitulo(textoTranscrito, capitulosTexto) {
   const T = _sincTrigramas(sincNorm(textoTranscrito))
   if (!T.size) return null
@@ -79,12 +103,8 @@ function sincCasarCapitulo(textoTranscrito, capitulosTexto) {
     return { i, nota: n / T.size }
   }).sort((a, b) => b.nota - a.nota)
   const campeao = notas[0], segundo = notas[1] || { nota: 0 }
-  // ⚠️ DOIS CORTES, E OS DOIS SÃO NECESSÁRIOS. A nota alta sozinha não basta
-  // (um capítulo enorme pode conter muita coisa); a distância sozinha também
-  // não (dois capítulos ruins podem estar longe um do outro). Os números vêm
-  // do caso real: 88,7% com 86 pontos de distância.
-  if (campeao.nota < 0.25) return null
-  if (campeao.nota - segundo.nota < 0.10) return null
+  if (campeao.nota < 0.22) return null
+  if (campeao.nota - segundo.nota < 0.08 && campeao.nota < 0.5) return null
   return { cap: campeao.i, nota: campeao.nota, margem: campeao.nota - segundo.nota }
 }
 
@@ -113,15 +133,40 @@ function _sincIndice(palavras) {
   return M
 }
 
-// Devolve `{ ancoras: [[posNoLivro, segundos], …], palavrasLivro, cobertura }`
-// ou `null` quando o casamento não se sustenta.
-// ⚠️ AS ÂNCORAS TÊM DE SER CRESCENTES DOS DOIS LADOS. Um 5-grama pode casar
-// fora de ordem (frase repetida em outro ponto do capítulo), e uma âncora
-// invertida arrastaria o texto para trás. Quem quebra a ordem é descartado.
-function sincAlinhar(textoLivro, segs) {
+// ⚠️ AS ÂNCORAS TÊM DE SER CRESCENTES DOS DOIS LADOS, e a v1 filtrava no
+// guloso: mantinha a primeira que viesse e descartava quem a contradissesse.
+// Uma âncora ERRADA no começo (frase repetida em outro ponto da seção)
+// derrubava todas as certas depois dela. A LIS (maior subsequência crescente)
+// decide pelo conjunto: fica o maior time que concorda entre si.
+function _sincLIS(pares) {
+  // pares ordenados por posição no livro; busca a maior subsequência com a
+  // posição na transcrição estritamente crescente. O(n log n).
+  const topo = []          // topo[k] = índice do par que fecha a subseq. de tamanho k+1 com menor j
+  const antes = new Array(pares.length).fill(-1)
+  for (let x = 0; x < pares.length; x++) {
+    const j = pares[x][1]
+    let lo = 0, hi = topo.length
+    while (lo < hi) {
+      const m = (lo + hi) >> 1
+      if (pares[topo[m]][1] < j) lo = m + 1; else hi = m
+    }
+    if (lo > 0) antes[x] = topo[lo - 1]
+    topo[lo] = x
+  }
+  const out = []
+  let x = topo.length ? topo[topo.length - 1] : -1
+  while (x >= 0) { out.push(pares[x]); x = antes[x] }
+  return out.reverse()
+}
+
+// Devolve o alinhamento de uma transcrição contra o texto de UMA seção,
+// com o tempo já ABSOLUTO no arquivo (`desloc` = início do capítulo do áudio
+// dentro do arquivo). `null` quando o casamento não se sustenta.
+function sincAlinhar(textoLivro, segs, desloc) {
+  desloc = desloc || 0
   const lw = sincNorm(textoLivro)
   const tw = _sincPalavrasComTempo(segs)
-  if (lw.length < 50 || tw.length < 50) return null
+  if (lw.length < 50 || tw.length < 30) return null
 
   const A = _sincIndice(lw), B = _sincIndice(tw.map(x => x.w))
   const brutas = []
@@ -130,36 +175,39 @@ function sincAlinhar(textoLivro, segs) {
     const j = B.get(g)
     if (j !== undefined && j >= 0) brutas.push([i, j])
   }
-  if (brutas.length < 10) return null
-  brutas.sort((a, b) => a[0] - b[0])
+  if (brutas.length < 12) return null
+  brutas.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  const mono = _sincLIS(brutas)
 
-  const mono = []
-  let ultimo = -1
-  for (const [i, j] of brutas) if (j > ultimo) { mono.push([i, j]); ultimo = j }
-  // Cobertura baixa é sinal de casamento errado — melhor não sincronizar do
-  // que sincronizar torto: texto acompanhando a voz errada é pior que texto
-  // parado.
-  const cobertura = mono.length / Math.max(1, lw.length)
-  if (cobertura < 0.15) return null
+  // ⚠️ A COBERTURA É DO LADO DO ÁUDIO (v2). A v1 dividia pelo tamanho da
+  // seção do livro — e 10 minutos de áudio dentro de "Part One" de *Carrie*
+  // (30 mil palavras) davam 5%, reprovados para sempre. O que valida um
+  // alinhamento é quanto DA TRANSCRIÇÃO ancorou no texto.
+  const cobertura = mono.length / Math.max(1, tw.length - SINC_K + 1)
+  if (mono.length < 12 || cobertura < 0.08) return null
 
-  // ⚠️ GUARDAR AS 3.168 ÂNCORAS SERIA GUARDAR O QUE A INTERPOLAÇÃO REFAZ. Uma
+  // ⚠️ GUARDAR TODAS AS ÂNCORAS SERIA GUARDAR O QUE A INTERPOLAÇÃO REFAZ. Uma
   // a cada 8 palavras mantém o erro dentro de meio segundo e derruba o tamanho
   // do mapa em 8× — e ele viaja para a nuvem, onde cada documento tem teto.
   const ancoras = []
   let proxima = -1
   for (const [i, j] of mono) {
     if (i < proxima) continue
-    ancoras.push([i, Math.round(tw[Math.min(tw.length - 1, j)].t * 100) / 100])
+    ancoras.push([i, Math.round((tw[Math.min(tw.length - 1, j)].t + desloc) * 100) / 100])
     proxima = i + SINC_PASSO
   }
-  // O fim do capítulo é âncora obrigatória: sem ele, a última página não teria
-  // para onde interpolar.
   const ultimaMono = mono[mono.length - 1]
-  const tFim = tw[Math.min(tw.length - 1, ultimaMono[1])].t
+  const tFim = tw[Math.min(tw.length - 1, ultimaMono[1])].t + desloc
   if (!ancoras.length || ancoras[ancoras.length - 1][0] < ultimaMono[0]) {
     ancoras.push([ultimaMono[0], Math.round(tFim * 100) / 100])
   }
-  return { ancoras, palavrasLivro: lw.length, palavrasAudio: tw.length, cobertura, casadas: mono.length }
+  return {
+    ancoras,
+    pos0: mono[0][0], pos1: ultimaMono[0],          // onde caiu, na seção
+    jMin: mono[0][1], jMax: ultimaMono[1],          // o que da transcrição foi usado
+    palavrasLivro: lw.length, palavrasAudio: tw.length,
+    casadas: mono.length, cobertura
+  }
 }
 
 // ---------------------------------------------------------------
@@ -197,22 +245,48 @@ function sincPosicaoDe(mapa, seg) {
   return Math.round(p0 + (p1 - p0) * ((seg - t0) / Math.max(0.001, t1 - t0)))
 }
 
+// O mapa "cobre" um ponto quando o ponto cai dentro das âncoras, com uma
+// folga de algumas centenas de palavras (2–3 min de narração) em cada borda.
+function _sincCobre(mapa, pos) {
+  const A = (mapa && mapa.ancoras) || []
+  if (!A.length) return false
+  return pos >= A[0][0] - SINC_FOLGA && pos <= A[A.length - 1][0] + SINC_FOLGA
+}
+
 // ---------------------------------------------------------------
 // ONDE O MAPA MORA
 // ---------------------------------------------------------------
 // Mesmo caminho do raio-X e do pré-estudo (§8.71): guardado no aparelho E na
-// nuvem, sob demanda. Alinhar de novo é barato, mas transcrever não é — e o
-// mapa é o que transforma a transcrição paga em leitura sincronizada nos dois
-// aparelhos.
+// nuvem, sob demanda. Alinhar de novo é barato, mas transcrever não é.
+//
+// FORMATO V2 (`v: 2`): âncoras com tempo ABSOLUTO no arquivo, e `trechos[]`
+// registrando qual capítulo do áudio contribuiu com o quê — é o que permite
+// mesclar transcrições novas sem perder as antigas.
+// Mapa V1 (sem `v`) é convertido NA LEITURA, somando o início do capítulo que
+// o gerou — o guardado não é reescrito, para não quebrar um aparelho que
+// ainda rode a versão anterior do app.
 function sincChave(livroId, capLivro) { return `sinc:${livroId}:${capLivro}` }
 
-async function sincMapaLer(livroId, capLivro) {
+function _sincV1paraV2(m, capLivro, audio) {
+  const cap = (audio && audio.capitulos || [])[m.capAudio] || {}
+  const d = cap.ini || 0
+  const anc = (m.ancoras || []).map(([p, t]) => [p, Math.round((t + d) * 100) / 100])
+  return {
+    v: 2, capLivro,
+    ancoras: anc,
+    trechos: [{ cap: m.capAudio, pos0: anc.length ? anc[0][0] : 0, pos1: anc.length ? anc[anc.length - 1][0] : 0, nota: m.nota, casadas: m.casadas, em: m.em || 0 }],
+    em: m.em || 0
+  }
+}
+
+async function sincMapaLer(livroId, capLivro, audio) {
   try {
     const bruto = typeof geradoLer === 'function'
       ? await geradoLer(sincChave(livroId, capLivro))
       : await BookDB.get(sincChave(livroId, capLivro))
     if (!bruto) return null
-    return typeof bruto === 'string' ? JSON.parse(bruto) : bruto
+    const m = typeof bruto === 'string' ? JSON.parse(bruto) : bruto
+    return m.v === 2 ? m : _sincV1paraV2(m, capLivro, audio)
   } catch (e) { return null }
 }
 
@@ -225,6 +299,25 @@ async function sincMapaGuardar(livroId, capLivro, mapa) {
       await BookDB.set(sincChave(livroId, capLivro), texto)
     }
   } catch (e) { console.warn('[sinc] não consegui guardar o mapa:', e && e.message) }
+}
+
+// Mescla um alinhamento novo num mapa existente da mesma seção. Onde os dois
+// cobrem o mesmo trecho, o novo vence (foi feito com a transcrição mais
+// recente); a ordem no tempo é reimposta no fim — âncora que voltaria no
+// relógio é descartada.
+function _sincMesclar(velho, novo) {
+  const n0 = novo.ancoras[0][0], n1 = novo.ancoras[novo.ancoras.length - 1][0]
+  const fora = (velho.ancoras || []).filter(([p]) => p < n0 || p > n1)
+  const juntas = fora.concat(novo.ancoras).sort((a, b) => a[0] - b[0])
+  const ancoras = []
+  for (const a of juntas) {
+    if (ancoras.length && a[1] <= ancoras[ancoras.length - 1][1]) continue
+    ancoras.push(a)
+  }
+  const trechos = (velho.trechos || []).filter(t => !(novo.trechos || []).some(n => n.cap === t.cap))
+    .concat(novo.trechos || [])
+    .sort((a, b) => (a.pos0 || 0) - (b.pos0 || 0))
+  return { ...velho, ...novo, ancoras, trechos, em: Date.now() }
 }
 
 // ---------------------------------------------------------------
@@ -261,6 +354,7 @@ function sincLigar(livro, audio) {
   audio.livroId = livro.id
   audio.updatedAt = Date.now()
   saveLivros(); saveAudiolivros()
+  _sincModeloCache = { id: null }
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
 }
 
@@ -268,6 +362,7 @@ function sincDesligar(livro, audio) {
   if (livro) { delete livro.audioId; livro.updatedAt = Date.now() }
   if (audio) { delete audio.livroId; delete audio.capMapa; audio.updatedAt = Date.now() }
   saveLivros(); saveAudiolivros()
+  _sincModeloCache = { id: null }
   if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
 }
 
@@ -276,8 +371,6 @@ function sincDesligar(livro, audio) {
 // `audioId` do livro sumiu num merge da nuvem (o objeto do livro veio de lá
 // sem o campo novo) enquanto o `livroId` do áudio ficou. Dois lugares para a
 // mesma verdade é um lugar para ela se perder.
-// O campo no livro continua sendo escrito como atalho, mas quem responde é a
-// varredura dos audiolivros — que é curta e nunca discorda de si mesma.
 function sincAudioDoLivro(livro) {
   if (!livro) return null
   const lista = (typeof audiolivros !== 'undefined' ? audiolivros : [])
@@ -291,11 +384,11 @@ function sincLivroDoAudio(audio) {
 }
 
 // ---------------------------------------------------------------
-// O TEXTO DOS CAPÍTULOS DO LIVRO, uma vez por sessão
+// O TEXTO DAS SEÇÕES DO LIVRO, uma vez por sessão
 // ---------------------------------------------------------------
-// Abrir o EPUB e extrair 105 capítulos custa segundos; fazer isso a cada
-// pergunta seria inviável. O cache vive na memória — cai sozinho ao recarregar.
-let _sincTextoCache = { id: null, caps: null }
+// Abrir o EPUB e extrair as seções custa segundos; fazer isso a cada pergunta
+// seria inviável. O cache vive na memória — cai sozinho ao recarregar.
+let _sincTextoCache = { id: null, caps: null, offsets: null, total: 0 }
 async function sincTextosDoLivro(livro) {
   if (_sincTextoCache.id === livro.id && _sincTextoCache.caps) return _sincTextoCache.caps
   const blob = await BookDB.get(livro.id)
@@ -306,67 +399,308 @@ async function sincTextosDoLivro(livro) {
     const html = await ep.zip.texto(c.href)
     caps.push(epubTextoLimpo(html || ''))
   }
-  _sincTextoCache = { id: livro.id, caps }
+  // A régua global: em que palavra (contando o livro inteiro) cada seção
+  // começa. É o que deixa o modelo de tempo enxergar o livro como UM texto.
+  const offsets = []
+  let soma = 0
+  for (const t of caps) { offsets.push(soma); soma += sincNorm(t).length }
+  _sincTextoCache = { id: livro.id, caps, offsets, total: soma }
   return caps
+}
+
+// ---------------------------------------------------------------
+// O MODELO DE TEMPO — que segundo do arquivo é esta palavra do livro?
+// ---------------------------------------------------------------
+// ⚠️ ESTA É A PEÇA QUE SUBSTITUI O "PALPITE PELA ORDEM" DA V1 — que assumia
+// capítulos 1:1 e, em *Carrie* (60 faixas × 3 seções), transcrevia a
+// introdução do narrador achando que era "Part One".
+// O modelo junta TODAS as âncoras já conquistadas (de qualquer seção) numa
+// régua global posição→tempo. Dentro dela, interpola; fora, extrapola pela
+// velocidade real do narrador; sem nenhuma âncora, proporção simples
+// palavra/duração. O primeiro alinhamento que chegar corrige o resto.
+let _sincModeloCache = { id: null }
+async function _sincModelo(livro, audio) {
+  const marca = livro.id + ':' + JSON.stringify(audio.capMapa || {})
+  if (_sincModeloCache.id === marca) return _sincModeloCache.m
+  await sincTextosDoLivro(livro)
+  const { offsets, total } = _sincTextoCache
+  const secoes = [...new Set(Object.values(audio.capMapa || {}).filter(s => s >= 0))]
+  let pares = []
+  for (const s of secoes) {
+    const m = await sincMapaLer(livro.id, s, audio)
+    for (const [p, t] of ((m && m.ancoras) || [])) pares.push([offsets[s] + p, t])
+  }
+  pares.sort((a, b) => a[0] - b[0])
+  pares = _sincLIS(pares)           // seções alinhadas fora de ordem não podem torcer a régua
+  const caps = audio.capitulos || []
+  const duracao = audio.duracao || (caps.length ? caps[caps.length - 1].fim : 0) || 0
+  const m = { offsets, total, pares, duracao }
+  _sincModeloCache = { id: marca, m }
+  return m
+}
+
+function _sincEstimarTempo(modelo, gPos) {
+  const P = modelo.pares
+  if (P.length >= 2) {
+    const g0 = P[0], g1 = P[P.length - 1]
+    if (gPos >= g0[0] && gPos <= g1[0]) {
+      let lo = 0, hi = P.length - 1
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (P[m][0] <= gPos) lo = m; else hi = m }
+      const [p0, t0] = P[lo], [p1, t1] = P[hi]
+      return t0 + (t1 - t0) * ((gPos - p0) / Math.max(1, p1 - p0))
+    }
+    // Fora da régua conhecida: extrapola pela velocidade média já MEDIDA.
+    const vel = (g1[0] - g0[0]) / Math.max(30, g1[1] - g0[1])    // palavras por segundo
+    const wps = vel > 0.5 ? vel : (modelo.total / Math.max(60, modelo.duracao))
+    return gPos < g0[0] ? Math.max(0, g0[1] - (g0[0] - gPos) / wps)
+                        : Math.min(modelo.duracao, g1[1] + (gPos - g1[0]) / wps)
+  }
+  // Nenhuma âncora ainda: proporção honesta. Erra pouco (a narração tem
+  // velocidade quase constante) e o primeiro alinhamento corrige.
+  return modelo.duracao * (gPos / Math.max(1, modelo.total))
+}
+
+// Que capítulo do áudio contém este segundo do arquivo.
+function sincCapDoTempo(audio, t) {
+  const caps = audio.capitulos || []
+  for (let i = 0; i < caps.length; i++) {
+    if (t >= (caps[i].ini || 0) && t < (caps[i].fim || Infinity)) return i
+  }
+  return caps.length ? caps.length - 1 : 0
+}
+
+// Escolhe o capítulo do áudio a transcrever para alcançar `gPos` — pulando os
+// que já se provaram "fora do livro" (créditos, introdução da gravação).
+async function sincEscolherCapAudio(livro, audio, gPos) {
+  const caps = audio.capitulos || []
+  if (!caps.length) return null
+  const modelo = await _sincModelo(livro, audio)
+  const t = _sincEstimarTempo(modelo, gPos)
+  let cap = sincCapDoTempo(audio, t)
+  const mapa = audio.capMapa || {}
+  let voltas = 0
+  while (mapa[cap] === -1 && cap + 1 < caps.length && voltas++ < caps.length) cap++
+  return { cap, t }
 }
 
 // ---------------------------------------------------------------
 // A OPERAÇÃO COMPLETA — de uma transcrição a um mapa guardado
 // ---------------------------------------------------------------
-// Devolve `{ capLivro, nota, ancoras }` ou lança com motivo em português.
+// Alinha TODAS as transcrições de um capítulo do áudio contra o livro.
+// Devolve o mapa (da seção onde o áudio CAIU — que pode não ser a que se
+// esperava; quem chama decide o que fazer com a resposta).
+// Lança com `.fora = true` quando o trecho não existe no texto do livro.
 async function sincProcessarCapitulo(livro, audio, capAudio) {
-  const tr = (audio.transcricoes || []).find(x => x.cap === capAudio)
-  if (!tr || !(tr.segs || []).length) throw new Error('este capítulo ainda não foi transcrito')
+  const trs = (audio.transcricoes || []).filter(x => x.cap === capAudio)
+  const segs = trs.slice().sort((a, b) => (a.ini || 0) - (b.ini || 0)).flatMap(t => t.segs || [])
+  if (!segs.length) throw new Error('este capítulo ainda não foi transcrito')
   const caps = await sincTextosDoLivro(livro)
-  const textoTr = tr.segs.map(s => s.t).join(' ')
+  const cap = (audio.capitulos || [])[capAudio] || {}
+  const desloc = cap.ini || 0
+  const textoTr = segs.map(s => s.t).join(' ')
 
-  // Se o capítulo já foi casado antes, confia no que ficou — o casamento é a
-  // parte cara (varre o livro inteiro) e não muda.
-  const jaCasado = (audio.capMapa || {})[capAudio]
-  let escolha = jaCasado != null ? { cap: jaCasado, nota: 1, margem: 1 } : sincCasarCapitulo(textoTr, caps)
-  if (!escolha) throw new Error('não achei este capítulo dentro do livro — o texto não bate')
+  const escolha = sincCasarCapitulo(textoTr, caps)
+  if (!escolha) {
+    // ⚠️ ISTO NÃO É ERRO, É INFORMAÇÃO — e foi exatamente o buraco da rodada
+    // 78: o "Chapter 1" do áudio de *Carrie* é "This is Audible" + introdução
+    // do autor, que o EPUB não tem. Marcar `-1` faz todo palpite futuro pular
+    // este capítulo, e a transcrição paga fica guardada (nada se perde).
+    audio.capMapa = { ...(audio.capMapa || {}), [capAudio]: -1 }
+    audio.updatedAt = Date.now()
+    saveAudiolivros()
+    _sincModeloCache = { id: null }
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+    const e = new Error('este trecho do áudio não aparece no texto do livro — deve ser introdução, créditos ou material extra da gravação')
+    e.fora = true
+    throw e
+  }
 
-  const mapa = sincAlinhar(caps[escolha.cap], tr.segs)
-  if (!mapa) throw new Error('achei o capítulo, mas o texto e o áudio não alinharam')
+  const alin = sincAlinhar(caps[escolha.cap], segs, desloc)
+  if (!alin) throw new Error('achei a seção do livro, mas o texto e o áudio não alinharam com segurança')
 
-  mapa.capAudio = capAudio
-  mapa.capLivro = escolha.cap
-  mapa.nota = Math.round(escolha.nota * 1000) / 1000
-  mapa.em = Date.now()
-  await sincMapaGuardar(livro.id, escolha.cap, mapa)
+  await _sincSalvarAlinhamento(livro, audio, capAudio, escolha, alin)
 
-  audio.capMapa = { ...(audio.capMapa || {}), [capAudio]: escolha.cap }
-  audio.updatedAt = Date.now()
-  saveAudiolivros()
-  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
-  return mapa
+  // ⚠️ DERRAME: um capítulo do áudio pode ATRAVESSAR a fronteira entre duas
+  // seções do EPUB (a faixa não sabe onde o arquivo XHTML termina). Quando
+  // sobra um pedaço grande da transcrição sem âncora numa das pontas, ele é
+  // tentado contra a seção vizinha — e vira mapa lá também.
+  const tw = _sincPalavrasComTempo(segs)
+  try {
+    if (alin.jMin / tw.length > 0.25) {
+      const viz = _sincVizinho(caps, escolha.cap, -1)
+      if (viz >= 0) {
+        const corte = tw[alin.jMin].t
+        const sub = segs.filter(s => (s.f || 0) <= corte + 1)
+        const a2 = sub.length ? sincAlinhar(caps[viz], sub, desloc) : null
+        if (a2) await _sincSalvarAlinhamento(livro, audio, capAudio, { cap: viz, nota: escolha.nota }, a2, true)
+      }
+    }
+    if ((tw.length - alin.jMax) / tw.length > 0.25) {
+      const viz = _sincVizinho(caps, escolha.cap, +1)
+      if (viz >= 0) {
+        const corte = tw[alin.jMax].t
+        const sub = segs.filter(s => (s.i || 0) >= corte - 1)
+        const a2 = sub.length ? sincAlinhar(caps[viz], sub, desloc) : null
+        if (a2) await _sincSalvarAlinhamento(livro, audio, capAudio, { cap: viz, nota: escolha.nota }, a2, true)
+      }
+    }
+  } catch (e) { console.warn('[sinc] derrame:', e && e.message) }
+
+  return await sincMapaLer(livro.id, escolha.cap, audio)
 }
 
-// Qual capítulo do ÁUDIO corresponde a este capítulo do LIVRO (o caminho
-// inverso do `capMapa`, que é guardado na direção que a transcrição produz).
-function sincCapAudioDoLivro(audio, capLivro) {
-  const m = (audio && audio.capMapa) || {}
-  for (const k of Object.keys(m)) if (Number(m[k]) === Number(capLivro)) return Number(k)
+// A próxima seção com texto de verdade, pulando páginas de abertura.
+function _sincVizinho(caps, i, passo) {
+  for (let k = i + passo; k >= 0 && k < caps.length; k += passo) {
+    if (sincNorm(caps[k]).length >= 200) return k
+  }
+  return -1
+}
+
+async function _sincSalvarAlinhamento(livro, audio, capAudio, escolha, alin, derrame) {
+  const novo = {
+    v: 2, capLivro: escolha.cap,
+    ancoras: alin.ancoras,
+    trechos: [{
+      cap: capAudio, pos0: alin.pos0, pos1: alin.pos1,
+      nota: Math.round((escolha.nota || 0) * 1000) / 1000,
+      casadas: alin.casadas,
+      cobertura: Math.round(alin.cobertura * 1000) / 1000,
+      em: Date.now()
+    }],
+    palavrasLivro: alin.palavrasLivro,
+    em: Date.now()
+  }
+  const velho = await sincMapaLer(livro.id, escolha.cap, audio)
+  const final = velho && (velho.ancoras || []).length ? _sincMesclar(velho, novo) : novo
+  await sincMapaGuardar(livro.id, escolha.cap, final)
+  if (!derrame) {
+    audio.capMapa = { ...(audio.capMapa || {}), [capAudio]: escolha.cap }
+    audio.updatedAt = Date.now()
+    saveAudiolivros()
+    if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+  }
+  _sincModeloCache = { id: null }
+  _sincCacheAudio = { audioId: null, capAudio: -1, mapa: null, frases: null, cap: null }
+}
+
+// Alinha DE GRAÇA tudo o que já foi transcrito e ainda não tem veredito —
+// transcrição é a parte cara; nunca se paga de novo pelo que já se tem.
+async function _sincAproveitarTranscricoes(livro, audio) {
+  const vistos = new Set()
+  for (const t of (audio.transcricoes || [])) {
+    if (vistos.has(t.cap) || (audio.capMapa || {})[t.cap] != null) continue
+    vistos.add(t.cap)
+    try { await sincProcessarCapitulo(livro, audio, t.cap) } catch (e) { /* fora do livro já ficou marcado */ }
+  }
+}
+
+// ---------------------------------------------------------------
+// TRANSCREVER O TRECHO CERTO — com o custo na mesa, antes
+// ---------------------------------------------------------------
+function _sincTempoTxt(s) {
+  s = Math.max(0, Math.round(s || 0))
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60)
+  return h ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`
+}
+
+// O alvo dentro do capítulo: inteiro quando cabe; janela em volta do ponto
+// estimado quando o capítulo é gigante (m4b de capítulo único, por exemplo) —
+// custo previsível em vez de uma conta de horas.
+function _sincAlvo(audio, capAudio, tAlvo) {
+  const cap = (audio.capitulos || [])[capAudio] || {}
+  const dur = Math.max(0, (cap.fim || 0) - (cap.ini || 0))
+  if (dur <= 0) return { ini: 0, fim: 0, inteiro: true, minutos: 10, estimado: true }
+  if (dur <= 20 * 60) return { ini: 0, fim: dur, inteiro: true, minutos: dur / 60 }
+  const rel = Math.max(0, Math.min(dur, (tAlvo || 0) - (cap.ini || 0)))
+  const ini = Math.max(0, rel - 120)
+  const fim = Math.min(dur, ini + 15 * 60)
+  return { ini, fim, inteiro: false, minutos: (fim - ini) / 60 }
+}
+
+async function _sincConfirmarTranscricao(audio, capAudio, tAlvo) {
+  const stt = typeof aiSttCfg === 'function' ? aiSttCfg() : null
+  if (!stt) {
+    toast('Configure a chave da Groq ou da OpenAI para transcrever (Configurações → IA)', 'error')
+    return null
+  }
+  const alvo = _sincAlvo(audio, capAudio, tAlvo)
+  const cap = (audio.capitulos || [])[capAudio] || {}
+  const nome = cap.titulo || `capítulo ${capAudio + 1}`
+  let custo = ''
+  try {
+    const brl = typeof aiUsdBrl === 'function' ? await aiUsdBrl() : 5.5
+    custo = (alvo.minutos * stt.usdMin * brl).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  } catch (e) {}
+  const ok = await confirmModal({
+    title: 'Transcrever um trecho do áudio', icon: 'sparkles', confirmText: 'Transcrever',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Pela minha régua, a voz do narrador passa por este ponto perto de
+      <b>${_sincTempoTxt(tAlvo)}</b> do áudio — em <b>${esc(nome)}</b>.
+      Para casar o texto com a voz eu transcrevo esse trecho
+      (~${Math.max(1, Math.round(alvo.minutos))} min${custo ? `, cerca de <b>${custo}</b>` : ''}).
+      É pago uma vez só e vale nos seus dois aparelhos.
+      Se o palpite errar por pouco, eu afino — e te pergunto de novo antes de gastar.</p>`
+  })
+  return ok ? alvo : null
+}
+
+async function _sincTranscrever(audio, capAudio, alvo, aoAndar) {
+  if (typeof _abTranscreverTrecho !== 'function' && typeof _loadScript === 'function') await _loadScript('js/audiobook.js')
+  if (typeof _abTranscreverTrecho !== 'function') throw new Error('não consegui carregar a transcrição')
+  await _abTranscreverTrecho(audio, capAudio, alvo, aoAndar)
+}
+
+// ---------------------------------------------------------------
+// GARANTIR MAPA para um ponto do livro — o coração do "ouvir daqui"
+// ---------------------------------------------------------------
+// ⚠️ A V1 recebia só a seção e adivinhava o capítulo do áudio PELA ORDEM. A
+// v2 recebe também a POSIÇÃO dentro da seção — porque numa seção de 30 mil
+// palavras (3h30 de narração) saber a seção não diz quase nada.
+// O laço se corrige sozinho: cada alinhamento diz onde o áudio caiu, o
+// modelo fica mais esperto, o próximo palpite acerta. No máximo duas
+// transcrições pagas por chamada — cada uma com o custo confirmado antes.
+async function sincPrepararCapitulo(livro, audio, capLivro, posDentro) {
+  posDentro = Math.max(0, posDentro || 0)
+  let mapa = await sincMapaLer(livro.id, capLivro, audio)
+  if (_sincCobre(mapa, posDentro)) return mapa
+
+  await sincTextosDoLivro(livro)
+  await _sincAproveitarTranscricoes(livro, audio)
+  mapa = await sincMapaLer(livro.id, capLivro, audio)
+  if (_sincCobre(mapa, posDentro)) return mapa
+
+  const tentados = new Set()
+  let pagas = 0
+  while (pagas < 2) {
+    const gPos = _sincTextoCache.offsets[capLivro] + posDentro
+    const esc = await sincEscolherCapAudio(livro, audio, gPos)
+    if (!esc || tentados.has(esc.cap)) break
+    tentados.add(esc.cap)
+
+    if (!(audio.transcricoes || []).some(x => x.cap === esc.cap)) {
+      const alvo = await _sincConfirmarTranscricao(audio, esc.cap, esc.t)
+      if (!alvo) return null
+      _sincBarraMsg('Transcrevendo o trecho…')
+      await _sincTranscrever(audio, esc.cap, alvo, m => _sincBarraMsg(m))
+      pagas++
+    }
+    _sincBarraMsg('Casando o texto com a voz…')
+    try { await sincProcessarCapitulo(livro, audio, esc.cap) }
+    catch (e) {
+      if (e && e.fora) { toast(String(e.message), 'info'); continue }
+      throw e
+    }
+    mapa = await sincMapaLer(livro.id, capLivro, audio)
+    if (_sincCobre(mapa, posDentro)) return mapa
+  }
+
+  if (mapa && (mapa.ancoras || []).length) {
+    toast('O áudio transcrito caiu perto, mas ainda não cobre este ponto — toque de novo para eu continuar procurando.', 'warning')
+  } else {
+    toast('Não consegui casar este ponto do livro com o áudio.', 'warning')
+  }
   return null
-}
-
-// ⚠️ Quando o capítulo do livro ainda não foi casado, o palpite honesto é a
-// ORDEM: o audiolivro segue o livro. Comparar quantos capítulos "de verdade"
-// (com texto) vieram antes resolve o descompasso entre as 105 seções do EPUB
-// (capa, mapas, sumário, apêndice) e os 75 capítulos do áudio.
-function sincPalpiteCapAudio(livro, audio, capLivro, textos) {
-  const jaCasado = sincCapAudioDoLivro(audio, capLivro)
-  if (jaCasado != null) return jaCasado
-  const MIN = 400                                   // palavras: abaixo disso não é capítulo
-  const comTexto = []
-  ;(textos || []).forEach((t, i) => { if (sincNorm(t).length >= MIN) comTexto.push(i) })
-  const pos = comTexto.indexOf(capLivro)
-  if (pos < 0) return null
-  const caps = (audio.capitulos || [])
-  // O áudio costuma abrir com créditos; se houver, ele desloca tudo em um.
-  const desloc = caps.length && /credit|opening|introduc/i.test(caps[0].titulo || '') ? 1 : 0
-  const alvo = pos + desloc
-  return alvo < caps.length ? alvo : null
 }
 
 // ================================================================
@@ -384,6 +718,7 @@ let _sincFrases = null          // [{ini, fim, pos, range}]
 let _sincAtual = -1
 let _sincCapLivro = -1
 let _sincSeguir = true
+let _sincBorda = false          // já avisei que o trecho sincronizado acabou?
 
 function sincAtivo() { return _sincOn }
 // Reindexa as frases quando alguma pintura reconstrói os nós de texto do
@@ -499,10 +834,7 @@ function _sincLevarAVista(f) {
     // ⚠️ ATRIBUIR `scrollTop` NÃO FUNCIONA AQUI, e isto já mordeu o projeto uma
     // vez (o mesmo comentário está em `_abCentralizar`): a viewport do leitor
     // tem `scroll-behavior:smooth`, e rolagem animada depende de o navegador
-    // estar compondo quadros. Medido: `vp.scrollTop = x + 300` deixou o valor
-    // em 4545, parado. `scrollTo` com `behavior` explícito vence o CSS sem
-    // alterar o elemento — e acompanhar a voz quer o pulo pronto, não uma
-    // animação que ainda está a caminho quando a frase seguinte começa.
+    // estar compondo quadros. `scrollTo` com `behavior` explícito vence o CSS.
     const suave = document.visibilityState === 'visible'
     const paginado = typeof _lerPaginado === 'function' ? _lerPaginado() : false
     if (paginado) {
@@ -524,7 +856,7 @@ function _sincLevarAVista(f) {
   } catch (e) {}
 }
 
-// Qual frase está tocando neste instante
+// Qual frase está tocando neste instante (tempo ABSOLUTO do arquivo)
 function _sincFraseDoTempo(t) {
   if (!_sincFrases || !_sincMapa) return -1
   const pos = sincPosicaoDe(_sincMapa, t)
@@ -542,21 +874,12 @@ function _sincFraseDoTempo(t) {
 // ---------------------------------------------------------------
 // ⚠️ A PRIMEIRA VERSÃO CRIOU UM SEGUNDO `<audio>`, E ELE OUVIU OS DOIS AO MESMO
 // TEMPO. O relato foi direto: *"ao clicar, um segundo áudio do mesmo audiobook
-// começou a rodar"*. O argumento de separar (o reprodutor tem estado próprio:
-// marcadores, timer de sono, Media Session) estava certo sobre o CÓDIGO e
-// errado sobre o USUÁRIO — para quem ouve, existe uma narração só.
-// Agora o leitor pilota o mesmo `#ab-audio` do reprodutor, pelo caminho normal
-// dele. Sair do leitor e ir ao reprodutor continua a MESMA escuta.
+// começou a rodar"*. Para quem ouve, existe uma narração só. O leitor pilota o
+// mesmo `#ab-audio` do reprodutor, pelo caminho normal dele.
+// ⚠️ V2: os tempos do mapa são ABSOLUTOS no arquivo — a mesma régua do
+// `<audio>`. As conversões relativas da v1 (que já causaram pulo de horas num
+// m4b) deixaram de existir: `el.currentTime` conversa direto com o mapa.
 function _sincAudio() { return document.getElementById('ab-audio') }
-
-// ⚠️ E OS INSTANTES NÃO ESTÃO NA MESMA RÉGUA. A transcrição guarda o tempo
-// RELATIVO ao capítulo (começa em 0); o `<audio>` toca o ARQUIVO INTEIRO, onde
-// o mesmo capítulo começa em `cap.ini`. Medido no acervo dele: o Prologue
-// começa aos **16 s** do arquivo, e a transcrição dele vai de 0 a 1491.
-// Somar errado aqui é o que fazia o áudio pular para o lugar errado — e num
-// capítulo adiantado o erro seria de HORAS, não de segundos.
-function _sincParaAudio(cap, t) { return (cap && cap.ini ? cap.ini : 0) + (t || 0) }
-function _sincDoAudio(cap, t) { return (t || 0) - (cap && cap.ini ? cap.ini : 0) }
 
 let _sincLigadoNoAudio = false
 function _sincLigarEventos(el) {
@@ -564,7 +887,15 @@ function _sincLigarEventos(el) {
   _sincLigadoNoAudio = true
   el.addEventListener('timeupdate', () => {
     if (!_sincOn || !_sincMapa) return
-    const ix = _sincFraseDoTempo(_sincDoAudio(_sincMapa.cap, el.currentTime))
+    const A = _sincMapa.ancoras || []
+    // A voz passou do fim do trecho já casado: em vez de deixar o realce
+    // congelar mudo na última frase, a barra oferece continuar.
+    if (A.length && el.currentTime > A[A.length - 1][1] + 6) {
+      if (!_sincBorda) { _sincBorda = true; _sincPintarBarra() }
+      return
+    }
+    if (_sincBorda) { _sincBorda = false; _sincPintarBarra() }
+    const ix = _sincFraseDoTempo(el.currentTime)
     if (ix >= 0) _sincPintarFrase(ix)
   })
   el.addEventListener('play', _sincPintarBarra)
@@ -596,22 +927,26 @@ async function sincLeitorAlternar() {
   const audio = sincAudioDoLivro(_lerLivro)
   if (!audio) return sincLigarModal()
   try {
-    _sincBarraMsg('Procurando este capítulo no audiolivro…')
-    const pronto = await sincPrepararCapitulo(_lerLivro, audio, _lerCap)
-    if (!pronto) return
-    _sincOn = true
-    _sincCapLivro = _lerCap
+    _sincBarraMsg('Procurando a voz do narrador neste ponto…')
     _sincFrases = sincIndexarFrases()
-    if (!_sincFrases) { _sincOn = false; toast('Não consegui ler as frases desta página.', 'error'); return }
+    if (!_sincFrases) { _sincBarraFechar(); toast('Não consegui ler as frases desta página.', 'error'); return }
+    // Começa de onde ele está LENDO — é isso que "ouvir daqui" quer dizer.
+    // ⚠️ E a posição entra ANTES do preparo (v2): é ela que diz qual trecho
+    // do áudio procurar dentro de uma seção de horas.
+    const pos = _sincPosicaoVisivel()
+    const mapa = await sincPrepararCapitulo(_lerLivro, audio, _lerCap, pos)
+    if (!mapa) { _sincBarraFechar(); return }
+    _sincOn = true
+    _sincBorda = false
+    _sincCapLivro = _lerCap
+    _sincMapa = mapa
+    _sincAtual = -1
     document.getElementById('ler-conteudo')?.addEventListener('click', sincCliqueNoTexto)
     document.getElementById('ler-btn-ouvir')?.classList.add('on')
     _sincPintarBarra()
-    const { el, cap } = await _sincCarregarAudio(audio, _sincMapa.capAudio)
-    _sincMapa.cap = cap
-    // Começa de onde ele está LENDO — é isso que "ouvir daqui" quer dizer.
-    const pos = _sincPosicaoVisivel()
-    const t = sincTempoDe(_sincMapa, pos)
-    if (t != null) el.currentTime = _sincParaAudio(cap, t)
+    const t = sincTempoDe(mapa, pos)
+    const { el } = await _sincCarregarAudio(audio, sincCapDoTempo(audio, t || 0))
+    if (t != null) el.currentTime = t
     await el.play().catch(() => {})
     _sincPintarBarra()
   } catch (e) {
@@ -625,7 +960,7 @@ function sincLeitorSair() {
   _sincOn = false
   const _el = _sincAudio(); if (_el) _el.pause()
   _sincLimparRealce()
-  _sincFrases = null; _sincAtual = -1
+  _sincFrases = null; _sincAtual = -1; _sincBorda = false
   _sincBarraFechar()
   document.getElementById('ler-conteudo')?.removeEventListener('click', sincCliqueNoTexto)
   document.getElementById('ler-btn-ouvir')?.classList.remove('on')
@@ -648,45 +983,69 @@ function _sincPosicaoVisivel() {
   return 0
 }
 
-// Garante mapa para o capítulo do livro: lê o guardado, e se não houver,
-// alinha — pedindo a transcrição quando ela faltar.
-async function sincPrepararCapitulo(livro, audio, capLivro) {
-  const guardado = await sincMapaLer(livro.id, capLivro)
-  if (guardado && (guardado.ancoras || []).length) {
-    _sincMapa = guardado
-    _sincMapa.fimAudio = _sincFimDoCap(audio, guardado.capAudio)
-    return true
+// A voz chegou ao fim do que já foi casado — transcrever o que vem em
+// seguida e continuar, do jeito que o Whispersync nunca deixa o leitor ver a
+// emenda. Se o próximo trecho cair em OUTRA seção do livro (a narração cruzou
+// de "Part One" para "Part Two"), o leitor vira junto.
+async function sincContinuar() {
+  if (!_lerLivro) return
+  const audio = sincAudioDoLivro(_lerLivro)
+  const el = _sincAudio()
+  if (!audio || !el || !_sincMapa) return
+  try {
+    const t = el.currentTime + 2
+    let cap = sincCapDoTempo(audio, t)
+    const mapa = audio.capMapa || {}
+    while (mapa[cap] === -1 && cap + 1 < (audio.capitulos || []).length) cap++
+    if (!(audio.transcricoes || []).some(x => x.cap === cap)) {
+      const alvo = await _sincConfirmarTranscricao(audio, cap, t)
+      if (!alvo) return
+      _sincBarraMsg('Transcrevendo o trecho…')
+      await _sincTranscrever(audio, cap, alvo, m => _sincBarraMsg(m))
+    }
+    _sincBarraMsg('Casando o texto com a voz…')
+    const novo = await sincProcessarCapitulo(_lerLivro, audio, cap)
+    if (novo && novo.capLivro === _sincCapLivro) {
+      _sincMapa = novo
+      _sincBorda = false
+      _sincAtual = -1
+      _sincPintarBarra()
+    } else if (novo && typeof lerIrParaCapitulo === 'function') {
+      // A narração entrou na próxima seção do livro: o leitor acompanha.
+      await lerIrParaCapitulo(novo.capLivro, 0)
+    }
+  } catch (e) {
+    _sincBorda = false
+    _sincPintarBarra()
+    toast(String(e.message || e), 'error')
   }
-  const textos = await sincTextosDoLivro(livro)
-  const capAudio = sincPalpiteCapAudio(livro, audio, capLivro, textos)
-  if (capAudio == null) { toast('Não consegui adivinhar qual capítulo do áudio é este.', 'warning'); return false }
-  const temTr = (audio.transcricoes || []).some(x => x.cap === capAudio)
-  if (!temTr) {
-    const nome = ((audio.capitulos || [])[capAudio] || {}).titulo || `capítulo ${capAudio + 1}`
-    const ok = await confirmModal({
-      title: 'Falta a transcrição deste capítulo', icon: 'sparkles', confirmText: 'Transcrever agora',
-      html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
-        Para casar o texto com a voz, preciso do que o narrador diz em <b>${esc(nome)}</b>.
-        Transcrevo agora — leva alguns minutos e é pago uma vez só; depois vale nos seus dois aparelhos.</p>`
-    })
-    if (!ok) return false
-    _sincBarraMsg('Transcrevendo o capítulo…')
-    if (typeof _abTranscreverTrecho !== 'function' && typeof _loadScript === 'function') await _loadScript('js/audiobook.js')
-    if (typeof _abTranscreverTrecho !== 'function') throw new Error('não consegui carregar a transcrição')
-    // O capítulo INTEIRO, como no "transcrever tudo" — meia transcrição daria
-    // meio capítulo sincronizado, que é pior que nenhum.
-    await _abTranscreverTrecho(audio, capAudio, _abAlvoInteiro(audio, capAudio), m => _sincBarraMsg(m))
-  }
-  _sincBarraMsg('Casando o texto com a voz…')
-  const mapa = await sincProcessarCapitulo(livro, audio, capAudio)
-  _sincMapa = mapa
-  _sincMapa.fimAudio = _sincFimDoCap(audio, capAudio)
-  return true
 }
 
-function _sincFimDoCap(audio, capAudio) {
-  const c = (audio.capitulos || [])[capAudio]
-  return c && c.fim ? c.fim : 0
+// Chamado pelo leitor quando o capítulo muda com o modo ligado.
+async function sincTrocouCapitulo(capLivro) {
+  if (!_sincOn || capLivro === _sincCapLivro) {
+    if (_sincOn) { _sincFrases = sincIndexarFrases(); _sincAtual = -1 }
+    return
+  }
+  const audio = sincAudioDoLivro(_lerLivro)
+  if (!audio) return sincLeitorSair()
+  const _p = _sincAudio(); if (_p) _p.pause()
+  _sincLimparRealce(); _sincAtual = -1; _sincBorda = false
+  try {
+    _sincBarraMsg('Procurando este capítulo no audiolivro…')
+    const mapa = await sincPrepararCapitulo(_lerLivro, audio, capLivro, 0)
+    if (!mapa) return sincLeitorSair()
+    _sincCapLivro = capLivro
+    _sincMapa = mapa
+    _sincFrases = sincIndexarFrases()
+    const t = sincTempoDe(mapa, 0)
+    const { el } = await _sincCarregarAudio(audio, sincCapDoTempo(audio, t || 0))
+    if (t != null) el.currentTime = t
+    _sincPintarBarra()
+  } catch (e) {
+    toast(String(e.message || e), 'error')
+    sincLeitorSair()
+  }
 }
 
 // ---------------------------------------------------------------
@@ -716,6 +1075,14 @@ function _sincPintarBarra() {
   const el = _sincAudio()
   const tocando = el && !el.paused
   const f = _sincFrases && _sincFrases[_sincAtual]
+  if (_sincBorda) {
+    b.innerHTML = `
+      <span class="sinc-frase">${ic('sparkles','ic-sm')} O trecho sincronizado terminou</span>
+      <button class="sinc-b sinc-play" onclick="sincContinuar()" data-tip="Transcrever o que vem agora e seguir acompanhando">
+        ${ic('chevronRight','ic-sm')}</button>
+      <button class="sinc-b" onclick="sincLeitorSair()" data-tip="Sair do modo ouvir junto">${ic('x','ic-sm')}</button>`
+    return
+  }
   b.innerHTML = `
     <button class="sinc-b" onclick="sincPular(-1)" data-tip="Frase anterior">${ic('chevronLeft','ic-sm')}</button>
     <button class="sinc-b sinc-play" onclick="sincPlay()" data-tip="${tocando ? 'Pausar' : 'Tocar'}">
@@ -739,7 +1106,7 @@ function sincPular(d) {
   if (!_sincFrases || !_sincMapa || !el) return
   const ix = Math.max(0, Math.min(_sincFrases.length - 1, (_sincAtual < 0 ? 0 : _sincAtual) + d))
   const t = sincTempoDe(_sincMapa, _sincFrases[ix].pos)
-  if (t != null) { el.currentTime = _sincParaAudio(_sincMapa.cap, t); _sincPintarFrase(ix) }
+  if (t != null) { el.currentTime = t; _sincPintarFrase(ix) }
 }
 
 // ⚠️ TOCAR NUMA FRASE É O GESTO MAIS ÓBVIO DESTA TELA, e ele não pode brigar
@@ -760,7 +1127,7 @@ function sincCliqueNoTexto(ev) {
         const t = sincTempoDe(_sincMapa, _sincFrases[i].pos)
         const el = _sincAudio()
         if (t != null && el) {
-          el.currentTime = _sincParaAudio(_sincMapa.cap, t)
+          el.currentTime = t
           _sincPintarFrase(i)
           if (el.paused) el.play().catch(() => {})
           _sincPintarBarra()
@@ -806,40 +1173,6 @@ async function sincLigarModal() {
   document.body.appendChild(ov)
 }
 
-// Chamado pelo leitor quando o capítulo muda com o modo ligado.
-async function sincTrocouCapitulo(capLivro) {
-  if (!_sincOn || capLivro === _sincCapLivro) {
-    if (_sincOn) { _sincFrases = sincIndexarFrases(); _sincAtual = -1 }
-    return
-  }
-  const audio = sincAudioDoLivro(_lerLivro)
-  if (!audio) return sincLeitorSair()
-  const _p = _sincAudio(); if (_p) _p.pause()
-  _sincLimparRealce(); _sincAtual = -1
-  try {
-    _sincBarraMsg('Procurando este capítulo no audiolivro…')
-    const ok = await sincPrepararCapitulo(_lerLivro, audio, capLivro)
-    if (!ok) return sincLeitorSair()
-    _sincCapLivro = capLivro
-    _sincFrases = sincIndexarFrases()
-    // ⚠️ IGUAL AO LIGAR (rodada 44): o `cap` volta junto e o tempo passa por
-    // `_sincParaAudio`. Este caminho descartava o cap (o realce e o clique
-    // ficavam sem o deslocamento) e cravava o tempo RELATIVO direto no
-    // arquivo — num m4b de arquivo único, o capítulo 12 começa milhares de
-    // segundos adentro, e virar a página mandava o áudio para outro lugar
-    // do livro. Em faixas soltas (ini=0) nada aparecia, e foi por isso que o
-    // teste passou.
-    const { el, cap } = await _sincCarregarAudio(audio, _sincMapa.capAudio)
-    _sincMapa.cap = cap
-    const t = sincTempoDe(_sincMapa, 0)
-    if (t != null) el.currentTime = _sincParaAudio(cap, t)
-    _sincPintarBarra()
-  } catch (e) {
-    toast(String(e.message || e), 'error')
-    sincLeitorSair()
-  }
-}
-
 async function sincLigarEscolher(audioId) {
   const audio = (audiolivros || []).find(a => a.id === audioId)
   if (!audio || !_lerLivro) return
@@ -855,11 +1188,10 @@ async function sincLigarEscolher(audioId) {
 // ⚠️ ESTE É O PEDIDO INTEIRO EM UMA FRASE. Hoje o marcador guarda o que o
 // Whisper ouviu: *"Garrod did not rise to the bait"*. O livro diz *"Gared did
 // not rise to the bait"* — e o card que ele estuda tem de trazer o que o
-// **autor** escreveu, com o áudio do narrador dizendo aquilo. É a diferença
-// entre estudar um livro e estudar a transcrição de um livro.
+// **autor** escreveu, com o áudio do narrador dizendo aquilo.
 // O cache existe porque quem pergunta é código SÍNCRONO (a lista de
 // marcadores, a captura), e ler o mapa é assíncrono.
-let _sincCacheAudio = { audioId: null, capAudio: -1, mapa: null, frases: null }
+let _sincCacheAudio = { audioId: null, capAudio: -1, mapa: null, frases: null, cap: null }
 
 function _sincFrasesDoTexto(texto) {
   const partes = String(texto || '').split(/(?<=[.!?…”"])\s+/)
@@ -880,15 +1212,19 @@ async function sincPrepararParaAudio(audio, capAudio) {
   try {
     if (!audio || !audio.livroId) return false
     if (_sincCacheAudio.audioId === audio.id && _sincCacheAudio.capAudio === capAudio) return !!_sincCacheAudio.mapa
-    _sincCacheAudio = { audioId: audio.id, capAudio, mapa: null, frases: null }
+    _sincCacheAudio = { audioId: audio.id, capAudio, mapa: null, frases: null, cap: null }
     const livro = sincLivroDoAudio(audio)
     if (!livro) return false
     const capLivro = (audio.capMapa || {})[capAudio]
-    if (capLivro == null) return false
-    const mapa = await sincMapaLer(livro.id, capLivro)
+    if (capLivro == null || capLivro < 0) return false
+    const mapa = await sincMapaLer(livro.id, capLivro, audio)
     if (!mapa || !(mapa.ancoras || []).length) return false
     const textos = await sincTextosDoLivro(livro)
-    _sincCacheAudio = { audioId: audio.id, capAudio, mapa, frases: _sincFrasesDoTexto(textos[capLivro]) }
+    _sincCacheAudio = {
+      audioId: audio.id, capAudio, mapa,
+      frases: _sincFrasesDoTexto(textos[capLivro]),
+      cap: (audio.capitulos || [])[capAudio] || null
+    }
     return true
   } catch (e) { return false }
 }
@@ -899,31 +1235,39 @@ async function sincPrepararParaAudio(audio, capAudio) {
 // ⚠️ ESTA É A PEÇA QUE ELE PEDIU DEPOIS DE VER A PRIMEIRA VERSÃO: *"o que eu
 // queria era que o texto do livro viesse pra cá"*. Devolvendo as frases no
 // MESMO formato das falas transcritas (`{i, f, t}`, em segundos relativos ao
-// capítulo), a aba de texto do reprodutor passa a mostrar o autor sem que nada
-// mais mude — o acompanhamento, a rolagem que centraliza, a tela cheia, a
-// seleção que traduz e a captura já sabem trabalhar com isso.
-// Devolve `null` quando não há mapa: aí a transcrição continua sendo mostrada,
-// como sempre foi.
+// capítulo), a aba de texto do reprodutor mostra o autor sem que nada mude.
+// ⚠️ V2: o mapa da seção cobre HORAS de áudio; aqui sai só a fatia deste
+// capítulo do áudio — senão a aba mostraria "Part One" inteira com milhares
+// de frases fora do relógio da faixa.
 function sincFalasDoLivro(audio, capAudio) {
   const c = _sincCacheAudio
   if (!c.mapa || !c.frases || c.audioId !== (audio && audio.id) || c.capAudio !== capAudio) return null
-  const fim = (c.mapa.ancoras[c.mapa.ancoras.length - 1] || [0, 0])[1]
+  const cap = c.cap || {}
+  const ini = cap.ini || 0
+  const fim = cap.fim || Infinity
+  const A = c.mapa.ancoras || []
+  if (!A.length) return null
   const out = []
   for (let k = 0; k < c.frases.length; k++) {
     const f = c.frases[k], prox = c.frases[k + 1]
+    // Só frases dentro da faixa coberta pelas âncoras (a borda clampada
+    // empilharia dezenas de frases no mesmo instante).
+    if (f.pos < A[0][0] - 30 || f.pos > A[A.length - 1][0] + 30) continue
     const i = sincTempoDe(c.mapa, f.pos)
-    const ff = prox ? sincTempoDe(c.mapa, prox.pos) : fim
-    if (i == null) continue
-    out.push({ i, f: Math.max(i + 0.3, ff == null ? i + 3 : ff), t: f.texto })
+    if (i == null || i < ini - 2 || i > fim + 2) continue
+    const ff = prox ? sincTempoDe(c.mapa, prox.pos) : A[A.length - 1][1]
+    out.push({ i: Math.max(0, i - ini), f: Math.max(i - ini + 0.3, (ff == null ? i + 3 : ff) - ini), t: f.texto })
   }
   return out.length ? out : null
 }
 
-// Síncrona de propósito — ver o comentário do cache acima.
+// Síncrona de propósito — ver o comentário do cache acima. `seg` chega
+// RELATIVO ao capítulo (é a régua dos marcadores e das falas transcritas).
 function sincFraseDoInstante(audio, capAudio, seg) {
   const c = _sincCacheAudio
   if (!c.mapa || !c.frases || c.audioId !== (audio && audio.id) || c.capAudio !== capAudio) return ''
-  const pos = sincPosicaoDe(c.mapa, seg)
+  const abs = (Number(seg) || 0) + ((c.cap && c.cap.ini) || 0)
+  const pos = sincPosicaoDe(c.mapa, abs)
   if (pos == null) return ''
   let lo = 0, hi = c.frases.length - 1, r = 0
   while (lo <= hi) {
@@ -945,9 +1289,14 @@ async function sincTextoAqui(audio, capAudio) {
   const livro = sincLivroDoAudio(audio)
   if (!livro) return sincLigarModalAudio(audio)
   try {
-    if ((audio.capMapa || {})[capAudio] == null) {
-      toast('Procurando este capítulo dentro do livro…', 'info')
-      const textos = await sincTextosDoLivro(livro)
+    const ja = (audio.capMapa || {})[capAudio]
+    if (ja === -1) {
+      toast('Este trecho do áudio não está no texto do livro — deve ser introdução ou créditos da gravação.', 'info')
+      return
+    }
+    if (ja == null) {
+      toast('Procurando este trecho dentro do livro…', 'info')
+      await sincTextosDoLivro(livro)
       const temTr = (audio.transcricoes || []).some(x => x.cap === capAudio)
       if (!temTr) {
         const nome = ((audio.capitulos || [])[capAudio] || {}).titulo || `capítulo ${capAudio + 1}`
@@ -958,7 +1307,7 @@ async function sincTextoAqui(audio, capAudio) {
             <b>${esc(nome)}</b>. É pago uma vez só, e depois vale nos seus dois aparelhos.</p>`
         })
         if (!ok) return
-        await _abTranscreverTrecho(audio, capAudio, _abAlvoInteiro(audio, capAudio),
+        await _sincTranscrever(audio, capAudio, _sincAlvo(audio, capAudio, ((audio.capitulos || [])[capAudio] || {}).ini || 0),
           m => { const b = el('ab-aba'); if (b) b.innerHTML = `<div class="est-nada"><p>${esc(m)}</p></div>` })
       }
       await sincProcessarCapitulo(livro, audio, capAudio)
@@ -968,27 +1317,32 @@ async function sincTextoAqui(audio, capAudio) {
     if (typeof abAba === 'function') abAba('texto')
     toast('Este é o texto do autor — a frase acende conforme ele lê', 'success')
   } catch (e) {
-    toast(String(e.message || e), 'error')
+    if (e && e.fora && typeof abAba === 'function') abAba('texto')
+    toast(String(e.message || e), e && e.fora ? 'info' : 'error')
   }
 }
 
 // ⚠️ "ABRIR NO LEITOR" NÃO É ABRIR NO COMEÇO. Quem está no minuto 12 quer o
 // parágrafo do minuto 12 — abrir na primeira página devolveria o trabalho de
 // procurar, que é o que esta peça existe para evitar.
+// `seg` aqui é o relógio do `<audio>` — ABSOLUTO no arquivo, a mesma régua
+// das âncoras v2.
 async function sincAbrirNoLeitor(audio, capAudio, seg) {
   if (!audio) return
   const livro = sincLivroDoAudio(audio)
   if (!livro) return sincLigarModalAudio(audio)
   try {
     let capLivro = (audio.capMapa || {})[capAudio]
+    if (capLivro === -1) {
+      toast('Este trecho do áudio não está no texto do livro — vou abrir no começo.', 'info')
+      capLivro = null
+    }
     if (capLivro == null) { await sincTextoAqui(audio, capAudio); capLivro = (audio.capMapa || {})[capAudio] }
-    if (capLivro == null) return
-    const mapa = await sincMapaLer(livro.id, capLivro)
+    if (capLivro == null || capLivro < 0) return
+    const mapa = await sincMapaLer(livro.id, capLivro, audio)
     const textos = await sincTextosDoLivro(livro)
     const total = Math.max(1, sincNorm(textos[capLivro]).length)
-    const cap = (audio.capitulos || [])[capAudio]
-    const rel = _sincDoAudio(cap, seg)
-    const pos = mapa ? sincPosicaoDe(mapa, rel) : 0
+    const pos = mapa ? sincPosicaoDe(mapa, seg) : 0
     const frac = Math.max(0, Math.min(0.98, (pos || 0) / total))
     // O reprodutor continua tocando: sair da seção nunca parou o áudio (§8.72).
     showSection('ler')
