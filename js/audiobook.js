@@ -1690,7 +1690,7 @@ function abTextoMais(ev) {
     <button onclick="cardMenuFechar();abTransPainel('ab-mais-btn')">
       ${ic('captions','ic-sm')} Transcrição</button>
     <button onclick="cardMenuFechar();abRaioXPainel()">
-      ${ic('eye','ic-sm')} O que é difícil</button>`, 250)
+      ${ic('eye','ic-sm')} O que é difícil</button>`, 272)
 }
 
 // ---- O PAINEL DO RAIO-X: os capítulos, e o que já foi analisado ----
@@ -1859,7 +1859,14 @@ function _abRaioXPainelRender(msg) {
   const btn = el('ab-raiox-btn2') || el('ab-mais-btn')
   if (btn) {
     const r = btn.getBoundingClientRect()
-    p.style.top = Math.round(r.bottom + 8) + 'px'
+    // ⚠️ O MESMO FREIO DO PAINEL IRMÃO, que aqui faltava: sem ele o painel
+    // nascia colado no botão e vazava pela base da tela. Medido ao abrir pelo
+    // "Mais": topo em 209 com a lista inteira abaixo da janela. O painel da
+    // transcrição já sobia quando não cabia; este não — mesmo defeito, dois
+    // arquivos de distância.
+    const alt = Math.min(innerHeight * 0.7, 460)
+    const top = (r.bottom + 8 + alt > innerHeight) ? Math.max(8, r.top - alt - 8) : r.bottom + 8
+    p.style.top = Math.round(top) + 'px'
     p.style.left = Math.round(Math.max(8, Math.min(r.left - 120, innerWidth - 340))) + 'px'
   }
 }
