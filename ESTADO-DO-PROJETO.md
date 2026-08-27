@@ -15,7 +15,27 @@
 > aviso honesto). **Testado com HLS real: hls.js tocando, 1280×720, tempo andando.**
 > `sw.js` → **englab-v432**. Detalhes na §9 (bloco 70ª, item HLS).
 >
-> Última atualização: 2026-08-26 (74ª) — **A ESCALA ESTAVA UM DEGRAU ABAIXO DO CONFORTÁVEL.**
+> Última atualização: 2026-08-26 (75ª) — **SIDEBAR SEM GRITOS, DASHBOARD EM BENTO, PALETA
+> RECALIBRADA.** Ele: *"barra lateral está feia, as cores, os itens"*, *"o dashboard foi tudo
+> na horizontal… poderia usar colunas, filosofia da Marie Kondo"*, *"estuda cores e
+> combinações de forma profunda"*. Estudo aplicado SÓ no midnight (os outros 5 temas
+> redefinem a família inteira): **fundos dessaturados no mesmo matiz** (bg `#0A002A`
+> sat-100% → `#0E0626`; surfaces e sidebar acompanham — Material/Discord/Linear: cinza COM
+> tinta, nunca a cor pura em área grande; o princípio Migaku fica, a dose baixa, comentário
+> do topo reconciliado), **roxo clareado** (primary `#6B2FC3` afundava no escuro, 2,5-2,7:1 →
+> `#7C3AED`; accent-bright → `#A78BFA`; grad/rgb/acc-1/purple acompanham; número do hero via
+> `--role-ia`), **laranja removido dos ícones de grupo da sidebar** (tinha sido pedido dele
+> em 20/08 com atrito registrado; o pedido de hoje reverte — acento só no interativo),
+> scrollbar da sidebar invisível até o hover, botão de recolher sem moldura. **Dashboard:
+> bento 2:1 só CSS ≥1041px** — hero como telha vertical à esquerda, pendência-IA + métricas
+> 2×2 à direita; abas/painéis largura cheia; `dashboard.js` intocado. ⚠️ Pegadinha real da
+> rodada: um retoque `2fr 1fr` (≥1280) no FIM do arquivo vencia a cascata sobre o
+> `.dash-grid` base e desalinhava a costura em 45px — unificado em `minmax(0,2fr) minmax(0,1fr)`
+> na regra base (fr cru respeita min-content; minmax(0,…) é proporção pura). **Medido no ar
+> depois de limpar SW+caches: costura 1068=1068, sem overflow, scrollbar oculta fora do
+> hover.** `sw.js` → **englab-v443** (75ª = v440→443).
+>
+> Última atualização anterior: 2026-08-26 (74ª) — **A ESCALA ESTAVA UM DEGRAU ABAIXO DO CONFORTÁVEL.**
 > Ele: *"tem sites e apps que parecem tão gostosos de se olhar, mas o lab ainda parece meio
 > feio"*. Diagnóstico MEDIDO no app publicado (detalhe na §9, bloco "Do diagnóstico visual"):
 > não falta sistema — falta calibragem. Três mudanças, todas em token do `:root`:
@@ -15515,6 +15535,15 @@ publicado (Vercel), logado, telas Dashboard e Vídeo, via Claude in Chrome:
       maioria, mas não foi medido no telefone dele); nome do usuário no chip da sidebar
       truncando ("Djemeson Tava…"); os `--text2/--text3` dos outros 5 temas não foram
       medidos nem alterados — se algum parecer apagado, é o mesmo conserto.
+- [x] **75ª (mesmo dia): executada a rodada de cor+layout** — ver o bloco no topo do
+      arquivo. Fundos dessaturados, roxo clareado, laranja fora dos rótulos de menu,
+      scrollbar/botão de recolher discretos, dashboard em bento 2:1 com costura medida.
+- [ ] De olho (75ª): o bento só existe ≥1041px (abaixo segue empilhado, correto);
+      a EXTENSÃO (netflix.css/kindle.css) continua no roxo antigo `#6B2FC3` — ela
+      pinta por cima de páginas de terceiros com paleta própria, mas se ele quiser
+      a marca alinhada, é uma troca de meia dúzia de hex; o tema `violet` usa
+      primary `#8B5CF6` vizinho do novo `#7C3AED` do midnight — os dois temas
+      ficaram parecidos, avaliar se o violet ainda se justifica.
 
 ### Do estudo Nuvio×addon (2026-08-26 — análise, nada implementado)
 
