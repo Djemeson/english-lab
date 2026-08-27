@@ -228,9 +228,15 @@ async function epubAbrir(buffer) {
 
 // Texto CRU de um capítulo (sem marcação) — usado pela cobertura e pela
 // contagem de palavras, onde o HTML só atrapalharia.
+// ⚠️ `textContent` COLA PARÁGRAFOS SEM ESPAÇO: `<p>…spread.</p><p>Then…</p>`
+// vira "spread.Then", e a frase "não termina" nunca — foi o que fez o realce
+// do ouvir-junto pintar dois parágrafos de uma vez (rodada 78). Um respiro no
+// fim de cada bloco devolve a fronteira; a normalização por palavra (sincNorm)
+// não muda, porque o ponto já virava separador lá.
 function epubTextoLimpo(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   doc.querySelectorAll('script,style,head').forEach(e => e.remove())
+  doc.querySelectorAll('p,div,h1,h2,h3,h4,h5,h6,li,blockquote,td,th,tr').forEach(e => e.append('\n'))
   return (doc.body ? doc.body.textContent : '').replace(/\s+/g, ' ').trim()
 }
 

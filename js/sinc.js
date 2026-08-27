@@ -230,6 +230,31 @@ function sincTempoDe(mapa, pos) {
   return t0 + (t1 - t0) * ((pos - p0) / Math.max(1, p1 - p0))
 }
 
+// ⚠️ O REALCE É POR FRASE, E FRASE NÃO PODE SER UM PARÁGRAFO INTEIRO. Ele viu
+// e disse: *"o texto em destaque tá feio, seção espalhada em mais de um
+// parágrafo"*. Duas causas, dois remédios: (1) parágrafos colados sem espaço
+// ("spread.Then") impediam o corte — a fronteira de bloco agora corta SEMPRE;
+// (2) o King escreve frases de fôlego longo — trecho acima de ~45 palavras é
+// subdividido na vírgula mais próxima do meio, até caber no olho.
+const SINC_FRASE_MAX = 45
+function _sincSubdividir(texto, a, b, saida) {
+  const pedaco = texto.slice(a, b)
+  if (sincNorm(pedaco).length <= SINC_FRASE_MAX) { saida.push([a, b]); return }
+  const meio = pedaco.length / 2
+  let melhor = -1, dist = Infinity
+  const re = /[,;:—–…]["”']?\s+/g
+  let m
+  while ((m = re.exec(pedaco))) {
+    const p = m.index + m[0].length
+    if (p < 25 || pedaco.length - p < 25) continue
+    const d = Math.abs(p - meio)
+    if (d < dist) { dist = d; melhor = p }
+  }
+  if (melhor < 0) { saida.push([a, b]); return }
+  _sincSubdividir(texto, a, a + melhor, saida)
+  _sincSubdividir(texto, a + melhor, b, saida)
+}
+
 // "O narrador está neste segundo; que palavra do livro é essa?"
 function sincPosicaoDe(mapa, seg) {
   const A = (mapa && mapa.ancoras) || []
@@ -753,23 +778,34 @@ function sincIndexarFrases() {
     }
   })
   const pedacos = []
-  let texto = '', no
+  const fronteiras = new Set()      // onde um BLOCO (parágrafo, título) termina
+  let texto = '', no, blocoAnterior = null
   while ((no = walker.nextNode())) {
     const t = no.nodeValue
+    // ⚠️ Entre dois <p> o texto corrido não tem espaço nenhum — "spread.Then".
+    // O regex de fim de frase exige espaço depois do ponto e nunca disparava:
+    // o realce pintava parágrafos emendados. A fronteira de bloco é corte
+    // OBRIGATÓRIO, com ou sem pontuação.
+    const bloco = no.parentElement.closest('p,div,h1,h2,h3,h4,h5,h6,li,blockquote,td,th') || no.parentElement
+    if (blocoAnterior && bloco !== blocoAnterior && texto.length) fronteiras.add(texto.length)
+    blocoAnterior = bloco
     pedacos.push({ no, ini: texto.length, len: t.length })
     texto += t
   }
   if (!texto.trim()) return null
 
   // Onde cada frase começa e termina, no texto corrido
-  const cortes = []
+  const pontos = new Set(fronteiras)
   const re = /[.!?…”"']+[\s]+|\n{2,}/g
-  let m, ultimo = 0
-  while ((m = re.exec(texto))) {
-    const fim = m.index + m[0].length
-    if (fim - ultimo > 3) { cortes.push([ultimo, fim]); ultimo = fim }
+  let m
+  while ((m = re.exec(texto))) pontos.add(m.index + m[0].length)
+  const ordenados = [...pontos].filter(p => p > 0 && p < texto.length).sort((a, b) => a - b)
+  const cortes = []
+  let ultimo = 0
+  for (const p of ordenados) {
+    if (p - ultimo > 3) { _sincSubdividir(texto, ultimo, p, cortes); ultimo = p }
   }
-  if (ultimo < texto.length) cortes.push([ultimo, texto.length])
+  if (ultimo < texto.length) _sincSubdividir(texto, ultimo, texto.length, cortes)
 
   const localizar = off => {
     for (const p of pedacos) if (off < p.ini + p.len) return { no: p.no, off: Math.max(0, off - p.ini) }
@@ -1194,10 +1230,18 @@ async function sincLigarEscolher(audioId) {
 let _sincCacheAudio = { audioId: null, capAudio: -1, mapa: null, frases: null, cap: null }
 
 function _sincFrasesDoTexto(texto) {
-  const partes = String(texto || '').split(/(?<=[.!?…”"])\s+/)
+  const s = String(texto || '')
+  // O mesmo tamanho de frase do leitor: trecho comprido demais é subdividido
+  // na vírgula, senão a aba de texto mostra parágrafos inteiros num bloco só.
+  const brutas = []
+  const re = /(?<=[.!?…”"])\s+/g
+  let m, ultimo = 0
+  while ((m = re.exec(s))) { _sincSubdividir(s, ultimo, m.index + m[0].length, brutas); ultimo = m.index + m[0].length }
+  if (ultimo < s.length) _sincSubdividir(s, ultimo, s.length, brutas)
   const out = []
   let pos = 0
-  for (const p of partes) {
+  for (const [a, b] of brutas) {
+    const p = s.slice(a, b)
     const n = sincNorm(p).length
     if (n) out.push({ pos, palavras: n, texto: p.trim() })
     pos += n
