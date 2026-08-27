@@ -15,7 +15,46 @@
 > aviso honesto). **Testado com HLS real: hls.js tocando, 1280×720, tempo andando.**
 > `sw.js` → **englab-v432**. Detalhes na §9 (bloco 70ª, item HLS).
 >
-> Última atualização: 2026-08-26 (75ª) — **SIDEBAR SEM GRITOS, DASHBOARD EM BENTO, PALETA
+> Última atualização: 2026-08-26 (76ª–77ª) — **O ESTUDO DE COR CHEGA AOS SEIS TEMAS, NASCE O
+> GRAFITE, E O CLARO/ESCURO VIRA UM CLIQUE.** Ele: *"vc fez a mudança pra todos os outros
+> temas?"* (não — só o midnight) + *"que tal novos temas ou atualizar as cores"* + *"faça
+> também os que ficaram pra depois"* + *"coloca um botão de escuro e claro do lado das
+> configurações"* + *"tira o nome Configurações e deixa só a engrenagem"* + *"depois resolve
+> o caso do mobile"*. Medido tema a tema por script (contraste WCAG + saturação HSL) ANTES
+> de mexer:
+>
+> | tema | satBG | text2 | text3 | bright/bg |
+> |---|---|---|---|---|
+> | midnight | 73% (destoava) | 9,09 | 6,80 | 7,19 |
+> | light | 62% | 6,96 | 5,44 | 5,48 |
+> | sepia | 44% | 5,52 | 4,65 | **4,06 reprovava** |
+> | emerald | 46% | 7,25 | 4,94 | 9,85 |
+> | violet | 47% | 6,38 | 4,89 | 7,15 |
+> | papel | 28% | 6,80 | 4,65 | **3,74 reprovava** |
+>
+> **(76ª)** midnight 73%→48% de saturação (alinhado aos irmãos; `#0E0626`→`#130C22`);
+> **`violet` virou `grafite`** — escuro NEUTRO com acento céu, porque o violet estava a
+> distância 11/255 do midnight no fundo e 38 no acento (mesmo tema, dois nomes) e o buraco
+> real era não haver nenhum tema sem cor; `THEME_ALIAS` migra a preferência no `applyTheme`
+> **e** no boot inline. `--accent-bright` do sepia e do papel consertados (é TEXTO: o
+> `--role-ia` dos claros). ⚠️ **Os `swatch` do seletor mentiam desde 2026-08-11** — o
+> midnight exibia o azul-cinza que o tema perdeu no reskin; todos corrigidos e reordenados.
+> **(77ª)** Rodapé da barra = engrenagem sem rótulo + botão claro/escuro (ícone mostra o
+> DESTINO); `applyTheme` grava `cfg.themeDark`/`themeLight` a cada troca (inclusive pelo
+> seletor) e os dois sobem/descem no sync, para o botão voltar ao tema que ele de fato usa;
+> gêmeo do botão na gaveta "Mais" do celular, onde a barra lateral não existe.
+> ⚠️ **Dois erros meus, achados medindo:** (1) as rodadas 74 e 75 estilizaram
+> `.sidebar::-webkit-scrollbar`, mas `.sidebar` tem `overflow-y:hidden` e **nunca rola** —
+> quem rola é `.sb-nav`; a régua seguia no print depois de duas "correções"; (2) o menu
+> não cabia (584px de lista para 506px, "Revisar" cortado ao meio) porque a fonte subiu 9%
+> na 74ª — item 10→8 e grupo 16→12 devolveram 60px. **Celular medido de verdade** (375×812,
+> `pointer:coarse` ativo, 6 seções): **zero overflow, zero fileira quebrada** — a pendência
+> da 74ª não se confirmou; o único furo real eram os 4 filtros de Palavras a 30px, agora 40.
+> ⚠️ **A extensão NÃO foi alinhada, e isso é a decisão certa:** o popup dela é um cartão
+> BRANCO, onde o roxo fechado dá 7,45:1 contra 5,70:1 do claro — a pendência que eu mesmo
+> registrei estava errada; aviso gravado no arquivo. `sw.js` → **englab-v447**.
+>
+> Última atualização anterior: 2026-08-26 (75ª) — **SIDEBAR SEM GRITOS, DASHBOARD EM BENTO, PALETA
 > RECALIBRADA.** Ele: *"barra lateral está feia, as cores, os itens"*, *"o dashboard foi tudo
 > na horizontal… poderia usar colunas, filosofia da Marie Kondo"*, *"estuda cores e
 > combinações de forma profunda"*. Estudo aplicado SÓ no midnight (os outros 5 temas
@@ -15538,12 +15577,21 @@ publicado (Vercel), logado, telas Dashboard e Vídeo, via Claude in Chrome:
 - [x] **75ª (mesmo dia): executada a rodada de cor+layout** — ver o bloco no topo do
       arquivo. Fundos dessaturados, roxo clareado, laranja fora dos rótulos de menu,
       scrollbar/botão de recolher discretos, dashboard em bento 2:1 com costura medida.
-- [ ] De olho (75ª): o bento só existe ≥1041px (abaixo segue empilhado, correto);
-      a EXTENSÃO (netflix.css/kindle.css) continua no roxo antigo `#6B2FC3` — ela
-      pinta por cima de páginas de terceiros com paleta própria, mas se ele quiser
-      a marca alinhada, é uma troca de meia dúzia de hex; o tema `violet` usa
-      primary `#8B5CF6` vizinho do novo `#7C3AED` do midnight — os dois temas
-      ficaram parecidos, avaliar se o violet ainda se justifica.
+- [x] **76ª–77ª: as três pendências da 75ª resolvidas** — o `violet` virou `grafite`
+      (era duplicata medida do midnight); a EXTENSÃO **não** foi alinhada, e essa é a
+      resposta certa (cartão branco: `#6B2FC3` dá 7,45:1 contra 5,70:1 do tom claro —
+      a pendência estava errada, aviso gravado no arquivo); o bento segue ≥1041px.
+- [x] **77ª: celular medido** (375×812, `pointer:coarse`, 6 seções) — zero overflow e
+      zero fileira quebrada: a pendência da 74ª sobre a fonte 9% maior **não se
+      confirmou**. Furo real encontrado e corrigido: `.kn-fil` (filtros de Palavras)
+      a 30px → 40px.
+- [x] **77ª: nome truncado no chip** — passou a mostrar o PRIMEIRO nome ("Djemeson"),
+      com o completo no `title` e nas Configurações.
+- [ ] De olho (77ª): com todos os 4 grupos do menu abertos a lista ainda rola (agora
+      com barra discreta e sem cortar item no meio) — se incomodar, o candidato a sair
+      é o bloco "Hoje" no fim da lista, que repete o badge de Revisar; os `--text2/
+      --text3` dos temas claros não foram tocados (só os `--accent-bright`); o tema
+      `grafite` nunca foi visto no celular dele.
 
 ### Do estudo Nuvio×addon (2026-08-26 — análise, nada implementado)
 
