@@ -15632,6 +15632,27 @@ stream entra em `videos[]` sem URL persistida. Dados de teste limpos.
 - [ ] **`captureStream` (gravar a cena em card) exige CORS na fonte** — link de
       debrid/http sem CORS toca mas não grava áudio; legenda/transcript não dependem.
 
+### Da rodada da dica que tapava a ação (2026-08-26, 73ª)
+
+**Relato dele (com print):** a dica *"Arraste para selecionar um trecho…"* caindo por
+cima do chip do raio-X, tapando **Preparar** e **Já sei**.
+
+- [x] **A dica saiu** (pedido dele): a legenda sobre o vídeo é a superfície onde ele
+      MEXE — marca do raio-X, glossário, seleção. Instrução que atrapalha a ação que
+      ela explica é ruído.
+- [x] **A CAUSA GERAL foi fechada no motor** (`setupTooltips`, core.js): a dica nascia
+      do CONTÊINER e o `closest` a encontrava mesmo com o mouse sobre a marca. Agora
+      `balaoNaFrente()` cala a dica quando há chip do raio-X, glossário ou menu de
+      seleção abertos — ou com o mouse/dedo sobre uma marca que TEM balão próprio
+      (`mark.ler-dif|ab-dif|vid-dif|ler-w`). Vale para leitor, audiolivro e vídeo.
+- [x] ⚠️ **A checagem tem de vir ANTES do atalho `target === tipTarget`**: entrando na
+      marca, o `closest` devolve o MESMO contêiner e o atalho saía sem esconder a dica
+      — o teste pegou isso (1ª versão passou 5/6 justamente aí).
+- [x] **`.dif-pop` acima da dica** (`z-tooltip + 1`): cinto e suspensório — se as duas
+      se encontrarem, quem manda é a AÇÃO, não a explicação.
+- [x] sw v438. **Testado ao vivo: 6/6** (dica normal aparece; sobre a marca some;
+      volta ao sair; toque na marca não mostra; chip acima na pilha).
+
 ### A CAUSA RAIZ: o gesto do clique morria no primeiro await (2026-08-26, 72ª)
 
 **Provada no Chrome dele, no app publicado**, com o mesmo clique nos dois caminhos:

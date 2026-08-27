@@ -5827,7 +5827,10 @@ body.ab-full .ab-chips{max-width:34em}
    `dif-pop-papel` herda as cores da leitura (que viajam do `.ler-leitor` por
    variável inline); `dif-pop-app` usa as do app. */
 .dif-pop{
-  position:fixed;z-index:var(--z-modal);max-width:320px;
+  /* Acima da dica (rodada 73): o chip é AÇÃO — "Preparar", "Já sei" —, e a
+     dica é só explicação. Se as duas se encontrarem, quem manda é a ação.
+     O motor de tooltips já cala quando há chip aberto; isto é o suspensório. */
+  position:fixed;z-index:calc(var(--z-tooltip) + 1);max-width:320px;
   display:flex;flex-direction:column;gap:6px;padding:10px 12px;
   border-radius:var(--radius-sm);box-shadow:0 10px 30px rgba(0,0,0,.34);
   border:1px solid transparent;border-left-width:3px;font-family:var(--font);

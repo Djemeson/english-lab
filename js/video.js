@@ -632,7 +632,12 @@ async function videoOpenPlayer(v) {
                injetava o que quisesse na origem do app, onde vivem as chaves. -->
           <video id="vid-player" src="${escA(src)}" controls preload="metadata"${_vidStream ? ' crossorigin="anonymous"' : ''}></video>
           <div class="vid-ov" id="vid-ov">
-            <span class="vid-ov-en" id="vid-ov-en" title="Arraste para selecionar um trecho; clique duplo seleciona a palavra"></span>
+            <!-- SEM dica aqui (rodada 73): a legenda é a superfície onde ele
+                 MEXE — marca do raio-X, glossário, seleção. A dica de uso
+                 nascia do contêiner e caía por cima do chip, tapando
+                 "Preparar" e "Já sei". Instrução que atrapalha a ação que ela
+                 explica é ruído; quem interage aqui já descobriu o gesto. -->
+            <span class="vid-ov-en" id="vid-ov-en"></span>
             <span class="vid-ov-pt" id="vid-ov-pt"></span>
           </div>
           <div class="vid-ov-pop hidden" id="vid-ov-pop"></div>

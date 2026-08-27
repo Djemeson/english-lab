@@ -2256,6 +2256,18 @@ function inputModal({ title, label, value = '', placeholder = '', confirmText = 
 // ================================================================
 ;(function setupTooltips() {
   let tipEl = null, tipTarget = null
+  // ⚠️ DICA NÃO PODE TAPAR AÇÃO (rodada 73). A dica de uso da legenda do vídeo
+  // nascia do CONTÊINER e o `closest` a encontrava mesmo com o mouse sobre uma
+  // marca do raio-X — caindo por cima do chip e tapando "Preparar" e "Já sei".
+  // Regra geral, que vale para toda tela onde há balão sobre texto: enquanto
+  // houver um balão aberto (chip do raio-X, glossário, menu de seleção), ou
+  // com o mouse sobre uma marca que TEM balão próprio, a dica de fundo cala.
+  function balaoNaFrente(alvo) {
+    if (typeof _difPop !== 'undefined' && _difPop && document.body.contains(_difPop)) return true
+    if (typeof glossAberto === 'function' && glossAberto()) return true
+    if (document.getElementById('sel-menu')) return true
+    return !!(alvo && alvo.closest && alvo.closest('mark.ler-dif, mark.ab-dif, mark.vid-dif, mark.ler-w'))
+  }
   function ensure() {
     if (!tipEl) { tipEl = document.createElement('div'); tipEl.className = 'el-tip'; document.body.appendChild(tipEl) }
     return tipEl
@@ -2274,6 +2286,10 @@ function inputModal({ title, label, value = '', placeholder = '', confirmText = 
   }
   function hide() { if (tipEl) tipEl.style.display = 'none'; tipTarget = null }
   document.addEventListener('mouseover', e => {
+    // ANTES do atalho de "mesmo alvo": entrando na marca, o `closest` devolve
+    // o MESMO contêiner de antes e o atalho sairia sem esconder a dica — que
+    // era exatamente o caso da legenda com o chip por cima.
+    if (balaoNaFrente(e.target)) { hide(); return }
     const target = e.target.closest && e.target.closest('[data-tip],[title]')
     if (!target || target === tipTarget) return
     let txt = target.getAttribute('data-tip')
@@ -2297,7 +2313,7 @@ function inputModal({ title, label, value = '', placeholder = '', confirmText = 
   document.addEventListener('touchstart', e => {
     clearTimeout(pressTimer); pressFired = false
     const target = e.target.closest && e.target.closest('[data-tip],[title]')
-    if (!target) { hide(); return }
+    if (!target || balaoNaFrente(e.target)) { hide(); return }
     pressTimer = setTimeout(() => {
       let txt = target.getAttribute('data-tip')
       if (!txt) {
