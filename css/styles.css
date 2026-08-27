@@ -2395,9 +2395,12 @@ body.sb-collapsed #fb-user-photo{margin:0}
   .dash-action-card{flex-wrap:wrap;row-gap:16px}
 }
 
-/* minmax(0,…) para a proporção ser PURA (fr cru respeita o min-content e o
-   gráfico empurrava a coluna): assim a costura casa com o bento do topo. */
-.dash-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:18px;align-items:start;margin-top:20px}
+/* 2:1 em minmax(0,…): a proporção PURA (fr cru respeita min-content e o
+   gráfico empurrava a coluna). Era 1.7fr AQUI e 2fr num retoque do fim do
+   arquivo que vencia a cascata — rodada 75 unificou na proporção que já
+   valia na tela, numa fonte só. O bento do topo usa a MESMA: é o que faz
+   a costura vertical descer alinhada. */
+.dash-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:18px;align-items:start;margin-top:20px}
 .dash-col{display:flex;flex-direction:column;gap:18px;min-width:0}
 .dash-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);padding:20px 22px}
 .dash-card-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;gap:10px}
@@ -3870,11 +3873,10 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
 
 /* --- Largura: o painel usa o que tem --- */
 #section-dashboard{max-width:1336px}
-/* Com folga, a coluna do calendario cresce mais que a da tendencia:
-   ela e a que converte largura em informacao (mais semanas de historico). */
-@media (min-width:1280px){
-  #section-dashboard .dash-grid{grid-template-columns:2fr 1fr}
-}
+/* O override 2fr/1fr que vivia aqui (≥1280) virou a REGRA BASE do
+   .dash-grid (rodada 75): duas proporções em larguras diferentes faziam a
+   costura do bento do topo desalinhar da de baixo. A justificativa segue
+   valendo — o calendário é quem converte largura em informação. */
 
 /* --- Cabecalho: identificacao, nao anuncio ---
    36px de titulo + 23px de subtitulo + 42px de respiro para dizer o que
@@ -8306,11 +8308,11 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
    markup não mudou — dashboard.js segue montando as mesmas caixas.
    ================================================================ */
 @media (min-width:1041px){
-  /* 1.7fr/18px = os MESMOS do .dash-grid logo abaixo: a costura vertical
-     do bento de cima cai exatamente sobre a do painel Progresso. */
+  /* 2:1 e 18px = os MESMOS do .dash-grid: a costura vertical do bento de
+     cima cai exatamente sobre a do painel Progresso. */
   #section-dashboard.active{
     display:grid;
-    grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);
+    grid-template-columns:minmax(0,2fr) minmax(0,1fr);
     gap:18px;
     align-content:start;
   }
