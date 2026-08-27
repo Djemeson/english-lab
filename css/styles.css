@@ -8304,10 +8304,12 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
    markup não mudou — dashboard.js segue montando as mesmas caixas.
    ================================================================ */
 @media (min-width:1041px){
+  /* 1.7fr/18px = os MESMOS do .dash-grid logo abaixo: a costura vertical
+     do bento de cima cai exatamente sobre a do painel Progresso. */
   #section-dashboard.active{
     display:grid;
-    grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);
-    gap:var(--sp-6);
+    grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);
+    gap:18px;
     align-content:start;
   }
   #section-dashboard > .page-header,
