@@ -69,7 +69,13 @@
   /* ⚠️ Hierarquia por OPACIDADE da mesma cor (100/60/35), como eles fazem, e
      não por três cinzas diferentes: nunca desafina com o fundo, e some um
      valor para manter. */
-  --text2: rgba(255,255,255,0.60);
+  /* ⚠️ 60/50 passavam AA mas eram a COR MAIS COMUM da tela (medido em
+     2026-08-26: 37 elementos em 0.50, 23 em 0.60, só 15 em branco cheio) —
+     a maior parte do que se lê estava pequena E desbotada ao mesmo tempo,
+     e é isso que dava o ar de "meio feio". Dark UIs comerciais usam ~70%
+     no secundário e ~55-60% no terciário. A hierarquia continua por
+     opacidade (100/68/58), só menos apagada. */
+  --text2: rgba(255,255,255,0.68);
   /* --text3 e usado nos rotulos pequenos de TODA a interface (eyebrows,
      labels de metrica, dicas). Nos valores antigos ele reprovava contraste
      em todos os 6 temas (2.36 a 3.11:1). Estes passam AA (>=4.6:1) sem
@@ -80,8 +86,9 @@
      tinha sido calibrado à mão por esse mesmo motivo, e eu quase repeti o erro
      que aquele comentário existia para evitar.
      0,50 dá 5,24:1 — mantém o papel de terciário (mais leve que `--text2`) e
-     passa AA. Copiar a proporção não vale copiar a falha de contraste. */
-  --text3: rgba(255,255,255,0.50);
+     passa AA. Copiar a proporção não vale copiar a falha de contraste.
+     Em 2026-08-26 subiu para 0,58 (~6,8:1) junto com o --text2: ver nota lá. */
+  --text3: rgba(255,255,255,0.58);
   --scrollbar-track: #06001C;
   /* Raios: o CSS tinha 36 valores distintos. Estes cobrem tudo
      (2-4px seguem literais em detalhes micro, e 50% em circulos). */
@@ -95,17 +102,23 @@
      de propósito: não mudam com o tema, só as cores mudam). */
   /* Escala tipográfica. O CSS tinha 77 tamanhos DISTINTOS, treze deles
      espremidos entre 0.7 e 0.95rem — diferenças invisíveis uma a uma que,
-     somadas, destroem o ritmo da página. Estes 10 degraus substituem todos. */
-  --fs-3xs: 0.65rem;
-  --fs-2xs: 0.7rem;
-  --fs-xs: 0.74rem;
-  --fs-sm: 0.8rem;
-  --fs-md: 0.88rem;
-  --fs-base: 0.95rem;
-  --fs-lg: 1.1rem;
-  --fs-xl: 1.4rem;
-  --fs-2xl: 1.9rem;
-  --fs-3xl: 2.5rem;
+     somadas, destroem o ritmo da página. Estes 10 degraus substituem todos.
+     ⚠️ RECALIBRADA em 2026-08-26 ("o lab ainda parece meio feio"): medido ao
+     vivo, a moda do texto visível era 12,8px (--fs-sm, 216 usos) com 10-12px
+     dominando — a escala inteira estava UM DEGRAU abaixo do confortável.
+     Apps comerciais usam 13-14px como corpo de ferramenta e 16px como base.
+     Cada degrau subiu ~1px para valores inteiros; a ORDEM e os papéis não
+     mudaram, então nenhum seletor precisou trocar de token. */
+  --fs-3xs: 0.6875rem;  /* 11px — era 10,4 */
+  --fs-2xs: 0.75rem;    /* 12px — era 11,2 */
+  --fs-xs: 0.8125rem;   /* 13px — era 11,8 */
+  --fs-sm: 0.875rem;    /* 14px — era 12,8; o corpo de fato da interface */
+  --fs-md: 0.9375rem;   /* 15px — era 14,1 */
+  --fs-base: 1rem;      /* 16px — era 15,2 */
+  --fs-lg: 1.125rem;    /* 18px — era 17,6 */
+  --fs-xl: 1.5rem;      /* 24px — era 22,4; título de página ganha presença */
+  --fs-2xl: 2rem;       /* 32px — era 30,4 */
+  --fs-3xl: 2.5rem;     /* 40px — inalterado */
   --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
   /* ⚠️ O PESO É METADE DA IDENTIDADE DO MIGAKU, e não o tamanho. Os títulos
      deles são **900** (black), não 700 "negrito forte" — com entrelinha
@@ -194,6 +207,14 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 ::-webkit-scrollbar-track{background:var(--scrollbar-track)}
 ::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:var(--radius-xs);border:2px solid transparent;background-clip:padding-box}
 ::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+/* A barra da sidebar fica SEMPRE à vista, colada no filete que separa sidebar
+   e conteúdo — a 8px com trilho pintado ela virava uma segunda borda cinza
+   (apontada no diagnóstico visual de 2026-08-26). Fina e discreta até o hover.
+   Tokens de borda, não branco-alpha: nos temas claros branco-alpha some. */
+.sidebar::-webkit-scrollbar{width:5px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border)}
+.sidebar:hover::-webkit-scrollbar-thumb{background:var(--border-strong)}
 
 /* ===== SIDEBAR LAYOUT ===== */
 .app-layout{display:flex;min-height:100vh}
