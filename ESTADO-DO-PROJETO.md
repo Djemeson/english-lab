@@ -15,7 +15,23 @@
 > aviso honesto). **Testado com HLS real: hls.js tocando, 1280×720, tempo andando.**
 > `sw.js` → **englab-v432**. Detalhes na §9 (bloco 70ª, item HLS).
 >
-> Última atualização: 2026-08-26 (76ª–77ª) — **O ESTUDO DE COR CHEGA AOS SEIS TEMAS, NASCE O
+> Última atualização: 2026-08-27 (78ª) — **SINCRONIA V2: O OUVIR-JUNTO NO MOLDE DO
+> WHISPERSYNC.** Ele ligou o áudio dentro de *Carrie* e levou "não achei este capítulo dentro
+> do livro" DEPOIS de pagar a transcrição. Diagnóstico no acervo real: o Chapter 1 do áudio é
+> "This is Audible…" + introdução do autor (não existe no EPUB — casamento 6,5% vs corte de
+> 25%), e o áudio tem 60 capítulos de ~10 min contra 3 seções de ~30 mil palavras no EPUB — a
+> v1 assumia 1:1 e até o caminho feliz reprovaria. Reescrito o motor (`js/sinc.js`): âncoras
+> com tempo ABSOLUTO no arquivo, mapa por seção parcial e mesclável, capítulo sem par vira
+> `capMapa[cap] = -1` ("fora do livro", com explicação e pulo automático), palpite por modelo
+> de tempo global que se autocorrige, cobertura medida do lado da transcrição, LIS no lugar
+> do guloso, derrame entre seções vizinhas, janela de 15 min para capítulo gigante, e barra
+> com "o trecho sincronizado terminou → continuar". Realce por frase consertado ao vivo com
+> ele olhando (parágrafos colados "spread.Then" + frases-rio divididas na vírgula/travessão).
+> **Testado de ponta a ponta no Chrome dele, no ar, com 2 transcrições reais (~R$ 0,06):**
+> Chapter 2→Part One 87% ancorado, continuar→Chapter 3 mesclou (294 âncoras, palavras 0–2507),
+> AGoT v1 convertido na leitura segue vivo. Ver §8.100 e §9.
+>
+> Anterior: 2026-08-26 (76ª–77ª) — **O ESTUDO DE COR CHEGA AOS SEIS TEMAS, NASCE O
 > GRAFITE, E O CLARO/ESCURO VIRA UM CLIQUE.** Ele: *"vc fez a mudança pra todos os outros
 > temas?"* (não — só o midnight) + *"que tal novos temas ou atualizar as cores"* + *"faça
 > também os que ficaram pra depois"* + *"coloca um botão de escuro e claro do lado das
@@ -1918,10 +1934,12 @@ js/init.js        — bootstrap (initApp) + service worker
 js/add.js         — aba Adicionar (manual/Kindle/Mídia/Website)  (CARREGADO LAZY)
 js/kindle-db.js   — leitor SQLite só-leitura (vocab.db do Kindle), sem WASM  (LAZY, antes de add.js)
 js/epub.js        — leitor de ZIP (DecompressionStream nativo) + parser EPUB  (LAZY, antes de ler.js)
-js/sinc.js        — SINCRONIA livro x audiolivro: casa capitulo por trigramas, casa
-                    palavra por 5-gramas (ancoras), interpola. Da o modo OUVIR JUNTO no
-                    leitor, o "Ver o texto" no reprodutor e a frase do AUTOR no marcador.
-                    Nao depende de nenhum dos dois — so de texto e numeros (§8.92)  (LAZY,
+js/sinc.js        — SINCRONIA livro x audiolivro (v2, §8.100): acha a secao por trigramas,
+                    ancora por 5-gramas unicos (LIS) com tempo ABSOLUTO no arquivo, mapa
+                    por secao parcial/mesclavel, capitulo sem par = "fora do livro" (-1),
+                    palpite por modelo de tempo global autocorretivo. Da o modo OUVIR
+                    JUNTO no leitor, o "Ver o texto" no reprodutor e a frase do AUTOR no
+                    marcador. Nao usa IA — so texto e numeros (§8.92, §8.100)  (LAZY,
                     nos dois pacotes)
 js/estante.js     — GERENCIADOR DO ACERVO: estante (busca/filtros/ordem), ficha do livro,
                     cadastro sem arquivo e o MOTOR DE CATÁLOGO usado por todas as telas de
@@ -15526,6 +15544,82 @@ Gateway de IA (freio/retry/teto), regras lexicais centralizadas, ficha técnica 
 exclusão de words/cards, parsers de m4b e SQLite, o leitor de mangá, o motor de sincronia,
 histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/Storage.
 
+## 8.100 Sincronia v2 — o ouvir-junto no molde do Whispersync (2026-08-27, 78ª)
+
+O gatilho: ele ligou o "ouvir junto" dentro de *Carrie*, aceitou pagar a transcrição do
+capítulo e recebeu **"não achei este capítulo dentro do livro — o texto não bate"**. Pediu:
+*"analisa toda essa função de livro junto com audio […] estude comercialmente, veja como a
+amazon trabalha com o whispersync e veja como deixar algo poderoso, eficiente, lindo e
+comercialmente valido."*
+
+### O diagnóstico, medido no acervo real (Chrome dele, app publicado)
+- O **Chapter 1 do áudio** de *Carrie* começa *"This is Audible."* e segue com a introdução
+  do AUTOR — texto que o EPUB dele **não tem**. Melhor casamento: **6,5%** (seção 7), contra
+  o corte de 25%. O erro da v1 estava **certo**; o beco é que era o problema (transcrição
+  paga → erro seco → nada a fazer).
+- Estrutural: o áudio tem **60 capítulos de ~10 min**; o EPUB tem 16 seções das quais **3
+  concentram o texto** (~30 mil palavras cada: Part One/Two/Three). A v1 assumia capítulo
+  1:1 e media cobertura contra o tamanho da SEÇÃO — 10 min ÷ 3h30 ≈ 5% < 15%: **até o
+  caminho feliz reprovaria.** É a mesma tríade que reprova pares no Whispersync da Amazon
+  (front matter só num formato, fronteiras diferentes, normalização).
+
+### A pesquisa (Whispersync, Immersion Reading, Storyteller — relatório na 78ª)
+- Amazon faz **forced alignment automático** com corte de elegibilidade ~97%; realce
+  frase/palavra só em LCD; vende como **upsell barato** (US$ 1,99–3,95) sobre o que o
+  usuário já tem; matched pairs por edição.
+- O blueprint open source é o **Storyteller** (storyteller-platform): transcreve tudo com
+  whisper.cpp e **ancora cada capítulo do EPUB pelo TEXTO, com busca fuzzy** — ignora a
+  estrutura dos arquivos de áudio; granularidade de **frase** (consenso prático).
+- Para L2, a pesquisa (Chang 2009; Hui 2024/26) sustenta: realce por frase + velocidade
+  ajustável + repetição sob demanda; o benefício depende do casamento de velocidades.
+
+### O motor v2 (js/sinc.js reescrito; assinaturas públicas preservadas)
+1. **Tempo absoluto no arquivo** nas âncoras — capítulos de áudio consecutivos se emendam
+   num mapa contínuo por seção; realce atravessa fronteira de faixa; morreram as conversões
+   relativas (fonte do bug de "pulo de horas" da rodada 44).
+2. **Mapa parcial e mesclável** (`trechos[]` + `_sincMesclar`); v1 convertido NA LEITURA
+   (soma `cap.ini`), guardado não é reescrito.
+3. **`capMapa[cap] = -1` = "fora do livro"** (créditos/introdução): mensagem que explica,
+   transcrição paga fica guardada, palpites futuros pulam o capítulo.
+4. **Modelo de tempo global** (posição→segundo): interpola âncoras existentes, extrapola
+   pela velocidade medida do narrador, frio usa proporção palavras/duração. O laço em
+   `sincPrepararCapitulo` se autocorrige (máx. 2 transcrições pagas por chamada, custo em
+   BRL confirmado ANTES, promessa explícita de perguntar de novo).
+5. **Cobertura pelo lado da transcrição** (casadas/5-gramas do áudio ≥ 8%) e
+   **LIS** no lugar do filtro guloso de monotonicidade.
+6. **Derrame**: ponta da transcrição sem âncora (>25%) tenta a seção vizinha — capítulo de
+   áudio que cruza a fronteira de seções vira mapa nos dois lados.
+7. **Capítulo gigante** (>20 min): transcreve janela de 15 min em volta do ponto estimado.
+8. **Barra**: novo estado "o trecho sincronizado terminou" + botão continuar
+   (`sincContinuar`) — transcreve o próximo trecho e, se a narração cruzou de seção, o
+   leitor vira junto (`lerIrParaCapitulo`).
+9. **Reprodutor**: `sincFalasDoLivro` fatia as frases da seção pela janela do capítulo do
+   áudio (antes mostraria "Part One" inteira com milhares de frases clampada no mesmo
+   instante); `sincFraseDoInstante` converte relativo→absoluto por dentro.
+
+### Realce por frase, consertado com ele olhando (mesma rodada)
+Ele, ao vivo: *"o texto em destaque tá feio, seção espalhada em mais de um parágrafo"*.
+Causas: `textContent` cola parágrafos sem espaço ("spread.Then") e o corte por pontuação
+exigia espaço; e frase-rio do King pintava 40+ palavras. Remédios: `epubTextoLimpo` põe um
+respiro no fim de cada bloco (posições dos mapas NÃO mudam — `sincNorm` já tratava o ponto
+como separador); fronteira de bloco no DOM é corte obrigatório; `_sincSubdividir` divide
+trecho >45 palavras na vírgula/;/travessão mais perto do meio (o `—` do King corta até sem
+espaço, antes de maiúscula colada). Distribuição medida depois: 76% das frases ≤15 palavras,
+só 3 acima de 45.
+
+### Testado ao vivo (Chrome dele, Vercel, acervo real — 2 transcrições ≈ R$ 0,06)
+- Chapter 1 (introdução) → **fora do livro marcado**, sem beco. Sintético: 1.800 palavras
+  do meio de Part One acharam as palavras 3000–4795 com **99,6%** de cobertura.
+- Fluxo dele completo: botão ouvir → modal "Chapter 2, ~10 min, R$ 0,03" → transcreveu
+  (baixou o m4b da nuvem sozinho) → **Part One 0–1161, 87,3% ancorado** → frase acesa na
+  tela, áudio no ponto de leitura.
+- Fim do trecho → barra "terminou" → continuar → Chapter 3 transcrito e **mesclado** (294
+  âncoras, palavras 0–2507, capMapa {0:-1, 1:7, 2:7}) — a frase acesa era exatamente a do
+  print que abriu a rodada.
+- Regressão AGoT: mapa **v1 convertido na leitura** (450 âncoras, +16s do Prologue), aba
+  Texto do reprodutor com 412 frases do autor a partir de *"PROLOGUE 'We should start
+  back'"*.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -15534,6 +15628,27 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Da sincronia v2 (2026-08-27, 78ª)
+
+- [ ] **Auto-continuação opcional**: hoje cada trecho novo pede confirmação (custo ~R$ 0,03
+      por ~10 min na Groq). Um `cfg.sincAuto` ("continuar transcrevendo sozinho enquanto eu
+      ouço") tiraria o modal do meio da escuta — decisão de gasto é dele, por isso ficou de
+      fora desta rodada.
+- [ ] **"Preparar o livro inteiro"**: botão que transcreve+alinha todos os capítulos numa
+      fila em segundo plano (custo do *Carrie* inteiro: ~444 min ≈ R$ 1,60 na Groq) e mostra
+      um medidor de cobertura por seção — o equivalente do selo "Whispersync ready".
+- [ ] **Velocidade do áudio na barra do ouvir-junto** — a pesquisa de L2 (Hui 2024/26) diz
+      que o benefício do ler-ouvindo depende do casamento entre velocidade do áudio e a de
+      leitura; o reprodutor tem controle, a barra não.
+- [ ] **Modos de estudo sobre o mapa** (ouvir-só → ouvir+ler → ler-só; repetir frase em
+      loop; esconder texto e revelar) — os diferenciais de L2 que a pesquisa sustenta e
+      nenhum leitor comercial entrega.
+- [ ] App ANTIGO lendo mapa v2 interpretaria tempo absoluto como relativo (janela pequena:
+      deploy simultâneo nos dois aparelhos; único mapa v1 pré-existente era o do AGoT).
+      Se aparecer realce em lugar absurdo no celular, mandar recarregar o app.
+- [ ] Frases sem pontuação nenhuma acima de 45 palavras não são subdivididas (3 casos em
+      Part One, máx. 60) — aceito por ora; se incomodar, cortar por contagem seca.
 
 ### Do diagnóstico visual (2026-08-26 — análise, nada implementado)
 
