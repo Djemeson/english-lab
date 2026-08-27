@@ -227,17 +227,32 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 ::-webkit-scrollbar-track{background:var(--scrollbar-track)}
 ::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:var(--radius-xs);border:2px solid transparent;background-clip:padding-box}
 ::-webkit-scrollbar-thumb:hover{background:var(--text3)}
-/* A barra da sidebar fica SEMPRE à vista, colada no filete que separa sidebar
-   e conteúdo — a 8px com trilho pintado ela virava uma segunda borda cinza
-   (apontada no diagnóstico visual de 2026-08-26). Fina e discreta até o hover.
-   Tokens de borda, não branco-alpha: nos temas claros branco-alpha some. */
-.sidebar::-webkit-scrollbar{width:5px}
-.sidebar::-webkit-scrollbar-track{background:transparent}
-/* Invisível até o mouse estar NA sidebar (rodada 75: mesmo a 5px com token de
-   borda ela seguia desenhando uma régua permanente no print dele — o menu
-   quase não rola, a barra não informa nada parada ali). */
-.sidebar::-webkit-scrollbar-thumb{background:transparent}
-.sidebar:hover::-webkit-scrollbar-thumb{background:var(--border-strong)}
+/* A barra fica SEMPRE à vista, colada no filete que separa sidebar e conteúdo
+   — a 8px com trilho pintado ela virava uma segunda borda cinza (apontada no
+   diagnóstico visual de 2026-08-26). Fina, e invisível até o mouse entrar.
+   Tokens de borda, não branco-alpha: nos temas claros branco-alpha some.
+   ⚠️ O SELETOR CERTO É `.sb-nav`, NÃO `.sidebar` (corrigido na rodada 77 —
+   medido: `.sidebar` tem overflow-y:hidden e NUNCA rola; quem rola é a lista
+   de dentro, com 145px de sobra). As duas rodadas anteriores estilizaram o
+   elemento errado e a régua continuou lá, no print e na tela. */
+.sb-nav::-webkit-scrollbar{width:5px}
+.sb-nav::-webkit-scrollbar-track{background:transparent}
+.sb-nav::-webkit-scrollbar-thumb{background:transparent;border:0;border-radius:var(--radius-pill)}
+.sidebar:hover .sb-nav::-webkit-scrollbar-thumb{background:var(--border-strong)}
+/* Firefox não tem os pseudo-elementos do WebKit: mesma ideia, sintaxe dele. */
+.sb-nav{scrollbar-width:thin;scrollbar-color:transparent transparent}
+.sidebar:hover .sb-nav{scrollbar-color:var(--border-strong) transparent}
+/* ---- O menu passou a não caber (rodada 77) ----
+   MEDIDO num notebook de 695px de altura: 584px de lista para 506px de
+   espaço, e o "Revisar" ficava cortado ao meio — parece defeito, não
+   rolagem. A causa é soma: a fonte subiu ~9% na 74ª e são 12 itens em 4
+   grupos. Dois pontos a menos de respiro por item (10→8) e um degrau a
+   menos entre grupos (16→12) devolvem 60px sem espremer: o item fica em
+   33px, à vontade para o mouse (o toque não passa por aqui — abaixo de
+   768px a barra lateral não existe). Com TODOS os grupos abertos ainda
+   rola, e tudo bem: agora a barra é discreta e nada corta no meio. */
+.sb-nav .nav-item{padding-top:var(--sp-3);padding-bottom:var(--sp-3)}
+.sb-nav-label-2{margin-top:var(--sp-5)}
 
 /* ===== SIDEBAR LAYOUT ===== */
 .app-layout{display:flex;min-height:100vh}
