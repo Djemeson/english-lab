@@ -242,7 +242,10 @@ function _sincSubdividir(texto, a, b, saida) {
   if (sincNorm(pedaco).length <= SINC_FRASE_MAX) { saida.push([a, b]); return }
   const meio = pedaco.length / 2
   let melhor = -1, dist = Infinity
-  const re = /[,;:—–…]["”']?\s+/g
+  // Vírgula/;/reticências com espaço — e o travessão do King, que emenda a
+  // frase seguinte SEM espaço ("no harm—It was still"): corta antes da
+  // maiúscula que vem colada nele.
+  const re = /[,;:—–…]["”']?\s+|[—–](?=["“]?[A-Z])/g
   let m
   while ((m = re.exec(pedaco))) {
     const p = m.index + m[0].length
