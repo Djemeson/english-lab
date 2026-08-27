@@ -15453,6 +15453,44 @@ histórico git limpo (665 commits, 3 buscas), regras por-usuário do Firestore/S
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
 
+### Do diagnóstico visual (2026-08-26 — análise, nada implementado)
+
+Ele disse: *"tem sites e apps que parecem tão gostosos de se olhar, mas o lab ainda parece
+meio feio"* e pediu pesquisa (estudos + o que apps comerciais fazem). Medido no app
+publicado (Vercel), logado, telas Dashboard e Vídeo, via Claude in Chrome:
+
+- **Texto pequeno e apagado é o problema nº 1.** A moda dos tamanhos de texto visível é
+  10,4–12,8px (26+21+12 elementos), com ocorrências de 8px e 9px; e a cor de texto mais
+  comum é `rgba(255,255,255,0.5)` (37 elementos) — metade da opacidade — seguida de 0.6.
+  Ou seja: a maior parte do que está na tela é pequena E desbotada ao mesmo tempo. Apps
+  comerciais usam corpo 14–16px, secundário ~70% e primário ≥90%.
+- **Sopa de botões na tela de Vídeo**: ~11 pílulas outline de mesmo peso visual em 3
+  fileiras (Buscar legenda/Importar/Preparar/Biblioteca + Repetir/Marcar/Sono + PT
+  legenda/PT IA/Névoa/Traduzir tudo + Legenda/Sync/Tela cheia). Nenhuma ação primária
+  preenchida; hierarquia zero.
+- **Raio de canto sem sistema**: 369 elementos com `border-radius: 2px` (duro, datado)
+  convivendo com 11px, 16px, 8px e 999px. A cara "amigável" dos apps comerciais vem de
+  raio consistente e generoso (8–16px).
+- **Escala tipográfica fraturada**: 11 tamanhos distintos com valores quebrados (11,84px,
+  15,2px, 17,6px, 22,4px…) — não há escala; o título da página (22,4px) mal se destaca.
+- **Layout não respira nem preenche**: cards do Dashboard esticados de ponta a ponta com
+  interior vazio (um corta na borda direita), metade inferior da tela de Vídeo morta,
+  barra de rolagem cinza aparente colada na sidebar, player com controles nativos do
+  Chrome (sem marca).
+- O que está BOM e é para manter: o par Inter+Newsreader é intencional e elegante (as
+  serifas dos números são Newsreader carregada, não fallback — `ClipperSoleil`/`Soleil`
+  declaradas e nunca carregadas são só lixo de declaração), o tema roxo escuro tem
+  identidade, o transcript com tradução borrada é bom design.
+- Embasamento: efeito estética-usabilidade (Kurosu & Kashimura 1995, Hitachi, 252
+  participantes; replicado por Tractinsky — bonito é PERCEBIDO como mais fácil de usar);
+  Lindgaard 2006 (julgamento visual se forma em 50ms e contamina o resto por halo); NN/g
+  "Why Does a Design Look Good" (consistência tipográfica + hierarquia + paleta contida +
+  grid); Refactoring UI (polimento = escalas restritas de espaço/tipo/cor/sombra, não
+  talento); Duolingo (cor viva, formas arredondadas, micro-interações).
+- [ ] **Decisão dele pendente**: rodada de polimento visual guiada por este diagnóstico
+      (ordem sugerida: contraste/tamanho de texto → hierarquia de botões → raio e escala
+      unificados → layout/respiro). A skill `revisao-de-design` cobre exatamente isso.
+
 ### Do estudo Nuvio×addon (2026-08-26 — análise, nada implementado)
 
 Ele perguntou se dá para o Lab virar addon do **Nuvio** (app de streaming
