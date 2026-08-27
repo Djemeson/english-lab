@@ -5582,8 +5582,16 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
    auto-fluxo, os três filhos (topo, abas, conteúdo) cairiam em L — abas na
    coluna 2 e o texto de volta na 1, debaixo do player. */
 @media (min-width: 1200px){
+  /* ⚠️ AS DUAS MARGENS SOBRAVAM, e ele viu: "tem espaço nas duas margens,
+     aproveita até a extensão máxima". O teto não era do player — é o
+     `max-width:1180px` que TODA seção do app tem, com margem automática dos
+     dois lados (97px de cada, medidos numa janela de 1536). Aqui ele sai,
+     e só aqui: o `:has()` prende a liberação ao player ABERTO, para a
+     estante de capas continuar na medida do resto do app. */
+  #section-audiobook:has(.ab-player){max-width:none}
+
   .ab-player{
-    max-width:1400px;
+    max-width:none;
     display:grid;
     grid-template-columns:minmax(320px, 360px) minmax(0, 1fr);
     grid-template-rows:auto minmax(0, 1fr);
