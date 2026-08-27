@@ -10,6 +10,9 @@
    ⚠️ A DESCOBERTA QUE MAIS PESA: o escuro deles não é cinza. `#0A002A` é
    azul-violeta, e é isso que tira o ar de "tema escuro genérico" que quase
    todo app tem. O nosso era `#06091A` — cinza-azulado, correto e sem graça.
+   [Rodada 75, 2026-08-26: o princípio FICA — escuro com roxo dentro —, mas
+   a dose baixou: saturação 100% em área grande vibra no olho (ver a nota
+   nos tokens de fundo). O matiz continua o do Migaku; o volume, não.]
 
    ⚠️ E SÃO SEIS ACENTOS, não um. O app era monocromático no azul; a paleta
    nova dá cor própria a coisas que hoje se confundem (progresso, IA, alerta).
@@ -20,26 +23,39 @@
    ferramenta de uso diário, e cartaz cansa quando se abre dez vezes por dia.
    O que veio da tipografia foi o PESO (ver `--fw-display`). */
 :root, [data-theme="midnight"] {
-  --bg: #0A002A;
+  /* ⚠️ FUNDOS DESSATURADOS (2026-08-26, rodada 75). O --bg antigo (#0A002A)
+     tinha saturação 100% — vermelho 10, verde ZERO. Fundo escuro totalmente
+     saturado é a armadilha clássica dos temas escuros: o Material Design e
+     os apps "premium" (Discord #313338, Linear) usam cinza COM TINTA de cor,
+     nunca a cor pura — a saturação alta em área grande vibra no olho.
+     Estes mantêm o mesmo matiz roxo-meia-noite, ~25 pontos menos saturados
+     e um fio mais claros. Texto é branco-alpha: contraste só melhora. */
+  --bg: #0E0626;
   --bg-grad: radial-gradient(1100px 560px at 82% -12%, rgba(var(--primary-rgb),0.14), transparent 58%),
              radial-gradient(900px 500px at -10% 110%, color-mix(in srgb, var(--purple) 12%, transparent), transparent 60%);
-  --surface: #12093A;
-  --surface2: #1A1049;
-  --surface3: #241858;
-  --sidebar-bg: #06001C;
+  --surface: #150D3B;
+  --surface2: #1D144A;
+  --surface3: #271C58;
+  --sidebar-bg: #09051D;
   --border: rgba(255,255,255,0.08);
   --border-strong: rgba(255,255,255,0.15);
-  --primary: #6B2FC3;
-  --primary-d: #55219E;
-  --accent-bright: #9B6BE8;
+  /* ⚠️ ROXO RECALIBRADO (2026-08-26, rodada 75 — "cores de destaque, tudo").
+     O #6B2FC3 é um roxo de TINTA (bom sobre fundo claro); sobre fundo escuro
+     ele afunda — media 2,5-2,7:1 como texto e apagava o próprio acento.
+     Acento em tema escuro precisa ser a variante MAIS LUMINOSA do mesmo
+     matiz (a regra do Material: dessatura o fundo, clareia o acento).
+     Mesmo matiz violeta, um degrau acima de luz: */
+  --primary: #7C3AED;
+  --primary-d: #6626CE;
+  --accent-bright: #A78BFA;
   --primary-glow: rgba(var(--primary-rgb),0.14);
-  --primary-rgb: 107,47,195;
+  --primary-rgb: 124,58,237;
   /* O gradiente de assinatura deles: azul → roxo. */
-  --primary-grad: linear-gradient(160deg, #3C91FF 0%, #6B2FC3 85%);
+  --primary-grad: linear-gradient(160deg, #3C91FF 0%, #7C3AED 85%);
   /* Gradiente quente, o segundo deles — para o que é conquista e energia. */
   --hot-grad: linear-gradient(135deg, #FF9345 0%, #FE4670 100%);
   /* Os seis acentos, na ordem do Migaku. */
-  --acc-1: #6B2FC3;   /* roxo      */
+  --acc-1: #7C3AED;   /* roxo      */
   --acc-2: #FE4670;   /* rosa      */
   --acc-3: #FF9345;   /* laranja   */
   --acc-4: #3C91FF;   /* azul      */
@@ -64,7 +80,7 @@
   --success: #00C7A4;
   --warning: #FF9345;
   --error: #FE4670;
-  --purple: #9B6BE8;
+  --purple: #A78BFA;
   --text: #FFFFFF;
   /* ⚠️ Hierarquia por OPACIDADE da mesma cor (100/60/35), como eles fazem, e
      não por três cinzas diferentes: nunca desafina com o fundo, e some um
@@ -89,7 +105,7 @@
      passa AA. Copiar a proporção não vale copiar a falha de contraste.
      Em 2026-08-26 subiu para 0,58 (~6,8:1) junto com o --text2: ver nota lá. */
   --text3: rgba(255,255,255,0.58);
-  --scrollbar-track: #06001C;
+  --scrollbar-track: #09051D;
   /* Raios: o CSS tinha 36 valores distintos. Estes cobrem tudo
      (2-4px seguem literais em detalhes micro, e 50% em circulos). */
   --radius-xs: 8px;
@@ -213,7 +229,10 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
    Tokens de borda, não branco-alpha: nos temas claros branco-alpha some. */
 .sidebar::-webkit-scrollbar{width:5px}
 .sidebar::-webkit-scrollbar-track{background:transparent}
-.sidebar::-webkit-scrollbar-thumb{background:var(--border)}
+/* Invisível até o mouse estar NA sidebar (rodada 75: mesmo a 5px com token de
+   borda ela seguia desenhando uma régua permanente no print dele — o menu
+   quase não rola, a barra não informa nada parada ali). */
+.sidebar::-webkit-scrollbar-thumb{background:transparent}
 .sidebar:hover::-webkit-scrollbar-thumb{background:var(--border-strong)}
 
 /* ===== SIDEBAR LAYOUT ===== */
@@ -464,7 +483,9 @@ select option{background:var(--surface)}
 .src-chip.active{background:var(--primary-glow);border-color:rgba(var(--primary-rgb),.4);color:var(--primary)}
 /* Dashboard home */
 .dash-action-card{background:var(--primary-glow);border:1px solid rgba(var(--primary-rgb),.35);border-radius:var(--radius);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.dash-action-left .dash-num{font-size:var(--fs-3xl);font-weight:700;color:var(--primary);line-height:1}
+/* Cor via --role-ia pelo CONTRASTE, não pelo papel: é "o roxo legível deste
+   tema" (claro no escuro, puro no claro) — o --primary cru media 2,7:1 aqui. */
+.dash-action-left .dash-num{font-size:var(--fs-3xl);font-weight:700;color:var(--role-ia);line-height:1}
 .dash-action-left .dash-sub{font-size:var(--fs-md);color:var(--text2);margin-top:4px}
 .dash-secondary{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;font-size:var(--fs-md);color:var(--text2)}
 .dash-mini-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
@@ -2100,12 +2121,15 @@ select option{background:var(--surface)}
 .sidebar{transition:width .2s ease}
 .sb-brand{position:relative}
 .sb-brand-text{flex:1;min-width:0}
+/* Sem moldura (rodada 75): uma caixinha com borda ao lado da marca era o
+   segundo objeto mais chamativo da sidebar sendo a ação MENOS usada dela.
+   Vira ícone quieto; o hover devolve a caixa. */
 .sb-collapse-btn{
   display:flex;align-items:center;justify-content:center;width:28px;height:28px;
-  flex-shrink:0;border:1px solid var(--border);background:var(--surface2);
+  flex-shrink:0;border:1px solid transparent;background:transparent;
   color:var(--text3);border-radius:var(--radius-xs);cursor:pointer;transition:all .14s;
 }
-.sb-collapse-btn:hover{color:var(--text);border-color:var(--border-strong);background:var(--surface3)}
+.sb-collapse-btn:hover{color:var(--text);border-color:var(--border);background:var(--surface2)}
 .sb-collapse-btn .ic{transition:transform .2s ease}
 
 body.sb-collapsed .sidebar{width:74px}
@@ -2306,7 +2330,7 @@ body.sb-collapsed #fb-user-photo{margin:0}
   gap:28px;
 }
 .dash-action-card::after{opacity:.22}
-.dash-action-card:not([style]) .dash-action-left .dash-num{color:var(--primary)}
+.dash-action-card:not([style]) .dash-action-left .dash-num{color:var(--role-ia)}
 .dash-action-card:not([style]) .dash-action-left .dash-sub{color:var(--text2)}
 /* Empurra o botão para a direita SEM abrir um vão de 663px no meio do nada:
    o espaço agora fica entre grupos de informação, não dentro de um deles. */
@@ -3553,17 +3577,18 @@ body.sb-collapsed #fb-user-photo{margin:0}
    fechando no clique; quem identifica o grupo é o ícone. O único sinal de
    "está fechado" é o ícone apagar um pouco — e o número somado, que só
    aparece nessa situação. */
-/* A SILHUETA DO GRUPO É LARANJA (pedido dele). Vai por `--role-energia`, e
-   não pelo `#FF9345` cru, porque o papel do acento muda de cor conforme o
-   tema — escrever a cor à mão deixaria a silhueta gritando nos temas claros.
-   ⚠️ Atrito consciente com o mapa de papéis (topo do arquivo): o laranja
-   responde por "a ação principal, a conquista, o fogo", e um rótulo de menu
-   não é ação. Ele pediu assim; fica registrado que o significado esticou. */
+/* A silhueta do grupo FOI laranja a pedido dele (rodada de 2026-08-20), com o
+   atrito registrado: laranja = "ação/conquista/fogo", e rótulo de menu não é
+   ação. Em 2026-08-26 ele olhou a sidebar e disse "está feia, as cores" — o
+   estudo de cor (60-30-10; acento SÓ no interativo) confirma que era isto:
+   quatro pontos quentes permanentes no lugar mais estrutural da tela.
+   O rótulo agora sussurra na cor do próprio texto; o laranja volta a ser
+   exclusivo do fogo da sequência e das ações. */
 .sb-grupo-ic{
-  width:15px;height:15px;flex-shrink:0;stroke:var(--role-energia);fill:none;stroke-width:2;
-  stroke-linecap:round;stroke-linejoin:round;opacity:.9;transition:opacity .16s ease;
+  width:15px;height:15px;flex-shrink:0;stroke:var(--text3);fill:none;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.9;transition:opacity .16s ease, stroke .14s ease;
 }
-.sb-nav-label:hover .sb-grupo-ic{opacity:1}
+.sb-nav-label:hover .sb-grupo-ic{opacity:1;stroke:var(--text2)}
 .sb-nav-label.fechado .sb-grupo-ic{opacity:.5}
 /* O número do cabeçalho não pode competir com o do item: menor e sem o
    vermelho, que fica reservado para "tem coisa parada no Preparar". */
@@ -8264,3 +8289,47 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 }
 .vid-lib-atalho:empty{display:none}
 .vid-lib-atalho.sem{color:var(--warning);border-color:color-mix(in srgb, var(--warning) 45%, transparent)}
+
+/* ================================================================
+   RODADA 75 (2026-08-26) — DASHBOARD EM BENTO
+   Pedido dele: "foi tudo usado na horizontal por linha… poderia usar
+   colunas". Eram três faixas de largura cheia empilhadas (hero,
+   aguardando-IA, métricas), cada uma com o miolo vazio. Agora o topo
+   é uma caixa bento: HERO como telha em pé à esquerda (o maior tile =
+   o mais importante, padrão-F), e à direita a coluna de apoio —
+   aviso de pendência + métricas 2×2. Abas e painéis seguem inteiros.
+   ⚠️ Só ≥1041px: abaixo do degrau 1040 do contrato de breakpoints o
+   empilhado atual é o certo (única exceção min-width além do 1280;
+   reverter três faixas à mão seria mais frágil que esta guarda). O
+   markup não mudou — dashboard.js segue montando as mesmas caixas.
+   ================================================================ */
+@media (min-width:1041px){
+  #section-dashboard.active{
+    display:grid;
+    grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);
+    gap:var(--sp-6);
+    align-content:start;
+  }
+  #section-dashboard > .page-header,
+  #section-dashboard > #audio-gen-banner,
+  #section-dashboard > .seg-tabs,
+  #section-dashboard > [role="tabpanel"]{grid-column:1/-1;min-width:0}
+  #section-dashboard.active > .page-header{margin-bottom:0}
+  #dash-main-action{grid-column:1;min-width:0;display:flex}
+  #dash-stats-area{grid-column:2;min-width:0;display:flex;flex-direction:column;gap:var(--sp-5)}
+  /* O hero deixa de ser faixa e vira telha: número em cima, quebra
+     revisões/novos no meio, ação embaixo — sem os 600px de vazio. */
+  #dash-main-action .dash-action-card{
+    flex:1;margin-bottom:0;
+    flex-direction:column;align-items:flex-start;justify-content:space-between;
+    gap:var(--sp-6);
+  }
+  #dash-main-action .dash-hero-split{
+    padding-left:0;border-left:0;width:100%;flex:0 0 auto;
+    justify-content:flex-start;gap:var(--sp-10);
+  }
+  #dash-main-action .dash-action-card .btn-primary{margin-left:0}
+  #dash-stats-area .dash-secondary{margin-bottom:0}
+  #dash-stats-area .metric-grid{grid-template-columns:1fr 1fr;margin-bottom:0;flex:1;gap:var(--sp-5)}
+  #dash-stats-area .metric-card{padding:var(--sp-5) var(--sp-6)}
+}
