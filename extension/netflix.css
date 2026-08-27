@@ -139,7 +139,14 @@
    escurissimo #19005E no texto, raio generoso, pilula nos botoes.
    ⚠️ A extensao NAO le o CSS do app -- folha propria, sem variaveis
    compartilhadas. Estes valores sao copia, e as duas precisam mudar juntas.
-   Mesmo aviso que ficou na legenda. */
+   Mesmo aviso que ficou na legenda.
+
+   ⚠️ O ROXO AQUI E #6B2FC3 E NAO ACOMPANHA O APP -- DE PROPOSITO (2026-08-26).
+   O app clareou o acento para #7C3AED porque o tema dele e ESCURO, e sobre
+   fundo escuro o roxo fechado afunda. Este cartao e BRANCO: aqui vale a
+   regra inversa, a mesma do tema `light` do app, que tambem ficou no
+   #6B2FC3. Medido sobre #fff: 7,45:1 contra 5,70:1 do tom claro. Alinhar
+   a marca "por coerencia" PIORA a leitura -- nao troque. */
 #englab-pop {
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: calc(8.5% + 104px); z-index: 1000000;

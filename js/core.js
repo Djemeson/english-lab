@@ -1139,16 +1139,27 @@ async function restoreCfgFromBackup() {
 // ================================================================
 // THEMES
 // ================================================================
+// ⚠️ O `swatch` é a AMOSTRA do seletor, e ela precisa ser a cor real do tema.
+// Estava mentindo desde o reskin de 2026-08-11: o midnight mostrava o
+// #06091A/#3B82F6 (cinza-azulado e azul) que o tema deixou de ter naquele dia,
+// e o light mostrava um branco-cinza no lugar do azul-lavanda. Escolher tema
+// por uma bolinha errada é escolher no escuro — corrigido na rodada 76.
+// Ao mexer em `--bg`/`--primary` de um tema, ATUALIZE o par aqui.
 const THEMES = [
-  { id: 'midnight', name: 'Midnight',  dark: true,  swatch: ['#06091A', '#3B82F6'] },
-  { id: 'light',    name: 'Light',     dark: false, swatch: ['#F4F6FB', '#2563EB'] },
-  { id: 'sepia',    name: 'Sepia',     dark: false, swatch: ['#F3EAD8', '#B45309'] },
+  { id: 'midnight', name: 'Midnight',  dark: true,  swatch: ['#130C22', '#7C3AED'] },
+  { id: 'grafite',  name: 'Grafite',   dark: true,  swatch: ['#13151B', '#38BDF8'] },
   { id: 'emerald',  name: 'Emerald',   dark: true,  swatch: ['#07130F', '#10B981'] },
-  { id: 'violet',   name: 'Violet',    dark: true,  swatch: ['#0E0A1C', '#8B5CF6'] },
+  { id: 'light',    name: 'Light',     dark: false, swatch: ['#D4DDF5', '#6B2FC3'] },
   { id: 'papel',    name: 'Papel',     dark: false, swatch: ['#F6F4EF', '#2E4BC6'] },
+  { id: 'sepia',    name: 'Sepia',     dark: false, swatch: ['#EFE6D6', '#B45309'] },
 ]
+// Tema aposentado → substituto. Sem isto, quem estava no `violet` cairia no
+// fallback do midnight sem explicação (e a nuvem devolveria 'violet' no próximo
+// aparelho, num vai-e-vem). Aqui a preferência é REESCRITA para o novo id.
+const THEME_ALIAS = { violet: 'grafite' }
 function applyTheme(id) {
-  const valid = THEMES.find(t => t.id === id) ? id : 'midnight'
+  const alvo = THEME_ALIAS[id] || id
+  const valid = THEMES.find(t => t.id === alvo) ? alvo : 'midnight'
   document.documentElement.setAttribute('data-theme', valid)
   cfg.theme = valid
   applyAccent(cfg.accent)
@@ -1195,9 +1206,13 @@ function applyAccent(hex) {
   root.style.setProperty('--primary-glow', `rgba(${rgb},0.10)`)
 }
 // Aplica o tema o mais cedo possível (antes mesmo do initApp) p/ evitar flash
+// O alias entra AQUI também: este bloco roda antes do initApp e é ele quem
+// pinta a primeira tela — sem a troca, o `violet` salvo daria um flash de
+// tema inexistente (nenhuma regra casa) antes do applyTheme corrigir.
 try {
   const _stored = JSON.parse(localStorage.getItem('englab_cfg') || '{}')
-  document.documentElement.setAttribute('data-theme', _stored.theme || 'midnight')
+  const _t = THEME_ALIAS[_stored.theme] || _stored.theme || 'midnight'
+  document.documentElement.setAttribute('data-theme', _t)
 } catch { document.documentElement.setAttribute('data-theme', 'midnight') }
 
 // ================================================================

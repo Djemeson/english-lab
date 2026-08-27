@@ -828,8 +828,17 @@ function updateFirebaseUI(user) {
     const photo = el('fb-user-photo')
     const name  = el('fb-user-name')
     if (photo && user.photoURL) { photo.src = user.photoURL; photo.style.display = 'block' }
-    if (name) name.textContent = user.displayName || user.email
-    
+    // PRIMEIRO NOME na barra lateral (rodada 76): a coluna tem ~150px e o nome
+    // completo virava "Djemeson Tava…" — reticências não identificam ninguém,
+    // e o sobrenome não é o que distingue a conta de quem usa o app sozinho.
+    // O nome inteiro continua nas Configurações, logo abaixo. Sem espaço no
+    // displayName (ou só e-mail), cai no valor original.
+    if (name) {
+      const completo = user.displayName || user.email || ''
+      name.textContent = (user.displayName || '').trim().split(/\s+/)[0] || completo
+      name.title = completo
+    }
+
     const photoMob = el('fb-user-photo-mob')
     if (photoMob && user.photoURL) { photoMob.src = user.photoURL }
 

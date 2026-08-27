@@ -29,14 +29,18 @@
      os apps "premium" (Discord #313338, Linear) usam cinza COM TINTA de cor,
      nunca a cor pura — a saturação alta em área grande vibra no olho.
      Estes mantêm o mesmo matiz roxo-meia-noite, ~25 pontos menos saturados
-     e um fio mais claros. Texto é branco-alpha: contraste só melhora. */
-  --bg: #0E0626;
+     e um fio mais claros. Texto é branco-alpha: contraste só melhora.
+     ⚠️ 2ª passada (rodada 76): 73% ainda destoava dos IRMÃOS — os outros
+     escuros do app vivem em 46-47% de saturação, e um tema que foge da
+     própria família é o que faz a troca de tema parecer troca de produto.
+     Agora 48%, mesma luminosidade. Branco sobre o fundo: 19,03:1. */
+  --bg: #130C22;
   --bg-grad: radial-gradient(1100px 560px at 82% -12%, rgba(var(--primary-rgb),0.14), transparent 58%),
              radial-gradient(900px 500px at -10% 110%, color-mix(in srgb, var(--purple) 12%, transparent), transparent 60%);
-  --surface: #150D3B;
-  --surface2: #1D144A;
-  --surface3: #271C58;
-  --sidebar-bg: #09051D;
+  --surface: #1E1334;
+  --surface2: #281A47;
+  --surface3: #322259;
+  --sidebar-bg: #0D0817;
   --border: rgba(255,255,255,0.08);
   --border-strong: rgba(255,255,255,0.15);
   /* ⚠️ ROXO RECALIBRADO (2026-08-26, rodada 75 — "cores de destaque, tudo").
@@ -105,7 +109,7 @@
      passa AA. Copiar a proporção não vale copiar a falha de contraste.
      Em 2026-08-26 subiu para 0,58 (~6,8:1) junto com o --text2: ver nota lá. */
   --text3: rgba(255,255,255,0.58);
-  --scrollbar-track: #09051D;
+  --scrollbar-track: #0D0817;
   /* Raios: o CSS tinha 36 valores distintos. Estes cobrem tudo
      (2-4px seguem literais em detalhes micro, e 50% em circulos). */
   --radius-xs: 8px;
@@ -1393,7 +1397,11 @@ select option{background:var(--surface)}
   --border-strong:rgba(90,62,28,0.30);
   --primary:#B45309;
   --primary-d:#92400E;
-  --accent-bright:#B45309;
+  /* ⚠️ NÃO é igual ao --primary (rodada 76): `--accent-bright` alimenta
+     TEXTO (é o `--role-ia` dos temas claros), e o #B45309 dá 4,06:1 sobre
+     este fundo — reprova AA. Um tom fechado leva a 4,88 sem tocar no
+     --primary, que é superfície/gráfico e pode continuar vivo. */
+  --accent-bright:#A04A08;
   --primary-glow:rgba(180,83,9,0.10);
   --primary-rgb:180,83,9;
   --primary-grad:linear-gradient(135deg,#D97706,#B45309);
@@ -1436,32 +1444,47 @@ select option{background:var(--surface)}
   --ring:0 0 0 3px color-mix(in srgb, var(--success) 25%, transparent);
 }
 
-/* ---- VIOLET (escuro, acento violeta) ---- */
-[data-theme="violet"]{
-  --bg:#0E0A1C;
-  --bg-grad:radial-gradient(1100px 560px at 82% -12%, rgba(139,92,246,0.18), transparent 58%),
-            radial-gradient(900px 500px at -10% 110%, color-mix(in srgb, var(--primary) 8%, transparent), transparent 60%);
-  --surface:#160F2B;
-  --surface2:#1D1539;
-  --surface3:#271C4B;
-  --sidebar-bg:#080518;
+/* ---- GRAFITE (escuro NEUTRO, acento céu) ----
+   ⚠️ ESTE TEMA SUBSTITUIU O "VIOLET" (rodada 76). Medido: o violet estava a
+   distância 11 (de 255) do midnight no fundo e 38 no acento — eram o MESMO
+   tema com dois nomes, e ficaram gêmeos de vez quando o midnight clareou o
+   roxo. O buraco real da paleta era outro: com cinco temas coloridos e
+   nenhum neutro, quem quisesse "sem cor" não tinha para onde ir — e o
+   neutro-azulado é justamente o que os apps de uso diário adotam
+   (Discord #313338, Linear, GitHub dark).
+   Saturação 15-20% (contra 46-48% dos temas com cor), acento céu porque
+   azul frio é o único que não briga com cinza-azulado.
+   `violet` é migrado para cá em applyTheme() — ver THEME_ALIAS em core.js. */
+[data-theme="grafite"]{
+  /* Papéis: o lima e o roxo do :root são cor de fundo escuro ROXO; aqui
+     precisam do vizinho frio para não parecerem manchas de outro tema. */
+  --role-ia:#A5B4FC; --role-fonte:#7DD3FC;
+  --bg:#13151B;
+  --bg-grad:radial-gradient(1100px 560px at 82% -12%, rgba(56,189,248,0.10), transparent 58%),
+            radial-gradient(900px 500px at -10% 110%, rgba(148,163,184,0.06), transparent 60%);
+  --surface:#1C1F27;
+  --surface2:#242932;
+  --surface3:#303541;
+  --sidebar-bg:#0C0E12;
   --border:rgba(255,255,255,0.09);
   --border-strong:rgba(255,255,255,0.16);
-  --primary:#8B5CF6;
-  --primary-d:#7C3AED;
-  --accent-bright:#A78BFA;
-  --primary-glow:rgba(139,92,246,0.12);
-  --primary-rgb:139,92,246;
-  --primary-grad:linear-gradient(135deg,#A78BFA,#7C3AED);
-  --success:#4CC39A; --warning:#E7BA53; --error:#ED7A74; --purple:#BCAAE9;
-  --text:#ECE6FB;
-  --text2:#9A8CC0;
-  --text3:#8678AA;
-  --scrollbar-track:#080518;
-  --shadow:0 18px 50px rgba(18,14,10,0.55);
-  --shadow-sm:0 2px 10px rgba(18,14,10,0.35);
-  --shadow-card:inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 30px rgba(18,14,10,0.35);
-  --ring:0 0 0 3px rgba(139,92,246,0.28);
+  --primary:#38BDF8;
+  --primary-d:#0EA5E9;
+  --accent-bright:#7DD3FC;
+  --primary-glow:rgba(56,189,248,0.10);
+  --primary-rgb:56,189,248;
+  --primary-grad:linear-gradient(135deg,#7DD3FC,#0EA5E9);
+  --hot-grad:linear-gradient(135deg,#FBBF24 0%,#FB7185 100%);
+  --success:#4CC39A; --warning:#E7BA53; --error:#ED7A74; --purple:#A5B4FC;
+  /* Medidos sobre #13151B: 15,13 · 7,34 · 5,80 — os três passam folgado. */
+  --text:#E6EAF2;
+  --text2:#9AA5B8;
+  --text3:#8592A8;
+  --scrollbar-track:#0C0E12;
+  --shadow:0 18px 50px rgba(6,8,12,0.55);
+  --shadow-sm:0 2px 10px rgba(6,8,12,0.35);
+  --shadow-card:inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 30px rgba(6,8,12,0.35);
+  --ring:0 0 0 3px rgba(56,189,248,0.28);
 }
 
 /* ---- PAPEL (claro, acento azul-tinta, estética "paper") ---- */
@@ -1481,7 +1504,9 @@ select option{background:var(--surface)}
   --border-strong:rgba(40,35,25,0.18);
   --primary:#2E4BC6;
   --primary-d:#24399C;
-  --accent-bright:#5B76E0;
+  /* Mesmo conserto do sepia (rodada 76): o #5B76E0 dava 3,74:1 aqui e
+     `--accent-bright` é texto. 4,84 com o tom fechado. */
+  --accent-bright:#4A63CC;
   --primary-glow:rgba(46,75,198,0.08);
   --primary-rgb:46,75,198;
   --primary-grad:linear-gradient(135deg,#2E4BC6,#5B76E0);
