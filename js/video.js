@@ -296,7 +296,9 @@ async function videoAcceptFile(file, handle) {
   }
   // await de propósito: o player abre depois, e um erro NELE não pode mais
   // levar o atalho junto (era o que acontecia com a gravação solta).
-  await _vidGuardarAtalho(v, handle)
+  const guardou = await _vidGuardarAtalho(v, handle)
+  // O cache SÍNCRONO é o que salva o próximo clique (rodada 72).
+  _vidAtalhoCache.set(v.id, { estado: guardou ? 'pronto' : 'sem-atalho', handle: guardou ? handle : null })
   _vidFile = file
   await videoOpenPlayer(v)
 }
@@ -325,13 +327,32 @@ async function videoOpenStream(v, url) {
 // trocar a CAÇADA PELA PASTA por UM clique de "Permitir".
 // Estados: 'pronto' (atalho + permissão viva) · 'precisa-permissao' (atalho
 // guardado, um clique resolve) · 'sem-atalho' (só o seletor de arquivos).
+// ⚠️ O GESTO DO CLIQUE MORRE NO PRIMEIRO `await` (rodada 72 — a causa raiz do
+// "tenho que buscar o vídeo de novo"). Medido no Chrome dele, no app
+// publicado: clicar na LINHA do vídeo dava
+//   SecurityError: Must be handling a user gesture to show a file picker
+// enquanto o MESMO clique no botão "Abrir arquivo" abria o seletor normalmente.
+// A diferença não era o navegador nem a permissão: `videoOpen` fazia
+// `await VideoDB.get('handles', id)` ANTES de chamar o seletor, e a espera do
+// IndexedDB gasta a "ativação transiente" que o navegador exige para abrir
+// seletor de arquivo ou pedir permissão. O seletor nunca abria; o atalho nunca
+// nascia; a etiqueta dizia "vai pedir o arquivo" para sempre.
+//
+// A saída é decidir COM O GESTO AINDA QUENTE: o estado (e o próprio handle)
+// ficam num cache SÍNCRONO, preenchido quando a lista é pintada.
+const _vidAtalhoCache = new Map()   // id → { estado, handle }
+
 async function videoHandleEstado(id) {
   let h = null
   try { h = await VideoDB.get('handles', id) } catch (e) {}
-  if (!h || typeof h.queryPermission !== 'function') return 'sem-atalho'
-  try {
-    return (await h.queryPermission({ mode: 'read' })) === 'granted' ? 'pronto' : 'precisa-permissao'
-  } catch (e) { return 'sem-atalho' }
+  let estado = 'sem-atalho'
+  if (h && typeof h.queryPermission === 'function') {
+    try {
+      estado = (await h.queryPermission({ mode: 'read' })) === 'granted' ? 'pronto' : 'precisa-permissao'
+    } catch (e) { estado = 'sem-atalho' }
+  }
+  _vidAtalhoCache.set(id, { estado, handle: estado === 'sem-atalho' ? null : h })
+  return estado
 }
 // O vídeo que o app tentou reabrir sozinho e não pôde por falta de permissão:
 // a biblioteca oferece o convite de um clique em vez de ficar muda.
@@ -344,6 +365,33 @@ let _vidPendente = null
 // store `handles` estava VAZIO depois de três tentativas, sem um único erro
 // no console. Agora grava, CONFERE que ficou, e registra o motivo no próprio
 // vídeo — que é o que a etiqueta da biblioteca passa a mostrar.
+// Pede o arquivo com o gesto AINDA QUENTE: o seletor é a PRIMEIRA coisa que
+// acontece, antes de qualquer leitura de banco. Foi a inversão dessa ordem que
+// deixou o clique na linha do vídeo sem efeito nenhum (rodada 72).
+async function _vidEscolherArquivo(v) {
+  let h
+  try {
+    ;[h] = await window.showOpenFilePicker({
+      types: [{ description: 'Vídeo ou podcast', accept: { 'video/*': ['.mp4', '.mkv', '.webm', '.mov', '.avi'], 'audio/*': ['.mp3', '.m4a', '.aac', '.ogg', '.opus', '.wav', '.flac'] } }]
+    })
+  } catch (e) {
+    if (e.name === 'AbortError') return
+    console.warn('[video] seletor:', e.name, e.message)
+    toast('O navegador não abriu o seletor (' + e.name + ')', 'error')
+    return
+  }
+  const file = await h.getFile()
+  v.fileName = file.name; v.fileSize = file.size; v.updated_at = new Date().toISOString()
+  saveVideos()
+  const ok = await _vidGuardarAtalho(v, h)
+  _vidAtalhoCache.set(v.id, { estado: ok ? 'pronto' : 'sem-atalho', handle: ok ? h : null })
+  toast(ok ? 'Atalho guardado — da próxima vez abre com um clique'
+           : 'Abri o vídeo, mas não consegui guardar o atalho', ok ? 'success' : 'warning')
+  _vidPendente = null
+  _vidFile = file
+  await videoOpenPlayer(v)
+}
+
 async function _vidGuardarAtalho(v, handle) {
   if (!v) return false
   if (!handle) {
@@ -386,6 +434,30 @@ async function videoOpen(id, { silencioso = false } = {}) {
     await videoOpenPlayer(v)
     return
   }
+  // ---- DECISÃO COM O GESTO QUENTE (rodada 72) ----
+  // Nada de `await` antes daqui: é este trecho que salva o clique. O cache foi
+  // preenchido quando a lista pintou, então dá para saber o que fazer sem
+  // esperar o banco — e o navegador ainda aceita abrir seletor/pedir permissão.
+  const cache = !silencioso && _vidAtalhoCache.get(id)
+  if (cache && cache.estado === 'sem-atalho' && window.showOpenFilePicker) {
+    return _vidEscolherArquivo(v)
+  }
+  if (cache && cache.estado === 'precisa-permissao' && cache.handle) {
+    try {
+      const p = await cache.handle.requestPermission({ mode: 'read' })   // 1º await: o gesto ainda vale
+      if (p === 'granted') {
+        _vidPendente = null
+        _vidAtalhoCache.set(id, { estado: 'pronto', handle: cache.handle })
+        _vidFile = await cache.handle.getFile()
+        await videoOpenPlayer(v)
+        return
+      }
+      toast('Sem permissão para ler o arquivo — clique de novo para autorizar', 'warning')
+      _vidPendente = id; renderVideoLib()
+      return
+    } catch (e) { console.warn('[video] permissão:', e.name, e.message) }
+  }
+
   const handle = await VideoDB.get('handles', id)
   if (handle && typeof handle.queryPermission === 'function') {
     try {

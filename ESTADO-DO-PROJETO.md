@@ -15632,6 +15632,37 @@ stream entra em `videos[]` sem URL persistida. Dados de teste limpos.
 - [ ] **`captureStream` (gravar a cena em card) exige CORS na fonte** — link de
       debrid/http sem CORS toca mas não grava áudio; legenda/transcript não dependem.
 
+### A CAUSA RAIZ: o gesto do clique morria no primeiro await (2026-08-26, 72ª)
+
+**Provada no Chrome dele, no app publicado**, com o mesmo clique nos dois caminhos:
+
+| clique | resultado |
+|---|---|
+| na LINHA do vídeo (`videoOpen`) | `SecurityError: Must be handling a user gesture to show a file picker` |
+| no botão "Abrir arquivo" (`videoPickFile`) | o seletor ABRE normalmente |
+
+Não era navegador, permissão, origem nem cota: `videoOpen` fazia
+`await VideoDB.get('handles', id)` ANTES de chamar o seletor, e a espera do
+IndexedDB **gasta a ativação transiente** que o navegador exige para abrir seletor de
+arquivo ou pedir permissão. O seletor nunca abria (só um `console.warn`), o atalho
+nunca nascia, e a etiqueta dizia "vai pedir o arquivo" para sempre — enquanto o mesmo
+arquivo aberto pelo botão funcionava. Era isso que ele via como *"tenho que buscar o
+vídeo de novo no notebook"*.
+
+- [x] **Cache SÍNCRONO do atalho** (`_vidAtalhoCache`: id → {estado, handle}),
+      preenchido quando a lista é pintada (`videoHandleEstado` popula). No clique dá
+      para decidir **sem esperar o banco**.
+- [x] **`videoOpen` decide com o gesto quente**: sem atalho → `_vidEscolherArquivo`
+      (o seletor é a PRIMEIRA coisa que roda); permissão pendente → `requestPermission`
+      como primeiro await. O caminho antigo (com leitura do banco) fica como rede de
+      segurança para quando o cache ainda não existe.
+- [x] **`_vidEscolherArquivo`**: abre o seletor, grava o atalho com conferência,
+      atualiza o cache e AVISA ("Atalho guardado — da próxima vez abre com um clique").
+- [x] sw v437. ⚠️ **Lição que vale para todo o projeto:** qualquer API que exija gesto
+      do usuário (seletor de arquivo, permissão, tela cheia, áudio) tem de ser chamada
+      ANTES do primeiro `await` do handler. Um `await` de IndexedDB parece inofensivo e
+      não é.
+
 ### Da rodada do atalho que se perdia em silêncio (2026-08-26, 71ª)
 
 **Relato dele:** *"fiz o teste 3 vezes e continua igual"* — a etiqueta seguia dizendo
