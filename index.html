@@ -244,9 +244,20 @@
     <button class="sb-today hidden" id="sb-today" onclick="showSection('revisar')" aria-label="Progresso de hoje"></button>
   </nav>
   <div class="sb-foot">
-    <button class="nav-item" id="nav-configuracoes" onclick="showSection('configuracoes')">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Configurações</span>
-    </button>
+    <!-- Dois ÍCONES lado a lado (pedido dele, 2026-08-26): a engrenagem perdeu
+         o rótulo — é o símbolo mais reconhecido da interface e a palavra só
+         ocupava a linha — e ganhou de par o botão claro/escuro, que antes
+         exigia entrar em Configurações → Aparência para uma troca de um
+         clique. O `id` continua `nav-configuracoes`: é por ele que a
+         navegação marca o item ativo. -->
+    <div class="sb-foot-actions">
+      <button class="sb-foot-btn" id="nav-configuracoes" onclick="showSection('configuracoes')"
+              data-tip="Configurações" aria-label="Configurações">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <button class="sb-foot-btn" id="sb-theme-toggle" onclick="toggleThemeMode()"
+              data-tip="Mudar o tema" aria-label="Mudar o tema"></button>
+    </div>
     <div class="sb-account">
       <button id="fb-login-btn" class="btn btn-secondary btn-sm btn-full" onclick="firebaseSignIn()" style="display:none;font-size:var(--fs-xs)">
         Entrar com Google
@@ -1255,6 +1266,13 @@
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10.6 3.09V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 16 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.4 9v.09A1.65 1.65 0 0 0 21.91 10.6H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       <span>Configurações</span>
     </button>
+    <!-- O mesmo botão claro/escuro da barra lateral. Sem ele, a troca de um
+         clique existiria só no computador: no celular a barra lateral não
+         existe, e Configurações mora aqui dentro. `navMaisIr` não serve —
+         não estamos indo para lugar nenhum, só trocando o tema; por isso o
+         onclick fecha a gaveta à mão. Conteúdo por sbThemeToggleSync(). -->
+    <button class="nmg-item" id="nav-tema-mob"
+            onclick="toggleThemeMode(); if (typeof navMaisFechar==='function') navMaisFechar()"></button>
   </div>
 </div>
 

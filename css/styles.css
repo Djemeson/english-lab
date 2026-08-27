@@ -3714,6 +3714,33 @@ body.sb-collapsed .sb-grupo::before{display:none}
 .sbt-ok{display:inline-flex;align-items:center;gap:4px;color:var(--success);font-weight:600}
 .sbt-ok .ic{width:12px;height:12px}
 
+/* ---- Rodapé: engrenagem + claro/escuro, dois ícones lado a lado ----
+   (2026-08-26) Alvo de 34px no desktop e 44 no toque; o ativo usa a mesma
+   tinta chapada dos itens do menu, para "estou em Configurações" continuar
+   legível sem o rótulo. */
+.sb-foot-actions{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-1) var(--sp-3)}
+.sb-foot-btn{
+  display:grid;place-items:center;width:34px;height:34px;flex-shrink:0;
+  border:1px solid transparent;background:none;color:var(--text3);
+  border-radius:var(--radius-sm);cursor:pointer;
+  transition:color .14s ease, background .14s ease, border-color .14s ease;
+}
+.sb-foot-btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+.sb-foot-btn:hover{color:var(--text);background:var(--surface2)}
+.sb-foot-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.sb-foot-btn.active{
+  background:color-mix(in srgb, var(--primary) 11%, transparent);
+  color:var(--text);
+}
+.sb-foot-btn.active svg{stroke:var(--primary)}
+@media (hover:none) and (pointer:coarse){
+  .sb-foot-btn{width:44px;height:44px}
+}
+/* No rail (só ícones) os dois empilham e centralizam: lado a lado não cabem
+   em 74px de largura sem espremer o alvo de toque. */
+body.sb-collapsed .sb-foot-actions{flex-direction:column;gap:var(--sp-1);padding:var(--sp-1) 0}
+
 /* ---- Conta: uma linha, sem moldura ---- */
 .sb-account{background:none;border:none;box-shadow:none;padding:0;margin-top:6px}
 .sb-user{

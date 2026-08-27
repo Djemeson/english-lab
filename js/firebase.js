@@ -1131,6 +1131,10 @@ async function fbPushData() {
     // Assim, um dispositivo sem a chave nunca apaga o valor já salvo na nuvem.
     const cfgPayload = {
       theme:       cfg.theme        || 'midnight',
+      // O par preferido de cada lado, para o botão claro/escuro da barra
+      // lateral chegar no outro aparelho já sabendo ao que voltar.
+      themeDark:   cfg.themeDark    || '',
+      themeLight:  cfg.themeLight   || '',
       accent:      cfg.accent       || '',
       imgQuality:  cfg.imgQuality   || 'low',
       nivelAluno:  cfg.nivelAluno   || 'B1',
@@ -1328,6 +1332,8 @@ async function fbPull() {
     if (c.sttProvider) cfg.sttProvider = c.sttProvider
     if (c.imgProvider) cfg.imgProvider = c.imgProvider
       if (c.theme)       cfg.theme       = c.theme
+      if (c.themeDark)   cfg.themeDark   = c.themeDark
+      if (c.themeLight)  cfg.themeLight  = c.themeLight
     if (c.accent !== undefined) cfg.accent = c.accent
     if (c.imgQuality) cfg.imgQuality = c.imgQuality
     if (c.nivelAluno) cfg.nivelAluno = c.nivelAluno
@@ -1659,6 +1665,8 @@ function _applyCloudDocs(docs) {
     // nível do aluno no celular passava a valer no computador só pelo botão
     // manual "Baixar" — o caminho normal (snapshot) os deixava para trás.
     if (c.accent != null)     cfg.accent     = c.accent
+    if (c.themeDark)          cfg.themeDark  = c.themeDark
+    if (c.themeLight)         cfg.themeLight = c.themeLight
     if (c.imgQuality)         cfg.imgQuality = c.imgQuality
     if (c.nivelAluno)         cfg.nivelAluno = c.nivelAluno
     if (c.activeLang)         cfg.activeLang = c.activeLang

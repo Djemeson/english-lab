@@ -1157,12 +1157,52 @@ const THEMES = [
 // fallback do midnight sem explicação (e a nuvem devolveria 'violet' no próximo
 // aparelho, num vai-e-vem). Aqui a preferência é REESCRITA para o novo id.
 const THEME_ALIAS = { violet: 'grafite' }
+function _temaEhEscuro(id) {
+  const t = THEMES.find(x => x.id === (THEME_ALIAS[id] || id))
+  return t ? t.dark : true
+}
 function applyTheme(id) {
   const alvo = THEME_ALIAS[id] || id
   const valid = THEMES.find(t => t.id === alvo) ? alvo : 'midnight'
   document.documentElement.setAttribute('data-theme', valid)
   cfg.theme = valid
+  // Lembra o último de CADA LADO. É isto que faz o botão claro/escuro voltar
+  // ao tema que ele de fato usa (Grafite, Sepia…) em vez de a um padrão que
+  // ele nunca escolheu — e vale mesmo quando a troca veio do seletor cheio.
+  if (_temaEhEscuro(valid)) cfg.themeDark = valid; else cfg.themeLight = valid
   applyAccent(cfg.accent)
+  sbThemeToggleSync()
+}
+
+// ---- Botão claro/escuro da barra lateral ----
+// O ícone mostra PARA ONDE o clique leva (sol quando está escuro), que é a
+// convenção dos apps: o botão anuncia o destino, não o estado atual.
+function sbThemeToggleSync() {
+  if (typeof el !== 'function') return   // roda antes do DOM no boot: sai quieto
+  const escuro = _temaEhEscuro(cfg.theme)
+  const alvo = escuro ? (cfg.themeLight || 'light') : (cfg.themeDark || 'midnight')
+  const nome = (THEMES.find(t => t.id === alvo) || {}).name || alvo
+  const icone = escuro ? 'sun' : 'moon'
+  const b = el('sb-theme-toggle')
+  if (b) {
+    b.innerHTML = ic(icone, 'ic-sm')
+    b.setAttribute('data-tip', `Mudar para ${nome}`)
+    b.setAttribute('aria-label', `Mudar para o tema ${nome}`)
+  }
+  // O gêmeo da gaveta do celular. Aqui o nome do destino aparece escrito: a
+  // gaveta é uma grade de rótulos, e um ícone mudo destoaria dos vizinhos.
+  const m = el('nav-tema-mob')
+  if (m) {
+    m.innerHTML = ic(icone, 'ic') + `<span>${esc(nome)}</span>`
+    m.setAttribute('aria-label', `Mudar para o tema ${nome}`)
+  }
+}
+function toggleThemeMode() {
+  const escuro = _temaEhEscuro(cfg.theme)
+  applyTheme(escuro ? (cfg.themeLight || 'light') : (cfg.themeDark || 'midnight'))
+  if (typeof saveCfg === 'function') saveCfg()
+  if (typeof renderThemePicker === 'function') renderThemePicker()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
 }
 
 // ================================================================
@@ -1230,6 +1270,8 @@ const ICONS = {
   settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   sparkles:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 14l.7 1.8L21.5 16.5l-1.8.7L19 19l-.7-1.8L16.5 16.5l1.8-.7z"/>',
   palette:'<path d="M12 2a10 10 0 1 0 0 20 2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2h1a4 4 0 0 0 4-4 9 9 0 0 0-9-9z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon:'<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   wrench:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.1 2.1-2.3-.6-.6-2.3z"/>',
   cloud:'<path d="M17.5 19a4.5 4.5 0 0 0 .5-9 6 6 0 0 0-11.6-1.5A4 4 0 0 0 7 19z"/>',
   // "Neste aparelho" no painel de nuvem do audiolivro: um monitor com base, que
