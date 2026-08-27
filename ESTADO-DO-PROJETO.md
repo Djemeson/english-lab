@@ -15,7 +15,24 @@
 > aviso honesto). **Testado com HLS real: hls.js tocando, 1280×720, tempo andando.**
 > `sw.js` → **englab-v432**. Detalhes na §9 (bloco 70ª, item HLS).
 >
-> Última atualização: 2026-08-26 (70ª) — **NASCEU A SEÇÃO "ASSISTIR": O LAB COMO CLIENTE DE
+> Última atualização: 2026-08-26 (74ª) — **A ESCALA ESTAVA UM DEGRAU ABAIXO DO CONFORTÁVEL.**
+> Ele: *"tem sites e apps que parecem tão gostosos de se olhar, mas o lab ainda parece meio
+> feio"*. Diagnóstico MEDIDO no app publicado (detalhe na §9, bloco "Do diagnóstico visual"):
+> não falta sistema — falta calibragem. Três mudanças, todas em token do `:root`:
+> **escala tipográfica +~1px por degrau** (fs-sm 12,8→14px, que é o corpo de fato com 216
+> usos; fs-xl 22,4→24px; valores inteiros, ordem e papéis preservados — nenhum seletor
+> trocou de token), **texto menos apagado no midnight** (text2 0,60→0,68; text3 0,50→0,58,
+> ~6,8:1 — a cor mais comum da tela era branco a 50%), e **scrollbar da sidebar discreta**
+> (5px, trilho transparente, thumb com token de borda — branco-alpha sumiria nos temas
+> claros). Falsos positivos descartados com medição: os 369 cantos de 2px são o heatmap
+> (correto); Soleil/ClipperSoleil "não carregadas" vêm de extensão do Chrome dele, não do
+> nosso código; max-width e hierarquia de botões JÁ existiam. **Conferido no ar (Vercel +
+> Pages, Chrome real): moda do texto 14px, tokens novos computados, 2.644 regras parseadas,
+> sem overflow.** ⚠️ De olho: +9% de fonte pode quebrar linha em fileira densa no celular;
+> o nome no chip do usuário da sidebar agora trunca ("Djemeson Tava…"). `sw.js` →
+> **englab-v439**.
+>
+> Última atualização anterior: 2026-08-26 (70ª) — **NASCEU A SEÇÃO "ASSISTIR": O LAB COMO CLIENTE DE
 > ADDONS DE VÍDEO**. Pedido dele: *"o lab tocando os addons — vários addons, link direto,
 > debrid, tudo"* + seção própria. Feito e testado ao vivo. `js/video-stream.js` novo (no pacote
 > lazy `assistir`, que traz o player inteiro): busca título por Cinemeta, consulta
@@ -15479,17 +15496,25 @@ publicado (Vercel), logado, telas Dashboard e Vídeo, via Claude in Chrome:
   Chrome (sem marca).
 - O que está BOM e é para manter: o par Inter+Newsreader é intencional e elegante (as
   serifas dos números são Newsreader carregada, não fallback — `ClipperSoleil`/`Soleil`
-  declaradas e nunca carregadas são só lixo de declaração), o tema roxo escuro tem
-  identidade, o transcript com tradução borrada é bom design.
+  aparecem em `document.fonts` mas vêm de EXTENSÃO do Chrome dele, não do nosso código:
+  varrido, zero ocorrências no projeto), o tema roxo escuro tem identidade, o transcript
+  com tradução borrada é bom design.
 - Embasamento: efeito estética-usabilidade (Kurosu & Kashimura 1995, Hitachi, 252
   participantes; replicado por Tractinsky — bonito é PERCEBIDO como mais fácil de usar);
   Lindgaard 2006 (julgamento visual se forma em 50ms e contamina o resto por halo); NN/g
   "Why Does a Design Look Good" (consistência tipográfica + hierarquia + paleta contida +
   grid); Refactoring UI (polimento = escalas restritas de espaço/tipo/cor/sombra, não
   talento); Duolingo (cor viva, formas arredondadas, micro-interações).
-- [ ] **Decisão dele pendente**: rodada de polimento visual guiada por este diagnóstico
-      (ordem sugerida: contraste/tamanho de texto → hierarquia de botões → raio e escala
-      unificados → layout/respiro). A skill `revisao-de-design` cobre exatamente isso.
+- [x] **EXECUTADO na 74ª rodada (mesmo dia, "pode executar as correções")**: escala
+      tipográfica recalibrada (+~1px/degrau), text2/text3 do midnight subiram para
+      0,68/0,58, scrollbar da sidebar discreta. Medição pós-deploy: moda do texto 14px.
+      Na medição fina, dois "achados" caíram: raio 2px era o heatmap (correto) e a
+      hierarquia de botões JÁ existe (primary/secondary/ghost) — ela só lia mal com
+      texto pequeno e apagado.
+- [ ] De olho (74ª): fileiras densas no CELULAR com +9% de fonte (flex-wrap segura a
+      maioria, mas não foi medido no telefone dele); nome do usuário no chip da sidebar
+      truncando ("Djemeson Tava…"); os `--text2/--text3` dos outros 5 temas não foram
+      medidos nem alterados — se algum parecer apagado, é o mesmo conserto.
 
 ### Do estudo Nuvio×addon (2026-08-26 — análise, nada implementado)
 
