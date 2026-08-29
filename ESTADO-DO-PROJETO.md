@@ -15784,6 +15784,18 @@ Duas defesas, porque uma só não basta:
 
 E `_vidNuvemRender` deixou de poder travar calado: se a leitura falhar, ele **diz** que falhou.
 
+⚠️ **E o próprio conserto criou um defeito, achado medindo minutos depois.** A primeira versão
+abria com o número fixo (`indexedDB.open('el-video-db', 3)`). Assim que o banco se curou
+subindo para a versão 4, **toda abertura seguinte** morreu em `VersionError: The requested
+version (3) is less than the existing version (4)` — o remédio consertava hoje e quebrava a
+seção Vídeo inteira amanhã, porque legenda, atalho, áudio consertado e o painel da nuvem
+passam todos por `VideoDB.open`. A abertura passou a ser **sem número de versão**: o navegador
+entrega o que existir (e cria na 1 se não existir nada, disparando o upgrade que cria os
+quatro), e quem decide se precisa subir de versão é a conferência de depósitos. Cobre os
+quatro casos — banco novo, completo na v3, vazio na v3, e já curado na v4. **A lição:
+auto-conserto que muda versão precisa de abertura sem versão, senão a cura de uma sessão é a
+falha da próxima.**
+
 ### O que foi conferido, no Chrome dele e no app publicado
 
 - **O banco se consertou sozinho ao vivo**: console registrou *"[video] banco sem depósitos:
@@ -15803,6 +15815,12 @@ E `_vidNuvemRender` deixou de poder travar calado: se a leitura falhar, ele **di
   em 29% para 256/895 MB, botão de cancelar presente.
 - **O leitor de fluxo do download**: 115.367 bytes lidos de `js/video.js`, contagem final
   batendo com o tamanho do blob.
+- **Depois do conserto do `VersionError`**, tudo refeito no código já publicado: banco abre na
+  v4 com os quatro depósitos, gravar/ler/apagar em `subs` ida e volta (`{"ok":1}`), o cartão
+  mostra *"Baixando 256 MB de 895 MB"* quando o total é confiável e *"Baixando 0 MB"* quando
+  não é (em vez do absurdo "de 37 MB"), o caminho do segundo aparelho abre o player sem
+  chamar o seletor, a barra do player mostra **"Na nuvem"** e o **console fica sem um único
+  erro**.
 
 ⚠️ **O que NÃO foi testado, e por quê:** a subida e a descida **reais** contra o Storage dele.
 O login do app é `signInWithPopup` e a janela do popup fica **fora** do alcance das
