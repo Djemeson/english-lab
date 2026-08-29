@@ -256,13 +256,20 @@ function _vidNuvemPintar() {
     cx.appendChild(cd)
   }
   const j = _vidNuvemJob
-  const pct = j.tot ? Math.min(1, j.env / j.tot) : 0
+  // ⚠️ `total` PODE SER MENOR QUE O LIDO, e eu vi isso medindo: o
+  // `Content-Length` de uma resposta comprimida conta os bytes NA REDE, e o
+  // fluxo entrega os bytes DESCOMPRIMIDOS. Arquivo de vídeo não é comprimido
+  // pelo servidor, então na prática não acontece — mas "Baixando 400 MB de
+  // 37 MB" é o tipo de absurdo que destrói a confiança na barra. Quando o
+  // número não fecha, some com a parte que não dá para afirmar.
+  const confia = j.tot > 0 && j.env <= j.tot
+  const pct = confia ? j.env / j.tot : 0
   cd.innerHTML = `
     <div class="ab-fila-topo">
       <span class="ab-fila-ic">${ic(j.modo === 'subir' ? 'cloud' : 'download', 'ic-sm')}</span>
       <span class="ab-fila-txt">
         <b>${esc(j.titulo)}</b>
-        <em>${j.modo === 'subir' ? 'Enviando' : 'Baixando'} ${vidNuvemMB(j.env)} de ${vidNuvemMB(j.tot)}</em>
+        <em>${j.modo === 'subir' ? 'Enviando' : 'Baixando'} ${vidNuvemMB(j.env)}${confia ? ' de ' + vidNuvemMB(j.tot) : ''}</em>
       </span>
       <button class="ab-fila-x" onclick="videoNuvemCancelar()" data-tip="Cancelar" aria-label="Cancelar">${ic('x','ic-sm')}</button>
     </div>
@@ -689,7 +696,14 @@ async function videoDelete(id) {
   const v = videos.find(x => x.id === id); if (!v) return
   if (!(await confirmModal({ title: 'Remover vídeo da lista', icon: 'trash', danger: true, confirmText: 'Remover',
     html: `<p style="font-size:var(--fs-sm);color:var(--text2)">Remove <b>${esc(v.title)}</b> da lista, com a legenda e os marcadores.
-      <b>Nada de estudo é apagado</b>: cards, cortes e áudios extraídos continuam.</p>` }))) return
+      <b>Nada de estudo é apagado</b>: cards, cortes e áudios extraídos continuam.
+      ${/* ⚠️ ISTO PRECISOU SER DITO quando o vídeo passou a poder ir para a
+             nuvem: a cópia de lá sai junto (e tem de sair, senão come a cota e
+             o episódio reaparece sozinho). Se o arquivo só existe na nuvem,
+             remover da lista é a ÚLTIMA cópia indo embora — e o aviso antigo
+             prometia justamente o contrário. */''}
+      ${vidTemNaNuvem(v) ? `<br><br><b>A cópia na sua nuvem (${vidNuvemMB(v.nuvem.bytes)}) sai junto.</b>
+        Para apagar só daqui e manter a da nuvem, use o ícone de nuvem no card.` : ''}</p>` }))) return
   videos = videos.filter(x => x.id !== id); saveVideos()
   VideoDB.del('handles', id); VideoDB.del('subs', id)
   // podcast baixado ocupa dezenas de MB: sai junto (nada de órfão no disco)

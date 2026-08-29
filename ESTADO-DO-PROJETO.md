@@ -15,7 +15,18 @@
 > aviso honesto). **Testado com HLS real: hls.js tocando, 1280×720, tempo andando.**
 > `sw.js` → **englab-v432**. Detalhes na §9 (bloco 70ª, item HLS).
 >
-> Última atualização: 2026-08-27 (78ª) — **SINCRONIA V2: O OUVIR-JUNTO NO MOLDE DO
+> Última atualização: 2026-08-29 (79ª) — **O VÍDEO VAI PARA A NUVEM E VOLTA EM OUTRO
+> APARELHO.** Legenda, cortes, marcadores e posição já atravessavam; só o arquivo ficava
+> preso, e abrir o episódio no celular caía no seletor de arquivos pedindo um `.mkv` que não
+> existe ali. Agora há painel por vídeo com os três lugares possíveis (disco · cópia baixada ·
+> nuvem), subida com barra e cancelamento, e `videoOpen` entra pela nuvem exatamente onde o
+> seletor apareceria. `storage.rules` subiu de 500 MB para **2 GB** em `midia/` — medindo: o
+> único episódio de arquivo do acervo dele tem **895 MB** e seria recusado. No caminho,
+> apareceu um defeito **anterior**: `el-video-db` estava na v3 **sem nenhum depósito**, o que
+> pendurava a seção Vídeo inteira em silêncio; o banco agora se conserta sozinho.
+> `sw.js` → **englab-v451**. Detalhes na §8.103.
+>
+> Registro anterior: 2026-08-27 (78ª) — **SINCRONIA V2: O OUVIR-JUNTO NO MOLDE DO
 > WHISPERSYNC.** Ele ligou o áudio dentro de *Carrie* e levou "não achei este capítulo dentro
 > do livro" DEPOIS de pagar a transcrição. Diagnóstico no acervo real: o Chapter 1 do áudio é
 > "This is Audible…" + introdução do autor (não existe no EPUB — casamento 6,5% vs corte de
@@ -15692,6 +15703,129 @@ com os 4 itens a **33px cada** (nenhum quebrando), alinhado ao gatilho e dentro 
 os dois painéis agora abrem em y=8, inteiros na tela; fecha por clique fora **e** por Escape;
 tela cheia mantém a barra com os quatro botões; **zero erro no console**.
 
+## 8.103 O vídeo vai para a nuvem e volta em outro aparelho (2026-08-29, 79ª)
+
+Pedido dele, curto: *"eu quero que tenha a possibilidade de enviar um vídeo pra nuvem e poder
+acessar de qualquer dispositivo. o áudio já tem essa função."* Tinha razão e a assimetria era
+grande: legenda, cortes, marcadores, raio-X e posição já atravessavam pelo banco — **só o
+arquivo ficava preso**. Abrir o mesmo episódio no celular caía no seletor de arquivos pedindo
+um `.mkv` que não existe ali, e nada dizia por quê. EPUB, audiolivro e episódio de podcast já
+tinham caminho para a nuvem; vídeo de arquivo era o último buraco.
+
+**O desenho copia o do audiolivro (§8.89), e de propósito** — o problema é o mesmo:
+
+1. **Nada é automático.** O EPUB sobe sozinho porque tem 4 MB; um episódio tem centenas.
+   Subir sem mandar seria queimar a franquia de dados do celular em segundo plano.
+2. **Nuvem e aparelho são estados separados.** Estar na nuvem não obriga a ocupar disco aqui.
+   O painel mostra os **três** lugares possíveis, que não se excluem: *no disco deste
+   aparelho* (o atalho do sistema — não ocupa nada), *cópia baixada aqui* (essa sim ocupa) e
+   *na sua nuvem*.
+3. **A subida mostra byte a byte e aceita desistir**, num cartão flutuante que segue o
+   usuário por qualquer seção do app.
+4. **"Liberar espaço aqui" NUNCA toca no arquivo do disco dele.** Sai só a cópia que o app
+   baixou para o IndexedDB — o atalho do sistema é de leitura, o app nem conseguiria apagar
+   o `.mkv` da pasta.
+
+### O que entrou onde
+
+- **`js/firebase.js`** — `midiaSubirArquivo(id, blob, aoAndar)` sobe pela *task* do Storage:
+  reporta byte a byte e aceita `cancel()` (`midiaSubindo`, `midiaCancelarEnvio`). O
+  `midiaGarantirNaNuvem` antigo (`put` mudo) continua servindo o podcast, que sobe em segundo
+  plano e ninguém está olhando. `midiaGarantirLocal` ganhou `aoBytes` e `sinal` (AbortSignal)
+  — 30 MB de podcast descem sem ninguém sentir, 900 MB de episódio não, e desistir no meio
+  precisa **interromper a rede**, não só parar de pintar a barra. `midiaBytesNaNuvem` responde
+  o tamanho real por metadados, sem baixar.
+- **`js/video.js`** — bloco *"O ARQUIVO DO VÍDEO NA NUVEM"*: painel por vídeo
+  (`videoNuvemPainel`), ícone de nuvem no card e botão na barra do player, e as quatro ações
+  (guardar, baixar para cá, liberar espaço aqui, tirar da nuvem). A marca
+  `v.nuvem = { bytes, em }` viaja em `videos[]` pelo banco — **é ela que faz o segundo
+  aparelho saber que existe cópia lá antes de perguntar à rede.**
+- **`js/video.js` / `videoOpen`** — a nuvem entra exatamente onde o seletor de arquivos
+  apareceria, e a decisão usa o **cache síncrono** de atalho (§ rodada 72: o gesto do clique
+  morre no primeiro `await`). O disco continua vencendo quando o atalho existe. Três pontos de
+  entrada: atalho ausente, permissão negada e o *fallback* final — que também olha a cópia já
+  baixada.
+- **`js/core.js`** — `avisosCaixa()`. A caixa de avisos flutuantes nasceu dentro do audiolivro
+  (`_abAvisos`); com o vídeo subindo arquivo também, **dois módulos lazy criando o mesmo
+  contêiner `position:fixed`** empilhavam cartão sobre cartão, e qual ganhava dependia de qual
+  seção abriu primeiro. Um dono só, no shell. `_abAvisos` passou a delegar.
+- **`storage.rules`** — `users/{uid}/midia/**` foi de 500 MB para **2 GB**, e a mudança nasceu
+  **medindo**: o único episódio de arquivo do acervo dele — *The White Lotus* S01E01 1080p —
+  tem **938.948.908 bytes (895 MB)**. Com o teto antigo, o **primeiro** arquivo que ele
+  tentasse guardar seria recusado no meio da subida, e a mensagem do Storage para isso é
+  `unauthorized`: a mesma palavra de quem nem está logado. Publicado com
+  `firebase deploy --only storage`.
+- **`sw.js`** — v450 → **v451** (e depois v451 seguiu; `core.js` e `firebase.js`, que são
+  shell cache-first, ganharam símbolos que os módulos lazy usam).
+
+### O defeito que apareceu no teste, e que era ANTERIOR à feature
+
+Medido no Chrome dele, no app publicado: **`el-video-db` estava na versão 3 com ZERO
+depósitos**. Estado que não deveria existir — a v3 cria os quatro (`handles`, `subs`, `media`,
+`files`).
+
+O efeito era pior do que parece. `db.transaction('files')` estoura na hora com `NotFoundError`
+e o `req.onerror` do `VideoDB` **não pega isso**: o erro é **síncrono**, então a promessa nunca
+resolve. Sem erro na tela, sem toast — promessa pendurada. O painel travou em *"Vendo onde está
+este arquivo…"* para sempre, e o mesmo valeria para legenda, atalho e áudio consertado: **a
+seção Vídeo inteira parada e calada**. O defeito é anterior a esta rodada (`podcastEnsureFile`
+já lia `files`); a feature só o colocou no caminho de qualquer clique.
+
+Duas defesas, porque uma só não basta:
+
+1. **Ao abrir** (`VideoDB.open`/`_abrir`): confere se os quatro depósitos existem; faltando
+   qualquer um, sobe **uma** versão só para criá-lo — o banco se conserta sozinho, sem perder
+   o que já estava lá. Limite de 2 tentativas. Ganhou também `onblocked` (outra aba segurando
+   o banco impedia a subida de versão e pendurava a promessa — o **mesmo** sintoma) e um
+   guarda `_abrindo`, para duas telas pedindo junto abrirem uma vez só.
+2. **Na leitura/escrita** (`get`/`set`/`del`): `try` em volta do `transaction()`, porque erro
+   síncrono nunca vira `onerror`. O pior caso passa a ser "não achei" em vez de promessa
+   pendurada.
+
+E `_vidNuvemRender` deixou de poder travar calado: se a leitura falhar, ele **diz** que falhou.
+
+### O que foi conferido, no Chrome dele e no app publicado
+
+- **O banco se consertou sozinho ao vivo**: console registrou *"[video] banco sem depósitos:
+  handles, subs, media, files — recriando na versão 4"*, e depois `versão 4` com os quatro
+  depósitos; ler `files` passou a devolver vazio em vez de estourar.
+- **Biblioteca**: 3 registros de teste → **2 ícones de nuvem** (o de fonte online não tem, e
+  não deve ter), **1 aceso**; etiquetas `"vai pedir o arquivo"` e `"vem da nuvem"`.
+- **Painel**: as três linhas com os valores certos (disco *não* · cópia *—* · nuvem *401 MB*),
+  e só os botões que fazem sentido no estado (*Baixar para cá*, *Tirar da nuvem*).
+- **O caminho do segundo aparelho, medido**: registro com marca de nuvem + cópia no banco +
+  **nenhum atalho** → `videoOpen` abriu o player com o arquivo (`ep.mp4`, 1024 B) e o seletor
+  de arquivos **não foi chamado uma única vez** (`showOpenFilePicker` instrumentado).
+- **Deslogado**, as duas mensagens honestas: *"Entre com o Google para guardar na nuvem"* e o
+  diagnóstico do `nuvemFrase` (*"Você não está conectado — … Deslogado, o app só enxerga este
+  aparelho"*), em vez de "não está na nuvem" no chute.
+- **Cartão flutuante**: dentro de `#ab-avisos` (fixo), 320×65, sem vazar pelas bordas, barra
+  em 29% para 256/895 MB, botão de cancelar presente.
+- **O leitor de fluxo do download**: 115.367 bytes lidos de `js/video.js`, contagem final
+  batendo com o tamanho do blob.
+
+⚠️ **O que NÃO foi testado, e por quê:** a subida e a descida **reais** contra o Storage dele.
+O login do app é `signInWithPopup` e a janela do popup fica **fora** do alcance das
+ferramentas do navegador — o clique em "Entrar com o Google" não produziu popup nem erro no
+console. Todo o resto foi exercitado no app publicado; o trecho de rede é o mesmo caminho já
+provado pelo podcast, mais o leitor de fluxo verificado acima.
+
+### Detalhes que o código guarda
+
+- `total` do download **pode ser menor que o lido** (Content-Length conta bytes na rede,
+  o fluxo entrega descomprimidos). Arquivo de vídeo não é comprimido pelo servidor, mas
+  quando o número não fecha o cartão **some com a parte que não dá para afirmar** em vez de
+  escrever "Baixando 400 MB de 37 MB".
+- `unauthorized` é **ambíguo** no Storage: sai igual para "passou do teto" e para "a regra
+  ainda não foi publicada". A mensagem diz as duas.
+- **"Remover da lista" passou a avisar que a cópia da nuvem sai junto** — e tem de sair,
+  senão come a cota e o episódio reaparece sozinho. Se o arquivo só existe lá, é a última
+  cópia indo embora, e o aviso antigo prometia o contrário.
+- O painel confere o tamanho **real** na nuvem antes de desenhar: o registro local pode estar
+  velho (subiu no outro aparelho) ou mentir (foi apagado por fora).
+- A etiqueta "vai pedir o arquivo" virou "vem da nuvem" quando há cópia lá — no aparelho
+  novo, que é justamente onde ela apareceria, ela seria mentira.
+
 ## 9. Pendências / a verificar
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
@@ -15700,6 +15834,25 @@ tela cheia mantém a barra com os quatro botões; **zero erro no console**.
 > passou por aqui" era falso: ele lê *Billy Summers* aqui dentro), e as que nunca foram
 > tarefa — decisões já tomadas e limitações de terceiros, que ganharam seção própria no fim.
 > **Ao acrescentar item novo, ponha no grupo certo.** Lista plana volta a inchar.
+
+### Do vídeo na nuvem (2026-08-29, 79ª)
+
+- [ ] **A subida e a descida reais nunca foram exercitadas contra o Storage dele** — o login
+      é `signInWithPopup` e a janela do popup fica fora do alcance das ferramentas do
+      navegador. **Primeiro teste de verdade é dele**: abrir o episódio, "Guardar na nuvem",
+      e depois abrir o mesmo episódio no celular. Se falhar, o console diz o motivo.
+- [ ] **Retomar um envio pela METADE após recarregar** não existe — mesma limitação do
+      audiolivro (§8.89): o SDK não entrega o endereço da sessão de upload retomável para
+      guardar. O que sobrevive é a intenção: arquivo inteiro que já subiu não repete.
+- [ ] **A cota gratuita são 5 GB no total.** Um episódio de 895 MB come 18% dela. Não há
+      medidor de quanto já foi usado — hoje ele só descobre quando o Storage recusar. Um
+      "quanto da sua nuvem está ocupado" em Configurações resolveria.
+- [ ] **Filme longo em 1080p ainda não cabe**: o teto de `midia/` é 2 GB por arquivo. Subir
+      mais é mexer em `storage.rules` + `firebase deploy --only storage`, e a partir daí uma
+      única obra passa a comer metade da cota.
+- [ ] **O aviso de gzip vale para o audiolivro também** — `abNuvemBaixarArquivo` conta bytes
+      do mesmo jeito e não tem o freio que o cartão do vídeo ganhou. Não incomoda hoje
+      (áudio não é comprimido pelo servidor), mas é o mesmo padrão em dois lugares.
 
 ### Da sincronia v2 (2026-08-27, 78ª)
 
