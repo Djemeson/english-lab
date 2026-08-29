@@ -48,45 +48,90 @@ let _vidHls = null              // instância hls.js ativa (streams HLS), destru
 // ---- IndexedDB próprio: handles de arquivo + legendas ----
 const VideoDB = {
   _db: null,
+  _abrindo: null,
+  // v2: store 'media' — áudio consertado (m4a extraído pelo ffmpeg.wasm)
+  // v3: store 'files' — o arquivo do episódio (podcast, e agora vídeo)
+  DEPOSITOS: ['handles', 'subs', 'media', 'files'],
+
+  // ⚠️ ESTE BANCO JÁ APARECEU VAZIO NO CHROME DELE — medido no app publicado
+  // enquanto eu testava o vídeo na nuvem: `el-video-db` na **versão 3 com ZERO
+  // depósitos**. Estado que não deveria existir (a v3 cria os quatro), e o
+  // efeito era brutal: `db.transaction('files')` estoura na hora com
+  // `NotFoundError`, e o `onerror` abaixo NÃO pega isso — o erro é SÍNCRONO, a
+  // promessa nunca resolve. A tela ficava eternamente em "Vendo onde está este
+  // arquivo…", e o mesmo valia para legenda, atalho e áudio consertado: a
+  // seção Vídeo inteira travada, calada, sem um erro visível.
+  //
+  // Duas defesas, porque uma só não basta:
+  //   1. AO ABRIR, confere se os quatro depósitos existem. Faltando qualquer
+  //      um, sobe uma versão só para criá-lo — o banco se conserta sozinho, sem
+  //      perder o que já estava lá.
+  //   2. NA LEITURA/ESCRITA, `try` em volta do `transaction()`, porque erro
+  //      síncrono não vira `onerror`. Assim o pior caso vira "não achei" em vez
+  //      de uma promessa pendurada para sempre.
   open() {
     if (this._db) return Promise.resolve(this._db)
+    if (this._abrindo) return this._abrindo          // duas telas pedindo junto abrem UMA vez
+    this._abrindo = this._abrir(3, 0).finally(() => { this._abrindo = null })
+    return this._abrindo
+  },
+  _abrir(versao, tentativa) {
     return new Promise((resolve, reject) => {
-      // v2: store 'media' — áudio consertado (m4a extraído pelo ffmpeg.wasm)
-      // v3: store 'files' — o arquivo do episódio de PODCAST baixado
-      const req = indexedDB.open('el-video-db', 3)
+      const req = indexedDB.open('el-video-db', versao)
       req.onupgradeneeded = () => {
         const db = req.result
-        if (!db.objectStoreNames.contains('handles')) db.createObjectStore('handles')
-        if (!db.objectStoreNames.contains('subs'))    db.createObjectStore('subs')
-        if (!db.objectStoreNames.contains('media'))   db.createObjectStore('media')
-        if (!db.objectStoreNames.contains('files'))   db.createObjectStore('files')
+        for (const d of VideoDB.DEPOSITOS) if (!db.objectStoreNames.contains(d)) db.createObjectStore(d)
       }
-      req.onsuccess = () => { this._db = req.result; resolve(this._db) }
+      req.onsuccess = () => {
+        const db = req.result
+        const falta = VideoDB.DEPOSITOS.filter(d => !db.objectStoreNames.contains(d))
+        if (falta.length && tentativa < 2) {
+          console.warn('[video] banco sem depósitos:', falta.join(', '), '— recriando na versão', db.version + 1)
+          const proxima = db.version + 1
+          db.close()
+          VideoDB._abrir(proxima, tentativa + 1).then(resolve, reject)
+          return
+        }
+        VideoDB._db = db
+        resolve(db)
+      }
+      // Outra aba segurando o banco impede a subida de versão. Sem isto a
+      // promessa ficava pendurada — o mesmo sintoma que estamos consertando.
+      req.onblocked = () => reject(new Error('banco em uso por outra aba'))
       req.onerror = () => reject(req.error)
     })
   },
   async get(store, key) {
-    const db = await this.open()
+    let db
+    try { db = await this.open() } catch (e) { console.warn('[video] banco:', e.message); return null }
     return new Promise(resolve => {
-      const req = db.transaction(store).objectStore(store).get(key)
+      let req
+      try { req = db.transaction(store).objectStore(store).get(key) }
+      catch (e) { console.warn('[video] leitura de', store, ':', e.name); return resolve(null) }
       req.onsuccess = () => resolve(req.result)
       req.onerror = () => resolve(null)
     })
   },
   async set(store, key, val) {
-    const db = await this.open()
+    let db
+    try { db = await this.open() } catch (e) { console.warn('[video] banco:', e.message); return }
     return new Promise(resolve => {
-      const tx = db.transaction(store, 'readwrite')
+      let tx
+      try { tx = db.transaction(store, 'readwrite') }
+      catch (e) { console.warn('[video] escrita em', store, ':', e.name); return resolve() }
       tx.objectStore(store).put(val, key)
-      tx.oncomplete = resolve; tx.onerror = resolve
+      tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve
     })
   },
   async del(store, key) {
-    const db = await this.open()
+    let db
+    try { db = await this.open() } catch (e) { console.warn('[video] banco:', e.message); return }
     return new Promise(resolve => {
-      const tx = db.transaction(store, 'readwrite')
+      let tx
+      try { tx = db.transaction(store, 'readwrite') }
+      catch (e) { console.warn('[video] remoção em', store, ':', e.name); return resolve() }
       tx.objectStore(store).delete(key)
-      tx.oncomplete = resolve; tx.onerror = resolve
+      tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve
     })
   }
 }
@@ -409,7 +454,22 @@ async function videoNuvemPainel(id) {
 async function _vidNuvemRender(id) {
   const box = document.getElementById('vid-nuvem-corpo'); if (!box) return
   const v = videos.find(x => x.id === id); if (!v) return
-  const onde = await _vidOndeEsta(v)
+  // ⚠️ SEM ISTO O PAINEL FICA ETERNAMENTE EM "Vendo onde está este arquivo…".
+  // Foi o que aconteceu no teste: o banco local estava sem depósitos e a
+  // leitura estourou, deixando a caixa pendurada sem UMA palavra de explicação.
+  // O banco agora se conserta sozinho, mas painel que trava calado é defeito
+  // por si só — se falhar, ele diz que falhou.
+  let onde
+  try { onde = await _vidOndeEsta(v) }
+  catch (e) {
+    console.warn('[video] painel da nuvem:', e && e.message)
+    box.innerHTML = `<p class="est-dica">Não consegui ler o armazenamento deste aparelho agora
+      (${esc(e && (e.name || e.message) || 'erro')}). Recarregue a página e tente de novo.</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('vid-nuvem').remove()">Fechar</button>
+      </div>`
+    return
+  }
 
   // ⚠️ A VERDADE SOBRE A NUVEM VEM DE LÁ, não do registro salvo aqui: ele pode
   // estar velho (subiu no outro aparelho) ou mentir (foi apagado por fora). É
