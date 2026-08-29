@@ -69,15 +69,25 @@ const VideoDB = {
   //   2. NA LEITURA/ESCRITA, `try` em volta do `transaction()`, porque erro
   //      síncrono não vira `onerror`. Assim o pior caso vira "não achei" em vez
   //      de uma promessa pendurada para sempre.
+  //
+  // ⚠️ ABRE SEM NÚMERO DE VERSÃO, e isso não é detalhe — é a correção de um
+  // defeito que o próprio conserto criou. A primeira versão desta função pedia
+  // `open('el-video-db', 3)` fixo; depois de o banco se curar subindo para a 4,
+  // toda abertura seguinte morria em `VersionError: The requested version (3)
+  // is less than the existing version (4)` — ou seja, o remédio quebrava a
+  // seção Vídeo no dia seguinte. Medido no Chrome dele, no ar, e por isso está
+  // escrito aqui. Sem número, o navegador entrega o que existir (e cria na 1 se
+  // não existir nada), e quem decide se precisa subir de versão é a conferência
+  // dos depósitos logo abaixo.
   open() {
     if (this._db) return Promise.resolve(this._db)
     if (this._abrindo) return this._abrindo          // duas telas pedindo junto abrem UMA vez
-    this._abrindo = this._abrir(3, 0).finally(() => { this._abrindo = null })
+    this._abrindo = this._abrir(null, 0).finally(() => { this._abrindo = null })
     return this._abrindo
   },
   _abrir(versao, tentativa) {
     return new Promise((resolve, reject) => {
-      const req = indexedDB.open('el-video-db', versao)
+      const req = versao ? indexedDB.open('el-video-db', versao) : indexedDB.open('el-video-db')
       req.onupgradeneeded = () => {
         const db = req.result
         for (const d of VideoDB.DEPOSITOS) if (!db.objectStoreNames.contains(d)) db.createObjectStore(d)
