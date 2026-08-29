@@ -2258,6 +2258,26 @@ function speakWord(word) {
   speechSynthesis.speak(u)
 }
 
+// ================================================================
+// A CAIXA DOS AVISOS DE TRABALHO DE FUNDO
+// ================================================================
+// ⚠️ MORA AQUI, NO SHELL, PORQUE DOIS MÓDULOS LAZY A DISPUTAM. Ela nasceu
+// dentro do audiolivro (`_abAvisos`), e quando o vídeo passou a subir arquivo
+// para a nuvem apareceu o problema: cada módulo criando o SEU contêiner
+// `position:fixed` no mesmo canto empilha um cartão em cima do outro, e qual
+// deles ganha depende de qual seção foi aberta primeiro. Um dono só, no
+// arquivo que sempre existe, e o flex empilha os cartões de verdade.
+function avisosCaixa() {
+  let cx = document.getElementById('ab-avisos')
+  if (!cx) {
+    cx = document.createElement('div')
+    cx.id = 'ab-avisos'
+    cx.className = 'ab-avisos'
+    document.body.appendChild(cx)
+  }
+  return cx
+}
+
 function toast(msg, type = 'info') {
   const icons = { success:'checkCircle', error:'x', warning:'alert', info:'info' }
   const t = document.createElement('div')

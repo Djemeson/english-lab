@@ -46,9 +46,33 @@ service firebase.storage {
       allow delete:         if ehODono() && request.auth.uid == uid;
     }
 
+    // ---- O EPISÓDIO DE VÍDEO ----
+    // ⚠️ NASCEU MEDINDO, NÃO CHUTANDO. Quando o vídeo passou a poder ir para a
+    // nuvem, o único episódio de arquivo do acervo dele — *The White Lotus*
+    // S01E01, 1080p — tinha **938.948.908 bytes (895 MB)**. Com o teto comum de
+    // 500 MB abaixo, o primeiro arquivo que ele tentasse guardar seria recusado
+    // no meio da subida, e a mensagem do Storage para isso é `unauthorized` —
+    // a MESMA palavra de quem nem está logado. A feature nasceria quebrada
+    // para o acervo real.
+    //
+    // 2 GB é o mesmo teto do audiolivro, e pela mesma razão: é a escala do
+    // arquivo, não do resto do app. O freio de verdade continua sendo a cota de
+    // 5 GB do plano gratuito — um episódio de 900 MB come 18% dela, e o app diz
+    // o tamanho ANTES de subir para essa conta ser dele.
+    //
+    // ⚠️ A pasta é `midia/`, a MESMA do podcast: para quem guarda, episódio de
+    // podcast e de série são a mesma coisa, e o app já apagava daqui em
+    // "Remover da lista".
+    match /users/{uid}/midia/{allPaths=**} {
+      allow read:           if ehODono() && request.auth.uid == uid;
+      allow create, update: if ehODono() && request.auth.uid == uid
+                            && request.resource.size < 2147483648;   // 2 GB
+      allow delete:         if ehODono() && request.auth.uid == uid;
+    }
+
     // ---- TODO O RESTO ----
-    // EPUB do leitor, episódio de vídeo, legenda, capa. 500 MB cobre com folga
-    // e continua sendo um freio de verdade.
+    // EPUB do leitor, legenda, capa. 500 MB cobre com folga e continua sendo um
+    // freio de verdade.
     match /users/{uid}/{allPaths=**} {
       allow read:           if ehODono() && request.auth.uid == uid;
       allow create, update: if ehODono() && request.auth.uid == uid

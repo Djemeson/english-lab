@@ -2648,15 +2648,11 @@ function _abFilaCarregar() {
 // ⚠️ DOIS TRABALHOS DE FUNDO PODEM RODAR JUNTOS — subir o áudio e transcrever
 // o livro. Cada um com `position:fixed` no mesmo canto viraria um cartão em
 // cima do outro. Uma caixa só, e o flex empilha.
+// A caixa passou a morar em `core.js` (`avisosCaixa`): o vídeo também sobe
+// arquivo agora, e dois módulos lazy criando o mesmo contêiner fixo davam
+// cartão em cima de cartão. O `typeof` cobre uma versão velha em cache.
 function _abAvisos() {
-  let cx = document.getElementById('ab-avisos')
-  if (!cx) {
-    cx = document.createElement('div')
-    cx.id = 'ab-avisos'
-    cx.className = 'ab-avisos'
-    document.body.appendChild(cx)
-  }
-  return cx
+  return typeof avisosCaixa === 'function' ? avisosCaixa() : document.body
 }
 
 function _abAvisosLimpar() {

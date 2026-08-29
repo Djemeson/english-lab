@@ -3,8 +3,10 @@
 // CARREGADO LAZY (só ao abrir a seção). Regras da casa:
 //   - O ESTADO videos[]/clips[] vive em core.js (não-lazy) — firebase.js
 //     sincroniza os dois e não pode depender deste arquivo (armadilha nº 1).
-//   - O ARQUIVO de vídeo nunca sai do aparelho: aqui só entram metadados,
+//   - O ARQUIVO de vídeo NÃO SOBE SOZINHO: por padrão só entram metadados,
 //     legenda (IndexedDB local), cortes e o áudio capturado da cena (KBs).
+//     Guardar o arquivo na nuvem é uma DECISÃO dele, botão a botão — ver o
+//     bloco "O ARQUIVO DO VÍDEO NA NUVEM" logo abaixo do VideoDB.
 //   - O áudio real da cena é salvo sob audioKey(texto da fala): o player do
 //     estudo (study.js) o encontra sozinho, sem nenhuma mudança lá.
 // ================================================================
@@ -90,6 +92,389 @@ const VideoDB = {
 }
 
 // ================================================================
+// O ARQUIVO DO VÍDEO NA NUVEM
+// ================================================================
+// ⚠️ O CABEÇALHO DESTE ARQUIVO DIZIA *"o ARQUIVO de vídeo nunca sai do
+// aparelho"*, e era verdade até aqui. Ele pediu o contrário, com a mesma frase
+// que motivou o audiolivro: *"quero enviar um vídeo pra nuvem e poder acessar
+// de qualquer dispositivo"*. Legenda, cortes, marcadores e posição já
+// atravessavam — só o arquivo ficava preso, e sem ele o resto não serve para
+// nada no segundo aparelho: abrir o episódio no celular caía no seletor de
+// arquivos pedindo um arquivo que só existe no PC.
+//
+// O DESENHO COPIA O DO AUDIOLIVRO, e de propósito — o problema é o mesmo:
+//
+// 1. **Nada é automático.** O EPUB sobe sozinho porque tem 4 MB; um episódio
+//    tem centenas. Subir isso sem mandar seria queimar a franquia de dados do
+//    celular dele em segundo plano. Só sobe quando ele mandar.
+// 2. **Nuvem e aparelho são estados separados.** Estar na nuvem não obriga a
+//    ocupar disco aqui, e vice-versa. O painel mostra os dois.
+// 3. **A subida mostra byte a byte e aceita desistir.** 400 MB sem barra é o
+//    app parecendo travado.
+// 4. **"Liberar espaço aqui" NUNCA toca no arquivo do disco dele.** O que sai
+//    é só a CÓPIA que o app baixou da nuvem para o IndexedDB — o `.mkv` da
+//    pasta dele é dele, e o app não tem nem como apagar.
+//
+// O caminho no Storage é `users/<uid>/midia/<id>`, o MESMO do podcast: o
+// episódio de podcast e o de série são a mesma coisa para quem guarda, e
+// `videoDelete` já mandava apagar de lá (`midiaApagarDaNuvem`) desde então.
+//
+// ⚠️ O TETO VEM DE `storage.rules`, NÃO DE PALPITE — o bloco
+// `users/{uid}/midia/**`. Ele nasceu 500 MB (a regra genérica) e virou 2 GB na
+// mesma rodada, medindo: o único episódio de arquivo do acervo dele tinha
+// **895 MB**, então o primeiro arquivo que ele tentasse guardar seria recusado.
+// Passar do teto morre num `unauthorized` seco — a mesma palavra de quem nem
+// está logado —, e é por isso que o app confere ANTES de começar a subir.
+const VID_NUVEM_TETO_MB  = 2048
+const VID_NUVEM_AVISO_MB = 400
+
+function vidNuvemMB(b) {
+  const n = Number(b) || 0
+  if (n >= 1073741824) return String(Math.round(n / 1073741824 * 10) / 10).replace('.', ',') + ' GB'
+  return Math.round(n / 1048576) + ' MB'
+}
+
+// A marca viaja em `videos[]`, que sincroniza pelo banco: é ela que faz o
+// SEGUNDO aparelho saber que existe cópia na nuvem sem perguntar à rede antes
+// de o usuário clicar em nada.
+function vidTemNaNuvem(v) { return !!(v && v.nuvem && v.nuvem.bytes) }
+
+function _vidNuvemGravar(v, bytes) {
+  v.nuvem = { bytes: Number(bytes) || 1, em: Date.now() }
+  v.updated_at = new Date().toISOString()
+  saveVideos()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+}
+
+function _vidNuvemLimpar(v) {
+  delete v.nuvem
+  v.updated_at = new Date().toISOString()
+  saveVideos()
+  if (typeof autoSyncAfterChange === 'function') autoSyncAfterChange()
+}
+
+// Vídeo de fonte online (Assistir) não tem arquivo nenhum para guardar.
+function vidPodeIrParaNuvem(v) { return !!v && v.source_type !== 'stream' }
+
+// ---- ONDE ESTÁ O ARQUIVO, SEM BAIXAR NADA ----
+// Três lugares possíveis, e eles não se excluem:
+//   'disco'  — o arquivo original, pelo atalho do sistema (não ocupa nada aqui)
+//   'copia'  — a cópia que o app baixou da nuvem (essa sim ocupa espaço)
+//   'nuvem'  — a cópia da conta dele
+async function _vidOndeEsta(v) {
+  const copia = await VideoDB.get('files', v.id)
+  const est = v.source_type === 'stream' ? 'sem-atalho' : await videoHandleEstado(v.id)
+  return {
+    copia: copia ? (copia.size || 0) : 0,
+    disco: est === 'pronto' || est === 'precisa-permissao',
+    discoPronto: est === 'pronto',
+    nuvem: (v.nuvem && v.nuvem.bytes) || 0
+  }
+}
+
+// ---- CONSEGUIR O BLOB PARA SUBIR ----
+// ⚠️ A ORDEM AQUI É O QUE EVITA UM PEDIDO DE PERMISSÃO IMPOSSÍVEL. O gesto do
+// clique morre no primeiro `await` (armadilha nº 1 desta seção, rodada 72), e
+// pedir `requestPermission` depois de ler o IndexedDB simplesmente não abre
+// caixa nenhuma. Então: o arquivo já aberto no player vence; depois a cópia
+// baixada; e o atalho do disco só é usado quando a permissão JÁ está viva
+// (`getFile()` sem pedir nada). Sem isso, a saída honesta é mandar ele abrir o
+// vídeo uma vez — que é onde a permissão nasce.
+async function _vidBlobParaSubir(v) {
+  if (_vidCur && _vidCur.id === v.id && _vidFile) return _vidFile
+  const copia = await VideoDB.get('files', v.id)
+  if (copia) return copia
+  const est = await videoHandleEstado(v.id)
+  if (est !== 'pronto') return null
+  try {
+    const h = (_vidAtalhoCache.get(v.id) || {}).handle || await VideoDB.get('handles', v.id)
+    return h ? await h.getFile() : null
+  } catch (e) { console.warn('[video] blob para subir:', e.name, e.message); return null }
+}
+
+// ================================================================
+// O AVISO FLUTUANTE — a subida/descida segue ele pelo app
+// ================================================================
+// Mesmo motivo do audiolivro: enquanto o progresso morava dentro do painel,
+// fechar o painel apagava a notícia e o envio seguia às cegas. A caixa é a
+// mesma (`avisosCaixa`, em core.js), então subir um vídeo e transcrever um
+// livro ao mesmo tempo empilha dois cartões em vez de sobrepor.
+let _vidNuvemJob = null   // { modo:'subir'|'baixar', titulo, env, tot, abort? }
+
+function _vidNuvemPintar() {
+  const cx = typeof avisosCaixa === 'function' ? avisosCaixa() : document.body
+  let cd = document.getElementById('vid-nuvem-aviso')
+  if (!_vidNuvemJob) { if (cd) cd.remove(); return }
+  if (!cd) {
+    cd = document.createElement('div')
+    cd.id = 'vid-nuvem-aviso'; cd.className = 'ab-fila'
+    cx.appendChild(cd)
+  }
+  const j = _vidNuvemJob
+  const pct = j.tot ? Math.min(1, j.env / j.tot) : 0
+  cd.innerHTML = `
+    <div class="ab-fila-topo">
+      <span class="ab-fila-ic">${ic(j.modo === 'subir' ? 'cloud' : 'download', 'ic-sm')}</span>
+      <span class="ab-fila-txt">
+        <b>${esc(j.titulo)}</b>
+        <em>${j.modo === 'subir' ? 'Enviando' : 'Baixando'} ${vidNuvemMB(j.env)} de ${vidNuvemMB(j.tot)}</em>
+      </span>
+      <button class="ab-fila-x" onclick="videoNuvemCancelar()" data-tip="Cancelar" aria-label="Cancelar">${ic('x','ic-sm')}</button>
+    </div>
+    <div class="ab-fila-barra"><i style="width:${Math.round(pct * 100)}%"></i></div>`
+}
+
+function videoNuvemCancelar() {
+  if (!_vidNuvemJob) return
+  if (_vidNuvemJob.modo === 'subir') { if (typeof midiaCancelarEnvio === 'function') midiaCancelarEnvio() }
+  else if (_vidNuvemJob.abort) { try { _vidNuvemJob.abort.abort() } catch (e) {} }
+}
+
+// ⚠️ O navegador só deixa AVISAR, não impedir. Ainda assim é melhor que um
+// envio de 400 MB morrer calado porque ele fechou a aba sem saber.
+window.addEventListener('beforeunload', e => {
+  if (!_vidNuvemJob) return
+  e.preventDefault(); e.returnValue = ''
+  return ''
+})
+
+// ================================================================
+// SUBIR
+// ================================================================
+async function videoNuvemGuardar(id) {
+  const v = videos.find(x => x.id === id); if (!v) return
+  if (_vidNuvemJob) { toast('Já tem um envio em andamento — espere ele terminar.', 'warning'); return }
+  if (typeof _fbUser === 'undefined' || !_fbUser) {
+    toast('Entre com o Google para guardar na nuvem.', 'warning'); return
+  }
+  const blob = await _vidBlobParaSubir(v)
+  if (!blob) {
+    toast('Não achei o arquivo deste vídeo neste aparelho. Abra o vídeo uma vez (para autorizar a leitura) e clique de novo.', 'warning')
+    return
+  }
+  const mb = blob.size / 1048576
+  if (mb > VID_NUVEM_TETO_MB) {
+    await confirmModal({
+      title: 'Grande demais para a nuvem', icon: 'alert', confirmText: 'Entendi', cancelText: null,
+      html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+        Este arquivo tem <b>${vidNuvemMB(blob.size)}</b> e a sua nuvem aceita
+        <b>${VID_NUVEM_TETO_MB / 1024} GB</b> por arquivo — ela ia recusar o envio no meio do caminho.<br><br>
+        Um episódio cabe com folga; um filme longo em 1080p, não. Dá para levantar esse teto, mas é uma
+        mudança na regra da sua nuvem — peça quando precisar.</p>` })
+    return
+  }
+  const ok = await confirmModal({
+    title: 'Guardar o vídeo na nuvem', icon: 'cloud', confirmText: 'Guardar',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Vou enviar <b>${vidNuvemMB(blob.size)}</b> para a sua nuvem. Depois disso, este vídeo
+      <b>abre e toca em qualquer aparelho seu</b> — sem procurar arquivo nenhum.<br><br>
+      ${mb > VID_NUVEM_AVISO_MB ? `<b>É bastante coisa.</b> Numa conexão móvel isso pesa na franquia —
+        vale fazer no Wi-Fi.<br><br>` : ''}
+      O envio mostra o andamento num aviso no canto e dá para cancelar. Só não <b>feche a aba</b>:
+      o que estiver a meio caminho recomeça.</p>` })
+  if (!ok) return
+
+  _vidNuvemJob = { modo: 'subir', titulo: v.title || v.fileName || 'Vídeo', env: 0, tot: blob.size }
+  _vidNuvemPintar()
+  document.getElementById('vid-nuvem')?.remove()   // o aviso flutuante assume daqui
+  try {
+    await midiaSubirArquivo(v.id, blob, (env, tot) => {
+      _vidNuvemJob.env = env; _vidNuvemJob.tot = tot || blob.size
+      _vidNuvemPintar()
+    })
+    _vidNuvemGravar(v, blob.size)
+    toast('Vídeo guardado na nuvem. Já dá para assistir em outro aparelho.', 'success')
+  } catch (e) {
+    const c = String(e.code || e.message || '')
+    if (c.includes('canceled')) toast('Envio cancelado — nada foi guardado.', 'info')
+    else if (c.includes('sem-login')) toast('Entre com o Google para guardar na nuvem.', 'warning')
+    // ⚠️ `unauthorized` é AMBÍGUO no Storage: sai igual para "passou do teto" e
+    // para "a regra que permite isto ainda não foi publicada". Dizer só uma das
+    // duas mandaria ele caçar o problema errado.
+    else if (c.includes('unauthorized')) toast(`Sua nuvem recusou o arquivo (${vidNuvemMB(blob.size)}). Ou passou do teto de ${VID_NUVEM_TETO_MB / 1024} GB, ou a regra nova da nuvem ainda não foi publicada.`, 'error')
+    else if (c.includes('quota') || c.includes('retry-limit')) toast('Sua nuvem recusou o envio (espaço ou tempo esgotado). Tente de novo.', 'error')
+    else toast('O envio falhou: ' + c, 'error')
+  } finally {
+    _vidNuvemJob = null
+    _vidNuvemPintar()
+    if (_videoView === 'lib') renderVideoLib()
+    if (document.getElementById('vid-nuvem-corpo')) _vidNuvemRender(v.id)
+  }
+}
+
+// ================================================================
+// BAIXAR — e é ela que faz o segundo aparelho funcionar
+// ================================================================
+// Devolve o blob ou null. Guarda a cópia no IndexedDB, então baixar uma vez
+// basta: o vídeo volta a abrir na hora até ele mandar liberar o espaço.
+async function _vidBaixarDaNuvem(v) {
+  if (_vidNuvemJob) { toast('Já tem um envio/download em andamento — espere ele terminar.', 'warning'); return null }
+  const jaTem = await VideoDB.get('files', v.id)
+  if (jaTem) return jaTem
+  if (typeof midiaGarantirLocal !== 'function') return null
+  const abort = new AbortController()
+  _vidNuvemJob = { modo: 'baixar', titulo: v.title || v.fileName || 'Vídeo',
+                   env: 0, tot: (v.nuvem && v.nuvem.bytes) || 0, abort }
+  _vidNuvemPintar()
+  try {
+    const blob = await midiaGarantirLocal(v.id, null, (lidos, total) => {
+      _vidNuvemJob.env = lidos; _vidNuvemJob.tot = total || _vidNuvemJob.tot
+      _vidNuvemPintar()
+    }, abort.signal)
+    if (!blob) {
+      // ⚠️ NADA DE "não está na nuvem" NO CHUTE. Deslogado não existe nuvem
+      // para olhar, e rede ruim não é ausência — foi o defeito que o leitor
+      // tinha. `midiaPorQueNaoVeio` pergunta de verdade.
+      if (abort.signal.aborted) { toast('Download cancelado.', 'info'); return null }
+      if (typeof midiaPorQueNaoVeio === 'function' && typeof nuvemFrase === 'function') {
+        toast(nuvemFrase(await midiaPorQueNaoVeio(v.id), 'o arquivo deste vídeo'), 'error')
+      } else toast('Não consegui baixar o arquivo deste vídeo.', 'error')
+      return null
+    }
+    // A nuvem é a verdade: se o registro local não sabia, agora sabe.
+    if (!vidTemNaNuvem(v)) _vidNuvemGravar(v, blob.size)
+    return blob
+  } finally {
+    _vidNuvemJob = null
+    _vidNuvemPintar()
+  }
+}
+
+// Abre o player com o arquivo vindo da nuvem (ou da cópia já baixada).
+async function _vidAbrirDaNuvem(v) {
+  const blob = await _vidBaixarDaNuvem(v)
+  if (!blob) return false
+  _vidPendente = null
+  _vidFile = new File([blob], v.fileName || 'video.mp4', { type: blob.type || 'video/mp4' })
+  await videoOpenPlayer(v)
+  return true
+}
+
+// ================================================================
+// TIRAR DA NUVEM · LIBERAR ESPAÇO AQUI
+// ================================================================
+async function videoNuvemTirar(id) {
+  const v = videos.find(x => x.id === id); if (!v) return
+  const onde = await _vidOndeEsta(v)
+  const soLa = !onde.copia && !onde.disco
+  if (!(await confirmModal({
+    title: 'Tirar o vídeo da nuvem', icon: 'cloud', confirmText: 'Tirar', danger: true,
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Apaga a <b>cópia da nuvem</b>. Legenda, cortes, marcadores e cards continuam intactos, e o
+      arquivo que estiver neste aparelho não é tocado.
+      ${soLa ? `<br><br><b>Atenção:</b> este arquivo <b>só existe na nuvem</b> — este aparelho não
+        tem cópia nem atalho para ele, e depois disso o vídeo volta a pedir o arquivo.` : ''}</p>` }))) return
+  if (typeof midiaApagarDaNuvem === 'function') await midiaApagarDaNuvem(id)
+  _vidNuvemLimpar(v)
+  toast('Vídeo removido da nuvem.', 'info')
+  if (_videoView === 'lib') renderVideoLib()
+  if (document.getElementById('vid-nuvem-corpo')) _vidNuvemRender(id)
+}
+
+// ⚠️ ISTO NÃO APAGA O ARQUIVO DELE. O que sai é só a CÓPIA que o app baixou da
+// nuvem para o IndexedDB. O `.mkv` da pasta dele o app nem consegue apagar —
+// o atalho do sistema é de leitura.
+async function videoNuvemLiberar(id) {
+  const v = videos.find(x => x.id === id); if (!v) return
+  const onde = await _vidOndeEsta(v)
+  if (!onde.copia) { toast('Não há cópia baixada neste aparelho para apagar.', 'info'); return }
+  if (!onde.nuvem) { toast('Guarde na nuvem antes de liberar o espaço daqui — senão o arquivo some de vez.', 'warning'); return }
+  if (!(await confirmModal({
+    title: 'Liberar espaço aqui', icon: 'trash', confirmText: 'Apagar a cópia',
+    html: `<p style="font-size:var(--fs-sm);color:var(--text2);line-height:1.65">
+      Apaga <b>${vidNuvemMB(onde.copia)}</b> que o app baixou para este aparelho.
+      <b>Seu arquivo original não é tocado</b> — o app nem consegue apagá-lo.<br><br>
+      A <b>cópia na nuvem fica</b>, então o vídeo volta na hora que você abrir de novo.</p>` }))) return
+  await VideoDB.del('files', id)
+  toast('Cópia apagada deste aparelho — a da nuvem continua.', 'success')
+  if (_videoView === 'lib') renderVideoLib()
+  if (document.getElementById('vid-nuvem-corpo')) _vidNuvemRender(id)
+}
+
+// ================================================================
+// O PAINEL — o que está onde, e o que dá para fazer
+// ================================================================
+async function videoNuvemPainel(id) {
+  const v = videos.find(x => x.id === id); if (!v) return
+  document.getElementById('vid-nuvem')?.remove()
+  const ov = document.createElement('div')
+  ov.id = 'vid-nuvem'; ov.className = 'srs-modal-overlay'
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+  ov.innerHTML = `<div class="srs-modal-box" style="width:100%;max-width:520px">
+    <div id="vid-nuvem-corpo"><p class="est-dica">Vendo onde está este arquivo…</p></div></div>`
+  document.body.appendChild(ov)
+  await _vidNuvemRender(id)
+}
+
+async function _vidNuvemRender(id) {
+  const box = document.getElementById('vid-nuvem-corpo'); if (!box) return
+  const v = videos.find(x => x.id === id); if (!v) return
+  const onde = await _vidOndeEsta(v)
+
+  // ⚠️ A VERDADE SOBRE A NUVEM VEM DE LÁ, não do registro salvo aqui: ele pode
+  // estar velho (subiu no outro aparelho) ou mentir (foi apagado por fora). É
+  // uma pergunta de metadados, sem baixar byte nenhum.
+  if (typeof midiaBytesNaNuvem === 'function' && (typeof _fbUser !== 'undefined' && _fbUser)) {
+    const real = await midiaBytesNaNuvem(id)
+    if (real && real !== onde.nuvem) { _vidNuvemGravar(v, real); onde.nuvem = real }
+    else if (!real && onde.nuvem) { _vidNuvemLimpar(v); onde.nuvem = 0 }
+  }
+
+  const linha = (icone, titulo, valor, dica) => `
+    <div class="ab-nuvem-linha">
+      <span class="ab-nuvem-ic">${ic(icone, 'ic-sm')}</span>
+      <span class="ab-nuvem-tit">${titulo}<em>${dica}</em></span>
+      <b>${valor}</b>
+    </div>`
+
+  box.innerHTML = `
+    <h4 style="font-size:var(--fs-base);font-weight:700;margin-bottom:4px">${esc(v.title || 'Vídeo')}</h4>
+    <p style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">
+      Onde está o arquivo deste vídeo${v.fileSize ? ` — ${vidNuvemMB(v.fileSize)}` : ''}.</p>
+
+    <div class="ab-nuvem-grade">
+      ${linha('device', 'No disco deste aparelho',
+              onde.disco ? 'sim' : 'não',
+              onde.disco
+                ? (onde.discoPronto ? 'o atalho está pronto — abre direto' : 'o atalho existe; o navegador pede um clique por sessão')
+                : 'este aparelho não sabe onde o arquivo está')}
+      ${linha('download', 'Cópia baixada aqui',
+              onde.copia ? vidNuvemMB(onde.copia) : '—',
+              onde.copia ? 'ocupa espaço e abre na hora' : 'nada ocupando espaço')}
+      ${linha('cloud', 'Na sua nuvem',
+              onde.nuvem ? vidNuvemMB(onde.nuvem) : 'não',
+              onde.nuvem ? 'abre em qualquer aparelho seu' : 'ainda não subiu')}
+    </div>
+
+    <div class="ab-nuvem-acoes">
+      ${!onde.nuvem ? `<button class="btn btn-primary btn-sm" onclick="videoNuvemGuardar('${id}')">
+        ${ic('cloud','ic-sm')} Guardar na nuvem</button>` : ''}
+      ${onde.nuvem && !onde.copia ? `<button class="btn btn-ghost btn-sm" onclick="videoNuvemBaixarClick('${id}')">
+        ${ic('download','ic-sm')} Baixar para cá</button>` : ''}
+      ${onde.copia && onde.nuvem ? `<button class="btn btn-ghost btn-sm" onclick="videoNuvemLiberar('${id}')">
+        ${ic('trash','ic-sm')} Liberar espaço aqui</button>` : ''}
+      ${onde.nuvem ? `<button class="btn btn-ghost btn-sm" onclick="videoNuvemTirar('${id}')">Tirar da nuvem</button>` : ''}
+    </div>
+    <p class="est-dica">${onde.nuvem
+      ? 'Com o arquivo na nuvem, este vídeo abre em qualquer aparelho seu — a legenda, os cortes e a posição já viajavam.'
+      : `Enquanto o arquivo não subir, este vídeo só toca neste aparelho. Teto de ${VID_NUVEM_TETO_MB} MB por arquivo.`}</p>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('vid-nuvem').remove()">Fechar</button>
+    </div>`
+}
+
+// Baixar pelo painel: traz o arquivo e fica na biblioteca (não abre o player —
+// quem clicou aqui queria a cópia, não a sessão de estudo).
+async function videoNuvemBaixarClick(id) {
+  const v = videos.find(x => x.id === id); if (!v) return
+  document.getElementById('vid-nuvem')?.remove()
+  const blob = await _vidBaixarDaNuvem(v)
+  if (blob) toast('Arquivo baixado — este vídeo já abre na hora aqui.', 'success')
+  if (_videoView === 'lib') renderVideoLib()
+}
+
+// ================================================================
 // RENDER RAIZ — decide a visão. Guard importante: se o player está de
 // pé (o usuário só trocou de aba e voltou, ou um snapshot da nuvem
 // chegou), NÃO reconstruímos o DOM — destruiria o <video> tocando.
@@ -121,8 +506,9 @@ function renderVideoLib() {
         <p style="font-size:var(--fs-base);font-weight:600;margin-bottom:8px">Nada aqui ainda</p>
         <p style="font-size:var(--fs-md);margin-bottom:6px">Busque um <b>podcast</b> e escolha o episódio, ou abra um episódio/filme
         do seu computador. Importe a legenda (.srt) e transforme as falas em cards — com o áudio real.</p>
-        <p style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:20px">O arquivo fica só no seu aparelho e pode ser apagado depois:
-        o app guarda a legenda, os cortes e os áudios extraídos.</p>
+        <p style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:20px">O arquivo fica no seu aparelho e pode ser apagado depois:
+        o app guarda a legenda, os cortes e os áudios extraídos. Se quiser assistir em outro aparelho,
+        o ícone de nuvem no card guarda o arquivo na sua conta.</p>
         <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="podcastOpen()">${ic('mic')}Buscar podcast</button>
           <button class="btn btn-secondary" onclick="videoPickFile()">${ic('plus')}Abrir arquivo</button>
@@ -167,6 +553,15 @@ function renderVideoLib() {
               <span class="vid-lib-atalho" data-tip="Carregando…"></span>
             </div>
           </div>
+          ${/* O ícone de nuvem no card, como no audiolivro: o estado tem de ser
+                VISÍVEL na lista. Sem ele, "este vídeo abre no celular?" só se
+                responde tentando — e a resposta chega tarde demais. */''}
+          ${vidPodeIrParaNuvem(v) ? `<button class="vid-lib-nuvem${vidTemNaNuvem(v) ? ' on' : ''}"
+            onclick="event.stopPropagation();videoNuvemPainel('${v.id}')"
+            data-tip="${vidTemNaNuvem(v)
+              ? 'O arquivo está na sua nuvem — abre em qualquer aparelho seu'
+              : 'O arquivo só existe neste aparelho. Clique para guardar na nuvem'}"
+            aria-label="Nuvem">${ic('cloud','ic-sm')}</button>` : ''}
           <!-- Menu único de card (UX-2): a lixeira solta no canto virou o
                mesmo menu da estante — destrutivo não fica a um clique nu. -->
           <button class="btn btn-ghost btn-sm" onclick="videoLibMenu(event,'${v.id}')" data-tip="Opções">${ic('chevronDown','ic-sm')}</button>
@@ -190,7 +585,14 @@ async function _vidPintarAtalhos() {
     // Podcast e stream não dependem de arquivo local: a etiqueta não se aplica.
     if (!v || v.podcast || v.source_type === 'stream') { alvo.remove(); continue }
     const est = await videoHandleEstado(id)
-    if (est === 'sem-atalho') {
+    // ⚠️ COM O ARQUIVO NA NUVEM, "vai pedir o arquivo" passou a ser MENTIRA —
+    // e é justamente no aparelho novo, onde nunca houve atalho, que a etiqueta
+    // apareceria. Lá o vídeo abre sozinho: baixa da nuvem e toca.
+    if (est === 'sem-atalho' && vidTemNaNuvem(v)) {
+      alvo.textContent = 'vem da nuvem'
+      alvo.dataset.tip = 'O arquivo está na sua nuvem. Ao abrir, o app baixa e guarda a cópia aqui — depois disso abre na hora.'
+      alvo.classList.remove('sem')
+    } else if (est === 'sem-atalho') {
       alvo.textContent = 'vai pedir o arquivo'
       // O MOTIVO, e não só o sintoma: sem isto, "vai pedir o arquivo" depois
       // de escolher o arquivo três vezes é um mistério — foi o relato dele.
@@ -217,6 +619,8 @@ function videoLibMenu(ev, id) {
   const v = videos.find(x => x.id === id); if (!v) return
   cardMenu(ev, id, `
     <button onclick="cardMenuFechar();videoOpen('${id}')">${ic('play','ic-sm')} ${v.podcast ? 'Ouvir agora' : 'Assistir agora'}</button>
+    ${vidPodeIrParaNuvem(v) ? `<button onclick="cardMenuFechar();videoNuvemPainel('${id}')">${ic('cloud','ic-sm')} ${
+      vidTemNaNuvem(v) ? 'Arquivo na nuvem' : 'Guardar na nuvem'}</button>` : ''}
     <div class="est-menu-sep"></div>
     <button class="perigo" onclick="cardMenuFechar();videoDelete('${id}')">${ic('trash','ic-sm')} Remover da lista</button>`)
 }
@@ -439,6 +843,23 @@ async function videoOpen(id, { silencioso = false } = {}) {
   // preenchido quando a lista pintou, então dá para saber o que fazer sem
   // esperar o banco — e o navegador ainda aceita abrir seletor/pedir permissão.
   const cache = !silencioso && _vidAtalhoCache.get(id)
+  // ---- A NUVEM ANTES DO SELETOR ----
+  // ⚠️ É ESTE TRECHO QUE FAZ O SEGUNDO APARELHO FUNCIONAR. Sem ele, abrir no
+  // celular um vídeo que subiu no PC caía no seletor de arquivos pedindo um
+  // `.mkv` que não existe ali — e não havia como o usuário saber disso.
+  //
+  // A decisão é SÍNCRONA de propósito: `v.nuvem` viaja em `videos[]` pelo
+  // banco, então dá para saber que existe cópia lá sem perguntar à rede — e
+  // sem gastar o gesto do clique, que é o que a rodada 72 ensinou.
+  //
+  // O DISCO CONTINUA GANHANDO quando o atalho existe: ler do disco é
+  // instantâneo, não gasta rede e não ocupa espaço. A nuvem só entra onde o
+  // seletor de arquivos apareceria.
+  if (cache && cache.estado === 'sem-atalho' && vidTemNaNuvem(v)) {
+    if (await _vidAbrirDaNuvem(v)) return
+    // Não veio (rede caiu, ele cancelou): segue o caminho normal — escolher o
+    // arquivo à mão continua sendo uma saída válida.
+  }
   if (cache && cache.estado === 'sem-atalho' && window.showOpenFilePicker) {
     return _vidEscolherArquivo(v)
   }
@@ -452,6 +873,9 @@ async function videoOpen(id, { silencioso = false } = {}) {
         await videoOpenPlayer(v)
         return
       }
+      // Ele disse não à leitura do disco — mas se o arquivo está na nuvem, isso
+      // não é beco sem saída: dá para assistir sem tocar no disco dele.
+      if (vidTemNaNuvem(v) && await _vidAbrirDaNuvem(v)) return
       toast('Sem permissão para ler o arquivo — clique de novo para autorizar', 'warning')
       _vidPendente = id; renderVideoLib()
       return
@@ -473,7 +897,9 @@ async function videoOpen(id, { silencioso = false } = {}) {
         return
       }
       // Ele recusou a permissão: respeitar e parar aqui. Cair no seletor de
-      // pastas depois de um "não" é insistir com outra roupa.
+      // pastas depois de um "não" é insistir com outra roupa. A nuvem é
+      // exceção, porque não mexe no disco dele — é a cópia da conta.
+      if (vidTemNaNuvem(v) && await _vidAbrirDaNuvem(v)) return
       toast('Sem permissão para ler o arquivo — clique de novo para autorizar', 'warning')
       _vidPendente = id; renderVideoLib()
       return
@@ -489,6 +915,18 @@ async function videoOpen(id, { silencioso = false } = {}) {
     }
   }
   if (silencioso) return          // nada de seletor de arquivo sem ele pedir
+  // Última parada antes de pedir o arquivo: a cópia baixada e a nuvem. Aqui o
+  // cache síncrono pode nem existir (vídeo aberto por link direto, aba nova),
+  // e a esta altura o gesto já se foi de qualquer jeito — então dá para
+  // perguntar ao banco com calma.
+  const copiaLocal = await VideoDB.get('files', id)
+  if (copiaLocal) {
+    _vidPendente = null
+    _vidFile = new File([copiaLocal], v.fileName || 'video.mp4', { type: copiaLocal.type || 'video/mp4' })
+    await videoOpenPlayer(v)
+    return
+  }
+  if (vidTemNaNuvem(v) && await _vidAbrirDaNuvem(v)) return
   toast('Escolha o arquivo do vídeo (o navegador não o guarda — só o atalho)', 'info')
   if (window.showOpenFilePicker) {
     try {
@@ -619,6 +1057,13 @@ async function videoOpenPlayer(v) {
     <button class="btn btn-ghost btn-sm" onclick="videoImportSubPick()" data-tip="Importar arquivo .srt/.vtt do computador">${ic('upload')}Importar</button>
     <button class="btn btn-secondary btn-sm" onclick="videoPrepare()" data-tip="Cruza a legenda com seu vocabulário: o que você ainda não conhece neste episódio">${ic('sparkles')}Preparar para assistir</button>
     ${ehPod && !_vidStream ? `<button class="btn btn-ghost btn-sm" onclick="podcastFreeSpace()" data-tip="Apaga só o áudio baixado; legenda, cortes e cards continuam">${ic('trash')}Liberar espaço</button>` : ''}
+    ${/* ⚠️ ESTE É O LUGAR NATURAL DE SUBIR, e não o card da biblioteca: aqui o
+          arquivo JÁ ESTÁ ABERTO (`_vidFile`), então não há atalho para
+          reautorizar nem gesto para perder. Pelo card ele também sobe, mas só
+          quando a permissão de leitura ainda está viva. */''}
+    ${!ehPod && v.source_type !== 'stream' ? `<button class="btn btn-ghost btn-sm${vidTemNaNuvem(v) ? ' vid-on' : ''}" onclick="videoNuvemPainel('${v.id}')" data-tip="${vidTemNaNuvem(v)
+      ? 'O arquivo está na sua nuvem — este vídeo abre em qualquer aparelho seu'
+      : 'Guardar o arquivo na sua nuvem para assistir em outro aparelho'}">${ic('cloud')}${vidTemNaNuvem(v) ? 'Na nuvem' : 'Guardar na nuvem'}</button>` : ''}
     <button class="btn btn-ghost btn-sm" onclick="videoBackToLib()">${ic('undo')}Biblioteca</button>`
 
   const area = el('video-area'); if (!area) return

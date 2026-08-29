@@ -715,7 +715,13 @@ async function midiaGarantirNaNuvem(id, blob, aoAndar) {
 
 // Mesma nota da de cima: `VideoDB` é lazy. Aqui a guarda é dupla — sem o
 // módulo, nem faz sentido baixar, porque não haveria onde guardar.
-async function midiaGarantirLocal(id, aoAndar) {
+//
+// `aoBytes(lidos, total)` é opcional e existe por causa do VÍDEO: um episódio
+// de podcast tem 30 MB e desce sem ninguém sentir; um episódio de série tem
+// 400 MB, e 400 MB numa rede comum são minutos de tela parada — que parecem
+// travamento. Sem o callback o caminho é o de sempre (`resp.blob()`), então o
+// podcast não muda em nada.
+async function midiaGarantirLocal(id, aoAndar, aoBytes, sinal) {
   if (typeof VideoDB === 'undefined') return null
   try {
     const jaTem = await VideoDB.get('files', id)
@@ -723,10 +729,63 @@ async function midiaGarantirLocal(id, aoAndar) {
     const r = _midiaRef('midia', id); if (!r) return null
     if (aoAndar) aoAndar('baixando o episódio da sua nuvem')
     const url = await r.getDownloadURL()
-    const blob = await (await fetch(url)).blob()
+    const blob = await _midiaBaixarBlob(url, aoBytes, sinal)
+    if (!blob) return null
     await VideoDB.set('files', id, blob)
     return blob
   } catch (e) { return null }
+}
+
+// `Content-Length` vem no cabeçalho do Storage, então dá para contar de
+// verdade em vez de fingir uma barra. Mesma peça do audiolivro.
+// `sinal` é um AbortSignal opcional: desistir de 400 MB no meio precisa
+// interromper a REDE, e não só parar de pintar a barra.
+async function _midiaBaixarBlob(url, aoBytes, sinal) {
+  const resp = await fetch(url, sinal ? { signal: sinal } : undefined)
+  if (!resp.ok) throw new Error('download ' + resp.status)
+  if (!resp.body || !aoBytes) return await resp.blob()
+  const total = Number(resp.headers.get('content-length')) || 0
+  const tipo = resp.headers.get('content-type') || 'application/octet-stream'
+  const leitor = resp.body.getReader()
+  const partes = []
+  let lidos = 0
+  for (;;) {
+    const { done, value } = await leitor.read()
+    if (done) break
+    partes.push(value); lidos += value.length
+    aoBytes(lidos, total)
+  }
+  return new Blob(partes, { type: tipo })
+}
+
+// ---- SUBIR UM ARQUIVO GRANDE COM BARRA E CANCELAMENTO ----
+// ⚠️ `midiaGarantirNaNuvem` acima usa `r.put(b)` e ESPERA calado. Serve para o
+// podcast (30 MB, em segundo plano, ninguém está olhando) e é péssimo para o
+// vídeo: 400 MB sem barra e sem botão de desistir é o app parecendo travado
+// com a franquia de dados dele indo embora. Aqui o mesmo `put` devolve a
+// tarefa, que reporta byte a byte e aceita `cancel()`.
+let _midiaTask = null
+function midiaSubindo() { return !!_midiaTask }
+function midiaCancelarEnvio() { try { _midiaTask && _midiaTask.cancel() } catch (e) {} }
+
+function midiaSubirArquivo(id, blob, aoAndar) {
+  return new Promise((res, rej) => {
+    const r = _midiaRef('midia', id)
+    if (!r) return rej(new Error('sem-login'))
+    const task = r.put(blob, { contentType: blob.type || 'application/octet-stream' })
+    _midiaTask = task
+    task.on('state_changed',
+      st => { if (aoAndar) aoAndar(st.bytesTransferred, st.totalBytes) },
+      e => { _midiaTask = null; rej(e) },
+      () => { _midiaTask = null; res(true) })
+  })
+}
+
+// Quanto o arquivo ocupa lá, sem baixar nada. Devolve 0 quando não existe —
+// quem chama trata "0" como "não está na nuvem".
+async function midiaBytesNaNuvem(id) {
+  const d = await nuvemDiagnostico(_midiaRef('midia', id))
+  return d.estado === 'existe' ? (d.bytes || 0) : 0
 }
 
 // A legenda é JSON de alguns KB — sobe sempre que muda, sem checar antes.

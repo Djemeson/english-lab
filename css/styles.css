@@ -5482,9 +5482,12 @@ body.sb-collapsed .sb-user{justify-content:center;padding:6px 0}
    app. Fica enquanto a fila tiver o que fazer, em qualquer seção — a subida
    roda em segundo plano, e o único jeito de isso não virar mistério é ela ter
    um lugar fixo na tela. */
-/* ⚠️ DOIS TRABALHOS DE FUNDO PODEM RODAR JUNTOS — subir o áudio e transcrever o
-   livro. Cada cartão com `position:fixed` no mesmo canto ficaria um em cima do
-   outro; a caixa é que é fixa, e o flex empilha. */
+/* ⚠️ VÁRIOS TRABALHOS DE FUNDO PODEM RODAR JUNTOS — subir o áudio do
+   audiolivro, transcrever o livro e (desde que o vídeo passou a ir para a
+   nuvem) subir/baixar um episódio. Cada cartão com `position:fixed` no mesmo
+   canto ficaria um em cima do outro; a caixa é que é fixa, e o flex empilha.
+   A caixa tem UM dono, `avisosCaixa()` em core.js, porque quem a usa são
+   módulos lazy que podem nem estar carregados. */
 .ab-avisos{
   position:fixed; right:24px; bottom:24px; z-index:var(--z-toast);
   display:flex; flex-direction:column-reverse; gap:8px; align-items:flex-end;
@@ -8445,6 +8448,20 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{
 }
 .vid-lib-atalho:empty{display:none}
 .vid-lib-atalho.sem{color:var(--warning);border-color:color-mix(in srgb, var(--warning) 45%, transparent)}
+
+/* O ícone de nuvem no card do vídeo. Mesmo papel do `.ab-card-nuvem` do
+   audiolivro — dizer, SEM abrir nada, se este arquivo abre em outro aparelho.
+   Aqui a linha é flex (não tem capa para sobrepor), então ele é um botão em
+   linha; apagado quando é só oferta, aceso quando o arquivo já está lá. */
+.vid-lib-nuvem{
+  flex:0 0 auto;width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:none;border:1px solid transparent;border-radius:var(--radius-sm);
+  color:var(--text3);cursor:pointer;transition:color .15s,background .15s,border-color .15s;
+}
+.vid-lib-nuvem:hover{background:var(--surface2);color:var(--text)}
+.vid-lib-nuvem.on{
+  color:var(--primary);border-color:rgba(var(--primary-rgb),.35);background:rgba(var(--primary-rgb),.1);
+}
 
 /* ================================================================
    RODADA 75 (2026-08-26) — DASHBOARD EM BENTO
