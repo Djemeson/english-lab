@@ -442,7 +442,19 @@ async function _vidApplyCues(cues, origem) {
 // 2) casa cada fala EN com o cue PT mais próximo do ponto médio deslocado.
 // Legendas PT também FUNDEM duas falas EN numa: o mesmo texto vale para as
 // duas (a deduplicação acontece na exibição do estudo focado).
+// ⚠️ O DESLOCAMENTO MEDIDO É GUARDADO (rodada 81). O alinhamento move TEXTO
+// (`c.pts`), nunca os tempos de `_vidCuesPT` — e por muito tempo isso não
+// importou, porque a trilha PT crua não ia para lugar nenhum: a tela mostra a
+// tradução nos tempos da legenda EN. Só que o EXPORT usa a trilha crua, e aí o
+// erro escapava: baixar ".srt PT-BR" entregava a legenda com o deslocamento
+// original da release dela. Medido ao vivo nas trilhas reais de Gilligan's
+// Island S01E01 (opensubtitles-v3): 2,3 s a 2,5 s de diferença entre a EN
+// aplicada e as duas PT-BR do mesmo episódio. O número fica aqui e o export
+// desconta — sem mexer no dado salvo, que continua sendo a trilha como veio.
+let _vidPTAlignOff = 0
+
 function _vidAlignPTTrack() {
+  _vidPTAlignOff = 0
   if (!_vidCues.length || !_vidCuesPT.length) return 0
 
   // Passada 1: varredura de -15s a +15s (grossa 0,5s, fina 0,1s) maximizando
@@ -506,6 +518,7 @@ function _vidAlignPTTrack() {
     }
     if (melhor) { c.pts = melhor.t; alinhadas++ }
   }
+  _vidPTAlignOff = bestOff
   console.log(`[video] trilha PT alinhada: offset ${bestOff}s, ${alinhadas}/${_vidCues.length} falas`)
   return alinhadas
 }
@@ -900,11 +913,18 @@ function videoSubExport(qual) {
   //       frente; se aquela fala não tiver IA, cai na trilha PT alinhada).
   //       É o formato que serve para assistir num player comum sem trocar
   //       de arquivo, e o que faz sentido depois de transcrever + traduzir.
+  // 'pt': a trilha crua vem no tempo da release DELA — o app nunca mexeu
+  // nesses tempos, só casou o texto. Sem descontar o deslocamento medido pelo
+  // alinhamento, o arquivo baixado sai fora de sincronia (2,5s no episódio que
+  // motivou o conserto), mesmo com a sincronização em dia dentro do app.
+  const off = qual === 'pt' ? (typeof _vidPTAlignOff === 'number' ? _vidPTAlignOff : 0) : 0
   const cues = qual === 'ia'
     ? _vidCues.filter(c => c.pt).map(c => ({ s: c.s, e: c.e, t: c.pt }))
     : qual === 'bi'
       ? _vidCues.filter(c => c.pt || c.pts).map(c => ({ s: c.s, e: c.e, t: `${c.t}\r\n${c.pt || c.pts}` }))
-      : (qual === 'pt' ? _vidCuesPT : _vidCues)
+      : qual === 'pt'
+        ? _vidCuesPT.map(c => ({ s: Math.max(0, c.s - off), e: Math.max(0.3, c.e - off), t: c.t }))
+        : _vidCues
   if (!cues.length) { toast(qual === 'ia' || qual === 'bi' ? 'Ainda não há tradução — use "Traduzir tudo"' : 'Sem legenda para baixar', 'warning'); return }
   const fmt = t => {
     t = Math.max(0, t)

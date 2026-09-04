@@ -195,6 +195,11 @@ async function videoSyncAuto(dur, t0Manual) {
         if (pos.matched >= 3 && ruindade(pos) <= 1.0) {
           _vidCur.subShift = 0
           _vidCur.updated_at = new Date().toISOString()
+          // A correção progressiva reescreve os tempos das DUAS trilhas com os
+          // coeficientes medidos na EN — o deslocamento entre elas muda um
+          // pouco. Realinhar aqui mantém `pts` na fala certa e, sobretudo,
+          // deixa o deslocamento guardado fresco para o export da trilha PT.
+          if (_vidCuesPT.length && typeof _vidAlignPTTrack === 'function') _vidAlignPTTrack()
           if (typeof _vidSyncMarcar === 'function') _vidSyncMarcar('progressiva')
           saveVideos(); autoSyncAfterChange(); _vidSaveSubs()
           _vidCueIdx = -1; renderVidTranscript(); _vidUpdateOverlay()

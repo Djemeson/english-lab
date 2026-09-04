@@ -15,7 +15,15 @@
 > aviso honesto). **Testado com HLS real: hls.js tocando, 1280×720, tempo andando.**
 > `sw.js` → **englab-v432**. Detalhes na §9 (bloco 70ª, item HLS).
 >
-> Última atualização: 2026-09-04 (80ª) — **A LEGENDA QUE O APP GEROU GANHOU PORTA DE SAÍDA.**
+> Última atualização: 2026-09-04 (81ª) — **A TRILHA PT BAIXADA SAÍA DO APP FORA DE SINCRONIA.**
+> Ele testou o botão novo e a legenda PT-BR não abriu em sincronia. Era real, e só nessa faixa:
+> o alinhamento da trilha PT move TEXTO, nunca tempo — mede o deslocamento entre as duas e usa
+> só para escolher qual fala PT vai sob qual fala EN. Na tela isso basta (quem manda no tempo é
+> a EN); no arquivo exportado, não: saía no tempo da release dela. Medido nas legendas reais do
+> episódio dele: **2,6s de erro, agora 0,2s**. O deslocamento passou a ser guardado e descontado
+> no export. Detalhes na §8.105.
+>
+> Registro anterior: 2026-09-04 (80ª) — **A LEGENDA QUE O APP GEROU GANHOU PORTA DE SAÍDA.**
 > Ele transcreveu com o Whisper, traduziu com a IA e não achou onde baixar nenhuma das duas —
 > com razão: a função de export existia desde sempre, mas só dentro do painel **Sync**, que é
 > o painel de consertar atraso. Quem gera a legenda a partir do áudio tem sincronia perfeita e
@@ -15902,6 +15910,63 @@ sem legenda nenhuma não abre menu. Console limpo.
   que a legenda quase sempre nasceu do Whisper.
 - **Não feito:** exportar `.vtt` além de `.srt`, e baixar transcrição como texto corrido (sem
   tempos) para levar para o Obsidian. Nenhum dos dois foi pedido.
+
+## 8.105 A trilha PT baixada saía do app fora de sincronia (2026-09-04, 81ª)
+
+Relato dele, no dia seguinte ao botão Baixar: *"as legendas que vêm prontas, quando são
+sincronizadas e depois salvas não vão com a correção da sincronia, pois fiz o teste e a
+legenda tava sem sincronia."*
+
+**Era verdade, e só para UMA das faixas: a trilha PT-BR baixada dos addons.**
+
+**A causa raiz.** `_vidAlignPTTrack()` alinha a trilha PT à legenda EN movendo **texto**, não
+tempo: mede o deslocamento global entre as duas e usa esse número só para escolher qual cue PT
+vira `c.pts` na fala EN. Os tempos de `_vidCuesPT` **nunca foram tocados** — e por muito tempo
+isso não importou, porque a tela mostra a tradução nos tempos da EN. `_vidCuesPT` era estrutura
+interna de casamento.
+
+Aí o export passou a existir, e `videoSubExport('pt')` serializa `_vidCuesPT` **cru**. O
+deslocamento medido ficava para trás: o arquivo saía no tempo da release da PT, não no do
+vídeo. Pior: o usuário via a legenda certinha dentro do app (é a EN que manda ali) e concluía,
+razoavelmente, que a sincronização não estava sendo salva.
+
+`videoSubShift` mexe nas duas trilhas com o mesmo delta, então a sincronização manual/IA
+**preserva** a distância entre elas — o erro não vinha do Sync, vinha de origem.
+
+**Medido com dado real** (opensubtitles-v3, `tt0057751:1:1` — o episódio da tela dele), quatro
+pares EN×PT-BR do mesmo episódio: deslocamentos de **0,8s · 2,3s · 2,4s · 2,5s**, e
+`_vidCuesPT[0].s` idêntico antes e depois do alinhamento nos quatro. Não é caso de borda.
+
+**O conserto.** `_vidPTAlignOff` guarda o deslocamento medido (gravado no fim de
+`_vidAlignPTTrack`, zerado na entrada da função e na troca de vídeo em `videoOpenPlayer` — o
+número é do PAR, não do app). `videoSubExport('pt')` desconta na hora de escrever o `.srt`.
+**Nada é gravado**: o pacote continua guardando a trilha como ela veio, e o export é que
+traduz para o tempo do vídeo. Blast radius de uma linha.
+
+De brinde, a correção **progressiva** da IA (`videoSyncAuto`) passou a realinhar a trilha PT
+depois de reescrever os tempos: ela warpa as duas com os coeficientes medidos na EN, o que
+muda um pouco a distância entre elas — sem realinhar, o número guardado envelhecia.
+
+| | Antes | Depois |
+|---|---|---|
+| `.srt` original (EN) | correto | correto (não mudou) |
+| `.srt` PT-BR baixada | **no tempo da release dela** | no tempo do vídeo |
+| `.srt` PT-BR (IA) | correto (tempos da EN) | correto |
+| `.srt` bilíngue | correto (tempos da EN) | correto |
+
+**Verificado ao vivo**, com as legendas reais do episódio: `Just sit right back` está em
+**1,435s** na EN aplicada; a primeira fala PT crua está em **4,031s** e agora sai exportada em
+**1,631s** — de 2,6s de erro para 0,2s. E o caso combinado: alinhar (offset 2s) → sincronizar
+no dedo −4s → exportar; a PT sai em 6,000s, exatamente sobre a EN em 6s. Trilha PT sem EN
+carregada não inventa deslocamento (fica 0). Console limpo.
+
+**Também verificado, e estava certo:** o caminho da legenda EN de ponta a ponta — `videoSubShift`
+→ `_vidSaveSubsNow` → releitura do IDB → export — devolve os tempos deslocados corretamente
+(cues gravados com `s` já ajustado). A queixa não alcançava essa faixa.
+
+**Fora do escopo:** gravar a trilha PT já corrigida no pacote (tentador, mas mexe no carimbo
+`at` e na comparação local×nuvem por causa de uma heurística — não vale o risco enquanto o
+conserto no export resolve).
 
 ## 9. Pendências / a verificar
 

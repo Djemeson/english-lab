@@ -1084,6 +1084,10 @@ async function videoOpenPlayer(v) {
   _vidCuesPT = (stored && stored.cuesPT) || []
   _vidSubCandidates = (stored && stored.candidates) || []
   _vidAppliedSubUrl = (stored && stored.appliedUrl) || null
+  // O deslocamento da trilha PT é do PAR (esta EN × esta PT): trocar de vídeo
+  // tem de zerá-lo, senão o export do episódio seguinte desconta o do anterior
+  // — o alinhamento só é recalculado quando as duas trilhas existem.
+  if (typeof _vidPTAlignOff !== 'undefined') _vidPTAlignOff = 0
   if (typeof _vidSyncInfo !== 'undefined') _vidSyncInfo = (stored && stored.sync) || null
   // O raio-X vem no MESMO pacote — e o rótulo guardado envelhece (ele estuda a
   // palavra, marca "já sei"): a revalidação de sempre, a mesma do leitor.
