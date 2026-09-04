@@ -15,7 +15,15 @@
 > aviso honesto). **Testado com HLS real: hls.js tocando, 1280×720, tempo andando.**
 > `sw.js` → **englab-v432**. Detalhes na §9 (bloco 70ª, item HLS).
 >
-> Última atualização: 2026-08-29 (79ª) — **O VÍDEO VAI PARA A NUVEM E VOLTA EM OUTRO
+> Última atualização: 2026-09-04 (80ª) — **A LEGENDA QUE O APP GEROU GANHOU PORTA DE SAÍDA.**
+> Ele transcreveu com o Whisper, traduziu com a IA e não achou onde baixar nenhuma das duas —
+> com razão: a função de export existia desde sempre, mas só dentro do painel **Sync**, que é
+> o painel de consertar atraso. Quem gera a legenda a partir do áudio tem sincronia perfeita e
+> nenhum motivo para abrir ali. Agora há um botão **Baixar** na barra do player, com menu que
+> só lista o que existe de fato — e um formato novo, o **bilíngue** (original em cima,
+> tradução embaixo, mesmos tempos). Detalhes na §8.104.
+>
+> Registro anterior: 2026-08-29 (79ª) — **O VÍDEO VAI PARA A NUVEM E VOLTA EM OUTRO
 > APARELHO.** Legenda, cortes, marcadores e posição já atravessavam; só o arquivo ficava
 > preso, e abrir o episódio no celular caía no seletor de arquivos pedindo um `.mkv` que não
 > existe ali. Agora há painel por vídeo com os três lugares possíveis (disco · cópia baixada ·
@@ -15843,6 +15851,57 @@ provado pelo podcast, mais o leitor de fluxo verificado acima.
   velho (subiu no outro aparelho) ou mentir (foi apagado por fora).
 - A etiqueta "vai pedir o arquivo" virou "vem da nuvem" quando há cópia lá — no aparelho
   novo, que é justamente onde ela apareceria, ela seria mentira.
+
+## 8.104 A legenda que o app gerou passou a ter porta de saída (2026-09-04, 80ª)
+
+Relato dele, com a tela do player aberta: *"eu transcrevi com o groq e depois gerei a tradução
+com o openai e nem um local tem a opção pra baixar essas duas legendas."*
+
+**O achado: a função de baixar já existia — e desde sempre.** `videoSubExport()` (em
+`js/video-subs.js`) escreve `.srt` com a sincronização aplicada, e a trilha PT e a tradução da
+IA já eram opções (`'pt'` e `'ia'`). O que faltava era **onde**: os três botões moravam só
+dentro do painel **Sync**, na linha "Levar com você".
+
+Isso é um erro de lugar, não de código, e o motivo é fácil de ver depois de descrito: **Sync é
+o painel de consertar atraso de legenda.** Quem acabou de transcrever com o Whisper e traduzir
+com a IA não tem nenhum motivo para abrir um painel de sincronia — a legenda dele está em
+sincronia perfeita, porque *ele mesmo acabou de gerá-la a partir do áudio*. Justamente o
+usuário com mais motivo para exportar era o com menos motivo para achar o botão. Ele concluiu,
+com toda razão, que o app não deixava baixar o que ele tinha acabado de pagar para gerar.
+
+**O que mudou**
+
+| | Antes | Depois |
+|---|---|---|
+| Onde se baixa | só dentro do painel Sync | botão **Baixar** na barra do player (+ o do Sync, que ficou) |
+| Formatos | original · trilha PT · tradução IA | os três + **bilíngue** (original em cima, tradução embaixo) |
+| Sem tradução ainda | botão simplesmente não aparecia | menu diz "Sem tradução ainda — use Traduzir tudo" |
+
+`videoBaixarMenu(ev)` (em `js/video-subs.js`, junto do exportador) monta um `cardMenu` só com
+as faixas que existem de fato: `_vidCues.length` → original; `c.pt` → tradução da IA;
+`_vidCuesPT.length` → trilha PT alinhada; `c.pt || c.pts` → bilíngue. Sem nenhuma das duas,
+avisa por toast em vez de abrir menu vazio. O botão fica no terceiro grupo da `vid-toolbar`
+(o grupo de TELA), antes do Sync.
+
+**O bilíngue (`qual === 'bi'`)** é a novidade de conteúdo, e é o formato que a situação dele
+pede: um arquivo só, `texto original \r\n tradução`, nos mesmos tempos — dá para assistir em
+qualquer player sem trocar de faixa. A tradução da IA vem na frente; a fala que não tiver IA
+cai na trilha PT alinhada (`c.pt || c.pts`). Sufixo `.bilingue.srt`.
+
+**Verificado ao vivo** (localhost, cues sintéticos, `URL.createObjectURL` e `a.click()`
+interceptados para ler o blob): os quatro formatos saem com SRT válido e nome de arquivo certo
+— `.srt`, `.pt-BR.ia.srt`, `.pt-BR.srt`, `.bilingue.srt`; o bilíngue com as duas linhas dentro
+do mesmo bloco. Menu com tudo disponível lista 4 itens; só com transcrição lista 1 + o aviso;
+sem legenda nenhuma não abre menu. Console limpo.
+
+**O horizonte, e o que ficou de fora**
+
+- **Onde mais o mesmo padrão existe:** o exportador já cobre transcrição do Whisper e legenda
+  importada pelo mesmo caminho — não há segunda função de export para corrigir.
+- **Podcast** usa a mesma `vid-toolbar`, então herdou o botão de graça; é exatamente o caso em
+  que a legenda quase sempre nasceu do Whisper.
+- **Não feito:** exportar `.vtt` além de `.srt`, e baixar transcrição como texto corrido (sem
+  tempos) para levar para o Obsidian. Nenhum dos dois foi pedido.
 
 ## 9. Pendências / a verificar
 

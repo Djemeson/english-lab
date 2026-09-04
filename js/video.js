@@ -1209,6 +1209,7 @@ async function videoOpenPlayer(v) {
           </div>
           <div class="vid-tb-group">
             <button class="btn btn-ghost btn-sm ${_vidOverlayOn ? 'vid-on' : ''}" id="vid-ov-toggle" onclick="videoToggleOverlay()" data-tip="Legenda sobre o vídeo, em tempo real">${ic('message','ic-sm')}Legenda</button>
+            <button class="btn btn-ghost btn-sm" id="vid-baixar" onclick="videoBaixarMenu(event)" data-tip="Baixar a legenda como .srt — a original (inclusive a que a IA transcreveu), a tradução, ou as duas juntas">${ic('download','ic-sm')}Baixar</button>
             <button class="btn btn-ghost btn-sm" id="vid-sync-btn" onclick="videoSyncToggle()" data-tip="Legenda fora de sincronia? Ajuste manual ou automático com IA">${ic('clock','ic-sm')}Sync${(v.subShift || 0) ? ` <span class="vid-sync-shift">${v.subShift > 0 ? '+' : ''}${(+v.subShift).toFixed(1)}s</span>` : ''}</button>
             <button class="btn btn-ghost btn-sm" onclick="videoToggleFullscreen()" data-tip="Tela cheia COM a legenda interativa (o botão do player usa a legenda nativa)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>Tela cheia</button>
           </div>

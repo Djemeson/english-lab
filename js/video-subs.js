@@ -896,10 +896,16 @@ async function _vidAutoFetchPT() {
 // ================================================================
 function videoSubExport(qual) {
   // 'ia': a tradução criada pela IA (cue.pt), nos MESMOS tempos da legenda EN
+  // 'bi': as duas de uma vez — original em cima, tradução embaixo (a IA na
+  //       frente; se aquela fala não tiver IA, cai na trilha PT alinhada).
+  //       É o formato que serve para assistir num player comum sem trocar
+  //       de arquivo, e o que faz sentido depois de transcrever + traduzir.
   const cues = qual === 'ia'
     ? _vidCues.filter(c => c.pt).map(c => ({ s: c.s, e: c.e, t: c.pt }))
-    : (qual === 'pt' ? _vidCuesPT : _vidCues)
-  if (!cues.length) { toast(qual === 'ia' ? 'Ainda não há tradução da IA — use "Traduzir legenda inteira"' : 'Sem legenda para baixar', 'warning'); return }
+    : qual === 'bi'
+      ? _vidCues.filter(c => c.pt || c.pts).map(c => ({ s: c.s, e: c.e, t: `${c.t}\r\n${c.pt || c.pts}` }))
+      : (qual === 'pt' ? _vidCuesPT : _vidCues)
+  if (!cues.length) { toast(qual === 'ia' || qual === 'bi' ? 'Ainda não há tradução — use "Traduzir tudo"' : 'Sem legenda para baixar', 'warning'); return }
   const fmt = t => {
     t = Math.max(0, t)
     const h = String(Math.floor(t / 3600)).padStart(2, '0')
@@ -912,9 +918,33 @@ function videoSubExport(qual) {
   const nomeBase = (_vidCur.fileName || _vidCur.title).replace(/\.[^.]+$/, '')
   const a = document.createElement('a')
   a.href = URL.createObjectURL(new Blob(['\ufeff' + srt], { type: 'application/x-subrip' }))
-  a.download = nomeBase + (qual === 'pt' ? '.pt-BR' : (qual === 'ia' ? '.pt-BR.ia' : '')) + '.srt'
+  a.download = nomeBase + (qual === 'pt' ? '.pt-BR' : qual === 'ia' ? '.pt-BR.ia' : qual === 'bi' ? '.bilingue' : '') + '.srt'
   a.click()
   toast('Legenda .srt baixada com a sincronização aplicada — deixe na mesma pasta do vídeo', 'success')
+}
+
+// ⚠️ POR QUE ESTE MENU EXISTE (rodada 81). O download JÁ existia — mas só
+// dentro do painel "Sync", na linha "Levar com você". Sync é o painel de
+// CONSERTAR ATRASO: quem acabou de transcrever com o Whisper e traduzir com a
+// IA não tem motivo nenhum para abrir ali, e concluiu (com razão) que o app
+// não deixava baixar o que ele mesmo tinha acabado de gerar. O botão do Sync
+// continua onde estava; este aqui só põe a mesma saída no lugar onde a pessoa
+// procura — na barra do player, ao lado da legenda.
+function videoBaixarMenu(ev) {
+  const temEN = _vidCues.length
+  const temIA = _vidCues.some(c => c.pt)
+  const temPT = _vidCuesPT.length > 0
+  const temBi = _vidCues.some(c => c.pt || c.pts)
+  if (!temEN && !temPT) { toast('Ainda não há legenda para baixar — importe, busque ou transcreva com a IA', 'warning'); return }
+  const it = (q, rot, dica) =>
+    `<button onclick="cardMenuFechar();videoSubExport(${q ? `'${q}'` : ''})" data-tip="${escA(dica)}">${ic('download','ic-sm')} ${rot}</button>`
+  cardMenu(ev, 'vid-baixar', `
+    <div class="est-menu-sep">Baixar como .srt</div>
+    ${temEN ? it('', 'Original (a transcrição)', 'A legenda em inglês como está no app — inclusive a que a IA escreveu ouvindo o episódio, com a sincronização aplicada') : ''}
+    ${temIA ? it('ia', 'Tradução da IA', 'A tradução PT-BR criada pela IA, nos mesmos tempos da legenda original') : ''}
+    ${temPT ? it('pt', 'Trilha PT-BR baixada', 'A legenda PT-BR que veio dos addons, já alinhada') : ''}
+    ${temBi ? it('bi', 'As duas juntas (bilíngue)', 'Um arquivo só: original em cima, tradução embaixo — para assistir em qualquer player') : ''}
+    ${!temIA && !temPT ? '<div class="est-menu-sep">Sem tradução ainda — use "Traduzir tudo"</div>' : ''}`, 260)
 }
 
 // ================================================================
