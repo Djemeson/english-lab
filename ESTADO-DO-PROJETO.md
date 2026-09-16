@@ -15,7 +15,12 @@
 > aviso honesto). **Testado com HLS real: hls.js tocando, 1280×720, tempo andando.**
 > `sw.js` → **englab-v432**. Detalhes na §9 (bloco 70ª, item HLS).
 >
-> Última atualização: 2026-09-16 (82ª) — **O OPENROUTER ENTRA NO APP, PELA IMAGEM: MUSE IMAGE.**
+> Última atualização: 2026-09-16 (83ª) — **LEVANTAMENTO: O QUE O OPENROUTER ABRE PARA O APP.**
+> Só análise, sem código. Relatório publicado em https://claude.ai/artifact/WuE3mvcoPeq4kYwAHL5v47
+> (privado). Fazer já: análise pelo OpenRouter, saldo real, plano B entre modelos, conserto de
+> JSON, teto na chave. Detalhes e números na §8.107; o roteiro virou grupo nas pendências.
+>
+> Registro anterior: 2026-09-16 (82ª) — **O OPENROUTER ENTRA NO APP, PELA IMAGEM: MUSE IMAGE.**
 > Terceiro fornecedor de imagens (ao lado de OpenAI e Gemini), com chave própria nas
 > Configurações e o **Meta Muse Image a US$ 0,01/imagem**. Um nível só — o modelo não tem
 > qualidade nem tamanho, e o seletor passou a listar só os níveis que existem. Duas rotas
@@ -16034,7 +16039,59 @@ Extensão não mexida (ela só faz chat).
 Formato real da resposta do Muse, tamanho da imagem e se a rota `/images` serve ou cai no chat
 — o console diz (`[img] meta/muse-image via OpenRouter /images|/chat`).
 
+## 8.107 Levantamento: o que o OpenRouter abre para o app (2026-09-16, 83ª)
+
+Pedido: *"estuda quais seriam essas possibilidades, faz um levantamento geral, analisa e depois
+me entrega."* Entregue como página: https://claude.ai/artifact/WuE3mvcoPeq4kYwAHL5v47
+
+**Fontes** (lidas hoje, nada de memória): `GET /api/v1/models?output_modalities=…` (599 modelos:
+158 texto→texto, 43 imagem, 29 vídeo, 21 transcrição, 18 voz, 37 embedding, 6 rerank),
+`/api/v1/models/{id}/endpoints` para preço por servidor, e a documentação oficial via
+`/docs/llms.txt` (tts, stt, batch, web-search, limits, faq, response-caching, response-healing,
+pdfs, oauth, model-fallbacks, free).
+
+**Fatos que mudam decisão** (conferidos, e fáceis de supor errado):
+- **A voz da OpenAI NÃO está no OpenRouter** — `openai/gpt-4o-mini-tts*` dá 404, apesar de
+  a doc usar como exemplo. TTS lá é acrescentar voz, não trocar. `/audio/speech` é compatível
+  com a OpenAI (`speed` só vale para modelos OpenAI). Kokoro: US$ 0,62/M caracteres (DeepInfra).
+- **Transcrição:** `/audio/transcriptions` aceita `verbose_json` + `timestamp_granularities`
+  e multipart de 25 MB (mesmo contrato do Whisper). Whisper Turbo: DeepInfra US$ 0,000003/s
+  (~0,011/h) contra Groq 0,04/h — **mas a doc diz que preferência de servidor NÃO se aplica a
+  transcrição**: não dá para forçar o barato. E os campos de tempo variam por servidor.
+- **Chat:** `openai/gpt-5.6-luna` 0,20/1,20 (igual à OpenAI), com `structured_outputs`.
+  DeepSeek V4 Flash 0,09/0,17 — ele REMOVEU o DeepSeek em 2026-08-08 por qualidade; preço não
+  reabre isso. Candidatos a teste: `qwen/qwen3.6-flash` 0,19/1,13, `mistralai/mistral-small-2603`
+  0,15/0,60 (via `tools/teste-ia.mjs`).
+- **Saldo:** `GET /api/v1/key` → `limit_remaining`, `usage_daily` (grátis). Cobre o "só sabe
+  que acabou quando falha" (rodada 44).
+- **Plano B:** parâmetro `models: [...]` — cobre queda, limite e recusa de moderação.
+- **Response healing:** conserta JSON torto, **só sem streaming** e com `response_format`.
+- **Batch API:** 50% do preço, janela de 24h, **só texto** (sem imagem), aceita embeddings.
+- **Web search** (server tool, beta): qualquer modelo; Exa US$ 0,007/busca (auto/fast/instant),
+  0,012 deep. Hoje `aiTextWeb` recusa fora da OpenAI.
+- **Embeddings:** gemini-embedding-2 US$ 0,20/M tokens (~US$ 0,02 por 10 mil palavras); há `:free`.
+  É o "dedupe semântico por embedding" que ficou para depois na 66ª.
+- **Grátis:** 20 modelos de texto `:free`; 50 pedidos/dia sem crédito, 1.000/dia com ≥ US$ 10.
+- **PDF:** qualquer modelo; motor `cloudflare-ai` grátis, `mistral-ocr` por página.
+- **Taxa:** 5,5% na compra de crédito, mínimo US$ 0,80 (recarga de US$ 5 = 16%); sem margem no uso.
+  BYOK: grátis até US$ 25 mil/mês de preço de tabela, 5% acima.
+
+**Descartado com motivo:** vídeo/música (Veo, Sora, Kling, Lyria: custo sem ganho de estudo) e
+clonagem de voz (`input_references` no TTS: voz de ator é problema jurídico, a própria não ensina).
+
 ## 9. Pendências / a verificar
+
+### Roteiro do OpenRouter (levantamento de 2026-09-16, 83ª — ver §8.107)
+
+- [ ] **1 · Base:** OpenRouter em `AI_PROVIDERS` (sai de `AI_CHAVES_EXTRAS`), saldo do `/key` no
+      semáforo, `models` como plano B, plugin `response-healing` no `aiJSON` sem streaming.
+      Pré-requisito: a primeira imagem real do Muse confirmar a chave dele.
+- [ ] **2 · Medir:** web search do OpenRouter no Explicar (fora da OpenAI) e transcrição de um
+      capítulo real — custo cobrado, servidor que atendeu e se o motor de sincronia aceita os tempos.
+- [ ] **3 · Significado:** embeddings no Raio-X para o dedupe de sentidos (pendência da 66ª).
+- [ ] **4 · Experimentos:** lote noturno (Batch API), vozes alternativas (ouvir antes de decidir),
+      shadowing com modelo que recebe áudio, leitor de PDF.
+- [ ] **Sem código, só dele:** criar a chave com teto de gasto mensal no site do OpenRouter.
 
 ### Do OpenRouter (2026-09-16, 82ª)
 
