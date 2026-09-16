@@ -15,7 +15,15 @@
 > aviso honesto). **Testado com HLS real: hls.js tocando, 1280×720, tempo andando.**
 > `sw.js` → **englab-v432**. Detalhes na §9 (bloco 70ª, item HLS).
 >
-> Última atualização: 2026-09-04 (81ª) — **A TRILHA PT BAIXADA SAÍA DO APP FORA DE SINCRONIA.**
+> Última atualização: 2026-09-16 (82ª) — **O OPENROUTER ENTRA NO APP, PELA IMAGEM: MUSE IMAGE.**
+> Terceiro fornecedor de imagens (ao lado de OpenAI e Gemini), com chave própria nas
+> Configurações e o **Meta Muse Image a US$ 0,01/imagem**. Um nível só — o modelo não tem
+> qualidade nem tamanho, e o seletor passou a listar só os níveis que existem. Duas rotas
+> (API de imagem → chat com `modalities`), custo anotado pelo valor COBRADO (`usage.cost`).
+> Testado com respostas simuladas e com chave inválida real; **nunca com chave válida** — a
+> primeira imagem de verdade é dele. `sw.js` → **englab-v452**. Detalhes na §8.106.
+>
+> Registro anterior: 2026-09-04 (81ª) — **A TRILHA PT BAIXADA SAÍA DO APP FORA DE SINCRONIA.**
 > Ele testou o botão novo e a legenda PT-BR não abriu em sincronia. Era real, e só nessa faixa:
 > o alinhamento da trilha PT move TEXTO, nunca tempo — mede o deslocamento entre as duas e usa
 > só para escolher qual fala PT vai sob qual fala EN. Na tela isso basta (quem manda no tempo é
@@ -15968,7 +15976,76 @@ carregada não inventa deslocamento (fica 0). Console limpo.
 `at` e na comparação local×nuvem por causa de uma heurística — não vale o risco enquanto o
 conserto no export resolve).
 
+## 8.106 OpenRouter, começando pela imagem: Muse Image (2026-09-16, 82ª)
+
+Pedido: *"vamos adicionar o openrouter no nosso projeto. vamos começar pela geração de imagem,
+o Muse Image."* — ou seja, o OpenRouter entra aos poucos, e a imagem é a porta.
+
+**O que foi conferido antes de escrever** (nada de memória):
+- `GET /api/v1/models?output_modalities=image` → o id é **`meta/muse-image`** (slug canônico
+  `meta/muse-image-1.0-eval-20260824`), entrada texto+imagem, saída só imagem, moderado.
+- Página do modelo: **US$ 0,01 por imagem**. `supported_parameters` **vazio** na API de imagem:
+  sem `quality`, sem `size`, sem `aspect_ratio`.
+- `GET /api/v1/images/models/meta/muse-image/endpoints` veio com **`endpoints: []`** — o
+  modelo está listado mas a rota dedicada não mostrou quem serve. Motivo da rota reserva.
+- CORS: preflight de `/api/v1/images` responde `Access-Control-Allow-Origin: *` com
+  `Authorization` liberado — dá para chamar direto do navegador, como os outros.
+- `/api/v1/models` é **público** (200 sem chave). Testar chave por ele aprovaria qualquer
+  coisa; o teste usa `GET /api/v1/key`, que exige a chave e não gasta.
+
+**Como ficou (`js/ai.js`):**
+- `AI_IMG.openrouter` com **um nível** (`low` → `meta/muse-image`, 0,01). `aiImgNivel` agora
+  cai no primeiro nível que EXISTE quando o pedido não existe, e `q` devolve o nível real.
+- `_aiImageOpenRouter`: (1) `POST /api/v1/images` só com `model`, `prompt`, `n:1` → lê
+  `data[0].b64_json` + `media_type` (ou `url`); (2) se der **400/404**, `POST
+  /api/v1/chat/completions` com `modalities:['image']` → `message.images[0].image_url.url`.
+  Recusa (403 de moderação), 401 e sem crédito **não** trocam de rota (repetiria o gasto).
+- Custo: `usage.cost` quando vem (anotado como real); sem ele, os 0,01 de tabela como estimativa.
+- `AI_CHAVES_EXTRAS` + `aiFornecedoresComChave()`: fornecedor que tem chave mas **não** entra
+  no seletor de chat (não tem `modelos`, quebraria `aiModel`). Linha de chave, botão Testar,
+  semáforo e `cfgAutoSalvar` leem a lista unida. Quando o OpenRouter virar fornecedor de
+  chat, ele sai de lá e entra em `AI_PROVIDERS` com `testeUrl`.
+- `_aiNomeDaUrl`: o aviso "sem créditos" e o "sem resposta em Ns" diziam **"OpenAI"** para
+  qualquer fornecedor (o de timeout, desde sempre). Agora nomeiam quem é. O regex de sem
+  crédito ganhou `insufficient credits` (a frase do 402 do OpenRouter).
+
+**Chave `openrouterKey` em todos os lugares onde as outras moram:** `DEF_CFG`, backup
+pegajoso do IndexedDB e sua restauração (`core.js`), subida e as duas descidas do Firestore
+(`firebase.js`), fora do JSON exportado (`settings.js`), aviso de backup antigo
+(`tools/ensaio-backup.mjs`). `sw.js`: `openrouter.ai` em NETWORK_ONLY, **englab-v452**.
+Extensão não mexida (ela só faz chat).
+
+**Seletor de qualidade** lista só os níveis do fornecedor, e com um nível só `cfgAutoSalvar`
+**não grava** `imgQuality` — senão ir ao OpenRouter e voltar à OpenAI apagava o "Padrão" dele.
+
+**Verificado ao vivo (localhost, `fetch` simulado onde precisava de chave):**
+
+| caso | resultado |
+|---|---|
+| nível pedido `high` no OpenRouter | roda `low` · `meta/muse-image` · 0,01 |
+| `/images` ok com `image/jpeg`, cost 0,0102 | `data:image/jpeg;base64,…`; livro-caixa anota 0,0102 real |
+| `/images` 404 "No endpoints" | cai no chat com `modalities:['image']` e devolve a imagem |
+| 403 "flagged" | erro `[OpenRouter] Your prompt was flagged`, **uma** rota só |
+| 402 "Insufficient credits" | erro claro + semáforo marca SEM CRÉDITOS, uma rota só |
+| chave inválida, **rede real** | `[OpenRouter] User not found.`; Testar → inválida |
+| Configurações | 4 linhas de chave (OpenRouter · imagens (Muse Image)), opção "OpenRouter · meta/muse-image", qualidade com 1 opção, ida-e-volta preserva `medium`, sem emoji |
+
+**Não verificado:** geração com chave válida (não há chave OpenRouter no projeto nem na nuvem).
+Formato real da resposta do Muse, tamanho da imagem e se a rota `/images` serve ou cai no chat
+— o console diz (`[img] meta/muse-image via OpenRouter /images|/chat`).
+
 ## 9. Pendências / a verificar
+
+### Do OpenRouter (2026-09-16, 82ª)
+
+- [ ] **Primeira imagem real pelo Muse** — ele cola a chave (Configurações → IA → OpenRouter →
+      Testar), escolhe "OpenRouter · meta/muse-image" em Imagens e gera a de um card. Conferir
+      no console qual rota serviu e o custo anotado.
+- [ ] **O Muse "raciocina antes de desenhar"** — pode demorar mais que os outros. O teto é 180s;
+      se estourar em lote, subir o teto só para ele.
+- [ ] **Próximos passos do OpenRouter** (pedido dele: "começar pela imagem"): chat/análise pelo
+      OpenRouter (vira entrada em `AI_PROVIDERS`, sai de `AI_CHAVES_EXTRAS`) e outros modelos
+      de imagem de lá como níveis médio/alto.
 
 > ⚠️ **Esta lista foi limpa em 2026-08-08**, quando chegou a 80 itens — tamanho em que
 > ninguém lê e ela deixa de proteger. Saíram as verificações de rodadas antigas que o uso

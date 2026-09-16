@@ -137,7 +137,7 @@ console.log(`\nENSAIO DE BACKUP — ${arq}`)
 console.log(`exportado em: ${bkp.exported_at || '(sem data — backup muito antigo?)'}\n`)
 
 // Chave vazando em backup antigo é o primeiro aviso.
-const chaves = ['openaiKey', 'geminiKey', 'groqKey'].filter(k => bkp.cfg && bkp.cfg[k])
+const chaves = ['openaiKey', 'geminiKey', 'groqKey', 'openrouterKey'].filter(k => bkp.cfg && bkp.cfg[k])
 if (chaves.length) {
   console.log(`⚠ ATENÇÃO: este backup é ANTIGO e carrega chave de API dentro (${chaves.join(', ')}).`)
   console.log('  Não compartilhe este arquivo; exporte um novo — os atuais saem sem as chaves.\n')

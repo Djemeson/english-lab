@@ -34,9 +34,9 @@ function renderKeyRows() {
   const box = el('cfg-keys'); if (!box) return
   const olho = `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
   box.innerHTML = `<div class="cfg-keys-title">Chaves de API — uma por fornecedor (só precisa das que for usar)</div>` +
-    Object.entries(AI_PROVIDERS).map(([id, P]) => `
+    aiFornecedoresComChave().map(([id, P]) => `
       <div class="cfg-key-row">
-        <span class="cfg-key-nome">${P.nome}${id === 'openai' ? ' <i>· também áudio/imagens</i>' : ''}</span>
+        <span class="cfg-key-nome">${P.nome}${id === 'openai' ? ' <i>· também áudio/imagens</i>' : P.usoNota ? ` <i>· ${esc(P.usoNota)}</i>` : ''}</span>
         <div class="cfg-key-campo">
           <input type="password" id="cfg-key-${id}" aria-label="Chave de API — ${escA(P.nome)}" placeholder="${P.placeholder}" autocomplete="off" onchange="cfgChaveMudou('${id}')">
           <button type="button" class="cfg-key-eye" onclick="togglePasswordVisibility('cfg-key-${id}')" aria-label="Mostrar/ocultar">${olho}</button>
@@ -44,7 +44,7 @@ function renderKeyRows() {
         <button type="button" class="btn btn-ghost btn-sm" onclick="testarChaveProv('${id}', this)">Testar</button>
         <span class="cfg-key-status" id="cfg-key-status-${id}"></span>
       </div>`).join('')
-  for (const [id, P] of Object.entries(AI_PROVIDERS)) {
+  for (const [id, P] of aiFornecedoresComChave()) {
     const i = el('cfg-key-' + id); if (i) i.value = cfg[P.keyCfg] || ''
   }
 }
@@ -71,8 +71,12 @@ function updateImgQualityOptions() {
   const P = AI_IMG[prov] || AI_IMG.openai
   // 'low' aqui também: com 'medium', o seletor MOSTRAVA "Padrão" enquanto o
   // aiImgNivel usava outro nível — a tela mentia sobre o que ia ser cobrado.
-  const atual = cfg.imgQuality || 'low'
-  sel.innerHTML = ['low', 'medium', 'high'].map(q => {
+  // Só os níveis que o fornecedor TEM (o OpenRouter tem um). O nível salvo
+  // que não existe aqui aparece como o que de fato vai rodar — sem apagar a
+  // escolha: voltar para a OpenAI devolve o nível que ele tinha.
+  const niveis = ['low', 'medium', 'high'].filter(q => P.niveis[q])
+  const atual = P.niveis[cfg.imgQuality] ? cfg.imgQuality : (niveis.includes('low') ? 'low' : niveis[0])
+  sel.innerHTML = niveis.map(q => {
     const n = P.niveis[q]
     // Sem toFixed(3): arredondava 0,0336 para "0,034" e a tela passava a
     // cobrar mais do que a tabela. Os preços são literais exatos no catálogo.
@@ -90,7 +94,7 @@ function updateImgProviderOptions() {
   const atual = AI_IMG[cfg.imgProvider] ? cfg.imgProvider : aiImgProvider()
   const q = cfg.imgQuality || 'low'
   sel.innerHTML = Object.entries(AI_IMG).map(([id, P]) => {
-    const n = P.niveis[q] || P.niveis.low
+    const n = P.niveis[q] || P.niveis.low || Object.values(P.niveis)[0]
     return `<option value="${id}"${id === atual ? ' selected' : ''}>${esc(P.nome)} · ${esc(n.model || n.quality || '')}</option>`
   }).join('')
 }
@@ -162,7 +166,7 @@ async function renderSemaforoIA(forcar) {
   if (typeof AI_PROVIDERS === 'undefined') return
   const provAtivo = aiProviderAtual()
   const linhas = []
-  for (const [id, P] of Object.entries(AI_PROVIDERS)) {
+  for (const [id, P] of aiFornecedoresComChave()) {
     const chave = (cfg[P.keyCfg] || '').trim()
     linhas.push({ id, P, chave })
   }
@@ -240,12 +244,16 @@ function cfgAutoSalvar() {
   cfg.aiModelProv = { ...(cfg.aiModelProv || {}), [cfg.aiProvider]: modelo }
   if (cfg.aiProvider === 'openai') cfg.aiModel = modelo   // espelho legado (sync antigo)
   cfg.ttsProvider = 'openai'
-  for (const [id, P] of Object.entries(AI_PROVIDERS)) {
+  for (const [id, P] of aiFornecedoresComChave()) {
     const i = el('cfg-key-' + id)
     if (i) cfg[P.keyCfg] = i.value.trim()
   }
   cfg.imgProvider = AI_IMG[el('cfg-img-provider')?.value] ? el('cfg-img-provider').value : 'openai'
-  cfg.imgQuality = el('cfg-img-quality')?.value || 'low'
+  // Com um nível só, o seletor não é escolha — gravar o valor dele apagaria o
+  // nível que ele usa nos fornecedores que têm três.
+  if (Object.keys(AI_IMG[cfg.imgProvider].niveis).length > 1) {
+    cfg.imgQuality = el('cfg-img-quality')?.value || 'low'
+  }
   cfg.sttProvider = el('cfg-stt-provider')?.value || 'auto'
   const nvSel = el('cfg-nivel-aluno')?.value
   if (cefrIdx(nvSel) >= 0) cfg.nivelAluno = nvSel
@@ -433,7 +441,7 @@ function exportData() {
   // ⚠️ AS CHAVES DE API NÃO ENTRAM: elas já vivem em três lugares (local,
   // IndexedDB e a nuvem da conta) — e um backup é um arquivo que se manda por
   // e-mail, se anexa, se compartilha. Chave dentro dele é chave vazada.
-  const { openaiKey, geminiKey, groqKey, ...cfgSemChaves } = cfg || {}
+  const { openaiKey, geminiKey, groqKey, openrouterKey, ...cfgSemChaves } = cfg || {}
   const payload = {
     words, cfg: cfgSemChaves, srsCards, srsLog, srsDecks, srsCfg,
     conversas: (typeof conversas !== 'undefined') ? conversas : [],

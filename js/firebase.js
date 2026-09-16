@@ -1206,6 +1206,7 @@ async function fbPushData() {
     if (cfg.openaiKey)   cfgPayload.openaiKey   = cfg.openaiKey
     if (cfg.geminiKey)   cfgPayload.geminiKey   = cfg.geminiKey
     if (cfg.groqKey)     cfgPayload.groqKey     = cfg.groqKey
+    if (cfg.openrouterKey) cfgPayload.openrouterKey = cfg.openrouterKey
     cfgPayload.aiModelProv = cfg.aiModelProv || {}
     cfgPayload.vidPT = cfg.vidPT || ''
     cfgPayload.sttProvider = cfg.sttProvider || 'auto'
@@ -1386,6 +1387,7 @@ async function fbPull() {
       if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
     if (c.geminiKey)   cfg.geminiKey   = c.geminiKey
     if (c.groqKey)     cfg.groqKey     = c.groqKey
+    if (c.openrouterKey) cfg.openrouterKey = c.openrouterKey
     if (c.aiModelProv) cfg.aiModelProv = c.aiModelProv
     if (c.vidPT !== undefined) cfg.vidPT = c.vidPT
     if (c.sttProvider) cfg.sttProvider = c.sttProvider
@@ -1711,6 +1713,7 @@ function _applyCloudDocs(docs) {
     if (c.openaiKey)   cfg.openaiKey   = c.openaiKey
     if (c.geminiKey)   cfg.geminiKey   = c.geminiKey
     if (c.groqKey)     cfg.groqKey     = c.groqKey
+    if (c.openrouterKey) cfg.openrouterKey = c.openrouterKey
     if (c.aiModelProv) cfg.aiModelProv = c.aiModelProv
     if (c.vidPT !== undefined) cfg.vidPT = c.vidPT
     if (c.sttProvider) cfg.sttProvider = c.sttProvider

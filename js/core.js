@@ -414,11 +414,11 @@ const DEF_CFG = {
   // instalasse hoje nasceria no modelo antigo e só seria movido no boot
   // seguinte. O padrão tem de ser o padrão nos dois caminhos.
   aiProvider: 'openai', aiModel: 'gpt-5.6-luna', ttsProvider: 'openai',
-  openaiKey: '', geminiKey: '', groqKey: '',
+  openaiKey: '', geminiKey: '', groqKey: '', openrouterKey: '',
   aiModelProv: {},
   vidPT: '',        // modo de tradução no vídeo, lembrado entre sessões
   sttProvider: 'auto',  // quem transcreve: auto (Groq se houver chave) | groq | openai
-  imgProvider: 'openai',// quem gera as imagens: openai | gemini
+  imgProvider: 'openai',// quem gera as imagens: openai | gemini | openrouter
   // FALTAVA aqui, e o buraco custava dinheiro: sem `imgQuality` no padrão,
   // `aiImgNivel()` caía em 'medium' — no Gemini isso é o 3.1 Flash a
   // US$ 0,067 em vez do 2.5 Flash a US$ 0,039, 1,7× mais caro, sem ninguém
@@ -1112,7 +1112,7 @@ async function backupCfgToIDB() {
     const prev = (await SettingsDB.get('cfg')) || {}
     const merged = { ...cfg }
     // Protege os campos sensíveis: não apaga um valor já salvo com string vazia
-    for (const k of ['openaiKey', 'geminiKey', 'groqKey']) {
+    for (const k of ['openaiKey', 'geminiKey', 'groqKey', 'openrouterKey']) {
       if (!merged[k] && prev[k]) merged[k] = prev[k]
     }
     await SettingsDB.set('cfg', merged)
@@ -1126,7 +1126,7 @@ async function restoreCfgFromBackup() {
   try { backup = await SettingsDB.get('cfg') } catch {}
   if (!backup || typeof backup !== 'object') return false
   let restored = false
-  const keys = ['openaiKey', 'geminiKey', 'groqKey', 'theme', 'accent', 'aiProvider', 'aiModel', 'ttsProvider']
+  const keys = ['openaiKey', 'geminiKey', 'groqKey', 'openrouterKey', 'theme', 'accent', 'aiProvider', 'aiModel', 'ttsProvider']
   for (const k of keys) {
     const cur = cfg[k]
     const curEmptyOrDefault = (cur === undefined || cur === '' || cur === DEF_CFG[k])

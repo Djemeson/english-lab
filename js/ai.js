@@ -1239,6 +1239,21 @@ function migrarModeloPadrao() {
   if (mexeu) console.info('[ai] modelo padrão migrado para', AI_DEFAULT_MODEL)
 }
 
+// Fornecedores que têm CHAVE mas não entram no seletor de chat. O OpenRouter
+// entra por aqui (por ora só gera imagem): a linha de chave, o teste e o
+// semáforo das Configurações leem esta lista junto com AI_PROVIDERS, sem que
+// ele apareça como opção de análise — onde quebraria por não ter `modelos`.
+const AI_CHAVES_EXTRAS = {
+  openrouter: {
+    nome: 'OpenRouter', keyCfg: 'openrouterKey', placeholder: 'sk-or-v1-...',
+    usoNota: 'imagens (Muse Image)', testeUrl: 'https://openrouter.ai/api/v1/key'
+  }
+}
+// Todos os fornecedores com chave, na ordem da tela.
+function aiFornecedoresComChave() {
+  return [...Object.entries(AI_PROVIDERS), ...Object.entries(AI_CHAVES_EXTRAS)]
+}
+
 function aiProviderAtual() {
   return AI_PROVIDERS[cfg.aiProvider] ? cfg.aiProvider : 'openai'
 }
@@ -1360,17 +1375,24 @@ async function _aiFetch(url, body, { timeoutMs = 90000, retries = 2, key } = {})
 // problema — uma vez por sessão por fornecedor, não a cada chamada.
 const _aiSemCreditoAvisado = new Set()
 function _aiEhSemCredito(msg) {
-  return /no credits|insufficient[_ ]quota|exceeded your (current )?quota|check your plan and billing/i.test(String(msg || ''))
+  return /no credits|insufficient[_ ](quota|credits)|exceeded your (current )?quota|check your plan and billing/i.test(String(msg || ''))
 }
 // O semáforo das Configurações pergunta por aqui: "este fornecedor já
 // respondeu 'sem créditos' nesta sessão?" — o teste de chave (GET /models) é
 // grátis e por isso NÃO enxerga billing; quem enxerga é o uso real.
 function aiSemCreditoVisto(nomeProv) { return _aiSemCreditoAvisado.has(nomeProv) }
 
-function _aiAvisarSemCredito(url, msg) {
-  const nome = /openai\.com/.test(url) ? 'OpenAI'
+// De quem é a URL — o aviso de "sem créditos" e o de "sem resposta" diziam
+// "OpenAI" para qualquer fornecedor, e com o OpenRouter isso ficaria errado.
+function _aiNomeDaUrl(url) {
+  return /openai\.com/.test(url) ? 'OpenAI'
     : /googleapis\.com/.test(url) ? 'Google Gemini'
-    : /groq\.com/.test(url) ? 'Groq' : 'o fornecedor de IA'
+    : /groq\.com/.test(url) ? 'Groq'
+    : /openrouter\.ai/.test(url) ? 'OpenRouter' : 'o fornecedor de IA'
+}
+
+function _aiAvisarSemCredito(url, msg) {
+  const nome = _aiNomeDaUrl(url)
   if (_aiSemCreditoAvisado.has(nome)) return
   _aiSemCreditoAvisado.add(nome)
   if (typeof toast === 'function') {
@@ -1421,7 +1443,7 @@ async function _aiFetchBruto(url, body, { timeoutMs = 90000, retries = 2, key } 
       clearTimeout(timer)
       if (e === lastErr) throw e                       // HTTP não-retryável já decidido acima
       const eraTimeout = e.name === 'AbortError'
-      lastErr = eraTimeout ? new Error(`Sem resposta da OpenAI em ${timeoutMs / 1000}s`) : e
+      lastErr = eraTimeout ? new Error(`Sem resposta da ${_aiNomeDaUrl(url)} em ${timeoutMs / 1000}s`) : e
       if (tent === retries) throw lastErr
       await new Promise(r => setTimeout(r, (tent + 1) * 1500))
     }
@@ -2988,6 +3010,20 @@ const AI_IMG = {
       medium: { model: 'gemini-3.1-flash-image',      usd: 0.067,  rotulo: 'Nano Banana 2 (3.1 Flash)' },
       high:   { model: 'gemini-3-pro-image',          usd: 0.134,  rotulo: 'Nano Banana Pro (3 Pro)' }
     }
+  },
+  // OPENROUTER (set/2026) — uma chave só dá acesso a dezenas de geradores.
+  // Começa pelo Muse Image (Meta), a US$ 0,01 por imagem: conferido em
+  // GET /api/v1/models?output_modalities=image e na página do modelo.
+  // ⚠️ UM NÍVEL SÓ, de propósito. O Muse não tem botão de qualidade nem de
+  // tamanho (supported_parameters vem vazio), e inventar "médio" e "alto"
+  // apontando para o mesmo modelo seria a tela mentindo sobre o que se paga.
+  // O seletor de qualidade lista os níveis que EXISTEM — ao pôr outro modelo
+  // do OpenRouter aqui, basta acrescentar a chave `medium`/`high`.
+  openrouter: {
+    nome: 'OpenRouter', keyCfg: 'openrouterKey',
+    niveis: {
+      low: { model: 'meta/muse-image', usd: 0.01, rotulo: 'Meta Muse Image' }
+    }
   }
 }
 
@@ -2998,8 +3034,11 @@ function aiImgNivel(quality) {
   const P = AI_IMG[aiImgProvider()]
   // Padrão 'low' (e não 'medium'): imagem de card de vocabulário não precisa
   // de resolução alta, e o salto medium/high multiplica a conta por 1,7 e 3,4.
-  const q = quality || cfg.imgQuality || 'low'
-  return { prov: aiImgProvider(), P, q, ...(P.niveis[q] || P.niveis.low) }
+  const pedido = quality || cfg.imgQuality || 'low'
+  // Fornecedor com menos níveis (o OpenRouter tem um): o nível pedido que não
+  // existe cai no primeiro que existe, e `q` diz o que REALMENTE vai rodar.
+  const q = P.niveis[pedido] ? pedido : (P.niveis.low ? 'low' : Object.keys(P.niveis)[0])
+  return { prov: aiImgProvider(), P, q, ...P.niveis[q] }
 }
 
 // Imagem — retorna data URL base64 (contrato usado por audio.js/study).
@@ -3010,10 +3049,13 @@ async function aiImage(prompt, { size = '1024x1024', quality, timeoutMs = 180000
   // Qual nível está REALMENTE valendo — o "gerei no baixo e veio caro" nasceu
   // de o app cair no médio em silêncio (imgQuality faltava no DEF_CFG).
   console.info(`[img] nível "${n.q}" · ${n.P.nome} · ${n.model || n.quality} · US$ ${n.usd}/imagem`)
-  const img = await (n.prov === 'gemini'
-    ? _aiImageGemini(prompt, n.model, key, timeoutMs, n)
+  const img = await (n.prov === 'gemini' ? _aiImageGemini(prompt, n.model, key, timeoutMs, n)
+    : n.prov === 'openrouter' ? _aiImageOpenRouter(prompt, n.model, key, timeoutMs, n)
     : _aiImageOpenAI(prompt, n.quality, size, timeoutMs, n.model))
-  _aiCustoAnotar(n.usd, { est: 1 })   // preço de tabela por imagem — o livro-caixa anota
+  // O OpenRouter devolve o custo COBRADO (`usage.cost`): quando ele vem, o
+  // livro-caixa anota o real; sem ele, o preço de tabela, marcado como estimativa.
+  if (n.usdReal > 0) _aiCustoAnotar(n.usdReal)
+  else _aiCustoAnotar(n.usd, { est: 1 })
   return img
 }
 
@@ -3029,6 +3071,56 @@ async function _aiImageOpenAI(prompt, quality, size, timeoutMs, modelo) {
   // fallback para modelos legados que retornam URL
   const blob = await (await fetch(data.data[0].url)).blob()
   return blobToBase64(blob)
+}
+
+// OPENROUTER — duas rotas, como no Gemini:
+//  1) POST /api/v1/images, a API dedicada de imagem (resposta no molde da
+//     OpenAI: data[].b64_json + media_type + usage.cost);
+//  2) POST /api/v1/chat/completions com `modalities: ['image']`, a rota
+//     antiga, que devolve message.images[].image_url.url já em data URL.
+// Por que a segunda existe: em set/2026 a listagem de ENDPOINTS da rota de
+// imagem veio VAZIA para o Muse (o modelo aparece, o fornecedor não). Se a
+// rota dedicada responder "não sei servir isso" (400/404), a de chat tenta.
+// Recusa de moderação (403) e falta de crédito NÃO trocam de rota: a outra
+// daria a mesma resposta e só gastaria de novo.
+async function _aiImageOpenRouter(prompt, model, key, timeoutMs, n2) {
+  const extrairCusto = j => { const c = Number(j?.usage?.cost); if (c > 0) n2.usdReal = c }
+  try {
+    // Só modelo e prompt: o Muse não aceita tamanho nem qualidade, e campo
+    // que o modelo não conhece é o jeito mais curto de ganhar um 400.
+    const res = await _aiFetch('https://openrouter.ai/api/v1/images', { model, prompt, n: 1 },
+      { timeoutMs, retries: 1, key })
+    const j = await res.json()
+    const d = j?.data?.[0]
+    if (d?.b64_json) {
+      extrairCusto(j)
+      console.info(`[img] ${model} via OpenRouter /images — US$ ${n2.usdReal ?? n2.usd}`)
+      return `data:${d.media_type || 'image/png'};base64,` + d.b64_json
+    }
+    if (d?.url) { extrairCusto(j); return blobToBase64(await (await fetch(d.url)).blob()) }
+    console.warn('[img] OpenRouter /images respondeu sem imagem. Campos:', Object.keys(j || {}).join(', '), j)
+  } catch (e) {
+    if (e.semCredito || !(e.status === 400 || e.status === 404)) {
+      throw new Error(`[OpenRouter] ${e.message}`)
+    }
+    console.warn(`[img] OpenRouter /images recusou (${e.status}: ${e.message}) — tentando pela rota de chat`)
+  }
+  let j
+  try {
+    const res = await _aiFetch('https://openrouter.ai/api/v1/chat/completions', {
+      model, modalities: ['image'], messages: [{ role: 'user', content: prompt }]
+    }, { timeoutMs, retries: 1, key })
+    j = await res.json()
+  } catch (e) { throw new Error(`[OpenRouter] ${e.message}`) }
+  const msg = j?.choices?.[0]?.message || {}
+  const url = msg.images?.[0]?.image_url?.url || msg.images?.[0]?.url
+  if (url) {
+    extrairCusto(j)
+    console.info(`[img] ${model} via OpenRouter /chat — US$ ${n2.usdReal ?? n2.usd}`)
+    return url.startsWith('data:') ? url : blobToBase64(await (await fetch(url)).blob())
+  }
+  const texto = String(msg.content || '').trim()
+  throw new Error(`[OpenRouter] imagem não gerada${texto ? ': ' + texto.slice(0, 160) : ' (resposta sem imagem)'}`)
 }
 
 // O Gemini tem DUAS rotas para gerar imagem: a clássica `:generateContent` e
@@ -3150,10 +3242,13 @@ function _aiGeminiMotivoSemImagem(j) {
 
 // Teste de chave POR FORNECEDOR: GET /models não consome token nenhum.
 async function aiTestKeyProv(prov, key) {
-  const P = AI_PROVIDERS[prov]
+  const P = AI_PROVIDERS[prov] || AI_CHAVES_EXTRAS[prov]
   if (!P) return { ok: false, msg: 'fornecedor desconhecido' }
   try {
-    const res = await fetch(P.modelsUrl, { headers: { 'Authorization': `Bearer ${key}` } })
+    // `testeUrl`: o /models do OpenRouter é PÚBLICO — responde 200 até sem
+    // chave, e o teste aprovaria qualquer coisa. O /key exige a chave e
+    // também não gasta nada.
+    const res = await fetch(P.testeUrl || P.modelsUrl, { headers: { 'Authorization': `Bearer ${key}` } })
     if (res.ok) return { ok: true }
     let msg = 'HTTP ' + res.status
     try { const e = await res.json(); if (e.error?.message) msg = e.error.message } catch {}
