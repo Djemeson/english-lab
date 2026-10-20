@@ -41,10 +41,9 @@ está em `lexaSistema`, no topo de `js/ai.js` — as duas precisam continuar diz
 **OBRIGATÓRIO.** Didático, organizado, curto. A regra completa, com o esqueleto de resposta,
 está em `~/.claude/CLAUDE.md` e vale para todos os projetos. O essencial:
 
-- **Ordem fixa:** *O que mudou* → *Antes → depois* (tabela) → *Por que importa* → *O que
-  verifiquei* → **Pendências**. Pule a seção sem conteúdo.
-- **Pendências SEMPRE no fim, em seção própria**, divididas em *o que depende de você* e *o
-  que ficou para depois*. Sem pendência, escreva "Nada pendente."
+- **Esqueleto de modo produção (20/10/2026):** 1ª linha = estado + veredito; **Decida** (com o
+  padrão, logo abaixo); **Fatos** (3–5, um por linha, nunca repetido, *conferido*/*dedução*);
+  **Feito** e **Depois** numa linha cada. Pule bloco vazio; sem nada depois, "Depois: nada."
 - **Efeito, nunca mecanismo.** "A análise ignora esse texto", não "a rede está na função X".
 - **Zero** nome de função, número de linha, nome de arquivo ou trecho de código sem ele pedir.
 - Tabela para comparar; no máximo 3–5 marcadores por lista; negrito só no que decide.
